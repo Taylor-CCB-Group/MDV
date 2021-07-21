@@ -1,0 +1,583 @@
+
+import Dimension from "./Dimension.js";
+//register dimensions
+import  "./CategoryDimension.js";
+import "./RangeDimension.js";
+import {scaleLinear,scaleSymlog} from "d3-scale";
+import {getColorLegend,getColorBar} from "../utilities/Color.js"
+
+
+/**
+* Creates an empty data structure
+* @param {integer} size - The number of rows(items) of the data structure
+* @param {Object} [config] - setup information for the datastore.
+* @param {Object[]} [config.columns] - an array of column objects, specifying 
+* the metadata for data structure, see {@link DataStore#addColumn}
+*/
+
+class DataStore{
+    constructor(size,config={}){       
+        this.size=size;
+        this.filterSize=size;
+        this.columns=[];
+        this.columnIndex={};
+        this.listeners={};
+        this.filterBuffer= new SharedArrayBuffer(size);
+        this.filterArray = new Uint8Array (this.filterBuffer);
+        this.dimensions=[];
+        this.textDecoder = new TextDecoder();
+        this.columnsWithData=[];
+       
+        if (config.columns){
+            for (let c of config.columns){
+                this.addColumn(c)
+            }
+        }
+    }
+
+    /**
+    * Adds a listener to the datastore that will be called when an event occurs,
+    * passing the event type and any data. There are the following different types
+    * of event:-
+    * <ul>
+    * <li> filtered - called when a filter is applied. The dimension doing the
+    * the filtering is passed as data </li>
+    * <li> column_added - called when after a column is added, the added column is 
+    * passed as data </li>
+    * <li> column_removed - called just before a column is removed </li> 
+    * </ul>
+    * @param {string} id- a unique id indetifying the listener
+    * @param {function} listener - a function that accepts two paramaters, the type
+    * of event and the dat associated with it
+    */
+    addListener(id,listener){
+        this.listeners[id]=listener;
+    }
+
+    /**
+    * Removes the specified listener from the datastore
+    * @param {string} id The id of the listener to remove 
+    */
+    removeListener(id){
+        delete this.listeners[id];
+    }
+
+    _callListeners(type,data){
+        for (let id in this.listeners){
+            this.listeners[id](type,data);
+        }
+    }
+
+    removeAllFilters(){
+        this.filterArray.fill(0);
+        for (let dim of this.dimensions){
+            dim.filterArray.fill(0);
+
+        }
+        this.filterSize=this.size;
+        this._callListeners("filtered","all_removed");
+    }
+
+
+
+    /**
+    * Returns the current filter, which is just an array corresponding
+    * to the index of the row, which contains 0 if it is present or 
+    * greater than 0 if it has been filtrered out. Do not modify the array.
+    * To check if an row is filtered use {@link DataStore#isRowFiltered} 
+    * @returns {Uint8Array} 
+    */
+    getFilter(){
+        return this.filterArray;
+    }
+
+     /**
+    * Returns true if the row is in the filter and false if it 
+    * has been filtered out
+    * @param {integer} index The index of the row 
+    * @returns {boolean} 
+    */
+    isRowFiltered(index){
+        return this.filterArray[index]===0;
+    }
+
+
+ 
+    //delete
+    _calculateCategories(column){
+        let vs = column.values;
+        let d= column.data;
+        let ci = {};
+        for (let n of vs){
+            ci[n]=0;
+        }
+        for (let i=0;i<d.length;i++){
+            let v= vs[d[i]];
+            ci[v]++;      
+        }
+    }
+
+    /**
+    * Adds a column's metadata and its data to the data store
+    * @param {Object} [column] An object describing the column
+    * @param {string} column.field - the id of the column - used internally
+    * @param {string} column.name -the human readable column abel
+    * @param {string} column.datatype - the datatype- can be one of 
+    * <ul>
+    * <li> double - any numerical type including integers </li>
+    * <li> text - data containing strings but with no more than 256 categories </li>
+    * <li> unique - data contianing strings but with many categories - internally 
+    * treated as JavaScript arrays so the number of these columns should be limited 
+    * especially in large datasets </li>
+    * </ul>
+    * @param {string[]} [column.values] Only required for text columns, where the index
+    * of the array should match the value in the data   
+    * @param {string[]} [column.colors] - An array of rgb hex colors. In the case of a 
+    * text column the colors should match the values. For number columns, the list represents
+    * colors that will be interpolated. If not supllied defsult color pallettes will be 
+    * supplied
+    * @param {boolean} [column.colorLogScale=false] - if true then the colors will be
+    * displayed on a log scale- useful if the dataset contains outliers. Because a symlog
+    * scale is used the data can contain 0 and negative values
+    * @param {SharedArrayBuffer|[]} [data ] In the case of a double(numnber) column the array
+    * byffer should be the appropriate size to conatin float32s.For text it shuld be Uint8
+    * and contain numbers corresponding to the indexes in the values parameter. For a column of
+    * type unique it should be a JavaScript array. This parameter is optional as the data can
+    * be added later see {@link DataStore#setColumnData}
+    */
+    addColumn(column,data=null){
+        let c  = {
+            name:column.name,
+            field:column.field,
+            datatype:column.datatype,
+        }
+        if (!c.field){
+            c.field=column.name;
+        }
+        if (column.colors){
+            c.colors=column.colors;
+        }
+        
+
+        if (column.datatype === "text"){
+            c.values= column.values;
+        
+        }
+        else if (column.datatype==="double" || column.datatpe ==="integer"){
+            c.colorLogScale=column.colorLogScale;
+            c.minMax=column.minMax
+        }
+        else{
+            c.stringLength= column.stringLength;
+        }
+
+        this.columns.push(c);
+        this.columnIndex[c.field]=c;
+        if (data){
+            this._setColumnData(column,data)
+        }
+        
+    }
+
+    loadJsonData(data){
+        const colData={}
+        for (let col in this.columns){
+            colData[col.field]=[];
+        }
+        for (let item of data){
+            for (let col in colData){
+                colData[col].append(item[col])
+            }
+        }
+        for (let col of colData){
+            this.setSetColumnData(col,colData[col])
+        }
+
+    }
+
+
+    /**
+    * returns a list of column name and fields (which have data) sorted by name 
+    * @param {Array} [filter] - can be either number, all, text, integer, double or unique
+    * @returns {Object[]}  An array of objects containing name,field and datatype 
+    * properties, sorted by name.
+    */
+    getColumnList(filter=null){
+        const columns=[]
+        for (let f in this.columnIndex){
+            const c= this.columnIndex[f];
+            if (!c.data){
+                continue;
+            }
+            
+            if (filter){
+                if (filter==="number"){
+                    if (c.datatype === "text" || c.datatype==="unique" ){
+                        continue;
+                    }
+                }
+                else if (filter !=="all" && filter!==c.datatype){
+                    continue;
+                }
+            }
+            columns.push({name:c.name,field:c.field,datatype:c.datatype})
+        }
+        return columns.sort((a,b)=>{
+            a.name.localeCompare(b.name)
+        });
+    }
+
+    /**
+    * Creates and returns a dimesion that it used to filter and group the data
+    * @param {string} type - the dimension type , the built in dimensions are 
+    * 'category_dimension' for text  columns and 'range_dimension' for number
+    * columns
+    * @returns {Dimension} A dimension that can be used for grouping/filtering 
+    */
+
+    getDimension(type,column){
+        if (! Dimension.types[type]){
+            throw(`Adding non existent Dimension: ${type}`);
+        }
+        const dim =new Dimension.types[type](column,this);
+        this.dimensions.push(dim)
+        return dim;
+    }
+
+    /**
+    * Returns an object, representing the row/item containing key/value pairs
+    * for all columns. As an object is created, this method is slow,
+    * so it is advisable not to use it for many rows at once.
+    * @param {integer} index - The index of the row
+    * @returns {Object} An object containg key(field)/value pairs. An extra
+    * variable 'index' contianing the row index is also added to the object
+    */
+    getRowAsObject(index){
+        const obj={}
+        for (let c of this.columnsWithData){
+            const col = this.columnIndex[c];
+            let v= col.data[index];
+            if (col.datatype==="text"){
+                v= col.values[v];
+            }
+            else if (col.datatype==="double" || col.datatype==="integer"){
+                if (isNaN(v)){
+                    v="missing";
+                }
+            }
+            else{
+                v= this.textDecoder.decode(col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength));
+            }
+         
+            obj[c]=v;
+        }
+        obj["index"]=index;
+        return obj;
+    }
+
+    /**
+    * Adds data to the store for the specified column. If the data is a JavaScript array,
+    * then it will be converted to the correct internal data structures and the only previously 
+    * supplied metadata required are field, name and datatype.
+    * If the data is a shared array buffer then, the data should be in the correct format 
+    * (Uint8 for 'unique' and 'text' types and Float32 for'double' and 'integer'). 
+    * Also the correct column metadata should have been previously supplied:-
+    * <ul>
+    * <li> values - if the columns is text </li>
+    * <li> stringLength - if the column is of 'unique' type </li>
+    * <li> minMax -  for integer/double columns, not compulsory as this will be calculated if not present </li>
+    * <ul>
+    * @param {string}  column - The field/id of the column.
+    * @param {SharedArrayBuffer|[]} data  either a javascript array or shared array buffer 
+    */
+
+    setColumnData(column,data){
+        let c= this.columnIndex[column];
+        if (!c){
+            throw `column ${column} is not present in data store`
+        }
+        let buffer = null;
+        if (Array.isArray(data)){
+            buffer = this._convertColumn(c,data);
+        }
+        else{
+            buffer=data;
+        }
+        c.buffer=buffer;      
+        if (c.datatype === "integer" || c.datatype=="double"){
+            const dataArray = c.data= new Float32Array(buffer);
+            if (!c.minMax){
+                let min =Number.MAX_VALUE, max = Number.MIN_VALUE;
+                for (let i=0;i<dataArray.length;i++){
+                    let value = dataArray[i];
+                    min = (value<min) ? value:min
+                    max = (value>max) ? value:max
+                }
+                c.minMax=[min,max];
+            }
+           
+        }
+        else {
+          c.data= new Uint8Array(buffer)
+        }
+        this.columnsWithData.push(column);      
+    }
+
+    _convertColumn(col,arr){
+       
+        const len =arr.length;
+        if (col.datatype==="text"){
+            const buff =new SharedArrayBuffer(this.size);
+            const v_to_n={}
+            for (let i=0;i<len;i++){
+                const v= arr[i]
+                if (v_to_n[v]=== undefined){
+                    v_to_n[v]=1
+                }
+                else{
+                    v_to_n[v]++
+                }
+            }
+            const li=[]
+            for (let v in v_to_n){
+                li.push([v,v_to_n[v]])
+            }
+            col.values=[];
+            const v_to_i={};
+            li.sort((a,b)=>b[1]-a[1]);
+            for (let i=0;i<li.length;i++){
+                col.values.push(li[i][0]);
+                v_to_i[li[i][0]]=i;
+            }
+           
+            const a  = new Uint8Array(buff);
+            for (let i=0;i<len;i++){
+                a[i]= v_to_i[arr[i]]
+            }
+            return buff;
+        }
+        else if (col.datatype === "integer" || col.datatype === "double"){
+            const buff =new  SharedArrayBuffer(this.size*4);
+            const a= new Float32Array(buff);
+           
+            for (let i=0;i<len;i++){
+                a[i]=arr[i]
+            }
+            return buff
+
+        }
+        else{
+           
+            const enc = new TextEncoder();
+            const buff =new SharedArrayBuffer(this.size*30);
+            let max = 0
+            for (let i =0;i<len;i++){
+               max= Math.max(max,arr[i].length);
+            }
+            col.stringLength=max;
+            for (let i=0;i<len;i++){
+                const a= enc.encode(arr[i].substring(0,max));
+                const b = new Uint8Array(buff,i*max,max);
+                b.set(a,0)
+            }
+           
+            return buff;
+        }
+
+    }
+
+
+    /**
+    * Returns a function which gives the appropriate color for the value of
+    * the specified column, when supplied with the index of a row/item in the datastore,
+    * @param {string} column The column id(field) to use for the function
+    * @param {object} [config] An optional config with extra parameters
+    * @param {integer} [config.bins=100] For columns with continuous data (doubles/integers),
+    * bins are calculated across the data range so that only a limited number of 
+    * color values need to be calculated. The default is 100, although it can be 
+    * altered here.
+    * @param {boolean} [config.asArray=false] By default the, function will return 
+    * a JavaScript compatible string specifying the color. If asArray is true then an array 
+    * of length 3 containing RGB values will be returned.
+    * @returns {function} The function, which when given a row index will return a color.
+    */
+    getColorFunction(column,config={}){
+        const c = this.columnIndex[column];
+        const data= c.data;
+       
+        let  colors  = this.getColumnColors(column,config);
+        //simply return the color associated with the value
+        if (c.datatype==="text"){                   
+            return x=>colors[data[x]];
+        }
+        else if(c.datatype==="integer" || c.datatype==="double"){    
+            const min = c.minMax[0];
+            const max =  c.minMax[1];
+            const bins = config.bins || 100;
+            const interval_size = (max-min)/(bins);
+            const fallbackColor = config.asArray?[0,0,0]:"#ffffff";
+            //the actual function - bins the value and returns the color for that bin
+            return x=>{
+                const v= data[x];
+                //missing data
+                if (isNaN(v)){
+                    return fallbackColor;
+                }
+                return colors[Math.floor((v - min) / interval_size)];
+            }
+        }
+    }
+
+    getColorLegend(column){
+        const colors = this.getColumnColors(column);
+        const c= this.columnIndex[column];
+        if (c.datatype==="integer" || c.datatype==="double"){
+            return getColorBar(colors,{range:c.minMax,label:c.name});
+        }
+        if (c.datatype==="text"){
+            return getColorLegend(colors,c.values,{label:c.name});
+        }
+       
+    }
+
+    getColumnColors(column,config={}){
+        const  c=  this.columnIndex[column];
+        const rArr= config.asArray;
+        if (c.datatype==="double" || c.datatype==="integer"){
+            const c_colors = c.colors || defaultIPalette;
+            const min = c.minMax[0];
+            const max =  c.minMax[1];
+            //caclulate the color of each bin
+            const ls= linspace(min,max,c_colors.length);
+            const scale =scaleLinear().domain(ls).range(c_colors).clamp(true);
+            const bins = config.bins || 100;
+            const interval_size = (max-min)/(bins);
+            let colors= new Array(bins+1);   
+            for (let i=0;i<bins+1;i++){
+                colors[i]=scale(min+(i*interval_size));
+                //convert to rgb array
+                if (rArr){
+                    colors[i]= rgbToRGB(colors[i]);
+                }
+            }
+            if(c.colorLogScale){
+                //calculate new colors based on a log scale
+                const logScale =scaleSymlog().domain([min,max]).range([0,bins]).clamp(true);
+                const  newColors= new Array(bins+1);   
+                for (let i=0;i<bins+1;i++){
+                    newColors[i]=colors[Math.floor(logScale(min+(i*interval_size)))];
+                }
+                colors=newColors;
+            }
+            return colors
+        }
+        else if (c.datatype==="text"){          
+            let colors=  c.colors || defaultPalette.slice(0,c.values.length);
+            if (rArr){
+                colors= colors.map(x=>hexToRGB(x));
+            }
+            return colors;
+        }
+
+    }
+
+    getRawColumn(column){
+        return this.columnIndex[column].data;
+    }
+
+    getMinMaxForColumn(column){
+        const c = this.columnIndex[column];
+        return c.minMax;
+    }
+    getColumnRange(column){
+        const c = this.columnIndex[column];
+        return c.minMax[1]-c.minMax[0];
+    }
+
+    getColumnInfo(column){
+        const c = this.columnIndex[column];
+        return {
+            name:c.name,
+            field:c.field,
+            datatype:c.datatype,
+            stringLength:c.stringLength
+        }
+    }
+
+    getLoadedColumns(){
+        return this.columns.filter(x=>x.data!=null).map(x=>x.field);
+    }
+
+    getAllColumns(){
+        return this.columns.map(x=>x.field);
+    }
+
+    getColumnValues(column){
+        return this.columnIndex[column].values;
+    }
+
+    getColumnName(col){
+        const c = this.columnIndex[col];
+        return c?c.name:null;
+    }
+
+    removeColumn(column){
+        this.columns= this.columns.filter((c)=>c.field!==column);
+        delete this.columnIndex[column];
+    }
+}
+
+
+
+
+function linspace(start,end,n){
+    var out = [];
+    var delta = (end - start) / (n - 1);
+
+    var i = 0;
+    while(i < (n - 1)) {
+        out.push(start + (i * delta));
+        i++;
+    }
+
+    out.push(end);
+    return out;
+}
+
+function hexToRGB(hex){
+    hex=hex.replace("#","")
+    var bigint = parseInt(hex, 16);
+    var r = (bigint >> 16) & 255;
+    var g = (bigint >> 8) & 255;
+    var b = bigint & 255;
+    return [r,g,b];
+}
+
+function rgbToRGB(rgb){
+    if (!rgb){
+        return [255,255,255];
+    }
+    rgb= rgb.substring(4,rgb.length-1).split(", ");
+    return rgb.map(x=>parseInt(x));
+}
+
+const defaultPalette=[
+	"#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628", "#f781bf", "#999999", "#1CE6FF", "#FF34FF",
+	"#FF4A46", "#008941", "#676FA6", "#A30059", "#FFDBE5", "#7A4900", "#0000A6", "#63FFAC", "#B79762",
+	"#004D43", "#8FB0FF", "#997D87", "#5A0007", "#809693", "#FEFFE6", "#1B4400", "#4FC601", "#3B5DFF", "#4A3B53", "#FF2F80",
+"#61615A", "#BA0900", "#6B7900", "#00C2A0", "#FFAA92", "#FF90C9", "#B903AA", "#D16100",
+"#DDEFFF", "#000035", "#7B4F4B", "#A1C299", "#300018", "#0AA6D8", "#013349", "#00846F",
+"#372101", "#FFB500", "#C2FFED", "#A079BF", "#CC0744", "#C0B9B2", "#C2FF99", "#001E09",
+"#00489C", "#6F0062", "#0CBD66", "#EEC3FF", "#456D75", "#B77B68", "#7A87A1", "#788D66",
+"#885578", "#FAD09F", "#FF8A9A", "#D157A0", "#BEC459", "#456648", "#0086ED", "#886F4C",
+"#34362D", "#B4A8BD", "#00A6AA", "#452C2C", "#636375", "#A3C8C9", "#FF913F", "#938A81",
+"#575329", "#00FECF", "#B05B6F", "#8CD0FF", "#3B9700", "#04F757", "#C8A1A1", "#1E6E00",
+"#7900D7", "#A77500", "#6367A9", "#A05837", "#6B002C", "#772600", "#D790FF", "#9B9700",
+"#549E79", "#FFF69F", "#201625", "#72418F", "#BC23FF", "#99ADC0", "#3A2465", "#922329",
+"#5B4534", "#FDE8DC"];
+
+const defaultIPalette=['#3288bd','#66c2a5','#abdda4','#e6f598','#fee08b','#fdae61','#f46d43','#d53e4f']
+
+
+export default DataStore;
+export {hexToRGB}

@@ -1,0 +1,27 @@
+{
+  "name": "ciview2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "css-loader": "^6.2.0",
+    "style-loader": "^3.1.0",
+    "webpack": "^5.45.1",
+    "webpack-cli": "^4.7.2",
+    "webpack-dev-server": "^3.11.2"
+  },
+  "dependencies": {
+    "d3": "^7.0.0",
+    "gl-matrix": "^3.3.0",
+    "jquery": "^3.6.0",
+    "microtip": "^0.2.2",
+    "nouislider": "^15.2.0",
+    "regl": "^2.1.0",
+    "split.js": "^1.6.4"
+  }
+}

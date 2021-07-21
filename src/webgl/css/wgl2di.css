@@ -1,0 +1,8 @@
+.wgl2di-brush{
+    height:0px;
+    width:0px;
+    cursor:move;
+	background-color:gray;
+    opacity:0.2;
+    position:absolute;
+}

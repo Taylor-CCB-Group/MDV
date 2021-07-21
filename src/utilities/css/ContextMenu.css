@@ -1,0 +1,154 @@
+
+.noUi-handle:after, .noUi-handle:before{
+    visibility:hidden;
+    left:-10px;
+   
+}
+
+.noUi-horizontal .noUi-handle {
+    width: 20px;
+    height: 20px;
+    right: -10px;
+    top: -2px;
+    border-radius:20px;
+    background: rgba(73, 69, 78);
+}
+
+* {
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: -moz-none;
+  -o-user-select: none;
+  user-select: none;
+}
+
+.ciview-menu-icon{
+  font-weight:"bold";
+  cursor:"pointer";
+  margin:2px 4px;
+  cursor:pointer;
+}
+
+
+.ciview-menu-bar{
+  flex:0 0 auto;
+  padding:3px 20px;
+  background-image:linear-gradient(white,darkgray);
+
+}
+
+.ciview-ctm-main{
+	position:absolute;
+	z-index:1000;
+	border:1px solid black;
+  background:white;
+
+   }
+   .ciview-ctm-active{
+       cursor:pointer
+   }
+   .ciview-ctm-selected{
+       background-color:lightgray;
+   }
+   .ciview-ctm-active:hover{
+       background-color:lightgray;
+   }
+   .ciview-ctm-item{
+       padding:4px;
+       white-space:nowrap;
+
+     
+   }
+    .ciview-ctm-item span{
+        margin-right:5px;
+        white-space:nowrap;
+    }
+
+    .ciview-ctm-left-icon{
+   	 margin-right:5px;
+   }
+
+   .ciview-ctm-ghosted{
+   	 opacity:0.5
+   }
+
+   .ciview-ctm-right-icon{
+   	 float:right
+   }
+
+   .legend-body::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+  }
+   
+  /* Handle */
+  .legend-body::-webkit-scrollbar-thumb {
+    background: #888; 
+  }
+  
+  /* Handle on hover */
+  .legend-body::-webkit-scrollbar-thumb:hover {
+    background: #555; 
+  }
+  .legend-body::-webkit-scrollbar {
+    width: 8px;
+    height:8px;
+  }
+  
+  
+
+
+
+
+   .ciview-dlg-outer {
+    position: absolute;
+    z-index: 40;
+    background-color: #f1f1f1;
+    border: 1px solid #d3d3d3;
+    overflow:auto;
+    display:flex;
+    flex-flow:column;
+
+  }
+  
+   .gutter-horizontal{
+     float:left;
+     height:100%;
+     background-color:silver;
+   }
+
+   .split-horizontal{
+    float:left;
+    height:100%;
+   }
+  .ciview-dlg-close-icon{
+      cursor:pointer;
+      color:black;
+      font-size:20px;
+      margin-left:auto;
+      margin-bottom:8px;
+      position:absolute;
+      top:3px;
+      right:3px
+  }
+
+  .ciview-dlg-content{ 
+        overflow-X:hidden;
+        overflow-Y:auto;
+        flex:1 1 auto;
+        padding:5px;
+  }
+  
+  .ciview-dlg-header {
+    padding: 6px;
+    cursor: move;
+    background-color: #2196F3;
+    color: #fff;
+    text-overflow: ellipsis;
+    overflow:hidden;
+    flex:0 0 auto;
+  }
+
+  .ciview-dlg-header-text{
+      white-space:nowrap;
+      text-overflow: ellipsis;
+  }

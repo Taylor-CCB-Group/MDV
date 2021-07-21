@@ -1,0 +1,1486 @@
+import regl from  "regl";
+import * as glMatrix from "gl-matrix";
+import {createEl, makeDraggable} from "../utilities/Elements.js";
+import {Camera} from "./Camera.js";
+
+class WGL2DI{
+	/** 
+    * Creates a new wg2di instance
+    * @param {string|object} div - The id of the div to house the instance or jquery element
+    * @param {integer} width - The width of the instance (optional- will be the width of the parent div if not supplied)
+    * @param {integer} height - The height  of the instance (optional- will be the height of the parent div if not supplied)
+    * @param {object} config (optional)
+    * <ul>
+    * <li> in_view_only - if true then only those objects in view will be drawn after panning/zooming.This will
+    * speed things up if maniluplating individual objects but slow down panning and zooming</li>
+    * <li> allow_object_drag - if true individual objects can be dragged </li>
+    * <li> default_brush - if true then brushing will be the default drag behavior - uses shift for panning
+    *  Otherwise panning is default and shift used for brushing
+	*
+    * </ul>
+    */
+	constructor(div,config){
+	
+		var self = this;
+		if (!config){
+			config={};
+		}
+		this.config=config;
+		this.mode = config.mode || "2d";
+		this.__doc__=document;
+
+		this.config.brush=this.config.brush || "default";
+
+	/*	this.draw_options=config.draw_options?config.draw_options:{depth:{enable:true},
+		blend:{}
+	}
+	*/
+
+		this.draw_options=config.draw_options?config.draw_options:{depth:{enable:false},
+		blend:{enable:true,
+		 func: {
+		  srcRGB: 'src alpha',
+		  srcAlpha: 'src alpha',
+		 dstRGB: 'one minus src alpha',
+		  dstAlpha: 'one minus src alpha'
+	  }
+    	
+    
+			
+	
+		}
+		}
+		
+	
+
+    
+    	this.regl=null;
+		this.pick_buffer=null;
+
+
+		this.pointOpacity=0.8;
+		this.pointRadius=10;
+		this.isFiltered=false;
+
+		
+		this.x_scale=1.0;
+		this.y_scale=1.0;
+		this.offset=[0,0];
+
+	
+
+		//html elements
+		if (typeof div === "string"){
+			this.div_container=document.getElementById(div);
+		}
+		else{
+			this.div_container=div;
+		}
+		
+
+		this._setUpDocument(config.width,config.height);
+	
+	
+		//handlers
+		this.handlers={
+			object_clicked:{},
+			object_over:{},
+			object_out:{},
+			brush_stopped:{},
+			zoom_stopped:{},
+			panning_stopped:{},
+		};
+
+		//switches
+		this.draw_labels=false;
+
+		this.object_types=[];
+
+		// circle shapes
+		this.circle_properties={x_pos:1,y_pos:1,color:1,pick_color:1,localFilter:1,globalFilter:1};
+	
+		this.circles={};
+		for (var prop in this.circle_properties){
+			this.circles[prop]=[];
+		}
+		this.circles.count=0;
+		this.object_types.push({data:this.circles,
+								properties:this.circle_properties,
+								vertices:1,
+								primitive:"points"
+							});
+		
+
+		// line shapes
+		this.line_properties={position:2,color:2,opacity:2};
+	
+		this.lines={};
+		for (var prop in this.line_properties){
+			this.lines[prop]=[];   ;
+		}
+		this.lines.count=0;
+		this.object_types.push({data:this.lines,
+								properties:this.line_properties,
+								vertices:2,
+								primitive:"lines"
+							});
+
+		//images
+		this.image_properties={'position':2,"color":2,"opacity":2};
+		this.images={};
+		for (var prop in this.image_properties){     
+			this.images[prop]=[];   
+		
+		}	
+		this.images.count=0;
+
+
+		//special propertis for images
+		this.images.props={x_y:[],w_h:[],text:[]};
+		
+		this.object_types.push({data:this.images,
+								properties:this.image_properties,
+								vertices:6,
+								primitive:"triangles"});
+	   
+		if (this.mode==="3d"){
+			this.circle_properties.z_pos=1;
+			this.camera = new Camera({distance:config.cameraDistance || 500,theta:0.75,phi:0.5});
+		}
+
+		//The last mouse position recorded
+		this.mouse_position=null;
+		//Was an object clicked
+		this.object_clicked=null;
+		//an object was clicked
+		this.dragging=false;
+		//object which mouse is over
+		this.object_mouse_over=null;
+
+
+		this.zoom_amount=0;
+		this.draw_order= this.mode==="3d"?[2,0,1]:[2,0,1];
+	
+
+		regl({
+			onDone: function(err,regl){
+				self.regl=regl;
+				regl._refresh()
+				self.pickbuffer = regl.framebuffer({ colorFormat: 'rgba',height:self.height,width:self.width});
+				self._initDrawMethods();
+				if (self.mode==="3d"){
+					self.object_types[0]['method']=self.__draw3DCircles;
+					self.object_types[1]['method']=self.__draw3DLines;
+				}
+		
+				self._addHandlers();
+				 
+			},
+			canvas:self.canvas,
+			attributes:{
+				antialias:false,
+			}
+		});
+
+	}
+
+
+
+	_setUpDocument(width,height){
+		if (this.config.brush){
+			this.div_container.style.cursor="crosshair";
+		}
+		if (!height){
+            const box= this.div_container.getBoundingClientRect();
+			this.height=height=box.height;
+			this.width =width=box.width;
+
+		}else{
+
+			this.height=height;
+			this.width=width;
+			this.div_container.style.height=height+"px";
+			this.div_container.style.width = width+"px";
+		}
+
+        const attr = {
+			height:height,
+			width:width,
+            styles:{
+                position:"absolute",
+                left:"0px",
+                top:"0px"
+            }
+        }
+		this.canvas =createEl("canvas",attr);
+	    this.label_canvas=createEl("canvas",attr);
+		this.label_context=this.label_canvas.getContext("2d");
+		this.div_container.append(this.canvas);
+        this.div_container.append(this.label_canvas);
+	}
+
+
+	colorPoints(colorFunc){
+        const len =this.circles.count; 
+		const colors = this.circles.color;
+        for (let n=0;n<len;n++){
+            const col = colorFunc(n);
+            const cp =n*3;
+            colors[cp]=col[0];
+            colors[cp+1]=col[1];
+            colors[cp+2]=col[2];
+        }
+    }
+
+
+	remove(){
+		this.pickbuffer.destroy();
+		this.regl.destroy();
+		//this.canvas.attr({height:1,width:1});
+		this.canvas.remove();
+		this.label_canvas.remove();
+
+	}
+	
+
+	setSize(width,height){
+		if (this.height===height && this.width===width){
+			return
+		}
+		let self=this;
+		width=Math.round(width);
+		height=Math.round(height);
+		let x_ratio=width/this.width;
+	    let y_ratio=height/this.height;
+	  
+		this.x_scale= this.x_scale*x_ratio;
+		this.y_scale= this.y_scale*y_ratio;
+	
+		this.height=height;
+		this.width=width;
+		this.div_container.style.height=height+"px";
+		this.div_container.style.width =width+"px"
+		this.canvas.setAttribute("height",height);
+		this.canvas.setAttribute("width",width);
+		this.label_canvas.setAttribute("height",height);
+		this.label_canvas.setAttribute("width",width);	
+		
+		this.pickbuffer.destroy()
+		this.pickbuffer = this.regl.framebuffer({ colorFormat: 'rgba',height:height,width:width});
+
+		//this is necessary, but I  don't know why?
+		let loop =this.regl.frame(function(){	
+		});
+		setTimeout(()=>{
+			self.refresh();
+			loop.cancel();
+			},100);
+	}
+
+	_getMousePosition(e){
+    	var rect = this.canvas.getBoundingClientRect();
+    	return [e.clientX-rect.left,e.clientY-rect.top];
+	}
+
+	_getActualPosition(position){
+    	var x = (position[0]/this.x_scale) - this.offset[0];
+    	var y = (position[1]/this.y_scale) - this.offset[1];
+    	return [x,y];
+	}
+
+	
+	_getCanvasCoords(pos){
+		let x=(pos[0]+this.offset[0])*this.x_scale;
+        let y=(pos[1]+this.offset[1])*this.y_scale;
+        return [x,y]
+
+	}
+
+	getRange(){
+		let tl = this._getActualPosition([0,0]);
+		let br = this._getActualPosition([this.width,this.height]);
+		return {
+			x_range:[tl[0],br[0]],
+			y_range:[tl[1],br[1]],
+			offset:[this.offset[0],this.offset[1]],
+			scale:[this.x_scale,this.y_scale]
+		};
+	}
+
+	highlightPoint(key){
+		clearInterval(this.an_func);
+		let obj = this.keys[key];
+		if (!obj){
+			return;
+		}
+		let pt=this.circles.position[this.objects[obj][0]];
+		this.label_context.clearRect(0, 0, this.width, this.height);
+	    this.highlight_point=pt
+		pt = this._getCanvasCoords(pt);
+		let ctx= this.label_context;
+		let self = this;
+		self.highlight_pt_radius=0.1;
+		ctx.fillStyle="orange";
+		self.an_func=setInterval(function(){
+			ctx.beginPath();
+            ctx.arc(pt[0], pt[1], self.highlight_pt_radius, 0, 2 * Math.PI);
+            ctx.fill();
+            self.highlight_pt_radius+=0.1;
+            if (self.highlight_pt_radius>(self.universal_circle_radius*self.x_scale)){
+
+            	clearInterval(self.an_func);
+            }
+		},5);
+		
+
+		
+	}
+
+
+
+	setPointRadius(value){
+		if (!value || isNaN(value)){
+			value=0;
+		}
+		this.pointRadius=value;
+	}
+	setFilter(val){
+		this.isFiltered=val;
+	}
+
+	setPointOpacity(value){
+		value=value>1.0?1.0:value;
+		value = value<0.0?0.0:value;
+		this.pointOpacity=value
+
+	}
+
+	getPointOpacity(){
+		return this.pointOpacity;
+	}
+
+	getPointRadius(){
+		return this.pointRadius;
+	}
+
+
+
+	addLine(positionTo,positionFrom,color=[0,0,0],opacity=1){
+		this.lines.position= this.lines.position.concat(positionTo,positionFrom);
+		this.lines.color = this.lines.color.concat(color,color);
+		this.lines.opacity = this.lines.opacity.concat([opacity,opacity]);
+		this.lines.count++;
+		return this.lines.count-1
+	}
+
+
+
+	addImage(image,config){
+		const c = config;
+		let self =this;
+	
+		let x = c.position[0];
+		let y = -c.position[1];
+		const height=c.height;
+		const width =c.width;
+		y=y-height;
+		var image_index=this.images.position.length;
+		this.images.position.push([x,y]);
+		this.images.position.push([x,y+height]);
+		this.images.position.push([x+width,y+height]),
+		this.images.position.push([x+width,y+height]);
+		this.images.position.push([x+width,y]);
+		this.images.position.push([x,y]);
+		this.image_position=[[-1,1],[-1,0],[0,0],[0,0],[0,1],[-1.0]];
+		
+		const opacity=c.opacity==null?1:c.opacity;
+		for (var a=0;a<6;a++){
+			 this.images.color.push([1,1,1]);
+			 this.images.opacity.push(opacity);
+		}
+		this.images.count++;
+		this.images.props.x_y.push([x,y]);
+		this.images.props.w_h.push([width,height]);
+		this.images.props.text.push(self.regl.texture({data:image,min:"linear"}));
+		return this.images.count-1;
+	}
+
+
+
+
+    addCircles(config){
+        this.circles.x_pos=config.x;
+        this.circles.y_pos=config.y;
+		if (this.mode==="3d"){
+			this.circles.z_pos=config.z;
+		}
+        const len = config.x.length;
+        this.circles.localFilter= config.localFilter;
+		this.circles.globalFilter= config.globalFilter;
+        this.circles.pick_color= new Uint8Array(len*3);
+        this.circles.color=new Uint8Array(len*3);
+        for (let n=0;n<len;n++){
+            let p = n*3;
+			const col = config.colorFunc(n);
+            this.circles.color[p]=col[0];
+            this.circles.color[p+1]=col[1];
+            this.circles.color[p+2]=col[2];
+            let pb= this._getRGBFromIndex(n+1);
+            this.circles.pick_color[p]=pb[0];
+            this.circles.pick_color[p+1]=pb[1];
+            this.circles.pick_color[p+2]=pb[2]
+        }
+        this.circles.count=len;
+    }
+
+
+	_getRGBFromIndex(index){
+	
+		var b = Math.floor(index/65536);
+		var temp = index%65536;
+		var g= Math.floor(temp/256);
+		var r = temp%256;
+		return [r,g,b];
+            
+	}
+
+	_getIndexFromRGB(rgb){
+    	return (rgb[2]*65536)+(rgb[1]*256)+rgb[0];    
+	}
+
+	_drawPickBuffer(){
+       	this.regl.clear({
+        	color: [0, 0, 0, 0],
+			depth: 1,
+        	framebuffer:this.pickbuffer
+    	});
+     	this._drawObjects(true);
+    
+	}
+	//refesh all 
+	//in_view only those in view
+	refresh(){
+    	//this.label_context.clearRect(0, 0, this.width, this.height);
+		
+		this.regl.clear({
+			color: [0, 0, 0, 0],
+			depth:1
+			});
+    	this._drawObjects(false);
+    	this._drawPickBuffer();
+    	this.label_context.font = "30px Arial";
+   
+	}
+
+	setCamera(distance,theta,phi){
+		if (this.mode!=="3d"){
+			return;
+		}
+		const s = this.camera.cameraState;
+		s.distance=Math.log(distance);
+		s.theta=theta;
+		s.phi=phi;
+		this.camera.updateCamera();
+	}
+
+	zoom(amount){
+    	this.x_scale*=amount;
+    	this.y_scale*=amount;
+   		this._drawObjects(false);
+	}
+
+
+	_drawObjects(buffer){
+	
+		let obj=null;
+	
+		if (this.mode==="3d"){
+			const cProj = this.camera.getProjection();
+			obj={
+				cameraProjection:cProj.projection,
+				cameraView:cProj.view,
+				cameraDistance:cProj.distance,
+				cameraEye:cProj.eye
+ 
+			 };
+		}
+		else{
+			obj = {
+				x_scale:this.x_scale,
+				y_scale:this.y_scale,
+				offset:this.offset
+			}
+		}
+		obj.point_radius=this.pointRadius;
+		obj.is_filtered=this.isFiltered?1:0;
+		obj.point_opacity=this.pointOpacity;
+	
+				
+		for (let i of this.draw_order){
+			var type =this.object_types[i];
+			//no objects of this type
+	
+			if (!type.data.count){
+				continue;
+			}
+	
+
+			if (buffer){
+				if (!type.properties.pick_color){
+					continue;
+				}
+				buffer=this.pickbuffer;
+			}
+			else{
+				buffer=null;
+			}
+
+			obj.buffer=buffer;
+			obj.count=type.data.count * type.vertices;
+			obj.primitive=type.primitive;
+			obj.is_buffer=buffer?1:0;
+			  
+		
+			//images special case - a draw commnad for each image
+			if (i===2){
+				for (let i=0;i<type.data.count;i++){
+					for (let prop in type.properties){
+						obj[prop]= type.data[prop].slice(i*6,(i*6)+6)
+					}
+					for (let prop in this.images.props){
+						obj[prop]=this.images.props[prop][i];
+					}
+					type.method(obj)
+
+				}
+				continue;
+			}
+				
+			
+			for (var prop in type.properties){
+
+				if (buffer){
+					//swap color for pock buffer
+					if (prop==='pick_color'){
+						obj['color']=type.data[prop];
+						continue;
+					}
+					if (prop==='color'){
+						continue;
+					}
+					obj[prop]=type.data[prop];
+				}
+				else{
+					if (prop==='pick_color'){
+						continue;
+					}
+					obj[prop]=type.data[prop];
+				}
+			}
+			type.method(obj);
+			
+		}
+	}
+
+
+	getObjectsInRange(x,y,w,h){
+		console.log(`${x},${y},${w},${h}`);
+		const  max = w*h*4;
+    	var pixels = this.regl.read({
+        x: x,
+        y: this.height -y-h,
+        width:w,
+        height:h ,
+       
+        framebuffer: this.pickbuffer
+    	});
+		const s = new Set()
+		for (let i=0;i<max;i+=4){
+			const index =this._getIndexFromRGB([pixels[i],pixels[i+1],pixels[i+2]]);
+			if (index!==null){
+				s.add(index-1)
+			}
+		}
+		return s;
+
+	}
+
+
+	_getObjectAtPosition(position){
+		if(position[1]<0 || position[0]<0){
+			return;
+		}
+	
+		var pixel = this.regl.read({
+			x: position[0],
+			y: this.height - position[1],
+			width: 1,
+			height: 1,
+			framebuffer: this.pickbuffer
+		});
+		
+		if (pixel[0]===0 && pixel[1]===0 && pixel[2]===0){
+			return null;
+		}
+		//console.log(pixel);
+		var index = this._getIndexFromRGB(pixel);
+		if (index>0){
+			return index-1;
+		}
+		return null;
+	}
+
+	addHandler(handler_type,handler,name){
+		var handler_dict = this.handlers[handler_type];
+		if (!handler_dict){
+			throw "Handler Not Supported";
+		}
+		if (!name){
+			name = Object.keys(handler_dict).length;
+		}
+		handler_dict[name]=handler;
+		return name;
+	}
+
+	removeHandler(handler_type,name){
+		var handler_dict = this.handlers[handler_type];
+		if (!handler_dict){
+			throw "Handler Not Supported";
+		}
+		delete handler_dict['name'];
+
+
+	}
+
+	_setUpBrush(origin){
+		let self = this;
+		let div =createEl("div",{
+			classes:["wgl2di-brush"],
+			styles:{
+				top:origin[1]+"px",
+				left:origin[0]+"px"
+			}
+		},this.div_container);
+
+		
+								  
+		makeDraggable(div,{
+			contain:true,
+			ondragstart:()=>this.brush_moving=true,
+			ondragend:()=>this._brushingStopped(),
+			doc:this.__doc__
+
+		});
+	
+		/*.resizable({
+			handles:"all",
+			start:function(ev,ui){
+				self.brush.moving=true;
+			},
+			stop:function (ev,ui){
+				self._brushingStopped();
+
+			}
+
+		});*/
+		this.brush={origin:origin,div:div,resizing:true};
+	}
+
+	_setUpPolyBrush(pos){
+		this.poly_brush={
+			points:[pos],
+			active:true,
+		}
+		let ctx= this.label_context;
+		
+		ctx.beginPath()
+		ctx.moveTo(pos[0],pos[1]);
+	
+
+
+	}
+
+	_extendPolyBrush(pos,end){
+		let ctx= this.label_context;
+	    //let prev = this.poly_brush.points[this.poly_brush.points.length-1]
+		
+		
+		ctx.lineTo(pos[0],pos[1]);
+		ctx.stroke()
+		this.poly_brush.points.push(pos);
+		if (end){
+			ctx.closePath();
+			ctx.fillStyle="lightgray";
+			ctx.globalAlpha=0.4;
+			ctx.fill();
+			let poly = []
+			for (let pt of this.poly_brush.points){
+				poly.push(this._getActualPosition(pt));
+			}
+			for (var i in this.handlers.brush_stopped){
+			    this.handlers.brush_stopped[i](poly,true);
+		    }
+
+		}
+	}
+
+	_finishPolyBrush(pos){
+		if (this.poly_brush.points.length<4){
+			this.clearBrush();
+			return;
+		}
+		let ctx= this.label_context;	
+		ctx.closePath();
+		ctx.fillStyle="lightgray";
+		ctx.globalAlpha=0.2;
+		ctx.fill();
+		ctx.globalAlpha=1;
+		let poly = [];
+		this.poly_brush.active=false;
+		for (let pt of this.poly_brush.points){
+			poly.push(this._getActualPosition(pt));
+		}
+		for (var i in this.handlers.brush_stopped){
+			this.handlers.brush_stopped[i](poly,true);
+		}
+	}
+
+
+
+	clearBrush(){
+		if (this.brush){
+			this.brush.div.remove();
+			this.brush=null;
+		}
+		if (this.poly_brush){
+		    this.label_context.clearRect(0, 0, this.width, this.height);
+		    this.poly_brush=null;
+		}
+	}
+
+	_brushingStopped(){
+		this.brush.resizing=false;
+		const d= this.brush.div;
+		const y= d.offsetTop;
+		const x = d.offsetLeft;
+		const w= d.offsetWidth;
+		const h = d.offsetHeight;
+		if (w<2){
+			this.clearBrush();
+			return;
+		}
+		if (this.mode==="3d"){
+			const s = this.getObjectsInRange(x,y,w,h);
+			
+			for (var i in this.handlers.brush_stopped){
+				this.handlers.brush_stopped[i](s);
+			}
+
+
+		}
+		else{
+			let lt =this._getActualPosition([x,y]);
+			let br = this._getActualPosition([x+w,y+h]);
+			let info = {x_min:lt[0],x_max:br[0],y_max:-lt[1],y_min:-br[1]};
+			for (var i in this.handlers.brush_stopped){
+				this.handlers.brush_stopped[i](info);
+			}
+
+		}
+		
+	
+
+	}
+
+	setGlobalFilter(filter){
+		this.circles.globalFilter=filter;
+	}
+
+
+	_addHandlers(){
+		var self=this;
+		this.div_container.addEventListener("mousemove",function(e){
+			if (self.brush){
+				if (self.brush.resizing){
+					let origin =self.brush.origin;
+					let now = self._getMousePosition(e);
+					let left = Math.round((origin[0]<now[0]?origin[0]:now[0]))+"px";
+					let top =Math.round((origin[1]<now[1]?origin[1]:now[1]))+"px";
+					let width = (Math.abs(origin[0]-now[0]))+"px";
+					let height= (Math.abs(origin[1]-now[1]))+"px";
+					self.brush.div.style.top=top;
+					self.brush.div.style.left=left;
+					self.brush.div.style.width=width;
+					self.brush.div.style.height=height;
+					
+					return;
+				}
+				else if (self.brush.moving){
+					self.dragging=false;
+					return;
+
+				}
+				
+			}
+			if (self.poly_brush && self.poly_brush.active){
+				clearTimeout(self.poly_brush_tidmout)
+				let pt =self._getMousePosition(e);
+				self.poly_brush_timeout= setTimeout(function(){
+					self._extendPolyBrush(pt);
+				},150)
+			}
+			//is this a drag or just a click without the mouse moving
+			if (self.mouse_position &&  ! self.dragging){
+				var x_amount= (e.pageX-self.mouse_position[0]);
+				var y_amount = (e.pageY-self.mouse_position[1]);
+				if (Math.abs(x_amount) > 3 || Math.abs(y_amount)>3){
+					self.dragging = true;
+				}
+			}
+
+			if (self.dragging){
+				const dx= e.pageX-self.mouse_position[0];
+				const dy =e.pageY-self.mouse_position[1]
+
+				if (self.mode==="3d"){
+					self.camera.mouseChange(dx/self.width,dy/self.height);
+				}
+				else{
+					const x_amount= dx/self.x_scale;
+					const y_amount = dy/self.y_scale;
+					if (!self.config.lock_x_axis){
+						self.offset[0]+=x_amount;
+					}		
+					self.offset[1]+=y_amount;
+
+				}
+			
+				if (!self.loop){
+					//self.label_context.clearRect(0, 0, self.width, self.height);
+					self.loop = self.regl.frame(()=>{
+						self.regl.clear({
+							color: [0, 0, 0, 0],
+							depth:1
+					  	});
+						self._drawObjects(false);
+					});
+
+				}
+				self.mouse_position[1]=e.pageY;
+				self.mouse_position[0]=e.pageX;      
+			}
+			//no drag event going on call any listners if mouse over/out an object
+			else{
+				var position =self._getMousePosition(e);
+				var obj = self._getObjectAtPosition(position);
+				if (obj!=null && self.object_mouse_over==null){
+					for (var i in self.handlers['object_over']){
+						self.handlers.object_over[i](e,obj);		           
+					}
+				
+					self.object_mouse_over=obj;
+					
+				}
+				else if (obj==null && self.object_mouse_over){
+					for (var i in self.handlers['object_out']){
+						self.handlers.object_out[i](e,self.object_mouse_over);
+					}
+				
+					
+					self.object_mouse_over=null;
+
+				}
+				//move directly from one object to another
+				else if(obj!=null && (obj!==self.object_mouse_over)){
+					for (var i in self.handlers['object_over']){    
+						self.handlers.object_over[i](e,obj);  
+					}
+					self.object_mouse_over=obj;
+				}         
+			}
+		});
+
+		this.div_container.addEventListener("mouseleave",function(evt){
+			if (self.object_mouse_over){
+				for (var i in self.handlers['object_out']){
+							self.handlers.object_out[i](self.object_mouse_over[2]);
+						}
+						self.object_mouse_over=null;
+			}
+			if (self.brush && self.brush.resizing){
+			    self._brushingStopped();
+			}
+		})
+
+	
+		this.div_container.addEventListener("mouseup",function(evt){
+			//just a click event - inform handlers
+			if (self.config.brush){
+				self.div_container.style.cursor="crosshair";
+			}
+			if (self.brush && self.brush.resizing){
+				self._brushingStopped();
+				return;
+			}
+			if (self.poly_brush && self.poly_brush.active){
+				self._finishPolyBrush();
+			}
+			if (!self.dragging){
+				//if (self.object_clicked){
+					var position =self._getMousePosition(evt);
+					var obj = self._getObjectAtPosition(position);
+					if (obj){
+						for (var i in self.handlers.object_clicked){
+							self.handlers.object_clicked[i](obj[2]);
+						}  
+					}
+				//}
+
+			}        
+			else{
+				//an object has finshed its drag
+				if (self.object_clicked){
+					self.object_clicked=null;
+					self.refresh(true);              
+				}
+				//update which objects are now in view
+				else{
+					let ret = self.getRange();
+					self.loop.cancel();
+					self.loop=null;
+					
+					  
+
+					//self._drawPickBuffer(false);
+					//self._getObjectsInView();
+				
+					self.refresh();
+					for (var i in self.handlers.panning_stopped){
+							self.handlers.panning_stopped[i](ret);
+					}
+				
+					if (self.brush){
+						//self._brushingStopped();
+					}
+				   
+				}
+				self.dragging=false;
+			}
+			self.object_clicked=null;
+			self.mouse_position=null;   
+		});  
+
+		this.div_container.addEventListener('mousewheel', function(event){
+			event.preventDefault();
+			var position =self._getActualPosition(self._getMousePosition(event));
+			let wdelta=0;
+			if (event.wheelDelta > 0 || event.detail < 0) {
+					self.zoom_amount+=0.01;
+					wdelta=-30;
+			}
+			else {
+					self.zoom_amount-=0.01;
+					wdelta=30;
+			}
+			if (self.mode==="3d"){
+				self.camera.mouseWheel(0,wdelta)
+			}
+			else {
+				if (!self.config.lock_x_axis){
+					self.x_scale*=(1+self.zoom_amount);
+				}
+				self.y_scale*=(1+self.zoom_amount);				
+				const new_position=self._getActualPosition(self._getMousePosition(event));
+				self.offset[0]+=new_position[0]-position[0];
+				self.offset[1]+=new_position[1]-position[1];
+			}
+           
+			if (!self.loop){
+		        self.label_context.clearRect(0, 0, self.width, self.height);
+				self.loop = self.regl.frame(function(){
+					self.regl.clear({
+						color: [0 ,0, 0, 0],
+						depth:1,
+					  })
+					self._drawObjects(false);
+				});
+			}
+
+
+			
+			//clear the timeout user has not finished zooming
+			clearTimeout(self._timer);
+			//when user finishes call the esxpensive methods;
+			self._timer= setTimeout(function() {
+				self.zoom_amount=0;
+				self.loop.cancel();
+				self.loop=null;
+				self._drawPickBuffer(false);
+				if (self.brush){
+
+				}
+				let ret = self.getRange();
+				for (let name in self.handlers.zoom_stopped){	
+					self.handlers.zoom_stopped[name](ret);
+				}
+                		
+				self.refresh();
+			}, 350);
+
+		});
+		this.div_container.addEventListener("mousedown",function (evt){
+			if (evt.which===3){
+				//add right click behaviour
+			}
+			//create brush
+			if ((self.config.brush && !(evt.shiftKey)) || (!(self.config.brush)&&evt.shiftKey)){
+				let origin = self._getMousePosition(evt);
+				if (self.config.brush=="default"){
+					let t = evt.target;
+					if(t.classList.contains("wgl2di-brush")){
+						return;
+					}
+					if (self.brush){
+						self.clearBrush();
+					}
+					let origin =self._getMousePosition(evt);
+					self._setUpBrush(origin);
+					return;
+				}
+				else if (self.config.brush==="poly"){
+				    if(self.poly_brush){
+			    	    self.clearBrush();
+			        }
+			        self._setUpPolyBrush(origin)		    
+			        return;
+				}
+			}
+		
+			if (evt.shiftKey){
+				self.div_container.style.cursor="move";
+			}
+			
+			var position =self._getMousePosition(evt);
+			self.mouse_position= [evt.pageX, evt.pageY];
+			self.clearBrush();
+		});
+
+	}
+
+
+	_initDrawMethods(){
+		var self = this;
+
+		//loading images
+		this.__drawCircles = this.regl({
+			depth:self.draw_options.depth,
+	        blend:self.draw_options.blend,
+	
+			frag: 
+		    `precision highp float;
+			varying vec3 fragColor;
+			varying float op;
+			varying float has_border;
+			uniform float is_buffer;
+			
+			void main(){
+			
+				vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+                
+				float r = dot(cxy, cxy);
+				if (r > 1.0) {
+					discard;
+				}
+				else{					
+					if(r>0.60 && has_border==-1.0 && is_buffer==0.0){
+					    gl_FragColor=vec4(0.1,0.1,0.1,1.0);
+					}
+					else{
+						gl_FragColor = vec4(fragColor,is_buffer==1.0?1.0:op);
+					}
+				}
+				
+			}`,
+
+			vert: 
+	        `attribute float x_pos;
+            attribute float y_pos;
+			attribute vec3 color;
+			attribute float lFilter;
+			attribute float gFilter;
+			varying vec3 fragColor;
+			varying float op;
+			varying float has_border;
+			uniform float x_scale;
+			uniform float y_scale;
+			uniform vec2 offset;
+			uniform float stage_height;
+			uniform float stage_width;
+			uniform float point_radius;
+			uniform float is_filtered;
+			uniform float point_opacity;
+			
+			vec2 normalizeCoords(float posX, float posY){
+				float x = (posX+offset[0])*x_scale;
+				float y = (posY+offset[1])*y_scale;
+				return vec2(2.0 * ((x / stage_width) - 0.5),-(2.0 * ((y / stage_height) - 0.5)));
+			}
+	
+			void main() {
+			    if (gFilter>0.0 && gFilter != lFilter){
+					return;
+				}
+				float r=point_radius;
+			
+				gl_PointSize = r;
+				fragColor = color/255.0;
+				op=point_opacity;
+				
+				has_border=lFilter-is_filtered;
+			
+				
+				vec2 real_position = normalizeCoords(x_pos,-y_pos);
+				gl_Position = vec4(real_position, 0.0, 1.0);
+			}
+			`,
+
+			attributes: {
+				x_pos: self.regl.prop('x_pos'),
+                y_pos:self.regl.prop("y_pos"),
+				color: self.regl.prop('color'),
+				lFilter:self.regl.prop("localFilter"),
+				gFilter:self.regl.prop("globalFilter")
+
+			},
+		
+			uniforms: {
+				x_scale:self.regl.prop('x_scale'),
+				y_scale:self.regl.prop('y_scale'),
+				stage_width: self.regl.context("viewportWidth"),
+				stage_height: self.regl.context('viewportHeight'),
+				offset:self.regl.prop("offset"),
+				point_radius:self.regl.prop("point_radius"),
+				point_opacity:self.regl.prop("point_opacity"),
+				is_filtered:self.regl.prop("is_filtered"),
+				is_buffer:self.regl.prop("is_buffer")
+
+			},
+
+			count:  self.regl.prop('count'),
+			primitive: self.regl.prop('primitive'),
+			framebuffer:self.regl.prop("buffer")
+		});
+
+		this.object_types[0]['method']=this.__drawCircles;
+
+
+	
+
+		this.__drawLines = this.regl({
+
+				// fragment shader
+				frag: `precision highp float;
+						varying vec3 fragColor;
+						void main () {
+							 gl_FragColor = vec4(fragColor,1);
+						}`,
+
+
+				vert: `
+						attribute vec2 position;
+						attribute vec3 color;
+						attribute float opacity;
+						uniform float x_scale;
+						uniform float y_scale;
+						uniform vec2 offset;
+						uniform float stage_height;
+						uniform float stage_width;
+						varying vec3 fragColor;
+						//varying float op;
+						vec2 normalizeCoords(vec2 position){	    
+							float x = (position[0]+offset[0])*x_scale;
+							float y = (position[1]+offset[1])*y_scale;
+				            return vec2(2.0 * ((x / stage_width) - 0.5),-(2.0 * ((y / stage_height) - 0.5)));
+						}
+						void main () {
+							if (opacity==0.0){
+								return;
+							}
+							fragColor=color/255.0;
+							vec2 norm_pos =normalizeCoords(position*vec2(1,-1));
+							gl_Position = vec4(norm_pos, 0.0, 1.0);
+						}`
+				,
+				attributes: {
+					position: self.regl.prop("position"),
+					color:self.regl.prop("color"),
+					opacity:self.regl.prop("opacity")
+				},
+
+				uniforms: {
+					  x_scale:self.regl.prop('x_scale'),
+					  y_scale:self.regl.prop('y_scale'),
+					  stage_height:self.regl.context("viewportHeight"),
+					  stage_width:self.regl.context("viewportWidth"),
+					  offset:self.regl.prop("offset")
+				},
+				primitive:self.regl.prop("primitive"),
+				count:self.regl.prop("count")
+
+
+
+			});
+		this.object_types[1]['method']=this.__drawLines;
+		
+
+		this.__drawImages = this.regl({
+			frag: `
+				precision mediump float;
+				uniform sampler2D text;
+				varying vec2 uv;
+				varying vec3 fragColor;
+				varying float op;
+				void main () {
+					gl_FragColor = vec4(fragColor,op)*texture2D(text, uv);							
+				}`,
+
+ 			vert: `
+				precision mediump float;
+
+				attribute vec2 position;
+				attribute vec3 color;
+				attribute float opacity;
+
+				uniform vec2 x_y;
+				uniform vec2 w_h;
+				uniform float stage_height;
+				uniform float stage_width;
+				uniform float x_scale;
+				uniform float y_scale;
+				uniform vec2 offset;
+
+				varying vec2 uv;
+				varying vec3 fragColor;
+				varying float op;
+		
+				
+				vec2 normalizeCoords(vec2 pos){
+					float x = (pos[0]+offset[0])*x_scale;
+					float y = (pos[1]+offset[1])*y_scale;
+					return vec2(2.0 * ((x / stage_width) - 0.5),-(2.0 * ((y / stage_height) - 0.5)));
+				}
+
+				void main () {
+					if (opacity==0.0){
+						return;
+					}
+					op=opacity;
+					
+					vec2 new_pos=normalizeCoords(position);
+					fragColor = color;
+				
+					float x_factor = 1.0/(((w_h[0]*x_scale)/stage_width)*2.0);
+					float y_factor = 1.0/(((w_h[1]*y_scale)/stage_height)*2.0);
+					
+
+					float x_offset=(((x_y[0]+offset[0])*x_scale)/stage_width)*2.0*x_factor;
+					float y_offset=(((x_y[1]+offset[1])*y_scale)/stage_height)*2.0*y_factor;
+					uv = vec2((new_pos[0]*x_factor)+x_factor-x_offset,-(new_pos[1]*y_factor)+y_factor-y_offset);
+					gl_Position = vec4(new_pos, 0.0, 1.0);
+
+				}`,
+
+			attributes: {
+    			position:self.regl.prop("position"),
+    			color:self.regl.prop("color"),
+    			opacity:self.regl.prop("opacity")
+   			},
+
+  			uniforms: {
+    			stage_height:self.regl.context("viewportHeight"),
+    			stage_width:self.regl.context("viewportWidth"),
+    			w_h:self.regl.prop("w_h"),
+    			x_y:self.regl.prop("x_y"),
+    			text:self.regl.prop("text"),
+				
+				x_scale:self.regl.prop('x_scale'),
+				y_scale:self.regl.prop('y_scale'),
+				offset:self.regl.prop("offset")
+    			
+
+  			},
+
+  			count: self.regl.prop("count"),
+			depth:self.draw_options.depth,
+			blend:self.draw_options.blend
+		});
+
+		this.object_types[2]['method']=this.__drawImages;
+
+		this.__draw3DCircles = this.regl({
+            frag: `
+            precision mediump float;
+            varying vec3 fragColor;
+			varying float op;
+			varying float has_border;
+			uniform float is_buffer;
+            void main () {
+			  float r = length(gl_PointCoord.xy - 0.4) ;
+              if (r> 0.4) {
+                discard;
+              }
+			  else{
+				if(r>0.3 && has_border==-1.0 && is_buffer==0.0){
+					gl_FragColor=vec4(0.1,0.1,0.1,1.0);
+				}
+				else{
+					gl_FragColor = vec4(fragColor,is_buffer==1.0?1.0:op);
+				}
+
+			  }
+             
+            }
+            `,
+          
+            vert: `
+            precision mediump float;
+
+            attribute float x_pos;
+            attribute float y_pos;
+            attribute float z_pos;
+            attribute vec3 color;
+            attribute float lFilter;
+            attribute float gFilter;
+			
+			uniform float time;
+            uniform float cdistance;
+            uniform mat4 view, projection;
+			uniform vec3 eye;
+			uniform float point_radius;
+			uniform float point_opacity;
+			uniform float is_buffer;
+			uniform float is_filtered;
+
+
+            varying vec3 fragColor;
+			varying float op;
+			varying float has_border;
+
+            void main () {
+                if (gFilter>0.0 && gFilter != lFilter){
+					return;
+				}
+                vec3 position = vec3(-x_pos,y_pos,-z_pos);
+                fragColor=color/255.0;
+				op = is_buffer==1.0?1.0:point_opacity;
+				has_border=lFilter-is_filtered;
+               
+				gl_PointSize = point_radius; //(distance(eye, position.xyz) /30.0);
+                gl_Position = projection * view * vec4(2.0 * position, 1.0);
+            }
+            `,
+          
+              attributes: {
+              
+                x_pos: self.regl.prop('x_pos'),
+                y_pos:self.regl.prop("y_pos"),
+                z_pos:self.regl.prop("z_pos"),
+				color: self.regl.prop('color'),
+				lFilter:self.regl.prop("localFilter"),
+				gFilter:self.regl.prop("globalFilter")
+              },
+          
+              uniforms: {
+				point_radius:self.regl.prop("point_radius"),
+				point_opacity:self.regl.prop("point_opacity"),
+				is_buffer:self.regl.prop("is_buffer"),
+                view: self.regl.prop("cameraView"),
+                cdistance:self.regl.prop("cameraDistance"),
+				eye:self.regl.prop("cameraEye"),
+				is_filtered:self.regl.prop("is_filtered"),
+                projection: (context,props) =>{
+                 return glMatrix.mat4.perspective(
+                    props.cameraProjection,
+                    Math.PI / 4,
+                    context.viewportWidth / context.viewportHeight,
+                    0.01,
+                    10000
+                  )
+                 },
+                
+              },
+          
+              count:  self.regl.prop('count'),
+			  framebuffer:self.regl.prop("buffer"),
+			  blend:self.draw_options.blend,
+              primitive: 'points',
+		
+		});
+
+		this.__draw3DLines = this.regl({
+
+            // fragment shader
+            frag: ' precision highp float;\n\
+                    varying vec3 fragColor;\n\
+                    void main () {\n\
+                         gl_FragColor = vec4(fragColor,1);\n\
+                    }\n',
+
+
+            vert: `
+                    attribute vec3 position;
+                    attribute vec3 color;
+                    uniform mat4 view, projection;
+    
+                    varying vec3 fragColor;
+                  
+                    
+                    void main () {
+                     
+                        fragColor=color;
+                        gl_Position = projection * view * vec4(2.0 * position*vec3(-1.0,1.0,-1.0), 1.0);
+                       
+                       
+                    }`
+            ,
+            attributes: {
+                position: self.regl.prop("position"),
+                color:self.regl.prop("color")
+            
+
+
+            },
+            uniforms: {
+                view: self.regl.prop("cameraView"),
+                projection: (context,props) =>{
+                 return glMatrix.mat4.perspective(
+                    props.cameraProjection,
+                    Math.PI / 4,
+                    context.viewportWidth / context.viewportHeight,
+                    0.01,
+                    10000
+                  )
+                 },
+                
+              },
+
+          
+            primitive:self.regl.prop("primitive"),
+            framebuffer:self.regl.prop("buffer"),
+            count:self.regl.prop("count"),
+			depth:{enable:false}
+
+
+
+        });
+		
+	
+	}
+	
+}
+
+
+export {WGL2DI};
+
+
+

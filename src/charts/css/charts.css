@@ -1,0 +1,105 @@
+.ciview-chart-titlebar{
+    display:flex;
+}
+
+.ciview-chart-title{
+    flex-grow:3;
+    text-overflow:ellipsis;
+    overflow:hidden;
+    white-space:nowrap;
+}
+.ciview-chart-menuspace{
+    flex-grow:1;
+    white-space:nowrap;
+    display:flex;
+    flex-flow: row-reverse;
+}
+.row-bar{
+    cursor:pointer;
+}
+
+.pie-arc{
+    cursor:pointer;
+}
+
+.row-text{
+    cursor:pointer;
+}
+
+.ciview-button{
+    background: #1266f1;
+    padding:5px 8px;
+    border-radius:5px;
+    cursor:pointer;
+    color:white;
+   
+}
+
+.ciview-title-div{
+    font-size:16px;
+    font-weight:bold;
+    padding:5px;
+}
+
+.ciview-button:hover{
+    box-shadow: 0 2px 5px 0 rgb(0 0 0 / 20%);
+}
+
+.row-bar:hover{
+    opacity:0.6;
+}
+
+.pie-arc:hover{
+    opacity:0.6;
+}
+
+
+.ciview-info-alert{
+    padding:8px;
+    width:250px;
+    position:absolute;
+    font-size:18px;
+
+}
+
+.ciview-alert-info{
+    color:#155724;
+    background:#d4edda;
+    border: 1px solid #c3e6cb;
+}
+
+.ciview-alert-danger{
+    color:#721c24;
+    background:#f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+.ciview-alert-warning{
+    color:#856404;
+    background:#fff3cd;
+    border: 1px solid #ffeeba;
+}
+
+
+
+
+.ciview-info-alert-spin{
+    font-size:18px;
+    float:right
+
+}
+
+
+.civew-chart-resetbutton{
+    visibility:hidden;
+    
+}
+
+.ciview-chart-content{
+    height:calc( 100% - 20px );
+    position:relative;
+}
+
+.ciview-chart-icon{
+    cursor:pointer;
+}
