@@ -1,0 +1,12 @@
+node_modules
+package-lock.json
+_tests/
+_dev/
+mlv.config.js
+avocato.config.js
+mlv.dev.config.js
+mlv.dev.stream.js
+.vscode
+_mlv/
+_avocato/
+project1/
