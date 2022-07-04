@@ -4,31 +4,36 @@ import Dimension from "./Dimension.js";
 class RangeDimension extends Dimension{
     constructor(column,parent){
         super(column, parent);   
-            this.worker= new Worker (new URL("./binWorker.js",import.meta.url));
-            
-       
+        this.worker= new Worker (new URL("./binWorker.js",import.meta.url));  
     }
 
- 
-      
-    filterSquare(range1,range2,indexes=[0,1]){
-        const t = performance.now();
-        const data1 = this.parent.columnIndex[this.column[indexes[0]]].data;
-        const data2 = this.parent.columnIndex[this.column[indexes[1]]].data;
+    filterSquare(args,columns){
+     
+        let data1= null;
+        if (typeof columns[0] !== "string"){
+            data1= columns[0];
+        }
+        else{
+            data1 = this.parent.columnIndex[columns[0]].data;
+        }
+        
+        const data2 = this.parent.columnIndex[columns[1]].data;
         const filter = this.parent.filterArray;
         const parent = this.parent;
+        const range1 =args.range1;
+        const range2 =args.range2;
       
         const localFilter= this.filterArray;
         for (let i=0;i<this.parent.size;i++){
             const v1 = data1[i];
-            const v2 = data2[i]
-            if (v1<range1[0] || v1>range1[1] || v2<range2[0] || v2>range2[1] || isNaN(v1) || isNaN(v2)){
+            const v2 = data2[i];
+            if ((this.bgfArray && this.bgfArray[i]===1) || v1<range1[0] || v1>range1[1] || v2<range2[0] || v2>range2[1] || isNaN(v1) || isNaN(v2)){
                
                 if (localFilter[i]===0){
                     if(++filter[i]===1){
                         parent.filterSize--;
                                          
-                    };
+                    }
                 }                  
                 localFilter[i]=1
             }
@@ -41,12 +46,10 @@ class RangeDimension extends Dimension{
                 localFilter[i]=0;
             }
         }
-        console.log(`square filter : ${performance.now()-t}`);
-        this.parent._callListeners("filtered",this);
     }
 
-    filterPoly(points,indexes=[0,1]){
-        const t = performance.now();
+    filterPoly(args,columns){
+        const points=args;
         let minX=Number.MAX_VALUE, minY= Number.MAX_VALUE;
         let maxX=Number.MIN_VALUE, maxY= Number.MIN_VALUE;
         for (let pt of points){
@@ -56,8 +59,14 @@ class RangeDimension extends Dimension{
             maxY= Math.max(maxY,pt[1]);
 
         }
-        const data1 = this.parent.columnIndex[this.column[indexes[0]]].data;
-        const data2 = this.parent.columnIndex[this.column[indexes[1]]].data;
+        let data1= null;
+        if (typeof columns[0] !== "string"){
+            data1= columns[0];
+        }
+        else{
+            data1 = this.parent.columnIndex[columns[0]].data;
+        }
+        const data2 = this.parent.columnIndex[columns[1]].data;
         const filter = this.parent.filterArray;
         const parent = this.parent;
         const len = parent.size;
@@ -92,8 +101,7 @@ class RangeDimension extends Dimension{
                                             
                         };
                     }                  
-                    localFilter[n]=1
-
+                    localFilter[n]=1;
                 }
                 else{
                     if (localFilter[n]===1){
@@ -105,14 +113,12 @@ class RangeDimension extends Dimension{
                 }
             }		
 		}
-        console.log("poly filter: "+ (performance.now()-t));
-        parent._callListeners("filtered",this);
-        
     }
 
-
-    filterRange(min,max,index=0){
-        const arr = this.parent.columnIndex[this.column[index]].data;
+    filterRange(args,columns){
+        const min = args.min;
+        const max=args.max;   
+        const arr = this.parent.columnIndex[columns[0]].data;
         const filter = this.parent.filterArray;
         const localFilter= this.filterArray;
         const parent = this.parent;
@@ -123,8 +129,7 @@ class RangeDimension extends Dimension{
                     if(++filter[i]===1){
                         parent.filterSize--;
                     };
-                }
-                
+                }             
                 localFilter[i]=1
             }
             else{
@@ -135,13 +140,12 @@ class RangeDimension extends Dimension{
                 }
                 localFilter[i]=0;
             }
-        }
-        this.parent._callListeners("filtered",this);
+        }   
     }
 
-    getBins(callback,config={},index=0){
+    getBins(callback,column,config={}){
        
-        const col = this.parent.columnIndex[this.column[index]];
+        const col = this.parent.columnIndex[column];
         config.bins = config.bins===undefined?10:config.bins;
         config.min = config.min===undefined?col.minMax[0]:config.min;
         config.max= config.max===undefined?col.minMax[1]:config.max;

@@ -1,36 +1,53 @@
 class Dimension{
-    constructor(column,parent){
-        if (typeof column === "string"){
-            this.column=[column]
-        }
-        else{
-            this.column=column;
-        }
-
+    constructor(parent){ 
         this.filterBuffer = new SharedArrayBuffer(parent.size);       
         this.parent=parent;
         this.filterArray= new Uint8Array(this.filterBuffer);
+        this.filterArguments =null;
+        this.filterIndexes = null;
+        this.filterMethod = null;
     }
-    removeFilter(){     
+
+    removeFilter(notify=true){  
+        if (!this.filterMethod){
+            return;
+        }  
         const filter = this.parent.filterArray;
         const localFilter= this.filterArray;
         const parent = this.parent;
-        for (let i=0;i<this.parent.size;i++){
+        const len = this.parent.size;
+        delete this.filterArguments;
+        delete this.filterColumns;
+        delete this.filterMethod;
+        for (let i=0;i<len;i++){
             if (localFilter[i]===1){
                 if(--filter[i]==0){
                     parent.filterSize++;
                 }
-                localFilter[i]=0;
-                
+                localFilter[i]=0;           
             }
         }
-        this.parent._callListeners("filtered",this); 
+        if (this.bgfArray){     
+            for (let i=0;i<len;i++){          
+                if (this.bgfArray[i]===0){
+                    //need to filter in         
+                    if(--filter[i]===0){
+                        parent.filterSize++;
+                    } 
+                    localFilter[i]=2;                          
+                }
+            }
+        }
+        if(notify){
+            this.parent._callListeners("filtered",this); 
+        }    
     }
 
     getLocalFilter(){
         return this.filterArray;
     }
 
+    //needs to be removed - produces strange behaviour
     filterOnIndex(indexSet){
         const filter = this.parent.filterArray;
         const len = this.parent.size;
@@ -55,23 +72,103 @@ class Dimension{
                 localFilter[i]=1
             }
         }
-        this.parent._callListeners("filtered",this);
+
+    }
     
+    /**
+    * Filters  the data
+    * @param {string} method- The name of the filter method
+    * @param {string[]} columns - a list of column ids used in the filtering
+    * @param {object} args - any extra arguments for filtering
+    * @param {boolean} [notify=true] - notify any listeners in the dataStore that the 
+    * data has been filtered
+    */
+    filter(method,columns,args,notify=true){
+        const t = performance.now();
+        this.filterColumns =columns;
+        this.filterArguments = args;
+        this.filterMethod = method;
+        this[method](args,columns);
+        if (this.bgfArray){
+            const filter = this.parent.filterArray;
+            const len = this.parent.size;
+            const localFilter= this.filterArray;
+            const parent = this.parent;
+            for (let i=0;i<len;i++){          
+                if (this.bgfArray[i]===0){
+                  
+                        if(++filter[i]===1){
+                            parent.filterSize--;
+                        }
+                 
+                    localFilter[i]=2;
+                }
+            }
+        }
+        if (notify){
+            this.parent._callListeners("filtered",this);
+        }
+        console.log(`method${method}: ${performance.now()-t}`);
+    }
+
+    reFilterOnDataChanged(columns){
+        if (this.filterMethod && this.filterColumns){
+            for (let c of this.filterColumns){
+                if (typeof c === "string" && columns.indexOf(c)!==-1){
+                    this.filter(this.filterMethod,this.filterColumns,this.filterArguments,false);
+                    return true;
+                }
+            }        
+        }
+        return false;
+    }
+
+    //updates the new size (assumes data already added to data store)
+    //any filtering is re-done,but no handlers called
+    updateSize(){
+        let newBuff =  new SharedArrayBuffer(this.parent.size);
+        let newArr = new Uint8Array(newBuff);
+        newArr.set(this.filterArray);
+        this.filterBuffer =newBuff;  
+        this.filterArray= newArr;
+        if (this.filterMethod){          
+            this.filter(this.filterMethod,this.filterColumns,this.filterArguments,false);
+        }
+    }
+
+
+    /**
+    * sets a permenant filter on the chart
+    * @param {string} column- The column of the filter
+    * @param {string}  cat - the category in the column to filter on
+    */
+    setBackgroundFilter(column,cat){  
+        const col = this.parent.columnIndex[column];
+        const ci =   col.values.indexOf(cat);
+        const data = col.data
+        this.bgfArray= new Uint8Array(this.parent.size);
+        for (let i=0;i<this.parent.size;i++){
+            if (data[i]===ci){
+                this.bgfArray[i]=1;
+                
+            }
+            else{
+                this.filterArray[i]=2;
+            }
+        }
+    }
+
+    clearBackGroundFilter(){
 
     }
 
- 
-
-    destroy(){    
-        this.removeFilter();
+    destroy(notify=true){    
+        this.removeFilter(notify);
         this.filterBuffer=null;
         this.localFilter=null;
-        this.parent.dimensions.splice(this.parent.dimensions.indexOf(this),1)
+        this.parent.dimensions.splice(this.parent.dimensions.indexOf(this),1);
     }
-
-
 }
 
-Dimension.types={};
-
+Dimension.types={base_dimension:Dimension};
 export default Dimension;

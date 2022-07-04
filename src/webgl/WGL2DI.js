@@ -3,6 +3,7 @@ import * as glMatrix from "gl-matrix";
 import {createEl, makeDraggable} from "../utilities/Elements.js";
 import {Camera} from "./Camera.js";
 
+
 class WGL2DI{
 	/** 
     * Creates a new wg2di instance
@@ -26,7 +27,11 @@ class WGL2DI{
 			config={};
 		}
 		this.config=config;
+		if (!config.offset){
+			config.offset=[0,0,0,0];
+		}
 		this.mode = config.mode || "2d";
+		this.movingImage=0;
 		this.__doc__=document;
 
 		this.config.brush=this.config.brush || "default";
@@ -56,6 +61,8 @@ class WGL2DI{
     
     	this.regl=null;
 		this.pick_buffer=null;
+
+		this.hideOnFilter=true;
 
 
 		this.pointOpacity=0.8;
@@ -89,12 +96,14 @@ class WGL2DI{
 			brush_stopped:{},
 			zoom_stopped:{},
 			panning_stopped:{},
+			pan_or_zoom:{}
 		};
 
 		//switches
 		this.draw_labels=false;
 
 		this.object_types=[];
+		this.pointScale=0;
 
 		// circle shapes
 		this.circle_properties={x_pos:1,y_pos:1,color:1,pick_color:1,localFilter:1,globalFilter:1};
@@ -109,8 +118,8 @@ class WGL2DI{
 								vertices:1,
 								primitive:"points"
 							});
-		
 
+	
 		// line shapes
 		this.line_properties={position:2,color:2,opacity:2};
 	
@@ -146,7 +155,25 @@ class WGL2DI{
 		if (this.mode==="3d"){
 			this.circle_properties.z_pos=1;
 			this.camera = new Camera({distance:config.cameraDistance || 500,theta:0.75,phi:0.5});
+			this.axisScales=[1,1,1];
 		}
+
+
+		//squares
+		this.square_properties={x_pos:1,y_pos:1,color:1,pick_color:1,localFilter:1,globalFilter:1};
+
+		this.squares={};
+		for (var prop in this.square_properties){
+			this.squares[prop]=[];
+		}
+		this.squares.count=0;
+		this.object_types.push({data:this.squares,
+								properties:this.square_properties,
+								vertices:1,
+								primitive:"points"
+							});
+			
+	
 
 		//The last mouse position recorded
 		this.mouse_position=null;
@@ -159,7 +186,7 @@ class WGL2DI{
 
 
 		this.zoom_amount=0;
-		this.draw_order= this.mode==="3d"?[2,0,1]:[2,0,1];
+		this.draw_order= this.mode==="3d"?[2,0,1,3]:[2,0,1,3];
 	
 
 		regl({
@@ -192,8 +219,8 @@ class WGL2DI{
 		}
 		if (!height){
             const box= this.div_container.getBoundingClientRect();
-			this.height=height=box.height;
-			this.width =width=box.width;
+			this.height=height=Math.round(box.height);
+			this.width =width=Math.round(box.width);
 
 		}else{
 
@@ -230,6 +257,17 @@ class WGL2DI{
             colors[cp+1]=col[1];
             colors[cp+2]=col[2];
         }
+		//color highlights
+		if (this.highlightPoints){
+			const ps = this.highlightPoints;
+			for (let i=0;i<ps.length;i++){
+				const ci = ps.indexes[i]*3;
+				const hi= i*3;
+				ps.color[hi]=this.circles.color[ci];
+				ps.color[hi+1]=this.circles.color[ci+1];
+				ps.color[hi+2]=this.circles.color[ci+2];	
+			}
+		}
     }
 
 
@@ -243,19 +281,29 @@ class WGL2DI{
 	}
 	
 
-	setSize(width,height){
+	setSize(width,height,rescale=null){
 		if (this.height===height && this.width===width){
 			return
 		}
 		let self=this;
 		width=Math.round(width);
 		height=Math.round(height);
-		let x_ratio=width/this.width;
-	    let y_ratio=height/this.height;
-	  
-		this.x_scale= this.x_scale*x_ratio;
-		this.y_scale= this.y_scale*y_ratio;
-	
+		if (rescale){
+			const scale= rescale(width,height);
+			this.x_scale=scale[0];
+			this.y_scale=scale[1];
+			
+		}
+		else{
+
+			let x_ratio=width/this.width;
+			let y_ratio=height/this.height;
+		  
+			this.x_scale= this.x_scale*x_ratio;
+			this.y_scale= this.y_scale*y_ratio;
+		
+		}
+
 		this.height=height;
 		this.width=width;
 		this.div_container.style.height=height+"px";
@@ -274,7 +322,7 @@ class WGL2DI{
 		setTimeout(()=>{
 			self.refresh();
 			loop.cancel();
-			},100);
+			},200);
 	}
 
 	_getMousePosition(e){
@@ -307,33 +355,67 @@ class WGL2DI{
 		};
 	}
 
-	highlightPoint(key){
-		clearInterval(this.an_func);
-		let obj = this.keys[key];
-		if (!obj){
+	setHighlightPoints(indexes){
+		if (indexes==null){
+			this.highlightPoints=null;
 			return;
 		}
-		let pt=this.circles.position[this.objects[obj][0]];
-		this.label_context.clearRect(0, 0, this.width, this.height);
-	    this.highlight_point=pt
-		pt = this._getCanvasCoords(pt);
-		let ctx= this.label_context;
-		let self = this;
-		self.highlight_pt_radius=0.1;
-		ctx.fillStyle="orange";
-		self.an_func=setInterval(function(){
-			ctx.beginPath();
-            ctx.arc(pt[0], pt[1], self.highlight_pt_radius, 0, 2 * Math.PI);
-            ctx.fill();
-            self.highlight_pt_radius+=0.1;
-            if (self.highlight_pt_radius>(self.universal_circle_radius*self.x_scale)){
-
-            	clearInterval(self.an_func);
-            }
-		},5);
+		const hlp={
+			x_pos:[],
+			y_pos:[],
+			color:[],
+			length:indexes.length,
+			indexes:indexes
+		}
+		if (this.mode==="3d"){
+			hlp.z_pos=[];
+		}
+		for (let index of indexes){
+			hlp.x_pos.push(this.circles.x_pos[index]);
+			hlp.y_pos.push(this.circles.y_pos[index]);
+			if (this.mode==="3d"){
+				hlp.z_pos.push(this.circles.z_pos[index]);
+			}
 		
+			const st = index*3;
+			hlp.color.push(this.circles.color[st]);
+			hlp.color.push(this.circles.color[st+1]);
+			hlp.color.push(this.circles.color[st+2]);
+		}
+		this.highlightPoints=hlp;		
+	}
 
-		
+	setOffsets(arr,value,offsets){
+		this.offsets={
+			arr:arr,
+			value:value,
+			offsets:offsets
+		}
+		const x = this.circles.x_pos;
+		const y = this.circles.y_pos;
+		const lf = this.circles.localFilter;
+		for (let n=0;n<arr.length;n++){
+			if (arr[n]===value && lf[n] !==2){
+				x[n]+=offsets[0];
+				y[n]+=offsets[1];
+			}
+		}
+	}
+
+	alterOffsets(xa,ya){
+		this.offsets.offsets[0]+=xa;
+		this.offsets.offsets[1]-=ya;
+		const arr = this.offsets.arr;
+		const v = this.offsets.value;
+		const x = this.circles.x_pos;
+		const y = this.circles.y_pos;
+		const lf = this.circles.localFilter;
+		for (let n=0;n<arr.length;n++){
+			if (arr[n]===v && lf[n]!==2){
+				x[n]+=xa;
+				y[n]-=ya;
+			}
+		}
 	}
 
 
@@ -346,6 +428,10 @@ class WGL2DI{
 	}
 	setFilter(val){
 		this.isFiltered=val;
+	}
+
+	setHideOnFilter(value){
+		this.hideOnFilter=value;
 	}
 
 	setPointOpacity(value){
@@ -373,7 +459,86 @@ class WGL2DI{
 		return this.lines.count-1
 	}
 
+	changeImage(image,config,index){
+		this.images.props.text[index]=this.regl.texture({data:image,min:"linear"});
+		this.resizeImage([config.width,config.height],index);
+		this.setImagePosition(config.position[0],config.position[1],index);
+	}
 
+	changeImageOpacity(index,opacity){
+		const st = index*6;
+		const end = st+6;
+		for (let a=st;a<end;a++){
+			this.images.opacity[a]=opacity;
+	   	}
+
+	}
+
+
+	moveImage(x,y){
+		const st = this.movingImage*6;
+		const en = st+6;
+		for (let n= st;n<en;n++){
+			const pos = this.images.position[n];
+			pos[0]+=x;
+			pos[1]+=y;
+		}
+		const xy =this.images.props.x_y[this.movingImage];
+		xy[0]+=x;
+		xy[1]+=y;
+
+	}
+
+	setImagePosition(x,y,index){
+		const p = this.images.position;
+		const i = index*6;
+		const width= this.images.props.w_h[index][0];
+		const height = this.images.props.w_h[index][1];
+		y=-y-height;
+		this.images.props.x_y[index]=[x,y];
+		p[i]= [x,y]
+		p[i+1]=[x,y+height];
+		p[i+2]=[x+width,y+height];
+		p[i+3]=[x+width,y+height];
+		p[i+4]= [x+width,y];
+		p[i+5]=[x,y];
+	}
+
+	getImageDetails(index){
+		const wh = this.images.props.w_h[index];
+		const xy =this.images.props.x_y[index];
+		return {
+			width:wh[0],
+			height:wh[1],
+			position:[xy[0],xy[1]],
+			index:index
+		}
+	}
+
+	resizeImage(factor,index){
+		const st = index*6;
+	    const wh = this.images.props.w_h[index];
+		const xy =this.images.props.x_y[index];
+		let width,height = null;
+		if (Array.isArray(factor)){
+			width = factor[0];
+			height= factor[1];
+			wh[0]=width;
+			wh[1]=height;
+		}
+		else{
+			width = wh[0]*=factor;
+			height= wh[1]*=factor;
+		}
+	
+		const x= xy[0];
+		const y =xy[1];
+		this.images.position[1]=[x,y+height];
+		this.images.position[2]=[x+width,y+height];
+		this.images.position[3]=[x+width,y+height];
+		this.images.position[4]=[x+width,y];		
+
+	}
 
 	addImage(image,config){
 		const c = config;
@@ -405,10 +570,44 @@ class WGL2DI{
 		return this.images.count-1;
 	}
 
+	removeImages(){
+		this.images.position=[];
+		this.images.color = [];
+		this.images.opacity = [];
+		this.images.props.x_y=[];
+		this.images.props.w_h=[];
+		this.images.props.text=[];
+		this.images.count=0;
+
+	}
 
 
 
-    addCircles(config){
+
+    addSquares(config){
+        this.squares.x_pos=config.x;
+        this.squares.y_pos=config.y;
+		
+        const len = config.x.length;
+        this.squares.localFilter= config.localFilter;
+		this.squares.globalFilter= config.globalFilter;
+        this.squares.pick_color= new Uint8Array(len*3);
+        this.squares.color=new Uint8Array(len*3);
+        for (let n=0;n<len;n++){
+            let p = n*3;
+			const col = config.colorFunc(n);
+            this.squares.color[p]=col[0];
+            this.squares.color[p+1]=col[1];
+            this.squares.color[p+2]=col[2];
+            let pb= this._getRGBFromIndex(n+1);
+            this.squares.pick_color[p]=pb[0];
+            this.squares.pick_color[p+1]=pb[1];
+            this.squares.pick_color[p+2]=pb[2]
+        }
+        this.squares.count=len;
+    }
+
+	addCircles(config){
         this.circles.x_pos=config.x;
         this.circles.y_pos=config.y;
 		if (this.mode==="3d"){
@@ -432,6 +631,36 @@ class WGL2DI{
         }
         this.circles.count=len;
     }
+
+	updateSize(newSize,config){
+
+		this.circles.x_pos=config.x;
+        this.circles.y_pos=config.y;
+		if (this.mode==="3d"){
+			this.circles.z_pos=config.z;
+		}
+
+        this.circles.localFilter= config.localFilter;
+		this.circles.globalFilter= config.globalFilter;
+		let newPickColor= new Uint8Array(newSize*3);
+		let newColor=new Uint8Array(newSize*3);
+		newColor.set(this.circles.color);
+		newPickColor.set(this.circles.pick_color);
+		this.circles.color= newColor;
+		this.circles.pick_color=newPickColor;
+		for (let n = this.circles.count;n<newSize;n++){
+			let p = n*3;
+			const col = config.colorFunc(n);
+            this.circles.color[p]=col[0];
+            this.circles.color[p+1]=col[1];
+            this.circles.color[p+2]=col[2];
+            let pb= this._getRGBFromIndex(n+1);
+            this.circles.pick_color[p]=pb[0];
+            this.circles.pick_color[p+1]=pb[1];
+            this.circles.pick_color[p+2]=pb[2]
+		}
+		this.circles.count=newSize;
+	}
 
 
 	_getRGBFromIndex(index){
@@ -483,10 +712,36 @@ class WGL2DI{
 		this.camera.updateCamera();
 	}
 
+	getCameraSettings(){
+		if (this.mode!=="3d"){
+			return;
+		}
+		const s = this.camera.cameraState;
+		return{
+			distance:Math.pow(Math.E,s.distance),
+			theta:s.theta,
+			phi:s.phi
+
+		}
+	
+	}
+
 	zoom(amount){
     	this.x_scale*=amount;
     	this.y_scale*=amount;
    		this._drawObjects(false);
+	}
+
+
+
+	setFilterAction(type){
+		if (type==="grey"){
+			this.hideOnFilter=false;
+
+		}
+		else{
+			this.hideOnFilter=true;
+		}
 	}
 
 
@@ -500,6 +755,7 @@ class WGL2DI{
 				cameraProjection:cProj.projection,
 				cameraView:cProj.view,
 				cameraDistance:cProj.distance,
+				axisScales:this.axisScales,
 				cameraEye:cProj.eye
  
 			 };
@@ -511,9 +767,11 @@ class WGL2DI{
 				offset:this.offset
 			}
 		}
+		obj.point_scale =this.pointScale?(this.x_scale+this.y_scale)/2/this.pointScale:1;
 		obj.point_radius=this.pointRadius;
 		obj.is_filtered=this.isFiltered?1:0;
 		obj.point_opacity=this.pointOpacity;
+		obj.hide_on_filter=this.hideOnFilter?1:0;
 	
 				
 		for (let i of this.draw_order){
@@ -555,6 +813,27 @@ class WGL2DI{
 				}
 				continue;
 			}
+			if(i===3){
+				if (buffer){
+					continue;
+				}
+				
+			
+				if (this.x_scale>=this.y_scale){
+					obj.side_length=20*(this.x_scale)
+					obj.bottom_clip=(this.y_scale/this.x_scale);
+					obj.right_clip=1.0;
+				}
+				else{
+
+					obj.side_length=20 *(this.y_scale);
+					obj.right_clip=(this.x_scale/this.y_scale);
+					obj.bottom_clip=1.0;
+
+
+				}
+			
+			}
 				
 			
 			for (var prop in type.properties){
@@ -578,6 +857,21 @@ class WGL2DI{
 				}
 			}
 			type.method(obj);
+			
+		}
+		if (this.highlightPoints && !(buffer)){
+			obj.x_pos=this.highlightPoints.x_pos;
+			obj.y_pos=this.highlightPoints.y_pos;
+			obj.color=this.highlightPoints.color;
+			obj.primitive="points";
+			obj.count=this.highlightPoints.length;
+			if (this.mode==="3d"){
+				obj.z_pos=this.highlightPoints.z_pos;
+				this.__draw3DHighlights(obj);
+			}
+			else{
+				this.__drawHighlights(obj);
+			}
 			
 		}
 	}
@@ -607,17 +901,20 @@ class WGL2DI{
 
 
 	_getObjectAtPosition(position){
-		if(position[1]<0 || position[0]<0){
+		if(position[1]<=0 || position[0]<=0){
 			return;
 		}
-	
-		var pixel = this.regl.read({
-			x: position[0],
-			y: this.height - position[1],
-			width: 1,
-			height: 1,
-			framebuffer: this.pickbuffer
-		});
+		try{
+			var pixel = this.regl.read({
+				x: position[0],
+				y: this.height - position[1],
+				width: 1,
+				height: 1,
+				framebuffer: this.pickbuffer
+			});
+		}catch(e){
+			console.log(position);
+		}
 		
 		if (pixel[0]===0 && pixel[1]===0 && pixel[2]===0){
 			return null;
@@ -706,7 +1003,7 @@ class WGL2DI{
 		
 		
 		ctx.lineTo(pos[0],pos[1]);
-		ctx.stroke()
+		ctx.stroke();
 		this.poly_brush.points.push(pos);
 		if (end){
 			ctx.closePath();
@@ -757,6 +1054,8 @@ class WGL2DI{
 		    this.poly_brush=null;
 		}
 	}
+
+
 
 	_brushingStopped(){
 		this.brush.resizing=false;
@@ -845,14 +1144,26 @@ class WGL2DI{
 				if (self.mode==="3d"){
 					self.camera.mouseChange(dx/self.width,dy/self.height);
 				}
-				else{
+				else{		
 					const x_amount= dx/self.x_scale;
 					const y_amount = dy/self.y_scale;
-					if (!self.config.lock_x_axis){
-						self.offset[0]+=x_amount;
-					}		
-					self.offset[1]+=y_amount;
+					if (self.movingImage != null && e.ctrlKey && self.images.count>0){
+						self.moveImage(x_amount,y_amount);
+						self.imageMoved=self.getImageDetails(self.movingImage);
+					}
+					else if(self.offsets && e.ctrlKey){
+						self.alterOffsets(x_amount,y_amount);
+					}
+					else{
+						if (!self.config.lock_x_axis){
+							self.offset[0]+=x_amount;
+						}		
+						self.offset[1]+=y_amount;
+						for (var i in self.handlers.pan_or_zoom){
+							self.handlers.pan_or_zoom[i](self.offset,self.x_scale,self.y_scale);
+						}
 
+					}
 				}
 			
 				if (!self.loop){
@@ -920,18 +1231,18 @@ class WGL2DI{
 			}
 			if (self.brush && self.brush.resizing){
 				self._brushingStopped();
-				return;
+				//return;
 			}
 			if (self.poly_brush && self.poly_brush.active){
 				self._finishPolyBrush();
 			}
-			if (!self.dragging){
+			if (!self.dragging && !(self.brush || self.poly_brush)){
 				//if (self.object_clicked){
 					var position =self._getMousePosition(evt);
 					var obj = self._getObjectAtPosition(position);
 					if (obj){
 						for (var i in self.handlers.object_clicked){
-							self.handlers.object_clicked[i](obj[2]);
+							self.handlers.object_clicked[i](obj);
 						}  
 					}
 				//}
@@ -946,8 +1257,12 @@ class WGL2DI{
 				//update which objects are now in view
 				else{
 					let ret = self.getRange();
-					self.loop.cancel();
-					self.loop=null;
+					if (self.loop){
+						self.loop.cancel();
+						self.loop=null;
+					}
+				
+					
 					
 					  
 
@@ -955,6 +1270,8 @@ class WGL2DI{
 					//self._getObjectsInView();
 				
 					self.refresh();
+					ret.imageMoved= self.imageMoved;
+					self.imageMoved=null;
 					for (var i in self.handlers.panning_stopped){
 							self.handlers.panning_stopped[i](ret);
 					}
@@ -970,7 +1287,7 @@ class WGL2DI{
 			self.mouse_position=null;   
 		});  
 
-		this.div_container.addEventListener('mousewheel', function(event){
+		this.div_container.addEventListener('wheel', function(event){
 			event.preventDefault();
 			var position =self._getActualPosition(self._getMousePosition(event));
 			let wdelta=0;
@@ -986,13 +1303,29 @@ class WGL2DI{
 				self.camera.mouseWheel(0,wdelta)
 			}
 			else {
-				if (!self.config.lock_x_axis){
-					self.x_scale*=(1+self.zoom_amount);
+				
+				if (self.movingImage != null && event.ctrlKey){
+					self.resizeImage(1+self.zoom_amount,self.movingImage);
+					const new_position=self._getActualPosition(self._getMousePosition(event));
+					self.moveImage(new_position[0]-position[0],new_position[1]-position[1]);
+					self.imageMoved =self.getImageDetails(self.movingImage);
+					
 				}
-				self.y_scale*=(1+self.zoom_amount);				
-				const new_position=self._getActualPosition(self._getMousePosition(event));
-				self.offset[0]+=new_position[0]-position[0];
-				self.offset[1]+=new_position[1]-position[1];
+				else{
+
+					if (!self.config.lock_x_axis){
+						self.x_scale*=(1+self.zoom_amount);
+					}
+					if (!self.config.lock_y_axis){
+						self.y_scale*=(1+self.zoom_amount);
+					}			
+					const new_position=self._getActualPosition(self._getMousePosition(event));
+					self.offset[0]+=new_position[0]-position[0];
+					self.offset[1]+=new_position[1]-position[1];
+					for (var i in self.handlers.pan_or_zoom){
+						self.handlers.pan_or_zoom[i](self.offset,self.x_scale,self.y_scale);					
+					}
+				}
 			}
            
 			if (!self.loop){
@@ -1020,6 +1353,8 @@ class WGL2DI{
 
 				}
 				let ret = self.getRange();
+				ret.imageMoved = self.imageMoved;
+				self.imageMoved =null;
 				for (let name in self.handlers.zoom_stopped){	
 					self.handlers.zoom_stopped[name](ret);
 				}
@@ -1032,8 +1367,9 @@ class WGL2DI{
 			if (evt.which===3){
 				//add right click behaviour
 			}
+			let otherKey = evt.shiftKey || evt.ctrlKey || evt.which==2;
 			//create brush
-			if ((self.config.brush && !(evt.shiftKey)) || (!(self.config.brush)&&evt.shiftKey)){
+			if ((self.config.brush && !(otherKey)) || (!(self.config.brush)&&otherKey)){
 				let origin = self._getMousePosition(evt);
 				if (self.config.brush=="default"){
 					let t = evt.target;
@@ -1056,13 +1392,14 @@ class WGL2DI{
 				}
 			}
 		
-			if (evt.shiftKey){
+			if (evt.otherKey){
 				self.div_container.style.cursor="move";
 			}
 			
 			var position =self._getMousePosition(evt);
 			self.mouse_position= [evt.pageX, evt.pageY];
 			self.clearBrush();
+			evt.preventDefault();
 		});
 
 	}
@@ -1077,10 +1414,11 @@ class WGL2DI{
 	        blend:self.draw_options.blend,
 	
 			frag: 
-		    `precision highp float;
+		    `precision mediump float;
 			varying vec3 fragColor;
 			varying float op;
 			varying float has_border;
+			varying float grey_out;
 			uniform float is_buffer;
 			
 			void main(){
@@ -1092,11 +1430,17 @@ class WGL2DI{
 					discard;
 				}
 				else{					
-					if(r>0.60 && has_border==-1.0 && is_buffer==0.0){
+					if(r>0.60 && has_border==-1.0 && is_buffer==0.0 && grey_out==0.0){
 					    gl_FragColor=vec4(0.1,0.1,0.1,1.0);
 					}
 					else{
-						gl_FragColor = vec4(fragColor,is_buffer==1.0?1.0:op);
+						if (grey_out==1.0 && is_buffer==0.0){
+							gl_FragColor = vec4(0.2,0.2,0.2,0.4);
+						}
+						else{
+							gl_FragColor = vec4(fragColor,is_buffer==1.0?1.0:op);
+						}
+						
 					}
 				}
 				
@@ -1111,6 +1455,7 @@ class WGL2DI{
 			varying vec3 fragColor;
 			varying float op;
 			varying float has_border;
+			varying float grey_out;
 			uniform float x_scale;
 			uniform float y_scale;
 			uniform vec2 offset;
@@ -1119,6 +1464,8 @@ class WGL2DI{
 			uniform float point_radius;
 			uniform float is_filtered;
 			uniform float point_opacity;
+			uniform float hide_on_filter;
+			uniform float point_scale;
 			
 			vec2 normalizeCoords(float posX, float posY){
 				float x = (posX+offset[0])*x_scale;
@@ -1127,14 +1474,35 @@ class WGL2DI{
 			}
 	
 			void main() {
-			    if (gFilter>0.0 && gFilter != lFilter){
+				float dd = 0.0;
+				grey_out=0.0;
+				if (lFilter==2.0){
 					return;
 				}
+			    if (gFilter>0.0 && gFilter != lFilter) {
+					if(hide_on_filter==1.0){
+						return;
+					}
+					else{
+						grey_out=1.0;
+					}
+				}
+				
+			
 				float r=point_radius;
 			
-				gl_PointSize = r;
-				fragColor = color/255.0;
-				op=point_opacity;
+				gl_PointSize = r*point_scale;
+				vec3 c = vec3(255.0,255.0,255.0);
+				if (color==c){
+					op=0.1;
+					fragColor=vec3(0.1,0.1,0.1);
+				}
+				else{
+					op=point_opacity;
+					fragColor = color/255.0;
+				}
+			
+				
 				
 				has_border=lFilter-is_filtered;
 			
@@ -1149,7 +1517,7 @@ class WGL2DI{
                 y_pos:self.regl.prop("y_pos"),
 				color: self.regl.prop('color'),
 				lFilter:self.regl.prop("localFilter"),
-				gFilter:self.regl.prop("globalFilter")
+				gFilter:self.regl.prop("globalFilter"),
 
 			},
 		
@@ -1162,14 +1530,100 @@ class WGL2DI{
 				point_radius:self.regl.prop("point_radius"),
 				point_opacity:self.regl.prop("point_opacity"),
 				is_filtered:self.regl.prop("is_filtered"),
-				is_buffer:self.regl.prop("is_buffer")
-
+				is_buffer:self.regl.prop("is_buffer"),
+				hide_on_filter:self.regl.prop("hide_on_filter"),
+				point_scale:self.regl.prop('point_scale')
 			},
 
 			count:  self.regl.prop('count'),
 			primitive: self.regl.prop('primitive'),
 			framebuffer:self.regl.prop("buffer")
 		});
+
+		this.__drawHighlights = this.regl({
+			depth:self.draw_options.depth,
+	        blend:self.draw_options.blend,
+			depth:self.draw_options.depth,
+	        blend:self.draw_options.blend,
+	
+			frag: 
+		    `precision highp float;
+			varying vec3 fragColor;
+			
+			void main(){
+
+				vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+                
+				float r = dot(cxy, cxy);
+				if (r > 1.0) {
+					discard;
+				}
+				else{					
+					if(r>0.50) {
+					    gl_FragColor=vec4(0.1,0.1,0.1,1.0);
+					}
+					else{
+						gl_FragColor = vec4(fragColor,1);
+					}
+				}	
+			}`,
+
+			vert: 
+	        `attribute float x_pos;
+            attribute float y_pos;
+			attribute vec3 color;
+			uniform float point_radius;
+			
+			varying vec3 fragColor;
+		
+			uniform float x_scale;
+			uniform float y_scale;
+			uniform vec2 offset;
+			uniform float stage_height;
+			uniform float stage_width;
+			uniform float point_scale;
+			
+			vec2 normalizeCoords(float posX, float posY){
+				float x = (posX+offset[0])*x_scale;
+				float y = (posY+offset[1])*y_scale;
+				return vec2(2.0 * ((x / stage_width) - 0.5),-(2.0 * ((y / stage_height) - 0.5)));
+			}
+	
+			void main() {
+			
+				float pr = point_radius*point_scale;
+				pr = pr<10.0?10.0:pr;
+				gl_PointSize = pr;
+				fragColor = color/255.0;
+					
+				vec2 real_position = normalizeCoords(x_pos,-y_pos);
+				gl_Position = vec4(real_position, 0.0, 1.0);
+			}
+			`,
+
+			attributes: {
+				x_pos: self.regl.prop('x_pos'),
+                y_pos:self.regl.prop("y_pos"),
+				color: self.regl.prop('color'),
+
+			},
+		
+			uniforms: {
+				x_scale:self.regl.prop('x_scale'),
+				y_scale:self.regl.prop('y_scale'),
+				stage_width: self.regl.context("viewportWidth"),
+				stage_height: self.regl.context('viewportHeight'),
+				offset:self.regl.prop("offset"),
+				point_radius:self.regl.prop("point_radius"),
+				point_scale:self.regl.prop('point_scale')
+			
+			},
+
+			count:  self.regl.prop('count'),
+			primitive: self.regl.prop('primitive')
+			
+		});
+
 
 		this.object_types[0]['method']=this.__drawCircles;
 
@@ -1317,6 +1771,94 @@ class WGL2DI{
 
 		this.object_types[2]['method']=this.__drawImages;
 
+
+		this.__drawSquares = this.regl({
+			frag: `
+				precision highp float;
+				varying vec3 fragColor;
+				varying float r_clip;
+				varying float b_clip;
+				uniform int is_buffer;
+				void main(){
+					if (gl_PointCoord[1]<1.0-b_clip){
+						discard;
+					}
+					if (gl_PointCoord[0]> r_clip){
+						discard;
+					}				
+					gl_FragColor = vec4(fragColor,1);					
+				}
+				`,
+
+			vert:` 
+				attribute float x_pos;
+				attribute float y_pos;			
+				attribute vec3 color;
+			
+				varying float r_clip;
+				varying float b_clip;
+				varying vec3 fragColor;
+
+				uniform float x_scale;
+				uniform float y_scale;
+				uniform vec2 offset;
+				uniform float stage_height;
+				uniform float stage_width;
+				uniform float right_clip;
+				uniform float bottom_clip;
+				uniform float side_length;
+				
+				vec2 normalizeCoords(float posX,float posY){
+					float x = (posX+offset[0])*x_scale;
+					float y = (posY+offset[1])*y_scale;
+					return vec2(2.0 * ((x / stage_width) - 0.5),-(2.0 * ((y / stage_height) - 0.5)));
+				}
+				void main() {
+					gl_PointSize = side_length;
+					fragColor = color/255.0;
+					r_clip=right_clip;
+					b_clip= bottom_clip;
+					float y = y_pos;
+					float x = x_pos;
+					if (bottom_clip!=1.0){
+						y-=10.0*(1.0/b_clip)-10.0;
+					}
+					if (r_clip!=1.0){
+						x+=10.0*(1.0/r_clip)-10.0;
+					}
+
+					vec2 real_position = normalizeCoords(x,y);
+				
+					gl_Position = vec4(real_position, 0.0, 1.0);
+				}
+			`
+			,
+				
+			attributes: {
+				x_pos: self.regl.prop('x_pos'),
+                y_pos:self.regl.prop("y_pos"),
+				color: self.regl.prop('color')	
+			},
+	
+			uniforms: {
+				x_scale:self.regl.prop('x_scale'),
+				y_scale:self.regl.prop('y_scale'),
+				stage_height:self.regl.context("viewportHeight"),
+				stage_width:self.regl.context("viewportWidth"),
+				offset:self.regl.prop("offset"),
+				is_buffer:self.regl.prop("is_buffer"),
+				right_clip:self.regl.prop("right_clip"),
+				bottom_clip:self.regl.prop("bottom_clip"),
+				side_length:self.regl.prop('side_length'),
+			},
+	
+			count:  self.regl.prop('count'),
+			primitive: self.regl.prop('primitive'),
+			framebuffer:self.regl.prop("buffer")
+		});
+		this.object_types[3]['method']=this.__drawSquares;
+
+
 		this.__draw3DCircles = this.regl({
             frag: `
             precision mediump float;
@@ -1324,17 +1866,24 @@ class WGL2DI{
 			varying float op;
 			varying float has_border;
 			uniform float is_buffer;
+			varying float grey_out;
             void main () {
 			  float r = length(gl_PointCoord.xy - 0.4) ;
               if (r> 0.4) {
                 discard;
               }
 			  else{
-				if(r>0.3 && has_border==-1.0 && is_buffer==0.0){
+				if(r>0.3 && has_border==-1.0 && is_buffer==0.0 && grey_out==0.0){
 					gl_FragColor=vec4(0.1,0.1,0.1,1.0);
 				}
 				else{
-					gl_FragColor = vec4(fragColor,is_buffer==1.0?1.0:op);
+					if (grey_out==1.0 && is_buffer==0.0){
+						gl_FragColor = vec4(0.2,0.2,0.2,0.4);
+					}
+					else{
+						gl_FragColor = vec4(fragColor,is_buffer==1.0?1.0:op);
+					}
+					
 				}
 
 			  }
@@ -1360,17 +1909,26 @@ class WGL2DI{
 			uniform float point_opacity;
 			uniform float is_buffer;
 			uniform float is_filtered;
+			uniform float hide_on_filter;
+			uniform vec3 axis_scales;
 
 
             varying vec3 fragColor;
 			varying float op;
 			varying float has_border;
+			varying float grey_out;
 
             void main () {
-                if (gFilter>0.0 && gFilter != lFilter){
-					return;
+				grey_out=0.0; 
+			    if (gFilter>0.0 && gFilter != lFilter) {
+					if(hide_on_filter==1.0){
+						return;
+					}
+					else{
+						grey_out=1.0;
+					}
 				}
-                vec3 position = vec3(-x_pos,y_pos,-z_pos);
+                vec3 position = vec3(-x_pos *axis_scales.x,y_pos*axis_scales.y,-z_pos*axis_scales.z);
                 fragColor=color/255.0;
 				op = is_buffer==1.0?1.0:point_opacity;
 				has_border=lFilter-is_filtered;
@@ -1398,6 +1956,9 @@ class WGL2DI{
                 cdistance:self.regl.prop("cameraDistance"),
 				eye:self.regl.prop("cameraEye"),
 				is_filtered:self.regl.prop("is_filtered"),
+				hide_on_filter:self.regl.prop("hide_on_filter"),
+				axis_scales:self.regl.prop("axisScales"),
+
                 projection: (context,props) =>{
                  return glMatrix.mat4.perspective(
                     props.cameraProjection,
@@ -1412,6 +1973,96 @@ class WGL2DI{
           
               count:  self.regl.prop('count'),
 			  framebuffer:self.regl.prop("buffer"),
+			 
+			  blend:self.draw_options.blend,
+              primitive: 'points',
+		
+		});
+
+		this.__draw3DHighlights = this.regl({
+            frag: `
+            precision mediump float;
+            varying vec3 fragColor;
+		
+            void main () {
+			  float r = length(gl_PointCoord.xy - 0.4) ;
+              if (r> 0.4) {
+                discard;
+              }
+			  else{
+				if(r>0.3){
+					gl_FragColor=vec4(0.1,0.1,0.1,1.0);
+				}
+				else{
+					
+						gl_FragColor = vec4(fragColor,1.0);
+				}
+					
+			  }
+             
+            }
+            `,
+          
+            vert: `
+            precision mediump float;
+
+            attribute float x_pos;
+            attribute float y_pos;
+            attribute float z_pos;
+            attribute vec3 color;
+			
+			uniform float time;
+    
+            uniform mat4 view, projection;
+			uniform vec3 eye;
+			uniform float point_radius;
+			uniform vec3 axis_scales;
+		
+
+
+            varying vec3 fragColor;
+		
+
+            void main () {
+			
+                vec3 position = vec3(-x_pos*axis_scales.x,y_pos*axis_scales.y,-z_pos*axis_scales.z);
+                fragColor=color/255.0;
+               
+				gl_PointSize = point_radius*2.0; //(distance(eye, position.xyz) /30.0);
+                gl_Position = projection * view * vec4(2.0 * position, 1.0);
+            }
+            `,
+          
+              attributes: {
+              
+                x_pos: self.regl.prop('x_pos'),
+                y_pos:self.regl.prop("y_pos"),
+                z_pos:self.regl.prop("z_pos"),
+				color: self.regl.prop('color'),
+				
+              },
+          
+              uniforms: {
+				point_radius:self.regl.prop("point_radius"),
+		
+                view: self.regl.prop("cameraView"),
+                cdistance:self.regl.prop("cameraDistance"),
+				eye:self.regl.prop("cameraEye"),
+				axis_scales:self.regl.prop("axisScales"),
+				
+                projection: (context,props) =>{
+                 return glMatrix.mat4.perspective(
+                    props.cameraProjection,
+                    Math.PI / 4,
+                    context.viewportWidth / context.viewportHeight,
+                    0.01,
+                    10000
+                  )
+                 },
+                
+              },
+          
+              count:  self.regl.prop('count'),
 			  blend:self.draw_options.blend,
               primitive: 'points',
 		
@@ -1431,6 +2082,7 @@ class WGL2DI{
                     attribute vec3 position;
                     attribute vec3 color;
                     uniform mat4 view, projection;
+					uniform vec3 axis_scales;
     
                     varying vec3 fragColor;
                   
@@ -1438,7 +2090,7 @@ class WGL2DI{
                     void main () {
                      
                         fragColor=color;
-                        gl_Position = projection * view * vec4(2.0 * position*vec3(-1.0,1.0,-1.0), 1.0);
+                        gl_Position = projection * view * vec4(2.0 * position*axis_scales*vec3(-1.0,1.0,-1.0), 1.0);
                        
                        
                     }`
@@ -1452,6 +2104,7 @@ class WGL2DI{
             },
             uniforms: {
                 view: self.regl.prop("cameraView"),
+				axis_scales:self.regl.prop("axisScales"),
                 projection: (context,props) =>{
                  return glMatrix.mat4.perspective(
                     props.cameraProjection,
@@ -1469,12 +2122,7 @@ class WGL2DI{
             framebuffer:self.regl.prop("buffer"),
             count:self.regl.prop("count"),
 			depth:{enable:false}
-
-
-
-        });
-		
-	
+        });	
 	}
 	
 }

@@ -1,8 +1,105 @@
+.u-tree-list{
+  list-style-type: none;
+}
+
+.u-tree-selected{
+  background: #888;
+}
+
+.table-dark-mode .slick-row.odd{
+  background:#303030;
+}
+
+.table-dark-mode .ui-widget-content{
+  color:white;
+}
+
+.table-dark-mode .even{
+  background:#404040
+}
+
+.table-dark-mode .slick-header-column{
+  background:black;
+  color:white;
+}
+
+.table-dark-mode .slick-header-columns{
+  background:black
+}
+.table-dark-mode .slick-header{
+  background:black
+}
+
+.table-dark-mode .slick-viewport::-webkit-scrollbar-track {
+  background: #585858;        /* color of the tracking area */
+}
+
+.table-dark-mode .slick-viewport::-webkit-scrollbar {
+  width: 12px;
+}
+.table-dark-mode .slick-viewport::-webkit-scrollbar-thumb {
+  background-color:	black ;
+
+}
+
+.table-dark-mode .slick-cell.selected{
+  background:	#808080
+}
+
+.mdv-progress-outer{
+  background-color:gray;
+  height:16px;
+  border-radius:5px;
+  position:relative;
+}
+
+.mdv-progress-inner{
+  background-color:blue;
+  height:16px;
+  border-radius:5px; 
+}
+
+.mdv-progress-text{
+ 
+  position: absolute;
+  top: 1px;
+color:white;
+  width: 100%;
+  text-align: center;
+  font-size: 14px;
+  overflow:hidden,
+
+
+}
+
+.mdv-dark-mode{
+  background-color: black;
+  color:white;
+}
+
+
+
 
 .noUi-handle:after, .noUi-handle:before{
     visibility:hidden;
     left:-10px;
    
+}
+.ciview-tooltip{
+  display:none;
+  position:absolute;
+  border-radius:6px;
+  padding:4px;
+  background:burlywood;
+  z-index:5;
+
+}
+
+.noUi-tooltip {
+  display: none;
+}
+.noUi-active .noUi-tooltip {
+  display: block;
 }
 
 .noUi-horizontal .noUi-handle {
@@ -101,7 +198,7 @@
 
    .ciview-dlg-outer {
     position: absolute;
-    z-index: 40;
+    z-index: 1100;
     background-color: #f1f1f1;
     border: 1px solid #d3d3d3;
     overflow:auto;
@@ -151,4 +248,30 @@
   .ciview-dlg-header-text{
       white-space:nowrap;
       text-overflow: ellipsis;
+  }
+
+
+  .autocomplete-items {
+    position: absolute;
+    border: 1px solid #d4d4d4;
+    border-bottom: none;
+    border-top: none;
+    z-index: 99;
+    /*position the autocomplete items to be the same width as the container:*/
+  }
+  
+  .autocomplete-items div {
+    padding: 10px;
+    cursor: pointer;
+    background-color: #fff;
+    border-bottom: 1px solid #d4d4d4;
+  }
+  .autocomplete-items div:hover {
+    /*when hovering an item:*/
+    background-color: #e9e9e9;
+  }
+  .autocomplete-active {
+    /*when navigating through the items using the arrow keys:*/
+    background-color: DodgerBlue !important;
+    color: #ffffff;
   }

@@ -9,10 +9,11 @@ module.exports = {
 			headers: {
 				"Cross-Origin-Opener-Policy":"same-origin",
 				"Cross-Origin-Embedder-Policy":"require-corp"		
-			}
+			},
+			static:"./public/"
 		  },
 	
-	   entry: './src/dev_index.js',
+	   entry: './src/modules/dev_index.js',
 
   	   output: {
     		   filename: 'dist/ciview2.js',

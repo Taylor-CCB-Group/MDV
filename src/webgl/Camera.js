@@ -89,7 +89,7 @@ class Camera{
     
         var theta = this.cameraState.theta;
         var phi = this.cameraState.phi;
-        console.log(phi+":"+theta)
+        //console.log(phi+":"+theta)
         var r = Math.exp(this.cameraState.distance);
     
         var vf = r * Math.sin(theta) * Math.cos(phi);

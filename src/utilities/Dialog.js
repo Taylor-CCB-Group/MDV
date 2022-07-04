@@ -1,10 +1,32 @@
 import {createEl,makeResizable,makeDraggable} from "./Elements.js";
 
 class BaseDialog{
+  /**
+  * Adds a menu icon with tooltip to the title bar 
+  * @param {object} config The css classs of the icon (space delimited).
+  * @param {DOMElement} [config.doc=document] The document to attach the dialog to 
+  * @param {integer} [config.width] - The width of the dialog (in pixels)
+  * @param {integer} [config.height] - The height of the dialog (in pixels)
+  * @param {integer} [config.maxHeight] - if no height is specified,
+  * the the dialog will fit its contents, unless maxHeight is given
+  * @param {integer[]} [config.position] - The x and y psoition (in the document's body)
+  * If absent, the dialog will be placed in the middle of the screen
+  * @param {integer} [config.columns] An integer which will divide the dialog into
+  * equally sized vertical columns, which can be accessed with this.columns array
+  * @param {boolean} [config.footer=false] If true - a footer will be added and can be 
+  * accessed with this.footer
+  * @param {object[]} [config.buttons] -A list of of objects which should contain text
+  * (the button's label) and method (the name of  the method to call when the button is clicked)
+  *  e.g [{text:"OK",method:"doSomething"}] - the method 'doSomething' needs to be in 
+  * subclass. Buttons are added to the footer, so this needs to also be specified in the config
+  * @param {function} [onClose] A function called whrn the dialog is closed
+  * @param {object} content The object passed to the init method
+  */
 
 constructor (config={},content) {
     config.doc=config.doc?config.doc:document;
     this.config=config;
+    this.buttons={};
     const width = config.width?config.width+"px":"";
     const height = config.height?config.height+"px":"";
    
@@ -54,6 +76,14 @@ constructor (config={},content) {
     if (config.footer){
       this._addFooter();
     }
+    if (config.buttons){
+      if (!this.footer){
+        this._addFooter;
+      }
+      for (let but of config.buttons){
+        this._addButton(but);
+      }
+    }
 
     this.init(content);
 
@@ -64,7 +94,7 @@ constructor (config={},content) {
    
     const dbox =this.outer.getBoundingClientRect();
     if (config.maxHeight && dbox.height>config.maxHeight){
-      dbox.height = config.MaxHeight;
+      dbox.height = config.maxHeight;
       this.outer.style.height=config.maxHeight+"px";
     }
 
@@ -108,6 +138,28 @@ constructor (config={},content) {
     },this.outer);
   }
 
+  _addButton(but){
+    const b = createEl("span",{
+      text:but.text,
+      classes:["ciview-button"]
+    },this.footer)
+    b.addEventListener("click",()=>this[but.method]());
+    if (but.id){
+      this.buttons[but.id]=b;
+    }
+  }
+
+  disableButton(id,disable){
+    //this.buttons[id].classList.remove("ciview-button");
+    if (disable){
+      this.buttons[id].classList.add("ciview-disabled");
+    }
+    else{
+      this.buttons[id].classList.remove("ciview-disabled");
+    }
+    
+  }
+
   _createColumns(number){
     this.dialog.style.display="flex";
     this.dialog.style.flexDirection="row";
@@ -122,10 +174,11 @@ constructor (config={},content) {
           }
         },this.dialog));
     }
-
-
   }
 
+  /**
+  * Closes the dialog and removes it from the DOM
+  */
   close(){
     
     if (this.config.onclose){
@@ -135,12 +188,58 @@ constructor (config={},content) {
 
   }
 
-
+  /**
+  * This method should be overridden to add content to the dialog
+  */
   init(){}
 
+  /**
+  * This method should be overridden if the layout needs
+  * updating on resize
+  * @param {integer} x the new width of the dialog
+  * @param {integer} y the new height of the dialog
+  */
   onResize(x,y){}
 
 
 }
 
-export {BaseDialog};
+
+
+
+function getTextInput(title,event,doc=document){
+  return new Promise((accept,reject)=>{
+    const div= createEl("div",{
+      styles:{
+        position:"absolute",
+        zIndex:200,
+        left:event.clientX+"px",
+        top:event.clientY+"px",
+        background:"white",
+        padding:"5px"
+      }
+  
+    },doc.body)
+    createEl("label",{text:title,style:{display:"block"}},div);
+    const i = createEl("input",{},div);
+    i.addEventListener("keypress",(e)=>{
+      if (e.keyCode===13){
+       submit();
+      }
+    });
+    i.focus();
+    const el= ()=>submit();
+    i.addEventListener("blur",el);
+
+    function submit(){
+      i.removeEventListener("blur",el);
+      div.remove();
+      accept(i.value);
+      
+    }
+
+  })
+
+
+}
+export {BaseDialog,getTextInput};

@@ -19,13 +19,13 @@ function getRandomDataStore(size,config={}){
         },
         {
             name:"colors",
-            field:"x4",
+            field:"colors",
             datatype:"text",
             values:[
             "blue", 
             "purple",
             "red",
-            "yelllow"
+            "yellow"
             ],
             colors:[
             "#7FFFD4",
@@ -62,6 +62,7 @@ function getRandomDataStore(size,config={}){
         if (Math.random()>0.95){
             a1[n]=NaN;
         }
+        //a1[200]= 420;
     
     }
     const ds  =  new DataStore(size,{
@@ -70,8 +71,53 @@ function getRandomDataStore(size,config={}){
     ds.setColumnData("x1",c1);
     ds.setColumnData("x2",c2);
     ds.setColumnData("x3",c3);
-    ds.setColumnData("x4",c4);
+    ds.setColumnData("colors",c4);
     return ds;
 }
 
-export {getRandomDataStore}
+
+
+
+function getRandomData(column,size){
+    let arrayType=Float32Array;
+    let bytes=4;
+    if (column.datatype=="unique" || column.datatype=="text"){
+        arrayType=Uint8Array;
+        bytes=1;
+        if(column.datatype=="unique"){
+          bytes=column.stringLength;
+          arr_len=size*column.stringLength;
+        }
+       
+    }
+    const len  = size*bytes;     
+    
+    const sab = new SharedArrayBuffer(len);
+    const new_arr =  new arrayType(sab)
+    if (column.datatype === "text"){
+      const s = 4;
+      for (let n=0;n<len;n++){
+          new_arr[n]=Math.floor(Math.random()*s);
+      }
+    }
+    else{
+      for (let n=0;n<len;n++){
+          new_arr[n]=Math.random()*100;
+      }
+    }
+    return sab
+
+}
+
+function mockDataLoader(columns,dataSource,size){
+
+    return new Promise((resolve,reject)=>{
+        const dataList=[];
+        for (let column of columns){        
+          dataList.push({data:getRandomData(column,size),field:column.field});
+        }       
+        resolve(dataList);
+    });
+}
+
+export {getRandomDataStore,mockDataLoader,getRandomData}

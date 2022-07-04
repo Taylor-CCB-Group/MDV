@@ -1,13 +1,13 @@
 import { WGL2DI } from "../webgl/WGL2DI.js";
-import {WGLChart} from "./WGLChart.js";
-import {BaseChart} from "./BaseChart.js";
+import WGLChart from "./WGLChart.js";
+import BaseChart from "./BaseChart.js";
 
 class WGL3DScatterPlot extends WGLChart{
     constructor(dataStore,div,config){
         if (!config.title){
             config.title= dataStore.getColumnName(config.param[0])+" x "+
-           dataStore.getColumnName(config.param[1])+" x "+
-           dataStore.getColumnName(config.param[2])
+            dataStore.getColumnName(config.param[1])+" x "+
+            dataStore.getColumnName(config.param[2]);
         }
 		super(dataStore,div,config,{});
         const c = this.config;
@@ -49,30 +49,90 @@ class WGL3DScatterPlot extends WGLChart{
           
           this.app.setPointRadius(c.radius);
           this.app.setPointOpacity(c.opacity);
+          c.axis_scales=c.axis_scales || [1,1,1];
+          this.app.axisScales=c.axis_scales;
 
           this.addAxis();
-          this.centerGraph();
+          this.centerGraph(c.camera);
           this.app.refresh();
           
 	}
+    setAxisScales(index,val){
+        this.config.axis_scales[index]=val;
+        this.app.refresh();
+    }
 
-    getSettings(){
-           
-        return super.getSettings({pointMax:30,pointMin:1})
+    getSettings(){        
+        let settings =  super.getSettings({pointMax:30,pointMin:1})
+        const c = this.config;
+        settings = settings.concat([
+            {
+                type:"slider",
+                max:3,
+                min:0.5,
+                doc:this.__doc__,
+                current_value:c.axis_scales[0],
+                label:"X Axis Scale",
+                func:(x)=>{
+                    this.setAxisScales(0,x)
+                }
+              
+            },
+            {
+                type:"slider",
+                max:3,
+                min:0.5,
+                doc:this.__doc__,
+                current_value:c.axis_scales[1],
+                label:"Y Axis Scale",
+                func:(x)=>{
+                    this.setAxisScales(1,x)
+                }
+            },
+            {
+                type:"slider",
+                max:3,
+                min:0.5,
+                doc:this.__doc__,
+                current_value:c.axis_scales[2],
+                label:"Z Axis Scale",
+                func:(x)=>{
+                    this.setAxisScales(2,x)
+                }
+            }
+        ]);
+        return settings;   
+    }
+
+    centerGraph(values){
+        if (values){
+            this.app.setCamera(values.distance,values.theta,values.phi);
+        }
+        else{
+            this.app.setCamera(this.defaultCDistance,-1.038,0.261);
+        }
         
     }
 
-    centerGraph(){
-        this.app.setCamera(this.defaultCDistance,-1.038,0.261);
+    getConfig(){
+        const config = super.getConfig();
+        config.camera=this.app.getCameraSettings();
+        return config;
     }
 
     _createFilter(indexes){
-        this.dim.filterOnIndex(indexes);
+        this.dim.filter("filterOnIndex",[],indexes);
     }
 
-
-
-   
+    onDataAdded(newSize){
+        const p = this.config.param;
+		const config = this.getSetupConfig();
+        config.x=this.dataStore.getRawColumn(p[0]);
+        config.y=this.dataStore.getRawColumn(p[1]);
+        config.z=this.dataStore.getRawColumn(p[2]);
+        this.app.updateSize(newSize,config);
+        super.onDataAdded(newSize);
+    }
 
     addAxis(){
         for (let index=0;index<3;index++){
@@ -84,13 +144,8 @@ class WGL3DScatterPlot extends WGLChart{
             const color = [0,0,0];
             color[index]=255;
             this.app.addLine(from,to,color);
-
-        }
-      
+        }   
     }
-
-  
-
 }
 
 BaseChart.types["wgl_3d_scatter_plot"]={
@@ -112,4 +167,4 @@ BaseChart.types["wgl_3d_scatter_plot"]={
     ]
 }
 
-export {WGL3DScatterPlot};
+export default WGL3DScatterPlot;

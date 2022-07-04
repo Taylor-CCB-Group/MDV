@@ -1,0 +1,46 @@
+.panel-track-label{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width:100px;
+    position:absolute;
+    right:5px;
+    display:none;
+    background-color: white;
+    color:black;
+    font-size:13px;
+    cursor:pointer
+
+}
+
+
+
+.panel-track-label:hover {
+    font-weight:bold;
+}
+
+
+.panel-loading-icon{
+    display:block;
+    position:absolute;
+    margin: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size:30px;
+}
+
+
+.panel-error-message{
+    display:none;
+    position:absolute;
+    margin: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size:20px;
+    color:#721c24;
+    background:#f8d7da;
+    border: 1px solid #f5c6cb;
+}
+

@@ -60,6 +60,7 @@ class PopOutWindow {
             if (c.title){
                 doc.title=c.title;
             }
+      
             if (onload){
                 onload(doc,self.getDimensions());
             } 

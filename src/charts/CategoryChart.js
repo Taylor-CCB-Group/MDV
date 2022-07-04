@@ -1,22 +1,19 @@
-import {SVGChart} from "./SVGChart.js";
+import SVGChart from "./SVGChart.js";
 
 class CategoryChart extends SVGChart{
-    constructor(dataStore,div,config,axisTypes){
-        
+    constructor(dataStore,div,config,axisTypes){       
         if (Array.isArray(config.param)){
             config.param=config.param[0];
         }
         config.title = config.title || dataStore.getColumnName(config.param);        
 		super(dataStore,div,config,axisTypes);        		 
-        this.dim = this.dataStore.getDimension("category_dimension",config.param);
+        this.dim = this.dataStore.getDimension("category_dimension");
         this.colors  = this.dataStore.getColumnColors(config.param);  
-        this.filter=[];
-       
-     
+        this.filter=[]; 
 	}
 
-    remove(){
-        this.dim.destroy();
+    remove(notify=true){
+        this.dim.destroy(notify);
         super.remove();
     }
 
@@ -30,21 +27,37 @@ class CategoryChart extends SVGChart{
         this.filter=[];  
         this.drawChart();   
     }
+  
 
     filterCategories(cat,append){
         if (append){
-            this.filter.push(cat)
+            if (this.filter.indexOf(cat)!==-1){
+                this.filter= this.filter.filter(x=>x!==cat)
+            }
+            else if (this.filter.length==0){
+                const vs = this.dataStore.getColumnValues(this.config.param);
+                this.filter= vs.filter(x=>x!==cat);
+            }
+            else{
+                this.filter.push(cat);
+            }
+            
         }
         else{
             this.filter=[cat];
         }
         this.resetButton.style.display = "inline";
         this.drawChart(100);
-        this.dim.filterCategories(this.filter.lenght===1?this.filter[0]:this.filter);       
+        this.dim.filter("filterCategories",[this.config.param],this.filter);       
     }
 
     getFilter(){
-        return this.filter.slice(0)
+        const f= {};
+        if (!(this.filter) || this.filter.length===0){
+            return null;
+        }
+        f[this.config.param]=this.filter.slice(0);
+        return f;
     }
 
     pinChart(){
@@ -66,7 +79,6 @@ class CategoryChart extends SVGChart{
             this.resetButton.style.display="none";
         }
         const config={};
-      
         this.dim.getCategories(data=>{
             this.rowData=[];
             this.maxCount=1;
@@ -75,8 +87,8 @@ class CategoryChart extends SVGChart{
                 this.maxCount= Math.max(data[n],this.maxCount);
             }
             this.drawChart();            
-        },config)    
+        },this.config.param,config)    
     }
 }
 
-export {CategoryChart};
+export default CategoryChart;

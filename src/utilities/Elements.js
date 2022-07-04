@@ -150,11 +150,37 @@ function removeDraggable(el){
 }
 
 
+class MDVProgress{
+    constructor(el,config){
+        this.el=el;
+        this.max=config.max || 100;
+        el.classList.add("mdv-progress-outer");
+        this.bar = createEl("div",{
+            classes:["mdv-progress-inner"],
+        },el);
+        this.text=createEl("div",{
+            classes:["mdv-progress-text"]
+        },el);
+        this.setText(config.text || "");
+        this.setValue(config.value || 0 );
+       
+    }
+
+    setText(text){
+        this.text.textContent=text;  
+    }
+    setValue(val){   
+        this.bar.style.width=`${Math.round((val/this.max)*100)}%`
+    }
+}
+
+
 
 function makeDraggable(el,config={}){
     if (!config.doc){
         config.doc=document;
     }
+
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
     let  handle= config.handle?el.querySelector(config.handle):el;
     let cont = null;
@@ -164,27 +190,31 @@ function makeDraggable(el,config={}){
             dir:config.contain
         };
     }
-
+ 
 
 
     handle.onmousedown = dragMouseDown;
-    el.__draginfo__={
-        handle:handle,
-        cursor:handle.style.cursor,
-        position:el.style.position,
-    }
-    handle.style.cursor="move";
-    el.style.position="absolute";
-    el.style.margin="0px 0px 0px 0px";
-    el.__doc__=config.doc;
+    
+        el.__draginfo__={
+            handle:handle,
+            cursor:handle.style.cursor,
+            position:el.style.position,
+        }
+        handle.style.cursor="move";
+        el.style.position="absolute";
+        el.style.margin="0px 0px 0px 0px";
+        el.__doc__=config.doc;
+    
     function dragMouseDown(e) {
+ 
+    
       e = e || window.event;
       e.preventDefault();
       // get the mouse cursor position at startup:
       pos3 = e.clientX;
       pos4 = e.clientY;
       if (config.ondragstart){
-          config.ondragstart();
+          config.ondragstart(el);
       }
       if (cont){
           cont.p_bb= el.parentElement.getBoundingClientRect();
@@ -206,7 +236,7 @@ function makeDraggable(el,config={}){
       pos3 = e.clientX;
       pos4 = e.clientY;
       //console.log(pos3+":"+pos4);
-      console.log(pos1+":"+pos2);
+      //console.log(pos1+":"+pos2);
       // set the element's new position:
       let nt  = el.offsetTop -pos2;
       let nl = el.offsetLeft - pos1;
@@ -218,8 +248,9 @@ function makeDraggable(el,config={}){
             return;
         }
     }
-
+    if (!config.y_axis){
       el.style.top = (nt) + "px";
+    }
       el.style.left = (nl) + "px";
     }
   
@@ -249,6 +280,14 @@ function addResizeListener(element,callback){
     return list;
 }
 
+function getElDim(el){
+    var rect = el.getBoundingClientRect(),
+    scrollLeft = window.pageXOffset || document.documentElement.scrollLeft,
+    scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    return { top: rect.top + scrollTop, left: rect.left + scrollLeft ,height:rect.height,width:rect.width}
+
+}
+
 export {createEl,createSVGEl,addResizeListener,makeDraggable,
     makeResizable,removeDraggable,removeResizable,createMenuIcon,
-    splitPane};
+    splitPane,getElDim,MDVProgress};

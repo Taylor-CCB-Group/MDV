@@ -60,9 +60,10 @@ function getColorLegend(colors,names,config={}){
             x:14,
             "alignment-baseline":"middle",
             styles:{
-                "font-size":"12px"
+                "font-size":"12px",
+                "fill":"currentColor"
             },
-            text:names[i]
+            text:names[i]===""?"none":names[i]
         },legendg)
     }
 
@@ -90,6 +91,7 @@ function getColorBar(colors,config={}){
         g.append("text")
         .text(c.label)
         .attr("x",10)
+        .style("fill","currentColor")
         .attr("alignment-baseline","hanging")
         .style("font-size","12px");
 

@@ -1,8 +1,8 @@
 
 import {select} from "d3-selection";
 import {easeLinear} from "d3-ease";
-import {SVGChart} from "./SVGChart.js";
-import {BaseChart} from "./BaseChart.js";
+import SVGChart from "./SVGChart.js";
+import BaseChart from "./BaseChart.js";
 import {brushX} from "d3-brush";
 
 class HistogramChart extends SVGChart{
@@ -44,7 +44,7 @@ class HistogramChart extends SVGChart{
 
 
         this._setBrushExtent();
-        this.dim = this.dataStore.getDimension("range_dimension",c.param);
+        this.dim = this.dataStore.getDimension("range_dimension");
         this.filter=null;
         this.binFiltered=new Array(this.config.bin_number).fill(false);
         this.onDataFiltered(null,true);
@@ -67,10 +67,12 @@ class HistogramChart extends SVGChart{
              
     }
 
-    remove(){
-        this.dim.destroy();
+    remove(notify=true){
+        this.dim.destroy(notify);
         super.remove();
     }
+
+    
 
 
     removeFilter(){
@@ -99,14 +101,21 @@ class HistogramChart extends SVGChart{
         }    
     }
 
-  
-
     setRange(start,end){
         this.filter=[start,end];      
         this._calculateFilterBins();
-        this.dim.filterRange(start,end);
+        this.dim.filter("filterRange",[this.config.param],{min:start,max:end});
         this.drawChart();
         this.resetButton.style.display = "inline";
+    }
+
+    getFilter(){
+        if (!this.filter){
+            return null;
+        }
+        const f={};
+        f[this.config.param]=this.filter.slice(0);
+        return f;
     }
 
    
@@ -137,7 +146,7 @@ class HistogramChart extends SVGChart{
             this.binData=data.slice(0,bn);
             this.binData[bn-1]+=data[bn];
             this.drawChart();
-        },config
+        },this.config.param,config
        )
        
     }
@@ -188,6 +197,24 @@ class HistogramChart extends SVGChart{
         const c = this.config;
         const maxMin = this.dataStore.getMinMaxForColumn(c.param)
         return settings.concat([
+          
+            {
+                type:"doubleslider",
+                min:maxMin[0],
+                max:maxMin[1],
+                doc:this.__doc__ || document,
+                current_value:[c.display_min,c.display_max],
+                label:"max min values",
+                info:{text:`Sometimes outliers can skew the histogram to one side.
+                     Setting a min/max value will add all counts less/greater than the 
+                     value specified to the first/last bin.`,position:"left"},
+                func:(x,y)=>{
+                    c.display_min=x;
+                    c.display_max=y;
+                    this._calculateFilterBins();
+                    this.onDataFiltered();
+                }
+            },
             {
                 type:"spinner",
                 max:100,
@@ -196,23 +223,6 @@ class HistogramChart extends SVGChart{
                 label:"Number of bins",
                 func:(x)=>{
                     c.bin_number=x;
-                    this._calculateFilterBins();
-                    this.onDataFiltered();
-                }
-            },
-            {
-                type:"doubleslider",
-                min:maxMin[0],
-                max:maxMin[1],
-                doc:this.__doc__ || document,
-                current_value:[c.display_min,c.display_max],
-                label:"max min values",
-                info:`Sometimes outliers can skew the histogram to one side.
-                     Setting a min value will add all counts less than this 
-                     value to the first bin and `,
-                func:(x,y)=>{
-                    c.display_min=x;
-                    c.display_max=y;
                     this._calculateFilterBins();
                     this.onDataFiltered();
                 }
@@ -230,4 +240,4 @@ BaseChart.types["bar_chart"]={
     }]
 }
 
-export {HistogramChart};
+export default HistogramChart;

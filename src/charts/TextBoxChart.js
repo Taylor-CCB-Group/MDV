@@ -1,4 +1,4 @@
-import {BaseChart} from "./BaseChart.js";
+import BaseChart from "./BaseChart.js";
 import {createEl} from "../utilities/Elements.js";
 
 
@@ -32,9 +32,11 @@ class TextBoxChart extends BaseChart{
 
 }
 
+export default TextBoxChart;
+
 BaseChart.types["text_box_chart"]={
     "class":TextBoxChart,
-    name:"Tex Box",
+    name:"Text Box",
     params:[]
 
 }

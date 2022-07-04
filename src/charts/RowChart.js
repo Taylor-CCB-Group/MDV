@@ -1,7 +1,7 @@
 import {select} from "d3-selection";
 import {easeLinear} from "d3-ease";
-import {CategoryChart} from "./CategoryChart.js";
-import { BaseChart } from "./BaseChart.js";
+import CategoryChart from "./CategoryChart.js";
+import BaseChart from "./BaseChart.js";
 
 class RowChart extends CategoryChart{
     constructor(dataStore,div,config){
@@ -12,33 +12,56 @@ class RowChart extends CategoryChart{
 	}
 
     drawChart(tTime=400){
+        const c = this.config;
         const trans =  select(this.contentDiv).transition()
         .duration(tTime).ease(easeLinear);
         const chartWidth= this.width-this.margins.left-this.margins.right;
         const chartHeight = this.height-this.margins.bottom- this.margins.top;
-        const nBars = this.rowData.length;
+      
+        const colors = this.dataStore.getColumnColors(this.config.param); 
         const vals = this.dataStore.getColumnValues(this.config.param);
-        const barHeight= (chartHeight-(nBars+1)*3)/nBars;
         
-  
-        this.x_scale.domain([0,this.maxCount]);
-        this.updateAxis();
+       
         const units = chartWidth/this.maxCount;
         const self = this;
+        let  data = this.rowData;
+        let maxCount = this.maxCount;
+  
+        if (c.exclude_categories){
+            const ex = new Set()
+            for (let n of c.exclude_categories){
+                ex.add(vals.indexOf(n))
+            }
+            data= this.rowData.filter((x,i)=>!ex.has(i));
+            maxCount= data.reduce((a,b)=>Math.max(a[0],b[0]))
+        }
+
+        
+        const nBars = data.length;
+       
+        const barHeight= (chartHeight-(nBars+1)*3)/nBars;
+
+        let fontSize = Math.round(barHeight);
+        fontSize=fontSize>20?20:fontSize;
+
+        this.x_scale.domain([0,this.maxCount]);
+        this.updateAxis();
+
         this.graph_area.selectAll(".row-bar")
-        .data(this.rowData,(d,i)=>i)
+        .data(data,(d,i)=>i)
         .join("rect")
         .on("click",(e,d)=>{
             self.filterCategories(vals[d[1]],e.shiftKey);
         })
         .transition(trans)
-        .style("fill",(d,i)=>{
+        .style("fill",(d)=>{
+            const i = d[1];
             if (self.filter.length>0){
                 if (self.filter.indexOf(vals[i])===-1){
                     return "lightgray"
                 }
             }
-            return self.colors[i];
+            return colors[i];
           
         })
         .attr("class","row-bar")
@@ -50,15 +73,17 @@ class RowChart extends CategoryChart{
 
         this.graph_area.selectAll(".row-text")
         
-        .data(this.rowData,(d,i)=>i)
+        .data(data)
         .join("text")
         .on("click",(e,d)=>{
             self.filterCategories(vals[d[1]],e.shiftKey);
         })
         .attr("class","row-text")
         .transition(trans)
-        .text((d,i)=>vals[i])
+        .text((d)=>vals[d[1]]===""?"none":vals[d[1]])
+        .attr("font-size",fontSize+"px")
         .attr("x",5)
+        .style("fill","currentColor")
         .attr("y",(d,i)=>((i+1)*3)+(i*barHeight)+(barHeight/2))
         //.attr("text-anchor", "middle")
         .attr("dominant-baseline", "central") 
@@ -76,4 +101,4 @@ BaseChart.types["row_chart"]={
 
 }
 
-export {RowChart};
+export default RowChart;

@@ -11,6 +11,7 @@ class ChartSettingsDialog extends BaseDialog{
     }
 
     init(content){
+        
         for (let s of content){
             let d = createEl("div",{
                 styles:{
@@ -71,23 +72,22 @@ class ChartSettingsDialog extends BaseDialog{
     }
 
     slider(s,d){
-        const sl = createEl("div",{
-            styles:{      
-            }
-        },d)
+        const sl = createEl("div",{},d)
         noUiSlider.create(sl, {
             start: [s.current_value],
             range: {
                 'min': [s.min],
                 'max': [s.max]
             },
-            format:{
+            step:s.step || null,
+            tooltips:true,
+            /*format:{
                 to:v=>{
                     return v+""
                 },
                 from:v=>{
                     return Number(v)}
-            },
+            },*/
             documentElement:s.doc
         });
         sl.noUiSlider.on("end",(values)=>{
@@ -156,10 +156,6 @@ class ChartSettingsDialog extends BaseDialog{
     }
 
     textbox(s,d){
-       
-      
-      
-
         const tb= createEl("textarea",{
            
             styles:{
@@ -186,15 +182,17 @@ class ChartSettingsDialog extends BaseDialog{
           })
     }
 
-    addInfoIcon(text,parent){
+    addInfoIcon(info,parent){
+        
         const sp= createEl("span",{
-            "aria-label":text,
+            "aria-label":info.text,
             role:"tooltip",
             "data-microtip-size": "medium",
-            "data-microtip-position": "bottom",
+            "data-microtip-position": info.position,
             styles:{
                 marginLeft:"5px"
-            }
+            },
+            classes:["ttt"]
             },parent);
     
         createEl("i",{  

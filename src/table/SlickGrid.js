@@ -20,7 +20,10 @@
 
 import {Slick} from "./Slick.js";
 import $ from "jquery";
+import { makeDraggable } from "../utilities/Elements.js";
 const jQuery = $;
+
+
 
 
 (function( $ ) {
@@ -41,6 +44,7 @@ const jQuery = $;
 
   // local refs (increase compression)
   var $event = $.event,
+   
       $special = $event.special,
       // configure the drag special event
       drag = $special.drag = {
@@ -70,6 +74,7 @@ const jQuery = $;
                   opts = obj.data || {};
               // count another realted event
               data.related += 1;
+             
               // extend data options bound with this event
               // don't iterate "opts" in case it is a node
               $.each( drag.defaults, function( key, def ){
@@ -117,7 +122,7 @@ const jQuery = $;
           },
 
           // initialize the interaction
-          init: function( event ){
+          init: function( event,args ){
               // sorry, only one touch at a time
               if ( drag.touched )
                   return;
@@ -163,10 +168,11 @@ const jQuery = $;
               // disable text selection
               drag.textselect( false );
               // bind additional events...
+              let doc = $(event.currentTarget).data("__doc__") || document;
               if ( drag.touched )
                   $event.add( drag.touched, "touchmove touchend", drag.handler, dd );
               else
-                  $event.add( document, "mousemove mouseup", drag.handler, dd );
+                  $event.add( doc, "mousemove mouseup", drag.handler, dd );
               // helps prevent text selection or scrolling
               if ( !drag.touched || dd.live )
                   return false;
@@ -221,10 +227,11 @@ const jQuery = $;
                   case 'touchend':
                   case 'mouseup':
                   default:
+                      let doc= $(dd.target).data("__doc__") || event.currentTarget || document;
                       if ( drag.touched )
                           $event.remove( drag.touched, "touchmove touchend", drag.handler ); // remove touch events
                       else
-                          $event.remove( document, "mousemove mouseup", drag.handler ); // remove page events
+                          $event.remove( doc, "mousemove mouseup", drag.handler ); // remove page events
                       if ( dd.dragging ){
                           if ( dd.drop !== false && $special.drop )
                               $special.drop.handler( event, dd ); // "drop"
@@ -784,7 +791,7 @@ const jQuery = $;
       }
 
       // Append the columnn containers to the headers
-      $headerL = $("<div class='slick-header-columns slick-header-columns-left' style='left:-1000px' />").appendTo($headerScrollerL);
+      $headerL = $("<div class='slick-header-columns slick-header-columns-left' style='left:-1000px' />").data("__doc__",__doc__).appendTo($headerScrollerL);
       $headerR = $("<div class='slick-header-columns slick-header-columns-right' style='left:-1000px' />").appendTo($headerScrollerR);
 
       // Cache the header columns
@@ -1634,7 +1641,7 @@ const jQuery = $;
           $footerRowR.empty();
         }
       }
-
+      let _off= 0;
       for (var i = 0; i < columns.length; i++) {
         var m = columns[i];
 
@@ -1647,6 +1654,7 @@ const jQuery = $;
             .attr("id", "" + uid + m.id)
             .attr("title", m.toolTip || "")
             .data("column", m)
+            .data("__doc__",__doc__)
             .addClass(m.headerCssClass || "")
             .addClass(hasFrozenColumns() && i <= options.frozenColumn? 'frozen': '')
             .appendTo($headerTarget);
@@ -1656,6 +1664,60 @@ const jQuery = $;
             .on('mouseenter', onMouseEnter)
             .on('mouseleave', onMouseLeave);
         }
+        header.on("dragstart",(e,i)=>{
+          i.target.style.zIndex=1;
+          i.target.style.opacity=0.6;
+        }).
+        on("drag",(e,i)=>{
+       
+          i.target.style.left =(1000+(i.offsetX-i.originalX))+"px";
+
+        }).on("dragend",(e,i)=>{
+          if (Math.abs(i.deltaX)<5){
+            i.target.style.opacity=1;
+            i.target.style.zIndex="";
+            return;
+          }
+
+          const col = $(i.target).data("column");
+          let st_c=0;
+          const sts=[];
+          let st_t=0;
+        
+          for (let c of columns){
+            sts.push(st_t)
+            if (c===col){
+              st_c=st_t;
+            }
+            st_t+=c.width
+          }
+          sts.push(st_t+1000)
+          const t_cols=[];
+          let n_pos = st_c+i.deltaX
+          if (n_pos<0){
+            t_cols.push(col);
+          }
+          for (let n=0;n<columns.length;n++){
+            if (columns[n]!==col){
+              t_cols.push(columns[n])
+            }
+            if (n_pos>sts[n] && n_pos<sts[n+1]){
+              t_cols.push(col);
+              n_pos=-1000;
+            }
+           
+            
+          }
+          columns=t_cols;
+         
+          setColumns(columns);
+        })
+       
+         
+        
+         
+          
+    
 
         if(m.hasOwnProperty('headerCellAttrs') && m.headerCellAttrs instanceof Object) {
           for (var key in m.headerCellAttrs) {
@@ -1988,6 +2050,7 @@ const jQuery = $;
         }
         $col = $(e);
         $("<div class='slick-resizable-handle' />")
+            .data("__doc__",__doc__)
             .appendTo(e)
             .on("dragstart", function (e, dd) {
               if (!getEditorLock().commitCurrentEdit()) {
@@ -2268,7 +2331,7 @@ const jQuery = $;
         hasFrozenRows = true;
         frozenRowsHeight = ( options.frozenRow ) * options.rowHeight;
 
-        var dataLength = getDataLength();
+        var fgLength = getDataLength();
 
         actualFrozenRow = ( options.frozenBottom )
           ? ( dataLength - options.frozenRow )
@@ -2406,7 +2469,7 @@ const jQuery = $;
     }
 
     function createCssRules() {
-      $style = $(`<style type='text/css' rel='stylesheet' title='${uid}' />`).appendTo($("head"));
+      $style = $(`<style type='text/css' rel='stylesheet'/>`).appendTo(__doc__.head);
       var rowHeight = (options.rowHeight - cellHeightDiff);
       var rules = [
         "." + uid + " .slick-group-header-column { left: 1000px; }",
@@ -2436,13 +2499,14 @@ const jQuery = $;
       if (!stylesheet) {
         var sheets = __doc__.styleSheets;
         
-        for (i = 0; i < sheets.length; i++) {
+        for (let i = 0; i < sheets.length; i++) {
           if ((sheets[i].ownerNode || sheets[i].owningElement) == $style[0]) {
             stylesheet = sheets[i];
             break;
           }
-          if (sheets[i].title==uid){
+          if (sheets[i].rules[0].selectorText && sheets[i].rules[0].selectorText.includes(uid)){
             stylesheet=sheets[i];
+            break;
           }
         }
 
@@ -6261,10 +6325,31 @@ const jQuery = $;
       }
     }
 
+    function getBaseDocument(){
+      return __doc__;
+    }
+
     function setBaseDocument(doc){
       __doc__=doc;
       stylesheet=null;
-      applyColumnWidths();
+      var sheets = __doc__.styleSheets;
+        
+      for (let i = 0; i < sheets.length; i++) {
+        if (sheets[i].rules[0].selectorText && sheets[i].rules[0].selectorText.includes(uid)){
+          stylesheet=sheets[i];
+          break;
+        }
+      }
+     
+      $style=$(stylesheet.ownerNode);
+      removeCssRules();
+      createCssRules();
+      //applyColumnWidths();
+      setColumns(columns);
+      //const columnElements = $headers.children();
+      //const el =columnElements.find(".slick-resizable-handle");
+     // el.data("__doc__",__doc__)
+
     }
 
 
@@ -6466,12 +6551,437 @@ const jQuery = $;
       //new stuff
       "applyColumnWidths":applyColumnWidths,
       "setBaseDocument":setBaseDocument,
+      "getBaseDocument":getBaseDocument
     });
 
     init();
   }
 
+  function TextEditor(args) {
+    var $input;
+    var defaultValue;
+    var scope = this;
+
+
+    this.init = function () {
+      $input = $("<INPUT type=text class='editor-text' />")
+          .appendTo(args.container)
+          .on("keyup",(e)=>{
+            const k = e.which;
+            if (k===37 || k===39 || k===8){
+              e.stopImmediatePropagation();
+              return;
+            }
+            this.autoCorrect($input.val());
+          })
+    };
+
+    this.autoCorrect=function(val){
+      const model= args.grid.getData();
+      const suggest = model.getValueSuggestion(val,args.column.field);
+      if (suggest){
+        $input.val(suggest);
+      }
+     
+
+    }
+
+    this.destroy = function () {
+      $input.remove();
+    };
+
+    this.focus = function () {
+      $input.focus();
+    };
+
+    this.getValue = function () {
+      return $input.val();
+    };
+
+    this.setValue = function (val) {
+      $input.val(val);
+    };
+
+    this.loadValue = function (item) {
+      defaultValue = item[args.column.field] || "";
+      $input.val(defaultValue);
+      $input[0].defaultValue = defaultValue;
+      $input.select();
+    };
+
+    this.serializeValue = function () {
+      return $input.val();
+    };
+
+    this.applyValue = function (item, state,notify=true) {
+      const model= args.grid.getData();
+      model.updateValue(state,item.__index__,args.column.field,notify)
+    };
+
+    this.isValueChanged = function () {
+      return (!($input.val() == "" && defaultValue == null)) && ($input.val() != defaultValue);
+    };
+
+    this.validate = function () {
+      if (args.column.validator) {
+        var validationResults = args.column.validator($input.val());
+        if (!validationResults.valid) {
+          return validationResults;
+        }
+      }
+
+      return {
+        valid: true,
+        msg: null
+      };
+    };
+
+    this.init();
+  }
+
+  function Overlays(options) {
+ 
+
+    var selectionOverlay;
+    var startRow;
+
+    var currentColumn;
+    var handleDragging;
+    var grid;
+    var self = this;
+    var handler = new Slick.EventHandler();
+    var dragDecorator;
+
+    var defaults = {
+        buttonCssClass: null,
+        buttonImage: "../images/down.gif",
+        decoratorWidth: 2
+    };
+
+    function init(g) {
+        options = $.extend(true, {}, defaults, options);
+        grid = g;
+
+        dragDecorator = new overlayRangeDecorator(grid);
+
+      
+       
+        selectionOverlay = createSelectionOverlay();
+
+        handler.subscribe(grid.onActiveCellChanged, activeCellChanged)
+               .subscribe(grid.onColumnsResized, columnResized)
+               .subscribe(grid.onScroll, gridScrolled);
+    }
+
+    function destroy() {
+        handler.unsubscribeAll();
+        selectionOverlay.$handle.unbind("dragstart", handleOverlayDragStart)
+                                .unbind('drag', handleOverlayDrag)
+                                .unbind('dragend', handleOverlayDragEnd);
+        selectionOverlay.remove();
+    }
+
+ 
+ 
+
+    function createSelectionOverlay() {
+        var canvas = grid.getCanvasNode();
+        var overlay = new Overlay(canvas);
+
+        overlay.$handle
+          .bind('dragstart', handleOverlayDragStart)
+          .bind('drag', handleOverlayDrag)
+          .bind('dragend', handleOverlayDragEnd);
+
+        return overlay;
+    }
+
+    function activeCellChanged(e, args) {
+        dragDecorator.hide();
+
+        moveSelectionOverlay(e, args);
+      
+    }
+
+    function columnResized(e, args) {
+     
+        moveSelectionOverlay(e, args);
+    }
+
+    function gridScrolled(e, args) {
+      
+        moveSelectionOverlay(e, args);
+    }
+
+  
+
+    function moveSelectionOverlay(e, args) {
+        var activeCell = grid.getActiveCell();
+
+        if (!activeCell) {
+            selectionOverlay.toggle(false);
+            return;
+        }
+
+        var column = grid.getColumns()[activeCell.cell];
+        selectionOverlay.toggle(true);
+
+        // Only show the handle if the cell is editable
+        selectionOverlay.$handle.toggle(typeof (column.editor) !== 'undefined');
+
+        var position = grid.getCellNodeBox(activeCell.row, activeCell.cell);
+
+        // Not coming through on the property so re-calculated
+        position.height = position.bottom - position.top;
+        position.width = position.right - position.left;
+
+        selectionOverlay.$left.css({
+            left: position.left - 2,
+            top: position.top,
+            width: 2,
+            height: position.height
+        });
+
+        selectionOverlay.$right.css({
+            left: position.left + position.width - 1,
+            top: position.top,
+            width: 2,
+            height: position.height
+        });
+
+        selectionOverlay.$top.css({
+            left: position.left - 2,
+            top: position.top - 2,
+            width: position.width + 3,
+            height: 2
+        });
+
+        selectionOverlay.$bottom.css({
+            left: position.left - 2,
+            top: position.top + position.height - 1,
+            width: position.width + 3,
+            height: 2
+        });
+
+        selectionOverlay.$handle.css({
+            left: position.left + position.width - 4,
+            top: position.top + position.height - 4,
+            width: 1,
+            height: 1
+        });
+    }
+
+    function handleOverlayDragStart(e, dd) {
+        var cell = grid.getActiveCell();
+
+        if (grid.canCellBeSelected(cell.row, cell.cell)) {
+            handleDragging = true;
+            e.stopImmediatePropagation();
+        }
+
+        if (!handleDragging) {
+            return null;
+        }
+        const ed = grid.getCellEditor();
+        if (ed){
+          //don't notify handlers until all values are changed i.e. drag ended
+          ed.applyValue(grid.getDataItem(cell.row),ed.getValue(),false)
+        }
+        
+
+        grid.focus();
+        startRow= cell.row;
+
+        dd.range = { start: cell, end: {} };
+
+        $(this).css({
+            "background-color": "transparent",
+            "border-color": "transparent"
+        });
+
+        return dragDecorator.show(new Slick.Range(cell.row, cell.cell));
+    }
+
+    function handleOverlayDrag(e, dd) {
+        if (!handleDragging) {
+            return;
+        }
+
+        var canvas = grid.getCanvasNode();
+
+        e.stopImmediatePropagation();
+
+        var end = grid.getCellFromPoint(
+            e.pageX - $(canvas).offset().left,
+            e.pageY - $(canvas).offset().top);
+
+        if (!grid.canCellBeSelected(end.row, end.cell)) {
+            return;
+        }
+
+        dd.range.end = end;
+
+        dragDecorator.show(new Slick.Range(dd.range.start.row,
+                                           dd.range.start.cell,
+                                           end.row,
+                                           dd.range.start.cell));
+        const vp =grid.getViewport();
+        if (vp.bottom===end.row){
+          grid.scrollRowIntoView(end.row+7);
+        }
+        if (vp.top===end.row){
+          grid.scrollRowIntoView(vp.top-7);
+        } 
+    }
+
+    function handleOverlayDragEnd(e, dd) {
+        if (!handleDragging) {
+            return;
+        }
+
+        handleDragging = false;
+
+        $(this).css({
+            "background-color": "",
+            "border-color": ""
+        });
+
+        dragDecorator.hideHandle();
+        const r = dragDecorator.getSelectedRange();
+        const dir=startRow<r.toRow?"+":"-";
+        self.onFillUpDown.notify({ dir:dir,"grid": grid, "range": r }, e, self);
+        dragDecorator.hide();
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function Overlay(target, prefix) {
+        var className = (prefix || '') + 'cell-overlay';
+
+        this.$left = $('<div>')
+            .addClass(className)
+            .addClass('left')
+            .appendTo(target);
+        
+        this.$right = $('<div>')
+            .addClass(className)
+            .addClass('right')
+            .appendTo(target);
+        
+        this.$top = $('<div>')
+            .addClass(className)
+            .addClass('top')
+            .appendTo(target);
+        
+        this.$bottom = $('<div>')
+            .addClass(className)
+            .addClass('bottom')
+            .appendTo(target);
+        
+        this.$handle = $('<div>')
+            .addClass("handle-overlay")
+            .data("__doc__",grid.getBaseDocument())
+            .appendTo(target);
+
+        this.toggle = function (showOrHide) {
+            this.$left.toggle(showOrHide);
+            this.$right.toggle(showOrHide);
+            this.$top.toggle(showOrHide);
+            this.$bottom.toggle(showOrHide);
+            this.$handle.toggle(showOrHide);
+        };
+
+        this.remove=function(){
+          this.$left.remove();
+          this.$right.remove();
+          this.$top.remove();
+          this.$bottom.remove();
+          this.$handle.remove();
+        }
+    }
+
+    function overlayRangeDecorator(targetGrid) {
+        var decorator;
+        var r;
+
+        function show(range) {
+            r = range;
+            if (!decorator) {
+                decorator = new Overlay(grid.getCanvasNode(), 'selection-');
+            }
+
+            var from = targetGrid.getCellNodeBox(range.fromRow, range.fromCell);
+            var to = targetGrid.getCellNodeBox(range.toRow, range.toCell);
+
+            decorator.$left.css({
+                top: from.top - 2,
+                left: from.left - 2,
+                height: to.bottom - from.top + 2,
+                width: options.decoratorWidth
+            });
+
+            decorator.$right.css({
+                top: from.top - 2,
+                left: to.right - 1,
+                height: to.bottom - from.top + 2,
+                width: options.decoratorWidth
+            });
+
+            decorator.$top.css({
+                top: from.top - 2,
+                left: to.left - 1,
+                height: options.decoratorWidth,
+                width: to.right - from.left + 2
+            });
+
+            decorator.$bottom.css({
+                top: to.bottom - 1,
+                left: from.left - 2,
+                height: options.decoratorWidth,
+                width: to.right - from.left + 3
+            });
+
+            decorator.$handle.css({
+                top: to.bottom - 3,
+                left: from.right - 4,
+                height: 1,
+                width: 1
+            });
+
+            return decorator;
+        }
+
+        function getSelectedRange() {
+            return r;
+        }
+
+        function hide() {
+            if (decorator) {
+                decorator.toggle(false);
+                decorator = null;
+            }
+        }
+
+        function hideHandle() {
+            decorator.$handle.hide();
+        }
+
+        return {
+            hide: hide,
+            hideHandle: hideHandle,
+            show: show,
+            getSelectedRange: getSelectedRange
+        };
+    }
+
+    $.extend(this, {
+        "init": init,
+        "destroy": destroy,
+        "onFillUpDown": new Slick.Event()
+    });
+}
+
   // exports
  
 
-  export {SlickGrid}
+  export {SlickGrid,TextEditor,Overlays}

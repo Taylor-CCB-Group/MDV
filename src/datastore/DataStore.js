@@ -3,8 +3,13 @@ import Dimension from "./Dimension.js";
 //register dimensions
 import  "./CategoryDimension.js";
 import "./RangeDimension.js";
+import "./CatColDimension.js";
+import  "./CatRangeDimension.js";
+import "./DensityDimension.js"
 import {scaleLinear,scaleSymlog} from "d3-scale";
 import {getColorLegend,getColorBar} from "../utilities/Color.js"
+import {quantileSorted} from 'd3-array';
+
 
 
 /**
@@ -13,6 +18,8 @@ import {getColorLegend,getColorBar} from "../utilities/Color.js"
 * @param {Object} [config] - setup information for the datastore.
 * @param {Object[]} [config.columns] - an array of column objects, specifying 
 * the metadata for data structure, see {@link DataStore#addColumn}
+* @param {Object[]} [config.columnGroups] - an array of objetcs each has
+* name, and a list of columns in that group
 */
 
 class DataStore{
@@ -22,17 +29,49 @@ class DataStore{
         this.columns=[];
         this.columnIndex={};
         this.listeners={};
+        this.indexes={};
         this.filterBuffer= new SharedArrayBuffer(size);
         this.filterArray = new Uint8Array (this.filterBuffer);
+        //keep track of dimensions and the columns they represent
         this.dimensions=[];
+    
         this.textDecoder = new TextDecoder();
+        this.columnGroups={};
+        this.subtypeToGroup={}
         this.columnsWithData=[];
+        this.dirtyColumns={
+            added:{},
+            removed:{},
+            data_changed:{},
+            colors_changed:{}
+        }
        
         if (config.columns){
             for (let c of config.columns){
                 this.addColumn(c)
             }
         }
+       
+        if (config.columnGroups){
+            for (let item of config.columnGroups){
+                this.addColumnGroup(item);
+            }
+        }
+    }
+
+    getLargeColumnGroups(){
+        const li=[];
+        for (let cg in this.columnGroups){
+            let item = this.columnGroups[cg];
+            if (item.largeColumnGroup){
+                li.push(item)
+            }
+        }
+        return li;
+    }
+
+    isFiltered(){
+        return this.filterSize!==this.size;
     }
 
     /**
@@ -42,13 +81,14 @@ class DataStore{
     * <ul>
     * <li> filtered - called when a filter is applied. The dimension doing the
     * the filtering is passed as data </li>
-    * <li> column_added - called when after a column is added, the added column is 
-    * passed as data </li>
+    * <li> data_highlighted - called when certain indexes have been highlighted </li>
     * <li> column_removed - called just before a column is removed </li> 
+    * <li> data_changed- called when data has changed giving a list of columns where
+    * the data has changed </li> 
     * </ul>
-    * @param {string} id- a unique id indetifying the listener
+    * @param {string} id - a unique id identifying the listener
     * @param {function} listener - a function that accepts two paramaters, the type
-    * of event and the dat associated with it
+    * of event and the data associated with it.
     */
     addListener(id,listener){
         this.listeners[id]=listener;
@@ -70,14 +110,105 @@ class DataStore{
 
     removeAllFilters(){
         this.filterArray.fill(0);
-        for (let dim of this.dimensions){
+        let noclear=[];
+        for (let dim of this.dimensions){     
+            if (dim.noclear){
+                noclear.push(dim);
+                continue
+            }
             dim.filterArray.fill(0);
-
-        }
+            dim.filterMethod=null;
+            if (dim.bgfArray){
+                for (let i=0;i<this.size;i++){
+                    if  (dim.bgfArray[i]===0){
+                        dim.filterArray[i]=2;
+                    }                      
+                } 
+            }
+        }  
         this.filterSize=this.size;
+        //need to re-add the noclear filters (id any)
+        for (let dim of noclear){
+            const f= dim.filterArray;
+            for (let n=0;n<f.length;n++){
+                if (f[n] === 1){
+                    if(++this.filterArray[n]===1){
+                        this.filterSize--;
+                    };
+
+                }
+               
+            }
+        }
         this._callListeners("filtered","all_removed");
     }
 
+    /** 
+    * This method should be called if the any data has been modified, specifiying the
+    * columns involved.
+    * Any dimensions will re-filter if necessary i.e. if the modified columns are 
+    * involved in the filter, and any listeners will be called.
+    * All 'data_changed' listeners will be informed with the columns changed and whether
+    * filtering has already occurred (in which case updating may have already occurred
+    * if the filter listener caused an update)
+    * @param {string[]} columns - a list of column/fields whose data has been modified
+    * @param {boolean} [is_dirty=true] - if false (default is true) then the column
+    * will not be tagged as dirty. This my be the case id the change was pulled from
+    * the backend for example 
+    * @param {boolean} [refilter=true] if false then no dimensions will be re-filterd
+    * for example if only the colors in the columns have changed
+    */
+    dataChanged(columns,is_dirty=true,refilter=true){
+        let hasFiltered=false;
+        for (let d of this.dimensions){
+            //this method will not call any listeners- wait until all done
+           if (d.reFilterOnDataChanged(columns)){
+                hasFiltered=true;
+           }
+        }
+        if (is_dirty){
+            for (let c of columns){
+                this.setColumnIsDirty(c);
+            }
+        }
+        //at least one of the dimensions has had to refilter?
+        if (hasFiltered){
+            this._callListeners("filtered")
+        }
+        this._callListeners("data_changed",{columns:columns,hasFiltered:hasFiltered});
+    }
+
+    dataHighlighted(indexes,source){
+        this.highightedData=indexes;
+        this._callListeners("data_highlighted",{indexes,source});
+    }
+
+    getHighlightedData(){
+        return this.highightedData;
+    }
+
+    triggerFilter(){
+        this._callListeners("filtered")
+    }
+
+
+    /**
+    * Tag that the colunm's data has changed and is not synched with the backend
+    */
+    setColumnIsDirty(col){
+        //new column anyway so column already 'dirty'
+        if (this.dirtyColumns.added[col]){
+            return;
+        }
+        this.dirtyColumns["data_changed"][col]=true;
+    }
+
+    setAllColumnsClean(col){
+        this.dirtyColumns.added={};
+        this.dirtyColumns.removed={};
+        this.dirtyColumns.data_changed={};
+        this.dirtyColumns.color_changed={};
+    }
 
 
     /**
@@ -121,7 +252,7 @@ class DataStore{
     * Adds a column's metadata and its data to the data store
     * @param {Object} [column] An object describing the column
     * @param {string} column.field - the id of the column - used internally
-    * @param {string} column.name -the human readable column abel
+    * @param {string} column.name -the human readable column label
     * @param {string} column.datatype - the datatype- can be one of 
     * <ul>
     * <li> double - any numerical type including integers </li>
@@ -134,18 +265,20 @@ class DataStore{
     * of the array should match the value in the data   
     * @param {string[]} [column.colors] - An array of rgb hex colors. In the case of a 
     * text column the colors should match the values. For number columns, the list represents
-    * colors that will be interpolated. If not supllied defsult color pallettes will be 
+    * colors that will be interpolated. If not suplied defsult color pallettes will be 
     * supplied
     * @param {boolean} [column.colorLogScale=false] - if true then the colors will be
     * displayed on a log scale- useful if the dataset contains outliers. Because a symlog
     * scale is used the data can contain 0 and negative values
-    * @param {SharedArrayBuffer|[]} [data ] In the case of a double(numnber) column the array
-    * byffer should be the appropriate size to conatin float32s.For text it shuld be Uint8
+    * @param {SharedArrayBuffer|[]} [data] In the case of a double(numnber) column the array
+    * buffer should be the appropriate size to contain float32s. For text it shuold be Uint8
     * and contain numbers corresponding to the indexes in the values parameter. For a column of
     * type unique it should be a JavaScript array. This parameter is optional as the data can
     * be added later see {@link DataStore#setColumnData}
+    * @param {boolean} dirty if true then the store will keep a record that this column has
+    * been added and is not permanatly stored in the backend
     */
-    addColumn(column,data=null){
+    addColumn(column,data=null,dirty=false){
         let c  = {
             name:column.name,
             field:column.field,
@@ -156,6 +289,19 @@ class DataStore{
         }
         if (column.colors){
             c.colors=column.colors;
+        }
+        if (column.editable){
+            c.editable=true;
+        }
+
+        if (column.subgroup){
+            c.subgroup=column.subgroup;
+            c.sgindex= column.sgindex;
+            c.sgtype=column.sgtype;
+        }
+        const cg = column.columnGroup;
+        if ( cg && this.columnGroups[cg]){
+            this.columnGroups[cg].columns.push(column.field)
         }
         
 
@@ -174,9 +320,28 @@ class DataStore{
         this.columns.push(c);
         this.columnIndex[c.field]=c;
         if (data){
-            this._setColumnData(column,data)
+            this.setColumnData(column.field,data)
+        }
+        if (dirty){
+            this.dirtyColumns.added[column.field]=true;
         }
         
+    }
+
+    //for columns whee the metadata is not housed locally
+    //need to create it from the field name
+    addColumnFromField(field){
+        const data = field.split("_")
+        const g = this.subtypeToGroup[data[0]];
+        const sg = g.subgroups[data[0]];
+        this.addColumn({
+            name:data[1],
+            field:field,
+            datatype:"double",
+            subgroup:sg.name,
+            sgindex:data[2],
+            sgtype:sg.type
+        });
     }
 
     loadJsonData(data){
@@ -192,7 +357,6 @@ class DataStore{
         for (let col of colData){
             this.setSetColumnData(col,colData[col])
         }
-
     }
 
 
@@ -206,10 +370,6 @@ class DataStore{
         const columns=[]
         for (let f in this.columnIndex){
             const c= this.columnIndex[f];
-            if (!c.data){
-                continue;
-            }
-            
             if (filter){
                 if (filter==="number"){
                     if (c.datatype === "text" || c.datatype==="unique" ){
@@ -222,25 +382,23 @@ class DataStore{
             }
             columns.push({name:c.name,field:c.field,datatype:c.datatype})
         }
-        return columns.sort((a,b)=>{
-            a.name.localeCompare(b.name)
-        });
+        return columns.sort((a,b)=> a.name.localeCompare(b.name));
     }
 
     /**
-    * Creates and returns a dimesion that it used to filter and group the data
+    * Creates and returns a dimension that it used to filter and group the data
     * @param {string} type - the dimension type , the built in dimensions are 
     * 'category_dimension' for text  columns and 'range_dimension' for number
     * columns
     * @returns {Dimension} A dimension that can be used for grouping/filtering 
     */
-
-    getDimension(type,column){
+    getDimension(type){
         if (! Dimension.types[type]){
             throw(`Adding non existent Dimension: ${type}`);
         }
-        const dim =new Dimension.types[type](column,this);
-        this.dimensions.push(dim)
+        const dim =new Dimension.types[type](this);
+        this.dimensions.push(dim);
+        
         return dim;
     }
 
@@ -252,9 +410,12 @@ class DataStore{
     * @returns {Object} An object containg key(field)/value pairs. An extra
     * variable 'index' contianing the row index is also added to the object
     */
-    getRowAsObject(index){
+    getRowAsObject(index,columns){
+        if (!columns){
+            columns= this.columnsWithData;
+        }
         const obj={}
-        for (let c of this.columnsWithData){
+        for (let c of columns){
             const col = this.columnIndex[c];
             let v= col.data[index];
             if (col.datatype==="text"){
@@ -271,8 +432,102 @@ class DataStore{
          
             obj[c]=v;
         }
-        obj["index"]=index;
+        obj["__index__"]=index;
         return obj;
+    }
+
+    getRowText(index,column){
+        const col = this.columnIndex[column];
+        if (col.datatype==="unique"){
+            const v= this.textDecoder.decode(col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength));
+            return v.replaceAll("\0","");
+
+        }
+        else if (col.datatype==="text"){
+            return col.values[col.data[index]]
+        }
+        else{
+            return col.data[index];
+        }
+      
+    }
+
+
+    getColumnIndex(column){
+        if (this.indexes[column]){
+            return this.indexes[column];
+        }
+        const col = this.columnIndex[column];
+        const index={};    
+        for (let n=0;n<this.size;n++){
+           let v= this.textDecoder.decode(col.data.slice(n*col.stringLength,(n*col.stringLength)+col.stringLength));
+           if (v.includes("#")){
+               v=v.split("#")[1]
+           }
+           index[v]=n
+
+        }
+        this.indexes[column]=index;
+        return index;
+    }
+
+
+    /**
+    * Gets a text file blob of the data which can be downloaded
+    * @param {string[]} columns A list of column fields/ids to create the file with
+    * @param {string|int[]} rows a value of 'filtered'  will only add filtered rows,
+    * alternatively a list of row indexes can be given. Any other value will result
+    * @param {string} [delimiter='\t'] The column delimiter to use
+    * @param {string} [delimiter='\n'] The newline delimiter default '\n' 
+    * @returns {Blob} A data blob which can be downloaded
+    */
+    getDataAsBlob(columns,rows="all",delimiter="\t",newline="\n"){
+        let indexes=null;
+        if (typeof rows !== "string"){
+            indexes=rows;
+        }
+        const arr=[];
+        const cols=[];
+        const headers=["index"];
+        for (let c of columns){
+            
+            const col= this.columnIndex[c];
+            cols.push(col);
+            headers.push(col.name);
+
+        }
+        const len =indexes?indexes.length:this.size
+        arr.push(headers.join(delimiter));
+        for (let i=0;i<len;i++){
+            let index= i
+            if (indexes){
+                index=indexes[i];
+            }else{
+                if (rows==="filtered" && this.filterArray[i]===1){
+                    continue
+                }
+            }
+            const line=[i];
+            for (let c of cols){
+                let v= c.data[index];
+                if (c.datatype==="text"){
+                    v= c.values[v];
+                }
+                else if (c.datatype==="double" || c.datatype==="integer"){
+                    if (isNaN(v)){
+                        v="";
+                    }
+                }
+                else{
+                    v= this.textDecoder.decode(c.data.slice(index*c.stringLength,(index*c.stringLength)+c.stringLength));
+                }
+             
+                line.push(v);
+            }
+            arr.push(line.join(delimiter))
+
+        }
+        return new Blob([arr.join(newline)],{type:"text/plain"})
     }
 
     /**
@@ -290,7 +545,6 @@ class DataStore{
     * @param {string}  column - The field/id of the column.
     * @param {SharedArrayBuffer|[]} data  either a javascript array or shared array buffer 
     */
-
     setColumnData(column,data){
         let c= this.columnIndex[column];
         if (!c){
@@ -310,17 +564,95 @@ class DataStore{
                 let min =Number.MAX_VALUE, max = Number.MIN_VALUE;
                 for (let i=0;i<dataArray.length;i++){
                     let value = dataArray[i];
+                    if (isNaN(value)){
+                        continue;
+                    }
                     min = (value<min) ? value:min
                     max = (value>max) ? value:max
                 }
                 c.minMax=[min,max];
             }
-           
+            if (!c.quantiles){
+                const a  = c.data.filter(x=>!isNaN(x)).sort();
+                c.quantiles={};
+                for (let q of [0.05,0.01,0.001]){
+                    c.quantiles[q]=[quantileSorted(a,q),quantileSorted(a,1-q)];           
+                }
+            }         
         }
         else {
           c.data= new Uint8Array(buffer)
         }
         this.columnsWithData.push(column);      
+    }
+
+    appendColumnData(column,data,newSize){
+        let c= this.columnIndex[column];
+        let arrType= Uint8Array;
+        let size = newSize;
+        if (c.datatype === "integer" || c.datatype=="double"){
+            arrType= Float32Array;
+            size=size*4;
+        }
+        else if (c.datatype==="unique"){
+            size=size*c.stringLength;
+        }
+        
+        let newBuffer = new SharedArrayBuffer(size);
+        let newArr= new arrType(newBuffer);
+        newArr.set(c.data);
+        newArr.set(new arrType(data),c.data.length);
+        c.data= newArr;
+        c.buffer = newBuffer
+
+    }
+
+    addDataToStore(columnData,size){
+        const newSize=size+this.size;
+        for (let c of columnData){
+            this.appendColumnData(c.column,c.data,newSize)
+        }
+        let newBuffer = new SharedArrayBuffer(newSize);
+        let newArr = new Uint8Array(newBuffer);
+        newArr.set(this.filterArray);
+
+
+        this.filterBuffer= newBuffer;
+        this.filterArray = newArr;
+        this.size = newSize;
+        this.filterSize+=size;
+        //update dimensions and redo any filters
+        for (let d of this.dimensions){
+            d.updateSize();
+        }
+        this._callListeners("data_added",this.size)
+    }
+
+    cleanColumnData(column){
+        const index= {};
+        const col = this.columnIndex[column];
+        for (let v in col.values){
+            index[v]=0;
+        }
+        for (let i=0;i<this.size;i++){
+            index[col.data[i]]++;
+        }
+        const newVals=[];
+        const oldToNew={};
+        for (let i=0;i<col.values.length;i++){
+            if (index[i]!==0){
+                newVals.push(col.values[i]);
+                oldToNew[i]=newVals.length-1;
+            }
+        }
+        for (let i=0;i<this.size;i++){
+           col.data[i]=oldToNew[col.data[i]]
+        }
+        col.values=newVals;
+        this.setColumnIsDirty(column);
+        this.dataChanged([column]);
+
+      
     }
 
     _convertColumn(col,arr){
@@ -368,13 +700,14 @@ class DataStore{
         }
         else{
            
-            const enc = new TextEncoder();
-            const buff =new SharedArrayBuffer(this.size*30);
+            
             let max = 0
             for (let i =0;i<len;i++){
                max= Math.max(max,arr[i].length);
             }
             col.stringLength=max;
+            const enc = new TextEncoder();
+            const buff =new SharedArrayBuffer(this.size*max);
             for (let i=0;i<len;i++){
                 const a= enc.encode(arr[i].substring(0,max));
                 const b = new Uint8Array(buff,i*max,max);
@@ -399,54 +732,120 @@ class DataStore{
     * @param {boolean} [config.asArray=false] By default the, function will return 
     * a JavaScript compatible string specifying the color. If asArray is true then an array 
     * of length 3 containing RGB values will be returned.
+    * @param {object} [config.overideValues] an object containing values to use, instead of
+    * the columns default values - can include
+    * <ul>
+    * <li> min - the minumum value </li>
+    * <li> max - the maximum value <li>
+    * <li> colors - the color scheme to use </li>
+    * <li> colorLogScale- whether to use a log scale </li>
+    * </ul
+    * @param {boolean} [config.useValue=false]  The returned function will require the
+    * columns value, not index
     * @returns {function} The function, which when given a row index will return a color.
     */
     getColorFunction(column,config={}){
         const c = this.columnIndex[column];
         const data= c.data;
-       
-        let  colors  = this.getColumnColors(column,config);
+        const ov = config.overideValues|| {}
+        let  colors  =  this.getColumnColors(column,config);
         //simply return the color associated with the value
         if (c.datatype==="text"){                   
             return x=>colors[data[x]];
         }
         else if(c.datatype==="integer" || c.datatype==="double"){    
-            const min = c.minMax[0];
-            const max =  c.minMax[1];
+            const min = ov.min==null?c.minMax[0]:ov.min;
+            const max = ov.max == null?c.minMax[1]:ov.max;
             const bins = config.bins || 100;
             const interval_size = (max-min)/(bins);
-            const fallbackColor = config.asArray?[0,0,0]:"#ffffff";
+            const fallbackColor = config.asArray?[255,255,255]:"#ffffff";
             //the actual function - bins the value and returns the color for that bin
-            return x=>{
-                const v= data[x];
-                //missing data
-                if (isNaN(v)){
-                    return fallbackColor;
+            if (config.useValue){
+                return v=>{
+                    if (isNaN(v)){
+                        return fallbackColor;
+                    }
+                    let bin = Math.floor((v - min) / interval_size);
+                    if (bin<0){
+                        bin=0
+                    }
+                    else if (bin>=colors.length){
+                        bin = colors.length-1;
+                    }
+                    return colors[bin];
                 }
-                return colors[Math.floor((v - min) / interval_size)];
-            }
+
+            }else{
+                return x=>{
+                    const v= data[x];
+                    //missing data
+                    if (isNaN(v)){
+                        return fallbackColor;
+                    }
+                    let bin = Math.floor((v - min) / interval_size);
+                    if (bin<0){
+                        bin=0
+                    }
+                    else if (bin>=colors.length){
+                        bin = colors.length-1;
+                    }
+                    if (!colors[bin]){
+                        console.log("www")
+                    }
+                    return colors[bin];
+                }
+            }    
         }
     }
 
-    getColorLegend(column){
-        const colors = this.getColumnColors(column);
+    getColorLegend(column,config={}){
+        const colors = this.getColumnColors(column,config);
         const c= this.columnIndex[column];
+        const name = config.name || c.name;
         if (c.datatype==="integer" || c.datatype==="double"){
-            return getColorBar(colors,{range:c.minMax,label:c.name});
+            let   range= c.minMaX;
+            if (config.overideValues){
+                const ov = config.overideValues;
+                range = [ov.min==null?c.minMax[0]:ov.min,ov.max==null?c.minMax[1]:ov.max]
+            }
+            return getColorBar(colors,{range:range,label:name});
         }
         if (c.datatype==="text"){
-            return getColorLegend(colors,c.values,{label:c.name});
+            return getColorLegend(colors,c.values,{label:name});
+        }  
+    }
+
+    /**
+    * the specified column, when supplied with the index of a row/item in the datastore,
+    * @param {string} column The column id(field) (only text columns)
+    * @returns {object} an object of values to colors
+    */
+     getValueToColor(column){
+        const vc={};
+        const colors = this.getColumnColors(column);
+        const values = this.getColumnValues(column);
+        for (let i=0;i<values.length;i++){
+            vc[values[i]]=colors[i];
         }
-       
+        return vc;
+
+    }
+
+    setColumnColors(column,colors){
+        const  c=  this.columnIndex[column];
+        c.colors= colors.slice(0);
+        this.dirtyColumns.colors_changed[column]=true;
+
     }
 
     getColumnColors(column,config={}){
         const  c=  this.columnIndex[column];
         const rArr= config.asArray;
         if (c.datatype==="double" || c.datatype==="integer"){
-            const c_colors = c.colors || defaultIPalette;
-            const min = c.minMax[0];
-            const max =  c.minMax[1];
+            const ov = config.overideValues || {};
+            const c_colors = ov.colors || (c.colors || defaultIPalette);
+            const min = ov.min || c.minMax[0];
+            const max =  ov.max ||c.minMax[1];
             //caclulate the color of each bin
             const ls= linspace(min,max,c_colors.length);
             const scale =scaleLinear().domain(ls).range(c_colors).clamp(true);
@@ -460,7 +859,11 @@ class DataStore{
                     colors[i]= rgbToRGB(colors[i]);
                 }
             }
-            if(c.colorLogScale){
+            let useLog = c.colorLogScale;
+            if(ov.colorLogScale!= null){
+                useLog= ov.colorLogScale;
+            }
+            if(useLog){
                 //calculate new colors based on a log scale
                 const logScale =scaleSymlog().domain([min,max]).range([0,bins]).clamp(true);
                 const  newColors= new Array(bins+1);   
@@ -478,7 +881,26 @@ class DataStore{
             }
             return colors;
         }
+    }
 
+    addColumnGroup(group){
+        if (!group.columns){
+            group.columns=[];
+        }
+        this.columnGroups[group.name]=group;
+        if (group.subgroups){
+            for (let t in group.subgroups){
+                this.subtypeToGroup[t]=group;
+            }
+        }
+    }
+
+    getColumnGroup(name){
+        const cg  =this.columnGroups[name];
+        if (!cg){
+            return null
+        }
+        return cg.columns;
     }
 
     getRawColumn(column){
@@ -500,7 +922,10 @@ class DataStore{
             name:c.name,
             field:c.field,
             datatype:c.datatype,
-            stringLength:c.stringLength
+            stringLength:c.stringLength,
+            subgroup:c.subgroup,
+            sgindex:c.sgindex,
+            sgtype:c.sgtype
         }
     }
 
@@ -516,19 +941,45 @@ class DataStore{
         return this.columnIndex[column].values;
     }
 
+
     getColumnName(col){
         const c = this.columnIndex[col];
         return c?c.name:null;
     }
 
-    removeColumn(column){
+     /**
+    * Removes the column and all its data
+    * @param {string} column - the columns id/field 
+    * @param {boolean} [dirty=false] if true, tags that the column should also be removed from the
+    * backend
+    * @param {boolean} [notify=false] if true notifies any listeners that the column has been removed
+    */
+
+    removeColumn(column,dirty=false,notify=false){
+        const c = this.columnIndex[column];
+        c.data=null;
+        c.buffer=null;
         this.columns= this.columns.filter((c)=>c.field!==column);
         delete this.columnIndex[column];
+        const i = this.columnsWithData.indexOf(column);
+        if (i!==-1){
+            this.columnsWithData.splice(i,1);
+        }
+        if (dirty){
+            //added and removed without saving
+            if (this.dirtyColumns.added[column]){
+                delete this.dirtyColumns.added[column];
+            }
+            else{
+                this.dirtyColumns.removed[column]=true;
+            }
+            
+        }
+        if (notify){
+            this._callListeners("column_removed",column)
+        }
     }
 }
-
-
-
 
 function linspace(start,end,n){
     var out = [];
@@ -553,6 +1004,12 @@ function hexToRGB(hex){
     return [r,g,b];
 }
 
+function RGBToHex(rgb){
+     return "#"+rgb.map(x => {
+        const hex = x.toString(16)
+        return hex.length === 1 ? '0' + hex : hex
+      }).join('');
+}
 function rgbToRGB(rgb){
     if (!rgb){
         return [255,255,255];
@@ -580,4 +1037,4 @@ const defaultIPalette=['#3288bd','#66c2a5','#abdda4','#e6f598','#fee08b','#fdae6
 
 
 export default DataStore;
-export {hexToRGB}
+export {hexToRGB,defaultPalette,RGBToHex}

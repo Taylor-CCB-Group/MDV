@@ -1,0 +1,498 @@
+import {createEl} from "../utilities/Elements.js";
+
+class ImageTable {
+    constructor(parent_div,data_view,config){
+        if (typeof parent_div === "string"){
+            parent_div =document.getElementById("#"+parent_div);
+        }
+        if (!config){
+            config={};
+        }
+        this.domId= this._getRandomString()
+        this.row_first=0;
+        this.row_last=139;
+        this.tile_height=205;
+        this.tile_width=205;
+        let self =this;
+        this.__doc__=document;
+        this.display_columns=[];
+        this.selection_mode=true;
+        this.imageFunc = config.imageFunc;
+        config.background_color=config.background_color?config.background_color:"lightgray";
+   
+        this.base_url=config.base_url;
+        this.parent = parent_div;
+        this.selected_tiles={};
+        this.margin=config.margin_size?config.margin_size:10
+       
+        this.cache_size=5;
+        const bb= this.parent.getBoundingClientRect();
+        this.config=config;
+        const bg = config.background_color;
+        this.view_port = createEl("div",{
+            styles:{
+                height:bb.height+"px",
+                width:bb.width+"px",
+                overflow:"auto",
+                backgroundColor:bg
+
+            }
+        },this.parent);
+        this.canvas = createEl("div",{
+            styles:{
+                position:"relative",
+                backgroundColor:bg
+
+            }
+        },this.view_port);
+        this.canvas.addEventListener("click",e=>{
+            this.imageClicked(e,e.srcElement);
+        });
+
+        this.canvas.addEventListener("mouseover",e=>{
+            this.mouseOver(e,e.srcElement);
+        });
+
+        this.canvas.addEventListener("keydown",e=>{
+            this.keyPresses(e);
+        });
+
+        this.data_view = data_view;
+        this._setCanvasHeight();
+        this.view_port.addEventListener("scroll",e=>this._hasScrolled(e));
+        this.parent.append(this.view_port);
+        /*let end_row = Math.floor((this.height+(this.cache_size*this.tile_height))/this.tile_height);
+        this.max_difference= end_row+this.cache_size;*/
+       // this._addListeners();
+        //this.render(0,end_row,true);
+        this.resize_timeout=null;
+        this.resize_timeout_length=50;
+        this.listeners={
+       		"image_clicked":new Map(),
+       		"image_over":new Map(),
+       		"image_out":new Map(),
+       		"data_changed":new Map(),
+       		"image_selected":new Map()
+       	};
+       	this.highlightcolors=null;
+       	this.tag_color_palletes={};
+       	this.image_suffix = config.image_suffix?config.image_suffix:".png";
+         
+        if (config.columns){
+            this.setColumns(config.columns);
+        }
+        //load first image to get the orignal dimensions 
+        let im = new Image();
+        im.onload=function(e){
+            self.originalDimensions=[im.width,im.height];
+            self.preferred_width=self.img_width=im.width;
+            self.preferred_height =self.img_height=im.height;
+            if (config.initial_image_width){
+                self.preferred_width=config.initial_image_width;
+                self.preferred_height=Math.round((self.preferred_width/self.img_width)*self.img_height)
+            }
+            self._resize();
+        }
+
+        const burl = this.config.base_url;
+        const type = this.config.image_type;
+        const image= this.data_view.getItemField(1,this.config.image_key)
+        im.src=`${burl}${image}.${type}`;
+       
+    }
+
+    mouseOver(e,img){
+        if (img.id){
+            let arr= img.id.split("-");
+            let index =parseInt(arr[1]);
+            let item = this.data_view.getItem(index);
+            if (!item){
+                return;
+            }
+            if (this.image_over){
+                //already in image
+                if (item.id === this.image_over.id){
+                    return;
+                }
+                //move from one image to another
+                this.listeners.image_out.forEach((func)=>{func(e,this.image_over[0],self.image_over[1])});
+            }
+            this.listeners.image_over.forEach((func)=>{func(e,item,img)});
+            this.image_over=img
+        }
+        //mouse out
+        else{
+            if (this.image_over){
+                this.listeners.image_out.forEach((func)=>{func(e,self.image_over[0],self.image_over[1])});
+            }
+            this.image_over=null;
+        }
+    }
+
+    imageClicked(e,img){
+        let id =  img.id;
+        if (!id){
+            id =img.parentElement.id
+        }
+        if (!id){
+            return;
+        }
+        let arr =id.split("-");
+        if (arr[0]==="mlvtile"){
+            let range=null;
+            let ids =null;
+            
+            let index = parseInt(arr[2]);
+            if (e.shiftKey && self.last_img_clicked != null) {
+                const l_index = this.last_img_clicked.index;
+                
+                range=[];
+                ids=[];
+                let diff = index-l_index<0?-1:1;
+                let st= l_index+1;
+                let en =index+1;
+                if (diff===-1){
+                    st=index;
+                    en=l_index;
+                }
+                for (let i=st;i<en;i++){
+                    let id = this.data_view.getId(i)
+                    
+                    ids.push(id);
+                }
+                ids.push(this.data_view.getId(l_index));
+                
+
+            }
+
+            const id = this.data_view.getId(index)
+            
+            this.listeners.image_clicked.forEach((func)=>{func(e,id,img)});
+
+            this.last_index_clicked=index;
+            
+            if (this.selection_mode){
+                
+                this.setSelectedTiles([index],e.ctrlKey,true);
+            }   
+        }
+    }
+
+    keyPressed(e){
+        if (e.which===39 || e.which===40){
+            if (this.last_index_clicked===this.data_view.getFilteredItems().length-1){
+                return;
+            }
+            if (this.last_index_clicked || this.last_index_clicked===0){
+                this.last_index_clicked++;
+                this.setSelectedTiles([this.data_view.getItem(this.last_index_clicked).id],false,true);
+                    if (this.last_index_clicked>this.getLastTileInView()){
+                    this.show(this.last_index_clicked);
+                }
+            }
+        }else if(e.which===37 || e.which===38){
+            if (this.last_index_clicked===0){
+                return;
+            }
+            if (this.last_index_clicked){
+                this.last_index_clicked--;
+                this.setSelectedTiles([this.data_view.getItem(this.last_index_clicked).id],false,true)
+                if (this.last_index_clicked<this.getFirstTileInView()){
+                    this.show(this.last_index_clicked);
+                }
+            }
+        }
+    }
+
+    addListener(type,func,id){
+    	let listener = this.listeners[type];
+    	if (!listener){
+    		return null;
+    	}
+    	if (!id){
+    		id = this._getRandomString()
+    	}
+    	listener.set(id,func);
+    	return id;
+    }
+
+    removeListener(type,id){
+    	let listener = this.listeners[type];
+    	if (!listener){
+    		return false;
+    	}
+    	return listener.delete(id);
+    }
+
+    setImageWidth(width,redraw){
+        this.setImageDimensions([width,Math.round((width/this.img_width)*this.img_height)],redraw)
+    }
+
+    setImageDimensions(dim,redraw){
+        let ft = this.getFirstTileInView();
+        if (!dim){
+            dim=[this.preferred_width,this.preferred_height];
+        }
+        else{
+            this.preferred_width=dim[0];
+            this.preferred_height=dim[1];
+        }
+        if (this.width < this.preferred_width+(this.margin*2) && this.width !==0){
+           dim[0]=this.width-(this.margin*3);
+           this.num_per_row=1;
+        }
+        else{
+            this.num_per_row= Math.ceil((this.width-this.margin)/(this.preferred_width+this.margin));
+            dim[0] = Math.floor((this.width-2*this.margin)/this.num_per_row)-this.margin;
+        }
+        dim[1]=Math.round((dim[0]/this.preferred_width)*this.preferred_height);
+    	this.tile_width=parseInt(dim[0])+this.margin;
+        this.tile_height=parseInt(dim[1])+this.margin;
+        this.t_width = parseInt(dim[0]);
+        this.t_height = parseInt(dim[1]);
+        let end_row = Math.floor((this.height+(this.cache_size*this.tile_height))/this.tile_height);
+        this.max_difference= end_row+this.cache_size;
+        if (redraw){
+            this.show(ft);
+        }
+    }
+
+    resize(){
+    	let self=this;
+    	clearTimeout(this.resize_timeout);
+    	 self.resize_timeout=setTimeout(()=>{	     
+    		 self._resize();
+         },self.resize_timeout_length);
+    }
+
+    getFirstTileInView(){
+        let top = this.view_port.scrollTop;
+        return Math.floor(top/this.tile_height)*this.num_per_row;
+    }
+
+    getLastTileInView(){
+        let bottom= this.view_port.scrollTop+this.view_port.height();
+        return Math.floor(bottom/this.tile_height)*this.num_per_row;
+    }
+
+    setColumns(columns){
+        this.columns=columns 
+    }
+
+    setColorBy(color_by){
+        this.color_by=color_by;
+    }
+
+    _setCanvasHeight(){
+        let h = ((Math.ceil(this.data_view.getLength()/this.num_per_row))*this.tile_height)+this.margin;
+        this.canvas.style.height=h+"px";
+    }
+
+    _hasScrolled(){
+        clearTimeout(this.scroll_timeout);
+        let s_top = this.view_port.scrollTop;
+        let begin_row = Math.floor((s_top-(this.cache_size*this.tile_height))/this.tile_height);
+        let end_row = Math.floor((s_top+this.height+(this.cache_size*this.tile_height))/this.tile_height);
+        if (begin_row<0){
+            begin_row=0;
+        }
+        let elapse=10;
+        if (Math.abs(begin_row-this.row_displayed_first)>this.max_difference){
+            elapse=50;
+        }
+        this.scroll_timeout= setTimeout(()=>{
+          
+            if (Math.abs(begin_row-this.row_displayed_first)>this.max_difference){
+                 this.render(begin_row,end_row,true);
+            }
+            else{
+                this.render(begin_row,end_row);
+            }
+        },elapse);
+    }
+
+    _removeByClass(className){
+        document.querySelectorAll(className).forEach(e => e.remove());
+    }
+
+    render(begin_row,end_row,all){    
+        if (all){
+            this.canvas.innerHTML="";
+            for (let n=begin_row;n<end_row;n++){
+                this._addRow(n);
+            }
+        }
+        else if (begin_row===this.row_displayed_first && begin_row!==0){
+            return;
+        }
+        else{
+            if (begin_row<this.row_displayed_first){
+                for (let n=begin_row;n<this.row_displayed_first;n++){
+                    this._addRow(n)     
+                }
+                for (let n=end_row;n<this.row_displayed_last;n++){
+                    this._removeByClass(`.mlv-tile-${this.domId}-${n}`);
+                }
+            }
+            else{
+                for (let n=this.row_displayed_last;n<end_row;n++){
+                    this._addRow(n)
+                }
+
+                for (let n=this.row_displayed_first;n<begin_row;n++){
+                    this._removeByClass(`.mlv-tile-${this.domId}-${n}`);
+                }
+
+            }
+        }
+        this.row_displayed_first=begin_row;
+        this.row_displayed_last=end_row;
+    }
+
+    _resize(fti){
+        if (!fti){
+            fti = this.getFirstTileInView();
+        }
+        const bb =this.parent.getBoundingClientRect() 
+        this.width = Math.round(bb.width);
+        this.height = Math.round(bb.height);
+        this.view_port.style.height= this.height+"px";
+        this.view_port.style.width = this.width+"px";
+        this.setImageDimensions();
+        this.show(fti)     
+    }
+
+    _calculateTopBottomRow(first_tile_index){
+        if (!first_tile_index){
+            first_tile_index=0;
+        }
+        let s_top=0;
+        if (first_tile_index || first_tile_index===0){
+            s_top=(Math.floor(first_tile_index/(this.num_per_row)))*this.tile_height;
+        }
+        else{
+            s_top = this.view_port.scrollTop;
+        }
+        const bb = this.view_port.getBoundingClientRect();
+        let height = bb.height;
+        let begin_row = Math.floor((s_top-(this.cache_size*this.tile_height))/this.tile_height);
+        let end_row = Math.floor((s_top+height+(this.cache_size*this.tile_height))/this.tile_height);
+        if (begin_row<0){
+                begin_row=0;
+        }
+        /*if (begin_row==0){
+            s_top=0;
+        }*/
+        return ({top:begin_row,bottom:end_row,scroll_top:s_top})    
+    }
+
+    setSelectedTiles(ids,append,propagate){
+        if (!append){
+            for (let id in this.selected_tiles){
+                let t  =  this.__doc__.getElementById(`mlvtile-${this.domId}-${id}`);
+                if (t){
+                    t.style.border= this.selected_tiles[id];
+                }
+              
+            }
+            this.selected_tiles={};
+        }
+        for (let id of ids){
+            let tile = this.__doc__.getElementById(`mlvtile-${this.domId}-${id}`);
+            if (tile){
+                this.selected_tiles[id]=tile.style.border;
+                tile.style.border="4px solid goldenrod";
+                console.log(tile.style.border);
+            }
+            
+           
+        }
+        if (propagate){
+               this.listeners.image_selected.forEach((func)=>{func(ids)});
+        }          
+    }
+
+    scrollToTile(index,select){
+        const pos = this.data_view.data.indexOf(index);
+        let obj = this._calculateTopBottomRow(pos);
+        if (Math.abs(obj.top-this.row_displayed_first)>this.max_difference){
+            this.render(obj.top,obj.bottom,true);
+        }
+        else{
+            this.render(obj.top,obj.bottom);
+        }
+        this.view_port.scrollTop=obj.scroll_top;
+        if (select){
+            this.setSelectedTiles([pos]);
+        }
+    }
+
+    _getRandomString(len,an){
+		if (!len){
+			len=6;
+		}
+    	an = an&&an.toLowerCase();
+    	let str="", i=0, min=an=="a"?10:0, max=an=="n"?10:62;
+   	 	for(;i++<len;){
+      		let r = Math.random()*(max-min)+min <<0;
+      		str += String.fromCharCode(r+=r>9?r<36?55:61:48);
+    	}
+    	return str;
+    }
+
+    show(first_tile_index){
+        if (!first_tile_index){
+            first_tile_index=0;
+        }
+        this._setCanvasHeight();  
+        let obj=this._calculateTopBottomRow(first_tile_index);
+        this.render(obj.top,obj.bottom,true);
+        this.view_port.scrollTop=obj.scroll_top;
+    }
+
+    _addRow(row){
+        let st = row*this.num_per_row;
+        let en = st+this.num_per_row;
+        let top = row * this.tile_height+this.margin;
+        let x=0;
+        const w = this.t_width+"px";
+        const h = this.t_height+"px";
+        const burl = this.config.base_url;
+        const type = this.config.image_type;
+        for (let i=st;i<en;i++){
+            const id =  this.data_view.getId(i);
+            if (id == null){
+                return;
+            }
+            const image= this.data_view.getItemField(i,this.config.image_key)
+            let left=x*this.tile_width+this.margin;
+            x++;
+            let border=""
+            if (this.color_by){
+                let color = this.color_by(id);
+                border= "4px solid "+color;
+            }
+            let extra_classes=[]
+            if (this.selected_tiles[id]){
+               border="4px solid goldenrod"
+            }   
+            createEl("img",{
+                src:`${burl}${image}.${type}`,
+                id:`mlvtile-${this.domId}-${i}`,
+                styles:{
+                    border:border,
+                    height:h,
+                    width:w,
+                    left:left+"px",
+                    top:top+"px"
+                },
+                classes:["mlv-tile",
+                        `mlv-tile-${this.domId}`,
+                        `mlv-tile-${this.domId}-${row}`]
+                        .concat(extra_classes)
+            },this.canvas)
+        }
+    }
+}
+
+export default ImageTable;

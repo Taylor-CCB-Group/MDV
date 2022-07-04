@@ -1,10 +1,13 @@
 {
   "name": "ciview2",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node_modules/.bin/webpack serve",
+    "build": "node_modules/.bin/webpack --config prod.config.js",
+    "run-hyperion":"node_modules/.bin/webpack  serve --config hyperion.dev.config.js",
+    "build-hyperion":"node_modules/.bin/webpack --config hyperion.prod.config.js"
   },
   "author": "",
   "license": "ISC",
@@ -13,14 +16,24 @@
     "style-loader": "^3.1.0",
     "webpack": "^5.45.1",
     "webpack-cli": "^4.7.2",
-    "webpack-dev-server": "^3.11.2"
+    "webpack-dev-server": "^4.7.4"
   },
   "dependencies": {
+    "@deck.gl/core": "^8.7.1",
+    "@deck.gl/geo-layers": "^8.7.1",
+    "@deck.gl/layers": "^8.7.1",
+    "@deck.gl/react": "^8.7.12",
+    "@hms-dbmi/viv": "^0.12.6",
     "d3": "^7.0.0",
+    "d3-contour": "^3.0.1",
+    "d3-geo": "^3.0.1",
+    "d3-sankey": "^0.12.3",
+    "deck.gl": "^8.7.1",
     "gl-matrix": "^3.3.0",
     "jquery": "^3.6.0",
     "microtip": "^0.2.2",
     "nouislider": "^15.2.0",
+    "react": "^18.2.0",
     "regl": "^2.1.0",
     "split.js": "^1.6.4"
   }

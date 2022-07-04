@@ -2,9 +2,9 @@ const path = require('path');
 webpack=require("webpack");
 
 module.exports = {	  
-	   entry: './src/prod_index.js',	 
+	   entry: './src/modules/basic_index.js',	 
   	   output: {
-    		   path: path.resolve(__dirname,"dist"),
+    		   path: path.resolve(__dirname,"dist/basic"),
     		   filename: 'ciview2.js',
 			   assetModuleFilename: 'images/[name][ext]',
 			  

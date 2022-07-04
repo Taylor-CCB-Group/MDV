@@ -1,1 +1,0 @@
-onmessage=function(a){const n=new Uint8Array(a.data[2]),t=a.data[3],e=n.length,r=new Array(t.values.length).fill(0),s=new Uint8Array(a.data[0]),l=new Uint8Array(a.data[1]);for(let a=0;a<e;a++)0!==l[a]&&l[a]!==s[a]||r[n[a]]++;postMessage(r)};

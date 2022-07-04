@@ -1,8 +1,8 @@
-import {SVGChart} from "./SVGChart.js";
+import SVGChart from "./SVGChart.js";
 import {createEl} from "../utilities/Elements.js";
 import { hexToRGB } from "../datastore/DataStore.js";
-import {select} from "d3-selection";
 import "d3-transition";
+
 class WGLChart extends SVGChart{
     constructor(dataStore,div,config,axisTypes){
         super(dataStore,div,config,axisTypes);
@@ -34,6 +34,11 @@ class WGLChart extends SVGChart{
 		},this.graphDiv)
 
     }
+
+    onDataHighlighted(data){
+        this.app.setHighlightPoints(data.indexes);
+        this.app.refresh();
+    }
     
     afterAppCreation(){
         const self = this;
@@ -48,26 +53,45 @@ class WGLChart extends SVGChart{
         });
 
         c.default_color= c.default_color || "#377eb8";
+        c.on_filter = c.on_filter==null?"hide":c.on_filter;
+        this.app.setFilterAction(c.on_filter);
 
         const dColor = hexToRGB(c.default_color)
 		let colorFunc=()=>dColor;
 		
 		if (c.color_by){
-			colorFunc=this.dataStore.getColorFunction(c.color_by,{asArray:true});
+            const conf ={
+                asArray:true,
+                overideValues:{
+                    colorLogScale:this.config.log_color_scale
+                }
+            }
+            this._addTrimmedColor(c.color_by,conf);
+			colorFunc=this.dataStore.getColorFunction(c.color_by,conf);
             if (!c.color_legend){
                 c.color_legend={
                     display:true
                 }
             }
-            if (c.color_legend.display){
-                this.addColorLegend(c.color_by);
-            }
+            
+            this.setColorLegend();
+            
 		}
+        this.app.addHandler("object_clicked",(index)=>{
+            this.dataStore.dataHighlighted([index],this);    
+        })
 
       
         return colorFunc;
 
     }
+
+    setToolTipColumn(column){
+        this.config.tooltip.column=column;
+        
+    }
+
+ 
 
     showTooltip(e,index){
 		var rect = this.graphDiv.getBoundingClientRect();
@@ -81,12 +105,33 @@ class WGLChart extends SVGChart{
 
 	}
 
+    getSetupConfig(){
+        const c =this.config;
+        const dColor = hexToRGB(c.default_color);
+        let colorFunc=()=>dColor;
+		
+		if (c.color_by){
+			colorFunc=this.dataStore.getColorFunction(c.color_by,{asArray:true});
+        }
+		return  {
+			localFilter:this.dim.getLocalFilter(),
+			globalFilter:this.dataStore.getFilter(),
+			colorFunc:colorFunc
+			
+		};
+
+    }
+
     setSize(x,y){
 		super.setSize(x,y);
 		const dim = this._getContentDimensions();
 		this.app.setSize(dim.width,dim.height);
+        this.graphDiv.style.left = dim.left+"px";
+        this.graphDiv.style.top = dim.top+"px";
 		this.updateAxis();
 	}
+
+
 
     onDataFiltered(dim){
         if (dim === "all_removed"){
@@ -94,12 +139,13 @@ class WGLChart extends SVGChart{
             this.app.setFilter(false);
             this.resetButton.style.display="none";
             
-        }      
+        }
+        this.app.setHighlightPoints(null);
         this.app.refresh();		
 	}
 
-    remove(){    
-        this.dim.destroy();
+    remove(notify=true){    
+        this.dim.destroy(notify);
         this.app.remove();
 		super.remove()       
     }
@@ -115,56 +161,18 @@ class WGLChart extends SVGChart{
     }
 
 
-    addColorLegend(){
-        if (!this.config.color_legend.display){
-            if (this.legend){
-                this.legend.remove();
-            }
-            return;
-        }
-        const box = this._getContentDimensions();
-        let lt= 0;
-        let ll = 0;
-        if (this.legend){
-            ll = this.legend.style.left;
-            lt = this.legend.style.top;
-            this.legend.remove();
-        }
-        else {
-            const cl= this.config.color_legend;
-            if (!cl.pos){
-                cl.pos=[box.left,box.top]
-            }
-            ll= cl.pos[0]+"px";
-            lt= cl.pos[1]+"px";
-        }
-        this.legend = this.dataStore.getColorLegend(this.config.color_by);
-        this.contentDiv.append(this.legend);
-       
-        this.legend.style.left= ll;
-        this.legend.style.top= lt;
-        this.legend.__doc__=this.__doc__;
-
-    }
+   
 
     colorByColumn(column){
-		const colorFunc = this.dataStore.getColorFunction(column,{asArray:true});
-        if (!this.config.color_legend){
-            this.config.color_legend={
-                display:true
-            }
-        }
-        
-        this.addColorLegend();
-        
+        this.config.color_by=column;
+        const colorFunc= this.getColorFunction(column,true)
         
 		const t = performance.now();
 		this.app.colorPoints(colorFunc);
 		console.log("color time:"+(performance.now()-t))
         setTimeout(()=>{
             this.app.refresh();
-        },50);
-        
+        },50);  
 	}
 
 	colorByDefault(){
@@ -226,48 +234,54 @@ class WGLChart extends SVGChart{
 
    
     getSettings(conf){
+        if (!conf){
+            conf={
+                pointMax:50,
+                pointMin:1
+            }
+        }
         const settings = super.getSettings();
         const c = this.config;
         const cols = this.dataStore.getColumnList();
+        settings.splice(2,0, {
+            type:"slider",
+            max:1,
+            min:0,
+            doc:this.__doc__,
+            current_value:c.opacity,
+            label:"Point Opacity",
+            func:(x)=>{
+                c.opacity=x;
+                this.app.setPointOpacity(x)
+                this.app.refresh();
+            }
+        },
+        {
+            type:"slider",
+            max:10,
+            min:0,
+    
+            doc:this.__doc__,
+            current_value:c.radius,
+            label:"Point Size",
+            func:(x)=>{
+                c.radius=x;
+                this.app.setPointRadius(x)
+                this.app.refresh();
+                console.log(x);
+            }
+        })
     
         return settings.concat([
-            {
-                type:"slider",
-                max:1,
-                min:0,
-                doc:this.__doc__,
-                current_value:c.opacity,
-                label:"Point Opacity",
-                func:(x)=>{
-                    c.opacity=x;
-                    this.app.setPointOpacity(x)
-                    this.app.refresh();
-                }
-            },
-            {
-                type:"slider",
-                max:conf.pointMax,
-                min:conf.pointMin,
-        
-                doc:this.__doc__,
-                current_value:c.radius,
-                label:"Point Size",
-                func:(x)=>{
-                    c.radius=x;
-                    this.app.setPointRadius(x)
-                    this.app.refresh();
-                    console.log(x);
-                }
-            },
+           
             {
                 type:"check",
                 label:"Show Tooltip",
                 current_value:c.tooltip.show,
                 func:(x)=>{
                     c.tooltip.show=x;
-                    if (!c.tooltip.column){
-                        c.tooltip.column= cols[0].field;
-                    }
+                    let cl= c.tooltip.column || cols[0].field
+                    this.setToolTipColumn(cl) 
                 }
             },
             {
@@ -276,7 +290,7 @@ class WGLChart extends SVGChart{
                 current_value:c.tooltip.column || cols[0].field,
                 values:[cols,"name","field"],
                 func:(x)=>{
-                    c.tooltip.column=x;
+                    this.setToolTipColumn(x);
                 }
 
             },
@@ -289,7 +303,20 @@ class WGLChart extends SVGChart{
                     this.app.refresh();
                 }
 
-            }
+            },
+            {
+				type:"radiobuttons",
+				label:"Action on Filter",
+				choices:[["Hide Points","hide"],["Gray Out Points","grey"]],
+				current_value:c.on_filter,
+				func:(x)=>{
+					c.on_filter=x;
+                    this.app.setFilterAction(x);
+                    this.app.refresh();
+				}
+
+			}
+
 
 
         ]);
@@ -300,4 +327,4 @@ class WGLChart extends SVGChart{
 
 
 
-export {WGLChart}
+export default WGLChart;

@@ -1,7 +1,7 @@
 import {getRandomString} from "../utilities/Utilities.js";
 import {ContextMenu} from "../utilities/ContextMenu.js";
 import {createEl} from "../utilities/Elements.js";
-import {ChartSettingsDialog} from "./ChartSettingsDialog.js";
+import SettingsDialog from "../utilities/SettingsDialog";
 
 
 class BaseChart{
@@ -35,7 +35,7 @@ class BaseChart{
         
         //create the DOM elements
         this.div = typeof div === "string"?document.getElementById(div):div;
-
+        this.div.classList.add("ciview-chart-panel");
         this.titleBar=createEl("div",{
             classes:["ciview-chart-titlebar"]
         })
@@ -73,6 +73,18 @@ class BaseChart{
             if (type==="filtered"){
                 this.onDataFiltered(data)
             }
+            else if (type==="data_changed"){
+                this.onDataChanged(data);
+            }
+            else if (type==="data_added"){
+                this.onDataAdded(data);
+            }
+            else if (type==="data_highlighted"){
+                if (this.onDataHighlighted){
+                    this.onDataHighlighted(data);
+                }
+            }
+
         });
    
         //set up context menu and icon which opens it
@@ -97,6 +109,23 @@ class BaseChart{
 
         //work out width and height based on container
         this._setDimensions();
+    }
+
+    _getContentDimensions(){
+        return{
+            top:5,
+            left:5,
+            height:this.height,
+            width:this.width
+        }
+    }
+
+    getFilter(){
+
+    }
+
+    setFilter(){
+        
     }
 
 
@@ -144,6 +173,7 @@ class BaseChart{
     addMenuIcon(icon,tooltip,config={}){
         const sp= createEl("span",{
             "aria-label":tooltip,
+            "data-microtip-color":"red",
             role:"tooltip",
             "data-microtip-size":config.size || "small",
             "data-microtip-position":config.position || "bottom-left",
@@ -173,7 +203,187 @@ class BaseChart{
     */
     onDataFiltered(){}
 
- 
+    /**Check if chart is composed of any columns whose data has
+     * changed. if so re-calculate and re-draw chart (call onDataFiltered)
+     * @param {object} data - a list of column/fields whose data has been modified
+     * @param {string[]} data.columns a list of column ids whose data has changed
+     * @param {boolean} hasFiltered Whether a 'filtered' callback has already been
+     * issued 
+     */
+    onDataChanged(data){
+        const columns = data.columns;
+        //update any charts which use data from the columns
+        //(if they haven't already been updated by the filter changing)
+        if (!data.hasFiltered){
+            let cols= this.config.param;
+            let isDirty=false
+            if (typeof this.config.param === "string" ){
+                cols=[this.config.param];
+            }
+            for (let p of cols){
+                if (columns.indexOf(p)!==-1){
+                    isDirty=true;
+                    break;
+                }
+            }
+            if (isDirty){
+                this.onDataFiltered();
+            }
+
+        }
+        //recolor any charts coloured by the column
+        if (columns.indexOf(this.config.color_by)!==-1){
+            this.colorByColumn(this.config.color_by);
+        }
+    }
+
+
+
+
+
+    getColorLegend(){
+        const conf = {overideValues:{
+            colorLogScale:this.config.log_color_scale
+        }};
+        this._addTrimmedColor(this.config.color_by,conf);
+
+        return this.dataStore.getColorLegend(this.config.color_by,conf);
+    }
+
+    _addTrimmedColor(column,conf){
+        const tr = this.config.trim_color_scale;
+        const col= this.dataStore.columnIndex[column];
+        if (tr && tr !=="none"){
+            if (col.quantiles && col.quantiles !=="NA"){
+                conf.overideValues.min=col.quantiles[tr][0];
+                conf.overideValues.max=col.quantiles[tr][1];
+            }
+        }
+
+    }
+
+    /**
+     * adds (or removes) the color legend depending on the chart's
+     * config color_legend.display value - assumes chart has a 
+     * get colorLegend method 
+     */
+     setColorLegend(){
+        if (!this.config.color_legend.display){
+            if (this.legend){
+                this.config.color_legend.pos=[this.legend.offsetLeft,this.legend.offsetTop];
+                this.legend.remove();
+                delete this.legend;
+            }
+            return;
+        }
+        const box = this._getContentDimensions();
+        let lt= 0;
+        let ll = 0;
+        if (this.legend){
+            ll = this.legend.style.left;
+            lt = this.legend.style.top;
+            this.legend.remove();
+        }
+        else {
+            const cl= this.config.color_legend;
+            if (!cl.pos){
+                cl.pos=[box.left,box.top]
+            }
+            ll= cl.pos[0]+"px";
+            lt= cl.pos[1]+"px";
+        }
+        this.legend = this.getColorLegend();
+        this.contentDiv.append(this.legend);
+       
+        this.legend.style.left= ll;
+        this.legend.style.top= lt;
+        this.legend.__doc__=this.__doc__;
+
+    }
+
+    getColorFunction(column,asArray){
+        this.config.color_by=column;
+        const conf ={
+            asArray:asArray,
+            overideValues:{
+                colorLogScale:this.config.log_color_scale
+            }
+        }
+        this._addTrimmedColor(column,conf);
+       
+      
+		const colorFunc = this.dataStore.getColorFunction(column,conf);
+       
+        if (!this.config.color_legend){
+            this.config.color_legend={
+                display:true
+            }
+        }
+        
+        this.setColorLegend();
+        return colorFunc;
+        
+    }
+
+
+    /**Checks to see if the column is used in the chart
+    * If so, the chart will be removed but no callbacks will be involved
+    * @param {object} data - a list of column/fields whose data has been modified
+    * @param {string[]} data.columns a list of column ids whose data has changed
+    * @param {boolean} hasFiltered Whether a 'filtered' callback has already been
+    * issued 
+    * @returns {boolean} true if the chart has been removed
+    */
+    onColumnRemoved(column){
+        let cols= this.config.param;
+        let isDirty=false
+        if (typeof this.config.param === "string" ){
+            cols=[this.config.param];
+        }
+        for (let p of cols){
+            if (column===p){
+                isDirty=true;
+                break;
+            }
+        }
+        if (isDirty){
+            this.remove(false);
+            return true;
+        }
+        if (this.colorByColumn){
+            if (this.config.color_by===column){
+                delete this.config.color_by;
+                this.colorByDefault();
+            }
+        }
+        return false;
+
+    }
+
+    onDataAdded(newSize){
+        this.onDataFiltered();
+    }
+
+    addToolTip(){
+        this._tooltip = createEl("div",{
+            classes:["ciview-tooltip"],
+            stlyles:{
+                display:"none",
+                position:"absolute"
+            }
+        },this.__doc__.body)
+    }
+
+    showToolTip(e,msg){
+        this._tooltip.innerHTML=msg;
+        this._tooltip.style.display= "inline-block";
+        this._tooltip.style.left= e.clientX+"px";
+        this._tooltip.style.top=e.clientY+"px"
+    }
+
+    hideToolTip(){
+        this._tooltip.style.display="none";
+    }
 
     /**
     * Just removes the DOM elements, subclasses should do their own cleanup
@@ -182,6 +392,9 @@ class BaseChart{
         this.titleBar.remove()
         this.contentDiv.remove();
         this.dataStore.removeListener(this.config.id);
+        if (this._tooltip){
+            this._tooltip.remove();
+        }
     }
 
 
@@ -242,18 +455,44 @@ class BaseChart{
             settings.push({
                 label:"Show Color Legend",
                 type:"check",
-                values:[cols,"name","field"],
+            
                 current_value:c.color_legend?c.color_legend.display:true, 
                 func:(x)=>{
                     if (!c.color_by){
                         return
                     }
                     c.color_legend.display=x;
-                    this.addColorLegend();
+                    this.setColorLegend();
 
                 }
 
-            })
+            });
+            settings.push({
+                label:"SymLog Color Scale",
+                type:"check",
+                
+                current_value:c.log_color_scale, 
+                func:(x)=>{      
+                    c.log_color_scale=x;
+                    if (c.color_by){
+                        this.colorByColumn(c.color_by);
+                    }
+                }
+            });
+            settings.push({
+                type:"radiobuttons",
+                label:"Trim Color Scale to Percentile",
+                current_value:c.trim_color_scale || "none",
+                choices:[["No Trim","none"],["0.001","0.001"],["0.01","0.01"],["0.05","0.05"]],             
+                func:(v)=>{
+                    c.trim_color_scale=v;
+                    if (c.color_by){
+                        this.colorByColumn(c.color_by);
+                    }
+                   
+                }
+            });
+
         }
 
         return settings;
@@ -274,7 +513,7 @@ class BaseChart{
    
     _openSettingsDialog(e){
         if (!this.settingsDialog){
-          this.settingsDialog=  new ChartSettingsDialog({
+          this.settingsDialog=  new SettingsDialog({
                 maxHeight:400,
                 doc:this.__doc__ || document,
                 width:300,
@@ -315,6 +554,9 @@ class BaseChart{
                 }
             })
         }
+        if (this.addToContextMenu){
+            menu=menu.concat(this.addToContextMenu());
+        }
         return menu;
     }
 
@@ -340,6 +582,10 @@ class BaseChart{
         if (this.legend){
             this.legend.__doc__=doc;
         }
+        if (this._tooltip){
+            this._tooltip.remove();
+            this.addToolTip();
+        }
     }
 
     _setConfigValue(conf,value,def){
@@ -348,6 +594,8 @@ class BaseChart{
         }
         return conf[value]
     }
+
+    drawChart(){}
 
 
 
@@ -385,15 +633,16 @@ class BaseChart{
             this.div.style.width=x+"px";
         }
         //calculate width and height based on outer div
-        this._setDimensions()
+        this._setDimensions();
     }
 
     _setDimensions(){
         const rect = this.div.getBoundingClientRect();
-        const y=rect.height;
-        const x=rect.width;
+        const y=Math.round(rect.height);
+        const x=Math.round(rect.width);
         this.config.size=[x,y];
-        this.height=y-20;
+        const rect2  = this.contentDiv.getBoundingClientRect();
+        this.height=Math.round(rect2.height);
         this.width=x;
     }
 
@@ -402,7 +651,9 @@ class BaseChart{
      * Downloads an image of the chart
      * @param {string} im_type - either svg or png 
      */
-    downloadImage(im_type){    
+    downloadImage(im_type){ 
+        const originalColor =this.contentDiv.style.color;
+        this.contentDiv.style.color = "black";
         this.getImage(resp=>{
             let link =document.createElement("a");
             link.download=this.config.title+"."+im_type;
@@ -415,7 +666,8 @@ class BaseChart{
                 link.href=url
             }        
             link.click();
-            link.remove()
+            link.remove();
+            this.contentDiv.style.color = originalColor;
         },im_type);       
     }
 
@@ -476,4 +728,4 @@ function copyStylesInline(destinationNode, sourceNode) {
 
   
 
-export {BaseChart}
+export default BaseChart
