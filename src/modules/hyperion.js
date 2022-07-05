@@ -51,9 +51,11 @@ function scLoadData(proj,local){
     const listener = (type,cm,data)=>{
         scListener(type,cm,data,proj);
     }
+
+    
     const cm = new ChartManager("app-holder",proj.data.dataSources,dataLoader,config,listener); 
     cm.addMenuIcon("_main","fas fa-cogs","re-cluster selected cells",()=>scRecluster(cm,proj.data.hyperion_config));
-    cm._ssfilter=_cm.dsIndex["cells"].dataStore.getDimension("category_dimension");
+    cm._ssfilter=cm.dsIndex["cells"].dataStore.getDimension("category_dimension");
 
     const urlbase= local?`${local}/images`:`/data/${proj.genome}/projects/${proj.id}/images`;
     cm._urlbase=urlbase;

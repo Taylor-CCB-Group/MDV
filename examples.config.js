@@ -11,10 +11,10 @@ module.exports = env =>{
 				"Cross-Origin-Opener-Policy":"same-origin",
 				"Cross-Origin-Embedder-Policy":"require-corp"		
 			},
-			static:"./public/"
+			static:"./examples/"
 		  },
 	
-	   entry: './src/modules/dev_index.js',
+	   entry: './examples/'+env.example+'.js',
 
   	   output: {
     		   filename: 'dist/ciview2.js',
@@ -40,5 +40,3 @@ module.exports = env =>{
   	}
 }
 };
-
-

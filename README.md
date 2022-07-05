@@ -19,9 +19,9 @@ Multi Dimensional Viewer (MDV) is tool for analyzing, annotating  and sharing mu
 * Diverse range of data sources (API calls,static files) can be used by implementing custom data loaders 
 
 
-
 ### Quick Start
 
 * clone the repository
-* npm install 
+* npm install
+* run the example - npm run run-ex --env example=basic_example
 

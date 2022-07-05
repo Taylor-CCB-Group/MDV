@@ -7,6 +7,7 @@
     "dev": "node_modules/.bin/webpack serve",
     "build": "node_modules/.bin/webpack --config prod.config.js",
     "run-hyperion":"node_modules/.bin/webpack  serve --config hyperion.dev.config.js",
+    "run-ex":"node_modules/.bin/webpack  serve --config examples.config.js --env process.env",
     "build-hyperion":"node_modules/.bin/webpack --config hyperion.prod.config.js"
   },
   "author": "",

@@ -1,19 +1,19 @@
 import "microtip/microtip.css";
-import "../css/fontawesome-5.15.3/all.css";
+import "../src/css/fontawesome-5.15.3/all.css";
 import 'nouislider/dist/nouislider.min.css'
-import "../utilities/css/ContextMenu.css";
-import "../charts/css/charts.css";
-import "../webgl/css/wgl2di.css";
-import "../table/css/slickgrid.css";
+import "../src/utilities/css/ContextMenu.css";
+import "../src/charts/css/charts.css";
+import "../src/webgl/css/wgl2di.css";
+import "../src/table/css/slickgrid.css";
 
-import {getRandomDataStore} from "../dev/MockDataStore.js";
-import { createEl } from "../utilities/Elements";
-import  RingChart  from "../charts/RingChart";
-import  RowChart  from "../charts/RowChart";
-import  WGLScatterPlot  from "../charts/WGLScatterPlot";
-import  WGL3DScatterPlot  from "../charts/WGL3DScatterPlot";
-import TableChart from "../charts/TableChart";
-import  HistogramChart  from "../charts/HistogramChart";
+import {getRandomDataStore} from "../src/dev/MockDataStore.js";
+import { createEl } from "../src/utilities/Elements";
+import  RingChart  from "../src/charts/RingChart";
+import  RowChart  from "../src/charts/RowChart";
+import  WGLScatterPlot  from "../src/charts/WGLScatterPlot";
+import  WGL3DScatterPlot  from "../src/charts/WGL3DScatterPlot";
+import TableChart from "../src/charts/TableChart";
+import  HistogramChart  from "../src/charts/HistogramChart";
 
 
 const ds2= getRandomDataStore(10000000);
