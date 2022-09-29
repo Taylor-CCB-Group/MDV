@@ -146,7 +146,7 @@ class GenomeBrowser extends BaseChart{
            
     }
     themeChanged(){
-        
+        console.warn('themeChanged() deprecated');
     }
 
     showHideDialog(){

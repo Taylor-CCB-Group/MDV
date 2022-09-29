@@ -40,10 +40,24 @@ const themes={
         background_color:"#bababa"
 
     }
-
 }
-
-
+//https://stackoverflow.com/questions/56393880/how-do-i-detect-dark-mode-using-javascript
+function getPreferredColorScheme() {
+    if (window.matchMedia) {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return "Dark";
+        } else {
+            return "Light";
+        }
+    } 
+    return "Light";
+}
+function listenPreferredColorScheme(callback) {
+    if (window.matchMedia) {
+        const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        colorSchemeQuery.addEventListener('change', ()=>callback(getPreferredColorScheme()));
+    }
+}
 
 /**
 * The object to manage charts
@@ -82,7 +96,11 @@ class ChartManager{
         this.listeners={};
         this.infoAlerts={};
         this.progressBars={};
-        this.theme="Light"
+        this.setTheme(getPreferredColorScheme());
+        //maybe better to stop listening once explicit option has been set
+        //or to allow the user to explicitly say 'system default'
+        listenPreferredColorScheme(t => this.setTheme(t));
+
         // each entry in dataSources will contain
         //  dataSource - the actual dataStore object
         //  name - the name given to this data source
@@ -199,7 +217,7 @@ class ChartManager{
                 position:"relative"
             }
         },this.containerDiv);
- 
+        this.contentDiv.classList.add('ciview-contentDiv');
 
      
 
@@ -259,27 +277,10 @@ class ChartManager{
 
     setTheme(theme){
         this.theme=theme;
-        for (let d of this.dataSources){
-            if (d.contentDiv){
-                d.contentDiv.style.background= themes[theme].background_color;
-            }
-            
-        }
-        for (let id in this.charts){
-            this._setChartTheme(this.charts[id].chart)
-        }
-    }
-
-    _setChartTheme(chart){
-        const t = themes[this.theme];
-      
-        chart.contentDiv.style.background=t.main_panel_color;
-        chart.contentDiv.style.color=t.text_color;
-        chart.titleBar.style.background=t.title_bar_color;
-        chart.titleBar.style.color=t.text_color;
-        if (chart.themeChanged){
-            chart.themeChanged();
-        }
+        document.getElementsByTagName('html')[0].className = theme;
+        //thinking about doing everything with css
+        // there could be graphics rendering of other sorts as well...
+        // nothing I can see at the moment that responds to theme.
     }
 
     _sync_colors(from,to){
@@ -365,9 +366,10 @@ class ChartManager{
                     flex:"1 1 auto",
                     position:"relative",
                     overflow:"auto",
-                    background:col
+                    // background:col
                 }
             },p);
+            ds.contentDiv.classList.add("ciview-contentDiv");
         }  
         //need to create a set to create track of 
         //charts loaded
@@ -1174,7 +1176,6 @@ class ChartManager{
         div.style.justifyContent="";
         const chartType= BaseChart.types[config.type];
         const chart = new chartType.class(ds.dataStore,div,config);
-        this._setChartTheme(chart);
         this.charts[chart.config.id]={
             chart:chart,
             dataSource:ds
