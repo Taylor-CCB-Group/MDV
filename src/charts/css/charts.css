@@ -98,6 +98,7 @@
     text-overflow:ellipsis;
     overflow:hidden;
     white-space:nowrap;
+    margin-left: 0.2em;
 }
 .ciview-chart-menuspace{
     flex-grow:1;
