@@ -11,6 +11,7 @@
     "build": "node_modules/.bin/webpack --config prod.config.js",
     "run-hyperion": "node_modules/.bin/webpack  serve --config hyperion.dev.config.js",
     "run-ex": "node_modules/.bin/webpack  serve --config examples.config.js --env process.env",
+    "run-example": "npm run run-ex --env example=basic_example",
     "build-hyperion": "node_modules/.bin/webpack --config hyperion.prod.config.js"
   },
   "repository": {
