@@ -44,7 +44,7 @@
     display:flex;
     flex-flow:column;
     border-radius:5px;
-  
+    box-shadow: 0 0 1em #888;
 }
 
 .ciview-chart-titlebar{
