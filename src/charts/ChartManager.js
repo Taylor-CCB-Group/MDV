@@ -168,7 +168,13 @@ class ChartManager{
                 position:"bottom-right"
             },
             func:()=>{
-                new ColorChooser(this);
+                try { new ColorChooser(this); }
+                catch (error) {
+                    console.error('error making ColorChooser', error);
+                    this.createInfoAlert("Error making color chooser", {
+                        type: "warning", duration: 2000
+                    });
+                 }
             }
 
         },this.menuBar);
