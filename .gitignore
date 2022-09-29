@@ -1,5 +1,4 @@
 node_modules
-package-lock.json
 _tests/
 _dev/
 mlv.config.js

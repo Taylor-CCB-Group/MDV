@@ -1,41 +1,49 @@
 {
   "name": "ciview2",
-  "version": "0.0.1",
-  "description": "",
+  "version": "0.0.2",
+  "description": "Multi Dimensional Viewer (MDV) is tool for analyzing, annotating  and sharing multi dimensional data.  It is inspired by [dc charts](https://dc-js.github.io/dc.js/) and [crossfilter](https://square.github.io/crossfilter/), but is performant with over 10 million data items due to the use of web workers, shared array buffers and native arrays.   &nbsp; ![summary](images/summary.png)",
   "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
   "scripts": {
     "dev": "node_modules/.bin/webpack serve",
     "build": "node_modules/.bin/webpack --config prod.config.js",
-    "run-hyperion":"node_modules/.bin/webpack  serve --config hyperion.dev.config.js",
-    "run-ex":"node_modules/.bin/webpack  serve --config examples.config.js --env process.env",
-    "build-hyperion":"node_modules/.bin/webpack --config hyperion.prod.config.js"
+    "run-hyperion": "node_modules/.bin/webpack  serve --config hyperion.dev.config.js",
+    "run-ex": "node_modules/.bin/webpack  serve --config examples.config.js --env process.env",
+    "build-hyperion": "node_modules/.bin/webpack --config hyperion.prod.config.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Taylor-CCB-Group/ciview2.git"
   },
   "author": "",
   "license": "ISC",
-  "devDependencies": {
-    "css-loader": "^6.2.0",
-    "style-loader": "^3.1.0",
-    "webpack": "^5.45.1",
-    "webpack-cli": "^4.7.2",
-    "webpack-dev-server": "^4.7.4"
+  "bugs": {
+    "url": "https://github.com/Taylor-CCB-Group/ciview2/issues"
   },
+  "homepage": "https://github.com/Taylor-CCB-Group/ciview2#readme",
   "dependencies": {
-    "@deck.gl/core": "^8.7.1",
-    "@deck.gl/geo-layers": "^8.7.1",
-    "@deck.gl/layers": "^8.7.1",
-    "@deck.gl/react": "^8.7.12",
-    "@hms-dbmi/viv": "^0.12.6",
-    "d3": "^7.0.0",
-    "d3-contour": "^3.0.1",
+    "@hms-dbmi/viv": "^0.13.2",
+    "@luma.gl/core": "^8.5.16",
+    "d3": "^7.6.1",
+    "d3-contour": "^4.0.0",
     "d3-geo": "^3.0.1",
     "d3-sankey": "^0.12.3",
-    "deck.gl": "^8.7.1",
-    "gl-matrix": "^3.3.0",
-    "jquery": "^3.6.0",
+    "deck.gl": "^8.8.11",
+    "gl-matrix": "^3.4.3",
+    "jquery": "^3.6.1",
     "microtip": "^0.2.2",
-    "nouislider": "^15.2.0",
+    "nouislider": "^15.6.1",
     "react": "^18.2.0",
     "regl": "^2.1.0",
-    "split.js": "^1.6.4"
+    "split.js": "^1.6.5"
+  },
+  "devDependencies": {
+    "css-loader": "^6.7.1",
+    "style-loader": "^3.3.1",
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0",
+    "webpack-dev-server": "^4.11.1"
   }
 }
