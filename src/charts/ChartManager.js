@@ -234,7 +234,7 @@ class ChartManager{
 
         //load any files first
 
-        this.dataLoader = dataLoader.function;
+        this.dataLoader = dataLoader.function;// || async function defaultDataLoaderFunction() { console.warn(`ceci n'est pas une dataLoader`) };
         this.viewLoader = dataLoader.viewLoader;
 
         if (dataLoader.files){     
@@ -798,6 +798,7 @@ class ChartManager{
             spinner.remove();
         }
         setTimeout(()=>{
+            if (!this.infoAlerts[id]) return; //PJT allow for clearing list.
             this.infoAlerts[id].div.remove();
             delete this.infoAlerts[id];
             let top =50;
@@ -806,6 +807,12 @@ class ChartManager{
                 top+=40;
             }
         },delay);
+    }
+    clearInfoAlerts() {
+        for (const i in this.infoAlerts) {
+            this.infoAlerts[i].div.remove();
+        }
+        this.infoAlerts = {};
     }
 
 
@@ -894,7 +901,7 @@ class ChartManager{
 
         })
        
-   
+        //"this.dataLoader is not a function" with e.g. "cell_types"
         this.dataLoader(columns,dataSource,dataStore.size).then(resp=>{
             for (let col of resp){
                 dataStore.setColumnData(col.field,col.data);
@@ -1078,7 +1085,19 @@ class ChartManager{
         const func = ()=>{
             this._addChart(dataSource,config,div,notify);
         }
-        this._getColumnsThen(dataSource,Array.from(neededCols),func);
+        // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
+        const neededColsArr = Array.from(neededCols);
+        try {
+            this._getColumnsThen(dataSource, neededColsArr, func);
+        } catch (error) {
+            this.clearInfoAlerts();
+            const id = this.createInfoAlert(`Error creating chart with columns [${neededColsArr.join(', ')}]: '${error}'`, {
+                type: "warning"
+            });
+            const idiv = this.infoAlerts[id].div;
+            idiv.onclick = () => idiv.remove();
+            div.remove();
+        }
     }
 
     
