@@ -306,8 +306,8 @@ class DataStore{
         
 
         if (column.datatype === "text"){
-            c.values= column.values;
-        
+            c.values= column.values || [`Error: no values for '${c.name}'`];
+            console.error(`couldn't find values for column '${c.name}' specified in dataSources`);
         }
         else if (column.datatype==="double" || column.datatpe ==="integer"){
             c.colorLogScale=column.colorLogScale;
