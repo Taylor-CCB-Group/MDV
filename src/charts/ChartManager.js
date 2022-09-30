@@ -361,6 +361,7 @@ class ChartManager{
                 classes:["ciview-menu-bar"]          
             },p);
             this._setUpMenu(ds);
+            // might move styles from here into .css
             ds.contentDiv=createEl("div",{
                 styles:{
                     flex:"1 1 auto",
