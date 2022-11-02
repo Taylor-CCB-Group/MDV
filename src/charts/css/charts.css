@@ -32,6 +32,10 @@
     --background_color: #bababa;
     --menu-gradient: linear-gradient(white, darkgray);
 }
+:root {
+    font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1em;
+}
 
 .mdv-select{
     border-radius: 3px;
