@@ -10,8 +10,10 @@
     "dev": "node_modules/.bin/webpack serve",
     "build": "node_modules/.bin/webpack --config prod.config.js",
     "run-hyperion": "node_modules/.bin/webpack  serve --config hyperion.dev.config.js",
+    "run-obvios": "node_modules/.bin/webpack  serve --config obvios.config.js",
     "run-ex": "node_modules/.bin/webpack  serve --config examples.config.js --env process.env",
     "run-example": "npm run run-ex --env example=basic_example",
+    "run-10Mexample": "npm run run-ex --env example=10M_points",
     "build-hyperion": "node_modules/.bin/webpack --config hyperion.prod.config.js"
   },
   "repository": {
