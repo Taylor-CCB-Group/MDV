@@ -1058,7 +1058,8 @@ class WGL2DI{
 
 
 	_brushingStopped(){
-		this.brush.resizing=false;
+		if (!this.brush) return; //'cannot set properties of null' was possible here
+		this.brush.resizing=false; 
 		const d= this.brush.div;
 		const y= d.offsetTop;
 		const x = d.offsetLeft;
