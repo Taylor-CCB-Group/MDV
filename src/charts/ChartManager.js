@@ -1761,7 +1761,7 @@ class AddChartDialog extends BaseDialog{
                     //PJT: would appreciate if this logic could be reviewed
                     //dataLoader existing may not be a guarantee of all columns being valid, but if it doesn't exist,
                     //then presumably columns without data cannot ever work.
-                    const disabled = c.data === undefined || this.dataLoader === undefined;
+                    const disabled = c.data === undefined && this.dataLoader === undefined;
                     const el = createEl("option", {text:item.name, value:item.field}, dd);
                     if (disabled) el.disabled = true;
                 }
