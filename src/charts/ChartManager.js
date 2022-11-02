@@ -1757,7 +1757,13 @@ class AddChartDialog extends BaseDialog{
                 },holder);
                 const ps= this.dataStore.getColumnList(p.type);
                 for (let item of ps){
-                    createEl("option",{text:item.name,value:item.field},dd)
+                    const c = this.dataStore.columnIndex[item.name];
+                    //PJT: would appreciate if this logic could be reviewed
+                    //dataLoader existing may not be a guarantee of all columns being valid, but if it doesn't exist,
+                    //then presumably columns without data cannot ever work.
+                    const disabled = c.data === undefined || this.dataLoader === undefined;
+                    const el = createEl("option", {text:item.name, value:item.field}, dd);
+                    if (disabled) el.disabled = true;
                 }
                 this.paramSelects.push(dd);
                 const largeGroups= this.dataStore.getLargeColumnGroups();
