@@ -270,6 +270,10 @@ BaseChart.types["viv_scatter_plot"]={
     {
         type:"number",
         name:"Y axis"
+    },
+    {
+        type: "text",
+        name: "Category Column"
     }
     ]
 }
