@@ -23,6 +23,7 @@ class VivViewer {
     this.height= this.canvas.height;
     this.width= this.canvas.width;
     this.config=config;
+    this.initClip();
     loadOmeTiff(config.url).then(loader=>{
       this.tiff = loader;
       this._setUp(loader,initialView);
@@ -182,12 +183,12 @@ class VivViewer {
     //   contrastLimits = v.contrastLimits;
     //   //TODO updateProps() equivalent
     // });
-    const colors = getDefaultChannelColors(n); //channels.map((_, i) => [i/n*255, (1-i/n)*255, 0]);
-    const xSlice = [0, SizeX * 2];
-    const ySlice = [0, SizeY * 2];
-    const zSlice = [0, SizeZ * 2];
-    const channelsVisible = channels.map(_ => true);
-    const resolution = loader.length - 1;
+    const colors = getDefaultChannelColors(n); // this should change...
+    const xSlice = this.getXSlice();
+    const ySlice = this.getYSlice();
+    const zSlice = this.getZSlice();
+    const channelsVisible = channels.map(_ => true); // this should change...
+    const resolution = loader.length - 1; // this should change...
     const props = {
       id,
       loader,
@@ -214,6 +215,47 @@ class VivViewer {
     //   getFillColor: () => [100, 100, 100]
     // }))
   };
+
+  initClip() {
+    this.clipX = [0, 1];
+    this.clipY = [0, 1];
+    this.clipZ = [0, 1];
+  }
+  // so much boilerplate...
+  setClipX(min, max) {
+    this.clipX = [min, max];
+    this._updateProps();
+  }
+  setClipY(min, max) {
+    this.clipY = [min, max];
+    this._updateProps();
+  }
+  setClipZ(min, max) {
+    this.clipZ = [min, max];
+    this._updateProps();
+  }
+  getXSlice() {
+    const {SizeX} = this.tiff.metadata.Pixels;
+    const [min, max] = this.clipX;
+    const v = SizeX;
+    return [min*v, max*v];
+  }
+  getYSlice() {
+    const {SizeY} = this.tiff.metadata.Pixels;
+    const [min, max] = this.clipY;
+    const v = SizeY;
+    return [min*v, max*v];
+  }
+  getZSlice() {
+    const {SizeZ} = this.tiff.metadata.Pixels;
+    const [min, max] = this.clipZ;
+    const v = SizeZ;
+    return [min*v, max*v];
+  }
+  _updateProps() {
+    this.createLayers(); //as of this writing, this will lose changes made to channels etc.
+    this.deck.setProps({layers: this.layers})
+  }
 
   _setUp(loader, iv){
     this.native_x= loader.metadata.Pixels.SizeX;

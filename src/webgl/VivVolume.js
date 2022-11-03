@@ -47,13 +47,35 @@ class VivVolume extends BaseChart {
 
     getSettings(conf) {
         return [
+            ...super.getSettings(conf),
+            {
+                type: "doubleslider",
+                label: "clip X",
+                min: 0, max: 1,
+                current_value: this.viv.clipX,
+                func: (min, max) => this.viv.setClipX(min, max)
+            },
+            {
+                type: "doubleslider",
+                label: "clip Y",
+                min: 0, max: 1,
+                current_value: this.viv.clipY,
+                func: (min, max) => this.viv.setClipY(min, max)
+            },
+            {
+                type: "doubleslider",
+                label: "clip Z",
+                min: 0, max: 1,
+                current_value: this.viv.clipZ,
+                func: (min, max) => this.viv.setClipZ(min, max)
+            },
             {
                 type: "button",
                 label: "Recenter camera",
                 func: () => {
                     this.viv.recenterCamera()
                 }
-            }
+            },
         ]
     }
     remove() {
