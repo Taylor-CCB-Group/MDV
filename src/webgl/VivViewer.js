@@ -32,6 +32,10 @@ class VivViewer {
     this.height=y;
     this.width=x;
     const v =this.getViewState(conf.x_scale,conf.y_scale,conf.offset);
+    this.canvas.width = x;
+    this.canvas.height = y;
+    this.canvas.style.width = x;
+    this.canvas.style.height = y;
     this.deck.setProps({
       height:y,
       width:x,
@@ -48,6 +52,8 @@ class VivViewer {
   }
 
   getViewState(x_scale,y_scale,offset){
+    // when rendering 3d, we want viewState to be undefined so it can use initialViewState & internal camera control
+    if (this.config.use3d) return undefined;
     const hzoom = Math.log2(y_scale);
     const wzoom = Math.log2(x_scale);
     let xpos = ((1/x_scale)*(this.native_x))/2;
@@ -189,7 +195,7 @@ class VivViewer {
     this.channels = loader.metadata.Pixels.Channels;
     this.loader= loader.data;
     this.transparentColor=[255,255,255,0];
-    const baseViewState = use3d ? undefined : this.getViewState(iv.x_scale,iv.y_scale,iv.offset);
+    const baseViewState = this.getViewState(iv.x_scale,iv.y_scale,iv.offset);
     
     if (use3d) {
       this._setUpVolumeView(loader);
