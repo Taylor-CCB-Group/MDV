@@ -282,4 +282,5 @@ select, input, textarea {
 
 .ciview-chart-icon{
     cursor:pointer;
+    margin: 0px 2px;
 }
