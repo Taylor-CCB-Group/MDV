@@ -1,4 +1,5 @@
 import BaseChart from "../charts/BaseChart.js";
+import { ColorChannelDialog } from "../charts/VivScatterPlot.js";
 import { createEl } from "../utilities/Elements.js";
 import VivViewer from '../webgl/VivViewer.js';
 
@@ -6,6 +7,9 @@ class VivVolume extends BaseChart {
     constructor(dataStore, div, config) {
         super(dataStore, div, config, {x:{}, y:{}});
         this.afterAppCreation();
+        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", ()=>{
+            new ColorChannelDialog(this.viv);
+        });
     }
     setSize(x, y) {
         super.setSize(x, y);

@@ -6,7 +6,7 @@ import {RGBToHex,hexToRGB} from "../datastore/DataStore.js";
 import {BaseDialog} from "../utilities/Dialog.js";
 import noUiSlider from "nouislider";
 
-class ColorChannelDialog extends BaseDialog{
+export class ColorChannelDialog extends BaseDialog{
     constructor(viv){
         const config={
             width:500,
@@ -185,6 +185,7 @@ class VivScatterPlot extends DensityScatterPlot{
     }
 
     getChannels(){
+        return this.viv.getChannels();
         const props = this.viv.layers[0].props;
         const names = props.selections.map(x=>this.viv.channels[x.c].Name);
         const colors = props.colors.map(x=>RGBToHex(x));
@@ -230,8 +231,20 @@ class VivScatterPlot extends DensityScatterPlot{
         const c = this.config;
         //make sure svg is on top of scatter plot and events pass through
         //this.contentDiv.prepend(this.app.div_container);
-       // this.svg.style("position","absolute")
-         //       .style("pointer-events","none");
+        // this.svg.style("position","absolute")
+        //       .style("pointer-events","none");
+        if (!c.viv) {
+            // this dummy config isn't really adequate
+            c.viv = {
+                url: 'https://viv-demo.storage.googleapis.com/LuCa-7color_3x3component_data.ome.tif',
+                image_properties: {
+                    contrastLimits: [[0, 255]],
+                    colors: [[255, 255, 255]],
+                    channelsVisible: [true],
+                    selections: [{c: 0, t: 0, z: 0}],
+                }
+            }
+        }
         if (c.viv){ 
             const box =this._getContentDimensions();
         

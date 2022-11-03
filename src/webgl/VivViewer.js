@@ -7,7 +7,7 @@ import {
   DETAIL_VIEW_ID,
 } from '@hms-dbmi/viv';
 
-import {hexToRGB} from "../datastore/DataStore.js";
+import {hexToRGB, RGBToHex} from "../datastore/DataStore.js";
 import {Deck} from '@deck.gl/core';
 import { getMultiSelectionStats, getDefaultSelectionStats, getDefaultChannelColors } from '../utilities/VivUtils.js';
 import { ScatterplotLayer } from 'deck.gl';
@@ -24,6 +24,7 @@ class VivViewer {
     this.width= this.canvas.width;
     this.config=config;
     loadOmeTiff(config.url).then(loader=>{
+      this.tiff = loader;
       this._setUp(loader,initialView);
     });
   }
@@ -128,7 +129,27 @@ class VivViewer {
 
   }
 
-  _createLayers3D(tiff) {
+  /** equivalent to VivScatterPlot... */
+  getAllChannels() {
+    return this.channels;
+  }
+  getChannels() {
+    const {props} = this.layers[0];
+    const names = props.selections.map(x => this.channels[x.c].Name);
+    const colors = props.colors.map(RGBToHex);
+    return names.map((name, i) => {
+      return {
+        name,
+        index: props.selections[i].c,
+        color: colors[i],
+        contrastLimits: props.contrastLimits[i].slice(0),
+        channelsVisible: props.channelsVisible[i]
+      }
+    });
+  }
+
+  _createLayers3D() {
+    const tiff = this.tiff;
     //most of this can move into createLayers()
     const {SizeX, SizeY, SizeZ, Channels: channels} = tiff.metadata.Pixels;
     const target = [SizeX/2, SizeY/2, SizeZ/2];
@@ -139,11 +160,11 @@ class VivViewer {
     const dtype = tiff.data[0].dtype;
     let { domains, contrastLimits } = getDefaultSelectionStats(n);
     ///wrong flow for now
-    getMultiSelectionStats(loader, selections).then((v) => {
-      domains = v.domains;
-      contrastLimits = v.contrastLimits;
-      //TODO updateProps() equivalent
-    });
+    // getMultiSelectionStats(loader, selections).then((v) => {
+    //   domains = v.domains;
+    //   contrastLimits = v.contrastLimits;
+    //   //TODO updateProps() equivalent
+    // });
     const colors = getDefaultChannelColors(n); //channels.map((_, i) => [i/n*255, (1-i/n)*255, 0]);
     const xSlice = [0, SizeX * 2];
     const ySlice = [0, SizeY * 2];
@@ -226,9 +247,9 @@ class VivViewer {
     });
   }
 
-  createLayers(info, tiff){
+  createLayers(info){
     if (this.config.use3d) {
-      this._createLayers3D(tiff);
+      this._createLayers3D();
       return;
     }
     const viewStates=  {id: DETAIL_VIEW_ID}
