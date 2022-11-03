@@ -23,7 +23,7 @@ class VivViewer {
     this.height= this.canvas.height;
     this.width= this.canvas.width;
     this.config=config;
-    loadOmeTiff(config.url,{pool:false}).then(loader=>{
+    loadOmeTiff(config.url).then(loader=>{
       this._setUp(loader,initialView);
     });
   }
