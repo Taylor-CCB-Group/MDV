@@ -148,6 +148,23 @@ class VivViewer {
     });
   }
 
+  recenterCamera() {
+    if (!this.config.use3d) return;
+    console.log('recenter');
+    const {SizeX, SizeY, SizeZ} = this.tiff.metadata.Pixels;
+    const target = [SizeX / 2, SizeY / 2, SizeZ / 2];
+    const initialViewState = {
+      target,
+      zoom: 1,
+      rotationX: 0,
+      rotationOrbit: 0 + Math.random() * 0.01
+    }
+    this.volViewState = initialViewState;
+    this.deck.setProps({
+      initialViewState
+    });
+  }
+
   _createLayers3D() {
     const tiff = this.tiff;
     //most of this can move into createLayers()

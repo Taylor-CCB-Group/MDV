@@ -44,6 +44,18 @@ class VivVolume extends BaseChart {
         // although some common features with channels etc.
         this.viv = new VivViewer(this.vivCanvas, vivConfig, iv);
     }
+
+    getSettings(conf) {
+        return [
+            {
+                type: "button",
+                label: "Recenter camera",
+                func: () => {
+                    this.viv.recenterCamera()
+                }
+            }
+        ]
+    }
     remove() {
         this.viv.deck?.finalize();
         this.dialog?.close();
