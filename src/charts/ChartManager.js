@@ -1699,9 +1699,11 @@ class AddChartDialog extends BaseDialog{
         callback(config);
         this.chartName.value="";
         this.chartDescription.value="";
-        this.chartType.value= this.defaultType;
-        this.setParamDiv(this.defaultType)
-
+        /// pjt I find this annoying... not sure why we didn't close the div before
+        /// but otherwise, would rather not reset these (can be handy when testing stuff)
+        // this.chartType.value= this.defaultType;
+        // this.setParamDiv(this.defaultType)
+        this.close();
     }
 
     _addMultiColumnSelect(holder,filter){
