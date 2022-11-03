@@ -1692,10 +1692,10 @@ class AddChartDialog extends BaseDialog{
             param:this.paramSelects.map((x)=>x.value),
             options: Object.fromEntries(this.options),
         }
-        console.log('config from add chart dialog', config);
         if (this.multiColumns){
             config.param =config.param.concat(this.multiColumns)
         }
+        console.log('config from add chart dialog', config);
         const t= BaseChart.types[this.chartType.value];
 
         if (t.init){
@@ -1799,7 +1799,7 @@ class AddChartDialog extends BaseDialog{
             createEl("div", {text: label||name+':'}, this.optionsDiv);
             const el = createEl("input", { value: defaultVal }, this.optionsDiv);
             this.options.set(name, defaultVal);
-            el.onchange = v => this.options.set(name, v);
+            el.onchange = v => this.options.set(name, el.value);
         }
     }
 }
