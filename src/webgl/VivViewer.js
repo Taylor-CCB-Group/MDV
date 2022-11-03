@@ -128,7 +128,8 @@ class VivViewer {
 
   }
 
-  _setUpVolumeView(tiff) {
+  _createLayers3D(tiff) {
+    //most of this can move into createLayers()
     const {SizeX, SizeY, SizeZ, Channels: channels} = tiff.metadata.Pixels;
     const target = [SizeX/2, SizeY/2, SizeZ/2];
     const id = '3d_' + DETAIL_VIEW_ID;
@@ -137,6 +138,7 @@ class VivViewer {
     const selections = channels.map((_, i) => {return {c: i, t: 0, z: 0}});
     const dtype = tiff.data[0].dtype;
     let { domains, contrastLimits } = getDefaultSelectionStats(n);
+    ///wrong flow for now
     getMultiSelectionStats(loader, selections).then((v) => {
       domains = v.domains;
       contrastLimits = v.contrastLimits;
@@ -148,15 +150,6 @@ class VivViewer {
     const zSlice = [0, SizeZ * 2];
     const channelsVisible = channels.map(_ => true);
     const resolution = loader.length - 1;
-    const extensions = [new ColorPalette3DExtensions.AdditiveBlendExtension()];
-    const volumeView = new VolumeView({
-      id,
-      target,
-      useFixedAxis: false,
-      extensions,
-      // extensions: [get3DExtension("", RENDERING_MODES.ADDITIVE)]
-    });
-    this.detailView = volumeView;
     const props = {
       id,
       loader,
@@ -170,13 +163,11 @@ class VivViewer {
       xSlice, ySlice, zSlice
     };
     console.dir(props);
+    const volumeView = this.detailView;
     const layers = volumeView.getLayers({
       props
     });
-    this.volumeLayer = layers;
-    this.volViewState = {
-      zoom: 1, target
-    };
+    this.layers = layers;
     // const r = (v) => v * Math.random();
     // layers.push(new ScatterplotLayer({
     //   data: new Array(1000).fill().map(()=>{return {position: [r(SizeX), r(SizeY), r(SizeZ)]}}),
@@ -198,7 +189,18 @@ class VivViewer {
     const baseViewState = this.getViewState(iv.x_scale,iv.y_scale,iv.offset);
     
     if (use3d) {
-      this._setUpVolumeView(loader);
+      // this._setUpVolumeView(loader);
+      const { SizeX, SizeY, SizeZ } = loader.metadata.Pixels;
+      const target = [SizeX / 2, SizeY / 2, SizeZ / 2];
+      this.volViewState = {
+        zoom: 1, target
+      };
+      this.detailView = new VolumeView({
+        id: DETAIL_VIEW_ID,
+        useFixedAxis: false,
+        target,
+        extensions: [new ColorPalette3DExtensions.AdditiveBlendExtension()],
+      });
     } else {
       this.detailView = new DetailView({
         id: DETAIL_VIEW_ID,
@@ -210,7 +212,7 @@ class VivViewer {
     const {image_properties} = this.config;
  
     const deckGLView =this.detailView.getDeckGlView();
-    this.createLayers(image_properties);
+    this.createLayers(image_properties, loader);
     this.deck=new Deck({
           canvas:this.canvas,
           layers:[this.layers],
@@ -224,11 +226,9 @@ class VivViewer {
     });
   }
 
-
-  createLayers(info){
-    //for now, pending refactor
+  createLayers(info, tiff){
     if (this.config.use3d) {
-      this.layers = this.volumeLayer;
+      this._createLayers3D(tiff);
       return;
     }
     const viewStates=  {id: DETAIL_VIEW_ID}
@@ -245,7 +245,6 @@ class VivViewer {
       viewStates,
       props:layerConfig
     })
-
   }
 }
 
