@@ -1649,7 +1649,8 @@ class AddChartDialog extends BaseDialog{
         }
         createEl("div",{},this.columns[0]).append(this.chartType);
         this.chartType.addEventListener("change",(e)=>{
-            this.setParamDiv(this.chartType.value,content.dataStore);
+            this.setOptionsDiv(this.chartType.value);
+            this.setParamDiv(this.chartType.value, content.dataStore);
         });
 
         createEl("div",{
@@ -1665,6 +1666,8 @@ class AddChartDialog extends BaseDialog{
         },this.columns[0]);
         this.chartDescription= createEl("textarea",{styles:{width:"150px",height:"100px"}},this.columns[0]);
       
+        this.optionsDiv = createEl("div", {}, this.columns[1]);
+        this.setOptionsDiv(types[0].type, content.dataStore);
 
         createEl("div",{
             text:"Columns",
@@ -1686,8 +1689,10 @@ class AddChartDialog extends BaseDialog{
             title:this.chartName.value,
             legend:this.chartDescription.value,
             type:this.chartType.value,
-            param:this.paramSelects.map((x)=>x.value)
+            param:this.paramSelects.map((x)=>x.value),
+            options: Object.fromEntries(this.options),
         }
+        console.log('config from add chart dialog', config);
         if (this.multiColumns){
             config.param =config.param.concat(this.multiColumns)
         }
@@ -1774,6 +1779,28 @@ class AddChartDialog extends BaseDialog{
                 }                
             }           
         } 
+    }
+
+    setOptionsDiv(type) {
+        this.optionsDiv.innerHTML = "";
+        const {options} = BaseChart.types[type];
+        if (!options) return;
+        this.options = new Map();
+        createEl("div", {
+            text: "Options",
+            classes: ["ciview-title-div"]
+        }, this.optionsDiv);
+        for (let option of options) {
+            const {name, label, type, defaultVal } = option;
+            if (type !== "string") {
+                console.warn("we only know handle 'string' options");
+                continue;
+            }
+            createEl("div", {text: label||name+':'}, this.optionsDiv);
+            const el = createEl("input", { value: defaultVal }, this.optionsDiv);
+            this.options.set(name, defaultVal);
+            el.onchange = v => this.options.set(name, v);
+        }
     }
 }
 

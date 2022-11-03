@@ -23,26 +23,53 @@ class VivVolume extends BaseChart {
                 position: "absolute"
             }
         }, this.contentDiv);
+        console.log('config in VivVolume', this.config);
         const vivConfig = {
-            url: '/data/t1-head-imj.ome.tiff',
+            url: this.config.options.url, //'/data/t1-head-imj.ome.tiff',
             use3d: true
         }
         // not really what we want... basically ignored with use3d.
         const iv = {
             x_scale: 1, y_scale: 1, offset: 0
         }
+        // we may not necessarily want to re-use VivViewer?
+        // although some common features with channels etc.
         this.viv = new VivViewer(this.vivCanvas, vivConfig, iv);
     }
 }
 
+const nameOption = {
+    type: "string",
+    name: "url",
+    label: "ome.tiff volume url",
+    defaultVal: "/data/t1-head-imj.ome.tiff"
+};
+
+BaseChart.types["viv_volume_scatter_view"] = {
+    name: "Viv Volume with Scatterplot",
+    class: VivVolume,
+    params: [{
+        type: "number",
+        name: "X axis"
+    },
+    {
+        type: "number",
+        name: "Y axis"
+    },
+    {
+        type: "number",
+        name: "Z axis"
+    },
+    {
+        type: "text",
+        name: "Category Column"
+    }
+    ],
+    options: [nameOption]
+}
 BaseChart.types["viv_volume_view"] = {
     name: "Viv Volume View",
     class: VivVolume,
-    params:[
-        // hmmm, url isn't a column...
-        // {
-        //     type: "string",
-        //     name: "url"
-        // }
-    ]
+    params: [],
+    options: [nameOption]
 }
