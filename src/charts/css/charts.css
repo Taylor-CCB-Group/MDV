@@ -4,6 +4,7 @@
         --main_panel_color: black;
         --text_color: white;
         --background_color: #333;
+        --input_border_color: #bbb;
         --menu-gradient: linear-gradient(#444, #222);
     }
 }
@@ -13,6 +14,7 @@
         --main_panel_color: #f1f1f1;
         --text_color: black;
         --background_color: #bababa;
+        --input_border_color: #333;
         --menu-gradient: linear-gradient(white, darkgray);
     }
 }
@@ -22,6 +24,7 @@
     --main_panel_color: black;
     --text_color: white;
     --background_color: #333;
+    --input_border_color: #bbb;
     --menu-gradient: linear-gradient(#444, #222);
 }
 
@@ -30,13 +33,16 @@
     --main_panel_color: #f1f1f1;
     --text_color: black;
     --background_color: #bababa;
+    --input_border_color: #333;
     --menu-gradient: linear-gradient(white, darkgray);
 }
 :root {
     font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
     line-height: 1em;
 }
-
+select, input, textarea {
+    border: 0.1em solid var(--input_border_color);
+}
 .mdv-select{
     border-radius: 3px;
     font-size:0.8em;
