@@ -8,7 +8,11 @@ class VivVolume extends BaseChart {
         super(dataStore, div, config, {x:{}, y:{}});
         this.afterAppCreation();
         this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", ()=>{
-            new ColorChannelDialog(this.viv);
+            if (this.dialog) {
+                this.dialog.close();
+                this.dialog = null;
+            }
+            else this.dialog = new ColorChannelDialog(this.viv);
         });
     }
     setSize(x, y) {
@@ -39,6 +43,11 @@ class VivVolume extends BaseChart {
         // we may not necessarily want to re-use VivViewer?
         // although some common features with channels etc.
         this.viv = new VivViewer(this.vivCanvas, vivConfig, iv);
+    }
+    remove() {
+        this.viv.deck?.finalize();
+        this.dialog?.close();
+        super.remove();
     }
 }
 
