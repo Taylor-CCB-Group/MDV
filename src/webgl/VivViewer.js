@@ -1,16 +1,21 @@
 import {
   loadOmeTiff,
   DetailView,
+  VolumeView,
   ColorPaletteExtension,
+  ColorPalette3DExtensions,
   DETAIL_VIEW_ID,
 } from '@hms-dbmi/viv';
 
 import {hexToRGB} from "../datastore/DataStore.js";
 import {Deck} from '@deck.gl/core';
+import { getMultiSelectionStats, getDefaultSelectionStats, getDefaultChannelColors } from '../utilities/VivUtils.js';
+import { ScatterplotLayer } from 'deck.gl';
 
 
 class VivViewer {
   constructor(canvas,config,initialView){
+    console.log('new VivViewer', config);
     this.canvas = canvas;
 
 
@@ -20,7 +25,7 @@ class VivViewer {
     this.config=config;
     loadOmeTiff(config.url,{pool:false}).then(loader=>{
       this._setUp(loader,initialView);
-    })
+    });
   }
 
   setSize(x,y,conf){
@@ -99,6 +104,7 @@ class VivViewer {
     const chs=   this.layers[0].props;
     chs.channelsVisible.push(true);
     channel.color= channel.color || "#ff00ff";
+    // pjt consider using helpers (copy from avivator utils).
     channel.contrastLimits = channel.contrastLimit || [20,100];
     channel.channelsVisible=true;
     chs.colors.push(hexToRGB(channel.color));
@@ -116,40 +122,109 @@ class VivViewer {
 
   }
 
-  _setUp(loader,iv){
+  _setUpVolumeView(tiff) {
+    const {SizeX, SizeY, SizeZ, Channels: channels} = tiff.metadata.Pixels;
+    const target = [SizeX/2, SizeY/2, SizeZ/2];
+    const id = '3d_' + DETAIL_VIEW_ID;
+    const loader = tiff.data;
+    const n = channels.length;
+    const selections = channels.map((_, i) => {return {c: i, t: 0, z: 0}});
+    const dtype = tiff.data[0].dtype;
+    let { domains, contrastLimits } = getDefaultSelectionStats(n);
+    getMultiSelectionStats(loader, selections).then((v) => {
+      domains = v.domains;
+      contrastLimits = v.contrastLimits;
+      //TODO updateProps() equivalent
+    });
+    const colors = getDefaultChannelColors(n); //channels.map((_, i) => [i/n*255, (1-i/n)*255, 0]);
+    const xSlice = [0, SizeX * 2];
+    const ySlice = [0, SizeY * 2];
+    const zSlice = [0, SizeZ * 2];
+    const channelsVisible = channels.map(_ => true);
+    const resolution = loader.length - 1;
+    const extensions = [new ColorPalette3DExtensions.AdditiveBlendExtension()];
+    const volumeView = new VolumeView({
+      id,
+      target,
+      useFixedAxis: false,
+      extensions,
+      // extensions: [get3DExtension("", RENDERING_MODES.ADDITIVE)]
+    });
+    this.detailView = volumeView;
+    const props = {
+      id,
+      loader,
+      dtype,
+      resolution,
+      channelsVisible,
+      contrastLimits,
+      domains,
+      selections,
+      colors,
+      xSlice, ySlice, zSlice
+    };
+    console.dir(props);
+    const layers = volumeView.getLayers({
+      props
+    });
+    this.volumeLayer = layers;
+    this.volViewState = {
+      zoom: 1, target
+    };
+    // const r = (v) => v * Math.random();
+    // layers.push(new ScatterplotLayer({
+    //   data: new Array(1000).fill().map(()=>{return {position: [r(SizeX), r(SizeY), r(SizeZ)]}}),
+    //   radiusScale: 1,
+    //   billboard: true,
+    //   getFillColor: () => [100, 100, 100]
+    // }))
+  };
+
+  _setUp(loader, iv){
     this.native_x= loader.metadata.Pixels.SizeX;
     this.native_y= loader.metadata.Pixels.SizeY;
+    const {use3d} = this.config;
     
-    this.extensions=[new ColorPaletteExtension()];
+    this.extensions = [new ColorPaletteExtension()];
     this.channels = loader.metadata.Pixels.Channels;
     this.loader= loader.data;
     this.transparentColor=[255,255,255,0];
-    const baseViewState = this.getViewState(iv.x_scale,iv.y_scale,iv.offset);
+    const baseViewState = use3d ? undefined : this.getViewState(iv.x_scale,iv.y_scale,iv.offset);
     
-    this.detailView = new DetailView({
-      id: DETAIL_VIEW_ID,
-      height:this.native_y,
-      width:this.native_x
-    });
-    const c = this.config;
-    const ip = c.image_properties;
-    
+    if (use3d) {
+      this._setUpVolumeView(loader);
+    } else {
+      this.detailView = new DetailView({
+        id: DETAIL_VIEW_ID,
+        height:this.native_y,
+        width:this.native_x
+      });
+    }
+    const initialViewState = this.volViewState;
+    const {image_properties} = this.config;
  
     const deckGLView =this.detailView.getDeckGlView();
-    this.createLayers(c.image_properties)
+    this.createLayers(image_properties);
     this.deck=new Deck({
           canvas:this.canvas,
           layers:[this.layers],
           views:[deckGLView],
-          viewState:baseViewState,   
+          viewState:baseViewState,
           width:this.width,
           height:this.height,
-          useDevicePixels:false    
-     })
+          useDevicePixels:false,
+          initialViewState,
+          controller: use3d
+    });
   }
 
 
   createLayers(info){
+    //for now, pending refactor
+    if (this.config.use3d) {
+      this.layers = this.volumeLayer;
+      return;
+    }
     const viewStates=  {id: DETAIL_VIEW_ID}
     const layerConfig = {
       loader:this.loader,

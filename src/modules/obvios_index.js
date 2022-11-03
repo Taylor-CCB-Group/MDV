@@ -6,6 +6,8 @@ import "../charts/css/charts.css";
 import "../webgl/css/wgl2di.css";
 import "../table/css/slickgrid.css";
 import ChartManager from '../charts/ChartManager.js';
-import "../../examples/basic_example.js"
-document.title = "OBVioS";
+import "../../examples/basic_example.js";
+import "../charts/VivScatterPlot";
+import "../webgl/VivVolume.js";
+document.title = "MDV - OBVioS";
 window.ChartManager = ChartManager;
