@@ -51,7 +51,7 @@ class SVGChart extends BaseChart{
         this.y_axis_svg=this.svg.append("g");
       
         
-      // add the x Axis
+        // add the x Axis
         const xa= axisTypes["x"];
         if (xa){
             if (!xa.custom){
@@ -141,6 +141,7 @@ class SVGChart extends BaseChart{
         this.y_axis_svg.attr("transform", `translate(${dim.left},${dim.top})`);
         if (ax.x){
             if (this.x_scale){
+                //PJT- TODO fix over-crowded ticks.
                 this.x_scale.range([0, dim.width]);
                 this.x_axis_svg.selectAll(".tick text");
                 this.x_axis_svg.transition().call(this.x_axis_call);
