@@ -1690,7 +1690,7 @@ class AddChartDialog extends BaseDialog{
             legend:this.chartDescription.value,
             type:this.chartType.value,
             param:this.paramSelects.map((x)=>x.value),
-            options: Object.fromEntries(this.options),
+            options: this.options ? Object.fromEntries(this.options) : undefined,
         }
         if (this.multiColumns){
             config.param =config.param.concat(this.multiColumns)
@@ -1768,9 +1768,10 @@ class AddChartDialog extends BaseDialog{
                     //PJT: would appreciate if this logic could be reviewed
                     //dataLoader existing may not be a guarantee of all columns being valid, but if it doesn't exist,
                     //then presumably columns without data cannot ever work.
+                    //this is the dialog, not the ChartManager, so it doesn't have dataLoader
                     const disabled = c.data === undefined && this.dataLoader === undefined;
                     const el = createEl("option", {text:item.name, value:item.field}, dd);
-                    if (disabled) el.disabled = true;
+                    // if (disabled) el.disabled = true;
                 }
                 this.paramSelects.push(dd);
                 const largeGroups= this.dataStore.getLargeColumnGroups();
