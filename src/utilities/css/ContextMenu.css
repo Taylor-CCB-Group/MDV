@@ -118,7 +118,7 @@ color:white;
   transition: border-width 0.2s;
 }
 .noUi-horizontal {
-  top: 8px;
+  top: 4px;
   height: 6px;
   margin: 6px 10px 14px 10px;
 }

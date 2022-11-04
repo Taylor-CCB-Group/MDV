@@ -96,6 +96,7 @@ const config={
             "cells":[
             {
                 type: "viv_volume_view",
+                title: "T1-head volume view",
                 param: [],
                 options: {url: "/data/t1-head-imj.ome.tiff"},
                 size:[400,600],

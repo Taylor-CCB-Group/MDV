@@ -62,7 +62,8 @@ export class ColorChannelDialog extends BaseDialog{
         const cont = createEl("div",{
             styles:{
                 display:"flex",
-                padding:"4px"
+                padding:"4px",
+                alignItems: "center"
             }
         },this.mainDiv);
         createEl("span",{
