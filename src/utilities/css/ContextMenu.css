@@ -103,12 +103,31 @@ color:white;
 }
 
 .noUi-horizontal .noUi-handle {
+  /* fugly. also doubleslider behaviour is a bit broken I think. */
     width: 20px;
     height: 20px;
     right: -10px;
-    top: -2px;
+    top: -8px;
     border-radius:20px;
     background: rgba(73, 69, 78);
+    box-shadow: none;
+    transition: border-width 0.5s;
+}
+.noUi-handle:hover, .noUi-handle:active {
+  border-width: 0.2em;
+  transition: border-width 0.2s;
+}
+.noUi-horizontal {
+  top: 8px;
+  height: 6px;
+  margin: 6px 10px 14px 10px;
+}
+.ciview-dlg-content label {
+  margin-right: 1em;
+}
+.ciview-dlg-content .ciview-button {
+  display: inline-block;
+  margin: 8px;
 }
 
 * {
@@ -248,6 +267,7 @@ color:white;
     text-overflow: ellipsis;
     overflow:hidden;
     flex:0 0 auto;
+    margin-bottom: 0.2em;
   }
 
   .ciview-dlg-header-text{
