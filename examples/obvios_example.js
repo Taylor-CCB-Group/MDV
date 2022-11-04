@@ -87,15 +87,8 @@ for (const s of mockSlices) {
 const mockDataLoaderFn = async (columns, dataSource, size) => {
     const dataList = [];
     for (const column of columns) {
-        const isNumber = column.datatype == 'double';
-        const arrayType = isNumber ? Float32Array : Uint8Array;
-        const bytes = isNumber ? 4 : column.datatype == "unique" ? column.stringLength : 1;
-
-        const d = mockDataRows.map(r => r[column.name]);
-        const sab = new SharedArrayBuffer(d.length * bytes);
-        const data = new arrayType(sab);
-        data.set(d);
-        dataList.push({field: column.name, data})
+        const data = mockDataRows.map(r => r[column.name]);
+        dataList.push({ field: column.name, data });
     }
     return dataList;
 }
