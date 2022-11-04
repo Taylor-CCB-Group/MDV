@@ -105,7 +105,7 @@ export class ColorChannelDialog extends BaseDialog{
             value:item.color
         },cont);
 
-        cc.addEventListener("change",()=>{
+        cc.addEventListener("input",()=>{
             item.color = cc.value;
             this.viv.setChannel(item);
         });
