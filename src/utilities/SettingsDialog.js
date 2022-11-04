@@ -72,6 +72,7 @@ class SettingsDialog extends BaseDialog{
     }
 
     button(s,d){
+        d.style.textAlign = "center";
         //maybe consider making this a 'button'
         createEl("span",{
             classes:["ciview-button"],
