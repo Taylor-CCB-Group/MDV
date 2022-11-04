@@ -26,9 +26,18 @@ class SettingsDialog extends BaseDialog{
             if (s.info){
                 this.addInfoIcon(s.info,d);
             }
-            this.controls[s.label]=this[s.type](s,d);
+            const factory = this[s.type];
+            if (!factory) {
+                console.warn(`SettingsDialog doesn't have a method '${s.type}'`);
+                continue;
+            }
+            this.controls[s.label] = factory(s,d);
         }
 
+    }
+    /** TODO */
+    folder(s, d) {
+        const container = d;
     }
     spinner(s,d){
          
@@ -63,6 +72,7 @@ class SettingsDialog extends BaseDialog{
     }
 
     button(s,d){
+        //maybe consider making this a 'button'
         createEl("span",{
             classes:["ciview-button"],
             text:s.label
@@ -82,19 +92,17 @@ class SettingsDialog extends BaseDialog{
             },
             step:s.step || null,
             tooltips:true,
-            /*format:{
-                to:v=>{
-                    return v+""
-                },
-                from:v=>{
-                    return Number(v)}
-            },*/
-            documentElement:this.config.doc
+            //PJT::: this.config was undefined
+            documentElement: s.doc
         });
-        sl.noUiSlider.on("end",(values)=>{
+        const change = (values) => {
             s.func(parseFloat(values[0]))
-        })
-
+        };
+        sl.noUiSlider.on("end", change);
+        if (s.continuous) {
+            console.log('adding update listener for ', s.label);
+            sl.noUiSlider.on("update", change);
+        }
     }
 
     check(s,d){
@@ -146,15 +154,21 @@ class SettingsDialog extends BaseDialog{
             },
             documentElement:s.doc
         });
-        sl.noUiSlider.on("end",(values)=>{
-            s.func(parseFloat(values[0]),parseFloat(values[1]))
-        })
-
+        const change = (values) => {
+            s.func(parseFloat(values[0]), parseFloat(values[1]))
+        };
+        sl.noUiSlider.on("end", change);
+        if (s.continuous) {
+            sl.noUiSlider.on("update", change);
+        }
     }
 
     text(s,d){
+        d.style.display = "flex";
+        d.style.alignItems = "center";
         const t = createEl("input",{
-            value:s.current_value
+            value:s.current_value,
+            styles: {flex: 2}
         },d);
         t.addEventListener("keyup",()=>{
             s.func(t.value);

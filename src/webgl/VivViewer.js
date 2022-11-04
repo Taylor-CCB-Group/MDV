@@ -201,7 +201,6 @@ class VivViewer {
       colors,
       xSlice, ySlice, zSlice
     };
-    console.dir(props);
     const volumeView = this.detailView;
     const layers = volumeView.getLayers({
       props

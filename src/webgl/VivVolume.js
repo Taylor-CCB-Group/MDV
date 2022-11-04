@@ -53,12 +53,14 @@ class VivVolume extends BaseChart {
                 label: "clip X",
                 min: 0, max: 1,
                 current_value: this.viv.clipX,
+                continuous: false,
                 func: (min, max) => this.viv.setClipX(min, max)
             },
             {
                 type: "doubleslider",
                 label: "clip Y",
                 min: 0, max: 1,
+                continuous: false,
                 current_value: this.viv.clipY,
                 func: (min, max) => this.viv.setClipY(min, max)
             },
@@ -66,6 +68,7 @@ class VivVolume extends BaseChart {
                 type: "doubleslider",
                 label: "clip Z",
                 min: 0, max: 1,
+                continuous: false,
                 current_value: this.viv.clipZ,
                 func: (min, max) => this.viv.setClipZ(min, max)
             },
