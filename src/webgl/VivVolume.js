@@ -6,6 +6,7 @@ import VivViewer from '../webgl/VivViewer.js';
 class VivVolume extends BaseChart {
     constructor(dataStore, div, config) {
         super(dataStore, div, config, {x:{}, y:{}});
+        this.setupScatterplot(dataStore, config);
         this.afterAppCreation();
         this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", ()=>{
             if (this.dialog) {
@@ -34,7 +35,8 @@ class VivVolume extends BaseChart {
         console.log('config in VivVolume', this.config);
         const vivConfig = {
             url: this.config.options.url, //'/data/t1-head-imj.ome.tiff',
-            use3d: true
+            use3d: true,
+            scatterData: this.scatterData
         }
         // not really what we want... basically ignored with use3d.
         const iv = {
@@ -43,6 +45,29 @@ class VivVolume extends BaseChart {
         // we may not necessarily want to re-use VivViewer?
         // although some common features with channels etc.
         this.viv = new VivViewer(this.vivCanvas, vivConfig, iv);
+    }
+
+    setupScatterplot(dataStore, config) {
+        if (config.param.length === 0) return;
+        //we'll need all the methods for handling data filtering etc...
+        const ix = this.config.param[0];
+        const iy = this.config.param[1];
+        const iz = this.config.param[2];
+        const icat = this.config.param[2];
+        const xCol = dataStore.getRawColumn(ix);
+        const yCol = dataStore.getRawColumn(iy);
+        const zCol = dataStore.getRawColumn(iz);
+        const catCol = dataStore.getRawColumn(icat);
+        this.scatterData = new Array(xCol.length).fill().map((_, i) => {
+            const x = xCol[i];
+            const y = yCol[i];
+            const z = zCol[i];
+            const cat = catCol[i];
+            const position = [x, y, z];
+            return {
+                position, cat
+            }
+        });
     }
 
     getSettings(conf) {

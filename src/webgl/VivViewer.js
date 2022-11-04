@@ -206,6 +206,15 @@ class VivViewer {
       props
     });
     this.layers = layers;
+    if (this.config.scatterData) {
+      // alert('scatter!');
+      layers.push(new ScatterplotLayer({
+        data: this.config.scatterData,
+        radiusScale: 1,
+        billboard: true,
+        getFillColor: () => [100, 100, 100]
+      }));
+    }
     // const r = (v) => v * Math.random();
     // layers.push(new ScatterplotLayer({
     //   data: new Array(1000).fill().map(()=>{return {position: [r(SizeX), r(SizeY), r(SizeZ)]}}),
