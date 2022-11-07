@@ -209,7 +209,7 @@ class VivViewer {
     if (this.config.scatterData) {
       // alert('scatter!');
       layers.push(new ScatterplotLayer({
-        data: this.config.scatterData.slice(0), //do not want to clone / slice here... but not seeing change otherwise
+        data: this.config.scatterData,//.slice(0), //do not want to clone / slice here... but mutating data doesn't work otherwise
         radiusScale: 1,
         billboard: true,
         getFillColor: (d) => d.color || [100, 100, 100]

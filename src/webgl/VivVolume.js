@@ -47,37 +47,57 @@ class VivVolume extends BaseChart {
         this.viv = new VivViewer(this.vivCanvas, vivConfig, iv);
     }
 
-    setupScatterplot(dataStore, config) {
+    setupScatterplot() {
+        const {dataStore, config} = this;
         if (config.param.length === 0) return;
         //we'll need all the methods for handling data filtering etc...
-        const ix = this.config.param[0];
-        const iy = this.config.param[1];
-        const iz = this.config.param[2];
-        const icat = this.config.param[2];
+        const ix = config.param[0];
+        const iy = config.param[1];
+        const iz = config.param[2];
+        const icat = config.param[2];
         const xCol = dataStore.getRawColumn(ix);
         const yCol = dataStore.getRawColumn(iy);
         const zCol = dataStore.getRawColumn(iz);
         const catCol = dataStore.getRawColumn(icat);
-        this.scatterData = new Array(xCol.length).fill().map((_, i) => {
+        const colorFunc = config.colorby ? this.getColorFunction(config.colorby, true) : () => [100,100,100];
+        // seems suboptimal. even if this was better, underlying deck.gl scatterplot data could maybe be Float32Array or something?
+        // might consider a custom layer, storying data in texture?
+        const indices = new Array(xCol.length).fill().map((_, i) => dataStore.filterArray[i] ? -1 : i).filter(v=> v>-1);
+        this.scatterData = new Array(dataStore.filterSize).fill().map((_, j) => {
+            const i = indices[j];
             const x = xCol[i];
             const y = yCol[i];
             const z = zCol[i];
             const cat = catCol[i];
             const position = [x, y, z];
+            const color = colorFunc(i);
             return {
-                position, cat
+                position, cat, color
             }
         });
+        config.scatterData = this.scatterData;
     }
+    onDataFiltered(dim) {
+        console.log('data filtered', dim);
+        //const {filterArray} = this.dataStore;
+        this.setupScatterplot();
+        this.viv.config.scatterData = this.scatterData; //should be redundant (when mutating)
+        this.viv._updateProps();
+    }
+    onDataAdded(){}
+    onDataChanged(){}
+    onDataHighlighted(){}
+
     colorByColumn(column) {
         if (!this.scatterData) return;
         this.config.colorby = column;
-        const colorFunc = this.getColorFunction(column, true);
-        this.scatterData.forEach((point, i) => {
-            const col = colorFunc(i);
-            point.color = col;
-        });
-        this.viv.config.scatterData = this.scatterData; //should be redundant
+        // const colorFunc = this.getColorFunction(column, true);
+        // this.scatterData.forEach((point, i) => {
+        //     const col = colorFunc(i);
+        //     point.color = col;
+        // });
+        this.setupScatterplot();
+        this.viv.config.scatterData = this.scatterData; //should be redundant (when mutating)
         this.viv._updateProps();
     }
     getColorOptions() {
