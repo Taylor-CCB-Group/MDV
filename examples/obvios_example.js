@@ -19,7 +19,7 @@ const sizeX = 256, sizeY = 256, sizeZ = 129;
 
 const mockDataSources = [{
     size,
-    name: "cells", //whatever...
+    name: "test", //whatever...
     columns: [
         {
             name: "cell_id",
@@ -55,12 +55,13 @@ const mockDataSources = [{
 const mockSlices = new Array(numSlices).fill().map((_, slice_id) => {
     // make a bunch of points, all on a random plane...
     const r = (v=1) => v*Math.random();
-    const normal = new Vector3([r(2)-1, r(2)-1, r(2)-1]);
+    // const normal = new Vector3([r(2)-1, r(2)-1, r(2)-1]);
+    const normal = new Vector3([r(0.5)-0.25, -1, r(0.5)-0.25]);
     normal.normalize();
-    const d = r(256);
-    const plane = new Plane(normal, d);
+    const d = slice_id * sizeY / numSlices; //r(32);
+    const plane = new Plane(normal, d*0.8);
     const p = (_, i) => {
-        const p2d = [r(256), r(256), 0];
+        const p2d = [r(256), 0, r(256)];
         const p = plane.projectPointOntoPlane(p2d);
         const mockX = p[0], mockY = p[1], mockZ = p[2];
         const classifier = "Type " + Math.round(r(3));
@@ -103,15 +104,22 @@ const config={
     only_view:{
         //the initial charts to load
         initialCharts:{
-            "cells":[
+            "test":[
             {
-                type: "viv_volume_view",
+                type: "viv_volume_scatter_view",
                 title: "T1-head volume view",
-                param: [],
+                param: ["mockX", "mockY", "mockZ"],
                 options: {url: "/data/t1-head-imj.ome.tiff"},
                 size:[400,600],
                 position:[10,10]
             },
+            {//TODO figure out why 'field colors' isn't working
+                type: "table_chart",
+                id: "table",
+                param: ["cell_id", "slice_id", "classifier"],
+                size: [400, 600],
+                position: [440, 10]
+            }
             // {
             //     type:"row_chart",
             //     param:"Clusters",
