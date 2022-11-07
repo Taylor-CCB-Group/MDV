@@ -1,5 +1,7 @@
 const path = require('path');
 webpack = require("webpack");
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
+
 
 module.exports = env => {
     return {
@@ -20,6 +22,9 @@ module.exports = env => {
             filename: 'dist/ciview2.js',
 
         },
+        plugins: [
+            // new BundleAnalyzerPlugin()
+        ],
         module: {
 
             rules: [
