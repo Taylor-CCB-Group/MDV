@@ -69,7 +69,24 @@ class VivVolume extends BaseChart {
             }
         });
     }
-
+    colorByColumn(column) {
+        if (!this.scatterData) return;
+        this.config.colorby = column;
+        const colorFunc = this.getColorFunction(column, true);
+        this.scatterData.forEach((point, i) => {
+            const col = colorFunc(i);
+            point.color = col;
+        });
+        this.viv.config.scatterData = this.scatterData; //should be redundant
+        this.viv._updateProps();
+    }
+    getColorOptions() {
+        if (!this.scatterData) return {};
+        return {
+            colorby: "all",
+            has_default_color: true
+        }
+    }
     getSettings(conf) {
         return [
             ...super.getSettings(conf),

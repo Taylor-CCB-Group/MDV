@@ -209,19 +209,12 @@ class VivViewer {
     if (this.config.scatterData) {
       // alert('scatter!');
       layers.push(new ScatterplotLayer({
-        data: this.config.scatterData,
+        data: this.config.scatterData.slice(0), //do not want to clone / slice here... but not seeing change otherwise
         radiusScale: 1,
         billboard: true,
-        getFillColor: () => [100, 100, 100]
+        getFillColor: (d) => d.color || [100, 100, 100]
       }));
     }
-    // const r = (v) => v * Math.random();
-    // layers.push(new ScatterplotLayer({
-    //   data: new Array(1000).fill().map(()=>{return {position: [r(SizeX), r(SizeY), r(SizeZ)]}}),
-    //   radiusScale: 1,
-    //   billboard: true,
-    //   getFillColor: () => [100, 100, 100]
-    // }))
   };
 
   initClip() {

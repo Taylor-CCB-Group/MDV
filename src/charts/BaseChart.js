@@ -293,6 +293,10 @@ class BaseChart{
             lt= cl.pos[1]+"px";
         }
         this.legend = this.getColorLegend();
+        if (!this.legend) {
+            console.warn('no color legend');
+            return;
+        }
         this.contentDiv.append(this.legend);
        
         this.legend.style.left= ll;
