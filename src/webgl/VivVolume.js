@@ -36,7 +36,8 @@ class VivVolume extends BaseChart {
         const vivConfig = {
             url: this.config.options.url, //'/data/t1-head-imj.ome.tiff',
             use3d: true,
-            scatterData: this.scatterData
+            scatterData: this.scatterData,
+            getScatterFillColor: () => [100, 0, 0]
         }
         // not really what we want... basically ignored with use3d.
         const iv = {
@@ -59,7 +60,6 @@ class VivVolume extends BaseChart {
         const yCol = dataStore.getRawColumn(iy);
         const zCol = dataStore.getRawColumn(iz);
         const catCol = dataStore.getRawColumn(icat);
-        const colorFunc = config.colorby ? this.getColorFunction(config.colorby, true) : () => [100,100,100];
         // seems suboptimal. even if this was better, underlying deck.gl scatterplot data could maybe be Float32Array or something?
         // might consider a custom layer, storying data in texture?
         const indices = new Array(xCol.length).fill().map((_, i) => dataStore.filterArray[i] ? -1 : i).filter(v=> v>-1);
@@ -70,9 +70,8 @@ class VivVolume extends BaseChart {
             const z = zCol[i];
             const cat = catCol[i];
             const position = [x, y, z];
-            const color = colorFunc(i);
             return {
-                position, cat, color
+                position, cat, i
             }
         });
         config.scatterData = this.scatterData;
@@ -91,13 +90,12 @@ class VivVolume extends BaseChart {
     colorByColumn(column) {
         if (!this.scatterData) return;
         this.config.colorby = column;
-        // const colorFunc = this.getColorFunction(column, true);
-        // this.scatterData.forEach((point, i) => {
-        //     const col = colorFunc(i);
-        //     point.color = col;
-        // });
-        this.setupScatterplot();
-        this.viv.config.scatterData = this.scatterData; //should be redundant (when mutating)
+        const colorFunc = this.getColorFunction(column, true);
+        // should allow only the getFillColor function to need change, not the data
+        this.viv.config.getScatterFillColor = (d) => colorFunc(d.i);
+        // this.setupScatterplot(); // now unnecessary, but still not working without copy:
+        /// PJT: WHY OH WHY do I need this in order for it to update props properly?
+        this.viv.config.scatterData = [...this.scatterData];
         this.viv._updateProps();
     }
     getColorOptions() {

@@ -218,8 +218,8 @@ class VivViewer {
         data: this.config.scatterData,//.slice(0), //do not want to clone / slice here... but mutating data doesn't work otherwise
         radiusScale: 1,
         billboard: true,
-        // getFillColor: this.config.getScatterFillColor
-        getFillColor: (d) => d.color || [100, 100, 100]
+        getFillColor: this.config.getScatterFillColor
+        // getFillColor: (d) => d.color || [100, 100, 100]
       }));
     }
   };
