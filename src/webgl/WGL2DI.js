@@ -1004,14 +1004,14 @@ class WGL2DI{
 		
 		ctx.lineTo(pos[0],pos[1]);
 		ctx.stroke();
-		this.poly_brush.points.push(pos);
+		this.poly_brush?.points.push(pos);
 		if (end){
 			ctx.closePath();
 			ctx.fillStyle="lightgray";
 			ctx.globalAlpha=0.4;
 			ctx.fill();
 			let poly = []
-			for (let pt of this.poly_brush.points){
+			for (let pt of this.poly_brush?.points){
 				poly.push(this._getActualPosition(pt));
 			}
 			for (var i in this.handlers.brush_stopped){
