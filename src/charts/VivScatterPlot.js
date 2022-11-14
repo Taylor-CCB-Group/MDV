@@ -171,38 +171,7 @@ class VivScatterPlot extends DensityScatterPlot{
 
     }
 
-    setChannel(channel){
-        this.viv.setChannel(channel);
-    }
-
-    getAllChannels(){
-        return this.viv.channels;
-    }
-
-    addChannel(channel){
-        return this.viv.addChannel(channel);
-    }
-    removeChannel(channel){
-        this.viv.removeChannel(channel);
-    }
-
-    getChannels(){
-        return this.viv.getChannels();
-        const props = this.viv.layers[0].props;
-        const names = props.selections.map(x=>this.viv.channels[x.c].Name);
-        const colors = props.colors.map(x=>RGBToHex(x));
-        props.selections;
-        return names.map((x,i)=>{
-            return{
-                name:x,
-                index:props.selections[i].c,
-                color:colors[i],
-                contrastLimits:props.contrastLimits[i].slice(0),
-                channelsVisible:props.channelsVisible[i]
-            }
-        })
-        
-    }
+    // PJT *Channel methods moved to VivViewer.
 
     remove(){
         this.viv.deck.finalize();
@@ -223,8 +192,8 @@ class VivScatterPlot extends DensityScatterPlot{
             selections:k.selections.slice(0),
             colors:k.colors.slice(0),
             channelsVisible:k.channelsVisible.slice(0),
-            contrastLimits:k.contrastLimits.slice(0)
-
+            contrastLimits:k.contrastLimits.slice(0),
+            domains: k.domains?.slice(0)
         }
         return conf;
     }
