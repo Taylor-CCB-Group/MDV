@@ -135,7 +135,7 @@ class LinkDataDialog extends BaseDialog{
         for (let id of this.ids){
             const cf = this.link.choose_field.id;
             const name  = this.ds.dataStore.getRowText(id,cf);
-            fieldIds.push(`${dt}_${name}(${dt})_${id}`);
+            fieldIds.push(`${dt}|${name}(${dt})|${id}`);
            
         }
         return fieldIds;     

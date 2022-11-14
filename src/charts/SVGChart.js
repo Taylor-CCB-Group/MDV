@@ -142,7 +142,7 @@ class SVGChart extends BaseChart{
         if (ax.x){
             if (this.x_scale){
                 this.x_scale.range([0, dim.width]);
-                this.x_axis_svg.selectAll(".tick text");
+                this.x_axis_svg.selectAll(".tick text").attr("font-family","Helvetica");
                 this.x_axis_svg.transition().call(this.x_axis_call);
                 if (ax.x.rotate_labels){
                     this.x_axis_svg.selectAll(".tick text")	.style("text-anchor", "end")
@@ -164,7 +164,8 @@ class SVGChart extends BaseChart{
                 .attr("y",this.margins.bottom-4)
                 .text(this.config.axis.x.label)
                 .attr("font-size",this.config.axis.x.textsize+"px")
-        }
+                .attr("font-family","Helvetica")
+            }
 
         if (ax.y){
             if (this.y_scale){
@@ -184,6 +185,7 @@ class SVGChart extends BaseChart{
                     .attr("transform", null);
                 }
                 this.y_axis_svg.selectAll(".tick text").attr("font-size",ax.y.tickfont)
+                .attr("font-family","Helvetica");
                 
 
             }
@@ -194,6 +196,7 @@ class SVGChart extends BaseChart{
                 .attr("transform", `rotate(-90)`)
                 .text(this.config.axis.y.label)
                 .attr("font-size",this.config.axis.y.textsize+"px")
+                .attr("font-family","Helvetica")
     
         }
 
@@ -392,19 +395,43 @@ class SVGChart extends BaseChart{
       
       }
 
+
+    _addLegendToSVG(param){
+        const legend = this[param];
+        if (!legend){
+            return;
+        }
+        const cl = [legend.offsetLeft,legend.offsetTop];
+        legend._leg = legend.querySelector("g");
+        legend._leg_g =  select(legend._leg).attr("transform",`translate(${cl[0]},${cl[1]})`);
+        this.svg.node().append(legend._leg_g.node());         
+
+    }
+
+    _removeLegendFromSVG(param){
+        const legend = this[param];
+        if (!legend){
+            return;
+        }
+        legend._leg_g.attr("transform",`translate(0,0)`);
+        this.legend.querySelector("svg").append(legend._leg);
+        delete this.legend._leg;
+        delete this.legend._leg_g;
+
+    }
+
+
     getImage(callback,type){
         if (this.addToImage){
             this.addToImage();
         }
-        const cl = this.config.color_legend;
+       
         //temporarily attach legend
-        let leg_g =null
-        let leg=null;
-        if (this.legend){
-            leg = this.legend.querySelector("g");
-            leg_g =  select(leg).attr("transform",`translate(${cl.pos[0]},${cl.pos[1]})`);
-            this.svg.node().append(leg_g.node());         
+        this._addLegendToSVG("legend");
+        if (this.extra_legends){
+            this.extra_legends.forEach(x=>this._addLegendToSVG(x));
         }
+        
 		const svgAsXML = (new XMLSerializer).serializeToString(this.svg.node());
 
         if (type==="png"){
@@ -413,9 +440,9 @@ class SVGChart extends BaseChart{
                 if (this.removeFromImage){
                     this.removeFromImage();
                 }
-                if (leg_g){
-                    leg_g.attr("transform",`translate(0,0)`);
-                    this.legend.querySelector("svg").append(leg);
+                this._removeLegendFromSVG("legend");
+                if (this.extra_legends){
+                    this.extra_legends.forEach(x=>this._removeLegendFromSVG(x));
                 }
             })
         }
@@ -424,10 +451,11 @@ class SVGChart extends BaseChart{
             if (this.removeFromImage){
                 this.removeFromImage();
             }  
-            if (leg_g){
-                leg_g.attr("transform",`translate(0,0)`);
-                this.legend.querySelector("svg").append(leg);
+            this._removeLegendFromSVG("legend");
+            if (this.extra_legends){
+                this.extra_legends.forEach(x=>this._removeLegendFromSVG(x));
             }
+            
         }    
     }
 

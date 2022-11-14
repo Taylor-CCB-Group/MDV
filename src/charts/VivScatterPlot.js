@@ -110,9 +110,9 @@ class ColorChannelDialog extends BaseDialog{
         });
         const dc= createEl("input",{
             classes:["mdv-flex-fixed","mdv-checkbox"],
-            type:"checkbox",
-            checked:item.channelsVisible
+            type:"checkbox"
         },cont);
+        dc.checked= item.channelsVisible;
         dc.addEventListener("click",()=>{
             item.channelsVisible= dc.checked;
             this.viv.setChannel(item);
@@ -193,6 +193,7 @@ class VivScatterPlot extends DensityScatterPlot{
             return{
                 name:x,
                 index:props.selections[i].c,
+                id:props.selections[i].id,
                 color:colors[i],
                 contrastLimits:props.contrastLimits[i].slice(0),
                 channelsVisible:props.channelsVisible[i]

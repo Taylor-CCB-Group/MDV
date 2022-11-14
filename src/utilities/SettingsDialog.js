@@ -30,6 +30,8 @@ class SettingsDialog extends BaseDialog{
         }
 
     }
+
+
     spinner(s,d){
          
         let sp =createEl("input",{
@@ -93,19 +95,59 @@ class SettingsDialog extends BaseDialog{
         });
         sl.noUiSlider.on("end",(values)=>{
             s.func(parseFloat(values[0]))
-        })
+        });
+        return sl;
 
     }
 
     check(s,d){
         const ch= createEl("input",{
-            type:"checkbox",
+            type:"checkbox"
         },d);
         ch.checked= s.current_value;
         ch.addEventListener("click",(e)=>{
             s.func(ch.checked)
         })
     }
+
+
+    multidropdown(s,d){
+        const dd = createEl("select",{
+            multiple:true,
+            styles:{
+                maxWidth:"200px",
+                height:"100px"
+            }
+        });
+        createEl("br",{},d);
+        for (let item of s.values[0]){
+            const v =item[s.values[2]];
+            const args = {
+                text:item[s.values[1]],
+                value:v
+            }
+            const sel = s.current_value.indexOf(v) !== -1;
+            if (sel){
+                args.selected=true;
+            }
+
+            createEl("option",args,dd)
+        }
+        d.append(dd);
+        createEl("br",{},d);
+        const b = createEl("span",{
+            classes:["ciview-button-sm"],
+            text:"Change"
+        },d)
+        b.addEventListener("click",(e)=>{
+            s.func(Array.from(dd.selectedOptions).map(x=>x.value));
+        })
+        return dd;
+    }
+       
+    
+
+    
 
     dropdown(s,d){
         const dd = createEl("select",{
@@ -139,6 +181,7 @@ class SettingsDialog extends BaseDialog{
             }
         },d)
         noUiSlider.create(sl, {
+            tooltips:true,
             start: [s.current_value[0], s.current_value[1]],
             range: {
                 'min': [s.min],
@@ -148,7 +191,8 @@ class SettingsDialog extends BaseDialog{
         });
         sl.noUiSlider.on("end",(values)=>{
             s.func(parseFloat(values[0]),parseFloat(values[1]))
-        })
+        });
+        return sl;
 
     }
 

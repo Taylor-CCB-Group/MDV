@@ -1,7 +1,194 @@
 
 import {WGL2DI} from "../webgl/WGL2DI.js";
 import WGLChart from "./WGLChart.js";
-import BaseChart from "./BaseChart.js"
+import BaseChart from "./BaseChart.js";
+import {BaseDialog} from "../utilities/Dialog.js"
+import { createEl } from "../utilities/Elements.js";
+
+
+
+class OffsetDialog extends BaseDialog{
+	constructor(scatterPlot){
+		super({title:"Alter Position",width:300},scatterPlot)
+	}
+
+	init(scatterPlot){
+		this.plot=scatterPlot;
+		this.ds = this.plot.dataStore;
+		createEl("div",{text:"Offset"},this.dialog);
+		this.bdiv= createEl("div",{styles:{
+			display:"flex",
+			justifyContent:"center",
+			alignItems: "center",
+			position:"relative",
+			height:"60px"
+		}},this.dialog);
+		for (let pos of [["top","up"],["bottom","down"],["right","right"],["left","left"]]){
+			this._addPButton(pos);
+		}
+		createEl("div",{text:"Rotation"},this.dialog);
+		this.rDiv= createEl("div",{
+			styles:{
+				height:"30px",
+				position:"relative"
+			}
+		},this.dialog);
+		for (let d of ["left","right"]){
+			this._addRButton(d);
+		}
+
+	
+		const dd = createEl("div",{},this.dialog);
+		const cname= this.ds.columnIndex[this.ds.offsets.groups].name;
+		createEl("div",{text:cname},dd);
+		this.groupSelect= createEl("select",{},dd);
+		const bb = createEl("span",{classes:["ciview-button-sm"],text:"Reset"},dd);
+		bb.addEventListener("click",e=>{
+			this.ds.resetColumnOffsets(this.filter,this.groupSelect.value,true);
+			this._showOffsets(this.groupSelect.value);
+		})
+		const vals =this.ds.columnIndex[this.ds.offsets.groups].values;
+		for (let v of vals){
+			createEl("option",{
+			text:v,
+			value:v
+			},this.groupSelect)
+		}
+		this.filter = this.plot.config.background_filter?this.plot.config.background_filter.category:null;
+		
+		this.groupSelect.addEventListener("change",()=>{
+			this._showOffsets(this.groupSelect.value);
+		});
+		this._addOffsetLabels();
+		this._showOffsets(vals[0]);
+		
+			
+	}
+
+	_alterOffset(dir){
+		const ds = this.plot.dataStore;
+		let x =0;
+		let y=0;
+		const am = parseFloat(this.offsetAm.value);
+		if (isNaN(am)){
+			return;
+		}
+		x+=dir==="right"?am:0;
+		x-=dir==="left"?am:0;
+		y+=dir==="up"?am:0;
+		y-=dir==="down"?am:0;
+		const gr = this.groupSelect.value;
+		ds.setColumnOffset({group:gr,offsets:[x,y],filter:this.filter},true);
+		this._showOffsets(gr);
+		
+	}
+
+
+
+	
+
+	_addOffsetLabels(){
+		const ld = createEl("div",{
+			styles:{
+				position:"absolute",
+				top:"20px",
+				left:"20px",
+				display:"flex",
+				justifyContent:"center",
+				gap:"5px"
+			},
+		},this.bdiv);
+		this.xoffset= createEl("span",{},ld);
+		this.yoffset = createEl("span",{},ld);
+		createEl("span",{text:"step:"},ld)
+		this.offsetAm= createEl("input",{
+			styles:{
+			
+				width:"30px"
+			},
+			value:1
+		},ld);
+
+		const rd = createEl("div",{
+			styles:{
+				position:"absolute",
+				top:"0px",
+				justifyContent:"center",
+				left:"25px",
+				display:"flex",
+				gap:"5px"
+			},
+		},this.rDiv);
+
+		this.angle = createEl("span",{},rd);
+		createEl("span",{text:"step:"},rd)
+		this.offsetAn= createEl("input",{
+			styles:{
+				width:"30px"
+			},
+			value:1
+		},rd);
+
+		
+	}
+
+	_showOffsets(group){
+		let xy=[0,0];
+		let angle=0;
+		const vs =  this.ds.offsets.values[this.filter];
+		if (vs && vs[group]){
+			xy = vs[group].offsets;
+			angle =vs[group].rotation;
+		}
+
+		this.xoffset.textContent="x:"+xy[0].toFixed(1);
+		this.yoffset.textContent="y:"+xy[1].toFixed(1);
+		this.angle.textContent="angle:"+angle.toFixed(1);
+	}
+	
+
+
+	_addPButton(position){
+		const styles = {
+			position:"absolute",
+			textAlign:"center",
+			cursor:"pointer"
+		};
+		styles[position[0]]="0px"
+		const b = createEl("i",{
+			classes:["fas",`fa-arrow-${position[1]}`],
+			styles:styles
+		},this.bdiv);
+		b.addEventListener("click",()=>{
+			this._alterOffset(position[1])
+		});
+
+	}
+	_addRButton(dir){
+		const styles = {
+			position:"absolute",
+			textAlign:"center"
+		};
+		styles[dir]="5px"
+		const j =createEl("i",{
+			classes:["fas",`fa-angle-double-${dir}`],
+			styles:styles,
+			cursor:"pointer"
+
+		},this.rDiv);
+		j.addEventListener("click",e=>{
+			const am = parseFloat(this.offsetAn.value);
+			if (isNaN(am)){
+				return;
+			}
+			const angle = dir==="left"?-am:am;
+			this.plot.dataStore.setColumnOffset({group:this.groupSelect.value,rotation:angle,filter:this.filter},true);
+			this._showOffsets(this.groupSelect.value);
+		});
+	}
+
+
+}
 
 
 class WGLScatterPlot extends WGLChart{
@@ -47,6 +234,7 @@ class WGLScatterPlot extends WGLChart{
 		this.centerGraph();
           
 		const colorFunc = this.afterAppCreation();
+		this.app.setBackGroundColor(c.background_color);
 
 
         this.app.addHandler("brush_stopped",function(range,is_poly){
@@ -73,14 +261,10 @@ class WGLScatterPlot extends WGLChart{
 			colorFunc:colorFunc
 			
 		});
+		
 
-		if (c.offsets){
-			const col = this.dataStore.columnIndex[c.offsets.param];
-			const v = col.values.indexOf(c.offsets.value)
-			this.app.setOffsets(col.data,v,c.offsets.offsets);
-		}
+	
 		this.defaultRadius=this._calculateRadius();
-		console.log(this.defaultRadius);
 	
 		c.radius= c.radius || 2;
 		
@@ -89,8 +273,10 @@ class WGLScatterPlot extends WGLChart{
 		this.app.setPointRadius(this.config.radius);
 		this.app.setPointOpacity(this.config.opacity);
 		
-		this.onDataFiltered();	   
+		this.onDataFiltered();   
     }
+
+
 
 	getDimension(){
 		return this.dataStore.getDimension("range_dimension");
@@ -131,6 +317,7 @@ class WGLScatterPlot extends WGLChart{
 		
 		const im = new Image();
 		const c = this.config;
+		c.image_opacity= c.image_opacity || 1;
 		im.src= ic.url;
 		im.onload=()=>{
 			if (change){
@@ -234,11 +421,21 @@ class WGLScatterPlot extends WGLChart{
 
 
     centerGraph(){
-		const roi = this.config.roi || {};
-    	let max_x=roi.max_x || this.minMaxX[1];
+		const c = this.config;
+		const roi = c.roi || {};
+		
+    	let max_x=roi.max_x || this.minMaxX[1];1
     	let max_y=roi.max_y || this.minMaxY[1];
     	let min_x=roi.min_x || this.minMaxX[0];
     	let min_y=roi.min_y || this.minMaxY[0];
+		if (c.center_using_quantiles){
+			const x_q= this.dataStore.columnIndex[c.param[0]].quantiles;
+			const y_q = this.dataStore.columnIndex[c.param[1]].quantiles;
+			const xmm =  x_q[c.center_using_quantiles]
+			const ymm =  y_q[c.center_using_quantiles]
+
+			
+		}
     	if (this.config.axis.y_log_scale){
     		max_y=this._getLogValue(max_y);   			   		
     		min_y=this._getLogValue(min_y);    		
@@ -265,6 +462,24 @@ class WGLScatterPlot extends WGLChart{
 
     }
 
+	getContextMenu(){
+		const m = super.getContextMenu();
+		if (this.dataStore.offsets){
+			const o = this.dataStore.offsets;
+			const n = this.dataStore.getColumnName(o.groups)
+			if (o.param[0]===this.config.param[0] && o.param[1]===this.config.param[1]){
+				m.push({
+					text:`Adjust ${n} position`,
+					icon:"fas fa-arrows-alt",
+					func:()=>{
+						new OffsetDialog(this);
+					}
+				})
+			}
+		}
+		return m;
+	}
+
 
 
 	_addSliderToSettings(settings,im,index){
@@ -283,31 +498,12 @@ class WGLScatterPlot extends WGLChart{
 
 	}
 
-	remove(){
-		if (this.config.offsets){
-			const x = this.dataStore.getRawColumn(this.x);
-			const y= this.dataStore.getRawColumn(this.y);
-			const lf = this.dim.getLocalFilter();
-			const o = this.app.offsets.offsets;
-			const arr  = this.app.offsets.arr;
-			const v = this.app.offsets.value;
-			if (o[0]!== 0 && o[1] !==0){
-				for (let n=0;n<lf.length;n++){
-					if (arr[n]===v && lf[n]!==2){
-						x[n]-=o[0];
-						y[n]-=o[1];
-					}
 
-				}
-			}
-		}
-		super.remove();
-	}
 
 	getConfig(){
 		const c = super.getConfig();
 		if (c.offsets){
-			c.offsets.offsets = this.app.offsets.offsets;
+			c.offsets.offsets = this.app.offsets.values.offsets;
 		}
 		return c;
 	}
@@ -374,10 +570,32 @@ class WGLScatterPlot extends WGLChart{
 					      
 			})
 
-		}		
-			
-			
+		}
+		settings.push({
+			type:"radiobuttons",
+			label:"Background Color",
+			choices:[
+				["none","none"],
+				["white","white"],
+				["light gray","lightgray"],
+				["gray","gray"],
+				["black","black"]
+			],
+			current_value:c.background_color || "none",
+			func:(x)=>{
+				if (x==="none"){
+					delete c.background_color
+				}
+				else{
+					c.background_color=x
+				}
+				this.app.setBackGroundColor(c.background_color);
+			}
+
+
+		})
 		
+				
 		return settings.concat([
 			{
 				type:"radiobuttons",

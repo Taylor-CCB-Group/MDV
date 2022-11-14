@@ -90,18 +90,32 @@ class ImageTableChart extends BaseChart{
 BaseChart.types["image_table_chart"]={
     "class":ImageTableChart,
     name:"Image Table",
-    required:"images",
-    init:(config,dataSource)=>{
-        //set the chr,start,finish columns
-        const i = dataSource.images;
-        config.param= i.key
-        //set the base track corresponding to the datastore
+    required:["images"],
+    init:(config,dataSource,extraControls)=>{
+        //get the available images
+        const i = dataSource.images[extraControls.image_set];
+        config.param= [i.key_column];
+        //set the base url and type
         config.images={
             base_url:i.base_url,
             type:i.type
         }
+    },
+    extra_controls:(dataSource)=>{
+        const values=[];
+        for (let iname in dataSource.images){
+            values.push({name:iname,value:iname})
+        }
+        //drop down of available image sets
+        return [
+            {
+                type:"dropdown",
+                name:"image_set",
+                label:"Image Set",
+                values:values
+            }
+        ];
     }
-
 }
 
 export default ImageTableChart;

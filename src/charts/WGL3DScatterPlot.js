@@ -18,7 +18,13 @@ class WGL3DScatterPlot extends WGLChart{
         const max= Math.max(...ranges);
         this.defaultCDistance = max*4;
         c.brush = c.brush || "default";
-		this.app= new WGL2DI(this.graphDiv,{mode:"3d",brush:c.brush,cameraDistance:this.defaultCDistance});
+        c.center= c.center || [0,0,0];
+       
+		this.app= new WGL2DI(this.graphDiv,{mode:"3d",
+            brush:c.brush,
+            cameraDistance:this.defaultCDistance,
+            cameraCenter:[-c.center[0]*2,c.center[1]*2,-c.center[2]*2]
+        });
        
 
         this.app.addHandler("brush_stopped",(indexes,is_poly)=>{
@@ -46,6 +52,7 @@ class WGL3DScatterPlot extends WGLChart{
 
           c.radius=c.radius || 5;
           c.opacity= c.opacity || 0.8;
+         
           
           this.app.setPointRadius(c.radius);
           this.app.setPointOpacity(c.opacity);
@@ -137,9 +144,9 @@ class WGL3DScatterPlot extends WGLChart{
     addAxis(){
         for (let index=0;index<3;index++){
             let mm = this.dataStore.getMinMaxForColumn(this.config.param[index]);
-            const from = [0,0,0];
+            const from = this.config.center.map((x,i)=>i===1?x:x);
             from[index]=mm[0];
-            const to = [0,0,0];
+            const to = this.config.center.map((x,i)=>i===1?x:x);
             to[index]=mm[1];
             const color = [0,0,0];
             color[index]=255;

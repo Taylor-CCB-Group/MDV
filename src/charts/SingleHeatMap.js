@@ -4,6 +4,7 @@ import BaseChart  from "./BaseChart.js";
 import SVGChart from "./SVGChart.js";
 
 
+
 class SingleHeatMap extends SVGChart{
     constructor(dataStore,div,config){
           
@@ -18,7 +19,7 @@ class SingleHeatMap extends SVGChart{
         vals=this.dataStore.getColumnValues(p[1]);
         this.x_scale.domain(vals.slice(0));   
         const c= this.config;
-        if (c.param.length===5){
+        if (c.param.length>4){
             this.stat_cutoff=c.param[4];
         }
       
@@ -29,6 +30,9 @@ class SingleHeatMap extends SVGChart{
        this.setColorFunction()
        //no filtering one time set up
        this.initialSetUp();
+
+      
+
        this.drawChart();
        
          
@@ -111,6 +115,13 @@ class SingleHeatMap extends SVGChart{
             data[n]=new Array(x_len);
         }
         const cat = this.dataStore.columnIndex[p[3]].values.indexOf(c.category);
+        let ct1 = null;
+        let ct2 = null;
+        if (c.show_group_interactions){
+            ct1= this.dataStore.getRawColumn(p[9]);
+            ct2= this.dataStore.getRawColumn(p[10]);     
+        }
+      
         for (let i =0;i<len;i++){
             if (fc[i]===cat){
                 let py = y[i];
@@ -128,6 +139,10 @@ class SingleHeatMap extends SVGChart{
                     if (stat){
                         data[px][py].push(stat[i])
                     }
+                    if (ct1){
+                        data[px][py].push(`${ct1[i]}-${ct2[i]}`);
+                    }
+                  
                 }
               
                 else{
@@ -151,6 +166,8 @@ class SingleHeatMap extends SVGChart{
     drawChart(tTime=300){
         const trans =  select(this.contentDiv).transition()
         .duration(tTime).ease(easeLinear);
+        const c  =this.config;
+        const p = c.param
         const cutoff = this.stat_cutoff?this.config.cutoff:null;
         const yvals= this.dataStore.getColumnValues(this.config.param[0]);
         const xvals= this.dataStore.getColumnValues(this.config.param[1]);
@@ -161,6 +178,29 @@ class SingleHeatMap extends SVGChart{
         const recWidth= dim.width/x_len;
         const self = this;
         const recHeight = dim.height/y_len;
+        let disFilter1 =null;
+        let disFilter2 = null;
+        let disFilter3 = null;
+        let disFilter4 = null;
+        if (c.display_type){
+           disFilter1 = this.dataStore.getRawColumn(p[5]);
+           disFilter2 = this.dataStore.getRawColumn(p[6]);
+           disFilter3 = this.dataStore.getRawColumn(p[7]);
+           disFilter4 = this.dataStore.getRawColumn(p[8]);
+        }
+        const mcol = "#E0E0E0";//"#f4f0ec"
+        let interactions= null;
+        if (this.config.show_group_interactions){
+            interactions={};
+            const gv1 = this.dataStore.getColumnValues(p[9]);
+            const gv2= this.dataStore.getColumnValues(p[10]);
+            for (let v1 in gv1 ){
+                for (let v2 in gv2){
+                    interactions[`${v1}-${v2}`]=0;
+                }
+            }
+        }
+
         this.graph_area.selectAll(".heatmap-row")
         .data(this.data)
         .join("g")
@@ -181,17 +221,45 @@ class SingleHeatMap extends SVGChart{
         .transition(trans)
         .attr("fill",(d,i)=>{
             if (!d){
-                return "#f4f0ec";
+                return mcol;
             }
             if (isNaN(d[2])){
-                return "#f4f0ec";
+                return mcol;
             }
             if (cutoff && d[5]>cutoff){
-                return "#f4f0ec";
+                return mcol;
+            }
+            if (c.display_type && c.display_type !== "all"){
+                if (c.display_type==="co-location"){
+                    if (!(disFilter1[d[3]]>1 && disFilter2[d[3]]>0 && disFilter3[d[3]]>1)){
+                        return mcol;
+                    }
+
+                }
+                else if(c.display_type==="dispersion"){
+                    if (!(disFilter1[d[3]]<1 && disFilter2[d[3]]<0 && disFilter4[d[3]]<1)){
+                        return mcol;
+                    }
+
+                }
+            }
+            if (interactions){
+                interactions[d[6]]++;
             }
             return self.colorFunction(d[2]);
         });
+        if (interactions){
+            const v1 = this.dataStore.getColumnValues(p[9]);
+            const v2= this.dataStore.getColumnValues(p[10]);
+            const msg=[];
+            for (let i in interactions){
+                const arr = i.split("-");
+                msg.push(`${v1[arr[0]]}-${v2[arr[1]]}:${interactions[i]}`);
+                this.legendIcon.setAttribute("aria-label",msg.join(", "));
 
+            }
+        }
+    
         this.updateAxis();
         
     }
@@ -246,7 +314,22 @@ class SingleHeatMap extends SVGChart{
 
             })
         }
-       
+       if (c.display_type){
+        settings.push({
+                type:"radiobuttons",
+                label:"Display Type",
+                current_value:c.display_type,
+                choices:[
+                    ["all","all"],
+                    ["co-location","co-location"],
+                    ["dispersion","dispersion"]
+                ],
+                func:(x)=>{   
+                    c.display_type=x;
+                    this.drawChart();
+                }
+            });
+        }
         settings.push({
             label:"Change Category",
             type:"dropdown",
@@ -306,23 +389,48 @@ BaseChart.types["single_heat_map"]={
     class:SingleHeatMap,
     params:[{
         type:"text",
-        name:"Categories on y-axis"
+        name:"Categories on y-axis" //0
     },
     {
         type:"text",
-        name:"categories on x-axis"
+        name:"categories on x-axis" //1
     },
     {
         type:"number",
-        name:"Value to display"
+        name:"Value to display" //2
     },
     {
         type:"text",
-        name:"column to filter"
+        name:"group to display" //3
+    },
+    {
+        type:"number",
+        name:"stat cutoff" //4
+    },
+    {
+        type:"number",
+        name:"dispersion filter 1" //5
+    },
+    {
+        type:"number",
+        name:"dispersion filter 2" //6
+    },
+    {
+        type:"number",
+        name:"dispersion filter 3" //7
+    },
+    {
+        type:"number",
+        name:"dispersion filter 4" //8
+    },
+    {
+        type:"text",
+        name:"group1" //9
+    },
+    {
+        type:"text",
+        name:"group2" //10
     }
-
-
-
     ]
 }
 

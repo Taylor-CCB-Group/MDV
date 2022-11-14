@@ -23,8 +23,11 @@ import "./DensityScatterPlot";
 import {BaseDialog} from "../utilities/Dialog.js";
 import {getRandomString} from "../utilities/Utilities.js";
 import {csv,tsv,json} from"d3-fetch";
-import LinkDataDialog from "./dialogs/LinkDataDialog.js"
+import LinkDataDialog from "./dialogs/LinkDataDialog.js";
+import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
+
+
 
 const themes={
     "Dark":{
@@ -90,21 +93,25 @@ class ChartManager{
         //  contentDiv the div that the charts associated with the datastore will be added
         this.dataSources=[];
         this.dsIndex={};
+        this.columnsLoading={};
         for (const d of dataSources){
             const ds= {
                 name:d.name,
-                dataStore:new DataStore(d.size,{columns:d.columns,columnGroups:d.columnGroups}),
+                dataStore:new DataStore(d.size,{columns:d.columns,columnGroups:d.columnGroups,offsets:d.offsets,links:d.links}),
                 link_to:d.link_to,
                 index_link_to:d.index_link_to,
                 color:d.color || themes[this.theme].background_color,
                 images:d.images,
                 genome_browser:d.genome_browser,
                 column_link_to:d.column_link_to,
+                links:d.links,
                 custom:d.custom || {}
             }
             this.dataSources.push(ds);
             this.dsIndex[d.name]=ds;
             this._addDSListeners(ds);
+            this.columnsLoading[d.name]={};
+            
         }
 
         if (listener){
@@ -112,7 +119,7 @@ class ChartManager{
         }
 
         this.transactions={};
-        this.columnsLoading={};
+       
         
         //set up container and top(main menu)
         this.containerDiv= typeof div === "string"?document.getElementById(div):div;
@@ -219,13 +226,13 @@ class ChartManager{
                 this.loadFile(item,()=>{
                    this.filesToLoad--;
                    if (this.filesToLoad===0){
-                    this._loadView(config,dataLoader)
+                    this._loadView(config,dataLoader,true)
                    }
                 });
             }
         }
         else{
-            this._loadView(config,dataLoader);
+            this._loadView(config,dataLoader,true);
         }
          
     }
@@ -264,6 +271,12 @@ class ChartManager{
         }
     }
 
+
+   
+
+    
+
+
     _setChartTheme(chart){
         const t = themes[this.theme];
       
@@ -295,19 +308,37 @@ class ChartManager{
         }
     }
 
+    _initiateOffsets(dataSource){
+        const ds = dataSource.dataStore
+        const o = ds.offsets;
+        const p = o.param;
+        const cols= [p[0],p[1],o.groups];
+        if (o.background_filter){
+            cols.push(o.background_filter);
+        }
+        this._getColumnsThen(dataSource.name,cols,()=>{
+            ds.initiateOffsets();
+            ds.updateColumnOffsets();
+            ds.updateColumnOffsets(null,true,true);
+        })
+       
+
+    }
+
     //load the view metadata or use initialCharts then call _init to load the view 
-    _loadView(config,dataLoader){
+    _loadView(config,dataLoader,firstTime=false){
+       
         //load view, then initialize
         if (config.initial_view){
             this.currentView=config.initial_view;
             this.viewSelect.value = config.initial_view;
             dataLoader.viewLoader(config.initial_view).then(data=>{
-                this._init(data);
+                this._init(data,firstTime);
             })     
         }
         //only one view hard coded in config
         else{
-            this._init(config.only_view)    
+            this._init(config.only_view,firstTime)    
         }
     }
 
@@ -315,7 +346,7 @@ class ChartManager{
         return this.dsIndex[name].dataStore;
     }
 
-    _init(view){
+    _init(view,firstTime=false){
 
         const dsToView=[];
         let charts=[];
@@ -336,6 +367,8 @@ class ChartManager{
         }
 
         for (let ds of this.dataSources){
+            delete ds.contentDiv;
+            delete ds.menuBar;
             if (ds.column_link_to){
                 this._sync_colors(this.dsIndex[ds.column_link_to.dataSource],ds);
             }
@@ -347,7 +380,7 @@ class ChartManager{
             const p = panes[n];
             p.style.display="flex";
             p.style.flexDirection="column";
-            const ds= this.dsIndex[dsToView[n]]
+            const ds= this.dsIndex[dsToView[n]];
             this.columnsLoading[ds.name]={};
             ds.charts=[];
             ds.menuBar = createEl("div",{
@@ -362,7 +395,21 @@ class ChartManager{
                     background:col
                 }
             },p);
-        }  
+        }
+
+        
+         //any first time initiation
+         if (firstTime){
+            //initiate offsets if any
+            for (let d of this.dataSources){
+                if (d.dataStore.offsets){
+                   this._initiateOffsets(d)
+                }
+            }
+
+        }
+
+
         //need to create a set to create track of 
         //charts loaded
         this._toLoadCharts = new Set();
@@ -401,7 +448,7 @@ class ChartManager{
                 const n2=  ds.dataStore.filterSize;
                 this.progressBars[ds.name].setValue(n2);
                 this.progressBars[ds.name].setText(n2);
-
+                //this._callListeners(type,)
             }
         })
     }
@@ -559,10 +606,7 @@ class ChartManager{
         if (config.background_filter){
             set.add(config.background_filter.column);
         }
-        if (config.offsets){
-            set.add(config.offsets.param);
-        }
-        
+       
     }
    
     /**
@@ -666,10 +710,21 @@ class ChartManager{
 
     getState(){
         const initialCharts={};
-        const updatedColumns={}
-        for (const ds of this.dataSources){  
-            initialCharts[ds.name]=[];
-            updatedColumns[ds.name]=this._getUpdatedColumns(ds.dataStore);      
+        const updatedColumns={};
+        const metadata={};
+        for (const ds of this.dataSources){
+            if (ds.contentDiv){
+                initialCharts[ds.name]=[];
+            }
+            updatedColumns[ds.name]=this._getUpdatedColumns(ds.dataStore); 
+            const dstore= ds.dataStore;
+            
+            if (dstore.dirtyMetadata.size !==0){
+                metadata[ds.name]={};
+                for (let param of dstore.dirtyMetadata){
+                    metadata[ds.name][param]=dstore[param];
+                }
+            }
         }
         for (let chid in this.charts){
             const chInfo = this.charts[chid];
@@ -682,11 +737,7 @@ class ChartManager{
             initialCharts[chInfo.dataSource.name].push(config);
             
         }
-        for (let ds in this.dsIndex){
-            if (initialCharts[ds].length===0){
-                delete initialCharts[ds];
-            }
-        }
+       
         const view = JSON.parse(JSON.stringify(this.viewData))
         view.initialCharts= initialCharts;
 
@@ -694,7 +745,8 @@ class ChartManager{
         return{     
             view:view,
             currentView:this.currentView,
-            updatedColumns:updatedColumns
+            updatedColumns:updatedColumns,
+            metadata:metadata
         }
     }
 
@@ -918,6 +970,20 @@ class ChartManager{
     }
 
 
+    _addLinkIcon(ds,ds_to,link){
+        createMenuIcon("fas fa-plus-square",{
+            tooltip:{
+                text:`Add ${link.name}`,
+                position:"bottom-right"
+            },
+            func:()=>{
+                new AddColumnsFromRowsDialog(ds,ds_to,link,this);
+            }
+        },ds.menuBar);
+
+    }
+
+
     _setUpMenu(ds){
         createMenuIcon("fas fa-chart-bar",{
             tooltip:{
@@ -939,6 +1005,15 @@ class ChartManager{
             }
             },ds.menuBar
         );
+        if (ds.links){
+            for (let ods in ds.links){
+                const link= ds.links[ods];
+                if (link.rows_as_columns){
+                    this._addLinkIcon(ds,this.dsIndex[ods],link.rows_as_columns)
+                }
+            }
+
+        }
         if (ds.link_to){
             createMenuIcon("fas fa-link",{
                 tooltip:{
@@ -1074,9 +1149,83 @@ class ChartManager{
     }
 
     
+    _getColumnsFromOtherSource(dataSource,otherDataSource,columns,indexCol,func){
+        this._getColumnsThen(otherDataSource,columns.concat(indexCol),()=>{
+             const ds= this.dsIndex[dataSource].dataStore;
+             const ods = this.dsIndex[otherDataSource].dataStore;
+             const oindex = ods.getColumnIndex(indexCol);
+             const ic = ds.columnIndex[indexCol]
+             const index = ic.values.map(x=>oindex[x]);
+             const colInfo= columns.map(x=>{
+                const c1 = ds.columnIndex[x];
+                const c2 = ods.columnIndex[x];
+                if (c2.values){
+                    c1.values=c2.values;
+                }
+                if (c2.minMax){
+                    c1.minMax=c2.minMax;
+                }
+                if (c2.qauntiles){
+                    c1.quantiles= c2.quantiles;
+                }
+
+                const buf = new  SharedArrayBuffer(ds.size * (c1.datatype==="text"?1:4));
+                const arrType = c1.datatype==="text"?Uint8Array:Float32Array;
+                return {
+                    col:x,
+                    data:buf,
+                    arr:new arrType(buf),
+                    odata:c2.data
+                }
+            });
+            for (let n=0;n<ds.size;n++){
+                const i = index[ic.data[n]];
+                for (let c of colInfo){
+                    c.arr[n]=c.odata[i]
+                }
+            }
+
+            for (let c of colInfo){
+                ds.setColumnData(c.col,c.data)
+            }
+            func();
+        })
+
+    }
+
 
     _getColumnsThen(dataSource,columns,func){
-        const dStore = this.dsIndex[dataSource].dataStore
+        const ds  =this.dsIndex[dataSource];
+        const dStore = ds.dataStore;
+        //check if need to load column data from linked data set
+        if (ds.links){
+            for (let ods in ds.links){
+                const link = ds.links[ods];
+                if (link.columns){
+                    const otherCols = [];
+                    const thisCols=[];
+                    for (let c of columns){
+                        if  (dStore.columnIndex[c].data){
+                            continue;
+                        }
+                        if(link.columns.indexOf(c)===-1){
+                            thisCols.push(c)
+                        }
+                        else{
+                            otherCols.push(c)
+                        }
+                    }
+                    //get the other datasource columns first
+                    if (otherCols.length>0){
+                        this._getColumnsFromOtherSource(dataSource,ods,
+                            otherCols,link.index, ()=>{
+                            this._getColumnsThen(dataSource,thisCols,func)
+                        })
+                        return;
+                    }
+                }
+            }
+        }
         const reqCols = columns.filter(x=>{
             //column already loading
             if (this.columnsLoading[dataSource][x]){
@@ -1124,24 +1273,7 @@ class ChartManager{
         //if original method is called check whether column has data
         chart[method]=(column)=>{
             this._getColumnsThen(dataSource,[column],()=>chart[newMethod](column));
-            /*if (chart.dataStore.columnIndex[column].data){
-                chart[newMethod](column);
-            }
-            //columns are loading, wait until loaded
-            else if (this.columnsLoading[dataSource][column]){             
-                this._haveColumnsLoaded([column],dataSource,()=>{
-                    chart[newMethod](column);
-                });                  
-            }
-            //load columns then color chart
-            else{
-                this.loadColumnSet([column],dataSource,()=>{
-                    chart[newMethod](column);
-                })
-            }*/
-           
         }
-
     }
 
     //check all columns have loaded - if not recursive call after
@@ -1150,7 +1282,7 @@ class ChartManager{
         for (let col of neededCols){
             if (this.columnsLoading[dataSource][col]){
                 setTimeout(()=>{
-                    this._haveColumnsLoaded(neededCols,dataSource,func)
+                    this._haveColumnsLoaded(neededCols,dataSource,func);
                 },500);
                 return;
             }
@@ -1206,7 +1338,7 @@ class ChartManager{
       
 
         const idl= ds.index_link_to;
-        if (chart.createIndexLinks && idl){
+        if (chart.setupLinks && idl){
             //ensures requested columns are loaded before other datasource loads them
             const func= (columns,callback)=>{
                 //make sure index is loaded before use
@@ -1214,7 +1346,7 @@ class ChartManager{
                 this._getColumnsThen(idl.dataSource,columns,callback)
 
             }    
-            chart.createIndexLinks(this.dsIndex[idl.dataSource].dataStore, idl.index,func);
+            chart.setupLinks(this.dsIndex[idl.dataSource].dataStore, idl.index,func);
         }
 
         const cll= ds.column_link_to;
@@ -1252,9 +1384,13 @@ class ChartManager{
         }
         switch(link.type){
             case "color_by_column":
-                const chart = this.charts[link.source_chart].chart;
+                const chart = this.charts[link.source_chart];
+                if (!chart){
+                    console.error(`broken link link:${link.id}`);
+                }
+                
               
-                chart.addListener(link.id,(type,data)=>{
+                chart.chart.addListener(link.id,(type,data)=>{
                     if (type==="cell_clicked"){
                         for (let cid of link.target_charts){
                             this.getChart(cid).colorByColumn(data.row)
@@ -1265,7 +1401,7 @@ class ChartManager{
         }
     }
 
-    //if a chart has been removed, wotk out which links need to be removed
+    //if a chart has been removed, work out which links need to be removed
     _removeLinks(chart){
         const linksToRemove =[];
         const cid = chart.config.id;
@@ -1304,12 +1440,14 @@ class ChartManager{
 
     
 
-    removeAllCharts(){
-        const allCharts=[]
+    removeAllCharts(dataSources){
+        const allCharts=[];
         for (let cn in this.charts){
             const ch = this.charts[cn];
-            allCharts.push([ch.chart,ch.window])
-
+            if (dataSources && dataSources.indexOf(ch.dataSource.name) ===-1){
+                continue;
+            }
+            allCharts.push([ch.chart,ch.window]);
         }
         for (let ci of allCharts){
             if (ci[1]){
@@ -1458,9 +1596,29 @@ class ChartManager{
         makeResizable(div,{
             onresizeend:(width,height)=>chart.setSize(width,height)
         })
-      
     }
 }
+
+
+
+class SubGroupColumnChooser extends BaseDialog{
+    constructor(dataStore,link,callback){
+        const config={
+            footer:true,
+            width:250,
+            maxHeight:500,
+            title:"Select Columns",
+            buttons:[{text:"OK",method:"getColumns"}]
+        }
+        super(config,{dataStore:dataStore,callback:callback,filter:filter});
+        
+    }
+    init(content){
+        createEl("input",{},this.div);
+    }
+}
+
+
 
 /**
 * Creates a dialog for the user to choose multiple columns
@@ -1539,15 +1697,14 @@ class ChooseColumnDialog extends BaseDialog{
     
     }
 
-
     getColumns(){
-        const cols=[]
+        const cols=[];
         for (let check of this.checks){
             if (check[0].checked){
-                cols.push(check[1])
+                cols.push(check[1]);
             }
         }
-        this.callback(cols)
+        this.callback(cols);
         this.close();
     }
 }
@@ -1574,6 +1731,7 @@ class AddChartDialog extends BaseDialog{
         
     }
     init(content){
+        this.extraControls={};
         const types=[];
         this.dataSource=content.dataSource;
         this.dataStore= content.dataSource.dataStore;
@@ -1647,6 +1805,10 @@ class AddChartDialog extends BaseDialog{
         this.setParamDiv(types[0].type,content.dataStore);
 
 
+        
+
+
+
         createEl("span",{
             text:"Add",
             classes:["ciview-button"]
@@ -1661,13 +1823,17 @@ class AddChartDialog extends BaseDialog{
             type:this.chartType.value,
             param:this.paramSelects.map((x)=>x.value)
         }
+        const ed={};
+        for (let name in this.extraControls){
+            ed[name]= this.extraControls[name].value;
+        }
         if (this.multiColumns){
             config.param =config.param.concat(this.multiColumns)
         }
         const t= BaseChart.types[this.chartType.value];
 
         if (t.init){
-            t.init(config,this.dataSource)
+            t.init(config,this.dataSource,ed)
         }
         callback(config);
         this.chartName.value="";
@@ -1714,31 +1880,65 @@ class AddChartDialog extends BaseDialog{
         this.paramDiv.innerHTML="";
         const params = BaseChart.types[type].params;
         this.paramSelects=[];
-        for (let p of params){
-            const d = createEl("div",{styles:{padding:"4px"}},this.paramDiv)
-            const sp =createEl("div",{text:p.name+":"},d);
-            const holder =createEl("div",{},this.paramDiv);
-            if (p.type.startsWith("_multi")){
-               this._addMultiColumnSelect(holder,p.type.split(":")[1])
-            }
-            else{
-                this.multiColumns=null;
-                const dd = createEl("select",{
-                    styles:{
-                        maxWidth:"200px"
-                    }
-                },holder);
-                const ps= this.dataStore.getColumnList(p.type);
-                for (let item of ps){
-                    createEl("option",{text:item.name,value:item.field},dd)
+        if (params){
+            for (let p of params){
+                const d = createEl("div",{styles:{padding:"4px"}},this.paramDiv)
+                const sp =createEl("div",{text:p.name+":"},d);
+                const holder =createEl("div",{},this.paramDiv);
+                if (p.type.startsWith("_multi")){
+                this._addMultiColumnSelect(holder,p.type.split(":")[1])
                 }
-                this.paramSelects.push(dd);
-                const largeGroups= this.dataStore.getLargeColumnGroups();
-                if (largeGroups.length>0){
+                else{
+                    this.multiColumns=null;
+                    const dd = createEl("select",{
+                        styles:{
+                            maxWidth:"200px"
+                        }
+                    },holder);
+                    const ps= this.dataStore.getColumnList(p.type);
+                    const sgs = {}
+                    for (let ds of this.dataStore.subgroupDataSources){
+                        sgs[ds]=createEl("optgroup",{label:ds});
+                    }
+                    for (let item of ps){
+                        let ele = dd;
+                        if (item.subgroup){
+                            ele=sgs[item.subgroup.dataSource];
+                        }
+                        createEl("option",{text:item.name,value:item.field},ele);
 
-                }                
-            }           
-        } 
+                    }
+                    for (let ds of this.dataStore.subgroupDataSources){
+                        dd.append(sgs[ds]);
+                    }
+                    this.paramSelects.push(dd);
+                }           
+            }
+        }
+        const t= BaseChart.types[this.chartType.value];
+        this.extraControls={};
+        if (t.extra_controls){
+            const controls = t.extra_controls(this.dataSource);
+            for (let c of controls){
+                createEl("div",{
+                    text:c.label,
+                    classes:["ciview-title-div"]
+                },this.columns[1]);
+                if (c.type==="dropdown"){
+                    const sel = createEl("select",{
+                        styles:{
+                            maxWidth:"200px"
+                        }
+                    },this.columns[1]);
+                    
+                    for (let item of c.values){
+                        createEl("option",{text:item.name,value:item.value},sel)
+                    }
+                    this.extraControls[c.name]=sel;
+                }
+            }
+
+        }
     }
 }
 

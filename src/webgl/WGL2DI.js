@@ -2,6 +2,8 @@ import regl from  "regl";
 import * as glMatrix from "gl-matrix";
 import {createEl, makeDraggable} from "../utilities/Elements.js";
 import {Camera} from "./Camera.js";
+import { thresholdFreedmanDiaconis } from "d3";
+import { copy } from "gl-matrix/cjs/mat4.js";
 
 
 class WGL2DI{
@@ -154,7 +156,11 @@ class WGL2DI{
 	   
 		if (this.mode==="3d"){
 			this.circle_properties.z_pos=1;
-			this.camera = new Camera({distance:config.cameraDistance || 500,theta:0.75,phi:0.5});
+			this.camera = new Camera({
+				center:config.cameraCenter,
+				distance:config.cameraDistance || 500,
+				theta:0.75,
+				phi:0.5});
 			this.axisScales=[1,1,1];
 		}
 
@@ -209,6 +215,11 @@ class WGL2DI{
 			}
 		});
 
+	}
+
+	setBackGroundColor(color){
+		color = color || "";
+		this.div_container.style.background=color;
 	}
 
 
@@ -385,40 +396,6 @@ class WGL2DI{
 		this.highlightPoints=hlp;		
 	}
 
-	setOffsets(arr,value,offsets){
-		this.offsets={
-			arr:arr,
-			value:value,
-			offsets:offsets
-		}
-		const x = this.circles.x_pos;
-		const y = this.circles.y_pos;
-		const lf = this.circles.localFilter;
-		for (let n=0;n<arr.length;n++){
-			if (arr[n]===value && lf[n] !==2){
-				x[n]+=offsets[0];
-				y[n]+=offsets[1];
-			}
-		}
-	}
-
-	alterOffsets(xa,ya){
-		this.offsets.offsets[0]+=xa;
-		this.offsets.offsets[1]-=ya;
-		const arr = this.offsets.arr;
-		const v = this.offsets.value;
-		const x = this.circles.x_pos;
-		const y = this.circles.y_pos;
-		const lf = this.circles.localFilter;
-		for (let n=0;n<arr.length;n++){
-			if (arr[n]===v && lf[n]!==2){
-				x[n]+=xa;
-				y[n]-=ya;
-			}
-		}
-	}
-
-
 
 	setPointRadius(value){
 		if (!value || isNaN(value)){
@@ -438,7 +415,6 @@ class WGL2DI{
 		value=value>1.0?1.0:value;
 		value = value<0.0?0.0:value;
 		this.pointOpacity=value
-
 	}
 
 	getPointOpacity(){
@@ -448,8 +424,6 @@ class WGL2DI{
 	getPointRadius(){
 		return this.pointRadius;
 	}
-
-
 
 	addLine(positionTo,positionFrom,color=[0,0,0],opacity=1){
 		this.lines.position= this.lines.position.concat(positionTo,positionFrom);
@@ -474,7 +448,6 @@ class WGL2DI{
 
 	}
 
-
 	moveImage(x,y){
 		const st = this.movingImage*6;
 		const en = st+6;
@@ -486,7 +459,6 @@ class WGL2DI{
 		const xy =this.images.props.x_y[this.movingImage];
 		xy[0]+=x;
 		xy[1]+=y;
-
 	}
 
 	setImagePosition(x,y,index){
@@ -537,7 +509,6 @@ class WGL2DI{
 		this.images.position[2]=[x+width,y+height];
 		this.images.position[3]=[x+width,y+height];
 		this.images.position[4]=[x+width,y];		
-
 	}
 
 	addImage(image,config){
@@ -580,9 +551,6 @@ class WGL2DI{
 		this.images.count=0;
 
 	}
-
-
-
 
     addSquares(config){
         this.squares.x_pos=config.x;
@@ -1151,8 +1119,9 @@ class WGL2DI{
 						self.moveImage(x_amount,y_amount);
 						self.imageMoved=self.getImageDetails(self.movingImage);
 					}
-					else if(self.offsets && e.ctrlKey){
+					else if(self.offsets && e.which ==3 		){
 						self.alterOffsets(x_amount,y_amount);
+					
 					}
 					else{
 						if (!self.config.lock_x_axis){
@@ -1254,6 +1223,7 @@ class WGL2DI{
 					self.object_clicked=null;
 					self.refresh(true);              
 				}
+				
 				//update which objects are now in view
 				else{
 					let ret = self.getRange();
@@ -1367,7 +1337,7 @@ class WGL2DI{
 			if (evt.which===3){
 				//add right click behaviour
 			}
-			let otherKey = evt.shiftKey || evt.ctrlKey || evt.which==2;
+			let otherKey = evt.shiftKey || evt.ctrlKey || evt.which==2 || evt.which==3;
 			//create brush
 			if ((self.config.brush && !(otherKey)) || (!(self.config.brush)&&otherKey)){
 				let origin = self._getMousePosition(evt);
@@ -1861,7 +1831,7 @@ class WGL2DI{
 
 		this.__draw3DCircles = this.regl({
             frag: `
-            precision mediump float;
+            precision highp float;
             varying vec3 fragColor;
 			varying float op;
 			varying float has_border;
@@ -1892,7 +1862,7 @@ class WGL2DI{
             `,
           
             vert: `
-            precision mediump float;
+            precision highp float;
 
             attribute float x_pos;
             attribute float y_pos;
@@ -1964,8 +1934,8 @@ class WGL2DI{
                     props.cameraProjection,
                     Math.PI / 4,
                     context.viewportWidth / context.viewportHeight,
-                    0.01,
-                    10000
+                   1,
+                    100000
                   )
                  },
                 
@@ -2055,8 +2025,8 @@ class WGL2DI{
                     props.cameraProjection,
                     Math.PI / 4,
                     context.viewportWidth / context.viewportHeight,
-                    0.01,
-                    10000
+                    1,
+                    100000
                   )
                  },
                 
@@ -2111,7 +2081,7 @@ class WGL2DI{
                     Math.PI / 4,
                     context.viewportWidth / context.viewportHeight,
                     0.01,
-                    10000
+                    100000
                   )
                  },
                 

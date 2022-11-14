@@ -22,12 +22,12 @@ class SelectionDialog extends BaseChart{
                 this.addTextFilter(col,div)
             }
             else if (col.datatype==="integer" || col.datatype==="double"){
-                this.addNumberFilter(col,div)
+                this.addNumberFilter(col,div);
             }
         }
 
         if (this.hasFiltered){
-            this.dataStore.triggerFilter();
+            setTimeout(()=>this.dataStore.triggerFilter(),1500);
         }
     }
 

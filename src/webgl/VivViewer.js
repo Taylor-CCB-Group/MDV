@@ -7,6 +7,7 @@ import {
 
 import {hexToRGB} from "../datastore/DataStore.js";
 import {Deck} from '@deck.gl/core';
+import { getRandomString } from '../utilities/Utilities.js';
 
 
 class VivViewer {
@@ -60,15 +61,11 @@ class VivViewer {
 
   setChannel(channel){
     const channels=   this.layers[0].props;
-    for (let i=0;i<channels.selections.length;i++){
-      const sel= channels.selections[i];
-      if (sel.c===channel.index){
-        channels.colors[i]=hexToRGB(channel.color);
-        channels.contrastLimits[i]=channel.contrastLimits;
-        channels.channelsVisible[i]= channel.channelsVisible;
-        break;
-      }
-    }
+    const i =channels.selections.findIndex(x=>x.id===channel.id)
+ 
+    channels.colors[i]=hexToRGB(channel.color);
+    channels.contrastLimits[i]=channel.contrastLimits;
+    channels.channelsVisible[i]= channel.channelsVisible;
     this.layers=[this.layers[0]];
     this.deck.setProps({
       layers:[this.layers]
@@ -103,13 +100,15 @@ class VivViewer {
     channel.channelsVisible=true;
     chs.colors.push(hexToRGB(channel.color));
     chs.contrastLimits.push(channel.contrastLimits);
-    chs.selections.push({z:0,t:0,c:channel.index});
-    
+    channel.id = getRandomString();
+    chs.selections.push({z:0,t:0,c:channel.index,id:channel.id});
+   
     this.createLayers(chs);
     this.deck.setProps({
       layers:[this.layers],
 
     });
+    
 
     channel.name=this.channels[channel.index].Name;
     return channel;
@@ -136,7 +135,11 @@ class VivViewer {
     
  
     const deckGLView =this.detailView.getDeckGlView();
-    this.createLayers(c.image_properties)
+    for (let s of c.image_properties.selections){
+      s.id=getRandomString();
+    }
+      
+    this.createLayers(c.image_properties);
     this.deck=new Deck({
           canvas:this.canvas,
           layers:[this.layers],

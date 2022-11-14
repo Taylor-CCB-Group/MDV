@@ -58,13 +58,13 @@
 
 
 .ciview-chart-title{
-    flex-grow:3;
+    flex-grow:1;
     text-overflow:ellipsis;
     overflow:hidden;
     white-space:nowrap;
 }
 .ciview-chart-menuspace{
-    flex-grow:1;
+    flex-grow:0;
     white-space:nowrap;
     display:flex;
     flex-flow: row-reverse;
@@ -115,6 +115,7 @@
     color:white;
     font-size:14px;
     margin: 0px 3px;
+    text-align: center;
    
 }
 

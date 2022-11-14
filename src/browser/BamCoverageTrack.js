@@ -1,3 +1,4 @@
+
 import {BamFeatureReader} from "./bam.js";
 import {MLVTrack} from "./tracks.js";
 
@@ -7,12 +8,16 @@ class BamSCATrack extends MLVTrack{
         super(config);
         this.catNumbers={};
         this.config.scale= this.config.scale || 0.1;
+        this.config.size_filter = this.config.size_filter=50;
+        this.config.size_filter_on = this.config.size_filter_on===undefined?false:config.size_filter_on
         if (!this.config.tag){
             this.config.tag="CB";
         }
         
 
         this.feature_source= new BamFeatureReader(this.config);
+        this.setFragmentSizeFilter();
+
     }
     addIndex(index){
         this.feature_source.catIndex=index;
@@ -54,6 +59,19 @@ class BamSCATrack extends MLVTrack{
         if (calculate){
             this.feature_source.calculateCategories();
         }
+    }
+
+    setFragmentSizeFilter(on,size){
+        if (on  || on === false){
+            this.config.size_filter_on=on;
+        }
+        if (size){
+            this.config.size_filter=size;
+        }
+        this.feature_source.size_filter_on=this.config.size_filter_on;
+        this.feature_source.size_filter=this.config.size_filter;
+   
+
     }
     
 
@@ -98,9 +116,9 @@ class BamSCATrack extends MLVTrack{
 
     drawFeatures(options){     
         //experimental
-        this.numbers = [1,1,1]     
+        //this.numbers = [1,1,1]     
         //this.feature_source.setCategories(data,names);
-        this.catColors=["red","green","blue"];
+        //this.catColors=["red","green","blue"];
         
 
         
@@ -114,7 +132,7 @@ class BamSCATrack extends MLVTrack{
         const st = bpStart-feature.store[1];
         const en = st+ (pixelWidth * bpPerPixel) + 1;
         const ind_track_height=Math.round(this.config.height/feature.length);
-        let max=800;//this.config.scale;
+        let max=this.config.scale;
 
         let top = options.top;
         this.top=options.top;
@@ -135,7 +153,7 @@ class BamSCATrack extends MLVTrack{
                         h=h>ind_track_height?ind_track_height:h;
 						y = ind_track_height - h;
 						x = Math.floor((bp - bpStart) / bpPerPixel);
-						ctx.fillRect( x, y+top, w, h);
+						ctx.fillRect( x, y+top, w,h);
 				    }
                 top += ind_track_height;  
             }		
@@ -144,23 +162,42 @@ class BamSCATrack extends MLVTrack{
     
     getSettings(panel){
         const s= super.getSettings(panel)
-        return s.concat([{
+        return s.concat([
+        {
+            label:"Fragment Size Filter",
+            type:"check",
+        
+            current_value:this.config.size_filter_on, 
+            func:(x)=>{
+                this.setFragmentSizeFilter(x);
+                this.feature_source.calculateCategories();
+                panel.update();
+            }
+        },
+            {
+
             type:"slider",
             min:0,
             max:300,
             step:1,
             label:"Fragment Size",
-            current_value:this.feature_source.fragmentThreshold,
+            current_value:this.config.size_filter,
             func:x=>{
-                this.feature_source.fragmentThreshold=x;
-                this.catNames=[
-                    "< "+x,
-                    "> "+x,
-                    "All"
-                ]
-                this.feature_source.calculateFragmentSize();
-                panel.update()
+                this.setFragmentSizeFilter(null,x);
+                this.feature_source.calculateCategories();
+                panel.update();
 
+            }
+        },{
+            type:"slider",
+            min:0,
+            max:1,
+            label:"Scale (cov/no cells)",
+            current_value:this.config.scale,
+            func:x=>{
+                this.config.scale=x;
+               
+                panel.update()
             }
         }]);
     }

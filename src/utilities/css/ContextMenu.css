@@ -63,7 +63,7 @@
  
   position: absolute;
   top: 1px;
-color:white;
+  color:white;
   width: 100%;
   text-align: center;
   font-size: 14px;
@@ -261,10 +261,11 @@ color:white;
   }
   
   .autocomplete-items div {
-    padding: 10px;
+    padding: 2px;
     cursor: pointer;
     background-color: #fff;
     border-bottom: 1px solid #d4d4d4;
+    font-size:0.8em;
   }
   .autocomplete-items div:hover {
     /*when hovering an item:*/
@@ -274,4 +275,25 @@ color:white;
     /*when navigating through the items using the arrow keys:*/
     background-color: DodgerBlue !important;
     color: #ffffff;
+  }
+
+  .mdv-grid-2-columns {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    grid-template-rows:1fr 10px;
+    justify-items:left;
+  }
+
+  .mdv-grid-footer{
+    grid-area:-2 / 1 / -1 /-1; 
+  }
+
+  .mdv-section {
+    white-space: nowrap;
+    padding:5px;
+  }
+
+  .mdv-disabled {
+    pointer-events:"none";
+    color:gray;
   }

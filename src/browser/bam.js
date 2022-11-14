@@ -455,8 +455,8 @@ class BamFeatureReader{
 
         }));
         this.store= [chr,bpStart,bpEnd];
-        this.calculateFragmentSize();
-        //this.calculateCategories();
+        //this.calculateFragmentSize();
+        this.calculateCategories();
         
        
         return this.features;
@@ -521,14 +521,12 @@ class BamFeatureReader{
         for (let i=0;i<len;i++){
             this.features.push(new Uint16Array(al))
         }
-        this.cut_window=10;
+        this.cut_window=0;
         const t= performance.now();
         if (this.cut_window){
             const win= this.cut_window;
             for (let i=0;i<this.pointer;i+=4){
-                /*if (this.alignments[i+3]>120){
-                    continue;
-                }*/
+              
                 let init =  this.alignments[i]-bpStart;
                 let st = init-win;
                 const en = init+win;
@@ -550,6 +548,9 @@ class BamFeatureReader{
         else{
        
             for (let i=0;i<this.pointer;i+=4){
+                if (this.size_filter_on && this.alignments[i+3]>this.size_filter){
+                    continue;
+                }
                 let st =  this.alignments[i]-bpStart;
                 const en = st+ this.alignments[i+1];
                 if (st<0){
@@ -622,9 +623,10 @@ class BamFeatureReader{
             lengthOnRef,
             p,
             seqBytes;
-       
+        let unknown=0;
+        let num=0;
         while (true) {
-            
+            num++
             blockSize = readInt(ba, offset);
             blockEnd = offset + blockSize + 4;
 
@@ -640,6 +642,7 @@ class BamFeatureReader{
                 return ;   // unmapped reads
             }
             else if (refID > chrId || pos > max) {
+                console.log(unknown+":"+num);
                 return ;    // off right edge, we're done
             }
             else if (refID < chrId) {
@@ -704,6 +707,9 @@ class BamFeatureReader{
 
            
             tags = decodeTags(new Uint8Array(ba.buffer.slice(p, blockEnd)));
+            if (this.catIndex[tags.CB]===undefined){
+                unknown++;
+            }
             this.alignments[this.pointer++]=this.catIndex[tags.CB];  // decode these on demand
             this.alignments[this.pointer++] = Math.abs(fragmentLength);
 
@@ -713,6 +719,7 @@ class BamFeatureReader{
             offset = blockEnd;
           
         }
+     
 
     }
 

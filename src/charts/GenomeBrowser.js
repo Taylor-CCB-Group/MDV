@@ -83,7 +83,7 @@ class GenomeBrowser extends BaseChart{
     //and the index key to id as well as the function to get data fron
     //the datastore (ensure column and index are loaded beofre carrying
     //out the function)
-    createIndexLinks(dataStore,index,func){
+    setupLinks(dataStore,index,func){
         this.dataLink= {
             dataStore:dataStore,
             index:index,
@@ -99,9 +99,9 @@ class GenomeBrowser extends BaseChart{
         func([cat],()=>{
             const ind = dataStore.getColumnIndex(index);
           
-                const colors = dataStore.getColumnColors(cat);
-                const col = dataStore.columnIndex[cat];
-                this.bamscatrack.setCategories(cat,col.data,col.values,colors);
+            const colors = dataStore.getColumnColors(cat);
+            const col = dataStore.columnIndex[cat];
+            this.bamscatrack.setCategories(cat,col.data,col.values,colors);
                 //get basic dimension from the other datastore
                
 
@@ -381,7 +381,9 @@ BaseChart.types["genome_browser"]={
                 decode_function:"generic",
                 displayMode:"EXPANDED"
         }];
+        //add the atac track if specified
         if (gb.atac_bam_track){
+            //field to cluster reads
             config.cluster_reads=gb.atac_bam_track.cluster_reads;
             config.tracks.push({
                 short_label:"Coverage",
@@ -391,7 +393,6 @@ BaseChart.types["genome_browser"]={
                 type:"bam_sca_track"
             })
         }
-
         config.default_track = dataSource.genome_browser.default_track.url
     }
 }
