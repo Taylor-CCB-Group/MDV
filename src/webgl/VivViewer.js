@@ -12,7 +12,6 @@ import {Deck} from '@deck.gl/core';
 import { getMultiSelectionStats, getDefaultSelectionStats, getDefaultChannelColors } from '../utilities/VivUtils.js';
 import { ScatterplotLayer } from 'deck.gl';
 
-let nextChannelID = 0; // might use a 'channelID' of some sort to address issue #21.
 class VivViewer {
   constructor(canvas,config,initialView){
     console.log('new VivViewer', config);
@@ -76,9 +75,7 @@ class VivViewer {
     const channels = this.mainVivLayer.props;
     for (let i=0;i<channels.selections.length;i++){
       const sel= channels.selections[i];
-      //PJT what if there is more than one channel entry corresponding to an actual channel c in the source?
-      //this is buggy...
-      if (sel.c===channel.index){
+      if (sel._id===channel._id){
         channels.colors[i]=hexToRGB(channel.color);
         channels.contrastLimits[i]=channel.contrastLimits;
         channels.channelsVisible[i]= channel.channelsVisible;
@@ -93,11 +90,10 @@ class VivViewer {
   }
 
   removeChannel(channel){
-    const chs=  this.mainVivLayer.props;
+    const chs = this.mainVivLayer.props;
     let i=0;
-    // behaves badly if more than one reference to the same channel in input data.
     for (let sel of chs.selections){
-      if (sel.c===channel.index){
+      if (sel._id === channel._id){
         break;
       }
       i++;
@@ -117,12 +113,16 @@ class VivViewer {
     const chs = this.mainVivLayer.props;
     chs.channelsVisible.push(true);
     channel.color= channel.color || "#ff00ff";
-    // pjt consider using helpers (copy from avivator utils).
-    channel.contrastLimits = channel.contrastLimit || [20,100];
+    // pjt consider using helpers (now effectively doing this indirectly).
+    /// --> channel.contrastLimit was always undefined anway
+    // channel.contrastLimits = channel.contrastLimit || [20,100];
+    channel.contrastLimits = this.defaultContrastLimits[channel.index].slice(0);
+    channel.domains = this.defaultDomains[channel.index].slice(0);
     channel.channelsVisible=true;
     chs.colors.push(hexToRGB(channel.color));
     chs.contrastLimits.push(channel.contrastLimits);
-    chs.selections.push({z:0,t:0,c:channel.index});
+    chs.domains.push(channel.domains);
+    chs.selections.push({z:0, t:0, c:channel.index, _id: ++this.nextChannelID});
     
     this.createLayers(chs);
     this.deck.setProps({
@@ -130,6 +130,7 @@ class VivViewer {
     });
 
     channel.name=this.channels[channel.index].Name;
+    channel._id = chs.selections[chs.selections.length-1]._id;
     return channel;
 
   }
@@ -146,6 +147,7 @@ class VivViewer {
       return {
         name,
         index: props.selections[i].c,
+        _id: props.selections[i]._id,
         color: colors[i],
         contrastLimits: props.contrastLimits[i].slice(0),
         channelsVisible: props.channelsVisible[i],
@@ -187,7 +189,11 @@ class VivViewer {
     this.newVivProps = null;
     if (!this.hasRequestedDefaultChannelStats) {
       this.hasRequestedDefaultChannelStats = true;
+      this.defaultDomains = domains;
+      this.defaultContrastLimits = contrastLimits;
       getMultiSelectionStats(loader, selections).then((v) => {
+        this.defaultDomains = v.domains;
+        this.defaultContrastLimits = v.contrastLimits;
         this.newVivProps = { ...this.mainVivLayer.props, ...v };
         this._updateProps();
       });
@@ -275,6 +281,7 @@ class VivViewer {
     
     this.extensions = [new ColorPaletteExtension()];
     this.channels = loader.metadata.Pixels.Channels;
+    this.nextChannelID = this.channels.length; // once _setUp is done, selections should have _id values 0..channels.length-1
     this.loader= loader.data;
     this.transparentColor=[255,255,255,0];
     const baseViewState = this.getViewState(iv.x_scale,iv.y_scale,iv.offset);
@@ -301,6 +308,7 @@ class VivViewer {
     }
     const initialViewState = this.volViewState;
     const {image_properties} = this.config;
+    if (image_properties?.selections) image_properties.selections.forEach((s, i) => s._id = i);
  
     const deckGLView =this.detailView.getDeckGlView();
     this.createLayers(image_properties, loader);
@@ -326,12 +334,14 @@ class VivViewer {
     const layerConfig = {
       loader:this.loader,
       contrastLimits:info.contrastLimits.slice(0),
+      domains: info.contrastLimits.slice(0),
       colors:info.colors.slice(0),
       channelsVisible:info.channelsVisible.slice(0),
       selections:info.selections.slice(0),
       extensions:this.extensions,
       transparentColor:this.transparentColor
     };
+    this.defaultContrastLimits = this.defaultDomains = layerConfig.contrastLimits; //PJT not tested
     this.layers= this.detailView.getLayers({
       viewStates,
       props:layerConfig

@@ -51,7 +51,9 @@ export async function getMultiSelectionStats(loader, selections = [{ c: 0, t: 0 
 export function getDefaultSelectionStats(n) {
     const domains = new Array(n).fill([0, 1000]);
     const contrastLimits = domains;
-    const selections = new Array(n).fill().map((_, i) => {return {c: i, t: 0, z: 0}});
+    //nb, not clear that adding _id here is necessarily ideal, seems to be working for now
+    //key for keeping track of multiple 'channels' with selections on the same 'c'.
+    const selections = new Array(n).fill().map((_, i) => {return {c: i, t: 0, z: 0, _id: i}});
     const colors = getDefaultChannelColors(n);
     const channelsVisible = new Array(n).fill(true);
     return { domains, contrastLimits, selections, colors, channelsVisible };
