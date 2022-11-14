@@ -188,7 +188,7 @@ class VivViewer {
     if (!this.hasRequestedDefaultChannelStats) {
       this.hasRequestedDefaultChannelStats = true;
       getMultiSelectionStats(loader, selections).then((v) => {
-        this.newVivProps = {...v, ...this.mainVivLayer.props };
+        this.newVivProps = { ...this.mainVivLayer.props, ...v };
         this._updateProps();
       });
     }
