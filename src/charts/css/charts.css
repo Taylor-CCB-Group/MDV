@@ -1,4 +1,37 @@
+@media (prefers-color-scheme: dark) {
+    :root {
+        --title_bar_color: #222;
+        --main_panel_color: black;
+        --text_color: white;
+        --background_color: #333;
+        --menu-gradient: linear-gradient(#444, #222);
+    }
+}
+@media (prefers-color-scheme: light) {
+    :root {
+        --title_bar_color: white;
+        --main_panel_color: #f1f1f1;
+        --text_color: black;
+        --background_color: #bababa;
+        --menu-gradient: linear-gradient(white, darkgray);
+    }
+}
 
+.Dark {
+    --title_bar_color: #222;
+    --main_panel_color: black;
+    --text_color: white;
+    --background_color: #333;
+    --menu-gradient: linear-gradient(#444, #222);
+}
+
+.Light {
+    --title_bar_color: white;
+    --main_panel_color: #f1f1f1;
+    --text_color: black;
+    --background_color: #bababa;
+    --menu-gradient: linear-gradient(white, darkgray);
+}
 
 .mdv-select{
     border-radius: 3px;
@@ -44,24 +77,28 @@
     display:flex;
     flex-flow:column;
     border-radius:5px;
-  
+    box-shadow: 0 0 1em #888;
 }
 
 .ciview-chart-titlebar{
     display:flex;
     padding:4px;
-    background:white;
+    background: var(--title_bar_color);
+    color: var(--text_color);
     flex:0 0 auto;
     font-size:14px;
 }
 
-
+.ciview-contentDiv {
+    background-color: var(--background_color);
+}
 
 .ciview-chart-title{
     flex-grow:1;
     text-overflow:ellipsis;
     overflow:hidden;
     white-space:nowrap;
+    margin-left: 0.2em;
 }
 .ciview-chart-menuspace{
     flex-grow:0;
@@ -79,7 +116,8 @@
     flex:1 1 auto;
     position:relative;
     min-height:1px;
-    background-color:#f1f1f1
+    background-color: var(--main_panel_color);
+    color: var(--text_color);
 }
 
 
@@ -161,6 +199,8 @@
 
 .ciview-main-menu-bar{
     height:30px;
+    color: var(--text_color);
+    background-color: var(--background_color);
 }
 
 

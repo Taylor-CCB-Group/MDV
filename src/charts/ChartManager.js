@@ -43,10 +43,24 @@ const themes={
         background_color:"#bababa"
 
     }
-
 }
-
-
+//https://stackoverflow.com/questions/56393880/how-do-i-detect-dark-mode-using-javascript
+function getPreferredColorScheme() {
+    if (window.matchMedia) {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return "Dark";
+        } else {
+            return "Light";
+        }
+    } 
+    return "Light";
+}
+function listenPreferredColorScheme(callback) {
+    if (window.matchMedia) {
+        const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        colorSchemeQuery.addEventListener('change', ()=>callback(getPreferredColorScheme()));
+    }
+}
 
 /**
 * The object to manage charts
@@ -85,7 +99,11 @@ class ChartManager{
         this.listeners={};
         this.infoAlerts={};
         this.progressBars={};
-        this.theme="Light"
+        this.setTheme(getPreferredColorScheme());
+        //maybe better to stop listening once explicit option has been set
+        //or to allow the user to explicitly say 'system default'
+        listenPreferredColorScheme(t => this.setTheme(t));
+
         // each entry in dataSources will contain
         //  dataSource - the actual dataStore object
         //  name - the name given to this data source
@@ -175,7 +193,13 @@ class ChartManager{
                 position:"bottom-right"
             },
             func:()=>{
-                new ColorChooser(this);
+                try { new ColorChooser(this); }
+                catch (error) {
+                    console.error('error making ColorChooser', error);
+                    this.createInfoAlert("Error making color chooser", {
+                        type: "warning", duration: 2000
+                    });
+                 }
             }
 
         },this.menuBar);
@@ -200,7 +224,7 @@ class ChartManager{
                 position:"relative"
             }
         },this.containerDiv);
- 
+        this.contentDiv.classList.add('ciview-contentDiv');
 
      
 
@@ -217,7 +241,7 @@ class ChartManager{
 
         //load any files first
 
-        this.dataLoader = dataLoader.function;
+        this.dataLoader = dataLoader.function;// || async function defaultDataLoaderFunction() { console.warn(`ceci n'est pas une dataLoader`) };
         this.viewLoader = dataLoader.viewLoader;
 
         if (dataLoader.files){     
@@ -260,33 +284,10 @@ class ChartManager{
 
     setTheme(theme){
         this.theme=theme;
-        for (let d of this.dataSources){
-            if (d.contentDiv){
-                d.contentDiv.style.background= themes[theme].background_color;
-            }
-            
-        }
-        for (let id in this.charts){
-            this._setChartTheme(this.charts[id].chart)
-        }
-    }
-
-
-   
-
-    
-
-
-    _setChartTheme(chart){
-        const t = themes[this.theme];
-      
-        chart.contentDiv.style.background=t.main_panel_color;
-        chart.contentDiv.style.color=t.text_color;
-        chart.titleBar.style.background=t.title_bar_color;
-        chart.titleBar.style.color=t.text_color;
-        if (chart.themeChanged){
-            chart.themeChanged();
-        }
+        document.getElementsByTagName('html')[0].className = theme;
+        //thinking about doing everything with css
+        // there could be graphics rendering of other sorts as well...
+        // nothing I can see at the moment that responds to theme.
     }
 
     _sync_colors(from,to){
@@ -392,9 +393,10 @@ class ChartManager{
                     flex:"1 1 auto",
                     position:"relative",
                     overflow:"auto",
-                    background:col
+                    // background:col
                 }
             },p);
+            ds.contentDiv.classList.add("ciview-contentDiv");
         }
 
         
@@ -406,10 +408,9 @@ class ChartManager{
                    this._initiateOffsets(d)
                 }
             }
-
         }
 
-
+  
         //need to create a set to create track of 
         //charts loaded
         this._toLoadCharts = new Set();
@@ -842,6 +843,7 @@ class ChartManager{
             spinner.remove();
         }
         setTimeout(()=>{
+            if (!this.infoAlerts[id]) return; //PJT allow for clearing list.
             this.infoAlerts[id].div.remove();
             delete this.infoAlerts[id];
             let top =50;
@@ -850,6 +852,12 @@ class ChartManager{
                 top+=40;
             }
         },delay);
+    }
+    clearInfoAlerts() {
+        for (const i in this.infoAlerts) {
+            this.infoAlerts[i].div.remove();
+        }
+        this.infoAlerts = {};
     }
 
 
@@ -938,7 +946,7 @@ class ChartManager{
 
         })
        
-   
+        //"this.dataLoader is not a function" with e.g. "cell_types"
         this.dataLoader(columns,dataSource,dataStore.size).then(resp=>{
             for (let col of resp){
                 dataStore.setColumnData(col.field,col.data);
@@ -1145,7 +1153,19 @@ class ChartManager{
         const func = ()=>{
             this._addChart(dataSource,config,div,notify);
         }
-        this._getColumnsThen(dataSource,Array.from(neededCols),func);
+        // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
+        const neededColsArr = Array.from(neededCols);
+        try {
+            this._getColumnsThen(dataSource, neededColsArr, func);
+        } catch (error) {
+            this.clearInfoAlerts();
+            const id = this.createInfoAlert(`Error creating chart with columns [${neededColsArr.join(', ')}]: '${error}'`, {
+                type: "warning"
+            });
+            const idiv = this.infoAlerts[id].div;
+            idiv.onclick = () => idiv.remove();
+            div.remove();
+        }
     }
 
     
@@ -1300,7 +1320,6 @@ class ChartManager{
         div.style.justifyContent="";
         const chartType= BaseChart.types[config.type];
         const chart = new chartType.class(ds.dataStore,div,config);
-        this._setChartTheme(chart);
         this.charts[chart.config.id]={
             chart:chart,
             dataSource:ds

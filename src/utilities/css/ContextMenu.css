@@ -6,44 +6,44 @@
   background: #888;
 }
 
-.table-dark-mode .slick-row.odd{
+.Dark .slick-row.odd{
   background:#303030;
 }
 
-.table-dark-mode .ui-widget-content{
+.Dark .ui-widget-content{
   color:white;
 }
 
-.table-dark-mode .even{
+.Dark .even{
   background:#404040
 }
 
-.table-dark-mode .slick-header-column{
+.Dark .slick-header-column{
   background:black;
   color:white;
 }
 
-.table-dark-mode .slick-header-columns{
+.Dark .slick-header-columns{
   background:black
 }
-.table-dark-mode .slick-header{
+.Dark .slick-header{
   background:black
 }
 
-.table-dark-mode .slick-viewport::-webkit-scrollbar-track {
+.Dark .slick-viewport::-webkit-scrollbar-track {
   background: #585858;        /* color of the tracking area */
 }
 
-.table-dark-mode .slick-viewport::-webkit-scrollbar {
+.Dark .slick-viewport::-webkit-scrollbar {
   width: 12px;
 }
-.table-dark-mode .slick-viewport::-webkit-scrollbar-thumb {
+.Dark .slick-viewport::-webkit-scrollbar-thumb {
   background-color:	black ;
 
 }
 
-.table-dark-mode .slick-cell.selected{
-  background:	#808080
+.Dark .slick-cell.selected{
+  background:	#5c3434
 }
 
 .mdv-progress-outer{
@@ -130,7 +130,8 @@
 .ciview-menu-bar{
   flex:0 0 auto;
   padding:3px 20px;
-  background-image:linear-gradient(white,darkgray);
+  background-image: var(--menu-gradient);
+  color: var(--text_color);
 
 }
 
@@ -199,14 +200,18 @@
    .ciview-dlg-outer {
     position: absolute;
     z-index: 1100;
-    background-color: #f1f1f1;
+    background-color: var(--background_color);
+    color: var(--text_color);
     border: 1px solid #d3d3d3;
     overflow:auto;
     display:flex;
     flex-flow:column;
 
   }
-  
+  select, input, textarea {
+    color: var(--text_color);
+    background-color: var(--background_color);
+  }
    .gutter-horizontal{
      float:left;
      height:100%;

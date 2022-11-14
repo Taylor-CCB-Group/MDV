@@ -281,15 +281,9 @@ class TableChart extends BaseChart{
     }
 
 
+    // pjt: deprecated
     themeChanged(){
-        const tcolor = this.contentDiv.style.color;
-        if (tcolor === "white"){
-            this.contentDiv.classList.add("table-dark-mode");
-        }
-        else{
-            this.contentDiv.classList.remove("table-dark-mode");
-        }
-        
+        console.warn('themeChanged() deprecated');
     }
 
    
