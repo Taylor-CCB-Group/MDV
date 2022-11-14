@@ -32,7 +32,7 @@ export class ColorChannelDialog extends BaseDialog{
         const ac = viv.getAllChannels();
         for (let n=0;n<ac.length;n++){
             createEl("option",{
-                text:ac[n].Name,
+                text:ac[n].Name ?? ac[n].ID,
                 value:n
             },sel)
         }
@@ -80,11 +80,12 @@ export class ColorChannelDialog extends BaseDialog{
                 overflow:"visible"
             }
         },cont);
+        const d = item.domains;
         noUiSlider.create(sl, {
             start: [item.contrastLimits[0],item.contrastLimits[1]],
             range: {
-                'min': 0,
-                'max': 300
+                'min': d ? d[0] : 0,
+                'max': d ? d[1] : 300
             },
             step:1,
             document:this.config.doc,

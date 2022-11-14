@@ -23,6 +23,7 @@ class VivViewer {
     this.height= this.canvas.height;
     this.width= this.canvas.width;
     this.config=config;
+    this.hasRequestedDefaultChannelStats = false;
     this.initClip();
     loadOmeTiff(config.url).then(loader=>{
       this.tiff = loader;
@@ -75,10 +76,12 @@ class VivViewer {
     const channels = this.mainVivLayer.props;
     for (let i=0;i<channels.selections.length;i++){
       const sel= channels.selections[i];
+      //PJT what if there is more than one channel entry corresponding to an actual channel c in the source?
       if (sel.c===channel.index){
         channels.colors[i]=hexToRGB(channel.color);
         channels.contrastLimits[i]=channel.contrastLimits;
         channels.channelsVisible[i]= channel.channelsVisible;
+        if (channel.domains) channels.domains[i] = channel.domains;
         break;
       }
     }
@@ -147,7 +150,8 @@ class VivViewer {
         index: props.selections[i].c,
         color: colors[i],
         contrastLimits: props.contrastLimits[i].slice(0),
-        channelsVisible: props.channelsVisible[i]
+        channelsVisible: props.channelsVisible[i],
+        domains: props.domains[i].slice(0)
       }
     });
   }
@@ -179,14 +183,15 @@ class VivViewer {
     const n = channels.length;
     const selections = channels.map((_, i) => {return {c: i, t: 0, z: 0}});
     const dtype = tiff.data[0].dtype;
-    /// --> are we creating from new, or do we already have props we can use?
-    let { domains, contrastLimits } = this.mainVivLayer ? this.mainVivLayer.props : getDefaultSelectionStats(n);
-    ///wrong flow for now
-    // getMultiSelectionStats(loader, selections).then((v) => {
-    //   domains = v.domains;
-    //   contrastLimits = v.contrastLimits;
-    //   //TODO updateProps() equivalent
-    // });
+    let { domains, contrastLimits } = this.newVivProps ?? (this.mainVivLayer ? this.mainVivLayer.props : getDefaultSelectionStats(n));
+    this.newVivProps = null;
+    if (!this.hasRequestedDefaultChannelStats) {
+      this.hasRequestedDefaultChannelStats = true;
+      getMultiSelectionStats(loader, selections).then((v) => {
+        this.newVivProps = v;
+        this._updateProps();
+      });
+    }
     const colors = getDefaultChannelColors(n); // this should change...
     const xSlice = this.getXSlice();
     const ySlice = this.getYSlice();
@@ -206,7 +211,7 @@ class VivViewer {
       xSlice, ySlice, zSlice
     };
     const volumeView = this.detailView;
-    // could we setProps here instead when the layer already exists?
+    // could we setProps here instead when the layer already exists? no, don't think so - readonly.
     const layers = volumeView.getLayers({
       props
     });
