@@ -91,7 +91,7 @@ export class ColorChannelDialog extends BaseDialog{
             document:this.config.doc,
             tooltips:true
         },cont);
-        sl.noUiSlider.on("end",(values)=>{
+        sl.noUiSlider.on("update",(values)=>{
             item.contrastLimits=[parseFloat(values[0]),parseFloat(values[1])];
             this.viv.setChannel(item);
         });
