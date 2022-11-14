@@ -12,7 +12,7 @@ import {Deck} from '@deck.gl/core';
 import { getMultiSelectionStats, getDefaultSelectionStats, getDefaultChannelColors } from '../utilities/VivUtils.js';
 import { ScatterplotLayer } from 'deck.gl';
 
-
+let nextChannelID = 0; // might use a 'channelID' of some sort to address issue #21.
 class VivViewer {
   constructor(canvas,config,initialView){
     console.log('new VivViewer', config);
@@ -77,6 +77,7 @@ class VivViewer {
     for (let i=0;i<channels.selections.length;i++){
       const sel= channels.selections[i];
       //PJT what if there is more than one channel entry corresponding to an actual channel c in the source?
+      //this is buggy...
       if (sel.c===channel.index){
         channels.colors[i]=hexToRGB(channel.color);
         channels.contrastLimits[i]=channel.contrastLimits;
@@ -85,7 +86,6 @@ class VivViewer {
         break;
       }
     }
-    // need to allow for more layers / different order.
     this.layers=[...this.layers];
     this.deck.setProps({
       layers: this.layers
@@ -93,9 +93,9 @@ class VivViewer {
   }
 
   removeChannel(channel){
-    // need to allow for more layers / different order.
     const chs=  this.mainVivLayer.props;
     let i=0;
+    // behaves badly if more than one reference to the same channel in input data.
     for (let sel of chs.selections){
       if (sel.c===channel.index){
         break;
@@ -114,8 +114,7 @@ class VivViewer {
   }
 
   addChannel(channel){
-    // need to allow for more layers / different order.
-    const chs=   this.mainVivLayer.props;
+    const chs = this.mainVivLayer.props;
     chs.channelsVisible.push(true);
     channel.color= channel.color || "#ff00ff";
     // pjt consider using helpers (copy from avivator utils).
@@ -128,7 +127,6 @@ class VivViewer {
     this.createLayers(chs);
     this.deck.setProps({
       layers:[this.layers],
-
     });
 
     channel.name=this.channels[channel.index].Name;
@@ -151,7 +149,7 @@ class VivViewer {
         color: colors[i],
         contrastLimits: props.contrastLimits[i].slice(0),
         channelsVisible: props.channelsVisible[i],
-        domains: props.domains[i].slice(0)
+        domains: props.domains[i]
       }
     });
   }
@@ -181,22 +179,22 @@ class VivViewer {
     const id = '3d_' + DETAIL_VIEW_ID;
     const loader = tiff.data;
     const n = channels.length;
-    const selections = channels.map((_, i) => {return {c: i, t: 0, z: 0}});
+    // this is wrong in cases where non-default set of channels is used.
+    // const selections = channels.map((_, i) => {return {c: i, t: 0, z: 0}});
     const dtype = tiff.data[0].dtype;
-    let { domains, contrastLimits } = this.newVivProps ?? (this.mainVivLayer ? this.mainVivLayer.props : getDefaultSelectionStats(n));
+    const { domains, contrastLimits, selections, colors, channelsVisible } = this.newVivProps 
+      ?? (this.mainVivLayer ? this.mainVivLayer.props : getDefaultSelectionStats(n));
     this.newVivProps = null;
     if (!this.hasRequestedDefaultChannelStats) {
       this.hasRequestedDefaultChannelStats = true;
       getMultiSelectionStats(loader, selections).then((v) => {
-        this.newVivProps = v;
+        this.newVivProps = {...v, ...this.mainVivLayer.props };
         this._updateProps();
       });
     }
-    const colors = getDefaultChannelColors(n); // this should change...
     const xSlice = this.getXSlice();
     const ySlice = this.getYSlice();
     const zSlice = this.getZSlice();
-    const channelsVisible = channels.map(_ => true); // this should change...
     const resolution = loader.length - 1; // this should change...
     const props = {
       id,
