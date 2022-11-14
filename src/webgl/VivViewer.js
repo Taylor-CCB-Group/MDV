@@ -72,7 +72,7 @@ class VivViewer {
   }
 
   setChannel(channel){
-    const channels=   this.layers[0].props;
+    const channels = this.mainVivLayer.props;
     for (let i=0;i<channels.selections.length;i++){
       const sel= channels.selections[i];
       if (sel.c===channel.index){
@@ -82,14 +82,16 @@ class VivViewer {
         break;
       }
     }
-    this.layers=[this.layers[0]];
+    // need to allow for more layers / different order.
+    this.layers=[...this.layers];
     this.deck.setProps({
-      layers:[this.layers]
+      layers: this.layers
     })
   }
 
   removeChannel(channel){
-    const chs=  this.layers[0].props;
+    // need to allow for more layers / different order.
+    const chs=  this.mainVivLayer.props;
     let i=0;
     for (let sel of chs.selections){
       if (sel.c===channel.index){
@@ -109,7 +111,8 @@ class VivViewer {
   }
 
   addChannel(channel){
-    const chs=   this.layers[0].props;
+    // need to allow for more layers / different order.
+    const chs=   this.mainVivLayer.props;
     chs.channelsVisible.push(true);
     channel.color= channel.color || "#ff00ff";
     // pjt consider using helpers (copy from avivator utils).
@@ -135,7 +138,7 @@ class VivViewer {
     return this.channels;
   }
   getChannels() {
-    const {props} = this.layers[0];
+    const {props} = this.mainVivLayer;
     const names = props.selections.map(x => this.channels[x.c].Name);
     const colors = props.colors.map(RGBToHex);
     return names.map((name, i) => {
@@ -176,7 +179,8 @@ class VivViewer {
     const n = channels.length;
     const selections = channels.map((_, i) => {return {c: i, t: 0, z: 0}});
     const dtype = tiff.data[0].dtype;
-    let { domains, contrastLimits } = getDefaultSelectionStats(n);
+    /// --> are we creating from new, or do we already have props we can use?
+    let { domains, contrastLimits } = this.mainVivLayer ? this.mainVivLayer.props : getDefaultSelectionStats(n);
     ///wrong flow for now
     // getMultiSelectionStats(loader, selections).then((v) => {
     //   domains = v.domains;
@@ -202,16 +206,19 @@ class VivViewer {
       xSlice, ySlice, zSlice
     };
     const volumeView = this.detailView;
+    // could we setProps here instead when the layer already exists?
     const layers = volumeView.getLayers({
       props
     });
     this.layers = layers;
+    this.mainVivLayer = layers[0];
     if (this.config.scatterData) {
       // alert('scatter!');
       layers.push(new ScatterplotLayer({
         data: this.config.scatterData,//.slice(0), //do not want to clone / slice here... but mutating data doesn't work otherwise
         radiusScale: 1,
         billboard: true,
+        // getFillColor: this.config.getScatterFillColor
         getFillColor: (d) => d.color || [100, 100, 100]
       }));
     }
@@ -254,7 +261,7 @@ class VivViewer {
     return [min*v, max*v];
   }
   _updateProps() {
-    this.createLayers(); //as of this writing, this will lose changes made to channels etc.
+    this.createLayers();
     this.deck.setProps({layers: this.layers})
   }
 
@@ -325,7 +332,8 @@ class VivViewer {
     this.layers= this.detailView.getLayers({
       viewStates,
       props:layerConfig
-    })
+    });
+    this.mainVivLayer = this.mainVivLayer;
   }
 }
 
