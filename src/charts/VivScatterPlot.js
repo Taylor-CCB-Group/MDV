@@ -112,9 +112,9 @@ export class ColorChannelDialog extends BaseDialog{
         });
         const dc= createEl("input",{
             classes:["mdv-flex-fixed","mdv-checkbox"],
-            type:"checkbox",
-            checked:item.channelsVisible
+            type:"checkbox"
         },cont);
+        dc.checked= item.channelsVisible;
         dc.addEventListener("click",()=>{
             item.channelsVisible= dc.checked;
             this.viv.setChannel(item);

@@ -1,4 +1,6 @@
 class Dimension{
+
+
     constructor(parent){ 
         this.filterBuffer = new SharedArrayBuffer(parent.size);       
         this.parent=parent;
@@ -72,7 +74,6 @@ class Dimension{
                 localFilter[i]=1
             }
         }
-
     }
     
     /**
@@ -99,8 +100,7 @@ class Dimension{
                   
                         if(++filter[i]===1){
                             parent.filterSize--;
-                        }
-                 
+                        }          
                     localFilter[i]=2;
                 }
             }
@@ -111,6 +111,13 @@ class Dimension{
         console.log(`method${method}: ${performance.now()-t}`);
     }
 
+
+    /**
+    * updates the filter if data in the supplied columns has been altered
+    * does not propagate (call any listeners)
+    * @param {string[]} columns - a list of columns whose data has changes
+    * @returns {boolean}  True if refiltering has taken place 
+    */
     reFilterOnDataChanged(columns){
         if (this.filterMethod && this.filterColumns){
             for (let c of this.filterColumns){
@@ -123,14 +130,20 @@ class Dimension{
         return false;
     }
 
-    //updates the new size (assumes data already added to data store)
-    //any filtering is re-done,but no handlers called
+    /**
+    * Experimental - should be invoked if the datastore has increased in size
+    * Will increase size of local filters 
+    */
     updateSize(){
         let newBuff =  new SharedArrayBuffer(this.parent.size);
         let newArr = new Uint8Array(newBuff);
         newArr.set(this.filterArray);
         this.filterBuffer =newBuff;  
         this.filterArray= newArr;
+        if (this.bgfArray){
+            const bd= this.bgfData;
+            this.setBackgroundFilter(b.column.b.cat);
+        }
         if (this.filterMethod){          
             this.filter(this.filterMethod,this.filterColumns,this.filterArguments,false);
         }
@@ -145,7 +158,11 @@ class Dimension{
     setBackgroundFilter(column,cat){  
         const col = this.parent.columnIndex[column];
         const ci =   col.values.indexOf(cat);
-        const data = col.data
+        const data = col.data;
+        this.bgfData={
+            column:column,
+            cat:cat
+        };
         this.bgfArray= new Uint8Array(this.parent.size);
         for (let i=0;i<this.parent.size;i++){
             if (data[i]===ci){
@@ -159,7 +176,8 @@ class Dimension{
     }
 
     clearBackGroundFilter(){
-
+        this.bgfArray=null;
+        this.bgfData=null;
     }
 
     destroy(notify=true){    

@@ -12,6 +12,8 @@ import {quantileSorted} from 'd3-array';
 
 
 
+
+
 /**
 * Creates an empty data structure
 * @param {integer} size - The number of rows(items) of the data structure
@@ -37,7 +39,13 @@ class DataStore{
     
         this.textDecoder = new TextDecoder();
         this.columnGroups={};
-        this.subtypeToGroup={}
+        this.subtypeToGroup={};
+
+        //info about subgroups and their datasources
+        this.subgroups={};
+        this.subgroupDataSources=new Set();
+
+
         this.columnsWithData=[];
         this.dirtyColumns={
             added:{},
@@ -45,30 +53,40 @@ class DataStore{
             data_changed:{},
             colors_changed:{}
         }
+        this.dirtyMetadata=new Set();
+
+        this.offsets=config.offsets;
        
         if (config.columns){
             for (let c of config.columns){
                 this.addColumn(c)
             }
         }
-       
+
         if (config.columnGroups){
             for (let item of config.columnGroups){
                 this.addColumnGroup(item);
             }
         }
-    }
-
-    getLargeColumnGroups(){
-        const li=[];
-        for (let cg in this.columnGroups){
-            let item = this.columnGroups[cg];
-            if (item.largeColumnGroup){
-                li.push(item)
+        if (config.links){
+            for (let ds in config.links){
+                const link = config.links[ds];
+                if (link.rows_as_columns){
+                    const sg= link.rows_as_columns.subgroups;
+                    this.subgroupDataSources.add(ds);
+                    for (let t in sg){
+                            this.subgroups[t]={
+                                subgroup:sg[t],
+                                dataSource:ds,
+                                name_column:link.rows_as_columns.name_column
+                            }
+                     }       
+                }
             }
         }
-        return li;
+        
     }
+
 
     isFiltered(){
         return this.filterSize!==this.size;
@@ -127,7 +145,7 @@ class DataStore{
             }
         }  
         this.filterSize=this.size;
-        //need to re-add the noclear filters (id any)
+        //need to re-add the noclear filters (if any)
         for (let dim of noclear){
             const f= dim.filterArray;
             for (let n=0;n<f.length;n++){
@@ -155,7 +173,7 @@ class DataStore{
     * @param {boolean} [is_dirty=true] - if false (default is true) then the column
     * will not be tagged as dirty. This my be the case id the change was pulled from
     * the backend for example 
-    * @param {boolean} [refilter=true] if false then no dimensions will be re-filterd
+    * @param {boolean} [refilter=true] if false then no dimensions will be re-filtered
     * for example if only the colors in the columns have changed
     */
     dataChanged(columns,is_dirty=true,refilter=true){
@@ -203,11 +221,12 @@ class DataStore{
         this.dirtyColumns["data_changed"][col]=true;
     }
 
-    setAllColumnsClean(col){
+    setAllColumnsClean(){
         this.dirtyColumns.added={};
         this.dirtyColumns.removed={};
         this.dirtyColumns.data_changed={};
-        this.dirtyColumns.color_changed={};
+        this.dirtyColumns.colors_changed={};
+        this.dirtyMetadata.clear();
     }
 
 
@@ -265,12 +284,12 @@ class DataStore{
     * of the array should match the value in the data   
     * @param {string[]} [column.colors] - An array of rgb hex colors. In the case of a 
     * text column the colors should match the values. For number columns, the list represents
-    * colors that will be interpolated. If not suplied defsult color pallettes will be 
+    * colors that will be interpolated. If not suplied default color pallettes will be 
     * supplied
     * @param {boolean} [column.colorLogScale=false] - if true then the colors will be
     * displayed on a log scale- useful if the dataset contains outliers. Because a symlog
     * scale is used the data can contain 0 and negative values
-    * @param {SharedArrayBuffer|[]} [data] In the case of a double(numnber) column the array
+    * @param {SharedArrayBuffer|[]} [data] In the case of a double/integer (number) column, the array
     * buffer should be the appropriate size to contain float32s. For text it shuold be Uint8
     * and contain numbers corresponding to the indexes in the values parameter. For a column of
     * type unique it should be a JavaScript array. This parameter is optional as the data can
@@ -299,24 +318,20 @@ class DataStore{
             c.sgindex= column.sgindex;
             c.sgtype=column.sgtype;
         }
-        const cg = column.columnGroup;
-        if ( cg && this.columnGroups[cg]){
-            this.columnGroups[cg].columns.push(column.field)
-        }
+       
         
-
         if (column.datatype === "text"){
             if (!column.values) console.warn(`no initial values for column '${c.name}' specified in dataSources`);
             c.values = column.values || [`Error: no values for '${c.name}'`];
         }
-        else if (column.datatype==="double" || column.datatpe ==="integer"){
+        else if (column.datatype==="double" || column.datatype ==="integer"){
             c.colorLogScale=column.colorLogScale;
-            c.minMax=column.minMax
+            c.minMax=column.minMax;
+            c.quantiles=column.quantiles;
         }
         else{
             c.stringLength= column.stringLength;
         }
-
         this.columns.push(c);
         this.columnIndex[c.field]=c;
         if (data){
@@ -328,34 +343,108 @@ class DataStore{
         
     }
 
-    //for columns whee the metadata is not housed locally
-    //need to create it from the field name
-    addColumnFromField(field){
-        const data = field.split("_")
-        const g = this.subtypeToGroup[data[0]];
-        const sg = g.subgroups[data[0]];
-        this.addColumn({
-            name:data[1],
-            field:field,
-            datatype:"double",
-            subgroup:sg.name,
-            sgindex:data[2],
-            sgtype:sg.type
-        });
-    }
-
-    loadJsonData(data){
-        const colData={}
-        for (let col in this.columns){
-            colData[col.field]=[];
-        }
-        for (let item of data){
-            for (let col in colData){
-                colData[col].append(item[col])
+    getNearestMatch(text,column,mismatches=1){
+        const col = this.columnIndex[column];
+        const tupper= text.toLowerCase();
+        const tlower = text.toUpperCase();
+        const e = new TextEncoder();
+        const bupper= e.encode(tupper);
+        const blower= e.encode(tlower);
+        const len = text.length;
+        const d = col.data;
+        let matches=[];
+        const sl = col.stringLength;
+    
+        for (let i = 0;i<d.length-len;i++){
+            let match=true;
+            let mm =0;
+            for (let a=0;a<len;a++){
+                if (bupper[a]!=d[i+a] && blower[a]!=d[i+a]){
+                    mm++;
+                    if (mm>mismatches){
+                        match=false;
+                        break
+                    } 
+                }
+            }
+            if (match){
+                const index = Math.floor(i/sl);
+                const v= this.textDecoder.decode(col.data.slice(index*sl,(index*sl)+sl)).replaceAll("\0","");
+                matches.push({
+                    value:v,
+                    index:index,
+                    mismatches:mm
+                });
+                if(mm===0){
+                   break
+                }
             }
         }
-        for (let col of colData){
-            this.setSetColumnData(col,colData[col])
+        matches  =matches.filter(x => x.value.length=== len)
+        matches.sort((a,b)=>a.mismatches-b.mismatches)
+        return matches;
+
+    }
+
+    getSuggestedValues(text,column,number=10){
+        const col = this.columnIndex[column];
+        const tupper= text.toLowerCase();
+        const tlower = text.toUpperCase();
+        const e = new TextEncoder();
+        const bupper= e.encode(tupper);
+        const blower= e.encode(tlower);
+        const len = text.length;
+        const d = col.data;
+        const matches=[];
+        const sl = col.stringLength;
+    
+        for (let i = 0;i<d.length-len;i++){
+            let match=true;
+            for (let a=0;a<len;a++){
+                if (bupper[a]!=d[i+a] && blower[a]!=d[i+a]){
+                    match=false;
+                    break
+                }
+            }
+            if (match){
+                const index = Math.floor(i/sl);
+                const v= this.textDecoder.decode(col.data.slice(index*sl,(index*sl)+sl)).replaceAll("\0","");
+                matches.push({
+                    value:v,
+                    index:index
+                });
+                if (matches.length>number){
+                    break;
+                }
+                
+            }
+        }
+        return matches;
+    }
+
+    //for columns where the metadata is not housed locally
+    //need to create it from the field name
+    addColumnFromField(field){
+        const data = field.split("|")
+        let g = this.subtypeToGroup[data[0]];
+        let sg = null;
+        if (!g){
+            g= this.subgroups[data[0]];
+            sg= g.subgroup;
+
+        }
+        else{
+            sg =  g.subgroups[data[0]];
+        }
+        if (!this.columnIndex[field]){
+            this.addColumn({
+                name:data[1],
+                field:field,
+                datatype:"double",
+                subgroup:sg.name,
+                sgindex:data[2],
+                sgtype:sg.type
+            });
         }
     }
 
@@ -367,7 +456,15 @@ class DataStore{
     * properties, sorted by name.
     */
     getColumnList(filter=null){
-        const columns=[]
+        const columns=[];
+        const sgDataSources={};
+        const sgs =Object.keys(this.subgroups).map(x=>{
+            sgDataSources[x]=[];
+            return x;
+        
+        });
+       
+        const has_sgs= sgs.length !== 0;
         for (let f in this.columnIndex){
             const c= this.columnIndex[f];
             if (filter){
@@ -380,9 +477,37 @@ class DataStore{
                     continue;
                 }
             }
+            //subgroup columns separate
+            if (has_sgs){
+                let has = false;
+                for (let s of sgs){
+                    if (c.field.startsWith(`${s}|`)){
+                        const sg = this.subgroups[s];
+                        sgDataSources[s].push({name:c.name,field:c.field,datatype:c.datatype,
+                            subgroup:{
+                                dataSource:sg.dataSource,
+                                name_column:sg.name_column
+
+                            }
+                        });
+                        has=true
+                        break
+                    }
+                }
+                if (has){
+                    continue;
+                }
+            }
             columns.push({name:c.name,field:c.field,datatype:c.datatype})
         }
-        return columns.sort((a,b)=> a.name.localeCompare(b.name));
+        let cols =  columns.sort((a,b)=> a.name.localeCompare(b.name));
+        if (has_sgs){
+            for (let ds in sgDataSources){
+                sgDataSources[ds].sort((a,b)=> a.name.localeCompare(b.name));
+                cols=cols.concat(sgDataSources[ds]);
+            }
+        }
+        return cols;
     }
 
     /**
@@ -453,18 +578,228 @@ class DataStore{
     }
 
 
+    setColumnOffset(data,update){
+        if (!data.filter){
+            data.filter="all"
+        }
+       const fd =data.filter;
+        //give defult values to this group if it has none
+        const o = this.offsets.values;
+        let fg = o[fd];
+        if (!fg){
+            fg={};
+            o[fd]=fg;
+        }
+        let inf =fg[data.group];
+        if (! inf){
+            inf={offsets:[0,0],rotation:0};
+            fg[data.group]=inf;
+        }
+        
+       
+        this.updateColumnOffsets(data,data.rotation,update);
+        this.dirtyMetadata.add("offsets");
+    }
+
+
+
+    _getRotationOrigin(column,group){
+        const o = this.offsets;
+        const gc= this.columnIndex[column];
+        const gv = gc.values.indexOf(group)
+        const gd= gc.data;
+        const x= this.columnIndex[o.param[0]];
+        const y= this.columnIndex[o.param[1]];
+    
+        let mmx=[Number.MAX_VALUE,Number.MIN_VALUE];
+        let mmy=[Number.MAX_VALUE,Number.MIN_VALUE];
+        for (let n=0;n<this.size;n++){
+            if (gd[n]===gv){
+                mmx[0]=Math.min(mmx[0],x.originalData[n]);
+                mmx[1]=Math.max(mmx[1],x.originalData[n]);
+                mmy[0]=Math.min(mmy[0],y.originalData[n]);
+                mmy[1]=Math.max(mmy[1],y.originalData[n]);
+            }
+        }
+        const mid= x=>x[0] + (x[1] -x[0])/2;
+        return [mid(mmx),mid(mmy)];
+
+    }
+
+    initiateOffsets(){
+        const o = this.offsets;
+        const x = this.columnIndex[o.param[0]];
+        const y= this.columnIndex[o.param[1]];
+     
+        x.originalData= new Float32Array(x.data);     
+        y.originalData= new Float32Array(y.data);
+    }
+
+
+    //gets the offset values
+    //single - the only value to offset or rotate
+    //filterValue - if background filter  the value of the filter
+    //rotate - to rotate if not then offset
+    _getOffsetValues(single,rotation){
+        const o = this.offsets;
+        let filterData=null;
+        let filterValues = null
+        if (o.background_filter){
+            const c = this.columnIndex[o.background_filter];
+            filterData=c.data;
+            filterValues= c.values;
+            
+        }
+        const gc= this.columnIndex[o.groups];
+        const values=[];
+      
+        for (let fv in o.values){
+            if (single &&  fv!==single.filter){
+                continue;
+            }
+
+        
+            for (let i in o.values[fv]){
+                if (single && i !==single.group){
+                    continue;
+                }
+                let v= o.values[fv][i];
+            
+                const val={
+                    index:gc.values.indexOf(i)
+                };
+                if (fv!=="all"){
+                    val.filterData=filterData;
+                    val.filterValue = filterValues.indexOf(fv);
+                }
+
+                if (rotation){
+                    if (!v.rotation_center){
+                        v.rotation_center=this._getRotationOrigin(o.groups,i);
+                    }
+                    val.rotation_center=[v.rotation_center[0]+v.offsets[0],v.rotation_center[1]+v.offsets[1]];
+                    
+                }
+            
+                if (single){
+                    if(rotation){
+                        val.rotation=single.rotation;
+                        v.rotation+=single.rotation;
+
+                    }
+                    else{
+                        v.offsets[0]+=single.offsets[0];
+                        v.offsets[1]+=single.offsets[1];
+                        val.offsets=single.offsets;
+                    }
+                }
+                else{
+                    if (rotation){
+                        val.rotation=v.rotation
+                    }
+                    else{
+                        val.offsets=v.offsets;
+                    }
+                }
+                if (rotation){
+                    const radians = (Math.PI / 180) * val.rotation;
+                    val.cos = Math.cos(radians);
+                    val.sin = Math.sin(radians);
+                }
+                values.push(val);
+            }      
+        }        
+        return values;
+    }
+
+    resetColumnOffsets(filter,group,update){
+        const o = this.offsets;
+        delete this.offsets.values[filter][group];
+        const fcol =  this.columnIndex[this.offsets.background_filter]
+        const filterData = fcol.data;
+        const filterVal= fcol.values.indexOf(filter);
+        const gr =this.getColumnValues(o.groups).indexOf(group);
+        const grData= this.columnIndex[o.groups].data;
+        const x = this.columnIndex[o.param[0]];
+        const y = this.columnIndex[o.param[1]];
+     
+        for (let n=0;n<this.size;n++){
+         
+           
+                if (filterData[n] !== filterVal){
+                    continue;
+                }
+                if (grData[n]===gr){
+                    y.data[n]=y.originalData[n];
+                    x.data[n]=x.originalData[n];
+                }
+                
+        }
+        if (update){
+            this.dataChanged([o.param[0],o.param[1]])
+        }
+        this.dirtyMetadata.add("offsets");
+    }
+    
+    //single - name of group to alter
+    //add - the values to add to current offsets- otheriwise current offsets used
+    updateColumnOffsets(single,rotation=false,update=false){
+        const o = this.offsets;
+        const gc= this.columnIndex[o.groups];
+        const groupData=gc.data; 
+        const x= this.columnIndex[o.param[0]];
+        const y= this.columnIndex[o.param[1]];
+        const values  = this._getOffsetValues(single,rotation);
+     
+        for (let n=0;n<this.size;n++){
+         
+            for (let v of values){
+                if (v.filterData && v.filterData[n] !== v.filterValue){
+                    continue;
+                }
+                if (groupData[n]===v.index){
+                    if (rotation){
+                        let cx= v.rotation_center[0];
+                        let cy = v.rotation_center[1];
+                        let nx = (v.cos * (x.data[n] - cx)) + (v.sin * (y.data[n] - cy)) + cx;
+                        let ny = (v.cos * (y.data[n] - cy)) - (v.sin * (x.data[n] - cx)) + cy;
+                        x.data[n]=nx;
+                        y.data[n]=ny;
+                    }else{
+                        x.data[n]=x.data[n]+v.offsets[0];
+                        y.data[n]=y.data[n]+v.offsets[1];
+
+                    }     
+                }
+            }     
+        }
+        if (update){
+            this.dataChanged([o.param[0],o.param[1]])
+        }
+    }
+
+  
+
     getColumnIndex(column){
         if (this.indexes[column]){
             return this.indexes[column];
         }
         const col = this.columnIndex[column];
-        const index={};    
-        for (let n=0;n<this.size;n++){
-           let v= this.textDecoder.decode(col.data.slice(n*col.stringLength,(n*col.stringLength)+col.stringLength));
-           if (v.includes("#")){
-               v=v.split("#")[1]
-           }
-           index[v]=n
+        const index={};
+        if (col.datatype==="unique"){
+            for (let n=0;n<this.size;n++){
+                let v= this.textDecoder.decode(col.data.slice(n*col.stringLength,(n*col.stringLength)+col.stringLength));
+                if (v.includes("#")){
+                    v=v.split("#")[1]
+                }
+                index[v]=n
+
+            }
+        }
+        else{
+            for (let n=0;n<this.size;n++){
+                index[col.values[col.data[n]]]=n;
+            }
 
         }
         this.indexes[column]=index;
@@ -789,13 +1124,17 @@ class DataStore{
                     else if (bin>=colors.length){
                         bin = colors.length-1;
                     }
-                    if (!colors[bin]){
-                        console.log("www")
-                    }
                     return colors[bin];
                 }
             }    
         }
+    }
+
+    getColorForCategory(column,cat){
+        const c = this.columnIndex[column];
+        const i = c.values.indexOf(cat)
+        return this.getColumnColors(column)[i];
+
     }
 
     getColorLegend(column,config={}){
@@ -828,6 +1167,19 @@ class DataStore{
             vc[values[i]]=colors[i];
         }
         return vc;
+
+    }
+
+    getColumnQuantile(column,per){
+        const col= this.columnIndex[column];
+        if (per && per !=="none"){
+            if (col.quantiles && col.quantiles !=="NA"){
+                return[col.quantiles[per][0],col.quantiles[per][1]];
+            }
+        }
+        else{
+            return col.minMax;
+        }
 
     }
 
@@ -907,10 +1259,17 @@ class DataStore{
         return this.columnIndex[column].data;
     }
 
+       
+    /**
+    * Returns the min/max values for a given column 
+    * @param {string} column The column id(field) 
+    * @returns {[]} An array - the first value being the min value and the second the max value
+    */
     getMinMaxForColumn(column){
         const c = this.columnIndex[column];
         return c.minMax;
     }
+    
     getColumnRange(column){
         const c = this.columnIndex[column];
         return c.minMax[1]-c.minMax[0];

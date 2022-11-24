@@ -27,7 +27,7 @@ class RangeDimension extends Dimension{
         for (let i=0;i<this.parent.size;i++){
             const v1 = data1[i];
             const v2 = data2[i];
-            if ((this.bgfArray && this.bgfArray[i]===1) || v1<range1[0] || v1>range1[1] || v2<range2[0] || v2>range2[1] || isNaN(v1) || isNaN(v2)){
+            if ( v1<range1[0] || v1>range1[1] || v2<range2[0] || v2>range2[1] || isNaN(v1) || isNaN(v2)){
                
                 if (localFilter[i]===0){
                     if(++filter[i]===1){

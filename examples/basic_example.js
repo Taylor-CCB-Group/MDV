@@ -24,14 +24,6 @@ const dataSources=[{
         "name":"cell_id",
         "datatype":"unique"
     },
-        {
-        "name":"Sample",
-        "datatype":"text"
-    },
-            {
-        "name":"cell_types",
-        "datatype":"text"
-    },
     {
         "name":"UMAP_3d_1",
         "datatype":"double"

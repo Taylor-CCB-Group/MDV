@@ -101,7 +101,7 @@ class BaseChart{
       
            
         //info icon
-        this.addMenuIcon("fas fa-info",config.legend || "No description",{size:"medium"});
+        this.legendIcon = this.addMenuIcon("fas fa-info",config.legend || "No description",{size:"medium"});
      
         this.div.append(this.titleBar);
         this.div.append(this.contentDiv); 
@@ -249,6 +249,9 @@ class BaseChart{
 
         return this.dataStore.getColorLegend(this.config.color_by,conf);
     }
+
+
+    getQunatile
 
     _addTrimmedColor(column,conf){
         const tr = this.config.trim_color_scale;

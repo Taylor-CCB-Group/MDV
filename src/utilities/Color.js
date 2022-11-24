@@ -4,9 +4,19 @@ import {scaleLinear} from "d3-scale";
 import {axisBottom} from "d3-axis";
 import {getRandomString} from "./Utilities.js";
 
+
+
+function getColorLegendCustom(scale,config={}){
+    const ticks = scale.ticks(config.ticks || 4);
+    const widths= ticks.map(x=>scale(x));
+    return getColorLegend(widths,ticks,config);
+}
+
 function getColorLegend(colors,names,config={}){
     const len = colors.length;
-    const height=(len*12)+ (len+2)*2;
+    const type = config.type || "color";
+    const h_fac= type==="circle"?20:12;
+    const height=(len*h_fac)+ (len+2)*2;
     const container = createEl("div",{
         styles:{
             width:"120px",
@@ -19,6 +29,8 @@ function getColorLegend(colors,names,config={}){
     createEl("div",{
         styles:{
             height:"20px",
+            whiteSpace:"nowrap"
+
         },
         classes:["legend-title"],
         text:config.label
@@ -42,22 +54,48 @@ function getColorLegend(colors,names,config={}){
     },body);
 
     const legendg=createSVGEl("g",{},legend);
+    const t_offset= type==="color"?14:type==="line"?20:30;
 
-
+    
     for (let i =0;i<len;i++){
-        createSVGEl("rect",{
-            y: ((i+1)*2)+(i*12),
-        	x:2,
-        	height:"10",
-        	width:"10",
-            styles:{
-                fill:colors[i]
-            }
-        },legendg);
+        if (type === "color"){
+            createSVGEl("rect",{
+                y: ((i+1)*2)+(i*h_fac),
+                x:2,
+                height:"10",
+                width:"10",
+                styles:{
+                    fill:colors[i]
+                }
+            },legendg);
+        }
+        else if (type==="line"){
+            createSVGEl("rect",{
+                y: ((i+1)*2)+(i*h_fac),
+                x:2,
+                height:"10",
+                width:colors[i],
+                styles:{
+                    fill:"gray"
+                }
+            },legendg);
+
+        }
+        else if (type==="circle"){
+            createSVGEl("circle",{
+                cy: ((i+1)*2)+(i*h_fac)+4,
+                cx:15,
+                r:colors[i],
+                styles:{
+                    fill:"gray"
+                }
+            },legendg);
+
+        }
 
         createSVGEl("text",{
-            y:((i+1)*2)+(i*12)+6,
-            x:14,
+            y:((i+1)*2)+(i*h_fac)+6,
+            x:t_offset,
             "alignment-baseline":"middle",
             styles:{
                 "font-size":"12px",
@@ -157,4 +195,4 @@ function getColorBar(colors,config={}){
 }
 
 
-export {getColorLegend,getColorBar}
+export {getColorLegend,getColorBar,getColorLegendCustom}

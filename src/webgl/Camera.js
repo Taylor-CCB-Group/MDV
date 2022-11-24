@@ -18,7 +18,7 @@ class Camera{
         this.cameraState = {
             view: glMatrix.mat4.identity(new Float32Array(16)),
             projection: glMatrix.mat4.identity(new Float32Array(16)),
-            center: [0,0,0],//new Float32Array(props.center || 3),
+            center: props.center ||[0,0,0],//new Float32Array(props.center || 3),
             theta: props.theta || 0,
             phi: props.phi || 0,
             distance: Math.log(props.distance || 1000),
@@ -29,7 +29,7 @@ class Camera{
         this.front = new Float32Array([0, 0, 1]);
 
         this.minDistance = Math.log('minDistance' in props ? props.minDistance : 0.5);
-        this.maxDistance = Math.log('maxDistance' in props ? props.maxDistance : 100000);
+        this.maxDistance = Math.log('maxDistance' in props ? props.maxDistance : 100000000000000);
 
         this.dtheta = 0;
         this.dphi = 0;
