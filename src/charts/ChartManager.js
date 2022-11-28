@@ -1614,6 +1614,10 @@ class ChartManager{
             }
         });
         makeResizable(div,{
+            onResizeStart: () => {
+                this._sendAllChartsToBack(ds);
+                div.style.zIndex = 2;
+            },
             onresizeend:(width,height)=>chart.setSize(width,height)
         })
     }

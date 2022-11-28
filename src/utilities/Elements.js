@@ -118,7 +118,7 @@ function makeResizable(el,config={}){
     if (config.onresizeend){
         ri.onresize=addResizeListener(el,(x,y)=>{
             config.onresizeend(x,y);
-        })
+        }, config.onResizeStart);
     }
     el.__resizeinfo__=ri;
 }
@@ -264,18 +264,19 @@ function makeDraggable(el,config={}){
     }
 }
 
-function addResizeListener(element,callback){
+function addResizeListener(element, endCallback, startCallback){
     let box = element.getBoundingClientRect();
     let width = box.width;
     let height = box.height;
     const list = (e)=>{
         let box = element.getBoundingClientRect();
         if (box.width!==width || box.height!==height){
-            callback(box.width,box.height);
+            endCallback(box.width,box.height);
         }
         width=box.width;
         height=box.height;
     }
+    if (startCallback) element.addEventListener("mousedown", startCallback);
     element.addEventListener("mouseup",list)
     return list;
 }
