@@ -184,10 +184,10 @@ class VivViewer {
     if (!this.hasRequestedDefaultChannelStats) {
       this.hasRequestedDefaultChannelStats = true;
       this.defaultDomains = domains;
-      this.defaultContrastLimits = contrastLimits;
+      this.defaultContrastLimits = contrastLimits.slice(0);
       getMultiSelectionStats(loader, selections).then((v) => {
         this.defaultDomains = v.domains;
-        this.defaultContrastLimits = v.contrastLimits;
+        this.defaultContrastLimits = v.contrastLimits.slice(0);
         this.newVivProps = { ...this.mainVivLayer.props, ...v };
         this._updateProps();
       });
@@ -337,7 +337,8 @@ class VivViewer {
       extensions:this.extensions,
       transparentColor:this.transparentColor
     };
-    this.defaultContrastLimits = this.defaultDomains = layerConfig.contrastLimits; //PJT not tested
+    if (!this.defaultDomains) this.defaultDomains = layerConfig.contrastLimits; //PJT somewhat tested
+    if (!this.defaultContrastLimits) this.defaultContrastLimits = this.defaultDomains.slice(0);
     this.layers= this.detailView.getLayers({
       viewStates,
       props:layerConfig
