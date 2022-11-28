@@ -34,6 +34,7 @@ class VivVolume extends BaseChart {
         }, this.contentDiv);
         console.log('config in VivVolume', this.config);
         const vivConfig = {
+            ///...
             url: this.config.options.url, //'/data/t1-head-imj.ome.tiff',
             use3d: true,
             scatterData: this.scatterData,
@@ -155,6 +156,16 @@ const nameOption = {
     defaultVal: "/data/t1-head-imj.ome.tiff"
 };
 
+const commonOptions = {
+    init: (config, dataSource, extraControls) => {
+        const {url} = extraControls;
+        config.options = {url};
+    },
+    extra_controls: (dataSource) => {
+        return [nameOption];
+    }
+};
+
 BaseChart.types["viv_volume_scatter_view"] = {
     name: "Viv Volume with Scatterplot",
     class: VivVolume,
@@ -175,11 +186,13 @@ BaseChart.types["viv_volume_scatter_view"] = {
         name: "Category Column"
     }
     ],
-    options: [nameOption]
+    ...commonOptions
+    // options: [nameOption]
 }
 BaseChart.types["viv_volume_view"] = {
     name: "Viv Volume View",
     class: VivVolume,
     params: [],
-    options: [nameOption]
+    ...commonOptions
+    // options: [nameOption]
 }

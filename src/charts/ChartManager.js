@@ -1800,7 +1800,6 @@ class AddChartDialog extends BaseDialog{
         }
         createEl("div",{},this.columns[0]).append(this.chartType);
         this.chartType.addEventListener("change",(e)=>{
-            this.setOptionsDiv(this.chartType.value);
             this.setParamDiv(this.chartType.value, content.dataStore);
         });
 
@@ -1817,9 +1816,6 @@ class AddChartDialog extends BaseDialog{
         },this.columns[0]);
         this.chartDescription= createEl("textarea",{styles:{width:"150px",height:"100px"}},this.columns[0]);
       
-        this.optionsDiv = createEl("div", {}, this.columns[1]);
-        this.setOptionsDiv(types[0].type, content.dataStore);
-
         createEl("div",{
             text:"Columns",
             classes:["ciview-title-div"]
@@ -1845,7 +1841,7 @@ class AddChartDialog extends BaseDialog{
             legend:this.chartDescription.value,
             type:this.chartType.value,
             param:this.paramSelects.map((x)=>x.value),
-            options: this.options ? Object.fromEntries(this.options) : undefined,
+            // options: this.options ? Object.fromEntries(this.options) : undefined,
         }
         const ed={};
         for (let name in this.extraControls){
@@ -1946,22 +1942,27 @@ class AddChartDialog extends BaseDialog{
         this.extraControls={};
         if (t.extra_controls){
             const controls = t.extra_controls(this.dataSource);
+            const parentDiv = this.paramDiv;
             for (let c of controls){
                 createEl("div",{
                     text:c.label,
                     classes:["ciview-title-div"]
-                },this.columns[1]);
+                },parentDiv);
                 if (c.type==="dropdown"){
                     const sel = createEl("select",{
                         styles:{
                             maxWidth:"200px"
                         }
-                    },this.columns[1]);
+                    },parentDiv);
                     
                     for (let item of c.values){
                         createEl("option",{text:item.name,value:item.value},sel)
                     }
                     this.extraControls[c.name]=sel;
+                } else if (c.type === 'string') {
+                    const el = createEl("input", { value: c.defaultVal }, parentDiv);
+                    this.extraControls[c.name] = el;
+                    //el.onchange // not using callback, value will be read on submit().
                 }
             }
 
