@@ -1967,6 +1967,27 @@ class AddChartDialog extends BaseDialog{
 
         }
     }
+    setOptionsDiv(type) {
+        this.optionsDiv.innerHTML = "";
+        const { options } = BaseChart.types[type];
+        if (!options) return;
+        this.options = new Map();
+        createEl("div", {
+            text: "Options",
+            classes: ["ciview-title-div"]
+        }, this.optionsDiv);
+        for (let option of options) {
+            const { name, label, type, defaultVal } = option;
+            if (type !== "string") {
+                console.warn("we only know handle 'string' options");
+                continue;
+            }
+            createEl("div", { text: label || name + ':' }, this.optionsDiv);
+            const el = createEl("input", { value: defaultVal }, this.optionsDiv);
+            this.options.set(name, defaultVal);
+            el.onchange = v => this.options.set(name, el.value);
+        }
+    }
 }
 
 export default ChartManager;
