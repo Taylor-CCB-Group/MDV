@@ -1,4 +1,5 @@
 import { getChannelStats } from "@hms-dbmi/viv";
+import { Matrix4 } from '@math.gl/core';
 
 
 
@@ -66,4 +67,32 @@ export function getDefaultChannelColors(n) {
         const a = i / (n);
         return [Math.floor(a * 255), Math.floor((1 - a) * 255), 0];
     });
+}
+
+
+/**
+ * Get physical size scaling Matrix4
+ * @param {Object} loader PixelSource
+ */
+export function getPhysicalSizeScalingMatrix(loader) {
+    const { x, y, z } = loader?.meta?.physicalSizes ?? {};
+    if (x?.size && y?.size && z?.size) {
+        const min = Math.min(z.size, x.size, y.size);
+        const ratio = [x.size / min, y.size / min, z.size / min];
+        return new Matrix4().scale(ratio);
+    }
+    return new Matrix4().identity();
+}
+
+export function getBoundingCube(loader) {
+    const source = Array.isArray(loader) ? loader[0] : loader;
+    const { shape, labels } = source;
+    const physicalSizeScalingMatrix = getPhysicalSizeScalingMatrix(source);
+    const xSlice = [0, physicalSizeScalingMatrix[0] * shape[labels.indexOf('x')]];
+    const ySlice = [0, physicalSizeScalingMatrix[5] * shape[labels.indexOf('y')]];
+    const zSlice = [
+        0,
+        physicalSizeScalingMatrix[10] * shape[labels.indexOf('z')]
+    ];
+    return [xSlice, ySlice, zSlice];
 }

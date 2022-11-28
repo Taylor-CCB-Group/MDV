@@ -11,4 +11,8 @@ function getRandomString(len=6,an){
     return str;
 }
 
-export {getRandomString}
+function NPOT(n) {
+    return Math.pow(2, Math.ceil(Math.log2(n)))
+}
+
+export {getRandomString, NPOT}

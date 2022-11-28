@@ -9,9 +9,9 @@ import {
 
 import {hexToRGB, RGBToHex} from "../datastore/DataStore.js";
 import {Deck} from '@deck.gl/core';
-import { getMultiSelectionStats, getDefaultSelectionStats } from '../utilities/VivUtils.js';
+import { getMultiSelectionStats, getDefaultSelectionStats, getBoundingCube } from '../utilities/VivUtils.js';
 import { ScatterplotLayer } from 'deck.gl';
-import { getRandomString } from '../utilities/Utilities.js';
+import { getRandomString, NPOT } from '../utilities/Utilities.js';
 
 
 class VivViewer {
@@ -248,19 +248,22 @@ class VivViewer {
   getXSlice() {
     const {SizeX} = this.tiff.metadata.Pixels;
     const [min, max] = this.clipX;
-    const v = SizeX;
+    // const v = NPOT(SizeX);
+    const v = getBoundingCube(this.loader)[0][1];
     return [min*v, max*v];
   }
   getYSlice() {
     const {SizeY} = this.tiff.metadata.Pixels;
     const [min, max] = this.clipY;
-    const v = SizeY;
+    // const v = NPOT(SizeY);
+    const v = getBoundingCube(this.loader)[1][1];
     return [min*v, max*v];
   }
   getZSlice() {
     const {SizeZ} = this.tiff.metadata.Pixels;
     const [min, max] = this.clipZ;
-    const v = SizeZ;
+    // const v = NPOT(SizeZ);
+    const v = getBoundingCube(this.loader)[2][1];
     return [min*v, max*v];
   }
   _updateProps() {
