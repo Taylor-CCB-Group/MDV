@@ -26,6 +26,7 @@ import {csv,tsv,json} from"d3-fetch";
 import LinkDataDialog from "./dialogs/LinkDataDialog.js";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
+import GridStackManager from "./GridstackManager";
 
 
 
@@ -226,7 +227,7 @@ class ChartManager{
         },this.containerDiv);
         this.contentDiv.classList.add('ciview-contentDiv');
 
-     
+        if (config.gridstack) this.gridStack = new GridStackManager(this);
 
         //each entry in charts will contain
         //  chart - the actual chart
@@ -397,6 +398,7 @@ class ChartManager{
                     // background:col
                 }
             },p);
+            ///gridstack...
             ds.contentDiv.classList.add("ciview-contentDiv");
         }
 
@@ -1129,7 +1131,7 @@ class ChartManager{
                 alignItems:"center",
                 justifyContent:"center"
             }
-        },ds.contentDiv);
+        },ds.contentDiv); //added to parent here...
         createEl("i",{
             classes:["fas","fa-circle-notch","fa-spin"],
           
@@ -1604,6 +1606,10 @@ class ChartManager{
     }
 
     _makeChartRD(chart,ds){
+        if (this.gridStack) {
+            this.gridStack.manageChart(chart, ds);
+            return;
+        }
         const div = chart.getDiv();
         makeDraggable(div,{
             handle:".ciview-chart-title",

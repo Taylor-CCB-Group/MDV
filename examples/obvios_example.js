@@ -101,6 +101,7 @@ const mockDataLoader = {
 
  //config - single view
 const config={
+    gridstack: true,
     only_view:{
         //the initial charts to load
         initialCharts:{
