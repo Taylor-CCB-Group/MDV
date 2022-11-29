@@ -22,7 +22,9 @@
   background:black;
   color:white;
 }
-
+.Dark .slick-header-column:hover {
+  background: var(--menu-gradient);
+}
 .Dark .slick-header-columns{
   background:black
 }
