@@ -13,7 +13,7 @@ function clearPosition(div) {
 }
 
 export default class GridStackManager {
-    cellHeight = 180;
+    cellHeight = 150;
     cellApproxWidth = 300;
     constructor(chartManager) {
         this.grids = new Map();
@@ -24,8 +24,12 @@ export default class GridStackManager {
         if (!this.grids.has(ds)) {
             const div = ds.contentDiv;
             div.classList.add('grid-stack');
-            const column = Math.round(div.getBoundingClientRect().width / this.cellApproxWidth);
+            const rect = div.getBoundingClientRect();
+            const column = Math.round(rect.width / this.cellApproxWidth);
             console.log(column);
+            const rows = Math.round(rect.height / this.cellHeight);
+            this.cellHeight = rect.height / rows; //hack, we could have different sizes for different ds etc.
+            console.log('gridstack cellHeight', this.cellHeight);
             const grid = GridStack.init({
                 cellHeight: this.cellHeight, handle: '.ciview-chart-title',
                 float: true
