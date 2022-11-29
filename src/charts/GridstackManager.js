@@ -84,12 +84,10 @@ export default class GridStackManager {
             let locked = false;
             const lockButton = chart.addMenuIcon("fas fa-unlock", "lock position");
             const lockIcon = lockButton.children[0];
-            const bCol = div.style.borderColor;
             lockButton.addEventListener("click", (e) => {
-                lockIcon.classList.remove("fa-lock");
-                lockIcon.classList.remove("fa-unlock");
                 locked = !locked;
-                lockIcon.classList.add(`fa-${locked?'':'un'}lock`);
+                lockIcon.classList.toggle("fa-lock", locked);
+                lockIcon.classList.toggle("fa-unlock", !locked);
                 grid.update(div, {locked});
                 div.classList.toggle('gridLock', locked);
             });
