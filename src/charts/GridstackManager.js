@@ -45,7 +45,7 @@ export default class GridStackManager {
         return this.grids.get(ds);
     }
 
-    manageChart(chart, ds, usePosition) {
+    manageChart(chart, ds, autoPosition) {
         const grid = this.getGrid(ds);
         const div = chart.getDiv();
         const rect = div.getBoundingClientRect();
@@ -53,11 +53,11 @@ export default class GridStackManager {
         const h = Math.round(rect.height / this.cellHeight);
         const x = Math.round(rect.x / grid.cellWidth());
         const y = Math.floor(rect.y / this.cellHeight);
-        // div.remove();
         //maybe better not to add to dom before getting here, and use grid.addWidget
         //current version seems to be working moderately ok.
         clearPosition(div);
         div.style.transition = 'filter 0.5s ease';
+        
         // using ResizeObserver rather than gridstack callbacks
         // means we have closure on 'chart' without needing to maintain another data structure
         // or attach more properties to the div.
@@ -67,12 +67,32 @@ export default class GridStackManager {
             } catch { }
         }, 20));
         ro.observe(div);
+        
+        // div.remove();
+        // grid.addWidget(div, {w, h, x, y, autoPosition});
+        
         grid.makeWidget(div);
-        if (usePosition) {
+        //nb, autoPosition property doesn't apply in update()?
+        //passing options to makeWidget() or addWidget() does not evoke joy.
+        if (autoPosition) {
             grid.update(div, {w, h, x, y});
         } else {
             grid.update(div, {w, h});
         }
-        // chart.setSize();
+        addPositionLock();
+        function addPositionLock() {
+            let locked = false;
+            const lockButton = chart.addMenuIcon("fas fa-unlock", "lock position");
+            const lockIcon = lockButton.children[0];
+            const bCol = div.style.borderColor;
+            lockButton.addEventListener("click", (e) => {
+                lockIcon.classList.remove("fa-lock");
+                lockIcon.classList.remove("fa-unlock");
+                locked = !locked;
+                lockIcon.classList.add(`fa-${locked?'':'un'}lock`);
+                grid.update(div, {locked});
+                div.classList.toggle('gridLock', locked);
+            });
+        }
     }
 }

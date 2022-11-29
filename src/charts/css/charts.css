@@ -100,6 +100,13 @@ select, input, textarea {
     overflow-x: hidden !important;
 }
 
+.Dark .gridLock {
+    border-color: #101010;
+}
+.Light .gridLock {
+    border-color: #444;
+}
+
 .ciview-chart-panel{
     display:flex;
     flex-flow:column;
