@@ -398,7 +398,6 @@ class ChartManager{
                     // background:col
                 }
             },p);
-            ///gridstack...
             ds.contentDiv.classList.add("ciview-contentDiv");
         }
 
@@ -1118,6 +1117,7 @@ class ChartManager{
 
         const chartType= BaseChart.types[config.type];
         const t = themes[this.theme];
+        // PJT may want different behaviour for gridstack
         const div= createEl("div",{
             styles:{
                 position:"absolute",
@@ -1131,7 +1131,7 @@ class ChartManager{
                 alignItems:"center",
                 justifyContent:"center"
             }
-        },ds.contentDiv); //added to parent here...
+        },ds.contentDiv);
         createEl("i",{
             classes:["fas","fa-circle-notch","fa-spin"],
           

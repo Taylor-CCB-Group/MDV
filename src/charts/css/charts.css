@@ -82,13 +82,19 @@ select, input, textarea {
     flex-grow:0;
 }
 
+.grid-stack  .ciview-chart-panel {
+    box-shadow: none;
+    box-sizing: border-box;
+    border: 4px solid var(--background_color);
+}
+
 
 .ciview-chart-panel{
     display:flex;
     flex-flow:column;
     border-radius:5px;
     box-shadow: 0 0 1em #888;
-}
+}    
 
 .ciview-chart-titlebar{
     display:flex;

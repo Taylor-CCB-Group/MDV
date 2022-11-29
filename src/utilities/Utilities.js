@@ -15,4 +15,14 @@ function NPOT(n) {
     return Math.pow(2, Math.ceil(Math.log2(n)))
 }
 
-export {getRandomString, NPOT}
+//https://www.freecodecamp.org/news/javascript-debounce-example/
+function debounce(fn, timeout) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => { fn.apply(this, args); }, timeout);
+    };
+}
+
+
+export {getRandomString, NPOT, debounce}
