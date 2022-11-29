@@ -16,7 +16,7 @@ module.exports = env => {
             static: "./examples/"
         },
 
-        entry: './src/modules/obvios_index.js',
+        entry: './src/modules/obvios_index.ts',
 
         output: {
             filename: 'dist/ciview2.js',
@@ -40,6 +40,11 @@ module.exports = env => {
                     test: /\.(png|svg|jpg|gif|eot|ttf|woff|woff2)$/,
                     type: 'asset/resource'
 
+                },
+                {
+                    test: /\.tsx?$/,
+                    use: 'ts-loader',
+                    exclude: '/node_modules'
                 }
             ]
         }

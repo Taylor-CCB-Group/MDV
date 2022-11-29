@@ -51,8 +51,8 @@ const mockDataSources = [{
         columns: ["mockX", "mockY", "mockZ"]
     }]
 }];
-
-const mockSlices = new Array(numSlices).fill().map((_, slice_id) => {
+const U = undefined as any; //YOLO
+const mockSlices = new Array(numSlices).fill(U).map((_, slice_id) => {
     // make a bunch of points, all on a random plane...
     const r = (v=1) => v*Math.random();
     // const normal = new Vector3([r(2)-1, r(2)-1, r(2)-1]);
@@ -70,7 +70,7 @@ const mockSlices = new Array(numSlices).fill().map((_, slice_id) => {
         return {cell_id, slice_id, mockX, mockY, mockZ, classifier, plane};
     }
     const n = size / numSlices;
-    const points = new Array(n).fill().map(p);
+    const points = new Array(n).fill(U).map(p);
     return {
         slice_id,
         plane,
@@ -86,7 +86,7 @@ for (const s of mockSlices) {
 //const mockDataCols = new Map();
 
 const mockDataLoaderFn = async (columns, dataSource, size) => {
-    const dataList = [];
+    const dataList: {field: string, data}[] = [];
     for (const column of columns) {
         const data = mockDataRows.map(r => r[column.name]);
         dataList.push({ field: column.name, data });
