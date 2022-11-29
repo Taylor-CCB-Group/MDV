@@ -89,13 +89,16 @@ select, input, textarea {
     Left 'overflow: hidden' for now anyway.
     */
     overflow: hidden;
-    box-sizing: content-box;
+    box-sizing: border-box;
     border: 4px solid var(--background_color);
 }
 .grid-stack-placeholder {
     background-color: rgba(0, 0, 0, 0.3);
 }
 
+.grid-stack {
+    overflow-x: hidden !important;
+}
 
 .ciview-chart-panel{
     display:flex;

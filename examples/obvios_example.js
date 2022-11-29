@@ -69,7 +69,7 @@ const mockSlices = new Array(numSlices).fill().map((_, slice_id) => {
         const cell_id = slice_id + '-' + i;
         return {cell_id, slice_id, mockX, mockY, mockZ, classifier, plane};
     }
-    const n = 10000 / 5;
+    const n = size / numSlices;
     const points = new Array(n).fill().map(p);
     return {
         slice_id,

@@ -427,12 +427,13 @@ class ChartManager{
             this._callListeners("view_loaded",this.currentView)
         }
         //add charts - any columns will be added dynamically
+        this._inInit = true;
         for (let ds in charts){  
             for (let ch of charts[ds]){
                 this.addChart(ds,ch);                            
             }
         }
-
+        this._inInit = false;
     }
 
     _addDSListeners(ds){
@@ -1607,7 +1608,7 @@ class ChartManager{
 
     _makeChartRD(chart,ds){
         if (this.gridStack) {
-            this.gridStack.manageChart(chart, ds);
+            this.gridStack.manageChart(chart, ds, this._inInit);
             return;
         }
         const div = chart.getDiv();

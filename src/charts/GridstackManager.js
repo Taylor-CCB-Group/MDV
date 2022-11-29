@@ -13,7 +13,7 @@ function clearPosition(div) {
 }
 
 export default class GridStackManager {
-    cellHeight = 200;
+    cellHeight = 180;
     cellApproxWidth = 300;
     constructor(chartManager) {
         this.grids = new Map();
@@ -28,6 +28,7 @@ export default class GridStackManager {
             console.log(column);
             const grid = GridStack.init({
                 cellHeight: this.cellHeight, handle: '.ciview-chart-title',
+                float: true
                 // these options not working as expected...
                 // margin: 10
                 // column
@@ -44,35 +45,34 @@ export default class GridStackManager {
         return this.grids.get(ds);
     }
 
-    manageChart(chart, ds) {
+    manageChart(chart, ds, usePosition) {
         const grid = this.getGrid(ds);
         const div = chart.getDiv();
         const rect = div.getBoundingClientRect();
         const w = Math.round(rect.width / grid.cellWidth());
         const h = Math.round(rect.height / this.cellHeight);
-        const x = Math.floor(rect.x / grid.cellWidth());
+        const x = Math.round(rect.x / grid.cellWidth());
         const y = Math.floor(rect.y / this.cellHeight);
         // div.remove();
         //maybe better not to add to dom before getting here, and use grid.addWidget
         //current version seems to be working moderately ok.
         clearPosition(div);
-        // grid.addWidget(chart.getDiv(), {autoPosition: true, w, h, x, y});
         div.style.transition = 'filter 0.5s ease';
-        grid.makeWidget(div);
-        //adding x, y seems to be making infinite loop
-        //resize doesn't work well until items are properly integrated in grid.
-        grid.update(div, {
-            w, h//, x, y
-        });
         // using ResizeObserver rather than gridstack callbacks
         // means we have closure on 'chart' without needing to maintain another data structure
         // or attach more properties to the div.
         const ro = new ResizeObserver(debounce(() => {
             try {
                 chart.setSize();
-            } catch {}
+            } catch { }
         }, 20));
         ro.observe(div);
+        grid.makeWidget(div);
+        if (usePosition) {
+            grid.update(div, {w, h, x, y});
+        } else {
+            grid.update(div, {w, h});
+        }
         // chart.setSize();
     }
 }
