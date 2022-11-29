@@ -13,7 +13,7 @@ function clearPosition(div) {
 }
 
 export default class GridStackManager {
-    cellHeight = 300;
+    cellHeight = 200;
     cellApproxWidth = 300;
     constructor(chartManager) {
         this.grids = new Map();

@@ -112,11 +112,11 @@ class BaseChart{
     }
 
     _getContentDimensions(){
-        return{
+        return{ //PJT to review re. gridstack.
             top:5,
             left:5,
             height:this.height,
-            width:this.width
+            width:this.width-5
         }
     }
 
