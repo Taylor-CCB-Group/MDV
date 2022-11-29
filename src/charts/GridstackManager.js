@@ -102,7 +102,9 @@ export default class GridStackManager {
             const {remove} = chart;
             chart.remove = () => {
                 remove.apply(chart);
-                grid.removeWidget(div);
+                //don't remove from DOM, as it happens elsewhere.
+                //doesn't get rid of regl 'must not double destroy framebuffer' error.
+                grid.removeWidget(div, false);
             }
         }
     }

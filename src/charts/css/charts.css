@@ -3,7 +3,7 @@
         --title_bar_color: #222;
         --main_panel_color: black;
         --text_color: white;
-        --background_color: #333;
+        --background_color: rgb(51, 51, 51);
         --input_border_color: #bbb;
         --menu-gradient: linear-gradient(#444, #222);
     }
@@ -13,8 +13,8 @@
         --title_bar_color: white;
         --main_panel_color: #f1f1f1;
         --text_color: black;
-        --background_color: #bababa;
-        --input_border_color: #333;
+        --background_color: rgb(186, 186, 186);
+        --input_border_color: rgb(51, 51, 51);
         --menu-gradient: linear-gradient(white, darkgray);
     }
 }
@@ -23,7 +23,7 @@
     --title_bar_color: #222;
     --main_panel_color: black;
     --text_color: white;
-    --background_color: #333;
+    --background_color: rgb(51, 51, 51);
     --input_border_color: #bbb;
     --menu-gradient: linear-gradient(#444, #222);
 }
@@ -32,8 +32,8 @@
     --title_bar_color: white;
     --main_panel_color: #f1f1f1;
     --text_color: black;
-    --background_color: #bababa;
-    --input_border_color: #333;
+    --background_color: rgb(186, 186, 186);
+    --input_border_color: rgb(51, 51, 51);
     --menu-gradient: linear-gradient(white, darkgray);
 }
 :root {
@@ -154,8 +154,18 @@ select, input, textarea {
     color: var(--text_color);
 }
 
-
-
+.legend-container {
+    backdrop-filter: blur(3px);
+    padding: 0.2em;
+    /* changing var(--background_color) to rgb() didn't help */
+    /* background-color: rgba(var(--background_color), 0.7); */
+}
+.Dark .legend-container {
+    background-color: rgba(51, 51, 51, 0.3);
+}
+.Light .legend-container {
+    background-color: rgba(186, 186, 186, 0.3);
+}
 
 .row-bar{
     cursor:pointer;

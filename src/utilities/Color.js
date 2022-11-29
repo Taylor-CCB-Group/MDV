@@ -23,7 +23,8 @@ function getColorLegend(colors,names,config={}){
             height:((height>215?215:height)+35)+"px",
             position:"absolute",
             border:"0.5px solid black" 
-        }
+        },
+        classes:["legend-container"]
     });
 
     createEl("div",{
@@ -186,7 +187,8 @@ function getColorBar(colors,config={}){
         width:width,
         styles:{
             position:"absolute"
-        }
+        },
+        classes: ["legend-container"]
     });
     container.append(svg);
     makeDraggable(container);
