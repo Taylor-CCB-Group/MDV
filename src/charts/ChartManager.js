@@ -1334,7 +1334,7 @@ class ChartManager{
                 this._popOutChart(chart,ds.contentDiv);
             }
         });     
-        chart.addMenuIcon("fas fa-trash","remove chart")
+        chart.addMenuIcon("fas fa-times","remove chart")
             .addEventListener("click",()=>{   
                 chart.remove();
                 div.remove();
