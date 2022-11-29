@@ -83,7 +83,9 @@ export default class GridStackManager {
         } else {
             grid.update(div, {w, h});
         }
+        
         addPositionLock();
+        addRemoveHandler();
         function addPositionLock() {
             let locked = false;
             const lockButton = chart.addMenuIcon("fas fa-unlock", "lock position");
@@ -95,6 +97,13 @@ export default class GridStackManager {
                 grid.update(div, {locked});
                 div.classList.toggle('gridLock', locked);
             });
+        }
+        function addRemoveHandler() {
+            const {remove} = chart;
+            chart.remove = () => {
+                remove.apply(chart);
+                grid.removeWidget(div);
+            }
         }
     }
 }
