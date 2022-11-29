@@ -28,7 +28,8 @@ class PopOutWindow {
 
     constructor(onload,onclose,config={}) {
         let self = this;
-        let winHtml = "<!DOCTYPE html><html></html>";
+        const className = document.documentElement.className;
+        // let winHtml = `<!DOCTYPE html><html class="${className}"></html>`; //not used
         let winUrl = URL.createObjectURL(new Blob([],{
             type: "text/html"
         }));
@@ -45,6 +46,11 @@ class PopOutWindow {
 
         this.window.addEventListener("load",function() {
             let doc = self.window.document;
+            doc.documentElement.className = className; //something unsets this again... not sure what.
+            // doc.body.className = className; //also gets unset.
+            this.setTimeout(()=> {
+                doc.documentElement.className = className;
+            }, 1000);
             doc.write(`<head>`);
             //copy header from parent window
             let h = document.head.innerHTML;
