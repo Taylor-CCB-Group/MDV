@@ -95,9 +95,12 @@ function getColorLegend(colors,names,config={}){
         }
 
         createSVGEl("text",{
-            y:((i+1)*2)+(i*h_fac)+6,
+            y:((i+1)*2)+(i*h_fac)+6+3,
             x:t_offset,
-            "alignment-baseline":"middle",
+            //Firefox was wrong. Changing to "center" made Chrome wrong in same way
+            // "alignment-baseline":"middle", 
+            //so... since change to "center" makes them consistent, adjusting "+6" offset above by "+3" to compensate
+            "alignment-baseline":"center",
             styles:{
                 "font-size":"12px",
                 "fill":"currentColor"
