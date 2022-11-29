@@ -26,7 +26,7 @@ import {csv,tsv,json} from"d3-fetch";
 import LinkDataDialog from "./dialogs/LinkDataDialog.js";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
-import GridStackManager from "./GridstackManager";
+import GridStackManager from "./GridstackManager.ts"; //nb, '.ts' unadvised in import paths...
 
 
 
@@ -227,7 +227,7 @@ class ChartManager{
         },this.containerDiv);
         this.contentDiv.classList.add('ciview-contentDiv');
 
-        if (config.gridstack) this.gridStack = new GridStackManager(this);
+        if (config.gridstack) this.gridStack = new GridStackManager();
 
         //each entry in charts will contain
         //  chart - the actual chart
@@ -1607,7 +1607,7 @@ class ChartManager{
     }
 
     _makeChartRD(chart,ds){
-        if (this.gridStack) {
+        if (ds && this.gridStack) {
             this.gridStack.manageChart(chart, ds, this._inInit);
             return;
         }

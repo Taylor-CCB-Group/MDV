@@ -35,7 +35,12 @@ module.exports = env =>{
 				test: /\.(png|svg|jpg|gif|eot|ttf|woff|woff2)$/,
 				type: 'asset/resource'
 			
-			}		
+			},
+			{
+				test: /\.tsx?$/,
+				use: 'ts-loader',
+				exclude: '/node_modules'
+			}
 		]
   	}
 }

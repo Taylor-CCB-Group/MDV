@@ -11,16 +11,24 @@ function clearPosition(div) {
     div.style.width = '';
     div.style.height = '';
 }
+type DataSource = {contentDiv: HTMLDivElement};
+type Chart = {
+    getDiv: ()=>HTMLDivElement;
+    remove: ()=>void;
+    addMenuIcon: (classes: string, info: string) => HTMLElement;
+    setSize: (x?: number, y?: number) => void;
+};
 
 export default class GridStackManager {
     cellHeight = 150;
     cellApproxWidth = 300;
-    constructor(chartManager) {
+    grids: Map<DataSource, GridStack>;
+    constructor() {
         this.grids = new Map();
-        this.chartManager = chartManager;
     }
 
-    getGrid(ds) {
+    getGrid(ds: DataSource) {
+        //ds is undefined for PopOuts... and lo, they behave pretty poorly ATM.
         if (!this.grids.has(ds)) {
             const div = ds.contentDiv;
             div.classList.add('grid-stack');
@@ -38,18 +46,21 @@ export default class GridStackManager {
                 // column
             }, div);
             grid.on('resizestop', (ev, el) => {
-                // console.log('resizestop', ev, el);
-                el.style.filter = '';
+                if (el instanceof HTMLElement) {
+                    el.style.filter = '';
+                }
             });
             grid.on('resizestart', (ev, el) => {
-                el.style.filter = 'blur(1px) opacity(0.5)';
+                if (el instanceof HTMLElement) {
+                    el.style.filter = 'blur(1px) opacity(0.5)';
+                }
             });
             this.grids.set(ds, grid);
         }
         return this.grids.get(ds);
     }
 
-    manageChart(chart, ds, autoPosition) {
+    manageChart(chart: Chart, ds: DataSource, autoPosition?: boolean) {
         const grid = this.getGrid(ds);
         const div = chart.getDiv();
         const rect = div.getBoundingClientRect();
@@ -90,7 +101,7 @@ export default class GridStackManager {
             let locked = false;
             const lockButton = chart.addMenuIcon("fas fa-unlock", "lock position");
             const lockIcon = lockButton.children[0];
-            lockButton.addEventListener("click", (e) => {
+            lockButton.addEventListener("click", () => {
                 locked = !locked;
                 lockIcon.classList.toggle("fa-lock", locked);
                 lockIcon.classList.toggle("fa-unlock", !locked);
