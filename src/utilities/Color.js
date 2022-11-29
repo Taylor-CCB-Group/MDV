@@ -40,7 +40,7 @@ function getColorLegend(colors,names,config={}){
         styles:{
             overflowY:"auto",
             overflowX:"hidden",
-            "height":"calc(100% - 25px)",
+            "height":"calc(100% - 10px)",
             "width":"100%",
         },
         classes:["legend-body"]

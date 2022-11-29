@@ -155,10 +155,14 @@ select, input, textarea {
 }
 
 .legend-container {
-    backdrop-filter: blur(3px);
-    padding: 0.2em;
+    backdrop-filter: blur(1px);
+    padding: 0.4em;
+    transition: backdrop-filter 0.2s ease-in-out;
     /* changing var(--background_color) to rgb() didn't help */
     /* background-color: rgba(var(--background_color), 0.7); */
+}
+.legend-container:hover {
+    backdrop-filter: blur(20px);
 }
 .Dark .legend-container {
     background-color: rgba(51, 51, 51, 0.3);
