@@ -43,22 +43,19 @@ class WGL2DI{
 	}
 	*/
 
-		this.draw_options=config.draw_options?config.draw_options:{depth:{enable:false},
-		blend:{enable:true,
-		 func: {
-		  srcRGB: 'src alpha',
-		  srcAlpha: 'src alpha',
-		 dstRGB: 'one minus src alpha',
-		  dstAlpha: 'one minus src alpha'
-	  }
-    	
-    
-			
-	
+		this.draw_options = config.draw_options ? config.draw_options : 
+		{
+			depth:{enable:false},
+			blend:{
+				enable:true,
+				func: {
+					srcRGB: 'src alpha',
+					srcAlpha: 'src alpha',
+					dstRGB: 'one minus src alpha',
+					dstAlpha: 'one minus src alpha'
+				}
+			}
 		}
-		}
-		
-	
 
     
     	this.regl=null;
@@ -957,7 +954,7 @@ class WGL2DI{
 			active:true,
 		}
 		let ctx= this.label_context;
-		
+		ctx.strokeStyle = getComputedStyle(this.canvas).getPropertyValue('color');
 		ctx.beginPath()
 		ctx.moveTo(pos[0],pos[1]);
 	
