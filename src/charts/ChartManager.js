@@ -1580,7 +1580,7 @@ class ChartManager{
               div.style.left = details.pos[0];
               div.style.top= details.pos[1];
               chart.setSize(details.dim[0],details.dim[1]);
-              this._makeChartRD(chart);
+              this._makeChartRD(chart, chInfo.dataSource);
               chart.popoutIcon.style.display="inline";
               delete chInfo.window
               
@@ -1607,6 +1607,8 @@ class ChartManager{
     }
 
     _makeChartRD(chart,ds){
+        //if (!ds) console.error(`_makeChartRD called without ds - resize / drag etc may not work properly`);
+        //^^ actually doesn't make much difference to non-gridStack in practice.
         if (ds && this.gridStack) {
             this.gridStack.manageChart(chart, ds, this._inInit);
             return;

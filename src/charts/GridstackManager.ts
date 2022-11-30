@@ -1,6 +1,7 @@
 import 'gridstack/dist/gridstack.min.css';
 import { GridStack } from 'gridstack';
 import { debounce } from '../utilities/Utilities';
+import { DataSource, Chart } from './charts';
 
 function clearPosition(div) {
     div.style.position = '';
@@ -11,18 +12,12 @@ function clearPosition(div) {
     div.style.width = '';
     div.style.height = '';
 }
-type DataSource = {contentDiv: HTMLDivElement};
-type Chart = {
-    getDiv: ()=>HTMLDivElement;
-    remove: ()=>void;
-    addMenuIcon: (classes: string, info: string) => HTMLElement;
-    setSize: (x?: number, y?: number) => void;
-};
 
 export default class GridStackManager {
     cellHeight = 150;
     cellApproxWidth = 300;
     grids: Map<DataSource, GridStack>;
+    dragHandle = '.ciview-chart-title'
     constructor() {
         this.grids = new Map();
     }
@@ -39,7 +34,7 @@ export default class GridStackManager {
             this.cellHeight = rect.height / rows; //hack, we could have different sizes for different ds etc.
             console.log('gridstack cellHeight', this.cellHeight);
             const grid = GridStack.init({
-                cellHeight: this.cellHeight, handle: '.ciview-chart-title',
+                cellHeight: this.cellHeight, handle: this.dragHandle,
                 float: true
                 // these options not working as expected...
                 // margin: 10
@@ -95,8 +90,9 @@ export default class GridStackManager {
             grid.update(div, {w, h});
         }
         
-        addPositionLock();
-        addRemoveHandler();
+        const oldChangeBase = addPopOutHandler(); //revertModifications() used here refers to values stored by subsequent calls
+        const lockButton = addPositionLock();
+        const oldRemove = addRemoveHandler();
         function addPositionLock() {
             let locked = false;
             const lockButton = chart.addMenuIcon("fas fa-unlock", "lock position");
@@ -108,6 +104,7 @@ export default class GridStackManager {
                 grid.update(div, {locked});
                 div.classList.toggle('gridLock', locked);
             });
+            return lockButton;
         }
         function addRemoveHandler() {
             const {remove} = chart;
@@ -117,6 +114,25 @@ export default class GridStackManager {
                 //doesn't get rid of regl 'must not double destroy framebuffer' error.
                 grid.removeWidget(div, false);
             }
+            return remove;
+        }
+        function addPopOutHandler() {
+            const {changeBaseDocument} = chart;
+            chart.changeBaseDocument = (doc) => {
+                changeBaseDocument.apply(chart, [doc]);
+                if (doc === document) console.error('changeBaseDocument should be restored to normal by the time we get here...');
+                revertModifications();
+            }
+            return changeBaseDocument;
+        }
+        // this happens when we close PopOut... we expect to add them all again straight after
+        // >>> this implementation might change if we change more of the ChartManager logic for when this is called <<<
+        function revertModifications() {
+            grid.removeWidget(div, true); //doesn't remove listeners from handle...
+            //// leaving listeners as a bug for now.
+            lockButton.remove();
+            chart.remove = oldRemove;
+            chart.changeBaseDocument = oldChangeBase;
         }
     }
 }
