@@ -1,7 +1,7 @@
 import 'gridstack/dist/gridstack.min.css';
 import { GridStack } from 'gridstack';
 import { debounce } from '../utilities/Utilities';
-import { DataSource, Chart } from './charts';
+import { DataSource, Chart, ChartManager } from './charts';
 
 function clearPosition(div) {
     div.style.position = '';
@@ -17,13 +17,16 @@ export default class GridStackManager {
     cellHeight = 150;
     cellApproxWidth = 300;
     grids: Map<DataSource, GridStack>;
-    dragHandle = '.ciview-chart-title'
-    constructor() {
+    dragHandle = '.ciview-chart-title';
+    chartManager: ChartManager;
+    constructor(chartManager: ChartManager) {
         this.grids = new Map();
+        this.chartManager = chartManager;
     }
 
     getGrid(ds: DataSource) {
         //ds is undefined for PopOuts... and lo, they behave pretty poorly ATM.
+        console.log(ds);
         if (!this.grids.has(ds)) {
             const div = ds.contentDiv;
             div.classList.add('grid-stack');
@@ -50,6 +53,7 @@ export default class GridStackManager {
                     el.style.filter = 'blur(1px) opacity(0.5)';
                 }
             });
+            this.chartManager.addMenuIcon(ds.name, "fas fa-th", "compact layout", ()=>grid.compact());
             this.grids.set(ds, grid);
         }
         return this.grids.get(ds);

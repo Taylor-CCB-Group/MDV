@@ -227,7 +227,7 @@ class ChartManager{
         },this.containerDiv);
         this.contentDiv.classList.add('ciview-contentDiv');
 
-        if (config.gridstack) this.gridStack = new GridStackManager();
+        if (config.gridstack) this.gridStack = new GridStackManager(this);
 
         //each entry in charts will contain
         //  chart - the actual chart
