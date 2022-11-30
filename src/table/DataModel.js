@@ -1,3 +1,4 @@
+import { setTagOnAllValues } from "./DataTagOperations.ts";
 
 
 class DataModel {
@@ -149,11 +150,14 @@ class DataModel {
     replaceValues(value,replace,column,notify=true){
         const col = this.dataStore.columnIndex[column];
        
-        let valPos= this._getValueIndex(value,col);
+        let valPos= replace === "_tagAll_" ? undefined : this._getValueIndex(value,col);
         if (replace==="_all_"){
             for (let i=0;i<this.data.length;i++){
                 col.data[this.data[i]]=valPos;
             }
+        }
+        else if (replace === "_tagAll_") {
+            setTagOnAllValues(value, col, this);
         }
         else if (replace==="_blank_"){
             let bIndex= col.values.indexOf(value);

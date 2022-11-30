@@ -342,7 +342,7 @@ class EditColumnDialog extends BaseDialog{
             maxHeight:500,
             title:"Bulk Edit "+ columnName
         }
-        super(config,{table:table,column:column});
+        super(config, { table, column });
     }
     init(content){
         this.col= content.column;
@@ -370,6 +370,7 @@ class EditColumnDialog extends BaseDialog{
 
         this.replaceInput = createEl("input",{},d2);
 
+        this._createButton("Tag all cells","_tagAll_");
         this._createButton("Fill All Cells","_all_");
         this._createButton("Fill Empty Cells","_blank_");
         this._createButton("Replace Value",null);
