@@ -1,5 +1,7 @@
 import { DataColumn } from "../charts/charts";
 
+type TagColumn = DataColumn<'text'>;
+
 const SEP = /\W*\,\W*/; //separate by comma with whitespace trimmed
 const JOIN = ', '; //join with comma and space.
 
@@ -9,14 +11,14 @@ const splitTags = (value: string) => value.split(SEP).filter(v=>v);
 /** Treating `col.values` as strings containing comma-separated 'tags',
  * find all the indices that include 'tag' as one of those tags.
  */
-export function getTagValueIndices(tag: string, col: DataColumn<'text'>) {
+export function getTagValueIndices(tag: string, col: TagColumn) {
     if (tag.split(SEP).length > 1) console.error('todo: process multiple tags in tag input');
     return col.values.map((v, i) => v.split(SEP).includes(tag) ? i : -1).filter(i => i != -1);
 }
 
-type DataModel = {data: Int32Array, _getValueIndex(value: string, col: DataColumn<'text'>)}
+type DataModel = {data: Int32Array, _getValueIndex(value: string, col: TagColumn)}
 
-function getValueIndex(value: string, col: DataColumn<'text'>) {
+function getValueIndex(value: string, col: TagColumn) {
     let i = col.values.indexOf(value);
     if (i === -1) {
         col.values.push(value);
@@ -25,7 +27,7 @@ function getValueIndex(value: string, col: DataColumn<'text'>) {
     return i;
 }
 
-export function setTagOnAllValues(tag: string, col: DataColumn<'text'>, dataModel: DataModel) {
+export function setTagOnAllValues(tag: string, col: TagColumn, dataModel: DataModel) {
     sanitizeTags(col);
     const indicesWithTag = getTagValueIndices(tag, col); //refers to values that already contain 'tag'
 
@@ -67,19 +69,24 @@ export function setTagOnAllValues(tag: string, col: DataColumn<'text'>, dataMode
     console.log(`updated ${count}/${data.length} selected rows`);
 }
 
+export function removeTagFromAllSelectedValues(tag: string, col: TagColumn, dataModel: DataModel) {
+    // it may be possible that certain tags previously only appeared in combination with others,
+    // so we should potentially cleanup... sanitizeTags doesn't currently remove unreferenced values.
+}
+
 /** processes a given column so that tags appear in sorted order and without repitition.
  * Note that this may potentially alter data in rows that where the corresponding value already
  * satisfied these conditions.
  */
-export function sanitizeTags(col: DataColumn<'text'>) {
+export function sanitizeTags(col: TagColumn) {
     const vals = col.values.map((unsorted, i) => {
-        const sorted = [...new Set(splitTags(unsorted))].sort().join((JOIN));
+        const sorted = [...new Set(splitTags(unsorted))].sort().join(JOIN);
         console.log({unsorted, sorted});
         return {i, unsorted, sorted}
     });
     const alreadySorted = vals.filter(v => v.sorted == v.unsorted);
     if (alreadySorted.length === vals.length) return;
-    
+    console.log('sanitizing tags...'); //not expected to happen unless other non-tag operations are performed on col?
     const values = alreadySorted.map(v => v.sorted);
     col.values = values;
     
@@ -89,7 +96,25 @@ export function sanitizeTags(col: DataColumn<'text'>) {
         const {i, sorted} = v;
         mapToSorted.set(i, getValueIndex(sorted, col));
     }
+    const usedValuesByIndex = new Set<number>();
     for (let i=0; i<col.data.length; i++) {
-        col.data[i] = mapToSorted.get(col.data[i]);
+        const j = col.data[i] = mapToSorted.get(col.data[i]);
+        usedValuesByIndex.add(j);
     }
+    const nUnused = vals.length - usedValuesByIndex.size;
+    if (nUnused) {
+        // ugh, we may want to do another pass... make sure to actually test when I implement this.
+        console.warn(`sanitizeTags left ${nUnused} unused values...`);
+    }
+}
+
+export function getTags(col: TagColumn) {
+    return new Set(col.values.map(splitTags).flat());
+}
+
+export function getTagsInSelection(col: TagColumn, dataModel: DataModel) {
+    const usedValuesByIndex = new Set<number>();
+    dataModel.data.forEach(i => usedValuesByIndex.add(col.data[i]));
+    const values = [...usedValuesByIndex].map(i => col.values[i]);
+    return new Set(values.map(splitTags).flat());
 }
