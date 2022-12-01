@@ -61,10 +61,10 @@ export function setTagOnAllValues(tag: string, col: TagColumn, dataModel: DataMo
         if (taggedIndex == -1) {
             const untaggedValue = col.values[untaggedIndex];
             const taggedValue = [tag, ...splitTags(untaggedValue)].sort().join(JOIN);
-            taggedIndex = dataModel._getValueIndex(taggedValue, col);
+            taggedIndex = dataModel._getValueIndex(taggedValue, col) as number;
             mapToAppendedTag.set(untaggedIndex, taggedIndex);
         }
-        col.data[data[i]] = taggedIndex;
+        col.data[data[i]] = taggedIndex!;
     }
     console.log(`updated ${count}/${data.length} selected rows`);
 }
@@ -98,7 +98,7 @@ export function sanitizeTags(col: TagColumn) {
     }
     const usedValuesByIndex = new Set<number>();
     for (let i=0; i<col.data.length; i++) {
-        const j = col.data[i] = mapToSorted.get(col.data[i]);
+        const j = col.data[i] = mapToSorted.get(col.data[i])!;
         usedValuesByIndex.add(j);
     }
     const nUnused = vals.length - usedValuesByIndex.size;
