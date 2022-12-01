@@ -54,7 +54,7 @@ class ImageTable {
         });
 
         this.canvas.addEventListener("keydown",e=>{
-            this.keyPresses(e);
+            this.keyPressed(e);
         });
 
         this.data_view = data_view;

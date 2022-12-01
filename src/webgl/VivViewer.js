@@ -211,7 +211,7 @@ class VivViewer {
     const volumeView = this.detailView;
     // could we setProps here instead when the layer already exists? no, don't think so - readonly.
     const layers = volumeView.getLayers({
-      props
+      props, viewStates: [this.volViewState]
     });
     this.layers = layers;
     this.mainVivLayer = layers[0];

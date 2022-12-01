@@ -136,7 +136,7 @@ class BaseChart{
     * <ul>
     * <li> removed - called when thr chart has been removed </li>
     * </ul>
-    * @param {string} id- a unique id indetifying the listener
+    * @param {string} id - a unique id indetifying the listener
     * @param {function} listener - a function that accepts two paramaters, the type
     * of event and the dat associated with it
     */
@@ -162,12 +162,12 @@ class BaseChart{
 
     /**
     * Adds a menu icon with tooltip to the title bar 
-    * @param {string} icon- the css classs of the icon (space delimited).
-    * @param {string} tootltip - the tooltip text
+    * @param {string} icon - the css classs of the icon (space delimited).
+    * @param {string} tooltip - the tooltip text
     * @param {object} config - extra inormation about the icon/tooltip
     * @param {string} [config.size=small] - the size of the tooltip
     * @param {string} [config.position=bottom] - the position of the tooltip.
-    * @param {function} [config.func=] - a function that is called when the icon is clicked
+    * @param {function} [config.func] - a function that is called when the icon is clicked
     * @returns {DOMElement} - the icon
     */
     addMenuIcon(icon,tooltip,config={}){
@@ -207,7 +207,7 @@ class BaseChart{
      * changed. if so re-calculate and re-draw chart (call onDataFiltered)
      * @param {object} data - a list of column/fields whose data has been modified
      * @param {string[]} data.columns a list of column ids whose data has changed
-     * @param {boolean} hasFiltered Whether a 'filtered' callback has already been
+     * @param {boolean} data.hasFiltered Whether a 'filtered' callback has already been
      * issued 
      */
     onDataChanged(data){

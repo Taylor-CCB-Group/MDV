@@ -229,7 +229,7 @@ class CellNetworkChart extends SVGChart{
             
         }
         if (!c.node_size.show_legend){
-            delete this.this.nodeColorLegend;
+            delete this.nodeColorLegend;
             return;
         }
         const name = this.dataStore.columnIndex[c.param[5]].name

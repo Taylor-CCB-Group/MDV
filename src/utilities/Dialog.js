@@ -4,6 +4,7 @@ class BaseDialog{
   /**
   * Adds a menu icon with tooltip to the title bar 
   * @param {object} config The css classs of the icon (space delimited).
+  * @param {string} [config.title] The dialog title
   * @param {DOMElement} [config.doc=document] The document to attach the dialog to 
   * @param {integer} [config.width] - The width of the dialog (in pixels)
   * @param {integer} [config.height] - The height of the dialog (in pixels)

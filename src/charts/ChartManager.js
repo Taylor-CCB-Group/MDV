@@ -777,7 +777,7 @@ class ChartManager{
     }
 
      /**Adds a menu icon to either the main menubar or a datasource meubar
-    * @param {string} datSource The name of dataa source or _main if addding
+    * @param {string} dataSource The name of data source or _main if addding
     * an icon to the main (top) toolbar
     * @param {string} icon The class name(s) of the icon
     * initially load
@@ -1088,7 +1088,7 @@ class ChartManager{
     /**
     * Adds a chart to the app
     * @param {string} dataSource The name of the chart's data source 
-    * @param {string} config The chart's config
+    * @param {any} config The chart's config
     * @param {boolean} [notify=false] If true any listeners will be informed that 
     * a chart has been loaded
     */
@@ -1331,7 +1331,7 @@ class ChartManager{
         this._makeChartRD(chart,ds);
         chart.popoutIcon = chart.addMenuIcon("fas fa-external-link-alt","popout",{
             func:()=>{
-                this._popOutChart(chart,ds.contentDiv);
+                this._popOutChart(chart);
             }
         });     
         chart.addMenuIcon("fas fa-times","remove chart")
@@ -1979,27 +1979,6 @@ class AddChartDialog extends BaseDialog{
                 }
             }
 
-        }
-    }
-    setOptionsDiv(type) {
-        this.optionsDiv.innerHTML = "";
-        const { options } = BaseChart.types[type];
-        if (!options) return;
-        this.options = new Map();
-        createEl("div", {
-            text: "Options",
-            classes: ["ciview-title-div"]
-        }, this.optionsDiv);
-        for (let option of options) {
-            const { name, label, type, defaultVal } = option;
-            if (type !== "string") {
-                console.warn("we only know handle 'string' options");
-                continue;
-            }
-            createEl("div", { text: label || name + ':' }, this.optionsDiv);
-            const el = createEl("input", { value: defaultVal }, this.optionsDiv);
-            this.options.set(name, defaultVal);
-            el.onchange = v => this.options.set(name, el.value);
         }
     }
 }

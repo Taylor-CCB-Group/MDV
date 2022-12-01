@@ -5,8 +5,8 @@ import VivViewer from '../webgl/VivViewer.js';
 
 class VivVolume extends BaseChart {
     constructor(dataStore, div, config) {
-        super(dataStore, div, config, {x:{}, y:{}});
-        this.setupScatterplot(dataStore, config);
+        super(dataStore, div, config);
+        this.setupScatterplot();
         this.afterAppCreation();
         this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", ()=>{
             if (this.dialog) {
@@ -106,9 +106,9 @@ class VivVolume extends BaseChart {
             has_default_color: true
         }
     }
-    getSettings(conf) {
+    getSettings() {
         return [
-            ...super.getSettings(conf),
+            ...super.getSettings(),
             {
                 type: "doubleslider",
                 label: "clip X",

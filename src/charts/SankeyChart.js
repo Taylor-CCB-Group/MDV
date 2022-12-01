@@ -223,7 +223,7 @@ class SankeyChart extends SVGChart{
         const v2 =  this.dataStore.getColumnValues(c2)[d.target.ind];
         this.linkFilter= ["A"+d.source.ind,"B"+d.target.ind];
         this.resetButton.style.display = "inline";
-        this.drawChart(100);
+        this.drawChart();
         this.dim.filter("filterMultipleCategories",[c1,c2],[v1,v2]);
 
     }
@@ -236,7 +236,7 @@ class SankeyChart extends SVGChart{
             this.filter=[cat];
         }
         this.resetButton.style.display = "inline";
-        this.drawChart(100);
+        this.drawChart();
         this.dim.filter("filterCategories",[column],this.filter);       
     }
 
