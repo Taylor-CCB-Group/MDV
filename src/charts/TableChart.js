@@ -421,6 +421,7 @@ class AddColumnDialog extends BaseDialog{
         const d1 = createEl("div",{style:dstyle},this.dialog);
         createEl("div",{text:"Column Name"},d1);
         this.name = createEl("input",{},d1);
+        this.name.addEventListener("keydown", (e) => {if (e.key === "Enter") this.addColumn()});
         const d2 = createEl("div",{style:dstyle},this.dialog);
         
         
@@ -435,6 +436,8 @@ class AddColumnDialog extends BaseDialog{
         const d3 = createEl("div",{style:dstyle},this.dialog);
         createEl("div",{text:"Position"},d3);
         this.position= createEl("input",{style:{width:"100px"},value:2},d3);
+
+        setTimeout(()=>this.name.focus(), 100);
     }
 
     addColumn(){
@@ -446,7 +449,7 @@ class AddColumnDialog extends BaseDialog{
         let pos = parseInt(this.position.value);
         pos = isNaN(pos)?null:pos
         this.table.createColumn(this.name.value,clone,pos);
-      
+        this.close();
     }
 
 
