@@ -13,8 +13,8 @@ type DataStructureTypes = {
 type DataValuesTypes = {
     'integer': undefined;
     'double': undefined;
-    'text': string[];
-    'unique': string[]; //not totally sure
+    'text': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
+    'unique': string[];
 }
 
 export type DataColumn<T extends DataType> = {
@@ -43,12 +43,22 @@ export type DataSource = {
     menuBar: HTMLDivElement;
 };
 
-export type GuiSpec<T> = {
-    type: string; 
+export type GuiValueTypes = {
+    "dropdown": string;
+    "check": boolean;
+    "text": string;
+    "radiobuttons": any;
+    "slider": number;
+    "button": undefined; //never?
+    "doubleslider": [number, number];
+}
+
+export type GuiSpec<T extends keyof GuiValueTypes> = {
+    type: T; 
     label: string;
-    current_value: T;
-    func: (T) => void;
-    values?: T[];
+    current_value: GuiValueTypes[T];
+    func: (v: GuiValueTypes[T]) => void;
+    values?: GuiValueTypes[T][];
 }
 
 export type Chart = {
@@ -57,7 +67,7 @@ export type Chart = {
     addMenuIcon: (classes: string, info: string) => HTMLElement;
     setSize: (x?: number, y?: number) => void;
     changeBaseDocument: (doc: Document) => void;
-    getSettings: () => GuiSpec<any>[]
+    getSettings: () => GuiSpec<any>[];
 };
 
 export type ChartManager = {

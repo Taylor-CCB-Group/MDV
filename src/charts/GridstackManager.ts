@@ -2,6 +2,7 @@ import 'gridstack/dist/gridstack.min.css';
 import { GridStack } from 'gridstack';
 import { debounce } from '../utilities/Utilities';
 import { DataSource, Chart, ChartManager } from './charts';
+import AnnotationDialog from './dialogs/AnnotationDialog';
 
 function clearPosition(div) {
     div.style.position = '';
@@ -25,8 +26,6 @@ export default class GridStackManager {
     }
 
     getGrid(ds: DataSource) {
-        //ds is undefined for PopOuts... and lo, they behave pretty poorly ATM.
-        console.log(ds);
         if (!this.grids.has(ds)) {
             const div = ds.contentDiv;
             div.classList.add('grid-stack');
@@ -34,7 +33,7 @@ export default class GridStackManager {
             const column = Math.round(rect.width / this.cellApproxWidth);
             console.log(column);
             const rows = Math.round(rect.height / this.cellHeight);
-            this.cellHeight = rect.height / rows; //hack, we could have different sizes for different ds etc.
+            this.cellHeight = rect.height / rows; //hack, we might want different sizes for different views, not one 'global'
             console.log('gridstack cellHeight', this.cellHeight);
             const grid = GridStack.init({
                 cellHeight: this.cellHeight, handle: this.dragHandle,
@@ -54,6 +53,7 @@ export default class GridStackManager {
                 }
             });
             this.chartManager.addMenuIcon(ds.name, "fas fa-th", "compact layout", ()=>grid.compact());
+            this.chartManager.addMenuIcon(ds.name, "fas fa-tags", "Tag annotation", () => {new AnnotationDialog(ds)})
             this.grids.set(ds, grid);
         }
         return this.grids.get(ds);
@@ -130,7 +130,7 @@ export default class GridStackManager {
             return changeBaseDocument;
         }
         // this happens when we close PopOut... we expect to add them all again straight after
-        // >>> this implementation might change if we change more of the ChartManager logic for when this is called <<<
+        // >>> this implementation might change if we change more of the ChartManager logic for when manageChart is called <<<
         function revertModifications() {
             grid.removeWidget(div, true); //doesn't remove listeners from handle...
             //// leaving listeners as a bug for now.

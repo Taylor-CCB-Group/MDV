@@ -26,7 +26,7 @@ import {csv,tsv,json} from"d3-fetch";
 import LinkDataDialog from "./dialogs/LinkDataDialog.js";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
-import GridStackManager from "./GridstackManager.ts"; //nb, '.ts' unadvised in import paths...
+import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 
 
 
@@ -777,7 +777,7 @@ class ChartManager{
     }
 
      /**Adds a menu icon to either the main menubar or a datasource meubar
-    * @param {string} dataSource The name of data source or _main if addding
+    * @param {string} dataSource The name of data source or _main if adding
     * an icon to the main (top) toolbar
     * @param {string} icon The class name(s) of the icon
     * initially load

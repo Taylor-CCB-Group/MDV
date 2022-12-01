@@ -1,19 +1,32 @@
 import { DataColumn } from "../charts/charts";
 
-/** Treating `col.values` as strings containing space-separated 'tags',
+const SEP = /\W*\,\W*/; //separate by comma with whitespace trimmed
+const JOIN = ', '; //join with comma and space.
+
+const splitTags = (value: string) => value.split(SEP).filter(v=>v);
+
+
+/** Treating `col.values` as strings containing comma-separated 'tags',
  * find all the indices that include 'tag' as one of those tags.
  */
 export function getTagValueIndices(tag: string, col: DataColumn<'text'>) {
-    // if we're going to treat values this way, we might want to consider escaping spaces,
-    // or treating the value passed to 'tag' as potentially containing multiple tags?
-    // we could use some horrible special character as tag delimiter
-    if (tag.split(' ').length > 1) console.error('todo: process space in tag input');
-    return col.values.map((v, i) => v.split(' ').includes(tag) ? i : -1).filter(i => i != -1);
+    if (tag.split(SEP).length > 1) console.error('todo: process multiple tags in tag input');
+    return col.values.map((v, i) => v.split(SEP).includes(tag) ? i : -1).filter(i => i != -1);
 }
 
 type DataModel = {data: Int32Array, _getValueIndex(value: string, col: DataColumn<'text'>)}
 
+function getValueIndex(value: string, col: DataColumn<'text'>) {
+    let i = col.values.indexOf(value);
+    if (i === -1) {
+        col.values.push(value);
+        i = col.values.length - 1;
+    }
+    return i;
+}
+
 export function setTagOnAllValues(tag: string, col: DataColumn<'text'>, dataModel: DataModel) {
+    sanitizeTags(col);
     const indicesWithTag = getTagValueIndices(tag, col); //refers to values that already contain 'tag'
 
     //map from index of value without tag, to index of that value with the tag added, if it already exists...
@@ -22,9 +35,9 @@ export function setTagOnAllValues(tag: string, col: DataColumn<'text'>, dataMode
     //the mapping will be added to
     const mapToAppendedTag = new Map<number, number>();
     col.values.filter((_, i) => !indicesWithTag.includes(i)).forEach((v, i) => {
-        const tags = [tag, ...v.split(' ')].sort(); //sort *after* adding tag
+        const tags = [tag, ...splitTags(v)].sort(); //sort *after* adding tag
         //we could assert !tags.includes(tag) before it was added
-        const valueWithTag = tags.join(' ');
+        const valueWithTag = tags.join(JOIN);
         mapToAppendedTag.set(i, col.values.indexOf(valueWithTag));
     });
 
@@ -45,11 +58,38 @@ export function setTagOnAllValues(tag: string, col: DataColumn<'text'>, dataMode
         let taggedIndex = mapToAppendedTag.get(untaggedIndex);
         if (taggedIndex == -1) {
             const untaggedValue = col.values[untaggedIndex];
-            const taggedValue = [tag, ...untaggedValue.split(' ')].sort().join(' ');
+            const taggedValue = [tag, ...splitTags(untaggedValue)].sort().join(JOIN);
             taggedIndex = dataModel._getValueIndex(taggedValue, col);
             mapToAppendedTag.set(untaggedIndex, taggedIndex);
         }
         col.data[data[i]] = taggedIndex;
     }
     console.log(`updated ${count}/${data.length} selected rows`);
+}
+
+/** processes a given column so that tags appear in sorted order and without repitition.
+ * Note that this may potentially alter data in rows that where the corresponding value already
+ * satisfied these conditions.
+ */
+export function sanitizeTags(col: DataColumn<'text'>) {
+    const vals = col.values.map((unsorted, i) => {
+        const sorted = [...new Set(splitTags(unsorted))].sort().join((JOIN));
+        console.log({unsorted, sorted});
+        return {i, unsorted, sorted}
+    });
+    const alreadySorted = vals.filter(v => v.sorted == v.unsorted);
+    if (alreadySorted.length === vals.length) return;
+    
+    const values = alreadySorted.map(v => v.sorted);
+    col.values = values;
+    
+    const mapToSorted = new Map<number, number>();
+    // we go over all vals, as values that are to be kept (alreadySorted) may still have their indices changed.
+    for (const v of vals) {
+        const {i, sorted} = v;
+        mapToSorted.set(i, getValueIndex(sorted, col));
+    }
+    for (let i=0; i<col.data.length; i++) {
+        col.data[i] = mapToSorted.get(col.data[i]);
+    }
 }
