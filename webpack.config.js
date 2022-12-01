@@ -20,30 +20,31 @@ module.exports = env =>{
     		   filename: 'dist/ciview2.js',
 
   	   },
-  	   module:{ 
-			
-     		rules:[
-			{
-				test:/\.css$/,
-				use:[
-					"style-loader",
-					"css-loader"
-				]
-				
-			},
-			{
-				test: /\.(png|svg|jpg|gif|eot|ttf|woff|woff2)$/,
-				type: 'asset/resource'
-			
-			},
-			{
-				test: /\.tsx?$/,
-				use: 'ts-loader',
-				exclude: '/node_modules'
-			}
-		]
-  	}
-}
+		resolve: {
+			extensions: ['.ts', '.js', '...']
+		},
+		module: {
+
+			rules: [
+				{
+					test: /\.css$/,
+					use: [
+						"style-loader",
+						"css-loader"
+					]
+
+				},
+				{
+					test: /\.(png|svg|jpg|gif|eot|ttf|woff|woff2)$/,
+					type: 'asset/resource'
+
+				},
+				{
+					test: /\.tsx?$/,
+					use: 'ts-loader',
+					exclude: '/node_modules'
+				}
+			]
+		}
+	}
 };
-
-

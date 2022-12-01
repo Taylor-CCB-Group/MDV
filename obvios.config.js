@@ -25,6 +25,9 @@ module.exports = env => {
         plugins: [
             // new BundleAnalyzerPlugin()
         ],
+        resolve: {
+            extensions: ['.ts', '.js', '...']
+        },
         module: {
 
             rules: [
