@@ -42,8 +42,9 @@ export default class TagModel {
         return getTags(this.tagColumn);
     }
     entireSelectionHasTag(tag: string) {
-        const tagIndices = getTagValueIndices(tag, this.tagColumn);
-        return !this.dataModel.data.some(v => !tagIndices.includes(v));
+        const col = this.tagColumn;
+        const tagIndices = getTagValueIndices(tag, col);
+        return !this.dataModel.data.some(v => !tagIndices.includes(col.data[v]));
     }
     getTagsInSelection() {
         const {dataModel, tagColumn: col} = this;
@@ -120,7 +121,7 @@ function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataM
         }
         col.data[data[i]] = taggedIndex!;
     }
-    console.log(`updated ${count}/${data.length} selected rows`);
+    // console.log(`updated ${count}/${data.length} selected rows`);
     if (notify && count) dataModel.dataStore.dataChanged([col.name]);
 }
 
@@ -131,8 +132,7 @@ function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataM
 function sanitizeTags(col: TagColumn, notify = false) {
     const vals = col.values.map((unsorted, i) => {
         const sorted = [...new Set(splitTags(unsorted))].sort().join(JOIN);
-        console.log({unsorted, sorted});
-        return {i, unsorted, sorted}
+        return {i, unsorted, sorted};
     });
     const alreadySorted = vals.filter(v => v.sorted == v.unsorted);
     if (alreadySorted.length === vals.length) return;

@@ -54,8 +54,8 @@ export default class AnnotationDialog extends BaseDialog {
         const allTags = [...this.tagModel.getTags()];
         const els = allTags.map(tag => `<li>${tag}</li>`);
         const renderTag = (tag: string) => {
-            const all = this.tagModel.entireSelectionHasTag(tag); //needs fixing.
-            const style = all ? `style="border 1px solid white"` : ""
+            const all = this.tagModel.entireSelectionHasTag(tag);
+            const style = `class="${all ? "allTagged" : "someTagged"}"`;
             return `<li ${style}>${tag}</li>`;
         }
         const tm = this.tagModel;

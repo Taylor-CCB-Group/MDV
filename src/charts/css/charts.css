@@ -342,3 +342,10 @@ select, input, textarea {
     border-radius: 0.5em;
     background-color: var(--button_color);
 }
+
+.annotationDialog .allTagged {
+    
+}
+.annotationDialog .someTagged {
+    filter: saturate(20%);
+}
