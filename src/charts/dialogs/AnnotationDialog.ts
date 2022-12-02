@@ -1,16 +1,16 @@
-import { DataModel } from "../../table/DataModel.js";
-import { getTags, getTagsInSelection, setTag, setTagOnAllSelectedValues } from "../../table/DataTagOperations";
+import DataStore from "../../datastore/DataStore.js";
+import TagModel from "../../table/TagModel";
 import {BaseDialog} from "../../utilities/Dialog.js";
 import {createEl} from "../../utilities/Elements.js";
-import { DataColumn, DataSource } from "../charts.js";
 
 
 export default class AnnotationDialog extends BaseDialog {
-    tagColumn: DataColumn<'text'>;
-    dataModel: DataModel;
+    tagModel: TagModel;
+    // tagColumn: DataColumn<'text'>;
+    // dataModel: DataModel;
     tagList: HTMLDivElement;
     tagInput: any;
-    constructor(dataSource: DataSource) {
+    constructor(dataStore: DataStore) {
         super({
             title: "Annotate selection",
             width: 400,
@@ -21,7 +21,7 @@ export default class AnnotationDialog extends BaseDialog {
                     text: "Add tag to selection",
                     method: () => {
                         const tag = this.tagInput.value;
-                        setTag({tag, ...this});
+                        this.tagModel.setTag(tag, true);
                         this.updateTagList();
                     }
                 },
@@ -29,20 +29,16 @@ export default class AnnotationDialog extends BaseDialog {
                     text: "Remove tag from selection",
                     method: () => {
                         const tag = this.tagInput.value;
-                        setTag({tag, ...this}, false);
+                        this.tagModel.setTag(tag, false);
                         this.updateTagList();
                     }
                 },
             ]
         }, null);
         this.outer.classList.add('annotationDialog');
-        // is there a '__tags' column? if so, use it, otherwise add it.
-        const {dataStore} = dataSource;
-        const dataModel = new DataModel(dataStore, {autoupdate: true});
-        dataModel.updateModel();
-        this.dataModel = dataModel;
-        if (!dataStore.columnIndex['__tags']) dataModel.createColumn('__tags', null);
-        this.tagColumn = dataStore.columnIndex['__tags'];
+        this.tagModel = new TagModel(dataStore);
+        this.tagModel.addListener(() => this.updateTagList());
+        
 
         const tagInput = createEl("input", {}, this.columns[0]); //chrome treats as password field (but without hidden value)?
         this.tagInput = tagInput;
@@ -55,14 +51,20 @@ export default class AnnotationDialog extends BaseDialog {
         this.updateTagList();
     }
     updateTagList() {
-        const tags = [...getTags(this.tagColumn)];
-        const els = tags.map(tag => `<li>${tag}</li>`);
+        const allTags = [...this.tagModel.getTags()];
+        const els = allTags.map(tag => `<li>${tag}</li>`);
+        const renderTag = (tag: string) => {
+            const all = this.tagModel.entireSelectionHasTag(tag); //needs fixing.
+            const style = all ? `style="border 1px solid white"` : ""
+            return `<li ${style}>${tag}</li>`;
+        }
+        const tm = this.tagModel;
         this.tagList.innerHTML = `<h2>all tags:</h2>
-        <ul>${els.join('')}</ul>
-        <h2>tags used in selection:</h2>
-        <ul>
-        ${[...getTagsInSelection(this.tagColumn, this.dataModel)].map(tag => `<li>${tag}</li>`).join('')}
-        </ul>
+            <ul>${els.join('')}</ul>
+            <h2>tags used in selection:</h2>
+            <ul>
+            ${[...tm.getTagsInSelection()].map(renderTag).join('')}
+            </ul>
         `;
     }
 }

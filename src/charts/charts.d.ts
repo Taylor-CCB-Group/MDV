@@ -3,6 +3,8 @@
 // - general shape of data structures NB - in many cases this can be inferred from JS, so I may remove these again...
 //   partly just using them as a form of documentation / notes-to-self.
 
+import DataStore from "../datastore/DataStore";
+
 export type DataType = 'integer' | 'double' | 'text' | 'unique';
 
 type DataStructureTypes = {
@@ -27,15 +29,15 @@ export type DataColumn<T extends DataType> = {
 }
 
 
-export type DataStore = {
-    size: number;
-    filterSize: number;
-    columns: DataColumn<any>[];
-    //tempted to try to be clever about generics in strings (keyof etc)
-    columnGroups: Record<string, {name: string, columns: string[]}>;
-    columnIndex: Record<string, DataColumn<any>>;
-    columnsWithData: string[];
-};
+// export type DataStore = {
+//     size: number;
+//     filterSize: number;
+//     columns: DataColumn<any>[];
+//     //tempted to try to be clever about generics in strings (keyof etc)
+//     columnGroups: Record<string, {name: string, columns: string[]}>;
+//     columnIndex: Record<string, DataColumn<any>>;
+//     columnsWithData: string[];
+// };
 export type DataSource = {
     name: string;
     charts: Chart[];

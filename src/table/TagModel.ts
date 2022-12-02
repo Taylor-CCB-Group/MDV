@@ -1,6 +1,6 @@
 import { DataColumn } from "../charts/charts";
 import DataStore from "../datastore/DataStore";
-//import { DataModel } from "./DataModel";
+import { DataModel } from "./DataModel";
 
 type TagColumn = DataColumn<'text'>;
 
@@ -13,12 +13,46 @@ const splitTags = (value: string) => value.split(SEP).filter(v=>v);
 /** Treating `col.values` as strings containing comma-separated 'tags',
  * find all the indices that include 'tag' as one of those tags.
  */
-export function getTagValueIndices(tag: string, col: TagColumn) {
+function getTagValueIndices(tag: string, col: TagColumn) {
     if (tag.split(SEP).length > 1) console.error('todo: process multiple tags in tag input');
     return col.values.map((v, i) => v.split(SEP).includes(tag) ? i : -1).filter(i => i != -1);
 }
 
-type DataModel = {data: Int32Array, _getValueIndex(value: string, col: TagColumn), dataStore: DataStore}
+export default class TagModel {
+    readonly tagColumn: TagColumn;
+    readonly dataModel: DataModel;
+    listeners: (()=>void)[] = [];
+    constructor(dataStore: DataStore) {
+        this.dataModel = new DataModel(dataStore, {autoupdate: true});
+        this.dataModel.updateModel();
+        //nb, this will replace any other "tag" listener on model (but the model is local to this object)
+        this.dataModel.addListener("tag", () => {
+            this.listeners.map(callback => callback());
+        })
+        if (!dataStore.columnIndex['__tags']) this.dataModel.createColumn('__tags', null);
+        this.tagColumn = dataStore.columnIndex['__tags'];
+    }
+    addListener(callback: ()=>void) {
+        this.listeners.push(callback);
+    }
+    setTag(tag: string, tagValue = true) {
+        setTag({tag, ...this}, tagValue);
+    }
+    getTags() {
+        return getTags(this.tagColumn);
+    }
+    entireSelectionHasTag(tag: string) {
+        const tagIndices = getTagValueIndices(tag, this.tagColumn);
+        return !this.dataModel.data.some(v => !tagIndices.includes(v));
+    }
+    getTagsInSelection() {
+        const {dataModel, tagColumn: col} = this;
+        const usedValuesByIndex = new Set<number>();
+        dataModel.data.forEach(i => usedValuesByIndex.add(col.data[i]));
+        const values = [...usedValuesByIndex].map(i => col.values[i]);
+        return new Set(values.map(splitTags).flat());
+    }
+}
 
 function getValueIndex(value: string, col: TagColumn) {
     let i = col.values.indexOf(value);
@@ -29,11 +63,11 @@ function getValueIndex(value: string, col: TagColumn) {
     }
     return i;
 }
-export function setTag(obj: {tag: string, tagColumn: TagColumn, dataModel: DataModel}, tagValue = true) {
+function setTag(obj: {tag: string, tagColumn: TagColumn, dataModel: DataModel}, tagValue = true) {
     const {tag, tagColumn, dataModel} = obj;
     setTagOnAllSelectedValues(tag, tagColumn, dataModel, true, tagValue);
 }
-export function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataModel, notify = true, tagValue = true) {
+function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataModel, notify = true, tagValue = true) {
     // if (dataModel.data.length == 0) {
     //     setTagOnAllValues(tag, col, dataModel, notify); //don't want to maintain permutations like this.
     //     return;
@@ -94,7 +128,7 @@ export function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel
  * Note that this may potentially alter data in rows that where the corresponding value already
  * satisfied these conditions.
  */
-export function sanitizeTags(col: TagColumn, notify = false) {
+function sanitizeTags(col: TagColumn, notify = false) {
     const vals = col.values.map((unsorted, i) => {
         const sorted = [...new Set(splitTags(unsorted))].sort().join(JOIN);
         console.log({unsorted, sorted});
@@ -125,11 +159,11 @@ export function sanitizeTags(col: TagColumn, notify = false) {
     if (notify) console.warn('sanitizeTags notify ignored');
 }
 
-export function getTags(col: TagColumn) {
+function getTags(col: TagColumn) {
     return new Set(col.values.map(splitTags).flat());
 }
 
-export function getTagsInSelection(col: TagColumn, dataModel: DataModel) {
+function getTagsInSelection(col: TagColumn, dataModel: DataModel) {
     const usedValuesByIndex = new Set<number>();
     dataModel.data.forEach(i => usedValuesByIndex.add(col.data[i]));
     const values = [...usedValuesByIndex].map(i => col.values[i]);
