@@ -129,7 +129,7 @@ const config={
                 param: ["mockX", "mockY"],
                 size: [400, 300],
                 position: [10, 620],
-                colorby: "slice_id" //not working
+                color_by: "slice_id"
             }
             // {
             //     type:"row_chart",
