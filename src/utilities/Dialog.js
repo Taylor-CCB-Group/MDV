@@ -140,7 +140,7 @@ constructor (config={},content) {
   }
 
   _addButton(but){
-    const b = createEl("span",{
+    const b = createEl("button",{
       text:but.text,
       classes:["ciview-button"]
     },this.footer)

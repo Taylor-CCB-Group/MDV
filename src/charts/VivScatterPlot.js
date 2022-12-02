@@ -46,7 +46,7 @@ export class ColorChannelDialog extends BaseDialog{
             type:"color",
             value:"#ff0000"
         },addDiv);
-        createEl("span",{
+        createEl("button",{
             classes:["ciview-button-sm"],
             text:"Add Channel"
         },addDiv).addEventListener("click",()=>{

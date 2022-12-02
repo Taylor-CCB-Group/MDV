@@ -49,13 +49,13 @@ class AddColumnsFromRowsDialog extends BaseDialog{
         
         this._addOptionsSection();
 
-        const b = createEl("div",{classes:["ciview-button-sm"],styles:[],text:"Apply"},this.columns[0]);
+        const b = createEl("button",{classes:["ciview-button-sm"],styles:[],text:"Apply"},this.columns[0]);
         b.addEventListener("click",()=>{
             this.addColumn(this.ac.getSelectedItem());
         });
 
         /*this.ta  = createEl("textarea",{},this.dialog);
-        const bu = createEl("span",{classes:["ciview-button-sm"],text:"Add All"},this.dialog);
+        const bu = createEl("button",{classes:["ciview-button-sm"],text:"Add All"},this.dialog);
         bu.addEventListener("click",e=>{
             this.parseNames(this.ta.value)
         });*/

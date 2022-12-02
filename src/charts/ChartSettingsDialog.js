@@ -62,7 +62,7 @@ class ChartSettingsDialog extends BaseDialog{
     }
 
     button(s,d){
-        createEl("span",{
+        createEl("button",{
             classes:["ciview-button"],
             text:s.label
         },d)

@@ -56,7 +56,7 @@ class FileUploadDialog extends BaseDialog{
         this.files=[]
         createEl("div",{text:content.text,classes:["civ-dg-div"]},this.dialog);
         const b =createEl("div",{classes:["civ-dg-div","ciview-center"]},this.dialog);
-        const s= createEl("span",{classes:["ciview-button-sm"],text:"Select Files"},b);
+        const s= createEl("button",{classes:["ciview-button-sm"],text:"Select Files"},b);
         createEl("i",{classes:["fas","fa-file-image"],styles:{marginLeft:"4px"}},s)
         b.addEventListener("click",()=>{
             this.fileInput.click()

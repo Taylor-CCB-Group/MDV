@@ -190,7 +190,7 @@ select, input, textarea {
     border-radius:5px;
     cursor:pointer;
     color:white;
-   
+    border: 0;
 }
 
 .ciview-button-sm{
@@ -199,10 +199,10 @@ select, input, textarea {
     border-radius:5px;
     cursor:pointer;
     color:white;
-    font-size:14px;
+    font-size:0.8em;
     margin: 0px 3px;
     text-align: center;
-   
+    border: 0;
 }
 
 

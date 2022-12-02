@@ -1540,9 +1540,9 @@ class ChartManager{
     }
 
     addButton(text,callback,tooltip){
-        createEl("span",{
+        createEl("button",{
             classes:["ciview-button"],
-            text:text,
+            text:text + "!",
             styles:{
                 position:"fixed",
                 bottom:"40px",
@@ -1841,7 +1841,7 @@ class AddChartDialog extends BaseDialog{
 
 
 
-        createEl("span",{
+        createEl("button",{
             text:"Add",
             classes:["ciview-button"]
         },this.footer).addEventListener("click",()=>this.submit(content.callback));

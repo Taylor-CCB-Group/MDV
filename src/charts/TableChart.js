@@ -382,7 +382,7 @@ class EditColumnDialog extends BaseDialog{
 
     _createButton(text,replace){
         const d = createEl("div",{style:{padding:"5px 10px"}},this.columns[1]);
-        createEl("span",{classes:["ciview-button"],text:text},d)
+        createEl("button",{classes:["ciview-button"],text:text},d)
         .addEventListener("click",()=>{
             const r= replace || this.replaceInput.value;
             if (r==="_delete_column_"){

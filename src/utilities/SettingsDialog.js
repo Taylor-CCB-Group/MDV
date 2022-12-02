@@ -74,7 +74,7 @@ class SettingsDialog extends BaseDialog{
     button(s,d){
         d.style.textAlign = "center";
         //maybe consider making this a 'button'
-        createEl("span",{
+        createEl("button",{
             classes:["ciview-button"],
             text:s.label
         },d)
@@ -142,7 +142,7 @@ class SettingsDialog extends BaseDialog{
         }
         d.append(dd);
         createEl("br",{},d);
-        const b = createEl("span",{
+        const b = createEl("button",{
             classes:["ciview-button-sm"],
             text:"Change"
         },d)
