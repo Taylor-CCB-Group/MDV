@@ -116,10 +116,20 @@ const config={
             },
             {//TODO figure out why 'field colors' isn't working
                 type: "table_chart",
+                title: "table",
                 id: "table",
                 param: ["cell_id", "slice_id", "classifier"],
                 size: [400, 600],
                 position: [440, 10]
+            },
+            {
+                type: "wgl_scatter_plot",
+                title: "mockX x mockY",
+                id: "scatter",
+                param: ["mockX", "mockY"],
+                size: [400, 300],
+                position: [10, 620],
+                colorby: "slice_id" //not working
             }
             // {
             //     type:"row_chart",

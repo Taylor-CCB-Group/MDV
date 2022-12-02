@@ -88,7 +88,8 @@ export default class GridStackManager {
         grid.makeWidget(div);
         //nb, autoPosition property doesn't apply in update()?
         //passing options to makeWidget() or addWidget() does not evoke joy.
-        if (autoPosition) {
+        if (!autoPosition) {
+            console.log({w, h, x, y});
             grid.update(div, {w, h, x, y});
         } else {
             grid.update(div, {w, h});
