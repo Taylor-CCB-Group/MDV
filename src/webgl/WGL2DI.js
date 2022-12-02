@@ -1064,6 +1064,7 @@ class WGL2DI{
 
 	_addHandlers(){
 		var self=this;
+		//consider changing so that some listeners are on window while brush is active...
 		this.div_container.addEventListener("mousemove",function(e){
 			if (self.brush){
 				if (self.brush.resizing){
@@ -1088,11 +1089,8 @@ class WGL2DI{
 				
 			}
 			if (self.poly_brush && self.poly_brush.active){
-				clearTimeout(self.poly_brush_tidmout)
 				let pt =self._getMousePosition(e);
-				self.poly_brush_timeout= setTimeout(function(){
-					self._extendPolyBrush(pt);
-				},150)
+				self._extendPolyBrush(pt);
 			}
 			//is this a drag or just a click without the mouse moving
 			if (self.mouse_position &&  ! self.dragging){
