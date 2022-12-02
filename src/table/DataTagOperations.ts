@@ -57,7 +57,7 @@ export function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel
         col.values.filter((_, i) => indicesWithTag.includes(i)).forEach((v, i) => {
             const tags = splitTags(v).filter(tag => tag !== tag).sort();
             const valueWithoutTag = tags.join(JOIN);
-            mapToAlteredTag.set(i, col.values.indexOf(valueWithoutTag)); // for "a" -> "", I'm getting 0 -> 0, which is wrong.
+            mapToAlteredTag.set(i, col.values.indexOf(valueWithoutTag));
         });
     }
 
@@ -70,7 +70,7 @@ export function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel
         // to introduce a new datatype with explicit semantics than hacking on top of 'text'?
         const currentVal = col.data[data[i]];
         
-        if (indicesWithTag.includes(currentVal)) continue;
+        if (tagValue == indicesWithTag.includes(currentVal)) continue;
         count++;
         // we've found a row that doesn't have the tag... if we were to add the tag, 
         // would that be a new value (ie, nothing else would have that combination of tags)?
