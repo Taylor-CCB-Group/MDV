@@ -1263,7 +1263,7 @@ class DataStore{
     /**
     * Returns the min/max values for a given column 
     * @param {string} column The column id(field) 
-    * @returns {[]} An array - the first value being the min value and the second the max value
+    * @returns {[min: number, max: number]} An array - the first value being the min value and the second the max value
     */
     getMinMaxForColumn(column){
         const c = this.columnIndex[column];
@@ -1272,6 +1272,10 @@ class DataStore{
     
     getColumnRange(column){
         const c = this.columnIndex[column];
+        if (!c.minMaX) {
+            console.error('unknown minMax for column ' + column);
+            return [0, 50];
+        }
         return c.minMax[1]-c.minMax[0];
     }
 

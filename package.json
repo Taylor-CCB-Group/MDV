@@ -13,7 +13,7 @@
     "run-obvios": "webpack  serve --config obvios.config.js",
     "run-ex": "webpack  serve --config examples.config.js --env process.env",
     "run-example": "npm run run-ex --env example=basic_example",
-    "run-10Mexample": "npm run run-ex --env example=10M_points",
+    "run-10Mexample": "npm run run-ex --env example=10Mand1_points",
     "build-hyperion": "webpack --config hyperion.prod.config.js"
   },
   "repository": {
