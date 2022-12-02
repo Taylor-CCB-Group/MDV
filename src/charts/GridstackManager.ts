@@ -56,7 +56,7 @@ export default class GridStackManager {
             this.chartManager.addMenuIcon(ds.name, "fas fa-tags", "Tag annotation", () => {new AnnotationDialog(ds)})
             this.grids.set(ds, grid);
         }
-        return this.grids.get(ds);
+        return this.grids.get(ds)!;
     }
 
     manageChart(chart: Chart, ds: DataSource, autoPosition?: boolean) {
