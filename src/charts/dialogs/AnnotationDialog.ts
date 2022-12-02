@@ -20,6 +20,7 @@ export default class AnnotationDialog extends BaseDialog {
         // is there a '__tags' column? if so, use it, otherwise add it.
         const {dataStore} = dataSource;
         const dataModel = new DataModel(dataStore, {autoupdate: true});
+        dataModel.updateModel();
         this.dataModel = dataModel;
         if (!dataStore.columnIndex['__tags']) dataModel.createColumn('__tags', null);
         this.tagColumn = dataStore.columnIndex['__tags'];
