@@ -29,12 +29,15 @@ function getValueIndex(value: string, col: TagColumn) {
     }
     return i;
 }
-
-export function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataModel, notify = true) {
-    if (dataModel.data.length == 0) {
-        setTagOnAllValues(tag, col, dataModel, notify);
-        return;
-    }
+export function setTag(obj: {tag: string, tagColumn: TagColumn, dataModel: DataModel}, tagValue = true) {
+    const {tag, tagColumn, dataModel} = obj;
+    setTagOnAllSelectedValues(tag, tagColumn, dataModel, true, tagValue);
+}
+export function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataModel, notify = true, tagValue = true) {
+    // if (dataModel.data.length == 0) {
+    //     setTagOnAllValues(tag, col, dataModel, notify); //don't want to maintain permutations like this.
+    //     return;
+    // }
     sanitizeTags(col);
     const indicesWithTag = getTagValueIndices(tag, col); //refers to values that already contain 'tag'
 
@@ -42,13 +45,21 @@ export function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel
     //or -1 if it doesn't (yet) exist.
     //As we process the list, every time we have a new combination of tags (a new value), 
     //the mapping will be added to
-    const mapToAppendedTag = new Map<number, number>();
-    col.values.filter((_, i) => !indicesWithTag.includes(i)).forEach((v, i) => {
-        const tags = [tag, ...splitTags(v)].sort(); //sort *after* adding tag
-        //we could assert !tags.includes(tag) before it was added
-        const valueWithTag = tags.join(JOIN);
-        mapToAppendedTag.set(i, col.values.indexOf(valueWithTag));
-    });
+    const mapToAlteredTag = new Map<number, number>();
+    if (tagValue) {
+        col.values.filter((_, i) => !indicesWithTag.includes(i)).forEach((v, i) => {
+            const tags = [tag, ...splitTags(v)].sort(); //sort *after* adding tag
+            //we could assert !tags.includes(tag) before it was added
+            const valueWithTag = tags.join(JOIN);
+            mapToAlteredTag.set(i, col.values.indexOf(valueWithTag));
+        });
+    } else {
+        col.values.filter((_, i) => indicesWithTag.includes(i)).forEach((v, i) => {
+            const tags = splitTags(v).filter(tag => tag !== tag).sort();
+            const valueWithoutTag = tags.join(JOIN);
+            mapToAlteredTag.set(i, col.values.indexOf(valueWithoutTag)); // for "a" -> "", I'm getting 0 -> 0, which is wrong.
+        });
+    }
 
     const {data} = dataModel;
     let count = 0;
@@ -64,64 +75,19 @@ export function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel
         // we've found a row that doesn't have the tag... if we were to add the tag, 
         // would that be a new value (ie, nothing else would have that combination of tags)?
         const untaggedIndex = currentVal;
-        let taggedIndex = mapToAppendedTag.get(untaggedIndex);
+        let taggedIndex = mapToAlteredTag.get(untaggedIndex);
         if (taggedIndex == -1) {
             const untaggedValue = col.values[untaggedIndex];
-            const taggedValue = [tag, ...splitTags(untaggedValue)].sort().join(JOIN);
+            const tags = splitTags(untaggedValue);
+            const alteredTags = tagValue ? [tag, ...tags] : tags.filter(tag => tag !== tag);
+            const taggedValue = alteredTags.sort().join(JOIN);
             taggedIndex = getValueIndex(taggedValue, col);
-            mapToAppendedTag.set(untaggedIndex, taggedIndex);
+            mapToAlteredTag.set(untaggedIndex, taggedIndex);
         }
         col.data[data[i]] = taggedIndex!;
     }
     console.log(`updated ${count}/${data.length} selected rows`);
     if (notify && count) dataModel.dataStore.dataChanged([col.name]);
-}
-
-export function setTagOnAllValues(tag: string, col: TagColumn, dataModel: DataModel, notify = true) {
-    sanitizeTags(col);
-    const indicesWithTag = getTagValueIndices(tag, col); //refers to values that already contain 'tag'
-
-    //map from index of value without tag, to index of that value with the tag added, if it already exists...
-    //or -1 if it doesn't (yet) exist.
-    //As we process the list, every time we have a new combination of tags (a new value), 
-    //the mapping will be added to
-    const mapToAppendedTag = new Map<number, number>();
-    col.values.filter((_, i) => !indicesWithTag.includes(i)).forEach((v, i) => {
-        const tags = [tag, ...splitTags(v)].sort(); //sort *after* adding tag
-        //we could assert !tags.includes(tag) before it was added
-        const valueWithTag = tags.join(JOIN);
-        mapToAppendedTag.set(i, col.values.indexOf(valueWithTag));
-    });
-
-    let count = 0;
-    for (let i = 0; i < col.data.length; i++) {
-        // if data was a bitmap, we'd just "or" our value
-        // so things like searching, adding tag would be very quick, but we might use a bit more space
-        // maybe we'd probably need more changes... but perhaps it would be clearer separation
-        // to introduce a new datatype with explicit semantics than hacking on top of 'text'?
-        const currentVal = col.data[i];
-
-        if (indicesWithTag.includes(currentVal)) continue;
-        count++;
-        // we've found a row that doesn't have the tag... if we were to add the tag, 
-        // would that be a new value (ie, nothing else would have that combination of tags)?
-        const untaggedIndex = currentVal;
-        let taggedIndex = mapToAppendedTag.get(untaggedIndex);
-        if (taggedIndex == -1) {
-            const untaggedValue = col.values[untaggedIndex];
-            const taggedValue = [tag, ...splitTags(untaggedValue)].sort().join(JOIN);
-            taggedIndex = getValueIndex(taggedValue, col);
-            mapToAppendedTag.set(untaggedIndex, taggedIndex);
-        }
-        col.data[i] = taggedIndex!;
-    }
-    console.log(`updated ${count}/${col.data.length} rows`);
-    if (notify && count) dataModel.dataStore.dataChanged([col.name]);
-}
-
-export function removeTagFromAllSelectedValues(tag: string, col: TagColumn, dataModel: DataModel) {
-    // it may be possible that certain tags previously only appeared in combination with others,
-    // so we should potentially cleanup... sanitizeTags doesn't currently remove unreferenced values.
 }
 
 /** processes a given column so that tags appear in sorted order and without repitition.
