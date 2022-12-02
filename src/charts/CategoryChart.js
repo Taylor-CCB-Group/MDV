@@ -80,10 +80,10 @@ class CategoryChart extends SVGChart{
         }
         const config={};
         this.dim.getCategories(data=>{
-            this.rowData=[];
+            this.rowData = new Array(data.length);
             this.maxCount=1;
             for (let n=0;n<data.length;n++){
-                this.rowData.push([data[n],n]);
+                this.rowData[n] = [data[n],n];
                 this.maxCount= Math.max(data[n],this.maxCount);
             }
             this.drawChart();            
