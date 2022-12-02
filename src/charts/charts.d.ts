@@ -1,6 +1,7 @@
 // Not necessarily comprehensive set of types, arbitrary coverage of
 // - parts of code that intersect with stuff I'm actually using directly in TS
-// - general shape of data structures 
+// - general shape of data structures NB - in many cases this can be inferred from JS, so I may remove these again...
+//   partly just using them as a form of documentation / notes-to-self.
 
 export type DataType = 'integer' | 'double' | 'text' | 'unique';
 

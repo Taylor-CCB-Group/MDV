@@ -1,5 +1,5 @@
 import { DataModel } from "../../table/DataModel.js";
-import { getTags, getTagsInSelection, setTagOnAllValues as setTagOnAllSelectedValues } from "../../table/DataTagOperations";
+import { getTags, getTagsInSelection, setTagOnAllSelectedValues } from "../../table/DataTagOperations";
 import {BaseDialog} from "../../utilities/Dialog.js";
 import {createEl} from "../../utilities/Elements.js";
 import { DataColumn, DataSource } from "../charts.js";
@@ -16,6 +16,7 @@ export default class AnnotationDialog extends BaseDialog {
             height: 400,
             columns: 2
         }, null);
+        this.outer.classList.add('annotationDialog');
         // is there a '__tags' column? if so, use it, otherwise add it.
         const {dataStore} = dataSource;
         const dataModel = new DataModel(dataStore, {autoupdate: true});
@@ -24,7 +25,7 @@ export default class AnnotationDialog extends BaseDialog {
         this.tagColumn = dataStore.columnIndex['__tags'];
 
         const tagInput = createEl("input", {}, this.columns[0]); //chrome treats as password field (but without hidden value)?
-        const addTagButton = createEl("button", {text: "Add tag to selection"}, this.columns[1]);
+        const addTagButton = createEl("button", {text: "Add tag to selection", classes:["ciview-button"]}, this.columns[1]);
         addTagButton.addEventListener("click", () => {
             setTagOnAllSelectedValues(tagInput.value, this.tagColumn, dataModel);
             this.updateTagList();

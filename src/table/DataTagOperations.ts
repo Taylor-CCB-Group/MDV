@@ -1,4 +1,6 @@
 import { DataColumn } from "../charts/charts";
+import DataStore from "../datastore/DataStore";
+//import { DataModel } from "./DataModel";
 
 type TagColumn = DataColumn<'text'>;
 
@@ -16,18 +18,23 @@ export function getTagValueIndices(tag: string, col: TagColumn) {
     return col.values.map((v, i) => v.split(SEP).includes(tag) ? i : -1).filter(i => i != -1);
 }
 
-type DataModel = {data: Int32Array, _getValueIndex(value: string, col: TagColumn)}
+type DataModel = {data: Int32Array, _getValueIndex(value: string, col: TagColumn), dataStore: DataStore}
 
 function getValueIndex(value: string, col: TagColumn) {
     let i = col.values.indexOf(value);
     if (i === -1) {
         col.values.push(value);
+        if (col.values.length > 256) throw new Error(`text column '${col.name}' exceeded 256 values when adding '${value}'`);
         i = col.values.length - 1;
     }
     return i;
 }
 
-export function setTagOnAllValues(tag: string, col: TagColumn, dataModel: DataModel) {
+export function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataModel, notify = true) {
+    if (dataModel.data.length == 0) {
+        setTagOnAllValues(tag, col, dataModel, notify);
+        return;
+    }
     sanitizeTags(col);
     const indicesWithTag = getTagValueIndices(tag, col); //refers to values that already contain 'tag'
 
@@ -61,12 +68,55 @@ export function setTagOnAllValues(tag: string, col: TagColumn, dataModel: DataMo
         if (taggedIndex == -1) {
             const untaggedValue = col.values[untaggedIndex];
             const taggedValue = [tag, ...splitTags(untaggedValue)].sort().join(JOIN);
-            taggedIndex = dataModel._getValueIndex(taggedValue, col) as number;
+            taggedIndex = getValueIndex(taggedValue, col);
             mapToAppendedTag.set(untaggedIndex, taggedIndex);
         }
         col.data[data[i]] = taggedIndex!;
     }
     console.log(`updated ${count}/${data.length} selected rows`);
+    if (notify && count) dataModel.dataStore.dataChanged([col.name]);
+}
+
+export function setTagOnAllValues(tag: string, col: TagColumn, dataModel: DataModel, notify = true) {
+    sanitizeTags(col);
+    const indicesWithTag = getTagValueIndices(tag, col); //refers to values that already contain 'tag'
+
+    //map from index of value without tag, to index of that value with the tag added, if it already exists...
+    //or -1 if it doesn't (yet) exist.
+    //As we process the list, every time we have a new combination of tags (a new value), 
+    //the mapping will be added to
+    const mapToAppendedTag = new Map<number, number>();
+    col.values.filter((_, i) => !indicesWithTag.includes(i)).forEach((v, i) => {
+        const tags = [tag, ...splitTags(v)].sort(); //sort *after* adding tag
+        //we could assert !tags.includes(tag) before it was added
+        const valueWithTag = tags.join(JOIN);
+        mapToAppendedTag.set(i, col.values.indexOf(valueWithTag));
+    });
+
+    let count = 0;
+    for (let i = 0; i < col.data.length; i++) {
+        // if data was a bitmap, we'd just "or" our value
+        // so things like searching, adding tag would be very quick, but we might use a bit more space
+        // maybe we'd probably need more changes... but perhaps it would be clearer separation
+        // to introduce a new datatype with explicit semantics than hacking on top of 'text'?
+        const currentVal = col.data[i];
+
+        if (indicesWithTag.includes(currentVal)) continue;
+        count++;
+        // we've found a row that doesn't have the tag... if we were to add the tag, 
+        // would that be a new value (ie, nothing else would have that combination of tags)?
+        const untaggedIndex = currentVal;
+        let taggedIndex = mapToAppendedTag.get(untaggedIndex);
+        if (taggedIndex == -1) {
+            const untaggedValue = col.values[untaggedIndex];
+            const taggedValue = [tag, ...splitTags(untaggedValue)].sort().join(JOIN);
+            taggedIndex = getValueIndex(taggedValue, col);
+            mapToAppendedTag.set(untaggedIndex, taggedIndex);
+        }
+        col.data[i] = taggedIndex!;
+    }
+    console.log(`updated ${count}/${col.data.length} rows`);
+    if (notify && count) dataModel.dataStore.dataChanged([col.name]);
 }
 
 export function removeTagFromAllSelectedValues(tag: string, col: TagColumn, dataModel: DataModel) {
@@ -78,7 +128,7 @@ export function removeTagFromAllSelectedValues(tag: string, col: TagColumn, data
  * Note that this may potentially alter data in rows that where the corresponding value already
  * satisfied these conditions.
  */
-export function sanitizeTags(col: TagColumn) {
+export function sanitizeTags(col: TagColumn, notify = false) {
     const vals = col.values.map((unsorted, i) => {
         const sorted = [...new Set(splitTags(unsorted))].sort().join(JOIN);
         console.log({unsorted, sorted});
@@ -106,6 +156,7 @@ export function sanitizeTags(col: TagColumn) {
         // ugh, we may want to do another pass... make sure to actually test when I implement this.
         console.warn(`sanitizeTags left ${nUnused} unused values...`);
     }
+    if (notify) console.warn('sanitizeTags notify ignored');
 }
 
 export function getTags(col: TagColumn) {

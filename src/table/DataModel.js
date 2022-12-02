@@ -116,6 +116,7 @@ class DataModel {
         let index= col.values.indexOf(value);
         if (index===-1){
             col.values.push(value);
+            if (col.values.length > 256) throw new Error(`text column '${col.name}' exceeded 256 values when adding '${value}'`);
             index=col.values.length-1;
         }
         return index;
