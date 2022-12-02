@@ -77,16 +77,29 @@ class VivVolume extends BaseChart {
         });
         config.scatterData = this.scatterData;
     }
-    onDataFiltered(dim) {
-        console.log('data filtered', dim);
+    _update() {
         //const {filterArray} = this.dataStore;
         this.setupScatterplot();
         this.viv.config.scatterData = this.scatterData; //should be redundant (when mutating)
         this.viv._updateProps();
     }
-    onDataAdded(){}
-    onDataChanged(){}
-    onDataHighlighted(){}
+    onDataFiltered(dim) {
+        console.log('data filtered', dim);
+        super.onDataFiltered(dim);
+        this._update();
+    }
+    onDataAdded(data){
+        super.onDataAdded(data);
+        this._update();
+    }
+    onDataChanged(data){
+        super.onDataChanged(data);
+        this._update();
+    }
+    onDataHighlighted(data){
+        super.onDataHighlighted(data);
+        this._update();
+    }
 
     colorByColumn(column) {
         if (!this.scatterData) return;
