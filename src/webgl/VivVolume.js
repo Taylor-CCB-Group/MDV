@@ -84,7 +84,6 @@ class VivVolume extends BaseChart {
         this.viv._updateProps();
     }
     onDataFiltered(dim) {
-        console.log('data filtered', dim);
         super.onDataFiltered(dim);
         this._update();
     }
@@ -97,7 +96,7 @@ class VivVolume extends BaseChart {
         this._update();
     }
     onDataHighlighted(data){
-        super.onDataHighlighted(data);
+        // super.onDataHighlighted(data); doesn't exist
         this._update();
     }
 
