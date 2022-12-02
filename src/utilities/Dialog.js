@@ -16,7 +16,7 @@ class BaseDialog{
   * equally sized vertical columns, which can be accessed with this.columns array
   * @param {boolean} [config.footer=false] If true - a footer will be added and can be 
   * accessed with this.footer
-  * @param {object[]} [config.buttons] -A list of of objects which should contain text
+  * @param {{text: string, method: ()=>void, id?: string}[]} [config.buttons] -A list of of objects which should contain text
   * (the button's label) and method (the name of  the method to call when the button is clicked)
   *  e.g [{text:"OK",method:"doSomething"}] - the method 'doSomething' needs to be in 
   * subclass. Buttons are added to the footer, so this needs to also be specified in the config
@@ -79,7 +79,7 @@ constructor (config={},content) {
     }
     if (config.buttons){
       if (!this.footer){
-        this._addFooter;
+        this._addFooter();
       }
       for (let but of config.buttons){
         this._addButton(but);
@@ -144,7 +144,7 @@ constructor (config={},content) {
       text:but.text,
       classes:["ciview-button"]
     },this.footer)
-    b.addEventListener("click",()=>this[but.method]());
+    b.addEventListener("click", but.method);
     if (but.id){
       this.buttons[but.id]=b;
     }
