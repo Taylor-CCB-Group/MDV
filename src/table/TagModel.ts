@@ -36,6 +36,7 @@ export default class TagModel {
         this.listeners.push(callback);
     }
     setTag(tag: string, tagValue = true) {
+        this.dataModel.updateModel();
         setTag({tag, ...this}, tagValue);
     }
     getTags() {
@@ -68,29 +69,30 @@ function setTag(obj: {tag: string, tagColumn: TagColumn, dataModel: DataModel}, 
     const {tag, tagColumn, dataModel} = obj;
     setTagOnAllSelectedValues(tag, tagColumn, dataModel, true, tagValue);
 }
-function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataModel, notify = true, tagValue = true) {
+function setTagOnAllSelectedValues(tagToChange: string, col: TagColumn, dataModel: DataModel, notify = true, tagValue = true) {
     // if (dataModel.data.length == 0) {
     //     setTagOnAllValues(tag, col, dataModel, notify); //don't want to maintain permutations like this.
     //     return;
     // }
     sanitizeTags(col);
-    const indicesWithTag = getTagValueIndices(tag, col); //refers to values that already contain 'tag'
+    const indicesWithTag = getTagValueIndices(tagToChange, col); //refers to values that already contain 'tag'
 
-    //map from index of value without tag, to index of that value with the tag added, if it already exists...
-    //or -1 if it doesn't (yet) exist.
-    //As we process the list, every time we have a new combination of tags (a new value), 
-    //the mapping will be added to
+    //If tagValue is true, map from the index of the value without the tag, to the index of the value with the tag.
+    //If false, the opposite.
+    //-1 if a value with corresponding set of tags doesn't (yet) exist.
+    //As we process the list, every time we need to use a new combination of tags (a new value), those -1 values will be set,
+    //but we don't add new values until we know we need them.
     const mapToAlteredTag = new Map<number, number>();
     if (tagValue) {
         col.values.filter((_, i) => !indicesWithTag.includes(i)).forEach((v, i) => {
-            const tags = [tag, ...splitTags(v)].sort(); //sort *after* adding tag
+            const tags = [tagToChange, ...splitTags(v)].sort(); //sort *after* adding tag
             //we could assert !tags.includes(tag) before it was added
             const valueWithTag = tags.join(JOIN);
             mapToAlteredTag.set(i, col.values.indexOf(valueWithTag));
         });
     } else {
         col.values.filter((_, i) => indicesWithTag.includes(i)).forEach((v, i) => {
-            const tags = splitTags(v).filter(tag => tag !== tag).sort();
+            const tags = splitTags(v).filter(t => t !== tagToChange).sort();
             const valueWithoutTag = tags.join(JOIN);
             mapToAlteredTag.set(i, col.values.indexOf(valueWithoutTag));
         });
@@ -99,10 +101,11 @@ function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataM
     const {data} = dataModel;
     let count = 0;
     for (let i=0; i<data.length; i++) {
-        // if data was a bitmap, we'd just "or" our value
+        // if data was a bitmap, we'd just do binary operations on our value
         // so things like searching, adding tag would be very quick, but we might use a bit more space
         // maybe we'd probably need more changes... but perhaps it would be clearer separation
         // to introduce a new datatype with explicit semantics than hacking on top of 'text'?
+        // this method is a bit unintuitive to write, and could be a source of bugs.
         const currentVal = col.data[data[i]];
         
         if (tagValue == indicesWithTag.includes(currentVal)) continue;
@@ -111,10 +114,11 @@ function setTagOnAllSelectedValues(tag: string, col: TagColumn, dataModel: DataM
         // would that be a new value (ie, nothing else would have that combination of tags)?
         const untaggedIndex = currentVal;
         let taggedIndex = mapToAlteredTag.get(untaggedIndex);
-        if (taggedIndex == -1) {
+        // undefined should be never, but it looks like that logic isn't right when removing tags
+        if (taggedIndex == undefined || taggedIndex == -1) {
             const untaggedValue = col.values[untaggedIndex];
             const tags = splitTags(untaggedValue);
-            const alteredTags = tagValue ? [tag, ...tags] : tags.filter(tag => tag !== tag);
+            const alteredTags = tagValue ? [tagToChange, ...tags] : tags.filter(t => t !== tagToChange);
             const taggedValue = alteredTags.sort().join(JOIN);
             taggedIndex = getValueIndex(taggedValue, col);
             mapToAlteredTag.set(untaggedIndex, taggedIndex);
