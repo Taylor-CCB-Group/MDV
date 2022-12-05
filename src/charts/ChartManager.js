@@ -1542,7 +1542,7 @@ class ChartManager{
     addButton(text,callback,tooltip){
         createEl("button",{
             classes:["ciview-button"],
-            text:text + "!",
+            text:text,
             styles:{
                 position:"fixed",
                 bottom:"40px",
