@@ -1,6 +1,12 @@
 
 import Split from "split.js"
 
+/**@template {keyof HTMLElementTagNameMap} T
+ * @param {T} type
+ * @param {{styles?:, classes?:string[], text?:string, [string]:string}=} attrs
+ * @param {HTMLElement=} parent
+ * @returns {HTMLElementTagNameMap[T]}
+ */
 function createEl(type,attrs,parent){
    
     const el = document.createElement(type);
@@ -85,7 +91,6 @@ function createMenuIcon(icon,config,parent){
     return sp;
 
 }
-
 function addElProps(el,attrs){
     for (var idx in attrs) {
         if ((idx === 'styles' || idx === 'style') && typeof attrs[idx] === 'object') {
