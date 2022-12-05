@@ -133,8 +133,8 @@ constructor (config={},content) {
         flex:"0 0 auto",
         padding:"5px",
         justifyContent:"center",
-        display:"flex"
-
+        display:"flex",
+        gap: "1em"
       }
     },this.outer);
   }

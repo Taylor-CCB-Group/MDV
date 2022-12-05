@@ -13,7 +13,7 @@ import { Plane } from '@math.gl/culling';
 
 
 // let's add some mock data that looks a bit more like what we expect to see...
-const size = 1000000, numSlices = 5;
+const size = 100000, numSlices = 5;
 // these correspond to the size of the T1-Head sample.
 const sizeX = 256, sizeY = 256, sizeZ = 129;
 
