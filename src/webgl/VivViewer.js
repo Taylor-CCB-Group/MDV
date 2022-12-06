@@ -13,6 +13,27 @@ import { getMultiSelectionStats, getDefaultSelectionStats, getBoundingCube } fro
 import { ScatterplotLayer } from 'deck.gl';
 import { getRandomString, NPOT } from '../utilities/Utilities.js';
 
+const tiffs = new Map();
+export function acceptTiffCache(oldTiffs) {
+  console.log('accepting tiff cache');
+  oldTiffs.forEach((tiff, key) => {
+    tiffs.set(key, tiff);
+  });
+}
+function getTiff(url) {
+  if (tiffs.has(url)) {
+    return tiffs.get(url);
+  }
+  const tiff = loadOmeTiff(url);
+  tiffs.set(url, tiff);
+  return tiff;
+}
+// if (module.hot) {
+//   module.hot.accept(newModule => {
+//     newModule.acceptTiffCache(tiffs);
+//   });
+// }
+
 
 class VivViewer {
   constructor(canvas,config,initialView){
@@ -26,7 +47,7 @@ class VivViewer {
     this.config=config;
     this.hasRequestedDefaultChannelStats = false;
     this.initClip();
-    loadOmeTiff(config.url).then(loader=>{
+    getTiff(config.url).then(loader=>{
       this.tiff = loader;
       this._setUp(loader,initialView);
     });
@@ -35,6 +56,7 @@ class VivViewer {
   setSize(x,y,conf){
     this.height=y;
     this.width=x;
+
     const v =this.getViewState(conf.x_scale,conf.y_scale,conf.offset);
     this.canvas.width = x;
     this.canvas.height = y;
