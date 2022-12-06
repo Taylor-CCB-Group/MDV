@@ -2,24 +2,25 @@ import {BaseDialog} from "../../utilities/Dialog.js";
 import {createEl} from "../../utilities/Elements.js";
 
 class ColorChooser extends BaseDialog{
-    constructor(cm){
+    constructor(cm,ds){
         const config={
             footer:true,
             width:500,
             maxHeight:500,
-            title:"Field Colors",
+            title:"Field Colors For "+ds.name,
             columns:2,
             buttons:[{
                 text:"Apply",
                 method:"applyColor"
             }]
         }
-        super(config,cm);
+        super(config,{cm:cm,ds:ds});
         
     }
 
-    init(cm){
-        this.cm =cm;
+    init(content){
+        let cm = this.cm =content.cm;
+        this.ds = content.ds;
         const c2 = this.columns[1];
         this.columns[0].style.overflowY="auto";
         const dStyle={
@@ -32,18 +33,7 @@ class ColorChooser extends BaseDialog{
             width:"70px",
             display:"inline-block"
         }
-        createEl("label",{text:"Data Set:",styles:lStyles},d1)
-        this.dsSelect= createEl("select",{
-            classes:["mdv-select"]
-        },d1);
-        const dsNames= [];
-        for (let d in cm.dsIndex){
-            dsNames.push(d);
-            createEl("option",{
-                text:d,
-                value:d
-            },this.dsSelect)
-        }
+       
         const d2 = createEl("div",{styles:dStyle},c2);
         createEl("label",{text:"Field:",styles:lStyles},d2)
         this.columnSelect = createEl("select",{
@@ -83,7 +73,7 @@ class ColorChooser extends BaseDialog{
             }
         },d4);
 
-        this.setDataSource(dsNames[0])
+        this.setDataSource(this.ds.name);
         createEl("span",{
             classes:["ciview-button-sm"],
             text:"Use Scheme"
@@ -132,7 +122,9 @@ class ColorChooser extends BaseDialog{
     }
 
     applyColor(){
-      const colors  = this.colorChoosers.map(x=>x.value);
+      
+      const colors = new Array(this.colorChoosers.length)
+      this.colorChoosers.forEach(x=>colors[x.__index]=x.value);
       this.dataSource.setColumnColors(this.column,colors);
       this.dataSource.dataChanged([this.column],false,false);
       for (let ds of this.cm.dataSources){
@@ -147,9 +139,14 @@ class ColorChooser extends BaseDialog{
         this.column=col;
         c1.innerHTML="";
         const vals = this.dataSource.getColumnValues(col);
+        const sorted = vals.slice(0).sort();
         const colors = this.dataSource.getColumnColors(col);
+        const sortedColors =  colors.map((x,i)=>{
+            const index = vals.indexOf(sorted[i]);
+            return {index:index,color:colors[index]}
+        })
         this.colorChoosers=[];
-        for (let n=0;n<colors.length;n++){
+        for (let n=0;n<sorted.length;n++){
             const d = createEl("div",{styles:{
                 display:"flex",
                 flexWrap:"nowrap"
@@ -160,7 +157,7 @@ class ColorChooser extends BaseDialog{
                     fontSize:"0.8erm"
                 },
                 classes:["mdv-flex-dynamic"],
-                text:vals[n]
+                text:sorted[n]
             },d);
             const cc= createEl("input",{
                 classes:["mdv-flex-fixed"],
@@ -170,8 +167,9 @@ class ColorChooser extends BaseDialog{
                     padding:"0px",
                 },
                 type:"color",
-                value:colors[n]
+                value:sortedColors[n].color
             },d);
+            cc.__index=sortedColors[n].index;
             this.colorChoosers.push(cc);
         }
     }

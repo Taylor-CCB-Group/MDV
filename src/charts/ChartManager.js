@@ -23,7 +23,6 @@ import "./DensityScatterPlot";
 import {BaseDialog} from "../utilities/Dialog.js";
 import {getRandomString} from "../utilities/Utilities.js";
 import {csv,tsv,json} from"d3-fetch";
-import LinkDataDialog from "./dialogs/LinkDataDialog.js";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
 
@@ -72,12 +71,12 @@ function listenPreferredColorScheme(callback) {
 * <li> columns - a list of objects describing each column see {@link DataStore#addColumn} <li>
 * <li> columnGroups - A list of objects with 'name' and 'columns' field
 * </ul>
-* @param {function | Object} dataloader - either a function describing how to load columns or an object
-* (list of objects) describing the files containing the daata
+* @param {function | Object} dataloader - An object containing the following
+* 
 * <ul>
-* <li> url - the url of the file <li>
-* <li> type - either csv,tsv or json <li>
-* <li> dataSource - the name of the datasource <li>
+* <li> function - The function to load the data (can be omitted if data loaded from a file<li>
+* <li> viewLoader - The function that will load the view <li>
+* <li> files - specifies the files to load the data <li>
 * </ul>
 * A dataLoader can be included as the first item in the list, if dynamic loading as 
 * well as static loading 
@@ -149,11 +148,32 @@ class ChartManager{
         },this.containerDiv);
 
         this.leftMenuBar= createEl("span",{},this.menuBar);
+        this.rightMenuBar= createEl("span",{styles:{float:"right"}},this.menuBar);
+
+
+
+        createEl("span",{classes:["mdv-divider"]},this.menuBar);
+      
+        if (config.all_views){
+       
+            this.viewSelect = createEl("select",{},this.menuBar);
+            for (let v of config.all_views){
+                createEl("option",{text:v,value:v},this.viewSelect)
+            }
+            this.viewSelect.addEventListener("change",(e)=>{
+                if (this.config.show_save_view_dialog && config.permission ==="edit"){
+                    this.showSaveViewDialog(()=>this.changeView(this.viewSelect.value));
+                }
+                else{
+                    this.changeView(this.viewSelect.value)
+                }
+            })
+        }
 
         if (config.permission==="edit"){
             createMenuIcon("fas fa-save",{
                 tooltip:{
-                    text:"Save",
+                    text:"Save View",
                     position:"bottom-right"
                 },
                 func:()=>{
@@ -161,18 +181,9 @@ class ChartManager{
                     this._callListeners("state_saved",state)
                 }
     
-            },this.leftMenuBar);
+            },this.menuBar);
         }
 
-        if (config.all_views){
-            this.viewSelect = createEl("select",{},this.menuBar);
-            for (let v of config.all_views){
-                createEl("option",{text:v,value:v},this.viewSelect)
-            }
-            this.viewSelect.addEventListener("change",(e)=>{
-                this.showSaveViewDialog(()=>this.changeView(this.viewSelect.value));
-            })
-        }
 
         if (config.permission==="edit" && config.all_views){
             createMenuIcon("fas fa-plus",{
@@ -185,36 +196,30 @@ class ChartManager{
                 }
     
             },this.menuBar);
+            createMenuIcon("fas fa-minus",{
+                tooltip:{
+                    text:"Delete Current View",
+                    position:"bottom-right"
+                },
+                func:()=>{
+                    this.showDeleteViewDialog();
+                }
+    
+            },this.menuBar);
         }
 
-        createMenuIcon("fas fa-palette",{
-            tooltip:{
-                text:"Change Color Scheme",
-                position:"bottom-right"
-            },
-            func:()=>{
-                try { new ColorChooser(this); }
-                catch (error) {
-                    console.error('error making ColorChooser', error);
-                    this.createInfoAlert("Error making color chooser", {
-                        type: "warning", duration: 2000
-                    });
-                 }
-            }
-
-        },this.menuBar);
-
+        
         
         createMenuIcon("fas fa-adjust",{
             tooltip:{
                 text:"Change Theme",
-                position:"bottom-right"
+                position:"bottom-left"
             },
             func:(e)=>{
                 this.themeMenu.show(e);
             }
 
-        },this.menuBar);
+        },this.rightMenuBar);
 
         this._setupThemeContextMenu();
       
@@ -330,10 +335,10 @@ class ChartManager{
     _loadView(config,dataLoader,firstTime=false){
        
         //load view, then initialize
-        if (config.initial_view){
-            this.currentView=config.initial_view;
-            this.viewSelect.value = config.initial_view;
-            dataLoader.viewLoader(config.initial_view).then(data=>{
+        if (config.all_views){
+            this.currentView=config.initial_view || config.all_views[0];
+            this.viewSelect.value =  this.currentView
+            dataLoader.viewLoader(this.currentView).then(data=>{
                 this._init(data,firstTime);
             })     
         }
@@ -495,10 +500,10 @@ class ChartManager{
                         this.removeAllCharts();
                         this.viewData.links=[];
                         const state = this.getState();
-                        const ic = state.view.initialCharts
+                        state.view.initialCharts={}
                         for (let ds in this.dsIndex){
                             if (vals[ds]){
-                                ic[ds]=[];
+                                state.view.initialCharts[ds]=[];
                             }
                         }
                         this._callListeners("state_saved",state);
@@ -539,6 +544,26 @@ class ChartManager{
         })
     }
 
+    showDeleteViewDialog(){
+        new CustomDialog({
+            title:"Delete View",
+            text:"Do you want to delete the current view?",
+            buttons:[
+            {
+                text:"YES",
+                method:()=>{
+                    this.deleteCurrentView();
+                }
+            },
+            {
+                text:"NO",
+                method:()=>{
+                }
+            }  
+            ]
+        })
+    }
+
 
     changeView(view){
         this.removeAllCharts();
@@ -547,6 +572,17 @@ class ChartManager{
         this.viewLoader(view).then(data=>{
             this._init(data);
         })
+    }
+
+    deleteCurrentView(){
+        const opt = this.viewSelect.querySelector(`option[value='${this.viewSelect.value}']`);
+        const state = this.getState();
+        this.currentView= this.viewSelect.value;
+        opt.remove();
+        this.changeView(this.viewSelect.value);
+        
+        
+       
     }
 
     _columnRemoved(ds,col){      
@@ -746,6 +782,7 @@ class ChartManager{
         return{     
             view:view,
             currentView:this.currentView,
+            all_views:Array.from(this.viewSelect.children,x=>x.value),
             updatedColumns:updatedColumns,
             metadata:metadata
         }
@@ -774,11 +811,11 @@ class ChartManager{
     }
 
      /**Adds a menu icon to either the main menubar or a datasource meubar
-    * @param {string} datSource The name of dataa source or _main if addding
+    * @param {string} datSource The name of data source or _main if addding
     * an icon to the main (top) toolbar
     * @param {string} icon The class name(s) of the icon
     * initially load
-    * @param {string} text Text that will be diaplyed in a tooltip
+    * @param {string} text Text that will be displayed in a tooltip
     * @param {function} func The function that will be called when the icon is pressed
     */
     addMenuIcon(dataSource,icon,text,func){
@@ -1013,6 +1050,23 @@ class ChartManager{
             }
             },ds.menuBar
         );
+        createMenuIcon("fas fa-palette",{
+            tooltip:{
+                text:"Change Color Scheme",
+                position:"bottom-right"
+            },
+            func:()=>{
+                try { new ColorChooser(this,ds); }
+                catch (error) {
+                    console.error('error making ColorChooser', error);
+                    this.createInfoAlert("Error making color chooser", {
+                        type: "warning", duration: 2000
+                    });
+                 }
+            }
+
+        },ds.menuBar);
+
         if (ds.links){
             for (let ods in ds.links){
                 const link= ds.links[ods];
@@ -1021,18 +1075,6 @@ class ChartManager{
                 }
             }
 
-        }
-        if (ds.link_to){
-            createMenuIcon("fas fa-link",{
-                tooltip:{
-                    text:`Link (add) data to ${ds.link_to.dataSource} panel`,
-                    position:"bottom-right"
-                },
-                func:()=>{
-                   new LinkDataDialog(this,ds);
-                }
-    
-            },ds.menuBar);
         }
         const idiv = createEl("div",{
             styles:{
@@ -1162,6 +1204,7 @@ class ChartManager{
             const id = this.createInfoAlert(`Error creating chart with columns [${neededColsArr.join(', ')}]: '${error}'`, {
                 type: "warning"
             });
+            console.log(error);
             const idiv = this.infoAlerts[id].div;
             idiv.onclick = () => idiv.remove();
             div.remove();
@@ -1296,6 +1339,21 @@ class ChartManager{
         }
     }
 
+
+    //supercedes previous method - more genric
+    //method must be specified in the method UsingColumns in types of dictionary
+    __decorateColumnMethod(method,chart,dataSource){
+        const newMethod = "_"+method;
+        chart[newMethod]= chart[method];
+        //if original method is called check whether column has data
+        //first argument must be column(s) needed
+        const self=this;
+        chart[method]=function(){
+            const cols = Array.isArray(arguments[0])?arguments[0]:[arguments[0]];
+            self._getColumnsThen(dataSource,cols,()=>chart[newMethod](...arguments));
+        }
+    }
+
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
     _haveColumnsLoaded(neededCols,dataSource,func){
@@ -1339,6 +1397,10 @@ class ChartManager{
                 this._callListeners("chart_removed",chart);
             });
        
+
+
+       
+
         //need to decorate any method that uses column data as data may
         //have to be loaded before method can execute
         if (chart.colorByColumn){
@@ -1350,9 +1412,16 @@ class ChartManager{
         if (chart.setBackgroundFilter){
             this._decorateColumnMethod("setBackgroundFilter",chart,dataSource);
         }
-        if (chart.changeContourCategory){
+        if (chart.changeContourParameter){
             this._decorateColumnMethod("changeContourParameter",chart,dataSource);
         }
+
+         //new preferred way to decorate column methods 
+         if (chartType.methodsUsingColumns){
+            for (let meth of chartType.methodsUsingColumns ){
+                this.__decorateColumnMethod(meth,chart,dataSource);
+            }
+         }
 
       
 

@@ -380,8 +380,8 @@ class BaseChart{
     showToolTip(e,msg){
         this._tooltip.innerHTML=msg;
         this._tooltip.style.display= "inline-block";
-        this._tooltip.style.left= e.clientX+"px";
-        this._tooltip.style.top=e.clientY+"px"
+        this._tooltip.style.left= (3+e.clientX)+"px";
+        this._tooltip.style.top=(3+e.clientY)+"px"
     }
 
     hideToolTip(){

@@ -577,7 +577,7 @@ class BamFeatureReader{
         
     }
     this.features.store=this.store;
-    console.log((this.pointer/3)+":"+(performance.now()-t));
+
    
    
 
@@ -642,7 +642,6 @@ class BamFeatureReader{
                 return ;   // unmapped reads
             }
             else if (refID > chrId || pos > max) {
-                console.log(unknown+":"+num);
                 return ;    // off right edge, we're done
             }
             else if (refID < chrId) {

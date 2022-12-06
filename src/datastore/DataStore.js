@@ -431,7 +431,6 @@ class DataStore{
         if (!g){
             g= this.subgroups[data[0]];
             sg= g.subgroup;
-
         }
         else{
             sg =  g.subgroups[data[0]];

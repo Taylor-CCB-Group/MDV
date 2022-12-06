@@ -263,6 +263,7 @@ class VivScatterPlot extends DensityScatterPlot{
 
 BaseChart.types["viv_scatter_plot"]={
     name:"Viv Scatter Plot",
+    allow_user_add:false,
     class:VivScatterPlot,
     params:[{
         type:"number",

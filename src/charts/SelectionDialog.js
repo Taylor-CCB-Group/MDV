@@ -12,6 +12,7 @@ class SelectionDialog extends BaseChart{
         this.numberFilters={};
         c.filters=c.filters || {};
         this.hasFiltred=false;
+        this.contentDiv.style.overflowY="auto"
         for (let c of con){
             const col =dataStore.columnIndex[c];
             const div =createEl("div",{
@@ -27,7 +28,7 @@ class SelectionDialog extends BaseChart{
         }
 
         if (this.hasFiltered){
-            setTimeout(()=>this.dataStore.triggerFilter(),1500);
+            setTimeout(()=>this.dataStore.triggerFilter(),0);
         }
     }
 
@@ -65,6 +66,26 @@ class SelectionDialog extends BaseChart{
                 margin:"0px 10px"
             }
         },div);
+        const dd = createEl("div",{styles:{
+            padding:"3px 10px",
+            overflow:"hidden"
+        }},div)
+        createEl("span",{text:">",styles:{"float":"left","fontWeight":"bold"}},dd);
+        const greaterThan = createEl("input",{
+            styles:{
+                width:"80px",
+                float:"left"
+            }
+        },dd);
+        createEl("span",{text:"<",styles:{"float":"right","fontWeight":"bold"}},dd);
+        const lessThan = createEl("input",{
+            styles:{
+                width:"80px",
+                float:"right"
+            }
+        },dd);
+      
+
         const c = this.config;     
         const dim =this.dataStore.getDimension("range_dimension");
         dim.noclear=true;
@@ -87,7 +108,7 @@ class SelectionDialog extends BaseChart{
             tooltips:true,
             documentElement:this.__doc__
         });
-        sl.noUiSlider.on("end",values=>{
+        sl.noUiSlider.on("set",values=>{
             const min = parseFloat(values[0]);
             const max = parseFloat(values[1]);
             if (min<=mm[0] && max >=mm[1]){
@@ -96,15 +117,60 @@ class SelectionDialog extends BaseChart{
             else{
                 c.filters[col.field]=[min,max];
             }
+            lessThan.value=max;
+            greaterThan.value= min;
+
             
             this.filterCategories(col.field);
         });
+        
+      
+        lessThan.value=cv[1];
+        greaterThan.value=cv[0];
+
+        greaterThan.addEventListener("blur",e=>{
+                let n = parseFloat(greaterThan.value);
+               
+                const cvi = sl.noUiSlider.get();
+                if (isNaN(n) || n > cvi[1]){
+                    return;
+                }
+                n  = n < mm[0]?mm[0]:n;
+                sl.noUiSlider.set([n, cvi[1]],true,true);
+        });
+        greaterThan.addEventListener("keypress",e=>{
+            if (e.key=== "Enter"){
+                greaterThan.blur();
+            }
+        });
+
+        lessThan.addEventListener("blur",e=>{
+            
+                let n = parseFloat(lessThan.value);
+               
+                const cvi = sl.noUiSlider.get();
+                if (isNaN(n) || n < cvi[0]){
+                    return;
+                }
+                n= n>mm[1]?mm[1]:n;
+                sl.noUiSlider.set([cvi[0], n],true,true);
+              
+        });
+        lessThan.addEventListener("keypress",e=>{
+            if (e.key=== "Enter"){
+                lessThan.blur();
+            }
+        });
+
+
         if (fil){
             this.filterCategories(col.field,false);
             this.hasFiltered=true;
         }
         this.numberFilters[col.field]=sl;
     }
+
+    
 
     filterCategories(col,notify=true){
         const f= this.config.filters[col];
