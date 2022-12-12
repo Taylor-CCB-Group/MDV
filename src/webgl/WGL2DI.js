@@ -2,8 +2,7 @@ import regl from  "regl";
 import * as glMatrix from "gl-matrix";
 import {createEl, makeDraggable} from "../utilities/Elements.js";
 import {Camera} from "./Camera.js";
-import { thresholdFreedmanDiaconis } from "d3";
-import { copy } from "gl-matrix/cjs/mat4.js";
+
 
 
 class WGL2DI{
@@ -952,12 +951,13 @@ class WGL2DI{
 	}
 
 	_setUpPolyBrush(pos){
+		
 		this.poly_brush={
 			points:[pos],
 			active:true,
 		}
 		let ctx= this.label_context;
-		
+		ctx.strokeStyle= getComputedStyle(this.div_container).getPropertyValue("color");
 		ctx.beginPath()
 		ctx.moveTo(pos[0],pos[1]);
 	

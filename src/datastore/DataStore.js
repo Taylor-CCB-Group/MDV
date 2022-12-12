@@ -36,6 +36,7 @@ class DataStore{
         this.filterArray = new Uint8Array (this.filterBuffer);
         //keep track of dimensions and the columns they represent
         this.dimensions=[];
+        this.name= config.name;
     
         this.textDecoder = new TextDecoder();
         this.columnGroups={};
