@@ -1893,10 +1893,6 @@ class AddChartDialog extends BaseDialog{
         this.setParamDiv(types[0].type,content.dataStore);
 
 
-        
-
-
-
         createEl("span",{
             text:"Add",
             classes:["ciview-button"]
@@ -1973,8 +1969,8 @@ class AddChartDialog extends BaseDialog{
                 const d = createEl("div",{styles:{padding:"4px"}},this.paramDiv)
                 const sp =createEl("div",{text:p.name+":"},d);
                 const holder =createEl("div",{},this.paramDiv);
-                if (p.type.startsWith("_multi")){
-                this._addMultiColumnSelect(holder,p.type.split(":")[1])
+                if (!(Array.isArray(p.type)) && p.type.startsWith("_multi")){
+                    this._addMultiColumnSelect(holder,p.type.split(":")[1])
                 }
                 else{
                     this.multiColumns=null;

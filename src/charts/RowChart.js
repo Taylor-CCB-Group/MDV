@@ -96,7 +96,7 @@ BaseChart.types["row_chart"]={
     "class":RowChart,
     name:"Row Chart",
     params:[{
-        type:"text",
+        type:["text","multitext"],
         name:"Category"
     }]
 

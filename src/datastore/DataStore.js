@@ -391,33 +391,62 @@ class DataStore{
         const col = this.columnIndex[column];
         const tupper= text.toLowerCase();
         const tlower = text.toUpperCase();
-        const e = new TextEncoder();
-        const bupper= e.encode(tupper);
-        const blower= e.encode(tlower);
-        const len = text.length;
-        const d = col.data;
         const matches=[];
-        const sl = col.stringLength;
-    
-        for (let i = 0;i<d.length-len;i++){
-            let match=true;
-            for (let a=0;a<len;a++){
-                if (bupper[a]!=d[i+a] && blower[a]!=d[i+a]){
-                    match=false;
-                    break
+        if (col.datatype==="unique"){
+            const e = new TextEncoder();
+            const bupper= e.encode(tupper);
+            const blower= e.encode(tlower);
+            const len = text.length;
+            const d = col.data;
+            
+            const sl = col.stringLength;
+        
+            for (let i = 0;i<d.length-len;i++){
+                let match=true;
+                for (let a=0;a<len;a++){
+                    if (bupper[a]!=d[i+a] && blower[a]!=d[i+a]){
+                        match=false;
+                        break;
+                    }
+                }
+                if (match){
+                    const index = Math.floor(i/sl);
+                    const v= this.textDecoder.decode(col.data.slice(index*sl,(index*sl)+sl)).replaceAll("\0","");
+                    matches.push({
+                        value:v,
+                        index:index
+                    });
+                    if (matches.length>number){
+                        break;
+                    }
+                    
                 }
             }
-            if (match){
-                const index = Math.floor(i/sl);
-                const v= this.textDecoder.decode(col.data.slice(index*sl,(index*sl)+sl)).replaceAll("\0","");
-                matches.push({
-                    value:v,
-                    index:index
-                });
-                if (matches.length>number){
-                    break;
+        }
+        else if (col.datatype==="text" || col.datatype==="multitext"){
+            const tlength = text.length;
+            for (let i=0;i<col.values.length;i++){
+                const v = col.values[i];
+                let match =true;
+                for (let n =0;n<v.length-tlength;n++){
+                    let match =true;
+                    for (let a=n;a<n<tlength;a++){
+                        if (text[n]!==tupper[a] && text[n] !==tlower){
+                            match =false;
+                            break
+                        }
+                    }
+                    if (match){
+                        break;
+                    }
                 }
-                
+                if (match){
+                    matches.push({
+                        value:v,
+                        index:i
+                    });
+                }
+
             }
         }
         return matches;
@@ -463,13 +492,18 @@ class DataStore{
             return x;
         
         });
-       
+        const f_array = Array.isArray(filter);  
         const has_sgs= sgs.length !== 0;
         for (let f in this.columnIndex){
             const c= this.columnIndex[f];
             if (filter){
-                if (filter==="number"){
-                    if (c.datatype === "text" || c.datatype==="unique" ){
+                if (f_array){
+                    if (filter.indexOf(c.datatype)===-1){
+                        continue;
+                    }
+                }
+                else if (filter==="number"){
+                    if (c.datatype === "text" || c.datatype==="unique" ||  c.datatype==="multitext" ){
                         continue;
                     }
                 }
@@ -487,7 +521,6 @@ class DataStore{
                             subgroup:{
                                 dataSource:sg.dataSource,
                                 name_column:sg.name_column
-
                             }
                         });
                         has=true
@@ -550,6 +583,11 @@ class DataStore{
                 if (isNaN(v)){
                     v="missing";
                 }
+            }
+            else if (col.datatype=="multitext"){
+                const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
+                v= Array.from(d.filter(x=>x!=255)).map(x=>col.values[x]).join(", ")
+
             }
             else{
                 v= this.textDecoder.decode(col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength));
@@ -915,8 +953,11 @@ class DataStore{
                 }
             }         
         }
+        else if (c.datatype==="multitext"){
+            c.data= new Uint16Array(buffer);
+        }
         else {
-          c.data= new Uint8Array(buffer)
+          c.data= new Uint8Array(buffer);
         }
         this.columnsWithData.push(column);      
     }
@@ -1005,7 +1046,7 @@ class DataStore{
                     v_to_n[v]++
                 }
             }
-            const li=[]
+            const li=[];
             for (let v in v_to_n){
                 li.push([v,v_to_n[v]])
             }
@@ -1031,6 +1072,44 @@ class DataStore{
                 a[i]=arr[i]
             }
             return buff
+
+        }
+        else if (col.datatype=== "multitext"){
+            let vals = new Set();
+            let max=0;
+            //first parse - get all possible values and max number
+            //of values in a single field
+            for (let i=0;i<len;i++){
+                const v= arr[i];
+                const vs = v.split(",");
+                max = Math.max(max,vs.length);
+                vs.forEach(x=>vals.add(x));   
+            }
+            const buff =new SharedArrayBuffer(this.size*max*2);
+            const data = new  Uint16Array(buff);
+            data.fill(65535);
+            const values= new Array(vals.size);
+            //more efficent than using indexOf in array
+            const map = {};
+            let  index=0;
+            for (let v of  vals){
+                map[v]=index;
+                values[index]=v;
+                index++;
+            }
+           
+            for (let i=0;i<len;i++){
+                const b= i*max;
+                const v= arr[i];
+                const vs = v.split(",");
+                vs.sort();
+                for (let n=0;n<vs.length;n++){
+                    data[b+n]=map[vs[n]];
+                }
+            }
+            col.values=values;
+            col.stringLength=max;
+            return buff;
 
         }
         else{
@@ -1226,7 +1305,7 @@ class DataStore{
             }
             return colors
         }
-        else if (c.datatype==="text"){          
+        else if (c.datatype==="text" || c.datatype==="multitext"){          
             let colors=  c.colors || defaultPalette.slice(0,c.values.length);
             if (rArr){
                 colors= colors.map(x=>hexToRGB(x));

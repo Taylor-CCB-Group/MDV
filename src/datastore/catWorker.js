@@ -2,15 +2,20 @@
 
 
 
+
 onmessage= function(e){
     const config = e.data[3];
-    const data= new Uint8Array(e.data[2]);
+    const dtype = config.datatype=="multitext"?Uint16Array:Uint8Array;
+    const data=new dtype(e.data[2]);
     const lFilter=new  Uint8Array(e.data[0]);
     const gFilter = new  Uint8Array(e.data[1]);
     let result = null;
     if (config.method==="sankey"){
         const data2= new Uint8Array(e.data[4]);
         result = getSankeyData(lFilter,gFilter,data,data2,config)
+    }
+    else if (config.method==="venn"){
+        result =calculateSets(lFilter,gFilter,data,config)
     }
     else if (config.method==="proportion"){
         const data2= new Uint8Array(e.data[4]);
@@ -85,17 +90,84 @@ function getProportionData(lFilter,gFilter,data,data2,config){
 
 
 
-function getNumberInCategory(lFilter,gFilter,data,config){
-    const cats = new Array(config.values.length).fill(0);
-    const  len = data.length;
+
+function calculateSets(lFilter,gFilter,data,config){
+    const t = performance.now();
+    const len = data.length/config.stringLength;
+    
+    const sets = new Map();
+    const ilen = config.stringLength;
     for (let i=0;i<len;i++){
         //if filtered out in global but not in local
         if (gFilter[i]!==0){
             if  (gFilter[i] !==lFilter[i]){
-            continue;
+                continue;
             }           
         }
-        cats[data[i]]++;
+        const st = i*ilen;
+        let arr = data.slice(st,st+ilen).toString();
+
+        
+        const val = sets.get(arr);
+        if (!val){
+            sets.set(arr,1);
+        }
+        else{
+            sets.set(arr,val+1);
+        }
+        
+        
+    }
+    const ret=[];
+    for (const [key, value] of sets.entries(sets)) {
+        const set_arr = key.split(",").map(x=>config.values[x]).filter(x=>x!==undefined);
+        ret.push({sets:set_arr,size:value})
+    }
+    console.log(`calc ven : ${performance.now()-t}`);
+    return ret;
+   
+
+    
+
+
+
+}
+
+function getNumberInCategory(lFilter,gFilter,data,config){
+    
+    const len = config.datatype==="multitext"?data.length/config.stringLength:data.length;
+    const cats = new Array(config.values.length).fill(0);
+    
+    if (config.datatype==="multitext"){
+        //calculateSets(lFilter,gFilter,data,config);
+        const ilen = config.stringLength;
+        for (let i=0;i<len;i++){
+            //if filtered out in global but not in local
+            if (gFilter[i]!==0){
+                if  (gFilter[i] !==lFilter[i]){
+                    continue;
+                }           
+            }
+            const st = i*ilen;
+            for (let n=st;n<st+ilen;n++){
+                if (data[n]===65535){
+                    break;
+                }
+                cats[data[n]]++;
+            }
+        }
+
+    }
+    else{
+        for (let i=0;i<len;i++){
+            //if filtered out in global but not in local
+            if (gFilter[i]!==0){
+                if  (gFilter[i] !==lFilter[i]){
+                    continue;
+                }           
+            }
+            cats[data[i]]++;
+        }
     }
     return cats;
 

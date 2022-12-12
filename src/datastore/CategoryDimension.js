@@ -15,54 +15,120 @@ class CategoryDimension extends Dimension{
       
      
         const vals = col.values;
-        let ind = 0;
         const cats=new Set();
         const len = this.parent.size;
         
         if (typeof category === "string"){
             const ind = vals.indexOf(category);
-            for (let i=0;i<len;i++){
-            
-                if (data[i]===ind){
-                    if (localFilter[i]===1){
-                       if (--filter[i] === 0){
-                            parent.filterSize++;
+           
+            if (col.datatype==="multitext"){
+                const int = col.stringLength;
+                for (let i=0;i<len;i++){
+                    const st = i*int;
+                    let has =false;
+                    for (let n=st;n<st+int;n++){
+                        if (data[n]===ind){
+                            has=true;
+                            break
                         }
                     }
-                    localFilter[i]=0;              
+                
+                    if (has){
+                        if (localFilter[i]===1){
+                            if (--filter[i] === 0){
+                                    parent.filterSize++;
+                                }
+                            }
+                            localFilter[i]=0;              
+                    }
+                
+                    else{                  
+                        if (localFilter[i]===0){
+                            if(++filter[i]===1){
+                                parent.filterSize--;
+                            }
+                        }              
+                        localFilter[i]=1
+                    }
                 }
-                else{                  
-                    if (localFilter[i]===0){
-                        if(++filter[i]===1){
-                            parent.filterSize--;
+            }
+
+            else{
+                for (let i=0;i<len;i++){
+                
+                    if (data[i]===ind){
+                        if (localFilter[i]===1){
+                        if (--filter[i] === 0){
+                                parent.filterSize++;
+                            }
                         }
-                    }              
-                    localFilter[i]=1
+                        localFilter[i]=0;              
+                    }
+                    else{                  
+                        if (localFilter[i]===0){
+                            if(++filter[i]===1){
+                                parent.filterSize--;
+                            }
+                        }              
+                        localFilter[i]=1
+                    }
                 }
-            }      
+            }     
         }
         else{
             for (let cat of category){
                 cats.add(vals.indexOf(cat));
             }
-            for (let i=0;i<len;i++){
-          
-                if (cats.has(data[i])){
-                    if (localFilter[i]===1){
-                        if (--filter[i] === 0){
-                            parent.filterSize++;
+            if (col.datatype==="multitext"){
+                 const int = col.stringLength;
+                for (let i=0;i<len;i++){
+                    const st = i*int;
+                    let has =false;
+                    for (let n=st;n<st+int;n++){
+                        if (cats.has(data[n])){
+                            has=true;
+                            break
                         }
                     }
-                    localFilter[i]=0;              
+                
+                    if (has){
+                        if (localFilter[i]===1){
+                            if (--filter[i] === 0){
+                                    parent.filterSize++;
+                                }
+                            }
+                            localFilter[i]=0;              
+                    }
+                
+                    else{                  
+                        if (localFilter[i]===0){
+                            if(++filter[i]===1){
+                                parent.filterSize--;
+                            }
+                        }              
+                        localFilter[i]=1
+                    }
                 }
-                else{                  
-                    if (localFilter[i]===0){
-                        if(++filter[i]===1){
-                            parent.filterSize--;
+            }
+            else{
+                for (let i=0;i<len;i++){
+                    if (cats.has(data[i])){
+                        if (localFilter[i]===1){
+                            if (--filter[i] === 0){
+                                parent.filterSize++;
+                            }
                         }
-                    }              
-                    localFilter[i]=1
-                } 
+                        localFilter[i]=0;              
+                    }
+                    else{                  
+                        if (localFilter[i]===0){
+                            if(++filter[i]===1){
+                                parent.filterSize--;
+                            }
+                        }              
+                        localFilter[i]=1
+                    } 
+                }
             }
         }  
     }
@@ -140,6 +206,8 @@ class CategoryDimension extends Dimension{
     getCategories(callback,column,config={}){
         const col = this.parent.columnIndex[column];
         config.values=col.values;
+        config.datatype=col.datatype;
+        config.stringLength= col.stringLength;
         const t = performance.now();
         const action = (e)=>{
             console.log(`calc categories ${col.name} : ${performance.now()-t}`);

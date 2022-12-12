@@ -2,6 +2,7 @@ import BaseChart from "./BaseChart.js"
 import { createEl } from "../utilities/Elements.js";
 import noUiSlider from "nouislider";
 
+
 class SelectionDialog extends BaseChart{
     constructor(dataStore,div,config){
         super(dataStore,div,config);
@@ -19,8 +20,11 @@ class SelectionDialog extends BaseChart{
                 styles:{padding:"5px"}
             },this.contentDiv)
             createEl("div",{text:col.name,styles:{fontWeight:"bold"}},div)
-            if (col.datatype==="text"){
+            if (col.datatype==="text" ){
                 this.addTextFilter(col,div)
+            }
+            else if (col.datatype==="multitext"){
+                this.addMultiTextFilter(col,div);
             }
             else if (col.datatype==="integer" || col.datatype==="double"){
                 this.addNumberFilter(col,div);
@@ -39,7 +43,7 @@ class SelectionDialog extends BaseChart{
             t[0].value="__none__";
             t[1].checked=false;
             f[c].category="__none__";
-            f[c].excluse=false;
+            f[c].exclude=false;
         }
         for (let c in this.numberFilters){
             const mm= this.dataStore.getMinMaxForColumn(c);
@@ -174,7 +178,8 @@ class SelectionDialog extends BaseChart{
 
     filterCategories(col,notify=true){
         const f= this.config.filters[col];
-        if (this.dataStore.columnIndex[col].datatype=== "text"){
+        const type = this.dataStore.columnIndex[col].datatype;
+        if (type=== "text" || type==="multitext"){
             if (f.category === "__none__"){
                 this.dims[col].removeFilter();
             }
@@ -200,6 +205,83 @@ class SelectionDialog extends BaseChart{
         
     }
 
+    createTag(div,col,value){
+        this.config.filters[col.field].catergory.push(value);
+        const d=createEl("div",{},div);
+        createEl("span",{text:value},d);
+        const i = createEl("i",classes["fas fa times"],d);
+        i.addEventListener("click",e=>{
+
+        })
+    }
+
+    addMultiTextFilter(col,div){
+        div.style.whiteSpace="nowrap";
+        const c = this.config;     
+        const dim =this.dataStore.getDimension("category_dimension");
+        dim.noclear=true;
+        this.dims[col.field]= dim;
+
+        if (!c.filters[col.field]){
+            c.filters[col.field]={
+                operand:"or",
+                category:[]
+            }
+        }
+        else{
+            this.filterCategories(col.field,false);
+            this.hasFiltered=true;
+        }
+        const fil = c.filters[col.field];
+        const dd = createEl("select",{
+            classes:["mdv-select"],
+            styles:{
+                maxWidth:"200px"
+            }
+        });
+       
+        for (let name of col.values){
+            createEl("option",{
+                text:name,
+                value:name
+            },dd)
+        }
+        div.append(dd);
+        const b = createEl("span",{
+            classes:["ciview-button-sm"],
+            text:"Add"
+        },div);
+        b.addEventListener("click",e=>{
+            this.createTag(div,col,dd.value);
+        });
+
+        dd.addEventListener("change",(e)=>{
+            fil.category=dd.value;
+            this.filterCategories(col.field);
+          
+        });
+        const cb =createEl("input",{
+            classes:["mdv-checkbox"],
+            type:"checkbox"
+        },div)
+        cb.checked= fil.exclude;
+
+        cb.addEventListener("click",e=>{
+            fil.exclude = cb.checked;
+            this.filterCategories(col.field);     
+        });
+        
+        createEl("span",{
+            text:"exclude",
+            style:{
+                fontSize:"11px",
+                verticalAlign:"middle"
+            }
+        },div);
+        this.textFilters[col.field]=[dd,cb]   
+        
+    }
+
     addTextFilter(col,div){
         div.style.whiteSpace="nowrap";
         const c = this.config;     
@@ -217,7 +299,7 @@ class SelectionDialog extends BaseChart{
             this.filterCategories(col.field,false);
             this.hasFiltered=true;
         }
-        const fil = c.filters[col.field]
+        const fil = c.filters[col.field];
         const dd = createEl("select",{
             classes:["mdv-select"],
             styles:{
