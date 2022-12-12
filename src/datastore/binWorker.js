@@ -1,3 +1,12 @@
+/**
+ * @param {SharedArrayBuffer} e.data[0] - local filterBuffer
+ * @param {SharedArrayBuffer} e.data[1] - global filterBuffer
+ * @param {SharedArrayBuffer} e.data[2] - data
+ * @param {Object} e.data[3] - config
+ * @param {Number} e.data[3].bins - number of bins
+ * @param {Number} e.data[3].min - min value
+ * @param {Number} e.data[3].max - max value
+ */
 const func = function(e){
     
 	const data= new Float32Array(e.data[2]);

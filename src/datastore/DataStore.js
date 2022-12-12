@@ -109,6 +109,7 @@ class DataStore{
     * of event and the data associated with it.
     */
     addListener(id,listener){
+        //PJT: XXX: this replaces any existing listener with the same id, probably not intended
         this.listeners[id]=listener;
     }
 
