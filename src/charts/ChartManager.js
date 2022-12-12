@@ -2045,6 +2045,10 @@ class AddChartDialog extends BaseDialog{
                     const el = createEl("input", { value: c.defaultVal }, parentDiv);
                     this.extraControls[c.name] = el;
                     //el.onchange // not using callback, value will be read on submit().
+                } else if (c.type === 'richtext') {
+                    const el = createEl("textarea", { value: c.defaultVal, styles: {height: '300px'} }, parentDiv);
+                    this.extraControls[c.name] = el;
+                    //el.onchange // not using callback, value will be read on submit().
                 }
             }
 

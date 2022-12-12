@@ -37,6 +37,14 @@ export default TextBoxChart;
 BaseChart.types["text_box_chart"]={
     "class":TextBoxChart,
     name:"Text Box",
-    params:[]
-
+    params:[],
+    extra_controls: ()=> [
+        {
+            type:"richtext",
+            name:"text",
+        }
+    ],
+    init:(config, dataSource, extraControls) => {
+        config.text = extraControls.text;
+    }
 }
