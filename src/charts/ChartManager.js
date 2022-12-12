@@ -211,7 +211,7 @@ class ChartManager{
 
         
         
-        createMenuIcon("fas fa-adjust",{
+        const themeButton = createMenuIcon("fas fa-adjust",{
             tooltip:{
                 text:"Change Theme",
                 position:"bottom-left"
@@ -221,6 +221,7 @@ class ChartManager{
             }
 
         },this.rightMenuBar);
+        themeButton.style.margin = "3px";
 
         this._setupThemeContextMenu();
       
