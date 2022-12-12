@@ -5,6 +5,7 @@ import {select} from "d3-selection";
 import {scaleBand,scaleLinear} from "d3-scale";
 import {axisLeft} from "d3-axis";
 import BaseChart from "./BaseChart";
+import { ClipSpace } from "@luma.gl/core";
 
 
 class MultiLineChart extends SVGChart{
@@ -71,6 +72,11 @@ class MultiLineChart extends SVGChart{
             this.y_axis_call= axisLeft(this.y_scale);
             this.y_scale.domain([1,0]);
         }
+    }
+
+    changeCategories(column,val1,val2){
+        this.config.param[1]=column;
+        this.onDataFiltered();
     }
 
     scaleTrim(val){
@@ -228,8 +234,20 @@ class MultiLineChart extends SVGChart{
         const s = super.getSettings();
         const c = this.config;
         const mm = this.dataStore.getMinMaxForColumn(c.param[0]);
+        const cols = this.dataStore.getColumnList("text");
        
         s.splice(1,0,
+            {
+                type:"dropdown",
+                current_value:c.param[1],
+                label:"Change Cetegories (y axis)",
+                values:[cols,"name","field"],
+                func:x=>{
+                    this.changeCategories(x,"val1","val2");
+                }
+
+
+            },
             {          
                 type:"check",
                 current_value:c.stacked,
@@ -309,6 +327,7 @@ class MultiLineChart extends SVGChart{
 BaseChart.types["multi_line_chart"]={
     "class":MultiLineChart,
     name:"Multi Line Chart",
+    methodsUsingColumns:["changeCategories"],
     params:[
      
         {

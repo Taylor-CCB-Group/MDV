@@ -94,7 +94,7 @@ function getColorLegend(colors,names,config={}){
 
         }
 
-        createSVGEl("text",{
+        const t= createSVGEl("text",{
             y:((i+1)*2)+(i*h_fac)+6+3,
             x:t_offset,
             //Firefox was wrong. Changing to "center" made Chrome wrong in same way
@@ -103,10 +103,12 @@ function getColorLegend(colors,names,config={}){
             "alignment-baseline":"center",
             styles:{
                 "font-size":"12px",
-                "fill":"currentColor"
+                "fill":"currentcolor"
             },
             text:names[i]===""?"none":names[i]
-        },legendg)
+        },legendg);
+        select(t).style("fill","currentcolor"); //seems redundant?
+        
     }
 
     makeDraggable(container,{handle:".legend-body"});

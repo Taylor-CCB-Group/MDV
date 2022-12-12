@@ -614,7 +614,7 @@ class FeatureParser{
             } ;
         }
         else{
-            this.decode = FeatureParser.decodeBed;
+            this.decode =config.decode_function === "decodeRefflat"?FeatureParser.decodeRefflat:FeatureParser.decodeBed;
             this.delimiter = /\s+/;
 
         }
@@ -922,6 +922,10 @@ class FeatureParser{
     static decodeRefflat(tokens, ignore) {
 
         if (tokens.length < 10) return null;
+        if (tokens[10] === undefined){
+            console.log(tokens[1]);
+            return null;
+        }
 
         var feature = {
                 chr: tokens[2],
@@ -939,14 +943,15 @@ class FeatureParser{
             exons = [];
 
         for (var i = 0; i < exonCount; i++) {
-            exons.push({start: parseInt(exonStarts[i]), end: parseInt(exonEnds[i])});
+          
+            let exon =  {start:parseInt(exonStarts[i]), end: parseInt(exonEnds[i])}
+            if (feature.cdStart > exon.end || feature.cdEnd < feature.cdStart) exon.utr = true;   // Entire exon is UTR
+            if (feature.cdStart >= exon.start && feature.cdStart <= exon.end) exon.cdStart = feature.cdStart;
+            if (feature.cdEnd >= exon.start && feature.cdEnd <= exon.end) exon.cdEnd = feature.cdEnd;
+            exons.push(exon);
         }
 
         feature.exons = exons;
-
-        feature.popupData = function () {
-            return [{name: "Name", value: feature.name}];
-        };
 
         return feature;
 

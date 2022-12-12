@@ -37,6 +37,7 @@ class HeatMap extends SVGChart{
         if (c.cluster_rows){
             this.margins.right=70;
         }
+        this.addToolTip();
         this.onDataFiltered();      
     }
 
@@ -180,6 +181,14 @@ class HeatMap extends SVGChart{
                 val:d.av
             });
         })
+        .on("mouseover mousemove",(e,d)=>{ 
+            const row = self.dataStore.columnIndex[self.config.param[d.row_id+1]].name;
+
+            self.showToolTip(e,`${vals[d.col_id]}<br>${row}<br>${d.av.toPrecision(2)}`);
+        }).
+        on("mouseleave",()=>{
+            self.hideToolTip();
+        })   
         .transition(trans)
         .attr("fill",(d,i)=>{
             if (d.miss){

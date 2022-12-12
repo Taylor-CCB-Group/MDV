@@ -393,7 +393,14 @@ BaseChart.types["genome_browser"]={
                 type:"bam_sca_track"
             })
         }
-        config.default_track = dataSource.genome_browser.default_track.url
+        //add any default tracks
+        config.default_track = gb.default_track.url;
+        if (gb.default_tracks){
+            for (let t of gb.default_tracks){
+                config.tracks.push(JSON.parse(JSON.stringify(t)));
+            }
+           
+        }
     }
 }
 

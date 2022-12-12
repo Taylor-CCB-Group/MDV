@@ -72,6 +72,13 @@ class CellRadialChart extends SVGChart{
 	}
 
 
+    onDataFiltered(){
+        this.makeHierarchy();
+        this.drawTree();
+        this.setStateLegend();
+    }
+
+
 
     getConfig(){
         const config = super.getConfig();
@@ -103,7 +110,7 @@ class CellRadialChart extends SVGChart{
             names=names.filter(x=>c.states.indexOf(x) !==-1);
         }
         this.state_legend = getColorLegend(colors,names,{label:col.name});
-        this.div.append(this.state_legend);
+        this.contentDiv.append(this.state_legend);
         this.state_legend.style.top= sl.position[1]+"px";
         this.state_legend.style.left= sl.position[0]+"px";
 
@@ -455,7 +462,7 @@ class CellRadialChart extends SVGChart{
         .append("path")
         .attr("class", "ring")
         .attr("d", ringGen)
-        .attr("opacity",0.1)
+        .attr("opacity",0.4)
         .attr("fill", d=>d.color)
         .attr("stroke", "gray")
         .attr("stroke-width", 1);
@@ -471,7 +478,7 @@ class CellRadialChart extends SVGChart{
         .append("path")
           .attr("class", "link")
           .attr("fill","none")
-          .attr("stroke", "black")
+          .attr("stroke", "currentColor")
           .attr("stroke-width", d=>{
             if (d.depth===3){
                 return cwidth?c.link_thickness.type:self.linkThicknessScale(thick[d.id]);
@@ -549,6 +556,7 @@ class CellRadialChart extends SVGChart{
           node.append("text")
               .attr("dy", ".31em")
               .attr("font-size",fs)
+              .style("fill","currentColor")
               .attr("font-family","Helvetica")
               .attr("x", d=> {
                 const x_off= d.depth==1?c.node_size.inner+1:c.node_size.outer+1;
@@ -583,6 +591,7 @@ class CellRadialChart extends SVGChart{
 
     makeHierarchy(){
         //get cell type columns
+        console.log("making hierarchy");
         
         const c = this.config;
         const ct1 = this.dataStore.columnIndex[c.param[1]];
@@ -590,6 +599,13 @@ class CellRadialChart extends SVGChart{
         const st = this.dataStore.columnIndex[c.param[0]];
         const sc = this.dataStore.columnIndex[c.param[3]];
         const oc = this.dataStore.columnIndex[c.param[5]];
+
+
+        const so = c.specific_only;
+        let include= null;
+        if (so){
+            include = new Set(so[0].map(x=>ct1.values.indexOf(x)));
+        }
   
    
 
@@ -616,23 +632,21 @@ class CellRadialChart extends SVGChart{
         }
         const en_inter= st_inter+inner_ring.length;
 
-        const has = new Set()
+        const has = new Set();
+        const f = this.dataStore.filterArray;
          
         for (let n=0;n<this.dataStore.size;n++){
-            if (this.filtered_ids && !(this.filtered_ids.has(n))){
+            if (f[n]>0 ){
                 continue
             }
+            if(include && !(include.has(ct2.data[n]))){
+                continue;
+            }
 
-            if (sc.data[n]>c.stat_cutoff){
-                continue;
-            }
-            if (c.outer_cell_type && oc.values[oc.data[n]]!==c.outer_cell_type){
-                continue;
-            }
             const c1= ct1.values[ct1.data[n]];
             const c2= ct2.values[ct2.data[n]];
             const s  = st.values[st.data[n]];
-            console.log(s+":"+st.data[n]);
+            
             const lu = `${s}|${c1}`;
             //exclude certain interactions
             let exclude= false;

@@ -50,6 +50,11 @@ select, input, textarea {
     margin:2px;
 }
 
+.mdv-divider{
+    margin-left:6px;
+    margin-right:6px;
+}
+
 .mdv-select:focus{
 
     box-shadow:0px 0px 3px 2px #088AFF;

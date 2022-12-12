@@ -5,6 +5,7 @@ import "d3-transition";
 import {easeLinear} from "d3-ease";
 import {axisLeft,axisBottom} from "d3-axis";
 import {cluster} from "d3-hierarchy";
+import { thresholdFreedmanDiaconis } from "d3";
 
 
 
@@ -166,12 +167,24 @@ class SVGChart extends BaseChart{
                 .text(this.config.axis.x.label)
                 .attr("font-size",this.config.axis.x.textsize+"px")
                 .attr("font-family","Helvetica")
-            }
+        }
 
         if (ax.y){
             if (this.y_scale){
                 this.y_scale.range([0, dim.height]);
-            
+                const tinterval = dim.height/this.y_scale.domain().length;
+                if (tinterval<8){
+                    const ii = Math.round(this.y_scale.domain().length/(dim.height/10))
+                    this.y_axis_call.tickFormat((d,i)=>{
+                        return i%ii==0?d:"";
+                    });
+
+                }
+                else{
+                    this.y_axis_call.tickFormat(null);
+                }
+                
+               
                
                 this.y_axis_svg.transition().call(this.y_axis_call);
                 if (ax.y.rotate_labels){    
