@@ -221,28 +221,20 @@ class SettingsDialog extends BaseDialog{
     textbox(s,d){
         const tb= createEl("textarea",{
            
+            // no other 'textbox' in our code apart from TextBoxChart AFAICT.
             styles:{
-                height:"20px",
+                // height:"20px",
                 width:"100%"
             }
         },d);
         tb.value=s.current_value;
     
         tb.addEventListener("keypress",e=>{
-            if (e.keyCode===13){
-                tb.blur();
-            }
-            else{
-                s.func(tb.value);
-            }
+            s.func(tb.value);
         });
         tb.addEventListener("blur",e=>{
-            tb.style.height = "20px";
             s.func(tb.value);
         })
-        tb.addEventListener("focus",e=>{
-            tb.style.height="80px"
-          })
     }
 
     addInfoIcon(info,parent){

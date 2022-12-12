@@ -1,6 +1,6 @@
 import BaseChart from "./BaseChart.js";
 import {createEl} from "../utilities/Elements.js";
-
+import {marked} from "marked";
 
 class TextBoxChart extends BaseChart{
     constructor(dataStore,div,config){
@@ -8,12 +8,14 @@ class TextBoxChart extends BaseChart{
        
         const c = this.config;
         c.text= c.text || "";
-        this.para = createEl("p",{
-            text:this.config.text,
+        this.para = createEl("div",{
+            // text: c.text,
+            // innerHTML: marked.parse(c.text),
             styles:{
                 padding:"5px"
             }
         },this.contentDiv);
+        this.para.innerHTML = marked.parse(c.text);
 
         
 	}
@@ -25,7 +27,11 @@ class TextBoxChart extends BaseChart{
             label:"Text",
             type:"textbox",
             current_value:c.text,
-            func:x=>this.para.textContent=c.text=x
+            func: x => {
+                c.text = x;
+                this.para.innerHTML = marked.parse(x);
+                //this.para.textContent = c.text = x
+            }
         });
         return settings;
     }
@@ -40,7 +46,7 @@ BaseChart.types["text_box_chart"]={
     params:[],
     extra_controls: ()=> [
         {
-            type:"richtext",
+            type:"textbox",
             name:"text",
         }
     ],
