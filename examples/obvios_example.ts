@@ -10,6 +10,10 @@ import ChartManager from "../src/charts/ChartManager";
 
 import { Matrix4, Vector3 } from 'math.gl';
 import { Plane } from '@math.gl/culling';
+import { BaseDialog } from "../src/utilities/Dialog";
+import { createEl } from "../src/utilities/Elements";
+import { DataModel } from "../src/table/DataModel";
+import { DataColumn } from "../src/charts/charts";
 
 
 // let's add some mock data that looks a bit more like what we expect to see...
@@ -98,6 +102,42 @@ const mockDataLoader = {
     function: mockDataLoaderFn
 }
 
+// could we add a 'select slice' option, that would 
+// - select the relevant points
+// - add an image-layer to the 3d view with an image & orientation corresponding to the slice
+// - set a clipping plane on the 3d view
+
+class SliceDialog extends BaseDialog {
+    constructor(chartManager: ChartManager) {
+        super({
+            title: "Select slice",
+            width: 300,
+            height: 200,
+            columns: 1,
+        }, {});
+        const dataStore = chartManager.getDataSource('test').dataStore;
+        const sliceColumn = dataStore.getColumn('slice_id') as DataColumn<'text'>;
+        // create a dropdown with the slice ids
+        const sliceDropdown = createEl('select', {}, this.columns[0]);
+        for (const s of mockSlices) {
+            const option = document.createElement('option');
+            sliceDropdown.appendChild(option);
+            option.value = '' + s.slice_id;
+            option.innerText = 'slice ' + s.slice_id;
+        }
+        sliceDropdown.addEventListener('change', (e) => {
+            const slice_id = Number.parseInt(sliceDropdown.value);
+            const slice = mockSlices.find(s => s.slice_id === slice_id);
+            //chartManager.getDataSource('test').selectRows(r => r.slice_id === slice_id);
+            // how do we filter the data?
+                            
+        });
+    }
+    // init() {
+    // }
+    // open(callback) {
+    // }
+}
 
  //config - single view
 const config={
