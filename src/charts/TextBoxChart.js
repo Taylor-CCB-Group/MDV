@@ -1,6 +1,11 @@
 import BaseChart from "./BaseChart.js";
 import {createEl} from "../utilities/Elements.js";
 import {marked} from "marked";
+import {sanitize} from 'dompurify';
+
+function render(text) {
+    return sanitize(marked.parse(text));
+}
 
 class TextBoxChart extends BaseChart{
     constructor(dataStore,div,config){
@@ -15,7 +20,7 @@ class TextBoxChart extends BaseChart{
                 padding:"5px"
             }
         },this.contentDiv);
-        this.para.innerHTML = marked.parse(c.text);
+        this.para.innerHTML = render(c.text);
 
         
 	}
@@ -29,7 +34,7 @@ class TextBoxChart extends BaseChart{
             current_value:c.text,
             func: x => {
                 c.text = x;
-                this.para.innerHTML = marked.parse(x);
+                this.para.innerHTML = render(x);
                 //this.para.textContent = c.text = x
             }
         });
