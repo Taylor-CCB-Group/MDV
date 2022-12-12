@@ -229,7 +229,7 @@ class SettingsDialog extends BaseDialog{
         },d);
         tb.value=s.current_value;
     
-        tb.addEventListener("keypress",e=>{
+        tb.addEventListener("input",e=>{
             s.func(tb.value);
         });
         tb.addEventListener("blur",e=>{
