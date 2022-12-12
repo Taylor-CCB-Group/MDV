@@ -1628,6 +1628,7 @@ class ChartManager{
         const div= chart.getDiv();
         const chInfo= this.charts[chart.config.id];
         const details={dim:[chart.config.size[0],chart.config.size[1]],pos:[div.style.left,div.style.top]};
+        if (div.gridstackPopoutCallback) div.gridstackPopoutCallback();
         removeResizable(div);
         removeDraggable(div);
         const win = new PopOutWindow(

@@ -14,6 +14,13 @@ function clearPosition(div) {
     div.style.height = '';
 }
 
+declare global {
+    interface HTMLDivElement {
+        gridstackNode?: any;
+        gridstackPopoutCallback?: () => void;
+    }
+}
+
 export default class GridStackManager {
     cellHeight = 150;
     cellApproxWidth = 300;
@@ -114,16 +121,21 @@ export default class GridStackManager {
         function addRemoveHandler() {
             const {remove} = chart;
             chart.remove = () => {
+                grid.removeWidget(div, true);
+                //div.gridstackNode = undefined; //doesn't help
                 remove.apply(chart);
-                //don't remove from DOM, as it happens elsewhere.
-                //doesn't get rid of regl 'must not double destroy framebuffer' error.
-                grid.removeWidget(div, false);
             }
             return remove;
         }
         function addPopOutHandler() {
             const {changeBaseDocument} = chart;
+            div.gridstackPopoutCallback = () => {
+                // console.log('removing from gridstack');
+                grid.removeWidget(div, true);
+            }
             chart.changeBaseDocument = (doc) => {
+                //by now, it's too late... the parent element is no longer the grid.
+                //grid.removeWidget(div, true);
                 changeBaseDocument.apply(chart, [doc]);
                 if (doc === document) console.error('changeBaseDocument should be restored to normal by the time we get here...');
                 revertModifications();
