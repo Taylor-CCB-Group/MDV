@@ -586,7 +586,7 @@ class DataStore{
             }
             else if (col.datatype=="multitext"){
                 const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
-                v= Array.from(d.filter(x=>x!=255)).map(x=>col.values[x]).join(", ")
+                v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(", ")
 
             }
             else{
@@ -1085,6 +1085,7 @@ class DataStore{
                 max = Math.max(max,vs.length);
                 vs.forEach(x=>vals.add(x));   
             }
+            vals.delete("");
             const buff =new SharedArrayBuffer(this.size*max*2);
             const data = new  Uint16Array(buff);
             data.fill(65535);
@@ -1099,8 +1100,12 @@ class DataStore{
             }
            
             for (let i=0;i<len;i++){
+               
                 const b= i*max;
                 const v= arr[i];
+                if (v===""){
+                    continue;
+                }
                 const vs = v.split(",");
                 vs.sort();
                 for (let n=0;n<vs.length;n++){

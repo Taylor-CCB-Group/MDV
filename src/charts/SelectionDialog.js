@@ -1,6 +1,7 @@
 import BaseChart from "./BaseChart.js"
 import { createEl } from "../utilities/Elements.js";
 import noUiSlider from "nouislider";
+import { getRandomString } from "../utilities/Utilities.js";
 
 
 class SelectionDialog extends BaseChart{
@@ -179,7 +180,7 @@ class SelectionDialog extends BaseChart{
     filterCategories(col,notify=true){
         const f= this.config.filters[col];
         const type = this.dataStore.columnIndex[col].datatype;
-        if (type=== "text" || type==="multitext"){
+        if (type=== "text" ){
             if (f.category === "__none__"){
                 this.dims[col].removeFilter();
             }
@@ -191,6 +192,17 @@ class SelectionDialog extends BaseChart{
                 this.resetButton.style.display = "inline";
                 this.dims[col].filter("filterCategories",[col],vs,notify)
             }    
+        }
+        else if (type==="multitext"){
+            if (f.category.length===0){
+                this.dims[col].removeFilter();
+            }
+            else{
+                this.resetButton.style.display = "inline";
+                const  args= f.category.slice(0);
+                args.operand= f.operand;
+                this.dims[col].filter("filterCategories",[col],args,notify)
+            }
         }
         else{
             if (!f){
@@ -206,12 +218,16 @@ class SelectionDialog extends BaseChart{
     }
 
     createTag(div,col,value){
-        this.config.filters[col.field].catergory.push(value);
+        
+        this.config.filters[col.field].category.push(value);
         const d=createEl("div",{},div);
         createEl("span",{text:value},d);
-        const i = createEl("i",classes["fas fa times"],d);
+        const i = createEl("i",{classes:["fas","fa-times"]},d);
         i.addEventListener("click",e=>{
-
+            this.config.filters[col.field].category=this.config.filters[col.field].category.filter(x=>x!==value);
+            console.log(this.config.filters[col.field].category);
+            d.remove();
+            this.filterCategories(col.field);  
         })
     }
 
@@ -252,33 +268,26 @@ class SelectionDialog extends BaseChart{
             text:"Add"
         },div);
         b.addEventListener("click",e=>{
-            this.createTag(div,col,dd.value);
-        });
-
-        dd.addEventListener("change",(e)=>{
-            fil.category=dd.value;
-            this.filterCategories(col.field);
-          
-        });
-        const cb =createEl("input",{
-            classes:["mdv-checkbox"],
-            type:"checkbox"
-        },div)
-        cb.checked= fil.exclude;
-
-        cb.addEventListener("click",e=>{
-            fil.exclude = cb.checked;
-            this.filterCategories(col.field);     
-        });
-        
-        createEl("span",{
-            text:"exclude",
-            style:{
-                fontSize:"11px",
-                verticalAlign:"middle"
+            if (fil.category.indexOf(dd.value)===-1){
+                this.createTag(div,col,dd.value);
+                this.filterCategories(col.field);  
             }
+            
+        });
+        const rname = getRandomString()
+        const rb = createEl("input",{   
+            type:"radio",
+            name:col.field,
+            value:"and"
         },div);
-        this.textFilters[col.field]=[dd,cb]   
+        rb.checked = fil.operand==="and";
+        rb.addEventListener("click",(e)=>{
+            fil.operand="and";
+            this.filterCategories(col.field);  
+
+        })
+      
+        this.textFilters[col.field]=[dd,rb]   
         
     }
 

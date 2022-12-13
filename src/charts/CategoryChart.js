@@ -86,6 +86,9 @@ class CategoryChart extends SVGChart{
                 this.rowData.push([data[n],n]);
                 this.maxCount= Math.max(data[n],this.maxCount);
             }
+            
+            this.rowData=  this.rowData.filter(x=>x[0]!==0).sort((a,b)=>b[0]-a[0]);
+            
             this.drawChart();            
         },this.config.param,config)    
     }

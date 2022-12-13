@@ -80,17 +80,32 @@ class CategoryDimension extends Dimension{
                 cats.add(vals.indexOf(cat));
             }
             if (col.datatype==="multitext"){
-                 const int = col.stringLength;
+                const int = col.stringLength;
+                let ao = category.operand==="and";
                 for (let i=0;i<len;i++){
                     const st = i*int;
                     let has =false;
+                    let num =0;
                     for (let n=st;n<st+int;n++){
+                        if (data[n]===65535){
+                            break;
+                        }
                         if (cats.has(data[n])){
-                            has=true;
-                            break
+                            if (!ao){
+                                has=true;
+                                break
+                            }
+                            else{
+                                num++;
+                                if (num === category.length){
+                                    has=true;
+                                    break;
+                                }
+                            }
+                           
                         }
                     }
-                
+                  
                     if (has){
                         if (localFilter[i]===1){
                             if (--filter[i] === 0){

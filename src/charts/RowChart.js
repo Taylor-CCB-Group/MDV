@@ -48,7 +48,7 @@ class RowChart extends CategoryChart{
         this.updateAxis();
 
         this.graph_area.selectAll(".row-bar")
-        .data(data)
+        .data(data, d=>d[1])
         .join("rect")
         .attr("class","row-bar")
         .on("click",(e,d)=>{
