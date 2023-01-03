@@ -68,7 +68,7 @@ class ImageTableChart extends BaseChart{
         const settings = super.getSettings();
         return settings.concat([{
             type:"slider",
-            max:od[1]*2,
+            max:od[1]*4,
             min:10,
             doc:this.__doc__,
             label:"Image Size",

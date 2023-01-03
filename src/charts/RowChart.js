@@ -9,6 +9,7 @@ class RowChart extends CategoryChart{
         this.config.type = "row_chart";
         //redraw the chart
         this.onDataFiltered(null);
+        this.labelg = this.graph_area.append("g");
 	}
 
     drawChart(tTime=400){
@@ -47,7 +48,7 @@ class RowChart extends CategoryChart{
         this.x_scale.domain([0,this.maxCount]);
         this.updateAxis();
 
-        this.graph_area.selectAll(".row-bar")
+        this.labelg.selectAll(".row-bar")
         .data(data, d=>d[1])
         .join("rect")
         .attr("class","row-bar")
@@ -74,7 +75,7 @@ class RowChart extends CategoryChart{
 
         this.graph_area.selectAll(".row-text")
         
-        .data(data)
+        .data(data,d=>d[1])
         .join("text")
         .on("click",(e,d)=>{
             self.filterCategories(vals[d[1]],e.shiftKey);
@@ -89,6 +90,49 @@ class RowChart extends CategoryChart{
         //.attr("text-anchor", "middle")
         .attr("dominant-baseline", "central") 
 
+    }
+
+    getSettings(){
+
+   
+        const settings= super.getSettings();
+        const c = this.config;
+        const max =Math.max(this.data.length || 60)
+
+        return settings.concat([
+            {
+                type:"spinner",
+                label:"Max Rows",
+                current_value:c.show_limit || max,
+                max:max,
+                func:x=>{
+                    c.show_limit=x;
+                    this.updateData();
+                    this.drawChart();
+                }
+            },
+            {
+                type:"check",
+                label:"Hide zero values",
+                current_value:c.filter_zeros,
+                func:x=>{
+                    c.filter_zeros=x;
+                    this.updateData();
+                    this.drawChart();
+                }
+            },
+            {
+                type:"radiobuttons",
+                label:"Sort Order",
+                current_value:c.sort || "default",
+                choices:[["Default","default"],["Size","size"],["Name","name"]],             
+                func:(v)=>{
+                    c.sort=v;
+                    this.updateData();
+                    this.drawChart();      
+                }
+            }
+        ])
     }
 }
 

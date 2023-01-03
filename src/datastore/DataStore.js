@@ -69,6 +69,9 @@ class DataStore{
                 this.addColumnGroup(item);
             }
         }
+        if (config.large_images){
+            this.large_images=config.large_images;
+        }
         if (config.links){
             for (let ds in config.links){
                 const link = config.links[ds];
@@ -313,6 +316,9 @@ class DataStore{
         if (column.editable){
             c.editable=true;
         }
+        if (column.is_url){
+            c.is_url=true;
+        }
 
         if (column.subgroup){
             c.subgroup=column.subgroup;
@@ -321,7 +327,8 @@ class DataStore{
         }
        
         
-        if (column.datatype === "text"){
+        if (column.datatype === "text" || column.datatype === "multitext"){
+            c.stringLength= column.stringLength;
             c.values = column.values || [`Error: no values for '${c.name}'`];
             console.warn(`no initial values for column '${c.name}' specified in dataSources`);
         }
@@ -332,6 +339,7 @@ class DataStore{
         }
         else{
             c.stringLength= column.stringLength;
+            
         }
         this.columns.push(c);
         this.columnIndex[c.field]=c;
@@ -608,6 +616,11 @@ class DataStore{
         }
         else if (col.datatype==="text"){
             return col.values[col.data[index]]
+        }
+        else if (col.datatype=="multitext"){
+            const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
+            return  Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(", ")
+
         }
         else{
             return col.data[index];
@@ -1083,7 +1096,7 @@ class DataStore{
                 const v= arr[i];
                 const vs = v.split(",");
                 max = Math.max(max,vs.length);
-                vs.forEach(x=>vals.add(x));   
+                vs.forEach(x=>vals.add(x.trim()));   
             }
             vals.delete("");
             const buff =new SharedArrayBuffer(this.size*max*2);
@@ -1109,7 +1122,7 @@ class DataStore{
                 const vs = v.split(",");
                 vs.sort();
                 for (let n=0;n<vs.length;n++){
-                    data[b+n]=map[vs[n]];
+                    data[b+n]=map[vs[n].trim()];
                 }
             }
             col.values=values;
@@ -1310,8 +1323,25 @@ class DataStore{
             }
             return colors
         }
-        else if (c.datatype==="text" || c.datatype==="multitext"){          
-            let colors=  c.colors || defaultPalette.slice(0,c.values.length);
+        else if (c.datatype==="text" || c.datatype==="multitext"){
+
+            let colors=  c.colors;
+            if (! colors){
+                const vlen = c.values.length;
+                const dlen = defaultPalette.length;
+                if (vlen<dlen){
+                    colors=defaultPalette.slice(0,vlen);
+                }
+                else{
+                    colors=[];
+                    const times = Math.floor(vlen/dlen);
+                    for (let n=0;n<times;n++){
+                        colors=colors.concat(defaultPalette);
+                    }
+                    colors=colors.concat(defaultPalette.slice(0,vlen%dlen))
+                }
+            }
+            
             if (rArr){
                 colors= colors.map(x=>hexToRGB(x));
             }

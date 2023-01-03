@@ -57,6 +57,25 @@
 
 }
 
+.mdv-section{
+    padding:4px;
+}
+
+.mdv-section-header{
+    background-color:var(--background_color);
+    font-weight: bold;
+}
+.mdv-section-value{
+    white-space:pre-wrap;
+}
+
+.mdv-image-holder{
+    margin:5px;
+    border:1px solid black;
+    position:relative;
+    overflow:hidden;
+}
+
 
 .mdv-checkbox{
     transform:scale(1.2);

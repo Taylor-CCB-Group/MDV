@@ -8,6 +8,7 @@ import {BaseDialog} from "../utilities/Dialog.js";
 
 
 
+
 class TableChart extends BaseChart{
     constructor(dataStore,div,config){
 		super(dataStore,div,config);
@@ -30,6 +31,11 @@ class TableChart extends BaseChart{
             
             if (column.editable){
                 col.editor=TextEditor;
+            }
+            if(column.is_url){
+                col.formatter=(  row, cell, value, columnDef, dataContext )=>{
+                    return `<a href="${value}" target="_blank">${value}</a>`
+                }
             }
             cols.push(col)
         }
@@ -61,7 +67,7 @@ class TableChart extends BaseChart{
         this.dataModel.addListener(this.config.id,()=>{
             this.grid.invalidate();
         });
-        //this is too update the header renderer
+        //this is to update the header renderer
         this.grid.setColumns(this.grid.getColumns())
        
 

@@ -17,6 +17,7 @@ import "./BoxPlot.js";
 import "./SankeyChart.js";
 import "./MultiLineChart.js";
 import "./DensityScatterPlot";
+import "./SelectionDialog.js";
 
 
 
@@ -27,6 +28,14 @@ import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
 
 
+
+const column_orders={
+    "double":0,
+    "integer":0,
+    "multitext":1,
+    "text":2,
+    "unique":2
+}
 
 const themes={
     "Dark":{
@@ -114,7 +123,11 @@ class ChartManager{
         for (const d of dataSources){
             const ds= {
                 name:d.name,
+<<<<<<< HEAD
                 dataStore:new DataStore(d.size,{name:d.name,columns:d.columns,columnGroups:d.columnGroups,offsets:d.offsets,links:d.links}),
+=======
+                dataStore:new DataStore(d.size,{columns:d.columns,columnGroups:d.columnGroups,offsets:d.offsets,links:d.links,large_images:d.large_images}),
+>>>>>>> dbd3531... added Summary Chart
                 link_to:d.link_to,
                 index_link_to:d.index_link_to,
                 color:d.color || themes[this.theme].background_color,
@@ -500,10 +513,15 @@ class ChartManager{
                         this.removeAllCharts();
                         this.viewData.links=[];
                         const state = this.getState();
-                        state.view.initialCharts={}
-                        for (let ds in this.dsIndex){
-                            if (vals[ds]){
-                                state.view.initialCharts[ds]=[];
+                        state.view.initialCharts={};
+                        if (this.dataSources.length===1){
+                            state.view.initialCharts[this.dataSources[0].name]=[];
+                        }
+                        else{
+                            for (let ds in this.dsIndex){
+                                if (vals[ds]){
+                                    state.view.initialCharts[ds]=[];
+                                }
                             }
                         }
                         this._callListeners("state_saved",state);
@@ -977,10 +995,7 @@ class ChartManager{
         //as you can't create an array from  an arry buffer starting at
         //a byte position not divisible by 4 
         columns.sort((a,b)=>{
-            const c= (a.datatype==="double" || a.datatype==="integer")?0:1;
-            const d= (b.datatype==="double" || b.datatype==="integer")?0:1;
-            return c-d;
-
+            return column_orders[a.datatype]-column_orders[b.datatype];
         })
        
         //"this.dataLoader is not a function" with e.g. "cell_types"

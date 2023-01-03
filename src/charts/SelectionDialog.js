@@ -38,12 +38,20 @@ class SelectionDialog extends BaseChart{
     }
 
     removeFilter(){
-        const f= this.config.filters   
+        const f= this.config.filters;
+      
         for (let c in this.textFilters){
             const t = this.textFilters[c];
-            t[0].value="__none__";
-            t[1].checked=false;
-            f[c].category="__none__";
+            const is_multi = f[c].operand;
+            if (!is_multi){
+                t[0].value="__none__";
+                t[1].checked=false;
+            }
+            else{
+                t[1].innerHTML="";
+            }
+            
+            f[c].category=is_multi?[]:"__none__";
             f[c].exclude=false;
         }
         for (let c in this.numberFilters){
@@ -217,9 +225,10 @@ class SelectionDialog extends BaseChart{
         
     }
 
-    createTag(div,col,value){
-        
-        this.config.filters[col.field].category.push(value);
+    createTag(div,col,value,add=true){
+        if (add){
+            this.config.filters[col.field].category.push(value);
+        }
         const d=createEl("div",{},div);
         createEl("span",{text:value},d);
         const i = createEl("i",{classes:["fas","fa-times"]},d);
@@ -231,8 +240,8 @@ class SelectionDialog extends BaseChart{
         })
     }
 
-    addMultiTextFilter(col,div){
-        div.style.whiteSpace="nowrap";
+    addMultiTextFilter(col,hdiv){
+        let div = createEl("div",{style:{whiteSpace:"nowrap"}},hdiv)
         const c = this.config;     
         const dim =this.dataStore.getDimension("category_dimension");
         dim.noclear=true;
@@ -248,6 +257,7 @@ class SelectionDialog extends BaseChart{
             this.filterCategories(col.field,false);
             this.hasFiltered=true;
         }
+
         const fil = c.filters[col.field];
         const dd = createEl("select",{
             classes:["mdv-select"],
@@ -256,7 +266,7 @@ class SelectionDialog extends BaseChart{
             }
         });
        
-        for (let name of col.values){
+        for (let name of col.values.slice(0).sort()){
             createEl("option",{
                 text:name,
                 value:name
@@ -267,17 +277,20 @@ class SelectionDialog extends BaseChart{
             classes:["ciview-button-sm"],
             text:"Add"
         },div);
+        const tdiv = createEl("div",{},div);
         b.addEventListener("click",e=>{
             if (fil.category.indexOf(dd.value)===-1){
-                this.createTag(div,col,dd.value);
+                this.createTag(tdiv,col,dd.value);
                 this.filterCategories(col.field);  
             }
             
         });
-        const rname = getRandomString()
+        div= createEl("div",{},hdiv)
+        const rname = getRandomString();
+        createEl("span",{text:"and"},div)
         const rb = createEl("input",{   
             type:"radio",
-            name:col.field,
+            name:rname,
             value:"and"
         },div);
         rb.checked = fil.operand==="and";
@@ -285,9 +298,24 @@ class SelectionDialog extends BaseChart{
             fil.operand="and";
             this.filterCategories(col.field);  
 
+        });
+        createEl("span",{text:"or"},div)
+        const ra = createEl("input",{   
+            type:"radio",
+            name:rname,
+            value:"or"
+        },div);
+        ra.checked = fil.operand==="or";
+        ra.addEventListener("click",(e)=>{
+            fil.operand="or";
+            this.filterCategories(col.field);  
+
         })
+        for (let c of fil.category){
+            this.createTag(tdiv,col,c,false);
+        }
       
-        this.textFilters[col.field]=[dd,rb]   
+        this.textFilters[col.field]=[dd,tdiv];
         
     }
 

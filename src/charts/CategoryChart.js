@@ -1,3 +1,4 @@
+import { thresholdScott } from "d3";
 import SVGChart from "./SVGChart.js";
 
 class CategoryChart extends SVGChart{
@@ -69,6 +70,31 @@ class CategoryChart extends SVGChart{
         this.onDataFiltered();
     }
 
+    updateData(){
+        const c = this.config;
+       
+        this.rowData= this.data.slice(0);
+        if (c.filter_zeros){
+            this.rowData=  this.rowData.filter(x=>x[0]!==0)
+        }
+        if (c.sort==="size"){
+            this.rowData.sort((a,b)=>b[0]-a[0]);
+        }
+        if (c.sort==="name"){
+            const v = this.dataStore.getColumnValues(c.param);
+            this.rowData.sort((a,b)=>v[a[1]].localeCompare(v[b[1]]));
+        }
+        if (this.rowData.length>40){
+            c.show_limit=40;
+        }
+        if (c.show_limit){
+            if (c.show_limit<this.rowData.length)
+                this.rowData.splice(c.show_limit);
+        }
+        
+
+    }
+
     onDataFiltered(dim){
         //no need to change anything
         if (this.dim === dim || this.isPinned){
@@ -80,15 +106,16 @@ class CategoryChart extends SVGChart{
         }
         const config={};
         this.dim.getCategories(data=>{
-            this.rowData=[];
+           
+            this.data=[];
             this.maxCount=1;
+            const c = this.config;
             for (let n=0;n<data.length;n++){
-                this.rowData.push([data[n],n]);
+                this.data.push([data[n],n]);
                 this.maxCount= Math.max(data[n],this.maxCount);
             }
-            
-            this.rowData=  this.rowData.filter(x=>x[0]!==0).sort((a,b)=>b[0]-a[0]);
-            
+
+            this.updateData(); 
             this.drawChart();            
         },this.config.param,config)    
     }
