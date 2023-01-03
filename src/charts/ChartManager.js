@@ -123,11 +123,7 @@ class ChartManager{
         for (const d of dataSources){
             const ds= {
                 name:d.name,
-<<<<<<< HEAD
-                dataStore:new DataStore(d.size,{name:d.name,columns:d.columns,columnGroups:d.columnGroups,offsets:d.offsets,links:d.links}),
-=======
                 dataStore:new DataStore(d.size,{columns:d.columns,columnGroups:d.columnGroups,offsets:d.offsets,links:d.links,large_images:d.large_images}),
->>>>>>> dbd3531... added Summary Chart
                 link_to:d.link_to,
                 index_link_to:d.index_link_to,
                 color:d.color || themes[this.theme].background_color,
