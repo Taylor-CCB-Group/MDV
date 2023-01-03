@@ -1,5 +1,8 @@
 # Multi Dimensional Viewer
 
+
+![logo](images/mdv_logo.png)
+
 Multi Dimensional Viewer (MDV) is tool for analyzing, annotating  and sharing multi dimensional data.  It is inspired by [dc charts](https://dc-js.github.io/dc.js/) and [crossfilter](https://square.github.io/crossfilter/), but is performant with over 10 million data items due to the use of web workers, shared array buffers and native arrays.  
 &nbsp;
 ![summary](images/summary.png)
