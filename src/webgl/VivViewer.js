@@ -130,8 +130,9 @@ class VivViewer {
     // pjt consider using helpers (now effectively doing this indirectly).
     /// --> channel.contrastLimit was always undefined anway
     // channel.contrastLimits = channel.contrastLimit || [20,100];
-    channel.contrastLimits = this.defaultContrastLimits[channel.index].slice(0);
-    channel.domains = this.defaultDomains[channel.index].slice(0);
+    //if new channels are addded there are no default values -need to be calculated?
+    channel.contrastLimits = [0,200];//this.defaultContrastLimits[channel.index].slice(0);
+    channel.domains = [0,200];//this.defaultDomains[channel.index].slice(0);
     channel.channelsVisible=true;
     chs.colors.push(hexToRGB(channel.color));
     chs.contrastLimits.push(channel.contrastLimits);
@@ -352,10 +353,14 @@ class VivViewer {
       return;
     }
     const viewStates=  {id: DETAIL_VIEW_ID}
+
+    //domains may not be the same as contrast limits -  again need way of calculating
+    //temp default values
+    const domains=info.contrastLimits.map(x=>[0,200]);
     const layerConfig = {
       loader:this.loader,
       contrastLimits:info.contrastLimits.slice(0),
-      domains: info.contrastLimits.slice(0),
+      domains,
       colors:info.colors.slice(0),
       channelsVisible:info.channelsVisible.slice(0),
       selections:info.selections.slice(0),
@@ -368,7 +373,7 @@ class VivViewer {
       viewStates,
       props:layerConfig
     });
-    this.mainVivLayer = this.mainVivLayer;
+    this.mainVivLayer = this.layers[0];
   }
 }
 

@@ -7,11 +7,11 @@ import {BaseDialog} from "../utilities/Dialog.js";
 import noUiSlider from "nouislider";
 
 export class ColorChannelDialog extends BaseDialog{
-    constructor(viv){
+    constructor(viv,doc){
         const config={
             width:500,
             title:"Channels",
-            doc:viv.__doc__
+            doc:doc || document
         }
         super(config,viv);
     }
@@ -154,7 +154,7 @@ class VivScatterPlot extends DensityScatterPlot{
         super(dataStore,div,config,{x:{},y:{}});
         if (config.viv){
             this.addMenuIcon("fas fa-palette","Alter Channels")
-            .addEventListener("click",(e)=>new ColorChannelDialog(this));
+            .addEventListener("click",(e)=>new ColorChannelDialog(this.viv,this.__doc__));
         }
        
     }

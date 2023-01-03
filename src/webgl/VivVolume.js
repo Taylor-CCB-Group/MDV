@@ -13,7 +13,7 @@ class VivVolume extends BaseChart {
                 this.dialog.close();
                 this.dialog = null;
             }
-            else this.dialog = new ColorChannelDialog(this.viv);
+            else this.dialog = new ColorChannelDialog(this.viv,this.__doc__);
         });
     }
     setSize(x, y) {

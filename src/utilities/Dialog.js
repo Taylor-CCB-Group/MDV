@@ -144,7 +144,7 @@ constructor (config={},content) {
       text:but.text,
       classes:["ciview-button"]
     },this.footer)
-    b.addEventListener("click", but.method);
+    b.addEventListener("click", ()=>this[but.method]());
     if (but.id){
       this.buttons[but.id]=b;
     }

@@ -1386,7 +1386,7 @@ class DataStore{
     
     getColumnRange(column){
         const c = this.columnIndex[column];
-        if (!c.minMaX) {
+        if (!c.minMax) {
             console.error('unknown minMax for column ' + column);
             return [0, 50];
         }

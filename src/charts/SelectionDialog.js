@@ -76,7 +76,7 @@ class SelectionDialog extends BaseChart{
     addNumberFilter(col,div){
         const sl = createEl("div",{
             styles:{
-                margin:"0px 10px"
+                margin:"10px 10px"
             }
         },div);
         const dd = createEl("div",{styles:{
@@ -86,14 +86,14 @@ class SelectionDialog extends BaseChart{
         createEl("span",{text:">",styles:{"float":"left","fontWeight":"bold"}},dd);
         const greaterThan = createEl("input",{
             styles:{
-                width:"80px",
+                width:"70px",
                 float:"left"
             }
         },dd);
         createEl("span",{text:"<",styles:{"float":"right","fontWeight":"bold"}},dd);
         const lessThan = createEl("input",{
             styles:{
-                width:"80px",
+                width:"70px",
                 float:"right"
             }
         },dd);
