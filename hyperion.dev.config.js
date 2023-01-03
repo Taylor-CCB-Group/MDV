@@ -1,3 +1,4 @@
+///todo ts-loader
 const path = require('path');
 webpack=require("webpack");
 module.exports = (env) => {
@@ -18,22 +19,31 @@ module.exports = (env) => {
   	   output: {
     		   filename: 'hyperion.js',
   	   },
-  	   module:{ 
-			
-     		rules:[
-			{
-				test:/\.css$/,
-				use:[
-					"style-loader",
-					"css-loader"
-				]
-			},
-			{
-				test: /\.(png|svg|jpg|gif|eot|ttf|woff|woff2)$/,
-				type: 'asset/resource'
-			
-			}		
-		]
-  	}
-}
+		resolve: {
+			extensions: ['.ts', '.js', '...']
+		},
+		module: {
+
+			rules: [
+				{
+					test: /\.css$/,
+					use: [
+						"style-loader",
+						"css-loader"
+					]
+
+				},
+				{
+					test: /\.(png|svg|jpg|gif|eot|ttf|woff|woff2)$/,
+					type: 'asset/resource'
+
+				},
+				{
+					test: /\.tsx?$/,
+					use: 'ts-loader',
+					exclude: '/node_modules'
+				}
+			]
+		}
+	}
 };

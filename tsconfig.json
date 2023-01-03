@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "outDir": "./dist/",
+        "noImplicitAny": false,
+        "module": "es6",
+        "target": "ESNext",
+        "lib": ["ESNext", "DOM"],
+        "allowJs": true,
+        // "checkJs": true,
+        "moduleResolution": "node",
+        "noUnusedParameters": false,
+        "noUnusedLocals": false,
+        "allowSyntheticDefaultImports": true,
+        "sourceMap": true
+    }
+}

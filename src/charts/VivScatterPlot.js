@@ -6,7 +6,7 @@ import {RGBToHex,hexToRGB} from "../datastore/DataStore.js";
 import {BaseDialog} from "../utilities/Dialog.js";
 import noUiSlider from "nouislider";
 
-class ColorChannelDialog extends BaseDialog{
+export class ColorChannelDialog extends BaseDialog{
     constructor(viv){
         const config={
             width:500,
@@ -32,7 +32,7 @@ class ColorChannelDialog extends BaseDialog{
         const ac = viv.getAllChannels();
         for (let n=0;n<ac.length;n++){
             createEl("option",{
-                text:ac[n].Name,
+                text:ac[n].Name ?? ac[n].ID,
                 value:n
             },sel)
         }
@@ -46,7 +46,7 @@ class ColorChannelDialog extends BaseDialog{
             type:"color",
             value:"#ff0000"
         },addDiv);
-        createEl("span",{
+        createEl("button",{
             classes:["ciview-button-sm"],
             text:"Add Channel"
         },addDiv).addEventListener("click",()=>{
@@ -62,7 +62,8 @@ class ColorChannelDialog extends BaseDialog{
         const cont = createEl("div",{
             styles:{
                 display:"flex",
-                padding:"4px"
+                padding:"4px",
+                alignItems: "center"
             }
         },this.mainDiv);
         createEl("span",{
@@ -79,17 +80,18 @@ class ColorChannelDialog extends BaseDialog{
                 overflow:"visible"
             }
         },cont);
+        const d = item.domains;
         noUiSlider.create(sl, {
             start: [item.contrastLimits[0],item.contrastLimits[1]],
             range: {
-                'min': 0,
-                'max': 300
+                'min': d ? d[0] : 0,
+                'max': d ? d[1] : 300
             },
             step:1,
             document:this.config.doc,
             tooltips:true
         },cont);
-        sl.noUiSlider.on("end",(values)=>{
+        sl.noUiSlider.on("update",(values)=>{
             item.contrastLimits=[parseFloat(values[0]),parseFloat(values[1])];
             this.viv.setChannel(item);
         });
@@ -104,7 +106,7 @@ class ColorChannelDialog extends BaseDialog{
             value:item.color
         },cont);
 
-        cc.addEventListener("change",()=>{
+        cc.addEventListener("input",()=>{
             item.color = cc.value;
             this.viv.setChannel(item);
         });
@@ -169,38 +171,7 @@ class VivScatterPlot extends DensityScatterPlot{
 
     }
 
-    setChannel(channel){
-        this.viv.setChannel(channel);
-    }
-
-    getAllChannels(){
-        return this.viv.channels;
-    }
-
-    addChannel(channel){
-        return this.viv.addChannel(channel);
-    }
-    removeChannel(channel){
-        this.viv.removeChannel(channel);
-    }
-
-    getChannels(){
-        const props = this.viv.layers[0].props;
-        const names = props.selections.map(x=>this.viv.channels[x.c].Name);
-        const colors = props.colors.map(x=>RGBToHex(x));
-        props.selections;
-        return names.map((x,i)=>{
-            return{
-                name:x,
-                index:props.selections[i].c,
-                id:props.selections[i].id,
-                color:colors[i],
-                contrastLimits:props.contrastLimits[i].slice(0),
-                channelsVisible:props.channelsVisible[i]
-            }
-        })
-        
-    }
+    // PJT *Channel methods moved to VivViewer.
 
     remove(){
         this.viv.deck.finalize();
@@ -221,8 +192,8 @@ class VivScatterPlot extends DensityScatterPlot{
             selections:k.selections.slice(0),
             colors:k.colors.slice(0),
             channelsVisible:k.channelsVisible.slice(0),
-            contrastLimits:k.contrastLimits.slice(0)
-
+            contrastLimits:k.contrastLimits.slice(0),
+            domains: k.domains?.slice(0)
         }
         return conf;
     }
@@ -231,8 +202,20 @@ class VivScatterPlot extends DensityScatterPlot{
         const c = this.config;
         //make sure svg is on top of scatter plot and events pass through
         //this.contentDiv.prepend(this.app.div_container);
-       // this.svg.style("position","absolute")
-         //       .style("pointer-events","none");
+        // this.svg.style("position","absolute")
+        //       .style("pointer-events","none");
+        if (!c.viv) {
+            // this dummy config isn't really adequate
+            c.viv = {
+                url: 'https://viv-demo.storage.googleapis.com/LuCa-7color_3x3component_data.ome.tif',
+                image_properties: {
+                    contrastLimits: [[0, 255]],
+                    colors: [[255, 255, 255]],
+                    channelsVisible: [true],
+                    selections: [{c: 0, t: 0, z: 0}],
+                }
+            }
+        }
         if (c.viv){ 
             const box =this._getContentDimensions();
         
@@ -272,6 +255,10 @@ BaseChart.types["viv_scatter_plot"]={
     {
         type:"number",
         name:"Y axis"
+    },
+    {
+        type: "text",
+        name: "Category Column"
     }
     ]
 }

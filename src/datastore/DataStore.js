@@ -113,6 +113,7 @@ class DataStore{
     * of event and the data associated with it.
     */
     addListener(id,listener){
+        //PJT: XXX: this replaces any existing listener with the same id, probably not intended
         this.listeners[id]=listener;
     }
 
@@ -330,7 +331,6 @@ class DataStore{
         if (column.datatype === "text" || column.datatype === "multitext"){
             c.stringLength= column.stringLength;
             c.values = column.values || [`Error: no values for '${c.name}'`];
-            console.warn(`no initial values for column '${c.name}' specified in dataSources`);
         }
         else if (column.datatype==="double" || column.datatype ==="integer"){
             c.colorLogScale=column.colorLogScale;
@@ -1377,7 +1377,7 @@ class DataStore{
     /**
     * Returns the min/max values for a given column 
     * @param {string} column The column id(field) 
-    * @returns {[]} An array - the first value being the min value and the second the max value
+    * @returns {[min: number, max: number]} An array - the first value being the min value and the second the max value
     */
     getMinMaxForColumn(column){
         const c = this.columnIndex[column];
@@ -1386,6 +1386,10 @@ class DataStore{
     
     getColumnRange(column){
         const c = this.columnIndex[column];
+        if (!c.minMaX) {
+            console.error('unknown minMax for column ' + column);
+            return [0, 50];
+        }
         return c.minMax[1]-c.minMax[0];
     }
 

@@ -32,7 +32,7 @@ class LinkDataDialog extends BaseDialog{
 
         const gld= createEl("div",{styles:{flex:1,display:"flex",flexDirection:"column"}},pf);
         this.linputList= createEl("textarea",{},gld);
-        //const b = createEl("span",{classes:["ciview-button-sm"],text:"ADD>"},gld);
+        //const b = createEl("button",{classes:["ciview-button-sm"],text:"ADD>"},gld);
        /* b.addEventListener("click",()=>{
             this.addToList();
         });*/
@@ -76,7 +76,7 @@ class LinkDataDialog extends BaseDialog{
         
         createEl("span",{text:"Chart:",styles:{marginRight:"4px"}},div);
         const select = createEl("select",{styles:{maxWidth:"150px"}},div);
-        const b= createEl("span",{classes:["ciview-button-sm"],text:"GO"},div);
+        const b= createEl("button",{classes:["ciview-button-sm"],text:"GO"},div);
         b.addEventListener("click",()=>{
             const param = this.getParams();
             if (param.length===0){
@@ -104,7 +104,7 @@ class LinkDataDialog extends BaseDialog{
         
         createEl("span",{text:"Category:",styles:{marginRight:"4px"}},div);
         const select = createEl("select",{styles:{maxWidth:"150px"}},div);
-        const b= createEl("span",{classes:["ciview-button-sm"],text:"GO"},div);
+        const b= createEl("button",{classes:["ciview-button-sm"],text:"GO"},div);
         b.addEventListener("click",()=>{
             let param = this.getParams();
             if (param.length===0){

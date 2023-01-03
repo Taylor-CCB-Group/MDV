@@ -7,12 +7,14 @@
     "example": "examples"
   },
   "scripts": {
-    "dev": "node_modules/.bin/webpack serve",
-    "build": "node_modules/.bin/webpack --config prod.config.js",
-    "run-hyperion": "node_modules/.bin/webpack  serve --config hyperion.dev.config.js",
-    "run-ex": "node_modules/.bin/webpack  serve --config examples.config.js --env process.env",
+    "dev": "webpack serve",
+    "build": "webpack --config prod.config.js",
+    "run-hyperion": "webpack  serve --config hyperion.dev.config.js",
+    "run-obvios": "webpack  serve --config obvios.config.js",
+    "run-ex": "webpack  serve --config examples.config.js --env process.env",
     "run-example": "npm run run-ex --env example=basic_example",
-    "build-hyperion": "node_modules/.bin/webpack --config hyperion.prod.config.js"
+    "run-10Mexample": "npm run run-ex --env example=10Mand1_points",
+    "build-hyperion": "webpack --config hyperion.prod.config.js"
   },
   "repository": {
     "type": "git",
@@ -32,8 +34,11 @@
     "d3-geo": "^3.0.1",
     "d3-sankey": "^0.12.3",
     "deck.gl": "^8.8.11",
+    "dompurify": "^2.4.1",
     "gl-matrix": "^3.4.3",
+    "gridstack": "^7.1.1",
     "jquery": "^3.6.1",
+    "marked": "^4.2.4",
     "microtip": "^0.2.2",
     "nouislider": "^15.6.1",
     "react": "^18.2.0",
@@ -43,7 +48,10 @@
   "devDependencies": {
     "css-loader": "^6.7.1",
     "style-loader": "^3.3.1",
+    "ts-loader": "^9.4.1",
+    "typescript": "^4.9.3",
     "webpack": "^5.74.0",
+    "webpack-bundle-analyzer": "^4.7.0",
     "webpack-cli": "^4.10.0",
     "webpack-dev-server": "^4.11.1"
   }

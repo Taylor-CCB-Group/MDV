@@ -42,22 +42,19 @@ class WGL2DI{
 	}
 	*/
 
-		this.draw_options=config.draw_options?config.draw_options:{depth:{enable:false},
-		blend:{enable:true,
-		 func: {
-		  srcRGB: 'src alpha',
-		  srcAlpha: 'src alpha',
-		 dstRGB: 'one minus src alpha',
-		  dstAlpha: 'one minus src alpha'
-	  }
-    	
-    
-			
-	
+		this.draw_options = config.draw_options ? config.draw_options : 
+		{
+			depth:{enable:false},
+			blend:{
+				enable:true,
+				func: {
+					srcRGB: 'src alpha',
+					srcAlpha: 'src alpha',
+					dstRGB: 'one minus src alpha',
+					dstAlpha: 'one minus src alpha'
+				}
+			}
 		}
-		}
-		
-	
 
     
     	this.regl=null;
@@ -936,17 +933,6 @@ class WGL2DI{
 
 		});
 	
-		/*.resizable({
-			handles:"all",
-			start:function(ev,ui){
-				self.brush.moving=true;
-			},
-			stop:function (ev,ui){
-				self._brushingStopped();
-
-			}
-
-		});*/
 		this.brush={origin:origin,div:div,resizing:true};
 	}
 
@@ -957,7 +943,7 @@ class WGL2DI{
 			active:true,
 		}
 		let ctx= this.label_context;
-		ctx.strokeStyle= getComputedStyle(this.div_container).getPropertyValue("color");
+		ctx.strokeStyle = getComputedStyle(this.canvas).getPropertyValue('color');
 		ctx.beginPath()
 		ctx.moveTo(pos[0],pos[1]);
 	
@@ -965,36 +951,30 @@ class WGL2DI{
 
 	}
 
-	_extendPolyBrush(pos,end){
-		let ctx= this.label_context;
-	    //let prev = this.poly_brush.points[this.poly_brush.points.length-1]
-		
+	_extendPolyBrush(pos, threshold = 15){
+		const ctx= this.label_context;
+		if (this.poly_brush.points.length) {
+			const prev = this.poly_brush.points[this.poly_brush.points.length-1];
+			const dx = prev[0]-pos[0];
+			const dy = prev[1]-pos[1];
+			const d = Math.sqrt(dx**2 + dy**2);
+			if (d < threshold) return;
+		}
 		
 		ctx.lineTo(pos[0],pos[1]);
 		ctx.stroke();
-		this.poly_brush.points.push(pos);
-		if (end){
-			ctx.closePath();
-			ctx.fillStyle="lightgray";
-			ctx.globalAlpha=0.4;
-			ctx.fill();
-			let poly = []
-			for (let pt of this.poly_brush.points){
-				poly.push(this._getActualPosition(pt));
-			}
-			for (var i in this.handlers.brush_stopped){
-			    this.handlers.brush_stopped[i](poly,true);
-		    }
-
-		}
+		this.poly_brush?.points.push(pos);
 	}
 
-	_finishPolyBrush(pos){
-		if (this.poly_brush.points.length<4){
+	_finishPolyBrush(){
+		if (this.poly_brush.points.length<3){
 			this.clearBrush();
 			return;
 		}
 		let ctx= this.label_context;	
+		const start = this.poly_brush.points[0];
+		ctx.lineTo(start[0], start[1]);
+		ctx.stroke();
 		ctx.closePath();
 		ctx.fillStyle="lightgray";
 		ctx.globalAlpha=0.2;
@@ -1006,7 +986,7 @@ class WGL2DI{
 			poly.push(this._getActualPosition(pt));
 		}
 		for (var i in this.handlers.brush_stopped){
-			this.handlers.brush_stopped[i](poly,true);
+			setTimeout(()=>this.handlers.brush_stopped[i](poly,true), 0);
 		}
 	}
 
@@ -1026,7 +1006,8 @@ class WGL2DI{
 
 
 	_brushingStopped(){
-		this.brush.resizing=false;
+		if (!this.brush) return; //'cannot set properties of null' was possible here
+		this.brush.resizing=false; 
 		const d= this.brush.div;
 		const y= d.offsetTop;
 		const x = d.offsetLeft;
@@ -1066,6 +1047,7 @@ class WGL2DI{
 
 	_addHandlers(){
 		var self=this;
+		//consider changing so that some listeners are on window while brush is active...
 		this.div_container.addEventListener("mousemove",function(e){
 			if (self.brush){
 				if (self.brush.resizing){
@@ -1090,11 +1072,8 @@ class WGL2DI{
 				
 			}
 			if (self.poly_brush && self.poly_brush.active){
-				clearTimeout(self.poly_brush_tidmout)
 				let pt =self._getMousePosition(e);
-				self.poly_brush_timeout= setTimeout(function(){
-					self._extendPolyBrush(pt);
-				},150)
+				self._extendPolyBrush(pt);
 			}
 			//is this a drag or just a click without the mouse moving
 			if (self.mouse_position &&  ! self.dragging){
@@ -1216,7 +1195,7 @@ class WGL2DI{
 					}
 				//}
 
-			}        
+			}
 			else{
 				//an object has finshed its drag
 				if (self.object_clicked){
@@ -1245,11 +1224,6 @@ class WGL2DI{
 					for (var i in self.handlers.panning_stopped){
 							self.handlers.panning_stopped[i](ret);
 					}
-				
-					if (self.brush){
-						//self._brushingStopped();
-					}
-				   
 				}
 				self.dragging=false;
 			}

@@ -26,6 +26,7 @@ import {getRandomString} from "../utilities/Utilities.js";
 import {csv,tsv,json} from"d3-fetch";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
+import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 
 
 
@@ -219,7 +220,7 @@ class ChartManager{
 
         
         
-        createMenuIcon("fas fa-adjust",{
+        const themeButton = createMenuIcon("fas fa-adjust",{
             tooltip:{
                 text:"Change Theme",
                 position:"bottom-left"
@@ -229,6 +230,7 @@ class ChartManager{
             }
 
         },this.rightMenuBar);
+        themeButton.style.margin = "3px";
 
         this._setupThemeContextMenu();
       
@@ -240,7 +242,7 @@ class ChartManager{
         },this.containerDiv);
         this.contentDiv.classList.add('ciview-contentDiv');
 
-     
+        if (config.gridstack) this.gridStack = new GridStackManager(this);
 
         //each entry in charts will contain
         //  chart - the actual chart
@@ -402,6 +404,7 @@ class ChartManager{
                 classes:["ciview-menu-bar"]          
             },p);
             this._setUpMenu(ds);
+            // might move styles from here into .css
             ds.contentDiv=createEl("div",{
                 styles:{
                     flex:"1 1 auto",
@@ -439,12 +442,13 @@ class ChartManager{
             this._callListeners("view_loaded",this.currentView)
         }
         //add charts - any columns will be added dynamically
+        this._inInit = true;
         for (let ds in charts){  
             for (let ch of charts[ds]){
                 this.addChart(ds,ch);                            
             }
         }
-
+        this._inInit = false;
     }
 
     _addDSListeners(ds){
@@ -825,7 +829,7 @@ class ChartManager{
     }
 
      /**Adds a menu icon to either the main menubar or a datasource meubar
-    * @param {string} datSource The name of data source or _main if addding
+    * @param {string} dataSource The name of data source or _main if adding
     * an icon to the main (top) toolbar
     * @param {string} icon The class name(s) of the icon
     * initially load
@@ -1138,7 +1142,7 @@ class ChartManager{
     /**
     * Adds a chart to the app
     * @param {string} dataSource The name of the chart's data source 
-    * @param {string} config The chart's config
+    * @param {any} config The chart's config
     * @param {boolean} [notify=false] If true any listeners will be informed that 
     * a chart has been loaded
     */
@@ -1168,6 +1172,7 @@ class ChartManager{
 
         const chartType= BaseChart.types[config.type];
         const t = themes[this.theme];
+        // PJT may want different behaviour for gridstack
         const div= createEl("div",{
             styles:{
                 position:"absolute",
@@ -1396,10 +1401,10 @@ class ChartManager{
         this._makeChartRD(chart,ds);
         chart.popoutIcon = chart.addMenuIcon("fas fa-external-link-alt","popout",{
             func:()=>{
-                this._popOutChart(chart,ds.contentDiv);
+                this._popOutChart(chart);
             }
         });     
-        chart.addMenuIcon("fas fa-trash","remove chart")
+        chart.addMenuIcon("fas fa-times","remove chart")
             .addEventListener("click",()=>{   
                 chart.remove();
                 div.remove();
@@ -1616,7 +1621,7 @@ class ChartManager{
     }
 
     addButton(text,callback,tooltip){
-        createEl("span",{
+        createEl("button",{
             classes:["ciview-button"],
             text:text,
             styles:{
@@ -1634,6 +1639,7 @@ class ChartManager{
         const div= chart.getDiv();
         const chInfo= this.charts[chart.config.id];
         const details={dim:[chart.config.size[0],chart.config.size[1]],pos:[div.style.left,div.style.top]};
+        if (div.gridstackPopoutCallback) div.gridstackPopoutCallback();
         removeResizable(div);
         removeDraggable(div);
         const win = new PopOutWindow(
@@ -1656,7 +1662,7 @@ class ChartManager{
               div.style.left = details.pos[0];
               div.style.top= details.pos[1];
               chart.setSize(details.dim[0],details.dim[1]);
-              this._makeChartRD(chart);
+              this._makeChartRD(chart, chInfo.dataSource);
               chart.popoutIcon.style.display="inline";
               delete chInfo.window
               
@@ -1683,6 +1689,12 @@ class ChartManager{
     }
 
     _makeChartRD(chart,ds){
+        //if (!ds) console.error(`_makeChartRD called without ds - resize / drag etc may not work properly`);
+        //^^ actually doesn't make much difference to non-gridStack in practice.
+        if (ds && this.gridStack) {
+            this.gridStack.manageChart(chart, ds, this._inInit);
+            return;
+        }
         const div = chart.getDiv();
         makeDraggable(div,{
             handle:".ciview-chart-title",
@@ -1693,6 +1705,10 @@ class ChartManager{
             }
         });
         makeResizable(div,{
+            onResizeStart: () => {
+                this._sendAllChartsToBack(ds);
+                div.style.zIndex = 2;
+            },
             onresizeend:(width,height)=>chart.setSize(width,height)
         })
     }
@@ -1879,7 +1895,7 @@ class AddChartDialog extends BaseDialog{
         }
         createEl("div",{},this.columns[0]).append(this.chartType);
         this.chartType.addEventListener("change",(e)=>{
-            this.setParamDiv(this.chartType.value,content.dataStore);
+            this.setParamDiv(this.chartType.value, content.dataStore);
         });
 
         createEl("div",{
@@ -1895,7 +1911,6 @@ class AddChartDialog extends BaseDialog{
         },this.columns[0]);
         this.chartDescription= createEl("textarea",{styles:{width:"150px",height:"100px"}},this.columns[0]);
       
-
         createEl("div",{
             text:"Columns",
             classes:["ciview-title-div"]
@@ -1904,7 +1919,11 @@ class AddChartDialog extends BaseDialog{
         this.setParamDiv(types[0].type,content.dataStore);
 
 
-        createEl("span",{
+        
+
+
+
+        createEl("button",{
             text:"Add",
             classes:["ciview-button"]
         },this.footer).addEventListener("click",()=>this.submit(content.callback));
@@ -1916,7 +1935,8 @@ class AddChartDialog extends BaseDialog{
             title:this.chartName.value,
             legend:this.chartDescription.value,
             type:this.chartType.value,
-            param:this.paramSelects.map((x)=>x.value)
+            param:this.paramSelects.map((x)=>x.value),
+            // options: this.options ? Object.fromEntries(this.options) : undefined,
         }
         const ed={};
         for (let name in this.extraControls){
@@ -1925,6 +1945,7 @@ class AddChartDialog extends BaseDialog{
         if (this.multiColumns){
             config.param =config.param.concat(this.multiColumns)
         }
+        console.log('config from add chart dialog', config);
         const t= BaseChart.types[this.chartType.value];
 
         if (t.init){
@@ -1933,9 +1954,11 @@ class AddChartDialog extends BaseDialog{
         callback(config);
         this.chartName.value="";
         this.chartDescription.value="";
-        this.chartType.value= this.defaultType;
-        this.setParamDiv(this.defaultType)
-
+        /// pjt I find this annoying... not sure why we didn't close the div before
+        /// but otherwise, would rather not reset these (can be handy when testing stuff)
+        // this.chartType.value= this.defaultType;
+        // this.setParamDiv(this.defaultType)
+        this.close();
     }
 
     _addMultiColumnSelect(holder,filter){
@@ -2014,22 +2037,31 @@ class AddChartDialog extends BaseDialog{
         this.extraControls={};
         if (t.extra_controls){
             const controls = t.extra_controls(this.dataSource);
+            const parentDiv = this.paramDiv;
             for (let c of controls){
                 createEl("div",{
                     text:c.label,
                     classes:["ciview-title-div"]
-                },this.columns[1]);
+                },parentDiv);
                 if (c.type==="dropdown"){
                     const sel = createEl("select",{
                         styles:{
                             maxWidth:"200px"
                         }
-                    },this.columns[1]);
+                    },parentDiv);
                     
                     for (let item of c.values){
                         createEl("option",{text:item.name,value:item.value},sel)
                     }
                     this.extraControls[c.name]=sel;
+                } else if (c.type === 'string') {
+                    const el = createEl("input", { value: c.defaultVal }, parentDiv);
+                    this.extraControls[c.name] = el;
+                    //el.onchange // not using callback, value will be read on submit().
+                } else if (c.type === 'textbox') {
+                    const el = createEl("textarea", { value: c.defaultVal, styles: {height: '300px'} }, parentDiv);
+                    this.extraControls[c.name] = el;
+                    //el.onchange // not using callback, value will be read on submit().
                 }
             }
 

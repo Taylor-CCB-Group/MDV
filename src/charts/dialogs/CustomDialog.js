@@ -148,7 +148,7 @@ class CustomDialog extends BaseDialog{
         const self =this;
         const menu = createEl("div",{},d);
         function addButton(title,check){
-            const sall = createEl("span",{
+            const sall = createEl("button",{
                 text:title,
                 classes:["ciview-button-sm"]
             },menu);
@@ -222,7 +222,7 @@ class CustomDialog extends BaseDialog{
     }
 
     addButton(button){
-        createEl("span",{
+        createEl("button",{
             text:button.text,
             classes:["ciview-button"]
         },this.footer).addEventListener("click",()=>this.buttonClicked(button));

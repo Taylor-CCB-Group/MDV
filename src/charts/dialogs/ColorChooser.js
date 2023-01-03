@@ -73,8 +73,8 @@ class ColorChooser extends BaseDialog{
             }
         },d4);
 
-        this.setDataSource(this.ds.name);
-        createEl("span",{
+        this.setDataSource(dsNames[0])
+        createEl("button",{
             classes:["ciview-button-sm"],
             text:"Use Scheme"
         },d4).addEventListener("click",()=>{

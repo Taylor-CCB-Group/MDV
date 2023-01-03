@@ -1,6 +1,12 @@
 
 import Split from "split.js"
 
+/**@template {keyof HTMLElementTagNameMap} T
+ * @param {T} type
+ * @param {{styles?:, classes?:string[], text?:string, [string]:string}=} attrs
+ * @param {HTMLElement=} parent
+ * @returns {HTMLElementTagNameMap[T]}
+ */
 function createEl(type,attrs,parent){
    
     const el = document.createElement(type);
@@ -85,7 +91,6 @@ function createMenuIcon(icon,config,parent){
     return sp;
 
 }
-
 function addElProps(el,attrs){
     for (var idx in attrs) {
         if ((idx === 'styles' || idx === 'style') && typeof attrs[idx] === 'object') {
@@ -118,7 +123,7 @@ function makeResizable(el,config={}){
     if (config.onresizeend){
         ri.onresize=addResizeListener(el,(x,y)=>{
             config.onresizeend(x,y);
-        })
+        }, config.onResizeStart);
     }
     el.__resizeinfo__=ri;
 }
@@ -264,18 +269,19 @@ function makeDraggable(el,config={}){
     }
 }
 
-function addResizeListener(element,callback){
+function addResizeListener(element, endCallback, startCallback){
     let box = element.getBoundingClientRect();
     let width = box.width;
     let height = box.height;
     const list = (e)=>{
         let box = element.getBoundingClientRect();
         if (box.width!==width || box.height!==height){
-            callback(box.width,box.height);
+            endCallback(box.width,box.height);
         }
         width=box.width;
         height=box.height;
     }
+    if (startCallback) element.addEventListener("mousedown", startCallback);
     element.addEventListener("mouseup",list)
     return list;
 }

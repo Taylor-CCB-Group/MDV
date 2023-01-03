@@ -26,12 +26,19 @@ class SettingsDialog extends BaseDialog{
             if (s.info){
                 this.addInfoIcon(s.info,d);
             }
-            this.controls[s.label]=this[s.type](s,d);
+            const factory = this[s.type];
+            if (!factory) {
+                console.warn(`SettingsDialog doesn't have a method '${s.type}'`);
+                continue;
+            }
+            this.controls[s.label] = factory(s,d);
         }
 
     }
-
-
+    /** TODO */
+    folder(s, d) {
+        const container = d;
+    }
     spinner(s,d){
          
         let sp =createEl("input",{
@@ -65,7 +72,9 @@ class SettingsDialog extends BaseDialog{
     }
 
     button(s,d){
-        createEl("span",{
+        d.style.textAlign = "center";
+        //maybe consider making this a 'button'
+        createEl("button",{
             classes:["ciview-button"],
             text:s.label
         },d)
@@ -84,20 +93,18 @@ class SettingsDialog extends BaseDialog{
             },
             step:s.step || null,
             tooltips:true,
-            /*format:{
-                to:v=>{
-                    return v+""
-                },
-                from:v=>{
-                    return Number(v)}
-            },*/
-            documentElement:this.config.doc
+            //PJT::: this.config was undefined
+            documentElement: s.doc
         });
-        sl.noUiSlider.on("end",(values)=>{
+        const change = (values) => {
             s.func(parseFloat(values[0]))
-        });
+        };
+        sl.noUiSlider.on("end", change);
+        if (s.continuous) {
+            console.log('adding update listener for ', s.label);
+            sl.noUiSlider.on("update", change);
+        }
         return sl;
-
     }
 
     check(s,d){
@@ -135,7 +142,7 @@ class SettingsDialog extends BaseDialog{
         }
         d.append(dd);
         createEl("br",{},d);
-        const b = createEl("span",{
+        const b = createEl("button",{
             classes:["ciview-button-sm"],
             text:"Change"
         },d)
@@ -189,16 +196,22 @@ class SettingsDialog extends BaseDialog{
             },
             documentElement:s.doc
         });
-        sl.noUiSlider.on("end",(values)=>{
-            s.func(parseFloat(values[0]),parseFloat(values[1]))
-        });
+        const change = (values) => {
+            s.func(parseFloat(values[0]), parseFloat(values[1]))
+        };
+        sl.noUiSlider.on("end", change);
+        if (s.continuous) {
+            sl.noUiSlider.on("update", change);
+        }
         return sl;
-
     }
 
     text(s,d){
+        d.style.display = "flex";
+        d.style.alignItems = "center";
         const t = createEl("input",{
-            value:s.current_value
+            value:s.current_value,
+            styles: {flex: 2}
         },d);
         t.addEventListener("keyup",()=>{
             s.func(t.value);
@@ -208,28 +221,20 @@ class SettingsDialog extends BaseDialog{
     textbox(s,d){
         const tb= createEl("textarea",{
            
+            // no other 'textbox' in our code apart from TextBoxChart AFAICT.
             styles:{
-                height:"20px",
+                // height:"20px",
                 width:"100%"
             }
         },d);
         tb.value=s.current_value;
     
-        tb.addEventListener("keypress",e=>{
-            if (e.keyCode===13){
-                tb.blur();
-            }
-            else{
-                s.func(tb.value);
-            }
+        tb.addEventListener("input",e=>{
+            s.func(tb.value);
         });
         tb.addEventListener("blur",e=>{
-            tb.style.height = "20px";
             s.func(tb.value);
         })
-        tb.addEventListener("focus",e=>{
-            tb.style.height="80px"
-          })
     }
 
     addInfoIcon(info,parent){

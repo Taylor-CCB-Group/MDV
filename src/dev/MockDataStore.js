@@ -1,41 +1,44 @@
 import DataStore from "../datastore/DataStore.js";
 
+const mockColumns= [
+    {
+        name:"x1",
+        field:"x1",
+        datatype:"double",
+    },
+    {
+        name:"x2",
+        field:"x2",
+        datatype:"double"
+    },
+    {
+        name:"x3",
+        field:"x3",
+        datatype:"double"
+    },
+    {
+        name:"colors",
+        field:"colors",
+        datatype:"text",
+        values:[
+        "blue", 
+        "purple",
+        "red",
+        "yellow"
+        ],
+        colors:[
+        "#7FFFD4",
+        "#8A2BE2",
+        "#DC143C",
+        "#FFD700"
+        ]
+    }
+    
+];
+
+
+
 function getRandomDataStore(size,config={}){
-    const columns= [
-        {
-            name:"x1",
-            field:"x1",
-            datatype:"double",
-        },
-        {
-            name:"x2",
-            field:"x2",
-            datatype:"double"
-        },
-        {
-            name:"x3",
-            field:"x3",
-            datatype:"double"
-        },
-        {
-            name:"colors",
-            field:"colors",
-            datatype:"text",
-            values:[
-            "blue", 
-            "purple",
-            "red",
-            "yellow"
-            ],
-            colors:[
-            "#7FFFD4",
-            "#8A2BE2",
-            "#DC143C",
-            "#FFD700"
-            ]
-        }
-        
-    ];
     const c1 = new SharedArrayBuffer(size*4);
     const c2 = new SharedArrayBuffer(size*4);
     const c3 = new SharedArrayBuffer(size*4);
@@ -66,7 +69,7 @@ function getRandomDataStore(size,config={}){
     
     }
     const ds  =  new DataStore(size,{
-        columns:columns
+        columns:mockColumns
     });
     ds.setColumnData("x1",c1);
     ds.setColumnData("x2",c2);
@@ -109,15 +112,35 @@ function getRandomData(column,size){
 
 }
 
-function mockDataLoader(columns,dataSource,size){
-
-    return new Promise((resolve,reject)=>{
-        const dataList=[];
-        for (let column of columns){        
-          dataList.push({data:getRandomData(column,size),field:column.field});
-        }       
-        resolve(dataList);
-    });
+function mockDataLoader(){
+    return {
+        function: (columns, dataSource, size) => {
+            return new Promise((resolve,reject)=>{
+                const dataList=[];
+                for (let column of columns){        
+                  dataList.push({data:getRandomData(column,size),field:column.field});
+                }       
+                resolve(dataList);
+            });
+        }
+    }
 }
 
-export {getRandomDataStore,mockDataLoader,getRandomData}
+export function mockDataSource(name, size) {
+    return {
+        size, name, columns: mockColumns
+    }
+}
+
+// function mockDataSources(dataStores) {
+//     return dataStores.map((ds, i) => {
+//         const {size, columns} = ds;
+//         return {
+//             size,
+//             name: "ds" + i,
+//             columns
+//         }
+//     });
+// }
+
+export {getRandomDataStore,mockDataLoader,getRandomData, mockColumns}

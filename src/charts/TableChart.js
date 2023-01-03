@@ -348,7 +348,7 @@ class EditColumnDialog extends BaseDialog{
             maxHeight:500,
             title:"Bulk Edit "+ columnName
         }
-        super(config,{table:table,column:column});
+        super(config, { table, column });
     }
     init(content){
         this.col= content.column;
@@ -387,7 +387,7 @@ class EditColumnDialog extends BaseDialog{
 
     _createButton(text,replace){
         const d = createEl("div",{style:{padding:"5px 10px"}},this.columns[1]);
-        createEl("span",{classes:["ciview-button"],text:text},d)
+        createEl("button",{classes:["ciview-button"],text:text},d)
         .addEventListener("click",()=>{
             const r= replace || this.replaceInput.value;
             if (r==="_delete_column_"){
@@ -426,6 +426,7 @@ class AddColumnDialog extends BaseDialog{
         const d1 = createEl("div",{style:dstyle},this.dialog);
         createEl("div",{text:"Column Name"},d1);
         this.name = createEl("input",{},d1);
+        this.name.addEventListener("keydown", (e) => {if (e.key === "Enter") this.addColumn()});
         const d2 = createEl("div",{style:dstyle},this.dialog);
         
         
@@ -440,6 +441,8 @@ class AddColumnDialog extends BaseDialog{
         const d3 = createEl("div",{style:dstyle},this.dialog);
         createEl("div",{text:"Position"},d3);
         this.position= createEl("input",{style:{width:"100px"},value:2},d3);
+
+        setTimeout(()=>this.name.focus(), 100);
     }
 
     addColumn(){
@@ -451,7 +454,7 @@ class AddColumnDialog extends BaseDialog{
         let pos = parseInt(this.position.value);
         pos = isNaN(pos)?null:pos
         this.table.createColumn(this.name.value,clone,pos);
-      
+        this.close();
     }
 
 

@@ -164,7 +164,7 @@ class RangeDimension extends Dimension{
             this.parent.filterBuffer,
             col.buffer,
             config
-            ]);
+        ]);
     }
 
     destroy(){

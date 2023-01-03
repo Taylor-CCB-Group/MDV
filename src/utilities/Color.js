@@ -23,7 +23,8 @@ function getColorLegend(colors,names,config={}){
             height:((height>215?215:height)+35)+"px",
             position:"absolute",
             border:"0.5px solid black" 
-        }
+        },
+        classes:["legend-container"]
     });
 
     createEl("div",{
@@ -39,7 +40,7 @@ function getColorLegend(colors,names,config={}){
         styles:{
             overflowY:"auto",
             overflowX:"hidden",
-            "height":"calc(100% - 25px)",
+            "height":"calc(100% - 10px)",
             "width":"100%",
         },
         classes:["legend-body"]
@@ -94,17 +95,19 @@ function getColorLegend(colors,names,config={}){
         }
 
         const t= createSVGEl("text",{
-            y:((i+1)*2)+(i*h_fac)+6,
+            y:((i+1)*2)+(i*h_fac)+6+3,
             x:t_offset,
-            "alignment-baseline":"middle",
-            //"fill":"currentColor",
+            //Firefox was wrong. Changing to "center" made Chrome wrong in same way
+            // "alignment-baseline":"middle", 
+            //so... since change to "center" makes them consistent, adjusting "+6" offset above by "+3" to compensate
+            "alignment-baseline":"center",
             styles:{
                 "font-size":"12px",
                 "fill":"currentcolor"
             },
             text:names[i]===""?"none":names[i]
         },legendg);
-        select(t).style("fill","currentcolor");
+        select(t).style("fill","currentcolor"); //seems redundant?
         
     }
 
@@ -189,7 +192,8 @@ function getColorBar(colors,config={}){
         width:width,
         styles:{
             position:"absolute"
-        }
+        },
+        classes: ["legend-container"]
     });
     container.append(svg);
     makeDraggable(container);

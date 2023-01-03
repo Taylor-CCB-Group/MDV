@@ -3,7 +3,8 @@
         --title_bar_color: #222;
         --main_panel_color: black;
         --text_color: white;
-        --background_color: #333;
+        --background_color: rgb(51, 51, 51);
+        --input_border_color: #bbb;
         --menu-gradient: linear-gradient(#444, #222);
     }
 }
@@ -12,7 +13,8 @@
         --title_bar_color: white;
         --main_panel_color: #f1f1f1;
         --text_color: black;
-        --background_color: #bababa;
+        --background_color: rgb(186, 186, 186);
+        --input_border_color: rgb(51, 51, 51);
         --menu-gradient: linear-gradient(white, darkgray);
     }
 }
@@ -21,7 +23,8 @@
     --title_bar_color: #222;
     --main_panel_color: black;
     --text_color: white;
-    --background_color: #333;
+    --background_color: rgb(51, 51, 51);
+    --input_border_color: #bbb;
     --menu-gradient: linear-gradient(#444, #222);
 }
 
@@ -29,10 +32,20 @@
     --title_bar_color: white;
     --main_panel_color: #f1f1f1;
     --text_color: black;
-    --background_color: #bababa;
+    --background_color: rgb(186, 186, 186);
+    --input_border_color: rgb(51, 51, 51);
     --menu-gradient: linear-gradient(white, darkgray);
 }
-
+:root {
+    font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+    --button_color: #1266f1;
+}
+.Dark a {
+    color: #1266f1;
+}
+select, input, textarea {
+    border: 0.1em solid var(--input_border_color);
+}
 .mdv-select{
     border-radius: 3px;
     font-size:0.8em;
@@ -96,13 +109,37 @@
     flex-grow:0;
 }
 
+.grid-stack  .ciview-chart-panel {
+    box-shadow: none;
+    /* nb changing box-sizing,  adjusted width in _getContentDimensions()...
+    otherwise VolumeView was overflowing.
+    Left 'overflow: hidden' for now anyway.
+    */
+    overflow: hidden;
+    box-sizing: border-box;
+    border: 4px solid var(--background_color);
+}
+.grid-stack-placeholder {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.grid-stack {
+    overflow-x: hidden !important;
+}
+
+.Dark .gridLock {
+    border-color: #101010;
+}
+.Light .gridLock {
+    border-color: #888;
+}
 
 .ciview-chart-panel{
     display:flex;
     flex-flow:column;
     border-radius:5px;
     box-shadow: 0 0 1em #888;
-}
+}    
 
 .ciview-chart-titlebar{
     display:flex;
@@ -144,8 +181,22 @@
     color: var(--text_color);
 }
 
-
-
+.legend-container {
+    backdrop-filter: blur(1px);
+    padding: 0.4em;
+    transition: backdrop-filter 0.2s ease-in-out;
+    /* changing var(--background_color) to rgb() didn't help */
+    /* background-color: rgba(var(--background_color), 0.7); */
+}
+.legend-container:hover {
+    backdrop-filter: blur(20px);
+}
+.Dark .legend-container {
+    background-color: rgba(51, 51, 51, 0.3);
+}
+.Light .legend-container {
+    background-color: rgba(186, 186, 186, 0.3);
+}
 
 .row-bar{
     cursor:pointer;
@@ -161,30 +212,30 @@
 }
 
 .ciview-button{
-    background: #1266f1;
+    background: var(--button_color);
     padding:5px 8px;
     border-radius:5px;
     cursor:pointer;
     color:white;
-   
+    border: 0;
 }
 
 .ciview-button-sm{
-    background: #1266f1;
+    background: var(--button_color);
     padding:3px 6px;
     border-radius:5px;
     cursor:pointer;
     color:white;
-    font-size:14px;
+    font-size:0.8em;
     margin: 0px 3px;
     text-align: center;
-   
+    border: 0;
 }
 
 
 
 .ciview-button-disabled{
-    background: #1266f1;
+    background: var(--button_color);
     padding:5px 8px;
     border-radius:5px;
     opacity:0.6;
@@ -297,4 +348,30 @@
 
 .ciview-chart-icon{
     cursor:pointer;
+    margin: 0px 2px;
+}
+
+.annotationDialog h2 {
+    font-weight: 400;
+    line-height: 1.2em;
+}
+
+.annotationDialog ul {
+    list-style: none;
+    display: flex;
+    gap: 0.5em;
+    font-size: small;
+}
+
+.annotationDialog li {
+    padding: 0.4em;
+    border-radius: 0.5em;
+    background-color: var(--button_color);
+}
+
+.annotationDialog .allTagged {
+    
+}
+.annotationDialog .someTagged {
+    filter: saturate(20%);
 }

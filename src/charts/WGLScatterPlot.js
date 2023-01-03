@@ -42,7 +42,7 @@ class OffsetDialog extends BaseDialog{
 		const cname= this.ds.columnIndex[this.ds.offsets.groups].name;
 		createEl("div",{text:cname},dd);
 		this.groupSelect= createEl("select",{},dd);
-		const bb = createEl("span",{classes:["ciview-button-sm"],text:"Reset"},dd);
+		const bb = createEl("button",{classes:["ciview-button-sm"],text:"Reset"},dd);
 		bb.addEventListener("click",e=>{
 			this.ds.resetColumnOffsets(this.filter,this.groupSelect.value,true);
 			this._showOffsets(this.groupSelect.value);

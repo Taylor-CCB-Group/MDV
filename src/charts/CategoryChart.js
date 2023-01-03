@@ -1,4 +1,4 @@
-import { thresholdScott } from "d3";
+
 import SVGChart from "./SVGChart.js";
 
 class CategoryChart extends SVGChart{
@@ -106,12 +106,11 @@ class CategoryChart extends SVGChart{
         }
         const config={};
         this.dim.getCategories(data=>{
-           
-            this.data=[];
+            this.data = new Array(data.length);
             this.maxCount=1;
             const c = this.config;
             for (let n=0;n<data.length;n++){
-                this.data.push([data[n],n]);
+                this.data[n] = [data[n],n];
                 this.maxCount= Math.max(data[n],this.maxCount);
             }
 
