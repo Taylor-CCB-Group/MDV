@@ -210,15 +210,19 @@ class CustomDialog extends BaseDialog{
         this.controlValues[s.id]=v;
         t.addEventListener("keyup",()=>{
             this.controlValues[s.id]=t.value;
-        })
+        });
+        this.controls[s.id]=t;
     }
 
 
     
 
     buttonClicked(button){
-        button.method(this.controlValues);
-        this.close()
+        const rv = button.method(this.controlValues, this.controls);
+        if (rv !== "noclose"){
+            this.close();
+        }
+       
     }
 
     addButton(button){

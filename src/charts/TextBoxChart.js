@@ -1,28 +1,23 @@
 import BaseChart from "./BaseChart.js";
 import {createEl} from "../utilities/Elements.js";
-import {marked} from "marked";
-import {sanitize} from 'dompurify';
 
-function render(text) {
-    return sanitize(marked.parse(text));
-}
 
 class TextBoxChart extends BaseChart{
     constructor(dataStore,div,config){
-		super(dataStore,div,config);
-       
+		super(dataStore,div,config);       
         const c = this.config;
         c.text= c.text || "";
         this.para = createEl("div",{
-            // text: c.text,
-            // innerHTML: marked.parse(c.text),
             styles:{
                 padding:"5px"
             }
         },this.contentDiv);
-        this.para.innerHTML = render(c.text);
-
-        
+        //conditional import of function which uses the packages marked and sanitize
+        //decreases size of entry module
+        import('../utilities/MarkdownText').then(({ default:renderText })=>{
+            this.render= renderText;
+            this.para.innerHTML = this.render(c.text);
+        })     
 	}
 
     getSettings(){
@@ -34,13 +29,11 @@ class TextBoxChart extends BaseChart{
             current_value:c.text,
             func: x => {
                 c.text = x;
-                this.para.innerHTML = render(x);
-                //this.para.textContent = c.text = x
+                this.para.innerHTML = this.render(x);
             }
         });
         return settings;
     }
-
 }
 
 export default TextBoxChart;

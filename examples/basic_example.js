@@ -68,7 +68,7 @@ const dataSources=[{
     ]
 }];
 
-//simple dataLoader - just specifies a single cdv file
+//simple dataLoader - just specifies a single csv file
 const dataLoader = {
     files:[
         {

@@ -23,7 +23,7 @@ import "./SelectionDialog.js";
 
 import {BaseDialog} from "../utilities/Dialog.js";
 import {getRandomString} from "../utilities/Utilities.js";
-import {csv,tsv,json} from"d3-fetch";
+import {csv,tsv,json} from "d3-fetch";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
@@ -1203,7 +1203,8 @@ class ChartManager{
                 top:"3px",
                 color:t.text_color,
                 textOverflow:"ellipsis",
-                fontSize:"18px"
+                wordBreak:"break-all",
+                fontSize:"16px"
 
             },
             text:config.title
