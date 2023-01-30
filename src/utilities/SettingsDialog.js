@@ -1,6 +1,7 @@
 import { BaseDialog } from "./Dialog.js";
 import { createEl } from "./Elements.js";
 import noUiSlider from "nouislider";
+import { func } from "../datastore/binWorker.js";
 
 
 
@@ -26,12 +27,14 @@ class SettingsDialog extends BaseDialog{
             if (s.info){
                 this.addInfoIcon(s.info,d);
             }
-            const factory = this[s.type];
-            if (!factory) {
+            //not sure  why assign a varaiable
+            //'this' no longer available in function call - causing problems
+            //const factory = this[s.type];
+            if (!this[s.type]) {
                 console.warn(`SettingsDialog doesn't have a method '${s.type}'`);
                 continue;
             }
-            this.controls[s.label] = factory(s,d);
+            this.controls[s.label] = this[s.type](s,d);
         }
 
     }
@@ -93,8 +96,8 @@ class SettingsDialog extends BaseDialog{
             },
             step:s.step || null,
             tooltips:true,
-            //PJT::: this.config was undefined
-            documentElement: s.doc
+            //PJT::: this.config was undefined (no longer the case)
+            documentElement: s.doc || this.config.doc
         });
         const change = (values) => {
             s.func(parseFloat(values[0]))
@@ -213,7 +216,13 @@ class SettingsDialog extends BaseDialog{
             value:s.current_value,
             styles: {flex: 2}
         },d);
-        t.addEventListener("keyup",()=>{
+        t.addEventListener("keyup",(e)=>{
+            if (s.only_update_on_enter){
+                if (e.key==="Enter"){
+                    s.func(t.value);
+                }
+                return;
+            }
             s.func(t.value);
         })
     }

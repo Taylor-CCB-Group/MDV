@@ -6,7 +6,8 @@ onmessage= function(e){
     const lFilter=new  Uint8Array(e.data[0]);
     const gFilter = new  Uint8Array(e.data[1]);
     const categories= new Uint8Array(e.data[2]);
-    const values = new Float32Array(e.data[3]);
+    const arrType= e.data[3][1] === "int32"?Int32Array:Float32Array;
+    const values = new arrType(e.data[3][0]);
     const config = e.data[4];
     const len =values.length;
     const catLen = config.values.length;
@@ -25,7 +26,7 @@ onmessage= function(e){
     }
     const arrs = [];
     for (let n=0;n<catLen;n++){
-        arrs.push(new Float32Array(cats[n]))
+        arrs.push(new arrType(cats[n]))
     }
 
     const totals = new Array(catLen).fill(0);
@@ -166,8 +167,8 @@ function kernelDensityEstimator(V,X,k=2) {
 function multiBoxPlot(e){
 
     const data= [];
-    for (let buf of e.data[2]){
-        data.push(new Float32Array(buf))
+    for (let item of e.data[2]){
+        data.push(item[1]==="int32"?new Int32Array(item[0]):new Float32Array(item[0]))
     }
     const dLen= data.length;
     const config = e.data[4];
@@ -191,7 +192,8 @@ function multiBoxPlot(e){
     }
 
     for (let n=0;n<dLen;n++){
-        results[n]=new Float32Array(total);
+        //should cope with int32 and float32 
+        results[n]=new Float64Array(total);
     }
     count=0;
     for (let i=0;i<tLen;i++){

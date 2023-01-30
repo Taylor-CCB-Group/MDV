@@ -206,7 +206,7 @@ class MLVTrack{
 				config.color="#D3D3D3";
 			}
 			else{
-				config.color="black";
+				//config.color="black";
 			}
 		}
 		if (!config.opacity){
@@ -222,13 +222,11 @@ class MLVTrack{
         ctx.font="15px Verdana";
         const dim = ctx.measureText(options.features);
         const y= options.top+(options.height/2)+20;
-        
+        ctx.fillStyle = options.textColor;
         for (let x=0;x<options.pixelWidth;x+=dim.width+10){
             ctx.fillText(options.features, x, y);
         }
         ctx.restore();
-
-
     }
 
 
@@ -531,8 +529,8 @@ class MLVBedTrack extends MLVTrack{
         			gene.color=this.color_function(gene);
         		}
         		
-                this.renderFeature(gene,coord,ctx,info);
-                this.renderFeatureLabel(ctx, gene, coord.px, coord.px1, py, windowX, windowX1);
+                this.renderFeature(gene,coord,ctx,info,options.textColor);
+                this.renderFeatureLabel(ctx, gene, coord.px, coord.px1, py, windowX, windowX1,options.textColor);
             }
             ctx.globalAlpha=1;
         }
@@ -563,9 +561,9 @@ class MLVBedTrack extends MLVTrack{
 
 
 
-	renderFeatureLabel(ctx, feature, featureX, featureX1, featureY, windowX, windowX1) {
+	renderFeatureLabel(ctx, feature, featureX, featureX1, featureY, windowX, windowX1,defaultColor) {
 		let info = this.config;
-        var geneColor, geneFontStyle, transform,
+        var geneFontStyle, transform,
             boxX, boxX1,    // label should be centered between these two x-coordinates
             labelX, labelY,
             textFitsInBox;
@@ -594,12 +592,12 @@ class MLVBedTrack extends MLVTrack{
         textFitsInBox = (boxX1 - boxX) > ctx.measureText(text).width;
         //geneColor="black";
 
-        if ((textFitsInBox || geneColor) && info.displayMode != "SQUISHED" && text) {
+        if ((textFitsInBox) && info.displayMode != "SQUISHED" && text) {
             geneFontStyle = {
                 font: '10px PT Sans',
                 textAlign: 'center',
-                fillStyle: geneColor || info.color,
-                strokeStyle: geneColor || info.color
+                fillStyle: info.color || defaultColor,
+                strokeStyle: info.color || defaultColor
             };
 
             if (info.displayMode === "COLLAPSED" && info.labelDisplayMode === "SLANT") {
@@ -648,10 +646,10 @@ class MLVBedTrack extends MLVTrack{
      * 
      */
 	
-	renderFeature(feature, coord,ctx,info){
+	renderFeature(feature, coord,ctx,info,defaultColor){
 		var e,x, cy, direction, exon, ePx, ePx1, ePxU, ePw, py2, h2, 
             step = 20,
-            color = this.config.color;
+            color = this.config.color || defaultColor;
         if (feature.color) {
             color = feature.color;
         }
@@ -816,7 +814,7 @@ class MLVWigTrack extends MLVTrack{
 	}
 
 
-	drawScale(pixel_height,ctx){
+	drawScale(pixel_height,ctx,defaultColor){
 		if (this.config.scale_link_to && this.config.group){
 			return;
 		}
@@ -824,7 +822,8 @@ class MLVWigTrack extends MLVTrack{
 		let	top=this.top;
 		let	bot = this.bottom;
 		
-		let range=this.max_y-this.min_y;
+		ctx.fillStyle=defaultColor;
+        ctx.strokeStyle=defaultColor;
 
 		ctx.beginPath();
 		ctx.moveTo(0,top);
@@ -836,7 +835,7 @@ class MLVWigTrack extends MLVTrack{
 		ctx.font="12px Arial";
 		ctx.stroke();
 		ctx.textBaseline="top";
-		ctx.fillStyle="black";
+		
 		if (this.max_y != null){
 		    ctx.fillText(this.max_y.toFixed(2),20,top);
 		    ctx.textBaseline="alphabetic";
@@ -1380,12 +1379,12 @@ class Graphics{
 Graphics.nucleotideColors={
 	"A":"green",
 	"T":"red",
-	"G":"black",
+	"G":"gray",
 	"C":"blue",
 	"a":"green",
 	"t":"red",
-	"c":"black",
-	"g":"blue"
+	"c":"blue",
+	"g":"gray"
 
 }
 

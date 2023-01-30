@@ -11,17 +11,24 @@ import {getColorLegend,getColorBar} from "../utilities/Color.js"
 import {quantileSorted} from 'd3-array';
 
 
-
-
-
 /**
 * Creates an empty data structure
-* @param {integer} size - The number of rows(items) of the data structure
+* @tutorial datasource
+* @param {integer} size - the number of rows(items) of the data structure
 * @param {Object} [config] - setup information for the datastore.
 * @param {Object[]} [config.columns] - an array of column objects, specifying 
 * the metadata for data structure, see {@link DataStore#addColumn}
 * @param {Object[]} [config.columnGroups] - an array of objetcs each has
 * name, and a list of columns in that group
+* @param {Object} [config.links] - an object describing how this DataStore
+* links with other DataStore
+* @param {Object} [config.images] - an object describing thumbnails which
+* are associated with each item/row in the DataStore
+* @param {Object} [config.large_iamges] - an object describing large images which
+* are associated with each item/row in the DataStore
+* @param {Object} [config.offsets] - an object specofying which columns can
+* have values that can be transformed and rotated and any transformations/
+* rotations appplied to them
 */
 
 class DataStore{
@@ -45,6 +52,9 @@ class DataStore{
         //info about subgroups and their datasources
         this.subgroups={};
         this.subgroupDataSources=new Set();
+        this.accessOtherDataStore=[];
+        this.syncColumnColors=[];
+        this.linkColumns=[];
 
 
         this.columnsWithData=[];
@@ -56,11 +66,16 @@ class DataStore{
         }
         this.dirtyMetadata=new Set();
 
-        this.offsets=config.offsets;
+        if (config.offsets){
+            config.offsets.values = config.offsets.values || {};
+            this.offsets=config.offsets;
+        }
+        this.images= config.images;
+        this.genome_browser = config.genome_browser;
        
         if (config.columns){
             for (let c of config.columns){
-                this.addColumn(c)
+                this.addColumn(c,c.data);
             }
         }
 
@@ -73,6 +88,7 @@ class DataStore{
             this.large_images=config.large_images;
         }
         if (config.links){
+            this.links= config.links;
             for (let ds in config.links){
                 const link = config.links[ds];
                 if (link.rows_as_columns){
@@ -86,12 +102,34 @@ class DataStore{
                             }
                      }       
                 }
+                if (link.access_data){
+                    this.accessOtherDataStore.push({
+                        dataSource:ds,
+                        index:link.index
+                    });
+                }
+                if (link.sync_column_colors){
+                    this.syncColumnColors.push({
+                        dataSource:ds,
+                        columns:link.sync_column_colors
+                    });
+                }
+                if (link.columns){
+                    this.linkColumns.push({
+                        dataSource:ds,
+                        columns:link.columns
+                    })
+                }
             }
-        }
-        
+        }   
     }
 
 
+    /**
+     * 
+     * @returns {boolean} - true if the DataStore has been filtered
+     * 
+     */
     isFiltered(){
         return this.filterSize!==this.size;
     }
@@ -101,12 +139,12 @@ class DataStore{
     * passing the event type and any data. There are the following different types
     * of event:-
     * <ul>
-    * <li> filtered - called when a filter is applied. The dimension doing the
-    * the filtering is passed as data </li>
-    * <li> data_highlighted - called when certain indexes have been highlighted </li>
-    * <li> column_removed - called just before a column is removed </li> 
-    * <li> data_changed- called when data has changed giving a list of columns where
-    * the data has changed </li> 
+    *   <li> filtered - called when a filter is applied. The dimension doing the
+    *   the filtering is passed as data </li>
+    *   <li> data_highlighted - called when certain indexes have been highlighted </li>
+    *   <li> column_removed - called just before a column is removed </li> 
+    *   <li> data_changed- called when data has changed giving a list of columns where
+    *   the data has changed </li> 
     * </ul>
     * @param {string} id - a unique id identifying the listener
     * @param {function} listener - a function that accepts two paramaters, the type
@@ -131,6 +169,12 @@ class DataStore{
         }
     }
 
+    /**
+     * Removes all filters from the datastore,
+     * More efficient than removing each filter individuallu
+     * Filters oo dimnensions with a noclear property will not
+     * be removed
+     */
     removeAllFilters(){
         this.filterArray.fill(0);
         let noclear=[];
@@ -170,18 +214,16 @@ class DataStore{
     * This method should be called if the any data has been modified, specifiying the
     * columns involved.
     * Any dimensions will re-filter if necessary i.e. if the modified columns are 
-    * involved in the filter, and any listeners will be called.
+    * involved in the filter and single filtered event will be broadcast.
     * All 'data_changed' listeners will be informed with the columns changed and whether
     * filtering has already occurred (in which case updating may have already occurred
-    * if the filter listener caused an update)
+    * if the object listening to data changes also listens to filtered events)
     * @param {string[]} columns - a list of column/fields whose data has been modified
     * @param {boolean} [is_dirty=true] - if false (default is true) then the column
-    * will not be tagged as dirty. This my be the case id the change was pulled from
+    * will not be tagged as dirty. This my be the case if the change was pulled from
     * the backend for example 
-    * @param {boolean} [refilter=true] if false then no dimensions will be re-filtered
-    * for example if only the colors in the columns have changed
     */
-    dataChanged(columns,is_dirty=true,refilter=true){
+    dataChanged(columns,is_dirty=true){
         let hasFiltered=false;
         for (let d of this.dimensions){
             //this method will not call any listeners- wait until all done
@@ -201,19 +243,30 @@ class DataStore{
         this._callListeners("data_changed",{columns:columns,hasFiltered:hasFiltered});
     }
 
+    /**
+     * This method calls any listeners to 'highlight' any rows specified e.g
+     * rows in a table or points in a scatter plot
+     * @param {array} indexes an array of indexes to items that should be highlighted
+     * @param {object} source the obect doing the highlighting
+     */
     dataHighlighted(indexes,source){
         this.highightedData=indexes;
         this._callListeners("data_highlighted",{indexes,source});
     }
 
+    /**
+     * @returns {array} The indexes of items that have been highligted
+     */
     getHighlightedData(){
         return this.highightedData;
     }
 
+    /**
+     * Broadcast a filter event to all listeners
+     */
     triggerFilter(){
         this._callListeners("filtered")
     }
-
 
     /**
     * Tag that the colunm's data has changed and is not synched with the backend
@@ -226,6 +279,10 @@ class DataStore{
         this.dirtyColumns["data_changed"][col]=true;
     }
 
+    /**
+     * Specify that all data (and metadata) has beem synched with
+     * the backend
+     */
     setAllColumnsClean(){
         this.dirtyColumns.added={};
         this.dirtyColumns.removed={};
@@ -246,11 +303,11 @@ class DataStore{
         return this.filterArray;
     }
 
-     /**
+    /**
     * Returns true if the row is in the filter and false if it 
     * has been filtered out
     * @param {integer} index The index of the row 
-    * @returns {boolean} 
+    * @returns {boolean} whether the row has been filtered out
     */
     isRowFiltered(index){
         return this.filterArray[index]===0;
@@ -273,33 +330,41 @@ class DataStore{
     }
 
     /**
-    * Adds a column's metadata and its data to the data store
-    * @param {Object} [column] An object describing the column
+    * Adds a column's metadata and optionally it's data to the DataStore
+    * @tutorial datasource
+    * @param {Object} column An object describing the column
     * @param {string} column.field - the id of the column - used internally
     * @param {string} column.name -the human readable column label
     * @param {string} column.datatype - the datatype- can be one of 
     * <ul>
-    * <li> double - any numerical type including integers </li>
-    * <li> text - data containing strings but with no more than 256 categories </li>
-    * <li> unique - data contianing strings but with many categories - internally 
-    * treated as JavaScript arrays so the number of these columns should be limited 
-    * especially in large datasets </li>
+    *   <li> double - any floating point data </li>
+    *   <li> integer - any integer data </li>
+    *   <li> text - data containing strings but with no more than 256 categories </li>
+    *   <li> unique - data contianing strings but with many categories </li>
+    *   <li> multitext - 
     * </ul>
+    * @param {boolean} [column.editable] whether the column's data can be changed
+    * @param {boolean} [column.is_url] the column's values will be displayed as links
+    * (text and unique columns only)
     * @param {string[]} [column.values] Only required for text columns, where the index
     * of the array should match the value in the data   
     * @param {string[]} [column.colors] - An array of rgb hex colors. In the case of a 
     * text column the colors should match the values. For number columns, the list represents
     * colors that will be interpolated. If not suplied default color pallettes will be 
     * supplied
+    * @param {number[]} [column.minMax] the min max values in the column's values 
+    * (integer/double only)
+    * @param {object} [column.quantiles] an object describing the 0.05,0.01 and 0,001 
+    * qunatile ranges (integer/double only)
     * @param {boolean} [column.colorLogScale=false] - if true then the colors will be
     * displayed on a log scale- useful if the dataset contains outliers. Because a symlog
     * scale is used the data can contain 0 and negative values
-    * @param {SharedArrayBuffer|[]} [data] In the case of a double/integer (number) column, the array
+    * @param {SharedArrayBuffer|Array} [data] In the case of a double/integer (number) column, the array
     * buffer should be the appropriate size to contain float32s. For text it shuold be Uint8
     * and contain numbers corresponding to the indexes in the values parameter. For a column of
     * type unique it should be a JavaScript array. This parameter is optional as the data can
     * be added later see {@link DataStore#setColumnData}
-    * @param {boolean} dirty if true then the store will keep a record that this column has
+    * @param {boolean} [dirty=false] if true then the store will keep a record that this column has
     * been added and is not permanatly stored in the backend
     */
     addColumn(column,data=null,dirty=false){
@@ -332,7 +397,7 @@ class DataStore{
             c.stringLength= column.stringLength;
             c.values = column.values || [`Error: no values for '${c.name}'`];
         }
-        else if (column.datatype==="double" || column.datatype ==="integer"){
+        else if (column.datatype==="double" || column.datatype ==="integer" ||  column.datatype==="int32"){
             c.colorLogScale=column.colorLogScale;
             c.minMax=column.minMax;
             c.quantiles=column.quantiles;
@@ -352,49 +417,19 @@ class DataStore{
         
     }
 
-    getNearestMatch(text,column,mismatches=1){
-        const col = this.columnIndex[column];
-        const tupper= text.toLowerCase();
-        const tlower = text.toUpperCase();
-        const e = new TextEncoder();
-        const bupper= e.encode(tupper);
-        const blower= e.encode(tlower);
-        const len = text.length;
-        const d = col.data;
-        let matches=[];
-        const sl = col.stringLength;
-    
-        for (let i = 0;i<d.length-len;i++){
-            let match=true;
-            let mm =0;
-            for (let a=0;a<len;a++){
-                if (bupper[a]!=d[i+a] && blower[a]!=d[i+a]){
-                    mm++;
-                    if (mm>mismatches){
-                        match=false;
-                        break
-                    } 
-                }
-            }
-            if (match){
-                const index = Math.floor(i/sl);
-                const v= this.textDecoder.decode(col.data.slice(index*sl,(index*sl)+sl)).replaceAll("\0","");
-                matches.push({
-                    value:v,
-                    index:index,
-                    mismatches:mm
-                });
-                if(mm===0){
-                   break
-                }
-            }
-        }
-        matches  =matches.filter(x => x.value.length=== len)
-        matches.sort((a,b)=>a.mismatches-b.mismatches)
-        return matches;
-
-    }
-
+    /**
+     * This method will return (case insensetive) any values in the column
+     * which contain the specified text (unique/text/multitext columns only)
+     * @param {*} text - the query value
+     * @param {*} column - the column to query
+     * @param {*} number  - the maximum number of results to return
+     * @returns {object[]} An array of objects with
+     * <ul>
+     *  <li>value-  the actual text match   </li>
+     *  <li>index - for unique columns, the row index and for 
+     *   text/multitext its index in the column's values array</li>
+     * </ul>
+     */
     getSuggestedValues(text,column,number=10){
         const col = this.columnIndex[column];
         const tupper= text.toLowerCase();
@@ -405,10 +440,8 @@ class DataStore{
             const bupper= e.encode(tupper);
             const blower= e.encode(tlower);
             const len = text.length;
-            const d = col.data;
-            
+            const d = col.data;    
             const sl = col.stringLength;
-        
             for (let i = 0;i<d.length-len;i++){
                 let match=true;
                 for (let a=0;a<len;a++){
@@ -426,8 +459,7 @@ class DataStore{
                     });
                     if (matches.length>number){
                         break;
-                    }
-                    
+                    }          
                 }
             }
         }
@@ -454,7 +486,6 @@ class DataStore{
                         index:i
                     });
                 }
-
             }
         }
         return matches;
@@ -490,7 +521,8 @@ class DataStore{
     * returns a list of column name and fields (which have data) sorted by name 
     * @param {Array} [filter] - can be either number, all, text, integer, double or unique
     * @returns {Object[]}  An array of objects containing name,field and datatype 
-    * properties, sorted by name.
+    * properties. The columns are ordered by main columns followed by subgroups. 
+    * Each group is ordered alphabetically
     */
     getColumnList(filter=null){
         const columns=[];
@@ -587,7 +619,7 @@ class DataStore{
             if (col.datatype==="text"){
                 v= col.values[v];
             }
-            else if (col.datatype==="double" || col.datatype==="integer"){
+            else if (col.datatype==="double" || col.datatype==="integer" || col.datatype==="int32"){
                 if (isNaN(v)){
                     v="missing";
                 }
@@ -599,72 +631,99 @@ class DataStore{
             }
             else{
                 v= this.textDecoder.decode(col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength));
+                v= v.replaceAll("\0","");
             }
-         
             obj[c]=v;
         }
         obj["__index__"]=index;
         return obj;
     }
 
-    getRowText(index,column){
-        const col = this.columnIndex[column];
-        if (col.datatype==="unique"){
-            const v= this.textDecoder.decode(col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength));
-            return v.replaceAll("\0","");
 
+    /**
+     * Return an array of conatining all the filterd values for
+     * the specified column - inefficent for large data sets
+     * @param {string} column - the column's field.id
+     * @returns {string[]|number[]}  An array pf filtered valaues
+     */
+    getFilteredValues(column){
+        const arr =  new Array(this.filterSize);
+        let index=0;
+        for (let n=0;n<this.size;n++){
+            if (this.filterArray[n]===0){
+                arr[index]=this.getRowText(n,column);
+                index++;
+            }    
         }
-        else if (col.datatype==="text"){
-            return col.values[col.data[index]]
-        }
-        else if (col.datatype=="multitext"){
-            const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
-            return  Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(", ")
-
-        }
-        else{
-            return col.data[index];
-        }
-      
+        return arr;
     }
 
+    /**
+    * Returns the value for the given row index and column
+    * @param {integer} index - the index of the row,
+    * @param {string} column - the columns's field/id
+    * @returns {string|number} - the vaule for the given index and field 
+    */
+    getRowText(index,column){
+        //not very efficent
+        return this.getRowAsObject(index,[column])[column];
+    }
 
+    /**
+     * Sets the columns offsets 
+     * @param {object} data - information about offset/rotation (should only contain offsets or rotation)
+     * @param {string} [data.filter] - if the offsets have a background filter - the value for this filter
+     * @param {string} data.group - the group (category) to offset
+     * @param {number} [data.rotation] - The amount to rotate (in degrees)
+     * @param {number[]} [data.offset] - The x, y offset values
+     * @param {boolean} update - update all dependants - default is false
+     */
     setColumnOffset(data,update){
-        if (!data.filter){
-            data.filter="all"
+        if (!this.offsets){
+            throw new Error("Attempting to set offsets but none are specified in config")
         }
-       const fd =data.filter;
-        //give defult values to this group if it has none
+        data.filter =data.filter || "all";
+        //give default values to this group if it has none
         const o = this.offsets.values;
-        let fg = o[fd];
+        let fg = o[data.filter];
         if (!fg){
             fg={};
-            o[fd]=fg;
+            o[data.filter]=fg;
         }
         let inf =fg[data.group];
         if (! inf){
             inf={offsets:[0,0],rotation:0};
             fg[data.group]=inf;
         }
-        
-       
         this.updateColumnOffsets(data,data.rotation,update);
         this.dirtyMetadata.add("offsets");
     }
 
 
-
-    _getRotationOrigin(column,group){
+    //gets the rotation origin of the group of points i.e. the center
+    _getRotationOrigin(column,group,filter){
         const o = this.offsets;
         const gc= this.columnIndex[column];
         const gv = gc.values.indexOf(group)
         const gd= gc.data;
         const x= this.columnIndex[o.param[0]];
         const y= this.columnIndex[o.param[1]];
+
+        //get background filters if any
+        let fv=null;
+        let fc= null;
+        if (o.background_filter){
+            fc = this.columnIndex[o.background_filter];
+            fv = fc.values.indexOf(filter)
+        }
     
         let mmx=[Number.MAX_VALUE,Number.MIN_VALUE];
         let mmy=[Number.MAX_VALUE,Number.MIN_VALUE];
+
         for (let n=0;n<this.size;n++){
+            if (fc && fc.data[n] !== fv){
+                continue;
+            }
             if (gd[n]===gv){
                 mmx[0]=Math.min(mmx[0],x.originalData[n]);
                 mmx[1]=Math.max(mmx[1],x.originalData[n]);
@@ -681,16 +740,16 @@ class DataStore{
         const o = this.offsets;
         const x = this.columnIndex[o.param[0]];
         const y= this.columnIndex[o.param[1]];
-     
+        //store the original values in the column object
         x.originalData= new Float32Array(x.data);     
         y.originalData= new Float32Array(y.data);
     }
 
 
     //gets the offset values
-    //single - the only value to offset or rotate
-    //filterValue - if background filter  the value of the filter
-    //rotate - to rotate if not then offset
+    //single - the only value to offset or rotate otherwise
+    //the valuea are obtained from the offsets config
+    //rotate true or false- to rotate if not then offset
     _getOffsetValues(single,rotation){
         const o = this.offsets;
         let filterData=null;
@@ -726,7 +785,7 @@ class DataStore{
 
                 if (rotation){
                     if (!v.rotation_center){
-                        v.rotation_center=this._getRotationOrigin(o.groups,i);
+                        v.rotation_center=this._getRotationOrigin(o.groups,i,fv);
                     }
                     val.rotation_center=[v.rotation_center[0]+v.offsets[0],v.rotation_center[1]+v.offsets[1]];
                     
@@ -763,37 +822,50 @@ class DataStore{
         return values;
     }
 
+    /**
+     * resets the columns offsets to default values
+     * @param {sring} [filter] - the filter value - or null if no filter
+     * @param {string} group - The group/category to reset
+     * @param {boolean} update - whether to inform listeners data has changed 
+     */
     resetColumnOffsets(filter,group,update){
+        filter= filter || "all";
         const o = this.offsets;
+        if (!o){
+            throw new Error("Attempting to reset offsets but none are specified in config")
+        }
         delete this.offsets.values[filter][group];
-        const fcol =  this.columnIndex[this.offsets.background_filter]
-        const filterData = fcol.data;
-        const filterVal= fcol.values.indexOf(filter);
+        let fc= null;
+        let fv =null;
+        if (filter !=="all"){
+            fc =  this.columnIndex[this.offsets.background_filter];
+            fv = fc.values.indexOf(filter);
+        }
         const gr =this.getColumnValues(o.groups).indexOf(group);
         const grData= this.columnIndex[o.groups].data;
         const x = this.columnIndex[o.param[0]];
         const y = this.columnIndex[o.param[1]];
      
         for (let n=0;n<this.size;n++){
-         
-           
-                if (filterData[n] !== filterVal){
+ 
+                if (fc && fc[n] !== fv){
                     continue;
                 }
                 if (grData[n]===gr){
                     y.data[n]=y.originalData[n];
                     x.data[n]=x.originalData[n];
-                }
-                
+                }        
         }
         if (update){
-            this.dataChanged([o.param[0],o.param[1]])
+            this.dataChanged([o.param[0],o.param[1]],false)
         }
         this.dirtyMetadata.add("offsets");
     }
     
-    //single - name of group to alter
-    //add - the values to add to current offsets- otheriwise current offsets used
+    //single - info about the group to rotate/offset
+    //if null then all groups will be offset according to the values in offsets
+    //rotation -  will rotate rather than update
+    //update - send message to update all dependants
     updateColumnOffsets(single,rotation=false,update=false){
         const o = this.offsets;
         const gc= this.columnIndex[o.groups];
@@ -825,12 +897,21 @@ class DataStore{
             }     
         }
         if (update){
-            this.dataChanged([o.param[0],o.param[1]])
+            //update listeners but although column data has changed - don't synch with backend
+            this.dataChanged([o.param[0],o.param[1]],false)
         }
     }
 
-  
-
+    
+    /**
+    * Gets an object whose keys contains the supplied column's values pointing
+    * to the row's index. Only for text and unique columns. Will give unpredictable
+    * results if a value is present more than once in the column. 
+    * The index is cached, so calling multiple times will not affect performance.
+    * @param {string[]} column The column's field/id
+    * @returns {object} An object whose keys are the columns values which point
+    * to the row's index 
+    */
     getColumnIndex(column){
         if (this.indexes[column]){
             return this.indexes[column];
@@ -839,7 +920,8 @@ class DataStore{
         const index={};
         if (col.datatype==="unique"){
             for (let n=0;n<this.size;n++){
-                let v= this.textDecoder.decode(col.data.slice(n*col.stringLength,(n*col.stringLength)+col.stringLength));
+                let v= this.textDecoder.decode(col.data.slice(n*col.stringLength,(n*col.stringLength)+col.stringLength)).replaceAll("\0","");
+                //needed for some cell ids
                 if (v.includes("#")){
                     v=v.split("#")[1]
                 }
@@ -874,9 +956,8 @@ class DataStore{
         }
         const arr=[];
         const cols=[];
-        const headers=["index"];
-        for (let c of columns){
-            
+        const headers=["index"].concat(columns);
+        for (let c of columns){    
             const col= this.columnIndex[c];
             cols.push(col);
             headers.push(col.name);
@@ -893,23 +974,8 @@ class DataStore{
                     continue
                 }
             }
-            const line=[i];
-            for (let c of cols){
-                let v= c.data[index];
-                if (c.datatype==="text"){
-                    v= c.values[v];
-                }
-                else if (c.datatype==="double" || c.datatype==="integer"){
-                    if (isNaN(v)){
-                        v="";
-                    }
-                }
-                else{
-                    v= this.textDecoder.decode(c.data.slice(index*c.stringLength,(index*c.stringLength)+c.stringLength));
-                }
-             
-                line.push(v);
-            }
+            const o = this.getRowAsObject(index,columns);
+            const line = [i].concat(columns.map(x=>o[x]))
             arr.push(line.join(delimiter))
 
         }
@@ -920,16 +986,10 @@ class DataStore{
     * Adds data to the store for the specified column. If the data is a JavaScript array,
     * then it will be converted to the correct internal data structures and the only previously 
     * supplied metadata required are field, name and datatype.
-    * If the data is a shared array buffer then, the data should be in the correct format 
-    * (Uint8 for 'unique' and 'text' types and Float32 for'double' and 'integer'). 
-    * Also the correct column metadata should have been previously supplied:-
-    * <ul>
-    * <li> values - if the columns is text </li>
-    * <li> stringLength - if the column is of 'unique' type </li>
-    * <li> minMax -  for integer/double columns, not compulsory as this will be calculated if not present </li>
-    * <ul>
+    * If the data is a shared array buffer then, the data should be in the correct
+    * format see [columns]{@tutorial datasource}
     * @param {string}  column - The field/id of the column.
-    * @param {SharedArrayBuffer|[]} data  either a javascript array or shared array buffer 
+    * @param {SharedArrayBuffer|Array} data  either a javascript array or shared array buffer 
     */
     setColumnData(column,data){
         let c= this.columnIndex[column];
@@ -944,8 +1004,8 @@ class DataStore{
             buffer=data;
         }
         c.buffer=buffer;      
-        if (c.datatype === "integer" || c.datatype=="double"){
-            const dataArray = c.data= new Float32Array(buffer);
+        if (c.datatype === "integer" || c.datatype=="double" || c.datatype==="int32"){
+            const dataArray = c.data=  c.datatype==="int32"?new Int32Array(buffer):new Float32Array(buffer);
             if (!c.minMax){
                 let min =Number.MAX_VALUE, max = Number.MIN_VALUE;
                 for (let i=0;i<dataArray.length;i++){
@@ -975,13 +1035,19 @@ class DataStore{
         this.columnsWithData.push(column);      
     }
 
+    //experimental
     appendColumnData(column,data,newSize){
         let c= this.columnIndex[column];
         let arrType= Uint8Array;
         let size = newSize;
-        if (c.datatype === "integer" || c.datatype=="double"){
-            arrType= Float32Array;
+        if (c.datatype === "integer" || c.datatype==="double"){
             size=size*4;
+            arrType= Float32Array;
+        }
+        else if ( c.datatype==="int32"){
+            size=size*4;
+            arrType= Int32Array;
+            
         }
         else if (c.datatype==="unique"){
             size=size*c.stringLength;
@@ -996,6 +1062,7 @@ class DataStore{
 
     }
 
+    //experimental
     addDataToStore(columnData,size){
         const newSize=size+this.size;
         for (let c of columnData){
@@ -1017,6 +1084,7 @@ class DataStore{
         this._callListeners("data_added",this.size)
     }
 
+    //experimental
     cleanColumnData(column){
         const index= {};
         const col = this.columnIndex[column];
@@ -1044,6 +1112,9 @@ class DataStore{
       
     }
 
+
+    //converts a JavaScript array to the intenal data structure (Typed Array)
+    //adding any mentadata requires e.g values. stringLength
     _convertColumn(col,arr){
        
         const len =arr.length;
@@ -1077,9 +1148,9 @@ class DataStore{
             }
             return buff;
         }
-        else if (col.datatype === "integer" || col.datatype === "double"){
+        else if (col.datatype === "integer" || col.datatype === "double" || col.datatype==="int32"){
             const buff =new  SharedArrayBuffer(this.size*4);
-            const a= new Float32Array(buff);
+            const a=  col.datatype==="int32"?new Int32Array(buff):new Float32Array(buff);
            
             for (let i=0;i<len;i++){
                 a[i]=arr[i]
@@ -1168,13 +1239,14 @@ class DataStore{
     * the columns default values - can include
     * <ul>
     * <li> min - the minumum value </li>
-    * <li> max - the maximum value <li>
+    * <li> max - the maximum value </li>
     * <li> colors - the color scheme to use </li>
     * <li> colorLogScale- whether to use a log scale </li>
     * </ul
     * @param {boolean} [config.useValue=false]  The returned function will require the
     * columns value, not index
-    * @returns {function} The function, which when given a row index will return a color.
+    * @returns {function} The function, which when given a row index (or value if this
+    * was specified) will return a color.
     */
     getColorFunction(column,config={}){
         const c = this.columnIndex[column];
@@ -1185,7 +1257,7 @@ class DataStore{
         if (c.datatype==="text"){                   
             return x=>colors[data[x]];
         }
-        else if(c.datatype==="integer" || c.datatype==="double"){    
+        else if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
             const min = ov.min==null?c.minMax[0]:ov.min;
             const max = ov.max == null?c.minMax[1]:ov.max;
             const bins = config.bins || 100;
@@ -1227,6 +1299,13 @@ class DataStore{
         }
     }
 
+    /**
+     * For a given column will returns the given
+     * color for that category
+     * @param {string} column - the coloumn's field/id
+     * @param {string} cat - the category
+     * @returns {string} - the hex value of the color
+     */
     getColorForCategory(column,cat){
         const c = this.columnIndex[column];
         const i = c.values.indexOf(cat)
@@ -1234,11 +1313,17 @@ class DataStore{
 
     }
 
+    /**
+     * Makes a color bar/legend based on the give column
+     * @param {string} column - the field/id of the column 
+     * @param {object} config - see [here]{@link DataStore#getColorFunction} 
+     * @returns {HMTLElemnt} - a color bar or color legend
+     */
     getColorLegend(column,config={}){
         const colors = this.getColumnColors(column,config);
         const c= this.columnIndex[column];
         const name = config.name || c.name;
-        if (c.datatype==="integer" || c.datatype==="double"){
+        if (c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){
             let   range= c.minMaX;
             if (config.overideValues){
                 const ov = config.overideValues;
@@ -1252,8 +1337,9 @@ class DataStore{
     }
 
     /**
-    * the specified column, when supplied with the index of a row/item in the datastore,
-    * @param {string} column The column id(field) (only text columns)
+    * This method returns an object whose keys are categories
+    * and values are the colors of the categories
+    * @param {string} column The column id(field) (only text/multitext columns)
     * @returns {object} an object of values to colors
     */
      getValueToColor(column){
@@ -1267,6 +1353,14 @@ class DataStore{
 
     }
 
+    /**
+     * Returns the n and 1-n qauntile values where n is the given percentile
+     * If no percentile is passed or is 'all'  than the column's max/min
+     * value will be returned
+     * @param {string} column - the column's field/id
+     * @param {string}  [per] - the percentile - either 0.001.0.01 or 0.05
+     * @returns {number[]} - the n and 1-n percentiles
+     */
     getColumnQuantile(column,per){
         const col= this.columnIndex[column];
         if (per && per !=="none"){
@@ -1280,17 +1374,39 @@ class DataStore{
 
     }
 
-    setColumnColors(column,colors){
+
+    /**
+     * Changes the columns current colors
+     * @param {string} column - the column's field or id 
+     * @param {string[]} colors - the column's new colors
+     * @param {booles} [notify=false] - notify any listeners that
+     * the data has changed
+     */
+    setColumnColors(column,colors,notify=false){
         const  c=  this.columnIndex[column];
+        if (colors.length !== c.values.length){
+            throw new Error(`${column} being set with incorrect number of columns `)
+        }
         c.colors= colors.slice(0);
         this.dirtyColumns.colors_changed[column]=true;
+        if (notify){
+            this.dataChanged([column],false)
+        }
 
     }
 
+    /**
+     * Returns the colors that the column uses or default ones if none have been set
+     * @param {string} column - the column's field or id
+     * @param {object} config - see see [here]{@link DataStore#getColorFunction} 
+     * @returns {string[]} An array of colors. For text/multitext, the colors will correspond
+     * to the column's values. For double/intgers it will contain binned values fron the min
+     * to max value
+     */
     getColumnColors(column,config={}){
         const  c=  this.columnIndex[column];
         const rArr= config.asArray;
-        if (c.datatype==="double" || c.datatype==="integer"){
+        if (c.datatype==="double" || c.datatype==="integer" || c.datattype==="int32"){
             const ov = config.overideValues || {};
             const c_colors = ov.colors || (c.colors || defaultIPalette);
             const min = ov.min || c.minMax[0];
@@ -1349,16 +1465,13 @@ class DataStore{
         }
     }
 
+    
     addColumnGroup(group){
         if (!group.columns){
             group.columns=[];
         }
         this.columnGroups[group.name]=group;
-        if (group.subgroups){
-            for (let t in group.subgroups){
-                this.subtypeToGroup[t]=group;
-            }
-        }
+
     }
 
     getColumnGroup(name){
@@ -1377,7 +1490,7 @@ class DataStore{
     /**
     * Returns the min/max values for a given column 
     * @param {string} column The column id(field) 
-    * @returns {[min: number, max: number]} An array - the first value being the min value and the second the max value
+    * @returns {number[]} An array - the first value being the min value and the second the max value
     */
     getMinMaxForColumn(column){
         const c = this.columnIndex[column];

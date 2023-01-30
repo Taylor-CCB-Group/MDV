@@ -36,21 +36,22 @@ class BamSCATrack extends MLVTrack{
     * sets the categories with
     * @param {Uint8Array} data The array holding the data
     * @param {Array} names a list of names  
-    * @param {Arrau} colors an array of colors
+    * @param {Array} colors an array of colors
     */
-    setCategories(col,data,names,colors,calculate=false){
-        //work out the number of cells in each category if
-        //not already calculated - needed for average reads per cell
+    setCategories(col,data,names,colors,calculate=false,overideCatNumbers=false){
+       
         if (col == null){
             this.feature_source.setCategories(null,null);
         }
-        if (!this.catNumbers[col]){
+         //work out the number of cells in each category if
+        //not already calculated - needed for average reads per cell
+        //value is cached
+        if (!(this.catNumbers[col]) || overideCatNumbers){
             const arr = new Array(names.length).fill(0);
             for(let i=0;i<data.length;i++){
                 arr[data[i]]++
             }
-            this.catNumbers[col]=arr;
-            
+            this.catNumbers[col]=arr;  
         }
         this.numbers = this.catNumbers[col];      
         this.feature_source.setCategories(data,names);
@@ -88,11 +89,13 @@ class BamSCATrack extends MLVTrack{
        
     }
 
-    drawScale(height,ctx){
+    drawScale(height,ctx,defaultColor){
         let top=this.top;
         const ind_track_height=Math.round(this.config.height/this.catNames.length);
+        ctx.strokeStyle=defaultColor;
+        ctx.fillStyle=defaultColor;
         for (let name of this.catNames){
-            let bot = top+ind_track_height;
+            let bot = top+ind_track_height;         
             ctx.beginPath();
             ctx.moveTo(0,top);
             ctx.lineTo(0,bot);
@@ -102,8 +105,7 @@ class BamSCATrack extends MLVTrack{
             ctx.lineTo(20,bot);
             ctx.font="12px Arial";
             ctx.stroke();
-            ctx.textBaseline="top";
-            ctx.fillStyle="currentColor";
+            ctx.textBaseline="top";      
             let num = this.config.scale     
             ctx.fillText(num.toFixed(2),20,top);
             ctx.font="14px Arial";

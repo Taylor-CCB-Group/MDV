@@ -119,7 +119,6 @@ class LinkDataDialog extends BaseDialog{
             });
             
         });
-
         const list = this.linkDataStore.getColumnList("text");
         for (let item of list){
                 

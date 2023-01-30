@@ -16,16 +16,16 @@ class BaseDialog{
   * equally sized vertical columns, which can be accessed with this.columns array
   * @param {boolean} [config.footer=false] If true - a footer will be added and can be 
   * accessed with this.footer
-  * @param {{text: string, method: ()=>void, id?: string}[]} [config.buttons] -A list of of objects which should contain text
+  * @param {object[]} [config.buttons] -A list of of objects which should contain text
   * (the button's label) and method (the name of  the method to call when the button is clicked)
-  *  e.g [{text:"OK",method:"doSomething"}] - the method 'doSomething' needs to be in 
+  *  e.g [{text:"OK",method:"doSomething"}] - the method 'doSomething' needs to be in the 
   * subclass. Buttons are added to the footer, so this needs to also be specified in the config
   * @param {function} [onClose] A function called when the dialog is closed
   * @param {object} content The object passed to the init method
   */
 
 constructor (config={},content) {
-    config.doc=config.doc?config.doc:document;
+    config.doc=config.doc || document;
     this.config=config;
     this.buttons={};
     const width = config.width?config.width+"px":"";

@@ -324,3 +324,7 @@
     pointer-events:"none";
     color:gray;
   }
+
+  .mdv-element-dragged {
+    border: 1px solid var(--text_color);
+  }

@@ -4,10 +4,13 @@ import MLVPanel from "../browser/panel.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 
 
+
+
 class GenomeBrowser extends BaseChart{
     constructor(dataStore,div,config){
 		super(dataStore,div,config);
-        const c = this.config;  
+        const c = this.config;
+        c.view_margins= c.view_margins || {type:"percentage",value:20};
         this.contentDiv.style.width="100%";
         this.contentDiv.style.height="100%";
         c.type="genome_browser";
@@ -39,16 +42,31 @@ class GenomeBrowser extends BaseChart{
         if (c.feature_label){
             this.setLabelFunction(c.feature_label);
         }
+        if (c.color_by){
+             this.colorByColumn(c.color_by,false)
+        }
+        if (c.color_wig_tracks_by){
+            const col = c.color_wig_tracks_by;
+            const vc= this.dataStore.getValueToColor(col);
+            //color any wig tracks
+            for (let v in vc){
+                const tr =this.browser.tracks[`${col}|${v}`];
+                if (tr){
+                    tr.config.color= vc[v];
+                }
+            }
+        }    
         if (!this.bamscatrack){
             const g= this.config.genome_location;
             if (g){
                 
-                this.browser.update(g.chr,g.start,g.end,true);
+                this.browser.update(g.chr,Math.round(g.start),Math.round(g.end),true);
             }
             else{
                 this.onDataHighlighted({indexes:[0]});
             }
-        }    
+        }
+       
 	}
 
 
@@ -84,16 +102,28 @@ class GenomeBrowser extends BaseChart{
     //the datastore (ensure column and index are loaded beofre carrying
     //out the function)
     setupLinks(dataStore,index,func){
+       
         this.dataLink= {
             dataStore:dataStore,
             index:index,
             getDataFunction:func
+        }
+        if (!this.bamscatrack){
+            return;
         }
         const cat = this.config.cluster_reads;
       
         dataStore.addListener("gb_"+this.config.id,(type,data)=>{
             if (type==="filtered"){
                 this.filterReads(data);
+            }
+            //has the data used to cluster reads changed
+            //if so update the atac track
+            else if (type==="data_changed"){
+                const cl = this.config.cluster_reads;
+                if (data.columns.indexOf(cl) !==-1){
+                    this.changeClusters(cl,true)
+                }
             }
         })
         func([cat],()=>{
@@ -134,19 +164,19 @@ class GenomeBrowser extends BaseChart{
         })
     }
 
-    changeClusters(column){
+    changeClusters(column,recalculateCats=false){
         this.config.cluster_reads=column;
         const ds = this.dataLink.dataStore;
         this.dataLink.getDataFunction([column],()=>{
             const colors = ds.getColumnColors(column);
             const col = ds.columnIndex[column];
-            this.bamscatrack.setCategories(column,col.data,col.values,colors,true);
+            this.bamscatrack.setCategories(column,col.data,col.values,colors,true,recalculateCats);
             this.browser.update();
         });
            
     }
     themeChanged(){
-        console.warn('themeChanged() deprecated');
+        this.browser.repaint(true,true);
     }
 
     showHideDialog(){
@@ -205,6 +235,7 @@ class GenomeBrowser extends BaseChart{
         this.browser.update();
     }
     //called if wig tracks associated with a column
+    //obsolete???
     createColumnLinks(dataStore,columns,func){
         this.dataLink={
             dataStore:dataStore,
@@ -221,19 +252,39 @@ class GenomeBrowser extends BaseChart{
                 tr.config.color= vc[v];
             }
         }
-        this.onDataHighlighted({indexes:[0]});
+       // this.onDataHighlighted({indexes:[0]});
     }
 
+    //called when a feature is highlighted 
     onDataHighlighted(data){
         if (data.source===this){
             return;
         }
         const p = this.config.param;
+        const vm = this.config.view_margins;
         const o = this.dataStore.getRowAsObject(data.indexes[0],p);
-        const st = o[p[2]]>o[p[1]]?o[p[1]]:o[p[2]];
-        const en = o[p[2]]>o[p[1]]?o[p[2]]:o[p[1]];    
-        const margin = Math.abs(Math.round(en-st)/5);
+        //some basic checks
+        let st = o[p[2]]>o[p[1]]?o[p[1]]:o[p[2]];
+        let en = o[p[2]]>o[p[1]]?o[p[2]]:o[p[1]];
+        let margin =1000;
+        if  (vm.type==="percentage"){
+            en =  st===en?st+1:en;
+            margin =  Math.round(en-st)*(vm.value/100);
+        }
+        else{
+            margin = vm.value;
+        }
         this.browser.update(o[p[0]],st-margin,en+margin) 
+    }
+
+    getImage(callback,type){
+        if (type=="svg"){
+            this.browser.repaint(true,false,callback)
+        }
+        else{
+            callback(this.browser.canvas);
+        }
+
     }
 
 
@@ -263,12 +314,15 @@ class GenomeBrowser extends BaseChart{
 	}
 
 
-    colorByColumn(column){
+    colorByColumn(column,update=true){
         const colorFunc =  this.getColorFunction(column);
         this.browser.setTrackColorFunction("_base_track",(feature)=>{
             return colorFunc(feature.data[0]);
         })
-        this.browser.update();
+        if (update){
+            this.browser.update();
+        }
+        
     }
 
     setLabelFunction(column){
@@ -308,8 +362,7 @@ class GenomeBrowser extends BaseChart{
     changeBaseDocument(doc){
         this.browser.closeAllDialogs();
         super.changeBaseDocument(doc);
-        this.browser.__doc__=doc;
-        
+        this.browser.__doc__=doc;   
     }
 
 
@@ -355,7 +408,37 @@ class GenomeBrowser extends BaseChart{
                     this.browser.update()
                 }
         });
-        
+        settings.push({
+            label:"View margin type",
+            type:"radiobuttons",
+            choices:[
+                ["% of feature length","percentage"],
+                ["absolute (bp)","absolute"]
+            ],
+            current_value:c.view_margins.type,
+            func:(x)=>{
+                c.view_margins.type=x;
+                const d = this.dataStore.getHighlightedData();
+                if (d){
+                    this.onDataHighlighted({indexes:[d]});
+                }
+            }
+        });
+        settings.push({
+            label:"View margin length",
+            type:"text",
+            current_value:c.view_margins.value,
+            only_update_on_enter:true,
+            func:(x)=>{
+                x= parseInt(x);
+                x= isNaN(x)?c.view_margins.type==="percentage"?20:1000:x;
+                c.view_margins.value=x;
+                const d = this.dataStore.getHighlightedData();
+                if (d){
+                    this.onDataHighlighted({indexes:[d]});
+                }
+            }
+        });
         return settings;
     }
 }
@@ -363,24 +446,35 @@ class GenomeBrowser extends BaseChart{
 BaseChart.types["genome_browser"]={
     "class":GenomeBrowser,
     name:"Genome Browser",
+    methodsUsingColumns:["setLabelFunction"],
+    configEntriesUsingColumns:["feature_label","color_wig_tracks_by"],
+
     params:[],
     required:["genome_browser"],
     init:(config,dataSource)=>{
         //set the chr,start,finish columns
         const gb = dataSource.genome_browser;
         config.param= gb.location_fields.slice(0);
+        //legacy
         if (gb.feature_label){
             config.feature_label=gb.feature_label;
         }
+        if (gb.default_parameters){
+            Object.assign(config,gb.default_parameters);
+        }
         
         //set the base track corresponding to the datastore
-        config.tracks=[{ 
-                short_label:gb.default_track.label,
-                url: gb.default_track.url,
-                track_id:"_base_track",
-                decode_function:"generic",
-                displayMode:"EXPANDED"
-        }];
+        const df= { 
+            short_label:gb.default_track.label,
+            url: gb.default_track.url,
+            track_id:"_base_track",
+            decode_function:"generic",
+            displayMode:"EXPANDED"
+        };
+        config.tracks=[df];
+        if (gb.default_track_parameters){
+            Object.assign(df,gb.default_track_parameters)
+        }
         //add the atac track if specified
         if (gb.atac_bam_track){
             //field to cluster reads
@@ -398,8 +492,7 @@ BaseChart.types["genome_browser"]={
         if (gb.default_tracks){
             for (let t of gb.default_tracks){
                 config.tracks.push(JSON.parse(JSON.stringify(t)));
-            }
-           
+            }         
         }
     }
 }

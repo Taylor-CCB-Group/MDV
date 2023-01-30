@@ -2,7 +2,7 @@ import Dimension from "./Dimension.js";
 class CategoryDimension extends Dimension{
     constructor(parent){
         super(parent)
-        this.worker= new Worker (new URL("./catWorker.js?v=6",import.meta.url));    
+        this.worker= new Worker (new URL("./catWorker.js?v=7",import.meta.url));    
     }
 
     filterCategories(args,columns){
@@ -225,7 +225,7 @@ class CategoryDimension extends Dimension{
         config.stringLength= col.stringLength;
         const t = performance.now();
         const action = (e)=>{
-            console.log(`calc categories ${col.name} : ${performance.now()-t}`);
+            //console.log(`calc categories ${col.name} : ${performance.now()-t}`);
             callback(e.data);
             this.worker.removeEventListener("message",action)    
         }

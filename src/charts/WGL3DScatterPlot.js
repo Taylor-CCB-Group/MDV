@@ -39,11 +39,15 @@ class WGL3DScatterPlot extends WGLChart{
 		});
        
         const colorFunc = this.afterAppCreation();
+        let cx = this.dataStore.columnIndex[p[0]];
+		let cy = this.dataStore.columnIndex[p[1]];
+        let cz = this.dataStore.columnIndex[p[2]];
+
 
         this.app.addCircles({
-            x:dataStore.getRawColumn(p[0]),
-            y:dataStore.getRawColumn(p[1]),
-            z:dataStore.getRawColumn(p[2]),
+            x:cx.datatype==="int32"?new Float32Array(cx.data):cx.data,
+			y:cy.datatype==="int32"?new Float32Array(cy.data):cy.data,
+            z:cz.datatype==="int32"?new Float32Array(cz.data):cz.data,
             localFilter:this.dim.getLocalFilter(),
             globalFilter:dataStore.getFilter(),
             colorFunc:colorFunc

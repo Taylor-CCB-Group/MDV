@@ -4,7 +4,7 @@ class CatRangeDimension extends RangeDimension{
     constructor(column,parent){
         super(column, parent);
         this.worker.terminate();
-        this.worker= new Worker (new URL("./boxPlotWorker.js?v=1",import.meta.url));
+        this.worker= new Worker (new URL("./boxPlotWorker.js?v=2",import.meta.url));
 
     }
 
@@ -31,15 +31,16 @@ class CatRangeDimension extends RangeDimension{
             this.filterBuffer,
             this.parent.filterBuffer,
             cat.buffer,
-            val.buffer,
+            [val.buffer,val.datatype],
             config
             ]);
 
     }
 
     getMultiBoxPlotData(callback,columns,config={}){
+        const cIndex= this.parent.columnIndex;
         const t = performance.now();
-        const buffs = columns.map(x=>this.parent.columnIndex[x].buffer)
+        const buffs = columns.map(x=>[cIndex[x].buffer,c.Index[x].datatype])
         config.analysis="multi";
         config.cat = this.parent.getColumnValues(columns[0]).indexOf(config.category)
         

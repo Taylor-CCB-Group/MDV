@@ -1,5 +1,5 @@
 import BaseChart from "./BaseChart.js"
-import { createEl } from "../utilities/Elements.js";
+import { createEl,makeSortable} from "../utilities/Elements.js";
 import noUiSlider from "nouislider";
 import { getRandomString } from "../utilities/Utilities.js";
 
@@ -19,8 +19,10 @@ class SelectionDialog extends BaseChart{
             const col =dataStore.columnIndex[c];
             const div =createEl("div",{
                 styles:{padding:"5px"}
-            },this.contentDiv)
-            createEl("div",{text:col.name,styles:{fontWeight:"bold"}},div)
+            },this.contentDiv);
+            //marker to identify which div associated with which column
+            div.__fcol__=col.field;
+            createEl("div",{text:col.name,classes:["i-title"],styles:{fontWeight:"bold"}},div)
             if (col.datatype==="text" ){
                 this.addTextFilter(col,div)
             }
@@ -31,6 +33,15 @@ class SelectionDialog extends BaseChart{
                 this.addNumberFilter(col,div);
             }
         }
+        makeSortable(this.contentDiv,
+            {
+                handle:"i-title",
+                //re-arrange params in config 
+                sortEnded:(li)=>{        
+                    this.config.param=li.map(x=>x.__fcol__);
+                }
+            });
+
 
         if (this.hasFiltered){
             setTimeout(()=>this.dataStore.triggerFilter(),0);

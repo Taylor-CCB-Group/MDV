@@ -86,7 +86,7 @@ BaseChart.types["row_summary_box"]={
         const is = extraControls.image_set
         if (is){
             if(is !== "__none__"){
-                const li =dataSource.dataStore.large_images[is];
+                const li =dataSource.large_images[is];
                 config.param = config.param || [];
                 config.param.push(li.key_column);
                 config.image={
@@ -100,7 +100,7 @@ BaseChart.types["row_summary_box"]={
     },
     extra_controls:(dataSource)=>{
         //drop down of available image sets
-        const li = dataSource.dataStore.large_images;
+        const li = dataSource.large_images;
         if (li){
             let vals=[];
             for (let n in li){

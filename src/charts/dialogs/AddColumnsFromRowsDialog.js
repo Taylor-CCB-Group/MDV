@@ -3,7 +3,7 @@ import {createEl} from "../../utilities/Elements.js";
 import AutoComplete from "../../utilities/AutoComplete.js";
 import {getRandomString} from "../../utilities/Utilities.js";
 
-const max_genes=1000;
+const max_genes=500;
 
 class AddColumnsFromRowsDialog extends BaseDialog{
     constructor(ds,ds_to,link,cm){
@@ -22,6 +22,9 @@ class AddColumnsFromRowsDialog extends BaseDialog{
         this.cm=content.cm;
 
         //add single gene
+
+       // createEl("div",{classes:["mdv-section"],text:""},this.columns[0])
+
         const h = createEl("div",{classes:["mdv-section"]},this.columns[0]);
         const ni = createEl("input",{},h);
         this.ac= new AutoComplete(ni,async (text)=>{
@@ -29,6 +32,7 @@ class AddColumnsFromRowsDialog extends BaseDialog{
         });
 
         this.ac.addListener((type,data)=>this.addColumn(data));
+        
 
         
         //add the radio buttons for type
@@ -54,11 +58,24 @@ class AddColumnsFromRowsDialog extends BaseDialog{
             this.addColumn(this.ac.getSelectedItem());
         });
 
-        /*this.ta  = createEl("textarea",{},this.dialog);
-        const bu = createEl("button",{classes:["ciview-button-sm"],text:"Add All"},this.dialog);
+        this.ta  = createEl("textarea",{rows:10},this.columns[1]);
+
+        this.errorDiv = createEl("div",{classes:["mdv-section"]},this.columns[1]);  
+
+        let d = createEl("div",{classes:["mdv-section"]},this.columns[1]);  
+        this.addHeatMapCheck= createEl("input",{type:"checkbox"},d);
+        createEl("span",{text:"Create Heat Map:",styles:{marginRight:"4px"}},d);
+        d = createEl("div",{classes:["mdv-section"]},this.columns[1]);
+        createEl("span",{text:"Categories:",styles:{marginRight:"4px"}},d);
+        this.heatMapSel = createEl("select",{styles:{maxWidth:"150px"}},d);
+        this.ds.dataStore.getColumnList("text").forEach(x=> createEl("option",{value:x.field,text:x.name},this.heatMapSel));  
+
+
+
+        const bu = createEl("button",{classes:["ciview-button-sm"],text:"Add All"},this.columns[1]);
         bu.addEventListener("click",e=>{
-            this.parseNames(this.ta.value)
-        });*/
+            this.parseNames();
+        });
 
         this.cm.addListener(this.rn,(type,c,data)=>{
             switch(type){
@@ -79,14 +96,27 @@ class AddColumnsFromRowsDialog extends BaseDialog{
         this.itemList=[];
         const tds=  this.ds_to.dataStore;
         tds.addListener(this.rn,(type,data)=>{
+            
             if (type==="data_highlighted"){
-                const index = data.indexes[0];
-                const value= tds.getRowText(index,this.link.name_column);
-                this.ac.setSelectedItem({value,index})
+                const l = data.indexes.length;
+                if (l==1){
+                    const index = data.indexes[0];
+                    const value= tds.getRowText(index,this.link.name_column);
+                    this.ac.setSelectedItem({value,index})
+                }
+                else if (l<200){
+                    this.ta.value = data.indexes.map(x=>tds.getRowText(x,this.link.name_column)).join("\n");
+                }
+                else{
+                    this.ta.value = "Too many items selected";
+                }
             }
             else if (type==="filtered"){
                 if (tds.filterSize<max_genes && tds.isFiltered()){
-                    //this.addFilteredItems();
+                    this.ta.value =  tds.getFilteredValues(this.link.name_column).join("\n");
+                }
+                else{
+                    this.ta.value = "Too many items selected";
                 }
             }
         });
@@ -146,51 +176,75 @@ class AddColumnsFromRowsDialog extends BaseDialog{
 
     
 
-    parseNames(text){
-        let names =  text.replaceAll("\"","").split(/[,\s]+/);
+    parseNames(){
+        let names =  this.ta.value.replaceAll("\"","").split(/[,\s]+/);
         names=names.filter(x=>x!=="");
-        this.ta.value="";
-        let g="";
-        for (let n of names){
-            const resp = this.ds_to.dataStore.getNearestMatch(n,this.link.name_column,1,1);
-            if (resp.length>0){
-                if (resp[0].mismatches===0){
-                    g+=resp[0].value+"\n"
-                }
-                else{
-                    g+=n+" - "+resp[0].value+"\n";
-                }        
-            }
-            else{
-                g+=n+"??\n"
+        //not suitable for large datsets - only exact match
+        const nindex = this.ds_to.dataStore.getColumnIndex(this.link.name_column)
+        let errors = false;
+        const cols= new Array(names.length);
+        for (let n=0;n<names.length;n++){
+            const i  = nindex[names[n]];
+            if (i !== undefined){
+                cols[n]={value:names[n],index:i};
             }
             
+            else{
+                errors=true;
+                names[n]=names[n]+"??"
+            }  
         }
-        this.ta.value=g;
+
+        if (errors){
+            this.errorDiv.textContent = "Some Entries were unrecognised";
+            this.ta.value="";
+            this.ta.value= names.join("\n")
+        }
+        else{
+            this.errorDiv.textContent="";
+            this.addColumn(cols);
+        }
     }
 
-    addColumn(c){
+    addColumn(col){
         const checked = document.querySelector(`input[name='${this.rn}']:checked`);
         const sg = checked.value;
-        const f = `${sg}|${c.value}(${sg})|${c.index}`
-    
-        this.ds.dataStore.addColumnFromField(f);
-        if (this.colorCheck.checked){
-            const v= this.colorChartSelect.value;
-            if (v){
-                this.cm.getChart(v).colorByColumn(f);
-                
+        const multi = Array.isArray(col)
+        const arr = multi?col:[col];
+        const fs= [];
+        for (let c of arr){
+            const f = `${sg}|${c.value}(${sg})|${c.index}`
+            this.ds.dataStore.addColumnFromField(f);
+            fs.push(f);
+            if (!multi){
+                if (this.colorCheck.checked){
+                    const v= this.colorChartSelect.value;
+                    if (v){
+                        this.cm.getChart(v).colorByColumn(f);
+                        
+                    }
+                }
+        
+                if (this.histoCheck.checked){
+                    this.cm.addChart(this.ds.name,{
+                        type:"bar_chart",
+                        param:f
+                    })
+                }
+                return;
             }
         }
+        if (this.addHeatMapCheck.checked){
 
-        if (this.histoCheck.checked){
             this.cm.addChart(this.ds.name,{
-                type:"bar_chart",
-                param:f
+                type:"heat_map",
+                param:[this.heatMapSel.value].concat(fs)
             })
-        }
-    }
 
+        }
+       
+
+    }
 }
 
 export default AddColumnsFromRowsDialog;

@@ -9,7 +9,7 @@ import { createEl } from "../utilities/Elements.js";
 
 class OffsetDialog extends BaseDialog{
 	constructor(scatterPlot){
-		super({title:"Alter Position",width:300},scatterPlot)
+		super({title:"Alter Position",width:300,doc:scatterPlot.__doc__},scatterPlot)
 	}
 
 	init(scatterPlot){
@@ -83,10 +83,6 @@ class OffsetDialog extends BaseDialog{
 		
 	}
 
-
-
-	
-
 	_addOffsetLabels(){
 		const ld = createEl("div",{
 			styles:{
@@ -135,7 +131,7 @@ class OffsetDialog extends BaseDialog{
 	_showOffsets(group){
 		let xy=[0,0];
 		let angle=0;
-		const vs =  this.ds.offsets.values[this.filter];
+		const vs =  this.ds.offsets.values[this.filter || "all"];
 		if (vs && vs[group]){
 			xy = vs[group].offsets;
 			angle =vs[group].rotation;
@@ -252,10 +248,12 @@ class WGLScatterPlot extends WGLChart{
 			c.image_opacity = c.image_opacity==null?1:c.image_opacity;
 			this.addBackgroundImage(c.background_image);
 		}
-
+		let cx = this.dataStore.columnIndex[this.x];
+		let cy = this.dataStore.columnIndex[this.y];
+		//will get some loss of precision for int32 plus no updating on data changed
 		this.app.addCircles({
-			x:this.dataStore.getRawColumn(this.x),
-			y:this.dataStore.getRawColumn(this.y),
+			x:cx.datatype==="int32"?new Float32Array(cx.data):cx.data,
+			y:cy.datatype==="int32"?new Float32Array(cy.data):cy.data,
 			localFilter:this.dim.getLocalFilter(),
 			globalFilter:this.dataStore.getFilter(),
 			colorFunc:colorFunc
@@ -464,17 +462,23 @@ class WGLScatterPlot extends WGLChart{
 
 	getContextMenu(){
 		const m = super.getContextMenu();
-		if (this.dataStore.offsets){
-			const o = this.dataStore.offsets;
-			const n = this.dataStore.getColumnName(o.groups)
-			if (o.param[0]===this.config.param[0] && o.param[1]===this.config.param[1]){
-				m.push({
-					text:`Adjust ${n} position`,
-					icon:"fas fa-arrows-alt",
-					func:()=>{
-						new OffsetDialog(this);
-					}
-				})
+		const c = this.config;
+		const d= this.dataStore;
+		//can we offset/rotate the x,y values
+		if (d.offsets){
+			const o = d.offsets;
+			const n = d.getColumnName(o.groups);
+			//check to see if plot has correct x,y and background filter for altering offsets
+			if (o.param[0]===c.param[0] && o.param[1]===c.param[1]){
+				if (!(o.background_filter) || o.background_filter===c?.background_filter?.column){
+					m.push({
+						text:`Adjust ${n} position`,
+						icon:"fas fa-arrows-alt",
+						func:()=>{
+							new OffsetDialog(this);
+						}
+					})
+				}
 			}
 		}
 		return m;

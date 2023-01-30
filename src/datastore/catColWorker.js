@@ -4,8 +4,8 @@
 
 onmessage= function(e){  
     const data= [];
-    for (let buf of e.data[3]){
-        data.push(new Float32Array(buf))
+    for (let item of e.data[3]){
+        data.push(item[1]==="int32"?new int32Array(item[0]):new Float32Array(item[0]))
     }
     const dLen= data.length
     const cat= new Uint8Array(e.data[2]);

@@ -1,0 +1,30 @@
+{
+    "opts":{
+        "destination":"docs/build",
+        "tutorials":"docs/extradocs",
+        "recurse":true,
+        "template":"node_modules/docdash",
+        "readme":"docs/readme.md"
+    },
+    "plugins": ["plugins/markdown"],
+    "source":{
+        "include":["src/datastore","src/charts","src/webgl","src/utilities","src/dataloaders"], 
+        "exclude":["src/utilities/venn","src/datastore/binWorker.js"]
+    
+    },
+    "docdash":{
+        "sectionOrder": [ 
+            "Tutorials",              
+            "Classes",
+            "Modules",
+            "Externals",
+            "Events",
+            "Namespaces",
+            "Mixins",
+            "Interfaces",
+            "Global"
+        ],
+        "outputSourceFiles": false
+    }
+}
+   

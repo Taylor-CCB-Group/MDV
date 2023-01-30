@@ -106,6 +106,81 @@ function addElProps(el,attrs){
     }
 }
 
+/**
+ * Enables the children of an HTML element to be sorted by the user
+ * via drag and drop
+ * @param {HTMLElement} list - an HTML element whose immediate children will
+ * be capable of being sorted.
+ * @param {object} config 
+ * @param {string} [config.handle] - if each child element is to be only 
+ * dragged by a handle, then this should be a class name that the handle 
+ * contains.
+ * @param {function} [config.sortEnded] - a function that is called when
+ * a sorting action has finished. The function is supplied with the
+ * current sorted list of child elements.
+ */
+function makeSortable(list,config={}){
+    let dragged = null;
+    let allowDrag=false;
+
+    function handleDragOver(e){
+        //place the dragged item before the current item
+        this.after(dragged);
+        e.preventDefault();
+        return false;
+    }
+    
+    function handleDragEnd(e){
+        allowDrag=false;
+        dragged.classList.remove("mdv-element-dragged");
+        if (config.sortEnded){
+            config.sortEnded(Array.from(list.children).slice(1));
+        }
+    }
+
+    function handleMouseDown(e){
+        //check whether item can be sorted
+        if (!config.handle){
+            allowDrag=true
+        }
+        else{
+            if(e.target.classList.contains(config.handle)){
+                allowDrag=true
+            }
+            else{
+                allowDrag=false;
+            }
+       }  
+    }
+
+    function handleDragStart(e){
+        if (!allowDrag){
+            e.preventDefault();
+            return false;
+        }
+        dragged =this;
+        this.classList.add("mdv-element-dragged");
+        //blank drag image as the swapping of items
+        //will give the appearance of dragging
+        e.dataTransfer.setDragImage(createEl("div",{}),0,0);
+    }
+
+    //add dummy element, allows items to be dragged to the beginning
+    //of the list i.e. after the dummy element
+    let firstDummyEl= createEl("div",  {styles:{height:"5px"}});
+    list.prepend(firstDummyEl);
+    firstDummyEl.addEventListener("dragover",handleDragOver);
+    //add drag events to all child elements
+    for (let n=0;n<list.children.length;n++){
+        const item = list.children[n];
+        item.draggable=true;
+        item.addEventListener("dragover",handleDragOver);
+        item.addEventListener("dragstart",handleDragStart);
+        item.addEventListener("dragend",handleDragEnd);
+        item.addEventListener("mousedown",handleMouseDown);     
+    }
+}
+
 
 
 function makeResizable(el,config={}){
@@ -295,5 +370,5 @@ function getElDim(el){
 }
 
 export {createEl,createSVGEl,addResizeListener,makeDraggable,
-    makeResizable,removeDraggable,removeResizable,createMenuIcon,
+    makeResizable,removeDraggable,removeResizable,createMenuIcon,makeSortable,
     splitPane,getElDim,MDVProgress};

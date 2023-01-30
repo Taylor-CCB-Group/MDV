@@ -73,7 +73,7 @@ class ColorChooser extends BaseDialog{
             }
         },d4);
 
-        this.setDataSource(cm.dataSources[0].name);
+        this.setDataSource(this.ds.dataStore.name);
         createEl("button",{
             classes:["ciview-button-sm"],
             text:"Use Scheme"
@@ -121,17 +121,29 @@ class ColorChooser extends BaseDialog{
 
     }
 
-    applyColor(){
-      
-      const colors = new Array(this.colorChoosers.length)
-      this.colorChoosers.forEach(x=>colors[x.__index]=x.value);
-      this.dataSource.setColumnColors(this.column,colors);
-      this.dataSource.dataChanged([this.column],false,false);
-      for (let ds of this.cm.dataSources){
-        if (ds.column_link_to && ds.column_link_to.dataSource === this.dsName){
-            this.cm._sync_colors(this.cm.dsIndex[ds.column_link_to.dataSource],ds);
+    applyColor(){   
+        const colors = new Array(this.colorChoosers.length)
+        this.colorChoosers.forEach(x=>colors[x.__index]=x.value);
+        this.dataSource.setColumnColors(this.column,colors);
+        this.dataSource.dataChanged([this.column],false,false);
+        for (let d of this.cm.dataSources){
+            const ds  = d.dataStore;
+            const scc = ds.syncColumnColors.find(x=>x.dataSource===this.dataSource.name);
+            if (scc){
+                const  c= scc.columns.find(x=>x.link_to===this.column);
+                if (c){
+                    this.cm._sync_colors([c],this.dataSource,ds);
+                    ds.dataChanged([c.col],false,false);     
+                }
+            }
+            const lcc = ds.linkColumns.find(x=>x.dataSource===this.dataSource.name);
+            if (lcc){
+                if (lcc.columns.indexOf(this.column)!==-1){
+                    ds.setColumnColors(this.column,colors)
+                    ds.dataChanged([this.column],false,false);            
+                }      
+            }
         }
-    }
     }
 
     setColumn(col){

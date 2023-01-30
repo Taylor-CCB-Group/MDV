@@ -30,6 +30,7 @@
 import {MLVTrack,RulerTrack} from "./tracks.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog.js";
+import canvasToSvg from "canvas-to-svg"
 
 class MLVPanel {
 	/**
@@ -551,11 +552,12 @@ class MLVPanel {
     /**
      * Repaint the view, using a cached image if available.
      * @param {boolean} force - If true then a cached image will not be used
-     * @param {boolean} range_from_tile Redraw the tile
-     */
-    repaint(force,range_from_tile) {
-
-    
+     * @param {boolean} range_from_tile - Redraw the tile
+	 * @param {function} [svg] - if a callback is supplied , then the
+	 * actual browser will not repaint but a serialises svg string of the 
+	 * browser's contents will be passed to the function
+      */
+    repaint(force,range_from_tile,svg) {
 		this.messageAlert.style.display="none";
         var pixelWidth,
             bpWidth,
@@ -563,11 +565,9 @@ class MLVPanel {
             bpEnd,
             self = this,
             ctx,
-            referenceFrame,
             chr,
             refFrameStart,
-            refFrameEnd,
-            success;
+            refFrameEnd;
 
         chr = this.chr;
         refFrameStart = this.start;
@@ -593,11 +593,18 @@ class MLVPanel {
         else {
             // Expand the requested range so we can pan a bit without reloading
             this.force_redraw=false;
-            pixelWidth = ((this.buffer_level*2)+1) * this.canvas.width;
+			if (!svg){
+            	pixelWidth = ((this.buffer_level*2)+1) * this.canvas.width;
+				bpStart = Math.max(0, Math.round(this.start-(this.buffer_level*this.canvas.width*this.bpPerPixel)));
+			}
+			else{
+				pixelWidth= this.canvas.width;
+				bpStart = Math.max(0, Math.round(this.start));
+			}
             bpWidth = Math.round(pixelWidth*this.bpPerPixel);
-            bpStart = Math.max(0, Math.round(this.start-(this.buffer_level*this.canvas.width*this.bpPerPixel)));
+           
             bpEnd = bpStart + bpWidth;
-            if (self.loading){
+            if (self.loading && !(svg)){
             	if (force && range_from_tile){
             		self.update_required=true;
             	}
@@ -614,11 +621,12 @@ class MLVPanel {
             }
 
          
-
-            self.loading = {start: bpStart, end: bpEnd};
-          
-			self.loadingIcon.style.display="block";
-			const textColor =  self.trackDiv.style.color;
+			if (!svg){
+				self.loading = {start: bpStart, end: bpEnd};
+			
+				self.loadingIcon.style.display="block";
+			}
+			const textColor = svg?"black":getComputedStyle(self.trackDiv).getPropertyValue('color');
 
             self.getAllFeatures( bpStart, bpEnd,!get_features,{pixelWidth:pixelWidth,bpPerPixel:self.bpPerPixel})
 
@@ -626,12 +634,27 @@ class MLVPanel {
                     
                     if (all_features) {
                         
-						
-                        var buffer = document.createElement('canvas');
+						let buffer = null;
+						if (svg){
+							//create mock canvas
+							buffer= {};
+
+						}	
+						else{
+							buffer = document.createElement('canvas');
+						}
+                        
                         buffer.width = pixelWidth;
                         buffer.height = self.getTracksHeight();
-                        ctx = buffer.getContext('2d');
-                        if (self.show_scale){
+						if (svg){
+							ctx= new canvasToSvg(buffer.width,buffer.height);
+						}
+						else{
+							ctx = buffer.getContext('2d');
+						}
+
+                        
+                        if (self.show_scale && !(svg)){
         					self.scale_buffer= document.createElement('canvas');
         					self.scale_buffer.width = 200;
         					self.scale_buffer.height = buffer.height;
@@ -703,10 +726,15 @@ class MLVPanel {
 							ctx.restore()
                                    
                             if (self.show_scale){
-                            	track.drawScale(options.pixelHeight,self.scale_buffer_ctx,textColor);
+								const sctx = svg?ctx:self.scale_buffer_ctx;
+                            	track.drawScale(options.pixelHeight,sctx,textColor);
                             }
                                       
                         }
+						if (svg){
+							svg(ctx.getSerializedSvg());
+							return;
+						}
                         for (let name in self.highlighted_regions){
                         	let region = self.highlighted_regions[name];
                         	if (self.chr !== region.chr){

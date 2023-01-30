@@ -4,7 +4,7 @@ import Dimension from "./Dimension.js";
 class RangeDimension extends Dimension{
     constructor(column,parent){
         super(column, parent);   
-        this.worker= new Worker (new URL("./binWorker.js",import.meta.url));  
+        this.worker= new Worker (new URL("./binWorker.js?v=1",import.meta.url));  
     }
 
     filterSquare(args,columns){
@@ -162,7 +162,7 @@ class RangeDimension extends Dimension{
         this.worker.postMessage([
             this.filterBuffer,
             this.parent.filterBuffer,
-            col.buffer,
+            [col.buffer,col.datatype],
             config
         ]);
     }

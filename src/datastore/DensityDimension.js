@@ -4,7 +4,7 @@ class DensityDimension extends RangeDimension{
     constructor(parent){
         super(parent);
         this.worker.terminate();
-        this.worker= new Worker (new URL("./densityWorker.js",import.meta.url));      
+        this.worker= new Worker (new URL("./densityWorker.js?v=1",import.meta.url));      
     }
 
     getDensityContours(callback,columns,config={}){
@@ -19,8 +19,8 @@ class DensityDimension extends RangeDimension{
         this.worker.postMessage([
             this.filterBuffer,
             this.parent.filterBuffer,
-            cIndex[columns[0]].buffer,
-            cIndex[columns[1]].buffer,
+            [cIndex[columns[0]].buffer,cIndex[columns[0]].datatype],
+            [cIndex[columns[1]].buffer,cIndex[columns[1]].datatype],
             cIndex[columns[2]].buffer,
             config
         ]);

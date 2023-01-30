@@ -663,9 +663,10 @@ class BaseChart{
         this.contentDiv.style.color = "black";
         this.getImage(resp=>{
             let link =document.createElement("a");
-            link.download=this.config.title+"."+im_type;
+            let name = this.config.title || "image"
+            link.download=name+"."+im_type;
             if (im_type==="svg"){
-                link.href=resp;
+                link.href="data:image/svg+xml," + encodeURIComponent(resp);
             }
             else{
                 let url =resp.toDataURL('image/png');

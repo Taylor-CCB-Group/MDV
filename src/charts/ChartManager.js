@@ -4,6 +4,7 @@ import { PopOutWindow } from "../utilities/PopOutWindow";
 import  DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";
+//default charts 
 import  "./HistogramChart.js";
 import  "./RowChart.js";
 import "./TableChart.js";
@@ -29,10 +30,13 @@ import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 
 
-
+//order of column data in an array buffer
+//doubles and integers (both represented by float32) need to be first
+// folowed by multitext (uint16) then text/unique (uint8) 
 const column_orders={
     "double":0,
     "integer":0,
+    "int32":0,
     "multitext":1,
     "text":2,
     "unique":2
@@ -72,38 +76,32 @@ function listenPreferredColorScheme(callback) {
 }
 
 /**
-* The object to manage charts
-* @param {string|DOMelement} div - The DOM element or id of the element to house the app
-* @param {Object[]} datasources - An array of datasources, each should have the following
-* <ul>
-* <li> name  -the name of the datasource</li>
-* <li> size - the size (number or rows) of the data set </li>
-* <li> columns - a list of objects describing each column see {@link DataStore#addColumn} <li>
-* <li> columnGroups - A list of objects with 'name' and 'columns' field
-* </ul>
-* @param {function | Object} dataloader - An object containing the following
+* The object to manage charts {@tutorial chartmanager}
 * 
+* @param {string|DOMelement} div - The DOM element or id of the element to house the app
+* @param {object[]} datasources - An array of datasource configs -see  {@tutorial datasource}.
+* Each config must contain the size parameter, giving the number of rows in the DataStore.
+* @param {object} dataloader - An object containing the following
 * <ul>
-* <li> function - The function to load the data (can be omitted if data loaded from a file<li>
-* <li> viewLoader - The function that will load the view <li>
-* <li> files - specifies the files to load the data <li>
+*   <li> function - The [function]{@tutorial datalaoder} to load the data
+    (can be omitted if data loaded from a file)</li>
+*   <li> viewLoader - The function that will load the each view </li>
+*   <li> files - specifies the files to load the data </li>
 * </ul>
-* A dataLoader can be included as the first item in the list, if dynamic loading as 
-* well as static loading 
-*
 * @param {Object} config extra settings
-* @param {Object[]} [config.initialCharts] A list of chart configs to
-* initially load
-* @param {function} [config.metaDataLoader] A method which returns a Promise
-* with a list of the column metadata, given the name of the datasource
-* and a list of column field/ids
-* @param {function} [config.onDataLoaded] A method which is called once all
-* the data is loaded (passing this as the only parameter)
+* @param {Object[]} [config.initialCharts] A list of chart configs to initially load if
+* no views are specified
+* @param {string[]} [config.all_views] A list of views that can be loaded (a suitable 
+* view loader is required to atually load the view)
+* @param {string} [config.current_view] the current view (only used with all views)
+* @param {string} [config.permisson] the level of permission the user has. This just makes certain
+* options unavaliable. Any logic should be handled when a state_saved event is broadcast
+* @param {boolean} [config.gridstack] whether to arrange the charts in a grid
+* @param
 * 
 */
 class ChartManager{
 
-    //
     constructor(div,dataSources,dataLoader,config={},listener=null){
         this.listeners={};
         this.infoAlerts={};
@@ -124,12 +122,10 @@ class ChartManager{
         for (const d of dataSources){
             const ds= {
                 name:d.name,
-                dataStore:new DataStore(d.size,{columns:d.columns,columnGroups:d.columnGroups,offsets:d.offsets,links:d.links,large_images:d.large_images}),
+                dataStore:new DataStore(d.size,d),
                 link_to:d.link_to,
                 index_link_to:d.index_link_to,
                 color:d.color || themes[this.theme].background_color,
-                images:d.images,
-                genome_browser:d.genome_browser,
                 column_link_to:d.column_link_to,
                 links:d.links,
                 custom:d.custom || {}
@@ -140,11 +136,9 @@ class ChartManager{
             this.columnsLoading[d.name]={};
             
         }
-
         if (listener){
             this.addListener("_default",listener)
         }
-
         this.transactions={};
        
         
@@ -288,8 +282,8 @@ class ChartManager{
            return mItems;
         
         })
-
     }
+
     __getMenuItem(theme){
         return {
             text:theme,
@@ -299,20 +293,36 @@ class ChartManager{
     }
 
     setTheme(theme){
-        this.theme=theme;
-        document.getElementsByTagName('html')[0].className = theme;
         //thinking about doing everything with css
         // there could be graphics rendering of other sorts as well...
         // nothing I can see at the moment that responds to theme.
+        this.theme=theme;
+        document.getElementsByTagName('html')[0].className = theme;
+        //only chart this is required for is the genome browser
+        //it uses canvas and thus has to redraw the canavas which is 
+        //just a png so won't be effected by css changes
+        if (!this.charts){
+            return;
+        }
+        for (let ch in this.charts){
+            const c= this.charts[ch];
+            if (c.chart.themeChanged){
+                c.chart.themeChanged();
+            }
+        }
+      
+        
     }
 
-    _sync_colors(from,to){
-        const columns = to.column_link_to.columns;
+
+    //sync color columns
+    _sync_colors(columns,from,to){ 
         for (let item of columns){
-            const from_col=from.dataStore.columnIndex[item.link_to];
-            const to_col = to.dataStore.columnIndex[item.col];
-            const newColors = new Array(to_col.values)
-            const colors = from.dataStore.getColumnColors(item.link_to)
+            
+            const from_col=from.columnIndex[item.link_to];
+            const to_col = to.columnIndex[item.col];
+            const newColors = new Array(to_col.values);
+            const colors = from.getColumnColors(item.link_to)
             for (let i=0;i<from_col.values.length;i++){
                 const val = from_col.values[i];
                 const index = to_col.values.indexOf(val);
@@ -321,7 +331,6 @@ class ChartManager{
                 }
             }
             to_col.colors=newColors;
-
         }
     }
 
@@ -329,22 +338,22 @@ class ChartManager{
         const ds = dataSource.dataStore
         const o = ds.offsets;
         const p = o.param;
+        //need to make sure all columns are loaded 
         const cols= [p[0],p[1],o.groups];
         if (o.background_filter){
             cols.push(o.background_filter);
         }
         this._getColumnsThen(dataSource.name,cols,()=>{
             ds.initiateOffsets();
+            //update x,y offsets
             ds.updateColumnOffsets();
+            //update rotation and update
             ds.updateColumnOffsets(null,true,true);
         })
-       
-
     }
 
     //load the view metadata or use initialCharts then call _init to load the view 
-    _loadView(config,dataLoader,firstTime=false){
-       
+    _loadView(config,dataLoader,firstTime=false){       
         //load view, then initialize
         if (config.all_views){
             this.currentView=config.initial_view || config.all_views[0];
@@ -386,9 +395,7 @@ class ChartManager{
         for (let ds of this.dataSources){
             delete ds.contentDiv;
             delete ds.menuBar;
-            if (ds.column_link_to){
-                this._sync_colors(this.dsIndex[ds.column_link_to.dataSource],ds);
-            }
+           
         }
         const col = themes[this.theme].background_color;
         //add all the appropriate panes (one per datasource)
@@ -415,19 +422,26 @@ class ChartManager{
             },p);
             ds.contentDiv.classList.add("ciview-contentDiv");
         }
-
-        
-         //any first time initiation
-         if (firstTime){
-            //initiate offsets if any
+     
+        //any first time initiation
+        if (firstTime){        
             for (let d of this.dataSources){
-                if (d.dataStore.offsets){
+                const ds = d.dataStore;
+                //initiate offsets if any
+                if (ds.offsets){
                    this._initiateOffsets(d)
+                }
+                //sync any columns
+                //phasing out
+                if (d.column_link_to){
+                    this._sync_colors(d.column_link_to.columns,this.dsIndex[d.column_link_to.dataSource].dataStore,ds);
+                }
+                for (let scc of ds.syncColumnColors){
+                    this._sync_colors(scc.columns,this.dsIndex[scc.dataSource].dataStore,ds);
                 }
             }
         }
 
-  
         //need to create a set to create track of 
         //charts loaded
         this._toLoadCharts = new Set();
@@ -457,6 +471,7 @@ class ChartManager{
                 this._columnRemoved(ds,data)
             }
             else if (type ==="data_highlighted"){
+                data.dataStore= ds.dataStore;
                 this._callListeners(type,data);
             }
             else if (type==="filtered"){
@@ -467,7 +482,7 @@ class ChartManager{
                 const n2=  ds.dataStore.filterSize;
                 this.progressBars[ds.name].setValue(n2);
                 this.progressBars[ds.name].setText(n2);
-                //this._callListeners(type,)
+                this._callListeners(type,data)
             }
         })
     }
@@ -661,6 +676,20 @@ class ChartManager{
         if (config.background_filter){
             set.add(config.background_filter.column);
         }
+
+        //are there any config entries that refer to column(s)
+        const t = BaseChart.types[config.type];
+        if (t.configEntriesUsingColumns){
+            t.configEntriesUsingColumns.forEach(x=>{
+                let e = config[x];
+                if(e){
+                    e= Array.isArray(e)?e:[e];
+                    for (let i of e){
+                        set.add(i)
+                    }
+                }
+            });
+        }
        
     }
    
@@ -815,24 +844,16 @@ class ChartManager{
 
     /** Displays a dialog
     * @param {Object} config extra settings
-    * @param {Object[]} [config.initialCharts] A list of chart configs to
-    * initially load
-    * @param {function} [config.metaDataLoader] A method which returns a Promise
-    * with a list of the column metadata, given the name of the datasource
-    * and a list of column field/ids
-    * @param {function} [config.onDataLoaded] A method which is called once all
-    * the data is loaded (passing this as the only parameter)
     */
 
     showCustomDialog(config){
         new CustomDialog(config);
     }
 
-     /**Adds a menu icon to either the main menubar or a datasource meubar
+     /**Adds a menu icon to either the main menubar or a datasource menubar
     * @param {string} dataSource The name of data source or _main if adding
     * an icon to the main (top) toolbar
     * @param {string} icon The class name(s) of the icon
-    * initially load
     * @param {string} text Text that will be displayed in a tooltip
     * @param {function} func The function that will be called when the icon is pressed
     */
@@ -918,9 +939,7 @@ class ChartManager{
 
     /**
     * Loads data for specified columns into the appropriate dataStore
-    * @param {string[]} columns An array of column fields/ids - if the datastore has no metadata
-    * on a column, then it will call the metaDataLoader specified in the ChartManager's config
-    * in order to load in the metadata, before loading in the actual data.
+    * @param {string[]} columns An array of column fields/ids 
     * @param {string} dataSource The name of the dataSource
     * @param {function} callback A function which will be run once all the
     * columns are loaded
@@ -928,27 +947,6 @@ class ChartManager{
     * @param {integer} [threads=2]  the number of concurrent requests
     */
     loadColumnSet(columns,dataSource,callback,split=10,threads=2){
-
-        //check to see if the datastore contains column information
-        const ds = this.dsIndex[dataSource].dataStore;
-        let noInfoCols = columns.filter(x=>!ds.columnIndex[x]);
-        //load in the metadata
-        if (noInfoCols.length>0){
-            this.config.metaDataLoader(dataSource,noInfoCols).then((data)=>{
-                for (let col of data){
-                    ds.addColumn(col)
-                }
-                this._loadColumnSet(columns,dataSource,callback,split,threads);
-            });
-        }
-        //metadata already present - load in the data 
-        else{
-            this._loadColumnSet(columns,dataSource,callback,split,threads);
-        }
-    }
-
-    _loadColumnSet(columns,dataSource,callback,split=10,threads=2){
-
         const id = getRandomString();
         this.transactions[id]={
             callback:callback,
@@ -973,7 +971,6 @@ class ChartManager{
             t.columns.push(col_list);
             col_list=[];
         }
-
         t.alertID= this.createInfoAlert(`Loading Columns:0/${columns.length}`,{spinner:true}); 
         const max = Math.min(t.columns.length,threads);
        
@@ -1045,6 +1042,7 @@ class ChartManager{
 
 
     _setUpMenu(ds){
+        const dataStore= ds.dataStore;
         createMenuIcon("fas fa-chart-bar",{
             tooltip:{
                 text:"Add Chart",
@@ -1061,7 +1059,7 @@ class ChartManager{
                 position:"bottom-right"
             },
             func:()=>{
-               ds.dataStore.removeAllFilters();
+               dataStore.removeAllFilters();
             }
             },ds.menuBar
         );
@@ -1082,9 +1080,9 @@ class ChartManager{
 
         },ds.menuBar);
 
-        if (ds.links){
-            for (let ods in ds.links){
-                const link= ds.links[ods];
+        if (dataStore.links){
+            for (let ods in dataStore.links){
+                const link= dataStore.links[ods];
                 if (link.rows_as_columns){
                     this._addLinkIcon(ds,this.dsIndex[ods],link.rows_as_columns)
                 }
@@ -1278,28 +1276,30 @@ class ChartManager{
         const ds  =this.dsIndex[dataSource];
         const dStore = ds.dataStore;
         //check if need to load column data from linked data set
-        if (ds.links){
-            for (let ods in ds.links){
-                const link = ds.links[ods];
+        if (dStore.links){
+            for (let ods in dStore.links){
+                const link = dStore.links[ods];
                 if (link.columns){
                     const otherCols = [];
                     const thisCols=[];
                     for (let c of columns){
-                        if  (dStore.columnIndex[c].data){
-                            continue;
-                        }
+                       
                         if(link.columns.indexOf(c)===-1){
                             thisCols.push(c)
                         }
-                        else{
+                        else if (!dStore.columnIndex[c].data){
                             otherCols.push(c)
                         }
                     }
-                    //get the other datasource columns first
+                    //get the other datasource's columns first
                     if (otherCols.length>0){
-                        this._getColumnsFromOtherSource(dataSource,ods,
-                            otherCols,link.index, ()=>{
-                            this._getColumnsThen(dataSource,thisCols,func)
+                        //get index column
+                        this._getColumnsThen(dataSource,[link.index],()=>{
+                            //then get all the other columns
+                            this._getColumnsFromOtherSource(dataSource,ods,
+                                otherCols,link.index, ()=>{
+                                this._getColumnsThen(dataSource,thisCols,func)
+                            })
                         })
                         return;
                     }
@@ -1326,7 +1326,7 @@ class ChartManager{
         if (reqCols.length===0){
             this._haveColumnsLoaded(columns,dataSource,func);
         }
-        //load requested columns then check all are loaded
+        //load required columns, then check all requested are loaded
         else{
             this.loadColumnSet(reqCols,dataSource,()=>{
                 this._haveColumnsLoaded(columns,dataSource,func);
@@ -1434,26 +1434,25 @@ class ChartManager{
         }
 
          //new preferred way to decorate column methods 
-         if (chartType.methodsUsingColumns){
+        if (chartType.methodsUsingColumns){
             for (let meth of chartType.methodsUsingColumns ){
                 this.__decorateColumnMethod(meth,chart,dataSource);
             }
-         }
-
-      
-
-        const idl= ds.index_link_to;
-        if (chart.setupLinks && idl){
-            //ensures requested columns are loaded before other datasource loads them
-            const func= (columns,callback)=>{
-                //make sure index is loaded before use
-                columns.push(idl.index);
-                this._getColumnsThen(idl.dataSource,columns,callback)
-
-            }    
-            chart.setupLinks(this.dsIndex[idl.dataSource].dataStore, idl.index,func);
         }
 
+      
+        if (chart.setupLinks){
+              //phasing out
+            if (ds.index_link_to){
+                this._giveChartAccess(chart,this.dsIndex[ds.index_link_to.dataSource].dataStore,ds.index_link_to.index);
+            }
+            for (let lnk of ds.dataStore.accessOtherDataStore){
+                this._giveChartAccess(chart,this.dsIndex[lnk.dataSource].dataStore,lnk.index);
+            }
+            
+        }
+       
+        //I think this is obsolete now
         const cll= ds.column_link_to;
         if (cll && chart.createColumnLinks){
             const func= (columns,callback)=>{
@@ -1466,7 +1465,7 @@ class ChartManager{
         if (notify){
             this._callListeners("chart_added",chart);
         } 
-        //check to see if all inital charted loaded , then can call any
+        //check to see if all inital charted loaded , then can call any listeners
         if (this._toLoadCharts){
             this._toLoadCharts.delete(config);
             if (this._toLoadCharts.size===0){
@@ -1480,6 +1479,18 @@ class ChartManager{
             }
         }
         return chart;
+    }
+
+    //gives a chart access to another datasource
+    _giveChartAccess(chart,dataSource,index){
+        const func= (columns,callback)=>{
+            //make sure index is loaded before use
+            columns.push(index);
+            this._getColumnsThen(dataSource.name,columns,callback);
+          
+
+        } 
+        chart.setupLinks(dataSource,index,func); 
     }
 
     //sets up a link between charts
@@ -1857,7 +1868,7 @@ class AddChartDialog extends BaseDialog{
             let allow =true
             if (t.required){
                 for (let r of t.required){
-                    if (!this.dataSource[r]){
+                    if (!this.dataStore[r]){
                         allow=false
                     }
                 }
@@ -1950,7 +1961,7 @@ class AddChartDialog extends BaseDialog{
         const t= BaseChart.types[this.chartType.value];
 
         if (t.init){
-            t.init(config,this.dataSource,ed)
+            t.init(config,this.dataSource.dataStore,ed)
         }
         callback(config);
         this.chartName.value="";
@@ -2037,7 +2048,7 @@ class AddChartDialog extends BaseDialog{
         const t= BaseChart.types[this.chartType.value];
         this.extraControls={};
         if (t.extra_controls){
-            const controls = t.extra_controls(this.dataSource);
+            const controls = t.extra_controls(this.dataSource.dataStore);
             const parentDiv = this.paramDiv;
             for (let c of controls){
                 createEl("div",{

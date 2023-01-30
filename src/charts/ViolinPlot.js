@@ -49,9 +49,10 @@ class ViolinPlot extends WGLChart{
 
         this.dim= this.dataStore.getDimension("catrange_dimension")
         this.x_scale.domain(this.values);
+        const cy = this.dataStore.columnIndex[c.param[1]];
         this.app.addCircles({
 			x:this.xPos,
-			y:this.dataStore.getRawColumn(c.param[1]),
+			y:cy.datatype==="int32"?new Float32Array(cy.data):cy.data,
 			localFilter:this.dim.getLocalFilter(),
 			globalFilter:this.dataStore.getFilter(),
 			colorFunc:colorFunc
@@ -81,8 +82,6 @@ class ViolinPlot extends WGLChart{
 
     _createFilter(range){
 		this.range=range;
-	
-	
         if (range==null){
             this.dim.removeFilter();
         }

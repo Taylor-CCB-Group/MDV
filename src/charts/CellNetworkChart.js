@@ -242,6 +242,19 @@ class CellNetworkChart extends SVGChart{
         }
     }
 
+    //this will be decorated to ensure data is loaded
+    changeLinkThicknessParameter(col,tq){
+        this._changeLinkThicknessScale(tq,null,true);
+    }
+
+    changeLinkLengthParameter(col,tq){
+        this._changeLinkLengthScale(tq,null,true);
+    }
+    changeLinkColorParameter(col,tq){
+        this._changeLinkColorScale(null,[tq[0],tq[1]],true);
+    }
+    
+
     _changeLinkThicknessScale(domain,range,update){
         const c = this.config;
         if (range){
@@ -689,22 +702,8 @@ class CellNetworkChart extends SVGChart{
         });
 
       
-        settings.push({
-            
-                type:"slider",
-                max:1,
-                min:0,
-                step:0.01,
-                doc:this.__doc__,
-                current_value:c.stat_cutoff,
-                label:"significance cut off",
-                func:(x)=>{
-                    c.stat_cutoff=x
-                    this.reCalculate();
-            }
-        });
-        settings.push({
-            
+       
+        settings.push({ 
             type:"slider",
             max:20,
             min:5,
@@ -772,7 +771,7 @@ class CellNetworkChart extends SVGChart{
                 const tq= this.dataStore.getColumnQuantile(v,0.01);
                 sl.updateOptions({range:{max:tq[1],min:tq[0]}});
                 sl.set(tq);
-                this._changeLinkColorScale(null,[tq[0],tq[1]],true);
+                this.changeLinkColorParameter(v,tq);
             }
         });
         const colors=[]
@@ -810,18 +809,20 @@ class CellNetworkChart extends SVGChart{
             label:"Link Thickness",
             type:"dropdown",
             values:[tCols,"name","field"],
-            current_value:c.param[3],
+            current_value:c.param[4],
             func:(x)=>{
-                c.param[5]=x;
+                c.param[4]=x;
 
             },
             onchange:(controls,v)=>{
+                //update the range/domain for the new parameter
                 c.param[4]=v;
                 const sl =controls["Link Thickness Domain"].noUiSlider;
                 const tq= this.dataStore.getColumnQuantile(v,0.01);
                 sl.updateOptions({range:{max:tq[1],min:tq[0]}});
                 sl.set(tq);
-                this._changeLinkThicknessScale(tq,null,true);
+                //update the chart
+                this.changeLinkThicknessParameter(v,tq)
             }
         });
 
@@ -879,12 +880,11 @@ class CellNetworkChart extends SVGChart{
                 const tq= this.dataStore.getColumnQuantile(v,0.01);
                 sl.updateOptions({range:{max:tq[1],min:tq[0]}});
                 sl.set(tq);
-                this._changeLinkLengthScale(tq,null,true);
+                this.changeLinkLengthParameter(v,tq);
             }
         });
 
-        settings.push({
-                
+        settings.push({                
             type:"doubleslider",
             max:200,
             min:1,
@@ -895,8 +895,7 @@ class CellNetworkChart extends SVGChart{
                 this._changeLinkLengthScale(null,[x,y],true);
             }
         });
-        settings.push({
-                
+        settings.push({            
             type:"doubleslider",
             max:tQuant[1],
             min:tQuant[0],
@@ -920,7 +919,6 @@ class CellNetworkChart extends SVGChart{
 
 
         //node  color
-      
         settings.push({
             type:"radiobuttons",
             label:"Node Color",
@@ -1005,6 +1003,7 @@ class CellNetworkChart extends SVGChart{
 BaseChart.types["cell_network_chart"]={
     name:"Cell Network Chart",
     allow_user_add:false,
+    methodsUsingColumns:["changeLinkThicknessParameter","changeLinkLengthParameter","changeLinkColorParameter"],
     class:CellNetworkChart,
     params:[
         {

@@ -84,7 +84,7 @@ class CategoryChart extends SVGChart{
             const v = this.dataStore.getColumnValues(c.param);
             this.rowData.sort((a,b)=>v[a[1]].localeCompare(v[b[1]]));
         }
-        if (this.rowData.length>40){
+        if (this.rowData.length>40 && !c.show_limit){
             c.show_limit=40;
         }
         if (c.show_limit){

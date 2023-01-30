@@ -5,7 +5,7 @@ import "d3-transition";
 import {easeLinear} from "d3-ease";
 import {axisLeft,axisBottom} from "d3-axis";
 import {cluster} from "d3-hierarchy";
-import { thresholdFreedmanDiaconis } from "d3";
+
 
 
 
@@ -461,7 +461,7 @@ class SVGChart extends BaseChart{
             })
         }
         else{
-            callback("data:image/svg+xml," + encodeURIComponent(svgAsXML));
+            callback(svgAsXML);
             if (this.removeFromImage){
                 this.removeFromImage();
             }  

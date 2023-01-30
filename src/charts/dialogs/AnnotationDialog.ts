@@ -19,20 +19,13 @@ export default class AnnotationDialog extends BaseDialog {
             buttons: [
                 {
                     text: "Add tag to selection",
-                    method: () => {
-                        const tag = this.tagInput.value;
-                        this.setTag(tag, true);
-                        this.updateTagList();
-                    }
+                    method: "AddTag" 
                 },
                 {
                     text: "Remove tag from selection",
-                    method: () => {
-                        const tag = this.tagInput.value;
-                        this.setTag(tag, false);
-                        this.updateTagList();
-                    }
-                },
+                    method: "RemoveTag" 
+                        
+                }
             ]
         }, null);
         this.outer.classList.add('annotationDialog');
@@ -53,6 +46,19 @@ export default class AnnotationDialog extends BaseDialog {
         // });
         this.tagListElement = createEl("div", {}, this.columns[0]);
         this.updateTagList();
+    }
+    addTag(){
+        const tag = this.tagInput.value;
+        this.setTag(tag, true);
+        this.updateTagList();
+
+    }
+
+    removeTag(){
+        const tag = this.tagInput.value;
+        this.setTag(tag, false);
+        this.updateTagList();
+                    
     }
     setTag(tag: string, tagValue: boolean) {
         this.tagModel.setTag(tag, tagValue);
