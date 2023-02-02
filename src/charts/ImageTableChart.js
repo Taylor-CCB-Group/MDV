@@ -1,7 +1,7 @@
 import {DataModel} from "../table/DataModel.js";
 import BaseChart from "./BaseChart.js"
-import { createEl } from "../utilities/Elements.js";
 import ImageTable from "../table/ImageTable.js";
+import { func } from "../datastore/binWorker.js";
 
 
 
@@ -15,6 +15,7 @@ class ImageTableChart extends BaseChart{
         this.dataModel.setColumns(this.config.param);
         this.dataModel.updateModel();
         const c = this.config;
+        c.margins = c.margins || {top_bottom:10,left_right:10}
 
      
 
@@ -22,7 +23,9 @@ class ImageTableChart extends BaseChart{
             base_url:c.images.base_url,
             image_type:c.images.type,
             image_key:c.param[0],
-            initial_image_width:c.image_width
+            initial_image_width:c.image_width,
+            image_label:c.image_label,
+            margins:c.margins
         });
         this.grid.addListener("image_clicked",(e,index)=>{
             this.dataStore.dataHighlighted([index],this)
@@ -56,17 +59,31 @@ class ImageTableChart extends BaseChart{
 
     }
 
+    setImageLabel(column){
+        this.config.image_label=column;
+        this.grid.setImageLabel(column);
+
+    }
+
     colorByColumn(column){
 		this.grid.setColorBy(this.getColorFunction(column,false));
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
 	}
 
+    colorByDefault(){
+        this.grid.setColorBy(null);
+        const ft = this.grid.getFirstTileInView();
+        this.grid.show(ft);
+    }
+
     getSettings(){
         const od = this.grid.originalDimensions;
         const c = this.config;
         const settings = super.getSettings();
-        return settings.concat([{
+        const cols= this.dataStore.getColumnList("all",true);
+        return settings.concat([
+        {
             type:"slider",
             max:od[1]*4,
             min:10,
@@ -77,7 +94,17 @@ class ImageTableChart extends BaseChart{
                 c.image_width=x;
                 this.grid.setImageWidth(x,true)
             }
-        }])
+        },
+        {
+            label:"Label",
+            type:"dropdown",
+            values:[cols,"name","field"],
+            current_value:c.image_label || "__none__",
+            func:x=>{
+                this.setImageLabel(x ==="__none__"?null:x)
+            }
+        }
+        ])
     }
     changeBaseDocument(doc){
         super.changeBaseDocument(doc);
@@ -91,6 +118,9 @@ BaseChart.types["image_table_chart"]={
     "class":ImageTableChart,
     name:"Image Table",
     required:["images"],
+    methodsUsingColumns:["setImageLabel"],
+    configEntriesUsingColumns:["image_label"],
+
     init:(config,dataSource,extraControls)=>{
         //get the available images
         const i = dataSource.images[extraControls.image_set];

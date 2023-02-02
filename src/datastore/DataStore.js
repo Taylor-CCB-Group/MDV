@@ -519,12 +519,15 @@ class DataStore{
 
     /**
     * returns a list of column name and fields (which have data) sorted by name 
-    * @param {Array} [filter] - can be either number, all, text, integer, double or unique
+    * @param {Array|string} [filter] - can be either be a string -'number', 'all' or a column type.
+    * Or an array of column types
+    * @param {boolean} [addNone=false] if true then an extra object will be added to the list
+    * with name 'None' and field '__none__'
     * @returns {Object[]}  An array of objects containing name,field and datatype 
     * properties. The columns are ordered by main columns followed by subgroups. 
     * Each group is ordered alphabetically
     */
-    getColumnList(filter=null){
+    getColumnList(filter=null,addNone=false){
         const columns=[];
         const sgDataSources={};
         const sgs =Object.keys(this.subgroups).map(x=>{
@@ -579,6 +582,9 @@ class DataStore{
                 sgDataSources[ds].sort((a,b)=> a.name.localeCompare(b.name));
                 cols=cols.concat(sgDataSources[ds]);
             }
+        }
+        if (addNone){
+            cols.push({name:"None",field:"__none__"})
         }
         return cols;
     }

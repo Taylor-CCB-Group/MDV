@@ -375,3 +375,9 @@ select, input, textarea {
 .annotationDialog .someTagged {
     filter: saturate(20%);
 }
+
+
+.mdv-image-label {
+    position:absolute;
+    text-align: center;
+}

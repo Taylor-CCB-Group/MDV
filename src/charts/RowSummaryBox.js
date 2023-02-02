@@ -1,7 +1,7 @@
 
 import BaseChart from "./BaseChart.js"
-import { createEl } from "../utilities/Elements.js";
 import ImagePanZoom from "../utilities/PanZoom.js";
+import { createEl,makeSortable} from "../utilities/Elements.js";
 
 class RowSummaryBox extends BaseChart{
     constructor(dataStore,div,config){
@@ -15,12 +15,14 @@ class RowSummaryBox extends BaseChart{
             this.imViewer=new ImagePanZoom(d,this._getImage(0));
         }
         this.paramHolders={};
+        const sectionDiv= createEl("div",{},this.contentDiv);
         for (let p of this.config.param){
             if (p === this.img_param){
                 continue;
             }
             const c = this.dataStore.columnIndex[p];
-            const d = createEl("div",{classes:["mdv-section"]},this.contentDiv)
+            const d = createEl("div",{classes:["mdv-section"]},sectionDiv);
+            d.__mcol__=c.field;
             createEl("div",{text:c.name,classes:["mdv-section-header"]},d);
             let te = createEl("div",{classes:["mdv-section-value"]},d);
             if (c.is_url){
@@ -28,6 +30,18 @@ class RowSummaryBox extends BaseChart{
             }
             this.paramHolders[c.field]=te;
         }
+        makeSortable(sectionDiv,{
+            handle:"mdv-section-header",
+            sortEnded:li=>{
+                const c =  this.config
+                let tp = [];
+                if (c.image){
+                    tp = [c.param[c.image.param]];
+                    c.image.param=0;
+                }
+                c.param= tp.concat(li.map(x=>x.__mcol__));  
+            }
+        })
         this.setParam(0);
         this.contentDiv.style.overflowY="auto";
 	}

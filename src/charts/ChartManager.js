@@ -1366,8 +1366,15 @@ class ChartManager{
         //first argument must be column(s) needed
         const self=this;
         chart[method]=function(){
-            const cols = Array.isArray(arguments[0])?arguments[0]:[arguments[0]];
-            self._getColumnsThen(dataSource,cols,()=>chart[newMethod](...arguments));
+            //column not needed
+            if (arguments[0] == null){
+                chart[newMethod](...arguments);
+            }
+            else{
+                const cols = Array.isArray(arguments[0])?arguments[0]:[arguments[0]];
+                self._getColumnsThen(dataSource,cols,()=>chart[newMethod](...arguments));
+            }
+           
         }
     }
 

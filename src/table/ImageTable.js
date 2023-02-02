@@ -18,12 +18,12 @@ class ImageTable {
         this.display_columns=[];
         this.selection_mode=true;
         this.imageFunc = config.imageFunc;
-        config.background_color=config.background_color?config.background_color:"lightgray";
+        //config.background_color=config.background_color?config.background_color:"lightgray";
    
         this.base_url=config.base_url;
         this.parent = parent_div;
         this.selected_tiles={};
-        this.margin=config.margin_size?config.margin_size:10
+        
        
         this.cache_size=5;
         const bb= this.parent.getBoundingClientRect();
@@ -33,15 +33,15 @@ class ImageTable {
             styles:{
                 height:bb.height+"px",
                 width:bb.width+"px",
-                overflow:"auto",
-                backgroundColor:bg
+                overflow:"auto"
+               // backgroundColor:bg
 
             }
         },this.parent);
         this.canvas = createEl("div",{
             styles:{
-                position:"relative",
-                backgroundColor:bg
+                position:"relative"
+               // backgroundColor:bg
 
             }
         },this.view_port);
@@ -139,7 +139,6 @@ class ImageTable {
         }
         let arr =id.split("-");
         if (arr[0]==="mlvtile"){
-            let range=null;
             let ids =null;
             
             let index = parseInt(arr[2]);
@@ -228,7 +227,16 @@ class ImageTable {
         this.setImageDimensions([width,Math.round((width/this.img_width)*this.img_height)],redraw)
     }
 
+    setImageLabel(col){
+        this.config.image_label = col;
+        const fti = this.getFirstTileInView();
+        this.setImageDimensions();
+        this.show(fti)     
+    }
+
     setImageDimensions(dim,redraw){
+        this.lrm = this.config.margins.left_right;
+        this.tbm = this.config.margins.top_bottom;
         let ft = this.getFirstTileInView();
         if (!dim){
             dim=[this.preferred_width,this.preferred_height];
@@ -237,17 +245,28 @@ class ImageTable {
             this.preferred_width=dim[0];
             this.preferred_height=dim[1];
         }
-        if (this.width < this.preferred_width+(this.margin*2) && this.width !==0){
-           dim[0]=this.width-(this.margin*3);
+       
+        if (this.width < this.preferred_width+(this.lrm*2) && this.width !==0){
+           dim[0]=this.width-(this.lrm*3);
            this.num_per_row=1;
         }
         else{
-            this.num_per_row= Math.ceil((this.width-this.margin)/(this.preferred_width+this.margin));
-            dim[0] = Math.floor((this.width-2*this.margin)/this.num_per_row)-this.margin;
+            this.num_per_row= Math.ceil((this.width-this.lrm)/(this.preferred_width+this.lrm));
+            dim[0] = Math.floor((this.width-2*this.lrm)/this.num_per_row)-this.lrm;
         }
         dim[1]=Math.round((dim[0]/this.preferred_width)*this.preferred_height);
-    	this.tile_width=parseInt(dim[0])+this.margin;
-        this.tile_height=parseInt(dim[1])+this.margin;
+
+        if (this.config.image_label){
+            this.label_size= Math.round(dim[1]/12);
+            this.label_size=Math.max(this.label_size,12);
+            //need to fit label in
+            this.tbm =  this.tbm<this.label_size+4?this.label_size+4:this.tbm
+            
+        }
+
+
+    	this.tile_width=parseInt(dim[0])+this.lrm;
+        this.tile_height=parseInt(dim[1])+this.tbm;
         this.t_width = parseInt(dim[0]);
         this.t_height = parseInt(dim[1]);
         let end_row = Math.floor((this.height+(this.cache_size*this.tile_height))/this.tile_height);
@@ -256,6 +275,8 @@ class ImageTable {
             this.show(ft);
         }
     }
+
+ 
 
     resize(){
     	let self=this;
@@ -284,7 +305,7 @@ class ImageTable {
     }
 
     _setCanvasHeight(){
-        let h = ((Math.ceil(this.data_view.getLength()/this.num_per_row))*this.tile_height)+this.margin;
+        let h = ((Math.ceil(this.data_view.getLength()/this.num_per_row))*this.tile_height)+this.tbm;
         this.canvas.style.height=h+"px";
     }
 
@@ -451,9 +472,10 @@ class ImageTable {
     }
 
     _addRow(row){
+        const label = this.config.image_label;
         let st = row*this.num_per_row;
         let en = st+this.num_per_row;
-        let top = row * this.tile_height+this.margin;
+        let top = row * this.tile_height+this.tbm;
         let x=0;
         const w = this.t_width+"px";
         const h = this.t_height+"px";
@@ -465,17 +487,18 @@ class ImageTable {
                 return;
             }
             const image= this.data_view.getItemField(i,this.config.image_key)
-            let left=x*this.tile_width+this.margin;
+            let left=x*this.tile_width+this.lrm;
             x++;
             let border=""
             if (this.color_by){
                 let color = this.color_by(id);
                 border= "4px solid "+color;
             }
-            let extra_classes=[]
+            let extra_classes=[];
             if (this.selected_tiles[id]){
                border="4px solid goldenrod"
-            }   
+            }
+
             createEl("img",{
                 src:`${burl}${image}.${type}`,
                 id:`mlvtile-${this.domId}-${i}`,
@@ -490,7 +513,19 @@ class ImageTable {
                         `mlv-tile-${this.domId}`,
                         `mlv-tile-${this.domId}-${row}`]
                         .concat(extra_classes)
-            },this.canvas)
+            },this.canvas);
+            if (label){
+                createEl("div",{
+                    text:this.data_view.getItemField(i,label),
+                    classes:["mdv-image-label"],
+                    styles:{
+                        width:w,
+                        fontSize: `${this.label_size}px`,
+                        top:(top-this.label_size)+"px",
+                        left:left+"px"
+                    }
+                },this.canvas);
+            }
         }
     }
 }
