@@ -213,11 +213,6 @@
     height:8px;
   }
   
-  
-
-
-
-
    .ciview-dlg-outer {
     position: absolute;
     z-index: 1100;
@@ -233,10 +228,12 @@
     color: var(--text_color);
     background-color: var(--background_color);
   }
+  
    .gutter-horizontal{
      float:left;
      height:100%;
      background-color:silver;
+     cursor:col-resize;
    }
 
    .split-horizontal{

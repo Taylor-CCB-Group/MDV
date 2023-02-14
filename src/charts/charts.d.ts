@@ -71,8 +71,10 @@ export type Chart = {
     setSize: (x?: number, y?: number) => void;
     changeBaseDocument: (doc: Document) => void;
     getSettings: () => GuiSpec<any>[];
+    removeLayout:()=> void;
+    config:any;
 };
 
 export type ChartManager = {
-    addMenuIcon: (dataSourceName: string, iconClass: string, text: string, func: ()=>void) => void;
+    addMenuIcon: (dataSourceName: string, iconClass: string, text: string, func: ()=>void) => HTMLElement;
 };

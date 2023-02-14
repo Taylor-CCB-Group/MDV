@@ -54,7 +54,10 @@ function splitPane(el,config={}){
     }
     Split(panes,{
         direction:dir,
-        gutterSize:5
+        gutterSize:5,
+        cursor:"pointer",
+        sizes:config.sizes,
+        onDragEnd:()=>window.dispatchEvent( new Event('resize') )
     })
     return panes;
  

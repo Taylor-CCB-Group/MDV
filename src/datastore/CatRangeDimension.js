@@ -81,7 +81,7 @@ class CatRangeDimension extends RangeDimension{
             this.filterBuffer,
             this.parent.filterBuffer,
             cat.buffer,
-            val.buffer,
+            [val.buffer,val.datatype],
             config
             ]);
     }  

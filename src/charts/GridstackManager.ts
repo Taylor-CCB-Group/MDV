@@ -20,11 +20,16 @@ declare global {
         gridstackPopoutCallback?: () => void;
     }
 }
+type GridInstance = {
+    grid:GridStack;
+    charts:Set<Chart>;
+    icon:HTMLElement;
+}
 
 export default class GridStackManager {
     cellHeight = 150;
     cellApproxWidth = 300;
-    grids: Map<DataSource, GridStack>;
+    grids: Map<DataSource,GridInstance>;
     dragHandle = '.ciview-chart-title';
     chartManager: ChartManager;
     constructor(chartManager: ChartManager) {
@@ -43,8 +48,10 @@ export default class GridStackManager {
             this.cellHeight = rect.height / rows; //hack, we might want different sizes for different views, not one 'global'
             console.log('gridstack cellHeight', this.cellHeight);
             const grid = GridStack.init({
-                cellHeight: this.cellHeight, handle: this.dragHandle,
-                float: true
+                cellHeight: this.cellHeight,
+                handle: this.dragHandle,
+                float: true,
+                oneColumnSize:400
                 // these options not working as expected...
                 // margin: 10
                 // column
@@ -59,21 +66,76 @@ export default class GridStackManager {
                     el.style.filter = 'blur(1px) opacity(0.5)';
                 }
             });
-            this.chartManager.addMenuIcon(ds.name, "fas fa-th", "compact layout", ()=>grid.compact());
-            this.chartManager.addMenuIcon(ds.name, "fas fa-tags", "Tag annotation", () => {new AnnotationDialog(ds.dataStore)})
-            this.grids.set(ds, grid);
+         
+            const i = this.chartManager.addMenuIcon(ds.name, "fas fa-compress-arrows-alt", "compact layout", ()=>grid.compact());
+            //this.chartManager.addMenuIcon(ds.name, "fas fa-tags", "Tag annotation", () => {new AnnotationDialog(ds.dataStore)})
+            this.grids.set(ds, {grid:grid,charts:new Set(),icon:i});
         }
+        
         return this.grids.get(ds)!;
     }
 
+    destroy(ds: DataSource){
+        if (!this.grids.has(ds)){
+            console.error(`destroying non-existent gridstack - ${ds.name}`)
+        }
+        const gi = this.grids.get(ds);
+        const div = ds.contentDiv;
+         //store sizes/positions of div elements
+        const sizes = new Map();
+        for (let chart of gi.charts){
+            const d = chart.getDiv();
+            sizes.set(d,[d.offsetWidth,d.offsetHeight,d.offsetLeft,d.offsetTop]);
+            chart.removeLayout();
+            delete chart.config.gssize;
+            delete chart.config.gsposition;
+        }
+                 
+        gi.grid.destroy(false);
+
+        //convert back to absolute positioning plus other clean up on the div
+        for (let chart of gi.charts){
+            const  d= chart.getDiv();
+            const s = sizes.get(d);
+            d.style.position="absolute";
+            d.style.width=(s[0]-5)+"px";
+            d.style.height=(s[1]-5)+"px";
+            d.style.left=s[2]+"px";
+            d.style.top=s[3]+"px";
+            chart.config.size=[s[0]-5,s[1]-5];
+            chart.config.position=[s[2],s[3]];
+            d.classList.remove("grid-stack-item")
+        }
+        div.classList.remove('grid-stack');
+        gi.icon.remove();
+        this.grids.delete(ds)
+    }
+
+
+    getCellDimensions(ds:DataSource){
+        const gridInstance = this.getGrid(ds);
+        const grid= gridInstance.grid;
+        return [grid.cellWidth(),this.cellHeight]
+    }
+
+
     manageChart(chart: Chart, ds: DataSource, autoPosition?: boolean) {
-        const grid = this.getGrid(ds);
+        const gridInstance = this.getGrid(ds);
+        const grid= gridInstance.grid;
+        gridInstance.charts.add(chart);
         const div = chart.getDiv();
         const rect = div.getBoundingClientRect();
-        const w = Math.round(rect.width / grid.cellWidth());
-        const h = Math.round(rect.height / this.cellHeight);
-        const x = Math.round(rect.x / grid.cellWidth());
-        const y = Math.floor(rect.y / this.cellHeight);
+        let w = Math.round(rect.width / grid.cellWidth());
+        let h = Math.round(rect.height / this.cellHeight);
+        let x = Math.round(div.offsetLeft / grid.cellWidth()); //relative location
+        //cases where the old container was wider than the current one
+        x=x>11?11:x;
+        let y = Math.floor(div.offsetTop / this.cellHeight);  //relative location
+        if (chart.config.gsposition){
+            [x,y]= chart.config.gsposition;
+            [w,h]= chart.config.gssize;
+            autoPosition=false;
+        }
         //maybe better not to add to dom before getting here, and use grid.addWidget
         //current version seems to be working moderately ok.
         clearPosition(div);
@@ -122,6 +184,8 @@ export default class GridStackManager {
             const {remove} = chart;
             chart.remove = () => {
                 grid.removeWidget(div, true);
+                gridInstance.charts.delete(chart);
+
                 //div.gridstackNode = undefined; //doesn't help
                 remove.apply(chart);
             }
@@ -151,5 +215,16 @@ export default class GridStackManager {
             chart.remove = oldRemove;
             chart.changeBaseDocument = oldChangeBase;
         }
+        chart.removeLayout=()=>{
+            grid.removeWidget(div,false); //doesn't remove listeners from handle...
+            lockButton.remove();
+            delete div.gridstackPopoutCallback;
+            chart.remove = oldRemove;
+            chart.changeBaseDocument = oldChangeBase;
+            ro.disconnect();
+        }
+
+        
     }
+    
 }

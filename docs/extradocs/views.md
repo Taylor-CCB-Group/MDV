@@ -1,64 +1,66 @@
-## specifying a view
+## Specifying a View
 
 Views are just collection of charts/widgets for each DataStore and optionally links between the charts. They are are specified in the ChartManager's config
 
-If there is only a single view then initialViews
+If there is only a single view add the view's config to the ChartManager's config with the key *onlyView*
 
 
-If there are multiple views, a list of all possible views needs to be defined in the config and a viewloader function in the dataloader config. Optionally and initial 
-
-
-
-```
-{
-    "datasource1":{
-        "initialCharts":[
-
-        ],
-        "links":[
-
-        ]
-    },
-    "datasource2":{
-        "initialCharts":[
-
-        ],
-        "links":[
-
-        ]
-    }
-}
-
-
-```
-
-If neither of the above are in the config then a blank view for each DataStore will be shown
-
-
-
-###
-
-an object containing a key 
-
- If you do not specify any views then the app will just show a blank canvas for each dataset
-If there is only a single view then it can be specified in the config with onlyView.
-Otherwise, you need to specify the available views and the current view in the config
-
-```
-
-    {
-        "all_views":[
-            "view 1",
-            "view 2",
-            "view 3"
-        ],
-        "initial_view":"view 1"
-    }
-```
-A viewLoader is then required to load in the views simply an async function that takes the name of the view and returns the views config
-```
-async function viewLoader(viewName){
+If there are multiple views, a list of all possible views needs to be defined in the config and a viewloader function in the dataloader config. A viewLoader function is then required in order retrieve a view. This is simply an async function that takes the name of the view and returns the view's config.
+```js
+async function myViewLoader(viewName){
     return await getView(viewName)
 }
 
+const dataLoader={
+    function:myDataLoader,
+    viewLoader:myViewLoader
+}
+
+const config={
+    all_views:["view1","view2","view3"],
+    current_view:"view2",
+    columns:myColumns
+}
+
+const m = new ChartManager("my-div",myDataSources,dataLoader,config)
+
 ```
+
+
+
+## The view config
+
+* **dataSources** and object containing the name of each dataSource 
+    * layout - either absolute or gridstack (default absolute)
+    * panelWidth - the width (as a percentage) of the panel. This is optional,
+    as by default each panel will take up an equal amount of space
+
+* **initialCharts** an object containing a list of all the charts for a dataSource
+
+```json
+{
+    "dataSources":{
+        "cells":{
+            "layout":"absolute",
+            "panelWidth":75
+        },
+        "genes":{
+            "layout":"gridstack",
+            "panelWidth":25
+        }
+    },
+    "initialCharts":{
+        "cells":[
+            {.....},
+            {.....}
+        ],
+        "genes":[
+            {......},
+            {......}
+        ]   
+    }
+}
+
+
+```
+

@@ -236,7 +236,7 @@ class ChartManager{
         },this.containerDiv);
         this.contentDiv.classList.add('ciview-contentDiv');
 
-        if (config.gridstack) this.gridStack = new GridStackManager(this);
+        this.gridStack = new GridStackManager(this);
 
         //each entry in charts will contain
         //  chart - the actual chart
@@ -254,6 +254,8 @@ class ChartManager{
         this.dataLoader = dataLoader.function;// || async function defaultDataLoaderFunction() { console.warn(`ceci n'est pas une dataLoader`) };
         this.viewLoader = dataLoader.viewLoader;
 
+        this.layoutMenus={};
+
         if (dataLoader.files){     
             this.filesToLoad=dataLoader.files.length;
             for (let item of dataLoader.files){
@@ -269,6 +271,55 @@ class ChartManager{
             this._loadView(config,dataLoader,true);
         }
          
+    }
+
+    _setUpChangeLayoutMenu(ds){
+        this.layoutMenus[ds.name]=new ContextMenu(()=>{
+            const lo = this.viewData.dataSources[ds.name].layout || "absolute";
+            return[ 
+                {
+                    text:"Absolute",
+                    ghosted:lo==="absolute",
+                    func:()=>this.changeLayout("absolute",ds)
+                
+                },    
+                {
+                    text:"Grid Stack",
+                    ghosted:lo==="gridstack",
+                    func:()=>this.changeLayout("gridstack",ds)  
+                }
+            ]
+        })
+    }
+
+    changeLayout(type,ds){
+        const view = this.viewData.dataSources[ds.name]
+        const current = view.layout || "absolute";
+        if (type=== current){
+            return;
+        }
+        //remove existing layouts on charts
+        if (current==="gridstack"){
+            this.gridStack.destroy(ds);
+
+        }
+        else if (current==="absolute"){
+            this.getAllCharts(ds.name).forEach(x=>{
+                const div = x.getDiv();
+                removeResizable(div);
+                removeDraggable(div);     
+            });
+        }
+        //add new ones
+        view.layout= type;
+        if (type==="absolute"){
+            this.getAllCharts(ds.name).forEach(x=>this._makeChartRD(x,ds));
+        }
+        else if (type==="gridstack"){
+            this.getAllCharts(ds.name).forEach(chart=>{
+                this.gridStack.manageChart(chart, ds, this._inInit);    
+            });
+        }
     }
 
     _setupThemeContextMenu(){
@@ -374,53 +425,86 @@ class ChartManager{
 
     _init(view,firstTime=false){
 
-        const dsToView=[];
-        let charts=[];
-        //no initial view
+    
+        //no initial view just make one with all available 
+        //DataSources but no charts
         if (!view){
+            const dts={}   
             for (let ds in this.dsIndex){
-                dsToView.push(ds);
+                dts[ds]={layout:"gridstack"}
             }
-            this.viewData={};
+            this.viewData={dataSources:dts,initialCharts:{}};
+            
+        }
+        else{
+            //legacy data (which only has initialCharts)
+            //need to add which DataSources to display
+            if (!view.dataSources){
+                view.dataSources={};
+                for (let ds in view.initialCharts){
+                    view.dataSources[ds]={};
+                }
+            }
+            this.viewData= view; 
+            
         }
 
-        else{
-            this.viewData= view;
-            charts= view.initialCharts
-            for (let ds in charts){
-                dsToView.push(ds);
-            }
-        }
 
         for (let ds of this.dataSources){
             delete ds.contentDiv;
-            delete ds.menuBar;
-           
+            delete ds.menuBar;   
         }
-        const col = themes[this.theme].background_color;
+        const dsToView= Object.keys(this.viewData.dataSources);
+
+        let widths= [];
+        for (let ds of dsToView){
+            let w = this.viewData.dataSources[ds].panelWidth;
+            if (!w){
+                widths=null;
+                break;
+            }
+            widths.push(w);
+        }
+        this.dsPanes={};
+    
         //add all the appropriate panes (one per datasource)
-        const panes = splitPane(this.contentDiv,{number:dsToView.length});
+        const panes = splitPane(this.contentDiv,{number:dsToView.length,sizes:widths});
         for (let n=0;n<dsToView.length;n++){        
             const p = panes[n];
+            
             p.style.display="flex";
             p.style.flexDirection="column";
             const ds= this.dsIndex[dsToView[n]];
+            this.dsPanes[ds.name]=p;
             this.columnsLoading[ds.name]={};
             ds.charts=[];
             ds.menuBar = createEl("div",{
                 classes:["ciview-menu-bar"]          
             },p);
-            this._setUpMenu(ds);
-            // might move styles from here into .css
-            ds.contentDiv=createEl("div",{
+            const d= createEl("div",{
                 styles:{
                     flex:"1 1 auto",
                     position:"relative",
                     overflow:"auto",
-                    // background:col
+                    height:"100px"
+                   
                 }
             },p);
+            this._setUpMenu(ds);
+            // might move styles from here into .css
+            ds.contentDiv=createEl("div",{
+                styles:{
+                    //flex:"1 1 auto",
+                    position:"relative",
+                    height:"100%"
+                    
+                    //overflow:"auto",
+                    // background:col
+                }
+            },d);
             ds.contentDiv.classList.add("ciview-contentDiv");
+            this._setUpChangeLayoutMenu(ds);
+            //need to add 
         }
      
         //any first time initiation
@@ -444,6 +528,7 @@ class ChartManager{
 
         //need to create a set to create track of 
         //charts loaded
+        const charts= view.initialCharts || {};
         this._toLoadCharts = new Set();
         for (let ds in charts){         
             for (let ch of charts[ds]){
@@ -525,17 +610,26 @@ class ChartManager{
                     this.currentView=vals["name"];
                     if (!vals["clone-view"]){
                         //remove all charts and links
+                        for (let ds in this.viewData.dataSources){
+                            if (this.viewData.dataSources[ds].layout==="gridstack"){
+                                this.gridStack.destroy(this.dsIndex[ds])
+                            }
+                        }
                         this.removeAllCharts();
                         this.viewData.links=[];
                         const state = this.getState();
                         state.view.initialCharts={};
+                        state.view.dataSources={};
+                        //only one datasource
                         if (this.dataSources.length===1){
                             state.view.initialCharts[this.dataSources[0].name]=[];
+                            state.viewDataSources[this.dataSources[0].name]={};
                         }
                         else{
                             for (let ds in this.dsIndex){
                                 if (vals[ds]){
                                     state.view.initialCharts[ds]=[];
+                                    state.view.dataSources[ds]={};
                                 }
                             }
                         }
@@ -599,6 +693,11 @@ class ChartManager{
 
 
     changeView(view){
+        for (let ds in this.viewData.dataSources){
+            if (this.viewData.dataSources[ds].layout==="gridstack"){
+                this.gridStack.destroy(this.dsIndex[ds])
+            }
+        }
         this.removeAllCharts();
         this.contentDiv.innerHTML="";
         this.currentView=view;
@@ -796,10 +895,16 @@ class ChartManager{
         const initialCharts={};
         const updatedColumns={};
         const metadata={};
+        const twidth= this.contentDiv.offsetWidth;
         for (const ds of this.dataSources){
             if (ds.contentDiv){
                 initialCharts[ds.name]=[];
+                let w = this.dsPanes[ds.name].style.width;
+                const re2 = /calc\((.+)\%.+/;
+                this.viewData.dataSources[ds.name].panelWidth=parseFloat(w.match(re2)[1]);
             }
+            
+            
             updatedColumns[ds.name]=this._getUpdatedColumns(ds.dataStore); 
             const dstore= ds.dataStore;
             
@@ -816,20 +921,28 @@ class ChartManager{
             const chart = chInfo.chart;
             const config = chart.getConfig();
             const div =  chart.getDiv();
-            config.position = [div.offsetLeft,div.offsetTop];
-        
+            const d = this.viewData.dataSources[chInfo.dataSource.name];
+            if (d.layout==="gridstack"){
+                config.gsposition= [parseInt(div.getAttribute("gs-x")),parseInt(div.getAttribute("gs-y"))];
+                config.gssize= [parseInt(div.getAttribute("gs-w")),parseInt(div.getAttribute("gs-h"))];
+
+            }
+            else{
+                config.position = [div.offsetLeft,div.offsetTop];
+            }
+                    
             initialCharts[chInfo.dataSource.name].push(config);
             
         }
        
         const view = JSON.parse(JSON.stringify(this.viewData))
         view.initialCharts= initialCharts;
-
+        const all_views = this.viewSelect?Array.from(this.viewSelect.children,x=>x.value):null;
         
         return{     
             view:view,
             currentView:this.currentView,
-            all_views:Array.from(this.viewSelect.children,x=>x.value),
+            all_views:all_views,
             updatedColumns:updatedColumns,
             metadata:metadata
         }
@@ -860,7 +973,7 @@ class ChartManager{
     addMenuIcon(dataSource,icon,text,func){
         const pos = dataSource==="_main"?"bottom-right":"bottom";
         const el= dataSource==="_main"?this.leftMenuBar:this.dsIndex[dataSource].menuBar
-        createMenuIcon(icon,{
+        return createMenuIcon(icon,{
             tooltip:{
                 text:text,
                 position:pos
@@ -1079,6 +1192,18 @@ class ChartManager{
             }
 
         },ds.menuBar);
+        createMenuIcon("fas fa-th",{
+            tooltip:{
+                text:"Change layout",
+                position:"bottom-right"
+            },
+            func:(e)=>{
+                this.layoutMenus[ds.name].show(e);
+            }
+
+        },ds.menuBar);
+
+       
 
         if (dataStore.links){
             for (let ods in dataStore.links){
@@ -1167,10 +1292,22 @@ class ChartManager{
             left=config.position[0];
             top=config.position[1];
         }
+        //hack approx position of grid stack elements
+        if (this.viewData.dataSources[dataSource].layout==="gridstack" && config.gssize){
+            const cellDim = this.gridStack.getCellDimensions(this.dsIndex[dataSource]);
+            width= Math.round(config.gssize[0] * cellDim[0]);
+            height = Math.round(config.gssize[1] * cellDim[1]);
+            left = Math.round(config.gsposition[0] * (cellDim[0]+5));
+            top = Math.floor(config.gsposition[1] * (cellDim[1]+5));
+
+        }
 
         const chartType= BaseChart.types[config.type];
         const t = themes[this.theme];
         // PJT may want different behaviour for gridstack
+        //MJS this is very messy - create divs in (hopefully) the right location and add chart when data loaded
+        //ideally create the chart with a waiting icon and  update it when the data has loaded
+        //However, no way of creating charts at the moment without data - charts need separate init method?
         const div= createEl("div",{
             styles:{
                 position:"absolute",
@@ -1243,7 +1380,7 @@ class ChartManager{
                 if (c2.minMax){
                     c1.minMax=c2.minMax;
                 }
-                if (c2.qauntiles){
+                if (c2.quantiles){
                     c1.quantiles= c2.quantiles;
                 }
 
@@ -1606,6 +1743,11 @@ class ChartManager{
         return cinfo.chart;
     }
 
+    /**
+     * Get all the charts for a data sorce
+     * @param {string} dataSource - The name of the data source 
+     * @returns {Array} - An array of chart objects
+     */
     getAllCharts(dataSource){
         const charts= []
         for (let id in this.charts){
@@ -1710,7 +1852,7 @@ class ChartManager{
     _makeChartRD(chart,ds){
         //if (!ds) console.error(`_makeChartRD called without ds - resize / drag etc may not work properly`);
         //^^ actually doesn't make much difference to non-gridStack in practice.
-        if (ds && this.gridStack) {
+        if (ds && this.gridStack && this.viewData.dataSources[ds.name].layout==="gridstack") {
             this.gridStack.manageChart(chart, ds, this._inInit);
             return;
         }
@@ -1732,26 +1874,6 @@ class ChartManager{
         })
     }
 }
-
-
-
-class SubGroupColumnChooser extends BaseDialog{
-    constructor(dataStore,link,callback){
-        const config={
-            footer:true,
-            width:250,
-            maxHeight:500,
-            title:"Select Columns",
-            buttons:[{text:"OK",method:"getColumns"}]
-        }
-        super(config,{dataStore:dataStore,callback:callback,filter:filter});
-        
-    }
-    init(content){
-        createEl("input",{},this.div);
-    }
-}
-
 
 
 /**

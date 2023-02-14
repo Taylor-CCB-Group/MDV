@@ -128,6 +128,42 @@ Charts that use the images in set1 would then associate the row whose set1 _imag
 
 These have exactly the same format as above, but represent much larger images, which are intended only to be displayed one or two at a time.
 
+### background_images
+
+Images which represent a category and have x, y co-ordinates
+
+```json
+
+"rois":{
+    "coordinates":["x","y"],
+    "column":"sample_id",
+    "color_by":"cell_type",
+    "images":{
+        "sample_1":[
+           {
+                "roi":{
+                    "min_x":0,
+                    "mix_y":0,
+                    "max_x":200,
+                    "max_y":200
+                },
+                "images":[
+                    {
+                        "url":"/...",
+                        "name":"my_image",
+                        "position":[0,0],
+                        "height":200,
+                        "width":200
+                    }
+                ]
+           }
+        ]
+    }
+
+}
+
+```
+
 
 ### offsets
 
