@@ -26,9 +26,9 @@ Multi Dimensional Viewer (MDV) is tool for analyzing, annotating  and sharing mu
 
 ## Running Locally
 
-MDV is just JavaScript designed to be embedded in a web page (), however in the python directory of this repository there are some python scripts to format data to a specific file structure and compiled JavaScript that can display that format. There is also a lightweight server that runs locally to display projects
+MDV is just JavaScript designed to be embedded in a web page (https://mdv.molbiol.ox.ac.uk/). However in the python directory of this repository, there are some python scripts to format data to a specific file structure and compiled JavaScript that can display that format. There is also a lightweight server that runs locally to display projects
 
-### installation
+### Installation
 
 Download and unzip the repository
 
@@ -46,7 +46,7 @@ git clone https://github.com/Taylor-CCB-Group/MDV.git
 * python (3.6 or above)
 * only 4GB of ram is required even for large datasets (~10 000 000 items) as data is lazily loaded as raw bytes
 
-### Displaying  example data
+### Displaying example data
 download the  data
 
 https://zenodo.org/record/6513508/files/hyp_example_data.zip?download=1
