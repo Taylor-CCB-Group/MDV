@@ -1,13 +1,11 @@
 from flask import Flask,render_template,request,make_response,send_file,Response
 import webbrowser
 import mimetypes
-import os
 import json
 import sys
 import re
 from werkzeug.utils import safe_join
 
-js_files= os.path.join(os.path.split(os.path.abspath(__file__))[0],"static","js")
 
 def add_safe_headers(resp):
     resp.headers["Cross-Origin-Opener-Policy"]= "same-origin"
@@ -16,7 +14,7 @@ def add_safe_headers(resp):
 
 
 
-def get_track(file_name,range_header):
+def get_range(file_name,range_header):
     file =open(file_name,"rb")
     size = sys.getsizeof(file_name)
     byte1, byte2 = 0, None
@@ -53,6 +51,22 @@ def create_app(project,open_browser=True, port =5000):
     def index():
         return render_template("page.html")
     
+    @app.route("/static/js/<path:path>")
+    def get_js_files(path):
+        return send_file(safe_join(js_files,path))
+    
+
+    @app.route("/<file>.b")
+    def get_binary_file(file):
+        file_name =safe_join(project.dir,file+".b")
+        range_header = request.headers.get('Range', None) 
+        return get_range(file_name,range_header)
+
+
+    @app.route("/<file>.json/")
+    def get_json_file(file):
+        return send_file(safe_join(project.dir,file+".json"))
+      
     #gets the raw byte data and packages it in the correct response
     @app.route('/get_data',methods =["POST"])
     def get_data():
@@ -65,12 +79,6 @@ def create_app(project,open_browser=True, port =5000):
         except Exception as e:
             print(e) 
             return "Problem handling request",400
-    
-    #js files need the correct headers also
-    #over-ide the normal static endpoint  
-    @app.route("/static/js/<path:path>")
-    def get_js_files(path):
-        return send_file(safe_join(js_files,path))
     
     #images contained in the project
     @app.route("/images/<path:path>")
@@ -96,7 +104,7 @@ def create_app(project,open_browser=True, port =5000):
         range_header = request.headers.get('Range', None)  
         if not range_header:
             return send_file(file_name)
-        return get_track(file_name,range_header)
+        return get_range(file_name,range_header)
         
 
     if open_browser:

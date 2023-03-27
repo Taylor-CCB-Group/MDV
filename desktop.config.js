@@ -5,7 +5,7 @@ module.exports = (env)=> {
 	return {	  
 	   	entry: './src/modules/desktop_index.js',
   	   	output: {
-    		   path: path.resolve(__dirname,"python/mdv/static/js"),
+    		   path: path.resolve(__dirname,"python/mdv/static/mdv/js"),
     		   filename: 'mdv.js',
 			   assetModuleFilename: '../img/[name][ext]',
 			  
@@ -27,7 +27,7 @@ module.exports = (env)=> {
 					test: /\.(png|svg|jpg|gif|eot|ttf|woff|woff2)$/,
 					type: 'asset/resource',
 					generator:{
-						publicPath:"/static/img/"
+						publicPath:"/static/mdv/img/"
 					}		
 				},	
 				{

@@ -30,9 +30,10 @@ import { createEl } from "../utilities/Elements";
 //objects to attach to the window object
 import ChartManager from '../charts/ChartManager.js';
 import FileUploadDialog from "../utilities/FileUploadDialog.js";
-import { processArrayBuffer, getArrayBufferDataLoader} from "../dataloaders/DataLoaders.js";
+import { processArrayBuffer, getArrayBufferDataLoader,getLocalCompressedBinaryDataLoader} from "../dataloaders/DataLoaders.js";
 window.ChartManager = ChartManager;
 window.scFileUploadDialog= FileUploadDialog;
 window.processArrayBuffer = processArrayBuffer;
 window.getArrayBufferDataLoader= getArrayBufferDataLoader;
 window.createEl= createEl;
+window.getLocalCompressedBinaryDataLoader = getLocalCompressedBinaryDataLoader;

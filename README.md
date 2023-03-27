@@ -66,11 +66,38 @@ Open a python shell
 python
 ```
 
-Create an MDV project from the downloaded folder and display it in a browser
+Create an MDV project from the downloaded folder and display it in a browser. Either run the code from the mdv/python folder, add 
+the folder to the PYTHONPATH environment variable or add the path in the code `sys.path.append("/path/to/mdv/python")`
 ```python
 from mdv.mdvproject import MDVProject
 p = MDVProject("/path/to/hyp_example_data")
 p.serve()
+```
+
+## Running on a server
+
+
+The default data storage is an hdf5 file which is a compressed files that allows random read/write access to the data. However, it cannot be accessed directly but requires some kind of wrapper e.g. h5py. Hence access via http calls directly is not possible and backend code is required to display an MDV project in a web page. However, it can be converted to simple continuous compressed blocks of data for each column and a json index . This allows direct access via an http request with a range header:-
+
+```python
+from mdv.mdvproject import MDVProject
+p = MDVProject("/path/to/hyp_example_data")
+p.convert_to_static_page("/path/to/myapp/")
+```
+
+The function also creates a simple home page for the project (index.html), which can be customized. The folder can then be put on the server and accessed via:-
+```
+http://myserver.com/path/to/myapp
+```
+
+Images and JavaScript files are obtained from /static/mdv/js and /static/mdv/img , so the python/static/mdv folder needs to be copied to the /server folder of the server. 
+
+
+No back end architecture is required , although the server needs to accept range headers and have the following headers on responses from the project folder and /static/mdv/js folder in order to allow SharedArrayBuffers and Webworkers:-
+
+```
+Cross-Origin-Opener-Policy:same-origin
+Cross-Origin-Embedder-Policy:require-corp
 ```
 
 

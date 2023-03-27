@@ -21,7 +21,7 @@ class MultiLineChart extends SVGChart{
 		if (!config.title){
 			config.title= x_name;	
 		}
-        if (config.scaletrim && !(config.band_wind)){
+        if (config.scaletrim && !(config.band_width)){
             config.band_width=0.1;
         }
         

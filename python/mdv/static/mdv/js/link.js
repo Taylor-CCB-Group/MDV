@@ -1,6 +1,6 @@
-function _mdvInit(){
+function _mdvInit(staticFolder){
 
-    _mdvGetData("/get_configs").then(data=>{
+    _getConfigs(staticFolder).then(data=>{
         let config = data.state;
         //legacy
         if (config.initialCharts){
@@ -22,8 +22,10 @@ function _mdvInit(){
         }
     
         const dataLoader={
-            function:getArrayBufferDataLoader("/get_data"),
-            viewLoader:_mdvGetView
+            function:staticFolder?getLocalCompressedBinaryDataLoader(data.datasources,".")
+                                :getArrayBufferDataLoader("/get_data"),
+            viewLoader:staticFolder?async (view)=> data.views[view]
+                                    :_mdvGetView
         }
     
         const listener = (type,cm,info)=>{
@@ -35,7 +37,7 @@ function _mdvInit(){
         //*******legacy
         cm._ssfilter=cm.dsIndex["cells"].dataStore.getDimension("category_dimension");
         
-        const urlbase= "/images";
+        const urlbase= "./images";
         cm._urlbase=urlbase;
         cm.hyperion_config=data.hyperion_config;
         for (let  name in cm.dsIndex){
@@ -45,10 +47,36 @@ function _mdvInit(){
                 ds._ssfilter=ds.dataStore.getDimension("category_dimension");
             }
         }
-
     });
    
 
+}
+
+async function _getConfigs(folder){
+    let configs={};
+    if (folder){
+        
+        let resp = await fetch(`./datasources.json`);
+        configs.datasources = await resp.json();
+        resp = await fetch(`./state.json`);
+        configs.state = await resp.json();
+        resp = await fetch(`./hyperion_config.json`);
+        if (resp.status==200){
+            configs.hyperion_config = await resp.json();
+        }
+        
+        resp = await fetch(`./views.json`);
+        configs.views =  await resp.json();
+        
+       
+    }
+    else{
+        configs = await _mdvGetData("/get_configs")
+    }
+
+    return configs;
+    
+    
 }
 
 function _mdvAddSSListener(ds,urlbase,cm,hyp_conf){

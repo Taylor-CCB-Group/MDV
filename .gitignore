@@ -12,3 +12,4 @@ project1/
 .DS_Store
 docs/build/
 _test.py
+__pycache__

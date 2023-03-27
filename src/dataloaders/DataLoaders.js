@@ -7,9 +7,10 @@
 **/
 
 
+
 /**
 * @memberof module:DataLoaders
-* @param {ArrayBuffer} - an array buffer containing raw concatenated
+* @param data {ArrayBuffer} - an array buffer containing raw concatenated
 * column data
 * @param {object} columns - any array of column objects 
 * <ul>
@@ -17,7 +18,7 @@
 *   <li> datatype </li>
 *   <li> sgtype </li>
 * </ul>
-* @param {integer} - the size of the columns
+* @param size {integer} - the size of the columns
 * @returns {object[]} a list of objects containing each colums's field name
 * and data
 **/
@@ -98,9 +99,9 @@ function processArrayBuffer(data,columns,size){
 *    "columns":[{"field":"x1","datatype":"integer"}]
 * }
 * </pre>
-* returns a d
+* returns a dataloader
 * @memberof module:DataLoaders
-* @param {string} - The url of the api
+* @param url {string} - The url of the api
 * @returns {function} a dataloader that can be used to construct {@link ChartManager}
 **/
 function getArrayBufferDataLoader(url){
@@ -120,5 +121,85 @@ function getArrayBufferDataLoader(url){
 	}
 }
 
+/**
+* Gets bytes from the server form static comoressed binary files
+* The files will be in in the supplied folder , one per datsource
+* named dsname1.b dsname2.b etc.
+*
+* returns a dataLosder
+* @memberof module:DataLoaders
+* @param {string} - The url of the remote folder
+* @returns {function} a dataloader that can be used to construct {@link ChartManager}
+**/
 
-export {getArrayBufferDataLoader,processArrayBuffer};
+function getLocalCompressedBinaryDataLoader(dataSources,folder){
+    const loaders = {}
+    for (let ds of dataSources) {
+        loaders[ds.name] = new CompressedBinaryDataLoader(`${folder}/${ds.name}.b`, ds.size);
+    }
+    return async (columns, dataSource, size) => {
+        return await loaders[dataSource].getColumnData(columns,size);
+    }
+}
+
+
+class CompressedBinaryDataLoader {
+    constructor(url, size) {
+        this.url = url;
+        this.index = null;
+        this.size = size;
+    }
+    async getColumnData(cols,size) {
+        const {default:pako} = await import ("pako");
+        if (!this.index) {
+            const iurl = this.url.replace(".b", '.json')
+            const resp = await fetch(iurl);
+            this.index = await resp.json();
+        }
+
+        return await Promise.all(cols.map(async (c) => {
+            let  lu =  c.field;
+            if (c.subgroup){
+                const arr =c.field.split("|");
+                lu = arr[0]+arr[2];
+            }
+            const i = this.index[lu];
+
+            const resp = await fetch(this.url,
+                {
+                    headers:
+                    {
+                        responseType: "arraybuffer",
+                        range: `bytes=${i[0]}-${i[1]}`
+                    }
+                });
+            const bytes = await resp.arrayBuffer();
+            const output = pako.inflate(bytes);
+
+            if (c.sgtype==="sparse"){
+                const l = new Uint32Array(output,0,1)[0];
+                //get the indexes
+			    const indexes = new Uint32Array(output,4,l);
+                //get the values
+			    const values = new Float32Array(output,(l*4)+1,l);
+                const sb = new SharedArrayBuffer(size*4)
+			    const new_arr= new Float32Array(sb);
+                //fill array with missing values
+			    new_arr.fill(NaN);
+                for (let i=0;i<indexes.length;i++){
+                    new_arr[indexes[i]]=values[i];	
+                }
+                return { data: sb, field: c.field };
+            }
+            else{
+                const sb = new SharedArrayBuffer(output.length)
+                const f = new Uint8Array(sb);
+                f.set(output, 0);
+                return { data: sb, field: c.field };
+            }
+          
+        }));
+    }
+}
+
+export {getArrayBufferDataLoader,processArrayBuffer,getLocalCompressedBinaryDataLoader};

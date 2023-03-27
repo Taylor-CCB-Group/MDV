@@ -517,6 +517,8 @@ class DataStore{
     }
 
 
+
+
     /**
     * returns a list of column name and fields (which have data) sorted by name 
     * @param {Array|string} [filter] - can be either be a string -'number', 'all' or a column type.
@@ -645,9 +647,21 @@ class DataStore{
         return obj;
     }
 
+    /**
+     * Returns the index of the first filtered item - slow
+     * @returns the index of the first filtered iten
+     */
+    getFirstFilteredIndex(){
+        for (let n=0;n<this.size;n++){
+            if (this.filterArray[n]===0){
+                return n;
+            }
+        }
+    }
+
 
     /**
-     * Return an array of conatining all the filterd values for
+     * Return an array of containing all the filterd values for
      * the specified column - inefficent for large data sets
      * @param {string} column - the column's field.id
      * @returns {string[]|number[]}  An array pf filtered valaues
@@ -870,7 +884,7 @@ class DataStore{
     
     //single - info about the group to rotate/offset
     //if null then all groups will be offset according to the values in offsets
-    //rotation -  will rotate rather than update
+    //rotation -  will rotate rather than translate
     //update - send message to update all dependants
     updateColumnOffsets(single,rotation=false,update=false){
         const o = this.offsets;
