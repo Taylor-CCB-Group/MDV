@@ -35,8 +35,9 @@ function _mdvInit(staticFolder){
     
         
         //*******legacy
-        cm._ssfilter=cm.dsIndex["cells"].dataStore.getDimension("category_dimension");
-        
+        if (data.hyperion){
+            cm._ssfilter=cm.dsIndex["cells"].dataStore.getDimension("category_dimension");
+        }
         const urlbase= "./images";
         cm._urlbase=urlbase;
         cm.hyperion_config=data.hyperion_config;
