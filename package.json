@@ -11,6 +11,7 @@
     "build": "webpack --config prod.config.js",
     "run-hyperion": "webpack  serve --config hyperion.dev.config.js",
     "run-obvios": "webpack  serve --config obvios.config.js",
+    "run-ytrap": "webpack  serve --config ytrap.config.js",
     "run-ex": "webpack  serve --config examples.config.js --env process.env",
     "run-example": "npm run run-ex --env example=basic_example",
     "run-10Mexample": "npm run run-ex --env example=10Mand1_points",
