@@ -284,7 +284,7 @@ class SelectionDialog extends BaseChart{
             },dd)
         }
         div.append(dd);
-        const b = createEl("span",{
+        const b = createEl("button",{
             classes:["ciview-button-sm"],
             text:"Add"
         },div);
