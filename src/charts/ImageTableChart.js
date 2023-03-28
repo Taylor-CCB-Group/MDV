@@ -31,7 +31,7 @@ class ImageTableChart extends BaseChart{
             this.dataStore.dataHighlighted([index],this)
         },c.id);
 
-        this.sortBy(c.sortBy);
+        this.sortBy(c.sortBy, c.sortOrder);
 	}
 
     setSize(x,y){
@@ -78,6 +78,7 @@ class ImageTableChart extends BaseChart{
     }
     sortBy(columnName, ascending = true) {
         this.config.sortBy = columnName;
+        this.config.sortOrder = ascending;
         this.dataModel.sort(columnName, ascending ? "asc" : "desc");
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
@@ -118,7 +119,15 @@ class ImageTableChart extends BaseChart{
             func: x => {
                 this.sortBy(x === "__none__" ? null : x)
             }
-        }
+        },
+        {
+            label: "Sort Ascending?",
+            type: "check",
+            current_value: c.sortOrder || true,
+            func: x => {
+                this.sortBy(c.sortBy, x)
+            }
+        },
         ])
     }
     changeBaseDocument(doc){
@@ -146,6 +155,7 @@ BaseChart.types["image_table_chart"]={
             type:i.type
         }
         config.sortBy = extraControls.sort_by;
+        config.sortOrder = extraControls.sort_order;
     },
     extra_controls:(dataSource)=>{
         const imageSets=[];
@@ -167,6 +177,13 @@ BaseChart.types["image_table_chart"]={
                 name: "sort_by",
                 label: "Sort By",
                 values: sortableColumns
+            },
+            //sort order checkbox
+            {
+                type:"check",
+                name:"sort_order",
+                label:"Sort Ascending",
+                value:true
             }
         ];
     }
