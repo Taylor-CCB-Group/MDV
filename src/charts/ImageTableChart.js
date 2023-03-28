@@ -31,7 +31,7 @@ class ImageTableChart extends BaseChart{
             this.dataStore.dataHighlighted([index],this)
         },c.id);
 
-        this.sortBy(c.sortBy, c.sortOrder);
+        if (c.sortBy) this.sortBy(c.sortBy, c.sortOrder);
 	}
 
     setSize(x,y){
@@ -142,8 +142,8 @@ BaseChart.types["image_table_chart"]={
     "class":ImageTableChart,
     name:"Image Table",
     required:["images"],
-    methodsUsingColumns:["setImageLabel"],
-    configEntriesUsingColumns:["image_label"],
+    methodsUsingColumns:["setImageLabel", "sortBy"],
+    configEntriesUsingColumns:["image_label", "sort_by"],
 
     init:(config,dataSource,extraControls)=>{
         //get the available images
@@ -178,13 +178,13 @@ BaseChart.types["image_table_chart"]={
                 label: "Sort By",
                 values: sortableColumns
             },
-            //sort order checkbox
-            {
-                type:"check",
-                name:"sort_order",
-                label:"Sort Ascending",
-                value:true
-            }
+            //sort order checkbox... broken
+            // {
+            //     type:"checkbox",
+            //     name:"sort_order",
+            //     label:"Sort Ascending",
+            //     value:true
+            // }
         ];
     }
 }
