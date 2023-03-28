@@ -1,6 +1,7 @@
 import { BaseDialog } from "./Dialog.js";
 import { createEl } from "./Elements.js";
 import noUiSlider from "nouislider";
+import lgui from 'lil-gui';
 import { func } from "../datastore/binWorker.js";
 
 
@@ -13,7 +14,9 @@ class SettingsDialog extends BaseDialog{
 
     init(content){
         this.controls=[]
-        
+        //experimental lil-gui version...
+        //this.initLilGui(content);
+        // return;
         for (let s of content){
             let d = createEl("div",{
                 styles:{
@@ -36,8 +39,38 @@ class SettingsDialog extends BaseDialog{
             }
             this.controls[s.label] = this[s.type](s,d);
         }
-
     }
+    initLilGui(content){
+        const gui = new lgui({container: this.dialog});
+        for (let s of content) {
+            switch (s.type) {
+                case "dropdown":
+                    gui.add(s, 'current_value', s.values[0].map(c => c[s.values[1]])).name(s.label).onChange(s.func);
+                    break;
+                case "check":
+                    if (s.current_value === undefined) s.current_value = false;
+                    gui.add(s, 'current_value').name(s.label).onChange(s.func);
+                    break;
+                case "button":
+                    gui.add(s, 'func').name(s.label);
+                    break;
+                case "slider":
+                    gui.add(s, 'current_value', s.min, s.max).name(s.label).onChange(s.func);
+                    break;
+                case "spinner":
+                    gui.add(s, 'current_value', s.min, s.max).name(s.label).onChange(s.func);
+                    break;
+                case "radiobuttons":
+                    gui.add(s, 'current_value', s.choices).name(s.label).onChange(s.func);
+                    break;
+                case "text":
+                case "textbox":
+                default:
+                    gui.add(s, 'current_value').name(s.label).onChange(s.func);
+            }
+        }
+    }
+            
     /** TODO */
     folder(s, d) {
         const container = d;
@@ -76,7 +109,6 @@ class SettingsDialog extends BaseDialog{
 
     button(s,d){
         d.style.textAlign = "center";
-        //maybe consider making this a 'button'
         createEl("button",{
             classes:["ciview-button"],
             text:s.label
