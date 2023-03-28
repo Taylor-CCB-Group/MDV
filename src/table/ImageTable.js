@@ -1,6 +1,11 @@
 import {createEl} from "../utilities/Elements.js";
 
 class ImageTable {
+    /**
+     * @param {HTMLElement|string} parent_div id or element
+     * @param {DataStore} data_view 
+     * @param {Object} config 
+     */
     constructor(parent_div,data_view,config){
         if (typeof parent_div === "string"){
             parent_div =document.getElementById("#"+parent_div);
