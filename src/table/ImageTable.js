@@ -486,12 +486,16 @@ class ImageTable {
         const h = this.t_height+"px";
         const burl = this.config.base_url;
         const type = this.config.image_type;
+        // looking for something to provide a default name; "Gene" is ok for ytrap...
+        const hasGeneColumn = this.data_view.dataStore.columnIndex["Gene"] !== undefined;
         for (let i=st;i<en;i++){
             const id =  this.data_view.getId(i);
             if (id == null){
                 return;
             }
-            const image= this.data_view.getItemField(i,this.config.image_key)
+            const image= this.data_view.getItemField(i,this.config.image_key);
+            const text = hasGeneColumn ? this.data_view.getItemField(i, "Gene") : undefined;
+            const missing = image === "missing";
             let left=x*this.tile_width+this.lrm;
             x++;
             let border=""
@@ -502,6 +506,9 @@ class ImageTable {
             let extra_classes=[];
             if (this.selected_tiles[id]){
                border="4px solid goldenrod"
+            }
+            if (missing){
+                extra_classes.push("mlv-tile-missing");
             }
 
             createEl("img",{
@@ -514,6 +521,8 @@ class ImageTable {
                     left:left+"px",
                     top:top+"px"
                 },
+                alt: text,
+                title: text,
                 classes:["mlv-tile",
                         `mlv-tile-${this.domId}`,
                         `mlv-tile-${this.domId}-${row}`]

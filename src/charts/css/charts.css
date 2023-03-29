@@ -4,7 +4,9 @@
         --main_panel_color: black;
         --text_color: white;
         --background_color: rgb(51, 51, 51);
-        --input_border_color: #bbb;
+        --input_border_color: #222;
+        --input_background_color: #222;
+        --dlg_background_color: #111;
         --menu-gradient: linear-gradient(#444, #222);
     }
 }
@@ -14,7 +16,9 @@
         --main_panel_color: #f1f1f1;
         --text_color: black;
         --background_color: rgb(186, 186, 186);
-        --input_border_color: rgb(51, 51, 51);
+        --input_border_color: rgb(230, 230, 230);
+        --input_background_color: rgb(230, 230, 230);
+        --dlg_background_color: white;
         --menu-gradient: linear-gradient(white, darkgray);
     }
 }
@@ -24,7 +28,9 @@
     --main_panel_color: black;
     --text_color: white;
     --background_color: rgb(51, 51, 51);
-    --input_border_color: #bbb;
+    --input_border_color: #222;
+    --input_background_color: #222;
+    --dlg_background_color: #111;
     --menu-gradient: linear-gradient(#444, #222);
 }
 
@@ -33,7 +39,9 @@
     --main_panel_color: #f1f1f1;
     --text_color: black;
     --background_color: rgb(186, 186, 186);
-    --input_border_color: rgb(51, 51, 51);
+    --input_border_color: rgb(230, 230, 230);
+    --input_background_color: rgb(230, 230, 230);
+    --dlg_background_color: white;
     --menu-gradient: linear-gradient(white, darkgray);
 }
 :root {
@@ -45,6 +53,8 @@
 }
 select, input, textarea {
     border: 0.1em solid var(--input_border_color);
+    border-radius: 4px;
+    background-color: var(--input_background_color);
 }
 .mdv-select{
     border-radius: 3px;
@@ -380,4 +390,7 @@ select, input, textarea {
 .mdv-image-label {
     position:absolute;
     text-align: center;
+}
+.Dark .mlv-tile-missing {
+    filter: invert();
 }
