@@ -46,7 +46,8 @@ class ImageTableChart extends BaseChart{
 
     getColorOptions(){
         return {
-            colorby:"all"
+            colorby:"all",
+            color_overlay: 0,
         }
     }
 
@@ -66,7 +67,7 @@ class ImageTableChart extends BaseChart{
     }
 
     colorByColumn(column){
-		this.grid.setColorBy(this.getColorFunction(column,false));
+		this.grid.setColorBy(this.getColorFunction(column,false), this.config.color_overlay);
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
 	}

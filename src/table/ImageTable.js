@@ -305,8 +305,9 @@ class ImageTable {
         this.columns=columns 
     }
 
-    setColorBy(color_by){
+    setColorBy(color_by, overlay){
         this.color_by=color_by;
+        this.color_overlay=overlay;
     }
 
     _setCanvasHeight(){
@@ -502,6 +503,22 @@ class ImageTable {
             if (this.color_by){
                 let color = this.color_by(id);
                 border= "4px solid "+color;
+                if (this.color_overlay) {
+                    createEl("div",{
+                        styles:{
+                            height:h,
+                            width:w,
+                            left:left+"px",
+                            top:top+"px",
+                            zIndex: 1,
+                            backgroundColor: color,
+                            opacity: this.color_overlay
+                        },
+                        classes:["mlv-tile",
+                                `mlv-tile-overlay-${this.domId}`,
+                                `mlv-tile-overlay-${this.domId}-${row}`]
+                    },this.canvas);
+                }
             }
             let extra_classes=[];
             if (this.selected_tiles[id]){
@@ -510,7 +527,6 @@ class ImageTable {
             if (missing){
                 extra_classes.push("mlv-tile-missing");
             }
-
             createEl("img",{
                 src:`${burl}${image}.${type}`,
                 id:`mlvtile-${this.domId}-${i}`,

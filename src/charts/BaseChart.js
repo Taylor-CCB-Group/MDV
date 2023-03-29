@@ -461,6 +461,17 @@ class BaseChart{
 
                 }
             });
+            if (colorOptions.color_overlay !== undefined) {
+                settings.push({
+                    label:"Color Overlay",
+                    type:"slider",
+                    current_value:c.color_overlay,
+                    func:(x)=>{
+                        c.color_overlay=x;
+                        this.colorByColumn(c.color_by);
+                    }
+                });
+            }
             settings.push({
                 label:"Show Color Legend",
                 type:"check",
