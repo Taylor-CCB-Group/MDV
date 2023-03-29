@@ -511,6 +511,7 @@ class ImageTable {
                             left:left+"px",
                             top:top+"px",
                             zIndex: 1,
+                            pointerEvents: "none",
                             backgroundColor: color,
                             opacity: this.color_overlay
                         },
