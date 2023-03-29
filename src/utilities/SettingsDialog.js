@@ -125,10 +125,10 @@ class SettingsDialog extends BaseDialog{
     slider(s,d){
         const sl = createEl("div",{},d)
         noUiSlider.create(sl, {
-            start: [s.current_value],
+            start: [s.current_value || 0],
             range: {
-                'min': [s.min],
-                'max': [s.max]
+                'min': [s.min || 0],
+                'max': [s.max || 1]
             },
             step:s.step || null,
             tooltips:true,
