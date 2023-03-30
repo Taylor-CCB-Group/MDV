@@ -251,7 +251,8 @@ class SettingsDialog extends BaseDialog{
         // d.style.alignItems = "center";
         const t = createEl("input",{
             value:s.current_value,
-            // styles: {flex: 2}
+            size: 10,
+            styles: {flex: 1}
         },d);
         t.addEventListener("keyup",(e)=>{
             if (s.only_update_on_enter){
