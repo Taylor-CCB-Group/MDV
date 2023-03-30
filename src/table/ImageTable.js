@@ -238,6 +238,11 @@ class ImageTable {
         this.setImageDimensions();
         this.show(fti)     
     }
+    setImageTitle(col){
+        this.config.image_title = col;
+        const fti = this.getFirstTileInView();
+        this.show(fti);
+    }
 
     setImageDimensions(dim,redraw){
         this.lrm = this.config.margins.left_right;
@@ -469,7 +474,7 @@ class ImageTable {
 
     show(first_tile_index){
         if (!first_tile_index){
-            first_tile_index=0;
+            first_tile_index=this.getFirstTileInView();
         }
         this._setCanvasHeight();  
         let obj=this._calculateTopBottomRow(first_tile_index);
@@ -488,14 +493,15 @@ class ImageTable {
         const burl = this.config.base_url;
         const type = this.config.image_type;
         // looking for something to provide a default name; "Gene" is ok for ytrap...
-        const hasGeneColumn = this.data_view.dataStore.columnIndex["Gene"] !== undefined;
+        const titleColumn = this.config.image_title || "Gene";
+        const hasTitleColumn = this.data_view.dataStore.columnIndex[titleColumn] !== undefined;
         for (let i=st;i<en;i++){
             const id =  this.data_view.getId(i);
             if (id == null){
                 return;
             }
             const image= this.data_view.getItemField(i,this.config.image_key);
-            const text = hasGeneColumn ? this.data_view.getItemField(i, "Gene") : undefined;
+            const text = hasTitleColumn ? `${titleColumn} '${this.data_view.getItemField(i, titleColumn)}'` : image;
             const missing = image === "missing";
             let left=x*this.tile_width+this.lrm;
             x++;

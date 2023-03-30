@@ -84,6 +84,10 @@ class ImageTableChart extends BaseChart{
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
     } 
+    setImageTitle(column){
+        this.config.image_title = column;
+        this.grid.setImageTitle(column);
+    }
 
     getSettings(){
         const od = this.grid.originalDimensions;
@@ -110,6 +114,15 @@ class ImageTableChart extends BaseChart{
             current_value:c.image_label || "__none__",
             func:x=>{
                 this.setImageLabel(x ==="__none__"?null:x)
+            }
+        },
+        {
+            label:"Tooltip",
+            type:"dropdown",
+            values:[cols,"name","field"],
+            current_value:c.image_title || "__none__",
+            func:x=>{
+                this.setImageTitle(x ==="__none__"?undefined:x)
             }
         },
         {
@@ -143,8 +156,8 @@ BaseChart.types["image_table_chart"]={
     "class":ImageTableChart,
     name:"Image Table",
     required:["images"],
-    methodsUsingColumns:["setImageLabel", "sortBy"],
-    configEntriesUsingColumns:["image_label", "sort_by"],
+    methodsUsingColumns:["setImageLabel", "sortBy", "setTitleColumn"],
+    configEntriesUsingColumns:["image_label", "sort_by", "image_title"],
 
     init:(config,dataSource,extraControls)=>{
         //get the available images
@@ -172,6 +185,12 @@ BaseChart.types["image_table_chart"]={
                 label:"Image Set",
                 values:imageSets
             },
+            {
+                type: "dropdown",
+                name: "image_title",
+                label: "Tooltip",
+                values: sortableColumns
+            },
             //drop down of columns to sort by
             {
                 type: "dropdown",
@@ -185,7 +204,7 @@ BaseChart.types["image_table_chart"]={
             //     name:"sort_order",
             //     label:"Sort Ascending",
             //     value:true
-            // }
+            // },
         ];
     }
 }
