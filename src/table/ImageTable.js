@@ -45,7 +45,9 @@ class ImageTable {
         },this.parent);
         this.canvas = createEl("div",{
             styles:{
-                position:"relative"
+                position:"relative",
+                zIndex: 0, //make sure this has a stacking context
+                // ^^ otherwise overlays can appear on top of other charts.
                // backgroundColor:bg
 
             }
