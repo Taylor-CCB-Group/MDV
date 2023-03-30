@@ -195,7 +195,7 @@ function makeResizable(el,config={}){
         resize: el.style.resize,
         overflow:el.style.overflow
     }
-    el.style.resize="both";
+    // el.style.resize="both"; //standard resizer is sometimes visible when it shouldn't be.
     el.style.overflow="hidden";
     //el.style.zIndex="0";
     if (config.onresizeend){
