@@ -149,7 +149,28 @@ select, input, textarea {
     flex-flow:column;
     border-radius:5px;
     box-shadow: 0 0 1em #888;
-}    
+}
+/*  */
+/* .ciview-chart-panel::-webkit-resizer {
+    z-index: 0;
+    display: inline-block;
+    position: relative;
+    bottom: 0px;
+    right: 0px;
+    background-color: green;
+    width: 100px;
+    height: 100px;
+} */
+.resizer-both {
+  width: 15px;
+  height: 15px;
+  background: transparent;
+  z-index: 10;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  cursor: nw-resize;
+}
 
 .ciview-chart-titlebar{
     display:flex;

@@ -203,6 +203,29 @@ function makeResizable(el,config={}){
             config.onresizeend(x,y);
         }, config.onResizeStart);
     }
+    //workaround for Safari bug #50
+    //https://codepen.io/jkasun/pen/QrLjXP
+    //(actually, mostly copilot filling in very similar code...)
+    const bottomRight = createEl("div", {
+        classes: ["resizer-both"],
+    }, el);
+    bottomRight.addEventListener("mousedown", initDrag, false);
+    function initDrag(e) {
+        ri.startX = e.clientX;
+        ri.startY = e.clientY;
+        ri.startWidth = parseInt(document.defaultView.getComputedStyle(el).width, 10);
+        ri.startHeight = parseInt(document.defaultView.getComputedStyle(el).height, 10);
+        document.documentElement.addEventListener("mousemove", doDrag, false);
+        document.documentElement.addEventListener("mouseup", stopDrag, false);
+    }
+    function doDrag(e) {
+        el.style.width = (ri.startWidth + e.clientX - ri.startX) + "px";
+        el.style.height = (ri.startHeight + e.clientY - ri.startY) + "px";
+    }
+    function stopDrag(e) {
+        document.documentElement.removeEventListener("mousemove", doDrag, false);
+        document.documentElement.removeEventListener("mouseup", stopDrag, false);
+    }
     el.__resizeinfo__=ri;
 }
 
