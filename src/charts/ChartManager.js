@@ -2028,7 +2028,6 @@ class AddChartDialog extends BaseDialog{
             }
         });
         for (let item of types){
-          
             createEl("option",{
                 text:item.name,
                 value:item.type
@@ -2067,7 +2066,7 @@ class AddChartDialog extends BaseDialog{
         createEl("button",{
             text:"Add",
             classes:["ciview-button"]
-        },this.footer).addEventListener("click",()=>this.submit(content.callback));
+    },this.footer).addEventListener("click",()=>this.submit(content.callback));
 
     }
 
@@ -2081,7 +2080,9 @@ class AddChartDialog extends BaseDialog{
         }
         const ed={};
         for (let name in this.extraControls){
-            ed[name]= this.extraControls[name].value;
+            const c = this.extraControls[name];
+            ed[name] = c.type === 'checkbox' ? c.value === 'on' : c.value;
+            config[name] = ed[name]; // pjt: is there a reason we didn't do this before?
         }
         if (this.multiColumns){
             config.param =config.param.concat(this.multiColumns)
@@ -2184,6 +2185,7 @@ class AddChartDialog extends BaseDialog{
                     text:c.label,
                     classes:["ciview-title-div"]
                 },parentDiv);
+                // could this logic be shared with SettingsDialog?
                 if (c.type==="dropdown"){
                     const sel = createEl("select",{
                         styles:{
@@ -2201,6 +2203,11 @@ class AddChartDialog extends BaseDialog{
                     //el.onchange // not using callback, value will be read on submit().
                 } else if (c.type === 'textbox') {
                     const el = createEl("textarea", { value: c.defaultVal, styles: {height: '300px'} }, parentDiv);
+                    this.extraControls[c.name] = el;
+                    //el.onchange // not using callback, value will be read on submit().
+                } else if (c.type === 'checkbox' || c.type === 'check') {
+                    const el = createEl("input", { type: 'checkbox' }, parentDiv);
+                    el.checked = c.defaultVal;
                     this.extraControls[c.name] = el;
                     //el.onchange // not using callback, value will be read on submit().
                 }

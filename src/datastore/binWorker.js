@@ -37,6 +37,13 @@ const func = function(e){
 }
 
 self.onmessage= function(e){  
+    if (e.data.length === undefined || typeof e.data === "string") {
+        // WordCloud internal setZeroTimeout calls window.postmessage...
+        // seems ok to ignore like this, but not a very clean solution
+        // ? there could be other instances of unexpected messages
+        // console.warn("unexpected message to binWorker", e.data);
+        return;
+    }
     self.postMessage(func(e));
 }
 export {func};
