@@ -355,7 +355,7 @@ class EditColumnDialog extends BaseDialog{
         this.dataModel= content.table.dataModel;
         this.table=content.table;
         const d1 = createEl("div",{},this.columns[0]);
-        createEl("div",{text:"Value:"},d1);
+        createEl("label",{text:"Value:"},d1); //a11y: label for?
 
         this.valInput = createEl("input",{},d1);
 
@@ -372,7 +372,7 @@ class EditColumnDialog extends BaseDialog{
           });
 
         const d2 = createEl("div",{},this.columns[0]);
-        createEl("div",{text:"Replace With:"},d2);
+        createEl("label",{text:"Replace With:"},d2); //a11y: label for?
 
         this.replaceInput = createEl("input",{},d2);
 
@@ -412,7 +412,7 @@ class AddColumnDialog extends BaseDialog{
                 text:"Add",
                 method:"addColumn"
             }],
-            width:280,
+            width:300,
             maxHeight:500,
             title:"Add Column"
         }
@@ -424,22 +424,22 @@ class AddColumnDialog extends BaseDialog{
         }
         this.table=table;
         const d1 = createEl("div",{style:dstyle},this.dialog);
-        createEl("div",{text:"Column Name"},d1);
+        createEl("label",{text:"Column Name"},d1);
         this.name = createEl("input",{},d1);
         this.name.addEventListener("keydown", (e) => {if (e.key === "Enter") this.addColumn()});
         const d2 = createEl("div",{style:dstyle},this.dialog);
         
         
-        const dc= createEl("div",{},d2);
+        const dc = createEl("label", {style: { display: 'flex' }},d2); //a11y: not convinced about label arrangement here
         this.cloneCheck = createEl("input",{type:"checkbox"},dc);
-        createEl("span",{text:"Copy Existing Column"},dc);
+        createEl("div",{text:"Copy Existing Column"},dc);
         const cols = table.getColumnInfo()
         this.cloneCol =createEl("select",{},d2);
         for (let c of cols){
             createEl("option",{text:c.name,value:c.field},this.cloneCol);
         }
         const d3 = createEl("div",{style:dstyle},this.dialog);
-        createEl("div",{text:"Position"},d3);
+        createEl("label",{text:"Position"},d3);
         this.position= createEl("input",{style:{width:"100px"},value:2},d3);
 
         setTimeout(()=>this.name.focus(), 100);

@@ -171,7 +171,9 @@ constructor (config={},content) {
             height:"100%",
             flexBasis:"0",
             flexGrow:"1",
-            padding:"0px 4px"
+            padding:"0px 4px",
+            flexDirection:"column",
+            alignItems:"stretch",
           }
         },this.dialog));
     }

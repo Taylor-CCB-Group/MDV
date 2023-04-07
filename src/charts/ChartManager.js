@@ -2018,7 +2018,7 @@ class AddChartDialog extends BaseDialog{
         this.defaultType=types[0].type;
 
         createEl("div",{
-            text:"Chart Type",
+            text:"Chart Type", //a11y - should be a label
             classes:["ciview-title-div"]
         },this.columns[0]);
 
@@ -2026,14 +2026,15 @@ class AddChartDialog extends BaseDialog{
             styles:{
                 maxWidth:"200px"
             }
-        });
+        }, this.columns[0]);
         for (let item of types){
             createEl("option",{
                 text:item.name,
                 value:item.type
             },this.chartType)
         }
-        createEl("div",{},this.columns[0]).append(this.chartType);
+        // createEl("div",{},this.columns[0]).append(this.chartType);
+
         this.chartType.addEventListener("change",(e)=>{
             this.setParamDiv(this.chartType.value, content.dataStore);
         });
@@ -2043,13 +2044,13 @@ class AddChartDialog extends BaseDialog{
             classes:["ciview-title-div"]
         },this.columns[0]);
 
-        this.chartName= createEl("input",{styles:{width:"150px"}},this.columns[0]);
+        this.chartName= createEl("input",{},this.columns[0]);
 
         createEl("div",{
             text:"Description",
             classes:["ciview-title-div"]
         },this.columns[0]);
-        this.chartDescription= createEl("textarea",{styles:{width:"150px",height:"100px"}},this.columns[0]);
+        this.chartDescription= createEl("textarea",{styles:{height:"100px"}},this.columns[0]);
       
         createEl("div",{
             text:"Columns",

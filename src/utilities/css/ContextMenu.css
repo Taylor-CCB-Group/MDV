@@ -234,10 +234,10 @@
   flex-shrink: 0;
 }
 .ciview-dlg-content select {
-  width: 5em;
-  flex-shrink: 1;
+  /* width: 5em; */
+  /* flex-shrink: 1; */
   min-width: 5em;
-  flex-grow: 1;
+  /* flex-grow: 1; nb flex-direction is now column */
 }
 .ciview-dlg-content .ciview-button {
   display: inline-block;
