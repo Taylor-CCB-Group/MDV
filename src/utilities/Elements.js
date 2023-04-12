@@ -3,7 +3,7 @@ import Split from "split.js"
 
 /**@template {keyof HTMLElementTagNameMap} T
  * @param {T} type
- * @param {{styles?:, classes?:string[], text?:string, [string]:string}=} attrs
+ * @param {{styles?:, classes?:string[], text?:string, [key: string]:string}=} attrs
  * @param {HTMLElement=} parent
  * @returns {HTMLElementTagNameMap[T]}
  */
