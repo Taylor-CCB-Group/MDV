@@ -2,7 +2,6 @@ import { BaseDialog } from "./Dialog.js";
 import { createEl } from "./Elements.js";
 import noUiSlider from "nouislider";
 // import lgui from 'lil-gui';
-import { func } from "../datastore/binWorker.js";
 
 
 

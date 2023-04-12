@@ -1,7 +1,6 @@
 import {DataModel} from "../table/DataModel.js";
 import BaseChart from "./BaseChart.js"
 import ImageTable from "../table/ImageTable.js";
-import { func } from "../datastore/binWorker.js";
 
 
 

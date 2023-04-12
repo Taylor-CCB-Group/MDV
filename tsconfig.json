@@ -11,6 +11,8 @@
         "noUnusedParameters": false,
         "noUnusedLocals": false,
         "allowSyntheticDefaultImports": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "noEmit": true,
+        "skipLibCheck": true,
     }
 }
