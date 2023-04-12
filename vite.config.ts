@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
     server: {
@@ -18,5 +19,10 @@ export default defineConfig({
     publicDir: "examples",
     build: {
         outDir: "vite-dist",
-    }
+    },
+    plugins: [
+        react({
+            include: [/\.tsx?$/, /\.jsx?$/],
+        })
+    ],
 })

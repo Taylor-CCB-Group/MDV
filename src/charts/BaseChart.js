@@ -199,9 +199,10 @@ class BaseChart{
 
     /**
     * Called by the datastore when the data is filtered. Needs to
-    * be implemented on any subclasses
+    * be implemented on any subclasses.
+    * @param {Dimension} dim - the dimension that has been filtered
     */
-    onDataFiltered(){}
+    onDataFiltered(dim){}
 
     /**Check if chart is composed of any columns whose data has
      * changed. if so re-calculate and re-draw chart (call onDataFiltered)

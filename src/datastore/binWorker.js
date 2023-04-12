@@ -46,5 +46,5 @@ self.onmessage= function(e){
     }
     self.postMessage(func(e));
 }
-export {func};
+//export {func};
 

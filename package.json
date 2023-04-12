@@ -53,6 +53,7 @@
     "wordcloud": "^1.2.2"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^3.1.0",
     "css-loader": "^6.7.1",
     "jsdoc": "^4.0.0",
     "style-loader": "^3.3.1",
