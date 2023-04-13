@@ -34,6 +34,11 @@ export default class TagModel {
     }
     addListener(callback: ()=>void) {
         this.listeners.push(callback);
+        return callback;
+    }
+    removeListener(callback: ()=>void) {
+        const i = this.listeners.indexOf(callback);
+        if (i != -1) this.listeners.splice(i, 1);
     }
     setTag(tag: string, tagValue = true) {
         this.dataModel.updateModel();

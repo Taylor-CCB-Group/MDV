@@ -245,4 +245,7 @@ function getTextInput(title,event,doc=document){
 
 
 }
+
+BaseDialog.experiment = {};
+
 export {BaseDialog,getTextInput};

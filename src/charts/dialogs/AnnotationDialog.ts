@@ -10,7 +10,7 @@ export default class AnnotationDialog extends BaseDialog {
     // dataModel: DataModel;
     tagListElement: HTMLDivElement;
     tagInput: any;
-    constructor(dataStore: DataStore) {
+    constructor(dataStore: DataStore, tagModel?: TagModel) {
         super({
             title: "Annotate selection",
             width: 400,
@@ -28,7 +28,7 @@ export default class AnnotationDialog extends BaseDialog {
             ]
         }, null);
         this.outer.classList.add('annotationDialog');
-        this.tagModel = new TagModel(dataStore);
+        this.tagModel = tagModel || new TagModel(dataStore);
         this.tagModel.addListener(() => this.updateTagList());
         
 
