@@ -186,3 +186,4 @@ const config={
 //create the app with the above parameters
 // const cm = new ChartManager("app1", dataSources, dataLoader, config);
 const cm = new ChartManager("app1", mockDataSources, mockDataLoader, config);
+export default cm;

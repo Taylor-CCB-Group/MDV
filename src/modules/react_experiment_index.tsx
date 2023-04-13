@@ -10,7 +10,10 @@ import "../table/css/slickgrid.css";
 // import ChartManager from '../charts/ChartManager.js';
 import "../charts/VivScatterPlot";
 import "../webgl/VivVolume.js";
-import "../../examples/obvios_example";
+import chartManager from "../../examples/obvios_example";
+import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 document.title = "MDV - OBVioS";
-// (window as any).ChartManager = ChartManager;
+(window as any).chartManager = chartManager;
 
+const ds = chartManager.dsIndex['test'];
+chartManager.addMenuIcon(ds.name, "fas fa-tags", "Tag annotation", () => { new AnnotationDialog(ds.dataStore) });

@@ -8,11 +8,10 @@ function ReactTest({dataStore, parent}) {
   const [filterSize, setFilterSize] = useState(dataStore.filterSize);
   const [text, setText] = useState(parent.config.text);
   useEffect(() => {
-    const listener = () => setFilterSize(dataStore.filterSize);
-    dataStore.addListener(id, listener);
+    dataStore.addListener(id, () => setFilterSize(dataStore.filterSize));
     parent.addListener("text", (type, data) => setText(data));
     return () => {
-      dataStore.removeListener(id, listener);
+      dataStore.removeListener(id);
       parent.removeListener("text");
     }
   }, [dataStore]);
