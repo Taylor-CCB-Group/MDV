@@ -19,12 +19,11 @@ export default class AnnotationDialog extends BaseDialog {
             buttons: [
                 {
                     text: "Add tag to selection",
-                    method: "AddTag" 
+                    method: "addTag" 
                 },
                 {
                     text: "Remove tag from selection",
-                    method: "RemoveTag" 
-                        
+                    method: "removeTag"                         
                 }
             ]
         }, null);
