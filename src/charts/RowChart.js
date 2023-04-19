@@ -36,7 +36,7 @@ class RowChart extends CategoryChart{
         const canvas = this.wordcloudCanvas;
         const w = canvas.width = this.contentDiv.clientWidth;
         const h = canvas.height = this.contentDiv.clientHeight;
-        const weightFactor = 100/maxVal;
+        const weightFactor = this.config.wordSize/maxVal;
         const p2 = Math.PI/2;
         canvas.style.display = "block";
         this.graph_area.style.display = "none";
@@ -140,6 +140,7 @@ class RowChart extends CategoryChart{
     getSettings() {
         const settings = super.getSettings();
         const c = this.config;
+        if (c.wordcloud) return this.getWordCloudSettings();
         const max = Math.max(this.data.length || 60)
 
 
@@ -187,6 +188,25 @@ class RowChart extends CategoryChart{
             }
         ])
     }
+
+    getWordCloudSettings() {
+        const settings = super.getSettings();
+        const c = this.config;
+        
+        return settings.concat([
+            {
+                type: "slider",
+                label: "Word Size",
+                current_value: c.wordSize || 100,
+                min: 10,
+                max: 100,
+                func: x => {
+                    c.wordSize = x;
+                    this.drawChart();
+                }
+            }
+        ]);
+    }
 }
 
 BaseChart.types["row_chart"]={
@@ -207,6 +227,7 @@ BaseChart.types["wordcloud"]={
     }],
     init: (config, dataStore) => {
         config.wordcloud = true;
+        config.wordSize = 20;
     }
 }
 

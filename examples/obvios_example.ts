@@ -150,7 +150,7 @@ const mockSlices = new Array(numSlices).fill(U).map((_, slice_id) => {
         const p = plane.projectPointOntoPlane(p2d);
         const mockX = p[0], mockY = p[1], mockZ = p[2];
         const classifier = "Type " + Math.round(r(3));
-        const w = Math.pow(r(), 0.2) * (goCellularTextVals.length-1);
+        const w = Math.pow(1-r(), 3) * (goCellularTextVals.length-1);
         const GO_cellular_component = goCellularTextVals[Math.floor(w)];
         /// not normalized wrt slice_id / plane... I suppose I need to figure out how dataSources relate
         const cell_id = slice_id + '-' + i;
