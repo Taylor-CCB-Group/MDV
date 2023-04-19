@@ -137,52 +137,51 @@ class RowChart extends CategoryChart{
 
     }
 
-    getSettings(){
-
-   
-        const settings= super.getSettings();
+    getSettings() {
+        const settings = super.getSettings();
         const c = this.config;
-        const max =Math.max(this.data.length || 60)
+        const max = Math.max(this.data.length || 60)
+
 
         return settings.concat([
             {
-                type:"spinner",
-                label:"Max Rows",
-                current_value:c.show_limit || max,
-                max:max,
-                func:x=>{
-                    c.show_limit=x;
+                type: "spinner",
+                label: "Max Rows",
+                current_value: c.show_limit || max,
+                max: max,
+                func: x => {
+                    c.show_limit = x;
                     this.updateData();
                     this.drawChart();
                 }
             },
             {
-                type:"check",
-                label:"Hide zero values",
-                current_value:c.filter_zeros,
-                func:x=>{
-                    c.filter_zeros=x;
+                type: "check",
+                label: "Hide zero values",
+                current_value: c.filter_zeros,
+                func: x => {
+                    c.filter_zeros = x;
                     this.updateData();
                     this.drawChart();
                 }
             },
             {
-                type:"radiobuttons",
-                label:"Sort Order",
-                current_value:c.sort || "default",
-                choices:[["Default","default"],["Size","size"],["Name","name"]],             
-                func:(v)=>{
-                    c.sort=v;
+                type: "radiobuttons",
+                label: "Sort Order",
+                current_value: c.sort || "default",
+                choices: [["Default", "default"], ["Size", "size"], ["Name", "name"]],
+                func: (v) => {
+                    c.sort = v;
                     this.updateData();
-                    this.drawChart();      
+                    this.drawChart();
                 }
             },
             {
-                type:"check",
-                label:"Display as WordCloud",
-                current_value:c.wordcloud,
-                func:x=>{
-                    c.wordcloud=x;
+                type: "check",
+                label: "Display as WordCloud",
+                current_value: c.wordcloud,
+                func: x => {
+                    c.wordcloud = x;
                     this.drawChart();
                 }
             }
@@ -197,17 +196,18 @@ BaseChart.types["row_chart"]={
         type:["text","multitext"],
         name:"Category"
     }],
-    extra_controls: (dataStore) => {
-        return [
-            {
-                type:"check",
-                label:"Show as WordCloud",
-                name: "wordcloud",
-                defaultVal:false,
-            }
-        ]
-    }
+}
 
+BaseChart.types["wordcloud"]={
+    "class":RowChart,
+    name:"Word Cloud",
+    params:[{
+        type:["text","multitext"],
+        name:"Category"
+    }],
+    init: (config, dataStore) => {
+        config.wordcloud = true;
+    }
 }
 
 export default RowChart;

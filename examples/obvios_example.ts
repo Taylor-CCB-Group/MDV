@@ -21,6 +21,82 @@ const size = 100000, numSlices = 5;
 // these correspond to the size of the T1-Head sample.
 const sizeX = 256, sizeY = 256, sizeZ = 129;
 
+const goCellularTextVals = [
+    "apicolateral plasma membrane",
+    "nucleoplasm",
+    "histone acetyltransferase complex",
+    "trans-Golgi network transport vesicle",
+    "nuclear outer membrane",
+    "fusome",
+    "presynaptic periactive zone",
+    "nucleolus",
+    "type Ib terminal bouton",
+    "nBAF complex",
+    "chaperonin-containing T-complex",
+    "integrin complex",
+    "Wnt signalosome",
+    "female germline ring canal inner rim",
+    "endoplasmic reticulum membrane",
+    "spanning component of plasma membrane",
+    "extrinsic component of mitochondrial outer membrane",
+    "nuclear envelope",
+    "axon",
+    "actin cytoskeleton",
+    "ruffle",
+    "protein-containing complex",
+    "apical plasma membrane",
+    "meiotic nuclear membrane microtubule tethering complex",
+    "nuclear periphery",
+    "astral microtubule",
+    "focal adhesion",
+    "precatalytic spliceosome",
+    "proton-transporting ATP synthase complex",
+    "cytoplasmic vesicle",
+    "Mpp10 complex",
+    "U2 snRNP",
+    "cytoskeleton of presynaptic active zone",
+    "cytoplasmic stress granule",
+    "lysosome",
+    "apical part of cell",
+    "neuronal cell body",
+    "lysosomal membrane",
+    "SWI\/SNF complex",
+    "endoplasmic reticulum exit site",
+    "receptor complex",
+    "growth cone",
+    "pleated septate junction",
+    "extrinsic component of plasma membrane",
+    "sodium:potassium-exchanging ATPase complex",
+    "heterochromatin",
+    "dystrophin-associated glycoprotein complex",
+    "germline ring canal",
+    "Rb-E2F complex",
+    "perivitelline space",
+    "tricellular tight junction",
+    "mitotic spindle pole",
+    "peroxisome",
+    "vesicle membrane",
+    "somatic ring canal",
+    "extracellular region",
+    "endocytic vesicle",
+    "investment cone",
+    "presynaptic active zone",
+    "U1 snRNP",
+    "membrane",
+    "filopodium",
+    "catalytic core F(1)",
+    "Wnt-Frizzled-LRP5\/6 complex",
+    "catalytic core",
+    "A band",
+    "ASAP complex",
+    "sarcomere",
+    "beta-catenin-TCF complex",
+    "perinuclear region of cytoplasm",
+    "axonal growth cone",
+    "postsynaptic density membrane",
+    "cytoneme"
+]
+
 const mockDataSources = [{
     size,
     name: "test", //whatever...
@@ -48,6 +124,11 @@ const mockDataSources = [{
         {
             name: "classifier",
             datatype: "text"
+        },
+        {
+            name: "GO_cellular_component",
+            datatype: "multitext",
+            values: goCellularTextVals
         }
     ],
     columnGroups: [{
@@ -69,9 +150,11 @@ const mockSlices = new Array(numSlices).fill(U).map((_, slice_id) => {
         const p = plane.projectPointOntoPlane(p2d);
         const mockX = p[0], mockY = p[1], mockZ = p[2];
         const classifier = "Type " + Math.round(r(3));
+        const w = Math.pow(r(), 0.2) * (goCellularTextVals.length-1);
+        const GO_cellular_component = goCellularTextVals[Math.floor(w)];
         /// not normalized wrt slice_id / plane... I suppose I need to figure out how dataSources relate
         const cell_id = slice_id + '-' + i;
-        return {cell_id, slice_id, mockX, mockY, mockZ, classifier, plane};
+        return {cell_id, slice_id, mockX, mockY, mockZ, classifier, plane, GO_cellular_component};
     }
     const n = size / numSlices;
     const points = new Array(n).fill(U).map(p);
