@@ -193,7 +193,7 @@ class RowChart extends CategoryChart{
         const settings = super.getSettings();
         const c = this.config;
         
-        return settings.concat([
+        return [
             {
                 type: "slider",
                 label: "Word Size",
@@ -205,7 +205,7 @@ class RowChart extends CategoryChart{
                     this.drawChart();
                 }
             }
-        ]);
+        ];
     }
 }
 
