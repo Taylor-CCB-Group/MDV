@@ -43,7 +43,7 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 index: "./index.html",
-                static: "src/static.html",
+                test: "src/static.html",
             }
         }
     },
