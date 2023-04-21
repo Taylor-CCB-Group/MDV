@@ -40,6 +40,7 @@
     "deck.gl": "^8.8.11",
     "docdash": "^2.0.0",
     "dompurify": "^2.4.1",
+    "dotenv": "^16.0.3",
     "gl-matrix": "^3.4.3",
     "gridstack": "^7.1.1",
     "jquery": "^3.6.1",

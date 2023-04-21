@@ -14,3 +14,4 @@ docs/build/
 _test.py
 __pycache__
 vite-dist
+.env

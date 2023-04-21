@@ -12,17 +12,19 @@ import { getLocalCompressedBinaryDataLoader } from "../dataloaders/DataLoaders.j
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
-const ytrap = 'http://localhost:8080/';
+// if URLSearchParams has a 'dir' parameter, use that as the data directory.
+const urlParams = new URLSearchParams(window.location.search);
+const dir = urlParams.get('dir') || '/data/ytrap';//http://localhost:8082/';
 
 async function loadData() {
-    let resp = await fetch(`${ytrap}/datasources.json`);
+    let resp = await fetch(`${dir}/datasources.json`);
     const datasources = await resp.json();
-    resp = await fetch(`${ytrap}/state.json`);
+    resp = await fetch(`${dir}/state.json`);
     const config = await resp.json();
-    resp = await fetch(`${ytrap}/views.json`);
+    resp = await fetch(`${dir}/views.json`);
     const views = await resp.json();
     const dataLoader = {
-        function: getLocalCompressedBinaryDataLoader(datasources, ytrap),
+        function: getLocalCompressedBinaryDataLoader(datasources, dir),
         viewLoader: async (view) => views[view]
     }
     const cm = new ChartManager("app1", datasources, dataLoader, config);
