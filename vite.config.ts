@@ -8,6 +8,7 @@ dotenv.config();
 const MDV_STATIC_DIR = process.env.MDV_STATIC_DIR || resolve("../mdv_static");
 console.log("MDV_STATIC_DIR", MDV_STATIC_DIR);
 const STATIC_PROXY = process.env.MDV_STATIC_PROXY || "http://localhost:9000";
+const isProd = process.env.NODE_ENV === "production";
 
 export default defineConfig({
     server: {
@@ -24,7 +25,7 @@ export default defineConfig({
         proxy: {
             "/static": {
                 target: STATIC_PROXY,
-                secure: false,
+                secure: isProd,
                 changeOrigin: true,
                 rewrite(path) {
                     return path.replace(/^\/static/, "");
