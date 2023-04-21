@@ -4,11 +4,13 @@ import pandas as pd
 import argparse
 import os
 import gzip
+import shutil
 from dotenv import load_dotenv
 # import numpy as np
 
-load_dotenv('../../.env')
-static_root = os.getenv('MDV_STATIC_DIR', '../../../mdv_static')
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+default_static_root = os.path.join(os.path.dirname(__file__), '../../../mdv_static')
+static_root = os.getenv('MDV_STATIC_DIR', default_static_root)
 
 parser = argparse.ArgumentParser(
     description='Process a csv table into MDV static site format'
@@ -16,11 +18,22 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-i', '--input', help='csv file to process', default='metric_table.csv')
 parser.add_argument('-o', '--outdir', help='output folder', default='test')
 parser.add_argument('--discard_redundant', help='discard redundant columns', default=True)
-### todo: image handling
 
 args = parser.parse_args()
 filename = args.input
 outdir = os.path.join(static_root, args.outdir)
+print(f'filename: "{filename}", outdir: "{outdir}"')
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
+
+### todo: non-hacky image handling
+indir = os.path.dirname(filename)
+if os.path.exists(os.path.join(indir, 'images')) and not os.path.exists(os.path.join(outdir, 'images')):
+    try:
+        shutil.copytree(os.path.join(indir, 'images'), os.path.join(outdir, 'images'))
+    except:
+        pass
+
 df = pd.read_csv(filename)
 
 types = {
@@ -66,7 +79,7 @@ def get_column_groups():
             cols[group_name] = {'name': group_name, 'columns': []}
         # num = int(m.group(2))
         cols[group_name]['columns'].append(name)
-    return cols
+    return [cols[k] for k in cols]
 
 def get_datasource():
     '''
@@ -135,14 +148,15 @@ def replace_text_values(col, values):
     return [val_dict[v] for v in col]
 
 def get_views():
-    return {"name": "main", 'initialCharts': {filename: []}}
+    return {filename: {"name": filename, 'initialCharts': {filename: []}}}
 
 def get_state():
-    return {"all_views": ["main"], "initial_view": "main"}
+    return {"all_views": [filename], "initial_view": filename}
 
 def convert_data_to_binary(df):
     '''
     Converts the dataframe to binary format.
+    NOT WORKING...
     '''
     dfile = f'{outdir}/{filename}.b'
     o = open(dfile, 'wb')
@@ -151,7 +165,7 @@ def convert_data_to_binary(df):
     for name in df.columns:
         comp = gzip.compress(df[name].to_numpy().tobytes())
         new_pos = current_pos + len(comp)
-        index[name] = [current_pos, new_pos]
+        index[name] = [current_pos, new_pos-1]
         o.write(comp)
         current_pos = new_pos
     o.close()
