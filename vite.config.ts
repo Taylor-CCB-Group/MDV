@@ -24,7 +24,7 @@ export default defineConfig(env => { return {
         proxy: {
             "/static": {
                 target: STATIC_PROXY,
-                secure: env.command === "serve",
+                secure: env.command === "build",
                 changeOrigin: true,
                 rewrite(path) {
                     return path.replace(/^\/static/, "");
