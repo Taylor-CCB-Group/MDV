@@ -1,10 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react';
 import * as dotenv from 'dotenv';
+import { resolve } from 'path';
 
 dotenv.config();
 
-const MDV_STATIC_DIR = process.env.MDV_STATIC_DIR || "../mdv_static";
+const MDV_STATIC_DIR = process.env.MDV_STATIC_DIR || resolve("../mdv_static");
+console.log("MDV_STATIC_DIR", MDV_STATIC_DIR);
+const STATIC_PROXY = process.env.MDV_STATIC_PROXY || "http://localhost:9000";
 
 export default defineConfig({
     server: {
@@ -16,13 +19,22 @@ export default defineConfig({
             "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization",
         },
         fs: {
-            allow: ["examples", ".", MDV_STATIC_DIR],
+            allow: ["examples", "."],
         },
+        proxy: {
+            "/static": {
+                target: STATIC_PROXY,
+                secure: false,
+                changeOrigin: true,
+                rewrite(path) {
+                    return path.replace(/^\/static/, "");
+                },
+            },
+        }
     },
     resolve: {
         alias: {
             "/data": "/examples/data",
-            "/static": MDV_STATIC_DIR,
         }
     },
     publicDir: "examples",
