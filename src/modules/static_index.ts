@@ -14,15 +14,35 @@ document.addEventListener("DOMContentLoaded", () => loadData());
 
 // if URLSearchParams has a 'dir' parameter, use that as the data directory.
 const urlParams = new URLSearchParams(window.location.search);
-const dir = urlParams.get('dir') || '/data/ytrap';//http://localhost:8082/';
+const dir = '/static/' + urlParams.get('dir') || '/data/ytrap';//http://localhost:8082/';
+
+function rewriteBaseUrlRecursive(config) {
+    if (Array.isArray(config)) {
+        for (const item of config) {
+            rewriteBaseUrlRecursive(item);
+        }
+        return;
+    }
+    for (const key in config) {
+        if (key === "base_url") {
+            config[key] = config[key].replace("./", `${dir}/`);
+        } else if (typeof config[key] === "object") {
+            rewriteBaseUrlRecursive(config[key]);
+        }
+    }
+}
+
+async function fetchAndPatchJSON(url) {
+    let resp = await fetch(url);
+    const config = await resp.json();
+    rewriteBaseUrlRecursive(config);
+    return config;
+}
 
 async function loadData() {
-    let resp = await fetch(`${dir}/datasources.json`);
-    const datasources = await resp.json();
-    resp = await fetch(`${dir}/state.json`);
-    const config = await resp.json();
-    resp = await fetch(`${dir}/views.json`);
-    const views = await resp.json();
+    const datasources = await fetchAndPatchJSON(`${dir}/datasources.json`);
+    const config = await fetchAndPatchJSON(`${dir}/state.json`);
+    const views = await fetchAndPatchJSON(`${dir}/views.json`);
     const dataLoader = {
         function: getLocalCompressedBinaryDataLoader(datasources, dir),
         viewLoader: async (view) => views[view]
