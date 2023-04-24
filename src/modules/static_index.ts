@@ -14,9 +14,10 @@ document.addEventListener("DOMContentLoaded", () => loadData());
 
 // if URLSearchParams has a 'dir' parameter, use that as the data directory.
 const urlParams = new URLSearchParams(window.location.search);
-const dir = urlParams.get('dir');
-const root = dir && dir.startsWith('https:') ? dir : '/static/' + dir || '/data/ytrap';//http://localhost:8082/';
-
+const dir = urlParams.get('dir') || prompt("Enter data URL", "https://mdvstatic.netlify.app/ytrap2");
+const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
+// set title of page to the data directory
+document.title = `MDV - ${root}`;
 
 function rewriteBaseUrlRecursive(config) {
     if (Array.isArray(config)) {
