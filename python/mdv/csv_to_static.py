@@ -8,10 +8,10 @@ import shutil
 from dotenv import load_dotenv
 # import numpy as np
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 default_static_root = os.path.join(os.path.dirname(__file__), '../../../mdv_static')
 static_root = os.getenv('MDV_STATIC_DIR', default_static_root)
-
+print(f'static_root: "{static_root}"')
 parser = argparse.ArgumentParser(
     description='Process a csv table into MDV static site format'
 )
@@ -23,6 +23,7 @@ args = parser.parse_args()
 filename = args.input
 outdir = os.path.join(static_root, args.outdir)
 print(f'filename: "{filename}", outdir: "{outdir}"')
+os.umask(0)
 if not os.path.exists(outdir):
     os.makedirs(outdir)
 
@@ -34,10 +35,11 @@ if os.path.exists(os.path.join(indir, 'images')) and not os.path.exists(os.path.
     except:
         pass
 
+print('reading csv...')
 df = pd.read_csv(filename)
 
 types = {
-    'float64': 'float',
+    'float64': 'double',
     'int64': 'integer',
     'O': 'text',
     'object': 'text',
@@ -130,7 +132,7 @@ def get_datasource():
             continue
         datatype = get_column_type(name)
         col_desc = { "datatype": datatype, "name": name, "field": name }
-        if datatype == 'float' or datatype == 'integer':
+        if datatype == 'double' or datatype == 'integer':
             col_desc['minMax'] = [min(col), max(col)]
             col_desc['quantiles'] = get_quantiles(col)
         elif datatype == 'text':
@@ -163,6 +165,10 @@ def convert_data_to_binary(df):
     index = {}
     current_pos = 0
     for name in df.columns:
+        # 'integer' and 'double' should be converted to float32 according to the spec
+        type = get_column_type(name)
+        if type == 'integer' or type == 'double':
+            df[name] = df[name].astype('float32')
         comp = gzip.compress(df[name].to_numpy().tobytes())
         new_pos = current_pos + len(comp)
         index[name] = [current_pos, new_pos-1]
@@ -175,12 +181,14 @@ def convert_data_to_binary(df):
 
 def main():
     if not os.path.exists(outdir):
+        print('creating output directory')
         os.makedirs(outdir)
 
     with open(f'{outdir}/datasources.json', 'w') as f:
+        print('writing datasources.json')
         f.write(json.dumps([get_datasource()]))
 
-    # df.to_hdf(f'{outdir}/data.h5', key='data', complevel=9, mode="w")
+    print('writing data binary')
     convert_data_to_binary(df)
 
     with open(f'{outdir}/views.json', 'w') as f:

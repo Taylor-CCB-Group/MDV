@@ -36,7 +36,7 @@ function rewriteBaseUrlRecursive(config) {
 }
 
 async function fetchAndPatchJSON(url) {
-    let resp = await fetch(url);//, { mode: "no-cors" });
+    let resp = await fetch(url)//, { mode: "no-cors" });
     const config = await resp.json();
     rewriteBaseUrlRecursive(config);
     return config;
@@ -51,5 +51,4 @@ async function loadData() {
         viewLoader: async (view) => views[view]
     }
     const cm = new ChartManager("app1", datasources, dataLoader, config);
-
 };
