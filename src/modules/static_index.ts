@@ -14,7 +14,9 @@ document.addEventListener("DOMContentLoaded", () => loadData());
 
 // if URLSearchParams has a 'dir' parameter, use that as the data directory.
 const urlParams = new URLSearchParams(window.location.search);
-const dir = '/static/' + urlParams.get('dir') || '/data/ytrap';//http://localhost:8082/';
+const dir = urlParams.get('dir');
+const root = dir && dir.startsWith('https:') ? dir : '/static/' + dir || '/data/ytrap';//http://localhost:8082/';
+
 
 function rewriteBaseUrlRecursive(config) {
     if (Array.isArray(config)) {
@@ -25,7 +27,7 @@ function rewriteBaseUrlRecursive(config) {
     }
     for (const key in config) {
         if (key === "base_url") {
-            config[key] = config[key].replace("./", `${dir}/`);
+            config[key] = config[key].replace("./", `${root}/`);
         } else if (typeof config[key] === "object") {
             rewriteBaseUrlRecursive(config[key]);
         }
@@ -33,18 +35,18 @@ function rewriteBaseUrlRecursive(config) {
 }
 
 async function fetchAndPatchJSON(url) {
-    let resp = await fetch(url);
+    let resp = await fetch(url);//, { mode: "no-cors" });
     const config = await resp.json();
     rewriteBaseUrlRecursive(config);
     return config;
 }
 
 async function loadData() {
-    const datasources = await fetchAndPatchJSON(`${dir}/datasources.json`);
-    const config = await fetchAndPatchJSON(`${dir}/state.json`);
-    const views = await fetchAndPatchJSON(`${dir}/views.json`);
+    const datasources = await fetchAndPatchJSON(`${root}/datasources.json`);
+    const config = await fetchAndPatchJSON(`${root}/state.json`);
+    const views = await fetchAndPatchJSON(`${root}/views.json`);
     const dataLoader = {
-        function: getLocalCompressedBinaryDataLoader(datasources, dir),
+        function: getLocalCompressedBinaryDataLoader(datasources, root),
         viewLoader: async (view) => views[view]
     }
     const cm = new ChartManager("app1", datasources, dataLoader, config);
