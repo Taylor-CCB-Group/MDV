@@ -5,24 +5,24 @@ import argparse
 import os
 import gzip
 import shutil
-from dotenv import load_dotenv
 # import numpy as np
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
-default_static_root = os.path.join(os.path.dirname(__file__), '../../../mdv_static')
-static_root = os.getenv('MDV_STATIC_DIR', default_static_root)
-print(f'static_root: "{static_root}"')
 parser = argparse.ArgumentParser(
     description='Process a csv table into MDV static site format'
 )
-parser.add_argument('-i', '--input', help='csv file to process', default='metric_table.csv')
-parser.add_argument('-o', '--outdir', help='output folder', default='test')
-parser.add_argument('--discard_redundant', help='discard redundant columns', default=True)
+parser.add_argument('-i', '--input', help='csv file to process')
+parser.add_argument('-o', '--outdir', help='output folder')
+parser.add_argument('--discard_redundant', help='discard redundant columns', default=False)
 
 args = parser.parse_args()
 filename = args.input
-outdir = os.path.join(static_root, args.outdir)
-print(f'filename: "{filename}", outdir: "{outdir}"')
+while not os.path.exists(filename):
+    input(f'file "{filename}" does not exist. Press enter to try again.')
+    filename = input('CSV input file: ')
+basename = os.path.basename(filename)
+outdir = args.outdir
+if not outdir:
+    outdir = input('output folder: ')
 os.umask(0)
 if not os.path.exists(outdir):
     os.makedirs(outdir)
@@ -95,7 +95,7 @@ def get_datasource():
         "name": "metric_table",
         "size": number of rows,
         "images": {
-            "composites": {
+            "images": {
                 "base_url": "./images/",
                 "type": "png",
                 "key_column": "image_id"
@@ -114,10 +114,10 @@ def get_datasource():
     }
     '''
     descriptor = {
-        "name": filename,
+        "name": basename,
         "size": df.shape[0],
         "images": {
-            "composites": {
+            "images": {
                 "base_url": "./images/",
                 "type": "png",
                 "key_column": "Index"
@@ -150,17 +150,16 @@ def replace_text_values(col, values):
     return [val_dict[v] for v in col]
 
 def get_views():
-    return {filename: {"name": filename, 'initialCharts': {filename: []}}}
+    return {basename: {"name": basename, 'initialCharts': {basename: []}}}
 
 def get_state():
-    return {"all_views": [filename], "initial_view": filename}
+    return {"all_views": [basename], "initial_view": basename}
 
 def convert_data_to_binary(df):
     '''
     Converts the dataframe to binary format.
-    NOT WORKING...
     '''
-    dfile = f'{outdir}/{filename}.b'
+    dfile = f'{outdir}/{basename}.b'
     o = open(dfile, 'wb')
     index = {}
     current_pos = 0
