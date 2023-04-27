@@ -26,8 +26,8 @@ export default defineConfig(env => { return {
         outDir: "vite-dist",
         rollupOptions: {
             input: {
-                obvios: "./index.html",
-                index: resolve(__dirname, "src/static.html"),
+                index: "./index.html",
+                obvios: resolve(__dirname, "src/obvios.html"),
             }
         }
     },

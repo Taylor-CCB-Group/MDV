@@ -43,7 +43,7 @@ The script takes arguments for the CSV file and the output folder. If either of 
 
 #### Example Python code to serve the static data
 
-The following code will serve the static data from a local python server. This is useful for testing, but not recommended for production use. Running this code will serve the data on http://localhost:8000, such that it can then be viewed at https://mdv-dev.netlify.app/src/static.html?dir=http://localhost:8000
+The following code will serve the static data from a local python server. This is useful for testing, but not recommended for production use. Running this code will serve the data on http://localhost:8000, such that it can then be viewed at https://mdv-dev.netlify.app/?dir=http://localhost:8000
 
 ```python
 import http.server
