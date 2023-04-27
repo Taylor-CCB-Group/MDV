@@ -43,15 +43,7 @@ class ImageTable {
 
             }
         },this.parent);
-        this.canvas = createEl("div",{
-            styles:{
-                position:"relative",
-                zIndex: 0, //make sure this has a stacking context
-                // ^^ otherwise overlays can appear on top of other charts.
-               // backgroundColor:bg
-
-            }
-        },this.view_port);
+        this.canvas = createEl("div",{},this.view_port);
         this.canvas.addEventListener("click",e=>{
             this.imageClicked(e,e.srcElement);
         });
