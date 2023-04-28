@@ -43,7 +43,11 @@ class ImageTable {
 
             }
         },this.parent);
-        this.canvas = createEl("div",{},this.view_port);
+        this.canvas = createEl("div", {
+            styles: {
+                position: "relative",
+            }
+        },this.view_port);
         this.canvas.addEventListener("click",e=>{
             this.imageClicked(e,e.srcElement);
         });
