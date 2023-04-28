@@ -2,7 +2,7 @@ import { DataColumn } from "../charts/charts";
 import DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
 
-type TagColumn = DataColumn<'text'>;
+type TagColumn = DataColumn<'multitext'>; //multitext...?
 
 const SEP = /\W*\,\W*/; //separate by comma with whitespace trimmed
 const JOIN = ', '; //join with comma and space.

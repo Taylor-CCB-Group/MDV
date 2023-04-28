@@ -5,18 +5,20 @@
 
 import DataStore from "../datastore/DataStore";
 
-export type DataType = 'integer' | 'double' | 'text' | 'unique';
+export type DataType = 'integer' | 'double' | 'text' | 'unique' | 'multitext' | 'int32';
 
 type DataStructureTypes = {
     'integer': Uint32Array;
     'double': Float32Array; //why is it called 'double'???
     'text': Uint8Array;
+    'multitext': Uint16Array;
     'unique': Uint8Array; //not sure about this either.
 }
 type DataValuesTypes = {
     'integer': undefined;
     'double': undefined;
     'text': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
+    'multitext': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
     'unique': string[];
 }
 
