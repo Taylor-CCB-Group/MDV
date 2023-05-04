@@ -30,8 +30,8 @@ class ImageTableChart extends BaseChart{
         this.grid.addListener("image_clicked",(e,index)=>{
             this.dataStore.dataHighlighted([index],this)
         },c.id);
-      
-        
+
+        this.sortBy(c.sortBy, c.sortOrder);
 	}
 
     setSize(x,y){
@@ -76,6 +76,13 @@ class ImageTableChart extends BaseChart{
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
     }
+    sortBy(columnName, ascending = true) {
+        this.config.sortBy = columnName;
+        this.config.sortOrder = ascending;
+        this.dataModel.sort(columnName, ascending ? "asc" : "desc");
+        const ft = this.grid.getFirstTileInView();
+        this.grid.show(ft);
+    } 
 
     getSettings(){
         const od = this.grid.originalDimensions;
@@ -103,7 +110,24 @@ class ImageTableChart extends BaseChart{
             func:x=>{
                 this.setImageLabel(x ==="__none__"?null:x)
             }
-        }
+        },
+        {
+            label: "Sort By",
+            type: "dropdown",
+            values: [cols, "name", "field"],
+            current_value: c.sortBy || "__none__",
+            func: x => {
+                this.sortBy(x === "__none__" ? null : x)
+            }
+        },
+        {
+            label: "Sort Ascending?",
+            type: "check",
+            current_value: c.sortOrder || true,
+            func: x => {
+                this.sortBy(c.sortBy, x)
+            }
+        },
         ])
     }
     changeBaseDocument(doc){
@@ -130,19 +154,36 @@ BaseChart.types["image_table_chart"]={
             base_url:i.base_url,
             type:i.type
         }
+        config.sortBy = extraControls.sort_by;
+        config.sortOrder = extraControls.sort_order;
     },
     extra_controls:(dataSource)=>{
-        const values=[];
+        const imageSets=[];
         for (let iname in dataSource.images){
-            values.push({name:iname,value:iname})
+            imageSets.push({name:iname,value:iname})
         }
-        //drop down of available image sets
+        const sortableColumns = dataSource.getLoadedColumns().map(c=>({name:c,value:c}));
         return [
+            //drop down of available image sets
             {
                 type:"dropdown",
                 name:"image_set",
                 label:"Image Set",
-                values:values
+                values:imageSets
+            },
+            //drop down of columns to sort by
+            {
+                type: "dropdown",
+                name: "sort_by",
+                label: "Sort By",
+                values: sortableColumns
+            },
+            //sort order checkbox
+            {
+                type:"check",
+                name:"sort_order",
+                label:"Sort Ascending",
+                value:true
             }
         ];
     }
