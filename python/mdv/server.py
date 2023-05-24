@@ -1,4 +1,4 @@
-from flask import Flask,render_template,request,make_response,send_file,Response
+from flask import Flask,render_template,request,make_response,send_file,Response,jsonify
 import webbrowser
 import mimetypes
 import json
@@ -88,13 +88,13 @@ def create_app(project,open_browser=True, port =5000):
     #All the project's metadata
     @app.route('/get_configs',methods =["GET","POST"])
     def get_configs():
-        return json.dumps(project.get_configs())
+        return jsonify(project.get_configs())
 
     #gets a particular view
     @app.route("/get_view",methods = ["POST"])
     def get_view():
         data=request.json
-        return json.dumps(project.get_view(data["view"]))
+        return jsonify(project.get_view(data["view"]))
     
     # only the specified region of track files (bam,bigbed,tabix)
     # needs to be returned 
