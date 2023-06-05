@@ -58,7 +58,7 @@ class MLVPanel {
 			let track=MLVTrack.getTrack(t_config);
 			this.tracks[track.config.track_id]=track;
 			this.track_order.push(track.config.track_id);
-			this._addTrackLabel(t_config)
+			this._addTrackLabel(track.config)
 		}
 		//check for linked scales
 		this._tracksChanged();
@@ -535,7 +535,7 @@ class MLVPanel {
     }
 
 
-    getAllFeatures(bpStart, bpEnd,force,data) {
+    async getAllFeatures(bpStart, bpEnd,force,data) {
         let promises = [];
 		this._display_order=[];
         for (let track_id  of this.track_order){
@@ -546,7 +546,7 @@ class MLVPanel {
 			this._display_order.push(track_id);
         	promises.push(track.getFeatures(this.chr,bpStart,bpEnd,force,data));       
         }
-        return Promise.all(promises);    
+        return await Promise.all(promises.map(p => p.catch(e => e)));    
     }
 
     /**
@@ -731,10 +731,7 @@ class MLVPanel {
                             }
                                       
                         }
-						if (svg){
-							svg(ctx.getSerializedSvg());
-							return;
-						}
+						
                         for (let name in self.highlighted_regions){
                         	let region = self.highlighted_regions[name];
                         	if (self.chr !== region.chr){
@@ -745,6 +742,10 @@ class MLVPanel {
                         	}
                         	self.drawHighlightedRegion(region,options);
                         }
+                        if (svg){
+							svg(ctx.getSerializedSvg());
+							return;
+						}
                         self.retries=0;
                         self.loading = false;
                         self.tile = new Tile(chr, bpStart, bpEnd, self.bpPerPixel, buffer);
@@ -798,7 +799,7 @@ class MLVPanel {
 
 
     autoScale(features,min,max){
-                if (!features){
+                if (!features || typeof features == "string" ){
                 	return({min:0,max:1})
                 }
         		features.forEach(function (f) {
@@ -1090,7 +1091,7 @@ class MLVPanel {
                 let left = this.start_select+"px";		
                 this.select_div=createEl("div",{
 					styles:{
-						"position":"absolute","opacity":0.2,"background-color":"blue","top":"0px","height":this.height,left:left,"width":"0px"
+						"position":"absolute","opacity":0.2,"background-color":"blue","top":"0px","height":this.height+"px",left:left,"width":"0px"
 					}
 				},this.trackDiv)
                 e.stopPropagation();

@@ -1,7 +1,7 @@
 ## dataloader function
 
 The asynchronous function takes an array of column objects, the name of the dataSource and the size of the data. it should return an array of objects containing field and data either a SharedArrayBuffer with the  [raw column data]{@tutorial datasource} or a JavaScript array. The latter will be slower as it will have to be converted into native format.
-```
+```js
 const columnData={
     "x1":[1,2,3,4],
     "color":["blue","green","red","blue"],

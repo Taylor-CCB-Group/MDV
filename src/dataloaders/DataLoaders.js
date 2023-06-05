@@ -135,7 +135,7 @@ function getArrayBufferDataLoader(url){
 function getLocalCompressedBinaryDataLoader(dataSources,folder){
     const loaders = {}
     for (let ds of dataSources) {
-        loaders[ds.name] = new CompressedBinaryDataLoader(`${folder}/${ds.name}.b`, ds.size);
+        loaders[ds.name] = new CompressedBinaryDataLoader(`${folder}/${ds.name}.gz`, ds.size);
     }
     return async (columns, dataSource, size) => {
         return await loaders[dataSource].getColumnData(columns,size);
@@ -152,7 +152,7 @@ class CompressedBinaryDataLoader {
     async getColumnData(cols,size) {
         const {default:pako} = await import ("pako");
         if (!this.index) {
-            const iurl = this.url.replace(".b", '.json')
+            const iurl = this.url.replace(".gz", '.json')
             const resp = await fetch(iurl);
             this.index = await resp.json();
         }

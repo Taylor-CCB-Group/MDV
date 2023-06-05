@@ -2,7 +2,7 @@ import Dimension from "./Dimension.js";
 class CatColDimension extends Dimension{
     constructor(parent){
         super(parent)
-        this.worker= new Worker (new URL("./catColWorker.js?v=4",import.meta.url));      
+        this.worker= new Worker (new URL("./catColWorker.js?v=5",import.meta.url));      
     }
 
     getAverages(callback,columns,config={}){

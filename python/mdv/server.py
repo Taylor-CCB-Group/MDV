@@ -1,4 +1,4 @@
-from flask import Flask,render_template,request,make_response,send_file,Response
+from flask import Flask,render_template,request,make_response,send_file,Response,jsonify
 import webbrowser
 import mimetypes
 import json
@@ -51,9 +51,9 @@ def create_app(project,open_browser=True, port =5000):
     def index():
         return render_template("page.html")
     
-    @app.route("/static/js/<path:path>")
-    def get_js_files(path):
-        return send_file(safe_join(js_files,path))
+    #@app.route("/static/js/<path:path>")
+    #def get_js_files(path):
+    #    return send_file(safe_join(js_files,path))
     
 
     @app.route("/<file>.b")
@@ -105,7 +105,17 @@ def create_app(project,open_browser=True, port =5000):
         if not range_header:
             return send_file(file_name)
         return get_range(file_name,range_header)
-        
+    
+    @app.route("/save_state",methods = ["POST"])
+    def save_data():
+        success=True
+        try:
+            state=request.json
+            project.set_state(state)
+        except Exception as e:
+            success=False
+
+        return jsonify({"success":success})
 
     if open_browser:
         webbrowser.open(f"http://localhost:{port}")

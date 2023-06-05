@@ -274,6 +274,32 @@ class GenomeBrowser extends BaseChart{
         else{
             margin = vm.value;
         }
+        const fcp =this.config.feature_present_column;
+        if (fcp){
+            const ids =  this.dataStore.getRowText(data.indexes[0],fcp).split(", ");
+            for (let id of ids){
+                this.browser.setTrackAttribute(id,"color","#35de26")
+            }
+            const not =this.dataStore.getColumnValues(fcp).slice(0).filter(x=>ids.indexOf(x) ===-1);
+            for (let id of not){
+                this.browser.setTrackAttribute(id,"color","#939c92")
+            }
+            const new_order = ids.concat(not)
+            const track_order=[];
+            let index=0;
+            for (let id of this.browser.track_order){
+                if (new_order.indexOf(id) !==-1){
+                    track_order.push(new_order[index]);
+                    index++
+                }
+                else{
+                    track_order.push(id)
+                }
+            }
+            this.browser.track_order=track_order;
+        }
+
+        
         this.browser.update(o[p[0]],st-margin,en+margin) 
     }
 
@@ -285,6 +311,10 @@ class GenomeBrowser extends BaseChart{
             callback(this.browser.canvas);
         }
 
+    }
+
+    configure_tracks(){
+        this.dataSrore
     }
 
 
@@ -447,7 +477,7 @@ BaseChart.types["genome_browser"]={
     "class":GenomeBrowser,
     name:"Genome Browser",
     methodsUsingColumns:["setLabelFunction"],
-    configEntriesUsingColumns:["feature_label","color_wig_tracks_by"],
+    configEntriesUsingColumns:["feature_label","color_wig_tracks_by","feature_present_column"],
 
     params:[],
     required:["genome_browser"],

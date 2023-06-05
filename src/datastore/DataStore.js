@@ -1426,11 +1426,11 @@ class DataStore{
     getColumnColors(column,config={}){
         const  c=  this.columnIndex[column];
         const rArr= config.asArray;
-        if (c.datatype==="double" || c.datatype==="integer" || c.datattype==="int32"){
+        if (c.datatype==="double" || c.datatype==="integer" || c.datatype==="int32"){
             const ov = config.overideValues || {};
             const c_colors = ov.colors || (c.colors || defaultIPalette);
-            const min = ov.min || c.minMax[0];
-            const max =  ov.max ||c.minMax[1];
+            const min = ov.min == undefined ? c.minMax[0]:ov.min;
+            const max =  ov.max == undefined ? c.minMax[1]:ov.max;
             //caclulate the color of each bin
             const ls= linspace(min,max,c_colors.length);
             const scale =scaleLinear().domain(ls).range(c_colors).clamp(true);

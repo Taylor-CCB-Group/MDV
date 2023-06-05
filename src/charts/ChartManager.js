@@ -623,7 +623,7 @@ class ChartManager{
                         //only one datasource
                         if (this.dataSources.length===1){
                             state.view.initialCharts[this.dataSources[0].name]=[];
-                            state.viewDataSources[this.dataSources[0].name]={};
+                            state.view.dataSources[this.dataSources[0].name]={};
                         }
                         else{
                             for (let ds in this.dsIndex){
@@ -707,14 +707,16 @@ class ChartManager{
     }
 
     deleteCurrentView(){
+        //remove the view choice and change view to the next one
         const opt = this.viewSelect.querySelector(`option[value='${this.viewSelect.value}']`);
-        const state = this.getState();
-        this.currentView= this.viewSelect.value;
         opt.remove();
-        this.changeView(this.viewSelect.value);
+        const state = this.getState();
+        //want to delete view and update any listeners
+        state.view=null;
+        this._callListeners("state_saved",state);
         
-        
-       
+        this.currentView= this.viewSelect.value;
+        this.changeView(this.viewSelect.value);  
     }
 
     _columnRemoved(ds,col){      
@@ -1061,6 +1063,9 @@ class ChartManager{
     */
     loadColumnSet(columns,dataSource,callback,split=10,threads=2){
         const id = getRandomString();
+        const lc = this.config.dataloading || {};
+        split  = lc.split || 10;
+        threads= lc.threads || 2;
         this.transactions[id]={
             callback:callback,
             columns:[],

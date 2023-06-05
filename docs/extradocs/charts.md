@@ -29,7 +29,7 @@ getImage(callback,type){
         });
     }
     else if type="png"{
-        callback.this.canvas;
+        callback(this.canvas);
     }
 }
 
@@ -46,7 +46,7 @@ addToImage(){
 }
 
 removeFromImage(){
-    this,svg.select("text").remove();
+    this.svg.select("text").remove();
 }
 
 ```
