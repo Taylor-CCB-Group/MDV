@@ -8,7 +8,15 @@ import "../../src/table/css/slickgrid.css";
 import ChartManager from "../charts/ChartManager.js";
 import "../charts/RowSummaryBox.js";
 import "../charts/ImageTableChart.js";
+import "../charts/WordCloudChart.js";
 import { getLocalCompressedBinaryDataLoader } from "../dataloaders/DataLoaders.js";
+
+import TagModel from '../table/TagModel';
+import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
+import { BaseDialog } from "../utilities/Dialog";
+import SideEffect from "../charts/dialogs/AnnotationDialogReact";
+console.log(SideEffect);
+
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
@@ -51,4 +59,16 @@ async function loadData() {
         viewLoader: async (view) => views[view]
     }
     const cm = new ChartManager("app1", datasources, dataLoader, config);
+    const dsName = datasources[0].name;
+    const ds = cm.dsIndex[dsName];
+    const tadModel = new TagModel(ds.dataStore);
+    // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
+    setTimeout(() => {
+        cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, tadModel); });
+        cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tadModel); });
+        cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => { 
+            const columns = datasources[0].columns.map(c => c.name);
+            cm.loadColumnSet(columns, dsName, () => { console.log("done loadColumnSet"); });
+        });
+    }, 0);
 };
