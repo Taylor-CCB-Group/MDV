@@ -174,30 +174,37 @@ class CompressedBinaryDataLoader {
                     }
                 });
             const bytes = await resp.arrayBuffer();
-            const output = pako.inflate(bytes);
-
-            if (c.sgtype==="sparse"){
-                const l = new Uint32Array(output,0,1)[0];
-                //get the indexes
-			    const indexes = new Uint32Array(output,4,l);
-                //get the values
-			    const values = new Float32Array(output,(l*4)+1,l);
-                const sb = new SharedArrayBuffer(size*4)
-			    const new_arr= new Float32Array(sb);
-                //fill array with missing values
-			    new_arr.fill(NaN);
-                for (let i=0;i<indexes.length;i++){
-                    new_arr[indexes[i]]=values[i];	
+            const expectedLength = i[1] - i[0] + 1;
+            if (bytes.byteLength !== expectedLength) {
+                console.warn(`Expected ${expectedLength} bytes but got ${bytes.byteLength} for ${c.field}... is the server correctly configured to Accept-Ranges?`);
+            }
+            try {
+                const output = pako.inflate(bytes);
+    
+                if (c.sgtype==="sparse"){
+                    const l = new Uint32Array(output,0,1)[0];
+                    //get the indexes
+                    const indexes = new Uint32Array(output,4,l);
+                    //get the values
+                    const values = new Float32Array(output,(l*4)+1,l);
+                    const sb = new SharedArrayBuffer(size*4)
+                    const new_arr= new Float32Array(sb);
+                    //fill array with missing values
+                    new_arr.fill(NaN);
+                    for (let i=0;i<indexes.length;i++){
+                        new_arr[indexes[i]]=values[i];	
+                    }
+                    return { data: sb, field: c.field };
                 }
-                return { data: sb, field: c.field };
+                else{
+                    const sb = new SharedArrayBuffer(output.length)
+                    const f = new Uint8Array(sb);
+                    f.set(output, 0);
+                    return { data: sb, field: c.field };
+                }
+            } catch (e) {
+                console.warn(`Error inflating ${c.field}: ${e}`);
             }
-            else{
-                const sb = new SharedArrayBuffer(output.length)
-                const f = new Uint8Array(sb);
-                f.set(output, 0);
-                return { data: sb, field: c.field };
-            }
-          
         }));
     }
 }
