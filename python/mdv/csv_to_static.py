@@ -10,9 +10,13 @@ import shutil
 parser = argparse.ArgumentParser(
     description='Process a csv table into MDV static site format'
 )
-parser.add_argument('-i', '--input', help='csv file to process')
+parser.add_argument('-i', '--input', help='csv file to process', default='data.csv')
 parser.add_argument('-o', '--outdir', help='output folder')
 parser.add_argument('--discard_redundant', help='discard redundant columns', default=False)
+# grouping options? rename columns so numbers have leading zeros?
+parser.add_argument('-g', '--group', help='group columns by regex', default=False)
+parser.add_argument('--group_by', help='group columns by regex', default=r'(.*?)(\d+)(.*)')
+parse_multitext = True
 
 args = parser.parse_args()
 filename = args.input
@@ -29,7 +33,8 @@ if not os.path.exists(outdir):
 
 ### todo: non-hacky image handling
 indir = os.path.dirname(filename)
-if os.path.exists(os.path.join(indir, 'images')) and not os.path.exists(os.path.join(outdir, 'images')):
+has_images = os.path.exists(os.path.join(indir, 'images'))
+if has_images and not os.path.exists(os.path.join(outdir, 'images')):
     try:
         shutil.copytree(os.path.join(indir, 'images'), os.path.join(outdir, 'images'))
     except:
@@ -46,15 +51,34 @@ types = {
     'bool': 'boolean', # 0 or 1? currently breaks this script if I make this integer
 }
 
+def rename_columns():
+    return
+    # rename columns that are numbers to have leading zeros
+    # this is so they sort correctly in the UI
+    for name in df.columns:
+        m = re.search(args.groub_by, name)
+        if not m:
+            continue
+        new_name = f'{m.group(1)}_{m.group(2).zfill(3)}{m.group(3)}'
+        df.rename(columns={name: new_name}, inplace=True)
+
 def get_column_type(name):
     v = df[name]
-    unique_values = len(set(v))
-    type = types[str(v.dtype)]
-    if type == 'text' and unique_values == v.size:
-        return 'unique'
-    if type is None:
+    unique_values = set(v)
+    ttype = types[str(v.dtype)]
+    # if type == 'text' and len(unique_values) == v.size:
+    #     return 'unique'
+
+    if ttype == 'text' and parse_multitext:
+        # does it look like comma-separated tags?
+        # 'argument of type 'bool' is not iterable'???
+        # when we have something like "unique_values: {False, True, nan}"
+        # print(f'{name}: ({type}) unique_values: {unique_values}')
+        if any([',' in str(s) for s in unique_values]):
+            return 'multitext'
+    if ttype is None:
         raise ValueError(f'unknown type {v.dtype} for {name}')
-    return type
+    return ttype
 
 
 def get_quantiles(col):
@@ -68,20 +92,20 @@ def get_quantiles(col):
 def get_text_indices(col):
     values = list(set(col))
     val_dict = {value: i for i, value in enumerate(values)}
-    return [val_dict[v] for v in col], values
+    return [val_dict[v] for v in col], [str(s) for s in values]
 
 def get_column_groups():
-    cols = {}
+    col_groups = {}
     for name in df.columns:
-        m = re.search(r'(.+)_(\d+)(.*)', name)
+        m = re.search(args.group_by, name)
         if not m:
             continue
         group_name = f'{m.group(1)}_{m.group(3)}'
-        if group_name not in cols:
-            cols[group_name] = {'name': group_name, 'columns': []}
+        if group_name not in col_groups:
+            col_groups[group_name] = {'name': group_name, 'columns': []}
         # num = int(m.group(2))
-        cols[group_name]['columns'].append(name)
-    return [cols[k] for k in cols]
+        col_groups[group_name]['columns'].append(name)
+    return [col_groups[k] for k in col_groups]
 
 def get_datasource():
     '''
@@ -116,15 +140,16 @@ def get_datasource():
     descriptor = {
         "name": basename,
         "size": df.shape[0],
-        "images": {
+        "columns": []
+    }
+    if has_images:
+        descriptor['images'] = {
             "images": {
                 "base_url": "./images/",
                 "type": "png",
                 "key_column": "Index"
             }
-        },
-        "columns": []
-    }
+        }
     for name in df.columns:
         col = df[name]
         if args.discard_redundant and len(set(col)) == 1:
@@ -132,10 +157,17 @@ def get_datasource():
             continue
         datatype = get_column_type(name)
         col_desc = { "datatype": datatype, "name": name, "field": name }
-        if datatype == 'double' or datatype == 'integer':
+        if datatype == 'boolean':
+            # would be better to have a separate boolean type
+            print(f'converting boolean {name} to number')
+            col_desc['datatype'] = 'integer'
+            col_desc['minMax'] = [0, 1]
+        elif datatype == 'double' or datatype == 'integer':
             col_desc['minMax'] = [min(col), max(col)]
             col_desc['quantiles'] = get_quantiles(col)
-        elif datatype == 'text':
+        elif datatype == 'text' or datatype == 'multitext':
+            # would be better to have a separate boolean type
+            # col_desc['datatype'] = 'text'
             indices, values = get_text_indices(col)
             col_desc['values'] = values
             df[name] = indices
@@ -166,7 +198,8 @@ def convert_data_to_binary(df):
     for name in df.columns:
         # 'integer' and 'double' should be converted to float32 according to the spec
         type = get_column_type(name)
-        if type == 'integer' or type == 'double':
+        if type == 'integer' or type == 'double' or type == 'boolean':
+            print('converting', name, 'to float32')
             df[name] = df[name].astype('float32')
         comp = gzip.compress(df[name].to_numpy().tobytes())
         new_pos = current_pos + len(comp)
@@ -179,6 +212,7 @@ def convert_data_to_binary(df):
         f.write(json.dumps(index))
 
 def main():
+    rename_columns()
     if not os.path.exists(outdir):
         print('creating output directory')
         os.makedirs(outdir)
