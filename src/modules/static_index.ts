@@ -8,6 +8,7 @@ import "../../src/table/css/slickgrid.css";
 import ChartManager from "../charts/ChartManager.js";
 import "../charts/RowSummaryBox.js";
 import "../charts/ImageTableChart.js";
+import "../charts/ImageScatterChart.js";
 import "../charts/WordCloudChart.js";
 import { getLocalCompressedBinaryDataLoader } from "../dataloaders/DataLoaders.js";
 
