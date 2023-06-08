@@ -729,6 +729,19 @@ class BaseChart{
 
 }
 
+/**
+ * A dictionary of all the chart types
+ * @type {Record<string, {
+ * "class": class, 
+ * name: string,
+ * required?: string[],
+ * init?: (config:object, dataSource:object, extraControls:object)=>void,
+ * extra_controls?: (dataSource:object)=>{type: string, name: string, label?: string, values?: object}[],
+ * params?: {type:string|string[], name:string}[],
+ * configEntriesUsingColumns?: string[],
+ * methodsUsingColumns?: string[],
+ * }>}
+ */
 BaseChart.types={};
 
 function copyStylesInline(destinationNode, sourceNode) {
