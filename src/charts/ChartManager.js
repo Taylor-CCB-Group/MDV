@@ -2193,7 +2193,10 @@ class AddChartDialog extends BaseDialog{
                     },parentDiv);
                     
                     for (let item of c.values){
-                        createEl("option",{text:item.name,value:item.value},sel)
+                        const option = createEl("option",{text:item.name,value:item.value},sel);
+                        if (item.value===c.defaultVal){
+                            option.selected=true;
+                        }
                     }
                     this.extraControls[c.name]=sel;
                 } else if (c.type === 'string') {

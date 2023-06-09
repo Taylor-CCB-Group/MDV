@@ -134,14 +134,12 @@ class BaseChart{
     * passing the event type and any data. There are the following different types
     * of event:-
     * <ul>
-    * <li> removed - called when thr chart has been removed </li>
+    * <li> removed - called when the chart has been removed </li>
     * </ul>
     * @param {string} id - a unique id indetifying the listener
     * @param {function} listener - a function that accepts two paramaters, the type
-    * of event and the dat associated with it
+    * of event and the data associated with it
     */
-
-
     addListener(id,listener){
         this.listeners[id]=listener;
     }
@@ -736,7 +734,7 @@ class BaseChart{
  * name: string,
  * required?: string[],
  * init?: (config:object, dataSource:object, extraControls:object)=>void,
- * extra_controls?: (dataSource:object)=>{type: string, name: string, label?: string, values?: object}[],
+ * extra_controls?: (dataSource:object)=>{type: string, name: string, label?: string, values?: object, defaultVal?: object}[],
  * params?: {type:string|string[], name:string}[],
  * configEntriesUsingColumns?: string[],
  * methodsUsingColumns?: string[],
