@@ -24,6 +24,7 @@ export type ImageArrayEntry = {
  * ImageArray is a class that holds a collection of images as a texture array, such that many images can be efficiently rendered
  * without requiring a lot of draw calls / GL state updates.
  * 
+ * Current design is brute-force, loading all images at once, little other logic.
  */
 export class ImageArray {
     textures: Map<string, ImageArrayEntry>;
@@ -47,6 +48,7 @@ export class ImageArray {
         this.loadImageColumn(dataStore, gl, config);
     }
     getImageAspect(i: number) {
+        return 0.5 + Math.random() // for testing
         return this.texturesByIndex.get(i).aspectRatio;
     }
     getImageIndex(i: number) {
@@ -72,10 +74,12 @@ export class ImageArray {
 
         gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels, gl.RGBA8, width, height, col.data.length);
         const memUsage = (width * height * 4 * col.data.length) / 1024 / 1024;
+        //consider showing this in the UI ('i' for info?)
         console.log(`Allocated ${memUsage.toFixed(2)}MB for image array (not accounting for mipmaps)`);
         let nLoaded = 0;
         col.data.map((d, i: number) => {
-            // XXX: why is this not working?
+            // XXX: still not working --- need to better grasp how DataModel works
+            // this.dataView.updateModel();
             const imageName = d;//this.dataView.getItemField(d, image_key);
             if (this.textures.has(imageName)) {
                 this.texturesByIndex.set(i, this.textures.get(imageName));
@@ -85,18 +89,17 @@ export class ImageArray {
             const url = `${base_url}/${imageName}.${image_type}`;
             const zIndex = i;
             const image = new Image(); //may want to use fetch instead for better control?
-            const entry = { zIndex, aspectRatio: 0 }; //not holding image ref, so we can garbage collect
+            const entry = { zIndex, aspectRatio: 1 }; //not holding image ref, so we can garbage collect
             this.textures.set(imageName, entry);
             this.texturesByIndex.set(i, entry);
             image.src = url;
             image.crossOrigin = "anonymous";
             image.onload = () => {
                 if (config.cancel) return; // todo: cancel requests
-                this.drawProgress(nLoaded++ / col.data.length);
                 // bind texture and update it
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
-                entry.aspectRatio = image.width / image.height;
+                entry.aspectRatio = image.width / image.height; // mutating entry won't prompt re-computing vertex buffers...
                 const resizedImage = resizeImage(image, width, height)//, this.logEl);
                 gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, zIndex, width, height, 1, gl.RGBA, gl.UNSIGNED_BYTE, resizedImage);
                 const error = gl.getError();
@@ -105,6 +108,7 @@ export class ImageArray {
                 }
                 gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
                 // probably not going to hurt to leave it bound in this case
+                this.drawProgress(nLoaded++ / col.data.length);
             }
             image.onerror = () => {
                 console.error(`Error loading image #${zIndex} '${url}'`);
