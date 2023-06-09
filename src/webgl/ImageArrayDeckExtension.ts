@@ -41,6 +41,12 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         ////
         
         `,
+        'vs:#main-end': `
+        //---- ImageArrayExtension
+        outerRadiusPixels = 1e-3;//HACKACK to make everything 'inCircle' for now
+        ////
+        
+        `,
         'fs:#decl': `
         //---- ImageArrayExtension
         uniform mediump sampler2DArray imageArray;
@@ -60,6 +66,7 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         // vec3 s = vec3(textureSize(imageArray, 0));
         // uvw.z /= s.z;
         // color.rgb = uvw;
+        // color.r = vImageIndex / s.z;
         ////
 
         `
