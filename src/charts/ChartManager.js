@@ -744,16 +744,17 @@ class ChartManager{
         }
     }
 
-    _getColumnsRequiredForChart(config,set){
+    _getColumnsRequiredForChart(config){
+        const set = new Set();
         const p = config.param;
       
         if (!p){
-            return;
-        }
-        if (typeof p === "string"){
+            //no 'parameters', 
+            //*but there could be other config entries / methods that refer to columns*
+            // return [];
+        } else if (typeof p === "string"){
             set.add(p);
-        }
-        else{
+        } else{
             for (let i of p ){
                 set.add(i);
             }
@@ -789,7 +790,7 @@ class ChartManager{
                 }
             });
         }
-       
+        return [...set];
     }
    
     /**
@@ -1271,8 +1272,7 @@ class ChartManager{
     */
     addChart(dataSource,config,notify=false){
         //check if columns need loading
-        const neededCols = new Set();
-        this._getColumnsRequiredForChart(config,neededCols);
+        const neededCols = this._getColumnsRequiredForChart(config);
         //check which columns need loading
         if (config.location){
             const l = config.location;
@@ -1302,7 +1302,6 @@ class ChartManager{
 
         }
 
-        const chartType= BaseChart.types[config.type];
         const t = themes[this.theme];
         // PJT may want different behaviour for gridstack
         //MJS this is very messy - create divs in (hopefully) the right location and add chart when data loaded
@@ -1348,9 +1347,8 @@ class ChartManager{
             this._addChart(dataSource,config,div,notify);
         }
         // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
-        const neededColsArr = Array.from(neededCols);
         try {
-            this._getColumnsThen(dataSource, neededColsArr, func);
+            this._getColumnsThen(dataSource, neededCols, func);
         } catch (error) {
             this.clearInfoAlerts();
             const id = this.createInfoAlert(`Error creating chart with columns [${neededColsArr.join(', ')}]: '${error}'`, {
