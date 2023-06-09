@@ -48,7 +48,7 @@ export class ImageArray {
         this.loadImageColumn(dataStore, gl, config);
     }
     getImageAspect(i: number) {
-        return 0.5 + Math.random() // for testing
+        // return 0.5 + Math.random() // for testing
         return this.texturesByIndex.get(i).aspectRatio;
     }
     getImageIndex(i: number) {
