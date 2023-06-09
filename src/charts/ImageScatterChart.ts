@@ -33,9 +33,10 @@ class ImageScatterChart extends BaseChart {
             canvas,
             layers,
             views: [view],
+            controller: true,
             initialViewState: {
                 // target: [0.5, 0.5, 0.5],
-                // zoom: 4, //0 means "one pixel is one unit", 1 scales by 2
+                // zoom: 0, //0 means "one pixel is one unit", 1 scales by 2
             },
             // glOptions: {},
             // parameters: {},
@@ -55,7 +56,7 @@ class ImageScatterChart extends BaseChart {
         const cz = columnIndex[param[2]] as Column;
         function n(col, i) {
             const {minMax} = col;
-            return 200*(col.data[i] - minMax[0]) / (minMax[1] - minMax[0]);
+            return 200*(col.data[i] - minMax[0]) / (minMax[1] - minMax[0]) - 100;
         }
         const data = new Array(cx.data.length).fill(0).map((_, i) => i);
 
@@ -65,7 +66,7 @@ class ImageScatterChart extends BaseChart {
         return [
             new ScatterplotExLayer({
                 data,
-                // baseRadius: 10000,
+                // radiusUnits: 'pixels', //default 'meters', also lineWidthUnits...
                 billboard: true,
                 getImageIndex: (i: K) => imageArray.getImageIndex(i),
                 getImageAspect: (i: K) => imageArray.getImageAspect(i),
@@ -73,7 +74,7 @@ class ImageScatterChart extends BaseChart {
                 getPosition: (i: K) => [n(cx, i), n(cy, i), n(cz, i)],
                 getRadius: (i: K) => 20,
                 getFillColor: (i: K) => [255, 255, 255],
-                imageArray, //XXX: deck doesn't like mutating props like this
+                imageArray, //XXX: deck doesn't like mutating props like this (but it has a callback to update it)
                 extensions: [new ImageArrayDeckExtension()]
             })
         ];
@@ -132,7 +133,8 @@ BaseChart.types["ImageScatterChart"] = {
                 type: "dropdown",
                 name: "texture_size",
                 label: "Texture Size",
-                values: imageSizes
+                values: imageSizes,
+                defaultVal: 256
             },
         ];
     },
