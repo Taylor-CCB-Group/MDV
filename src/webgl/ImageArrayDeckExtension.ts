@@ -44,6 +44,8 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         'vs:#main-end': `
         //---- ImageArrayExtension
         outerRadiusPixels = 1e-3;//HACKACK to make everything 'inCircle' for now
+        // - but it breaks opacity, and generally we can do better...
+        // it would be good to have border lines back, too
         ////
         
         `,
@@ -58,11 +60,16 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         'fs:DECKGL_FILTER_COLOR': `
         //---- ImageArrayExtension
         vec2 uv = 0.5 * (geometry.uv + 1.0);
-        // todo fix aspect ratio
-        // uv.x *= max(1., vImageAspect);
-        // uv.y /= vImageAspect;
+        uv.y = 1. - uv.y; // flip y
+        // todo fix aspect ratio in vertex shader
+        uv.x *= max(1., vImageAspect);
+        uv.y /= min(1., vImageAspect);
+        if (uv.y > 1. || uv.x > 1.) discard;
         vec3 uvw = vec3(uv, vImageIndex);
-        color *= texture(imageArray, uvw);
+        vec4 t = texture(imageArray, uvw);
+        color *= t;
+        color.a = t.a; //HACK so broken inCircle doesn't break opacity
+        // color.r = vImageAspect - 0.5;
         // vec3 s = vec3(textureSize(imageArray, 0));
         // uvw.z /= s.z;
         // color.rgb = uvw;
