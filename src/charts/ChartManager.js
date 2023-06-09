@@ -1351,7 +1351,7 @@ class ChartManager{
             this._getColumnsThen(dataSource, neededCols, func);
         } catch (error) {
             this.clearInfoAlerts();
-            const id = this.createInfoAlert(`Error creating chart with columns [${neededColsArr.join(', ')}]: '${error}'`, {
+            const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
                 type: "warning"
             });
             console.log(error);
