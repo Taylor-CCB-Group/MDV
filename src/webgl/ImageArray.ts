@@ -1,5 +1,5 @@
-import { n } from '../../vite-dist/assets/ChartManager-ea1713fe';
 import DataStore from '../datastore/DataStore';
+import { DataModel } from '../table/DataModel';
 import { createEl } from '../utilities/Elements';
 
 export type ImageArrayConfig = {
@@ -31,10 +31,14 @@ export class ImageArray {
     texture: WebGLTexture;
     gl: WebGL2RenderingContext;
     logEl: HTMLDivElement;
+    dataView: DataModel;
     onProgress: (n: number) => void;
-    constructor(dataStore, canvas: HTMLCanvasElement, config: ImageArrayConfig) {
+    constructor(dataStore, canvas: HTMLCanvasElement, dataView: DataModel, config: ImageArrayConfig) {
         this.textures = new Map();
         this.texturesByIndex = new Map();
+        
+        this.dataView = dataView;
+
         const gl = canvas.getContext("webgl2");
         this.gl = gl;
         this.texture = gl.createTexture();
@@ -66,22 +70,23 @@ export class ImageArray {
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        // gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA, col.data.length, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
         gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels, gl.RGBA8, width, height, col.data.length);
+        const memUsage = (width * height * 4 * col.data.length) / 1024 / 1024;
+        console.log(`Allocated ${memUsage.toFixed(2)}MB for image array (not accounting for mipmaps)`);
         let nLoaded = 0;
-        // this should be based on a selection filter (ie, we don't just call it on the whole column from constructor)
         col.data.map((d, i: number) => {
-            //consider mapping from data index to texture index in case several rows have the same image?
-            if (this.textures.has(d)) {
-                this.texturesByIndex.set(i, this.textures.get(d));
+            // XXX: why is this not working?
+            const imageName = d;//this.dataView.getItemField(d, image_key);
+            if (this.textures.has(imageName)) {
+                this.texturesByIndex.set(i, this.textures.get(imageName));
                 nLoaded++;
                 return;
             }
-            const url = `${base_url}/${d}.${image_type}`;
+            const url = `${base_url}/${imageName}.${image_type}`;
             const zIndex = i;
             const image = new Image(); //may want to use fetch instead for better control?
             const entry = { zIndex, aspectRatio: 0 }; //not holding image ref, so we can garbage collect
-            this.textures.set(d, entry);
+            this.textures.set(imageName, entry);
             this.texturesByIndex.set(i, entry);
             image.src = url;
             image.crossOrigin = "anonymous";
@@ -92,7 +97,7 @@ export class ImageArray {
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
                 entry.aspectRatio = image.width / image.height;
-                const resizedImage = resizeImage(image, width, height);
+                const resizedImage = resizeImage(image, width, height)//, this.logEl);
                 gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, zIndex, width, height, 1, gl.RGBA, gl.UNSIGNED_BYTE, resizedImage);
                 const error = gl.getError();
                 if (error !== gl.NO_ERROR) {
@@ -101,15 +106,25 @@ export class ImageArray {
                 gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
                 // probably not going to hurt to leave it bound in this case
             }
+            image.onerror = () => {
+                console.error(`Error loading image #${zIndex} '${url}'`);
+            }
         });
     }
 }
 
-function resizeImage(image: HTMLImageElement, width: number, height: number) {
+function resizeImage(image: HTMLImageElement, width: number, height: number, logEl?: HTMLDivElement) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
     ctx.drawImage(image, 0, 0, width, height);
+    if (logEl) {
+        canvas.style.opacity = "0.2";
+        logEl.parentElement.appendChild(canvas);
+        setTimeout(() => {
+            logEl.parentElement.removeChild(canvas);
+        }, 1000);
+    }
     return canvas;
 }

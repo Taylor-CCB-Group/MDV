@@ -52,9 +52,14 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         'fs:DECKGL_FILTER_COLOR': `
         //---- ImageArrayExtension
         vec2 uv = 0.5 * (geometry.uv + 1.0);
-        uv.y /= vImageAspect;
+        // todo fix aspect ratio
+        // uv.x *= max(1., vImageAspect);
+        // uv.y /= vImageAspect;
         vec3 uvw = vec3(uv, vImageIndex);
         color *= texture(imageArray, uvw);
+        // vec3 s = vec3(textureSize(imageArray, 0));
+        // uvw.z /= s.z;
+        // color.rgb = uvw;
         ////
 
         `
