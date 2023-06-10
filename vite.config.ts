@@ -4,6 +4,7 @@ import { resolve } from 'path';
 
 
 export default defineConfig(env => { return {
+    base: "./",
     server: {
         headers: {
             "Cross-Origin-Embedder-Policy": "require-corp",
