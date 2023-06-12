@@ -54,7 +54,7 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         uniform mediump sampler2DArray imageArray;
         in float vImageIndex;
         in float vImageAspect;
-        ////
+        uniform float opacity;
         
         `,
         'fs:DECKGL_FILTER_COLOR': `
@@ -68,7 +68,8 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         vec3 uvw = vec3(uv, vImageIndex);
         vec4 t = texture(imageArray, uvw);
         color *= t;
-        color.a = t.a; //HACK so broken inCircle doesn't break opacity
+        ///--- opacity may well not be correct gamma etc
+        color.a = t.a * opacity; //HACK so broken inCircle doesn't break opacity
         // color.r = vImageAspect - 0.5;
         // vec3 s = vec3(textureSize(imageArray, 0));
         // uvw.z /= s.z;

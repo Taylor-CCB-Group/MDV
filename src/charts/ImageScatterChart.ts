@@ -19,6 +19,7 @@ class ImageScatterChart extends BaseChart {
     progress = 0;
     billboard = true;
     size = 20;
+    opacity = 255;
     colorBy?: (index: number) => number[];
     id: number;
     constructor(dataStore, div, config) {
@@ -109,6 +110,8 @@ class ImageScatterChart extends BaseChart {
             },
             getRadius: 1,
             radiusScale: this.size,
+            // getFillColor: this.colorBy ? (i: K)=>[...this.colorBy(i), this.opacity] : [255, 255, 255, this.opacity],
+            opacity: this.opacity/255,
             getFillColor: this.colorBy ? (i: K)=>this.colorBy(i) : [255, 255, 255],
             imageArray,
             updateTriggers: {
@@ -117,7 +120,7 @@ class ImageScatterChart extends BaseChart {
                 // It seems like all attributes are updated when we make this new layer descriptor anyway...
                 // It should be be able to avoid updating position etc when unrelated data changes, but that's not happening.
                 getImageAspect: this.progress,
-                getFillColor: this.colorBy,
+                getFillColor: [this.colorBy, this.opacity],
             },
             extensions: [new ImageArrayDeckExtension()]
         });
@@ -166,6 +169,20 @@ class ImageScatterChart extends BaseChart {
                 continuous: true,
                 func: (v) => {
                     this.size = v;
+                    this.updateDeck();
+                }
+            },
+            {
+                type: "slider",
+                name: "opacity",
+                label: "Opacity",
+                current_value: this.opacity,
+                min: 0,
+                max: 255,
+                step: 1,
+                continuous: true,
+                func: (v) => {
+                    this.opacity = v;
                     this.updateDeck();
                 }
             },
