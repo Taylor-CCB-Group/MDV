@@ -18,7 +18,6 @@ class ImageScatterChart extends BaseChart {
     progress = 0;
     billboard = true;
     size = 20;
-    _layer: ScatterplotExLayer;
     id: number;
     constructor(dataStore, div, config) {
         super(dataStore, div, config);
@@ -42,10 +41,9 @@ class ImageScatterChart extends BaseChart {
         });
         this.imageArray.onProgress = (n) => {
             this.progress = n;
-            this._layer.setNeedsUpdate();// attempt to force redraw
-            this.doDeck();
+            this.updateDeck();
         }
-        const layers = this.getLayers();
+        const layers = this.updateDeck();
         const view = new OrbitView();
         this.deck = new Deck({
             canvas,
@@ -68,13 +66,7 @@ class ImageScatterChart extends BaseChart {
             // parameters: {},
         });
     }
-    doDeck() {
-        // not necessary ATM... layers should update with updateTriggers
-        // that's not working, but this also isn't helping...
-        const layers = this.getLayers();
-        this.deck.setProps({ layers });
-    }
-    getLayers() {
+    updateDeck() {
         const { param } = this.config;
         const {columnIndex} = this.dataStore;
         
@@ -98,7 +90,7 @@ class ImageScatterChart extends BaseChart {
         // const {getImageAspect, getImageIndex} = this.imageArray;// need to bind this
         type K = never; //data is not iterable, so ~never will be passed to the callbacks
         const layer = new ScatterplotExLayer({
-            id: this.id,
+            id: `scatter-${this.id}`,
             data,
             // radiusUnits: 'pixels', //default 'meters', also lineWidthUnits...
             // stroked: true, //TODO: make sure we can render properly with this
@@ -120,18 +112,18 @@ class ImageScatterChart extends BaseChart {
             imageArray,
             updateTriggers: {
                 //TODO: figure out how to get this to work...
-                getImageAspect: [this.progress],
+                getImageAspect: this.progress,
                 // imageAspect: [this.progress],
             },
             extensions: [new ImageArrayDeckExtension()]
         });
-        this._layer = layer;
+        if (this.deck) this.deck.setProps({layers: [layer]});
         return [layer];
     }
 
     onDataFiltered() {
         this.dataModel.updateModel();
-        this.doDeck();
+        this.updateDeck();
     }
 
     getSettings() {
@@ -143,7 +135,7 @@ class ImageScatterChart extends BaseChart {
                 current_value: this.billboard,
                 func: (v) => {
                     this.billboard = v;
-                    this.doDeck();
+                    this.updateDeck();
                 }
             },
             {
@@ -157,7 +149,7 @@ class ImageScatterChart extends BaseChart {
                 continuous: true,
                 func: (v) => {
                     this.size = v;
-                    this.doDeck();
+                    this.updateDeck();
                 }
             },
         ]
