@@ -19,6 +19,7 @@ class ImageScatterChart extends BaseChart {
     progress = 0;
     billboard = true;
     size = 20;
+    colorBy?: (index: number) => number[];
     id: number;
     constructor(dataStore, div, config) {
         super(dataStore, div, config);
@@ -44,7 +45,7 @@ class ImageScatterChart extends BaseChart {
             this.progress = n;
             this.updateDeck();
         }
-        const layers = this.updateDeck();
+        const layers = this.updateDeck(); //...
         const view = new OrbitView();
         this.deck = new Deck({
             canvas,
@@ -108,7 +109,7 @@ class ImageScatterChart extends BaseChart {
             },
             getRadius: 1,
             radiusScale: this.size,
-            getFillColor: [255, 255, 255],
+            getFillColor: this.colorBy ? (i: K)=>this.colorBy(i) : [255, 255, 255],
             imageArray,
             updateTriggers: {
                 // what is this actually for?
@@ -116,6 +117,7 @@ class ImageScatterChart extends BaseChart {
                 // It seems like all attributes are updated when we make this new layer descriptor anyway...
                 // It should be be able to avoid updating position etc when unrelated data changes, but that's not happening.
                 getImageAspect: this.progress,
+                getFillColor: this.colorBy,
             },
             extensions: [new ImageArrayDeckExtension()]
         });
@@ -126,6 +128,11 @@ class ImageScatterChart extends BaseChart {
     //needs *not* to be in `methodsUsingColumns`, which will break things...
     onDataFiltered(dim: Dimension) {
         this.dataModel.updateModel();
+        this.updateDeck();
+    }
+
+    colorByColumn(col: string) {
+        this.colorBy = this.getColorFunction(col, true);
         this.updateDeck();
     }
 
