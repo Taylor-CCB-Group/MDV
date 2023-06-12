@@ -6,6 +6,7 @@ import { ImageArray } from "../webgl/ImageArray.js";
 //import { ScatterplotLayer } from 'deck.gl/typed'; // -no, using ScatterplotExLayer
 import { ScatterplotExLayer, ImageArrayDeckExtension } from '../webgl/ImageArrayDeckExtension.js';
 import { OrbitView } from "deck.gl/typed";
+import Dimension from "../datastore/Dimension.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
 type Column = { data: Float32Array, minMax: [number, number] }
@@ -58,7 +59,6 @@ class ImageScatterChart extends BaseChart {
             getTooltip: (info) => {
                 const {index, picked} = info;
                 const titleColumn = this.config.image_title;
-                // this.dataModel.updateModel();
                 const text = this.dataModel.getItemField(index, titleColumn);
                 return picked && {html: `<div>${titleColumn}: '${text}'</div>`,}
             },
@@ -78,28 +78,28 @@ class ImageScatterChart extends BaseChart {
             return 200*(col.data[i] - minMax[0]) / (minMax[1] - minMax[0]) - 100;
         }
         
-        const {length} = cx.data;
-        const {progress, size, billboard} = this;
-        
-        // only length is needed - trying to force more updates, 
-        // but for performance when working properly we should target updates more precisely
-        const data = {length, progress, size, billboard}; //new Uint32Array(cx.data.length+1).fill(0).map((_, i) => i);
-        //data[cx.data.length] = this.progress;//experiment wirh shallow difference to try to force update
+        /// deck can take any 'data' with a 'length' property, if we have accessors for synthesizing the data by index,
+        // or pass descriptors for data layout of each attribute in existing TypedArrays...
+        // const {length} = cx.data;        
+        // const data = {length};
+        // type K = never; //data is not iterable, we can pass a 'never' as 1st arg, then use {index} from 2nd arg.
 
-        const {imageArray} = this;
+        /// we want to use 'data' of the current model, so we can filter it
+        const {data} = this.dataModel;
+        type K = number;
+
+        const {imageArray, billboard} = this;
         // const {getImageAspect, getImageIndex} = this.imageArray;// need to bind this
-        type K = never; //data is not iterable, so ~never will be passed to the callbacks
         const layer = new ScatterplotExLayer({
             id: `scatter-${this.id}`,
             data,
             // radiusUnits: 'pixels', //default 'meters', also lineWidthUnits...
             // stroked: true, //TODO: make sure we can render properly with this
-            billboard: this.billboard,
+            billboard,
             pickable: true,
-            getImageIndex: (i: K, {index}) => imageArray.getImageIndex(index),
-            getImageAspect: (i: K, {index}) => imageArray.getImageAspect(index),
-            getPosition: (_: K, {index, data, target}) => {
-                const i = index as number;
+            getImageIndex: (i: K) => imageArray.getImageIndex(i),
+            getImageAspect: (i: K) => imageArray.getImageAspect(i),
+            getPosition: (i: K, {target}) => {
                 //[n(cx, i), n(cy, i), n(cz, i)] // say no to garbage
                 target[0] = n(cx, i);
                 target[1] = n(cy, i);
@@ -111,9 +111,11 @@ class ImageScatterChart extends BaseChart {
             getFillColor: [255, 255, 255],
             imageArray,
             updateTriggers: {
-                //TODO: figure out how to get this to work...
+                // what is this actually for?
+                // it's not for making reactive updates.
+                // It seems like all attributes are updated when we make this new layer descriptor anyway...
+                // It should be be able to avoid updating position etc when unrelated data changes, but that's not happening.
                 getImageAspect: this.progress,
-                // imageAspect: [this.progress],
             },
             extensions: [new ImageArrayDeckExtension()]
         });
@@ -121,9 +123,17 @@ class ImageScatterChart extends BaseChart {
         return [layer];
     }
 
-    onDataFiltered() {
+    //needs *not* to be in `methodsUsingColumns`, which will break things...
+    onDataFiltered(dim: Dimension) {
         this.dataModel.updateModel();
         this.updateDeck();
+    }
+
+    
+    getColorOptions() {
+        return {
+            colorby: "all",            
+        }
     }
 
     getSettings() {
@@ -160,7 +170,7 @@ BaseChart.types["ImageScatterChart"] = {
     class: ImageScatterChart,
     name: "Image Scatter Plot",
     required: ["images"],
-    methodsUsingColumns: ["onDataFiltered", "getLayers"],
+    methodsUsingColumns: ["updateDeck"],
     configEntriesUsingColumns: ["image_key", "image_title"],
 
     init: (config, dataSource, extraControls) => {
