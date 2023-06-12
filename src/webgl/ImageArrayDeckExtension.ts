@@ -62,8 +62,8 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         vec2 uv = 0.5 * (geometry.uv + 1.0);
         uv.y = 1. - uv.y; // flip y
         // todo fix aspect ratio in vertex shader
-        uv.x *= max(1., vImageAspect);
-        uv.y /= min(1., vImageAspect);
+        uv.x /= min(1., vImageAspect);
+        uv.y *= max(1., vImageAspect);
         if (uv.y > 1. || uv.x > 1.) discard;
         vec3 uvw = vec3(uv, vImageIndex);
         vec4 t = texture(imageArray, uvw);
