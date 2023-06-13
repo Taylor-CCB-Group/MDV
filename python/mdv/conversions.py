@@ -1,4 +1,5 @@
-import scanpy as sc
+import scanpy
+import mudata
 from .mdvproject import MDVProject
 
 def convert_scanpy_to_mdv(folder,scanpy_object,max_dims=3):
@@ -33,6 +34,21 @@ def convert_scanpy_to_mdv(folder,scanpy_object,max_dims=3):
     return mdv
 
     
+def convert_mudata_to_mdv(folder,mudata_object,max_dims=3):
+    md=mudata_object
+    p= MDVProject(folder)
+    #add the cells
+    p.add_datasource("cells",md.obs)
+
+    for mod in md.mod.keys():   
+        mdata = md.mod[mod]
+        if hasattr(mdata.X,"value"):
+            p.add_datasource(mod,mdata.var)
+            p.add_column(mod,{"name":"name","datatype":"unique"},mdata.var.index)
+            p.add_rows_as_columns_link("cells",mod,"name",mod)
+            matrix = mdata.X.value.transpose().tocsr()
+            p.add_rows_as_columns_subgroup("cells",mod,mod+"_expr",matrix,sparse=True)
+
 
 
     

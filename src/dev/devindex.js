@@ -6,6 +6,8 @@ import "../charts/css/charts.css";
 import "../webgl/css/wgl2di.css";
 import "../table/css/slickgrid.css";
 import "../browser/css/browser.css";
+import "../browser/bam_track.js";
+import "../browser/BamCoverageTrack.js";
 import "../charts/GenomeBrowser.js";
 import ChartManager from '../charts/ChartManager.js';
 import {getLocalCompressedBinaryDataLoader} from "../dataloaders/DataLoaders.js";

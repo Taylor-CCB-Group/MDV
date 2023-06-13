@@ -21,7 +21,7 @@ class AutoComplete{
         //click outside dropdown removes the list
 
         this.dli = e=>{
-            if (e.target.parent=== this.lisHolder){
+            if (e.target.parentElement=== this.listHolder){
                 return;
             }
             if (this.listHolder ){

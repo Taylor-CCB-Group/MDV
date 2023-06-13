@@ -469,15 +469,21 @@ class DataStore{
                 const v = col.values[i];
                 let match =true;
                 for (let n =0;n<v.length-tlength;n++){
-                    let match =true;
-                    for (let a=n;a<n<tlength;a++){
-                        if (text[n]!==tupper[a] && text[n] !==tlower){
+                    match =true
+                    for (let a=0;a<tlength;a++){
+                        if (v[a+n]!==tupper[a] && v[a+n] !==tlower[a]){
                             match =false;
-                            break
+                            break;
+                        }
+                        else{
+                            console.log("match")
                         }
                     }
                     if (match){
                         break;
+                    }
+                    else{
+                        console.log(n);
                     }
                 }
                 if (match){
@@ -485,6 +491,9 @@ class DataStore{
                         value:v,
                         index:i
                     });
+                    if (matches.length>number){
+                        break;
+                    }     
                 }
             }
         }

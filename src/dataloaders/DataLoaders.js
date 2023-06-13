@@ -6,8 +6,6 @@
 * 
 **/
 
-
-
 /**
 * @memberof module:DataLoaders
 * @param data {ArrayBuffer} - an array buffer containing raw concatenated
@@ -86,9 +84,6 @@ function processArrayBuffer(data,columns,size){
 	return dataList;
 }
 
-
-
-
 /**
 * Gets bytes from an API. The data loader will send a post request 
 * to the url with with a jsonified object containing the datasource
@@ -117,16 +112,16 @@ function getArrayBufferDataLoader(url){
 		//the data is any arraybuffer containing each individual 
 		//column's raw data
 		const data = await response.arrayBuffer();
-		return processArrayBuffer(data,columns,size)
+		return processArrayBuffer(data,columns,size);
 	}
 }
 
 /**
-* Gets bytes from the server form static comoressed binary files
+* Gets bytes from the server form static compressed binary files
 * The files will be in in the supplied folder , one per datsource
-* named dsname1.b dsname2.b etc.
+* named dsname1.gz dsname2.gz etc.
 *
-* returns a dataLosder
+* returns a dataLoader
 * @memberof module:DataLoaders
 * @param {string} - The url of the remote folder
 * @returns {function} a dataloader that can be used to construct {@link ChartManager}
@@ -156,7 +151,8 @@ class CompressedBinaryDataLoader {
             const resp = await fetch(iurl);
             this.index = await resp.json();
         }
-
+        //unable to request multiple ranges, which would be more efficient
+        //send off request for each column separately and then return all of them
         return await Promise.all(cols.map(async (c) => {
             let  lu =  c.field;
             if (c.subgroup){
@@ -165,23 +161,29 @@ class CompressedBinaryDataLoader {
             }
             const i = this.index[lu];
 
-            const resp = await fetch(this.url,
-                {
-                    headers:
-                    {
-                        responseType: "arraybuffer",
-                        range: `bytes=${i[0]}-${i[1]}`
-                    }
-                });
+            let resp = null;
+            const args={
+                headers:{
+                    responseType: "arraybuffer",
+                    range: `bytes=${i[0]}-${i[1]}`
+                }
+            }
+            try{
+               resp = await fetch(this.url,args)
+            } catch (e){
+                //lets try again
+               resp = await fetch(this.url,args)
+            }
             const bytes = await resp.arrayBuffer();
             const output = pako.inflate(bytes);
 
             if (c.sgtype==="sparse"){
-                const l = new Uint32Array(output,0,1)[0];
+                const b = output.buffer
+                const l = new Uint32Array(b,0,1)[0];
                 //get the indexes
-			    const indexes = new Uint32Array(output,4,l);
+			    const indexes = new Uint32Array(b,4,l);
                 //get the values
-			    const values = new Float32Array(output,(l*4)+1,l);
+			    const values = new Float32Array(b,(l*4)+4,l);
                 const sb = new SharedArrayBuffer(size*4)
 			    const new_arr= new Float32Array(sb);
                 //fill array with missing values

@@ -24,101 +24,103 @@ class AddColumnsFromRowsDialog extends BaseDialog{
         //add single gene
 
        // createEl("div",{classes:["mdv-section"],text:""},this.columns[0])
+        this.cm._getColumnsThen(this.ds_to.name,[this.link.name_column],()=>{
 
-        const h = createEl("div",{classes:["mdv-section"]},this.columns[0]);
-        const ni = createEl("input",{},h);
-        this.ac= new AutoComplete(ni,async (text)=>{
-            return this.ds_to.dataStore.getSuggestedValues(text,this.link.name_column,8)
-        });
+            const h = createEl("div",{classes:["mdv-section"]},this.columns[0]);
+            const ni = createEl("input",{},h);
+            this.ac= new AutoComplete(ni,async (text)=>{
+                return this.ds_to.dataStore.getSuggestedValues(text,this.link.name_column,8)
+            });
 
-        this.ac.addListener((type,data)=>this.addColumn(data));
-        
-
-        
-        //add the radio buttons for type
-        this.rn = getRandomString();
-        for (let sg in this.link.subgroups){
-            createEl("label",{
-                text:this.link.subgroups[sg].label
-            },this.footer);
-            createEl("input",{
-                type:"radio",
-                name:this.rn,
-                value:sg,
-                checked:true
-            },this.footer);
-        }
-
-
-        
-        this._addOptionsSection();
-
-        const b = createEl("button",{classes:["ciview-button-sm"],styles:[],text:"Apply"},this.columns[0]);
-        b.addEventListener("click",()=>{
-            this.addColumn(this.ac.getSelectedItem());
-        });
-
-        this.ta  = createEl("textarea",{rows:10},this.columns[1]);
-
-        this.errorDiv = createEl("div",{classes:["mdv-section"]},this.columns[1]);  
-
-        let d = createEl("div",{classes:["mdv-section"]},this.columns[1]);  
-        this.addHeatMapCheck= createEl("input",{type:"checkbox"},d);
-        createEl("span",{text:"Create Heat Map:",styles:{marginRight:"4px"}},d);
-        d = createEl("div",{classes:["mdv-section"]},this.columns[1]);
-        createEl("span",{text:"Categories:",styles:{marginRight:"4px"}},d);
-        this.heatMapSel = createEl("select",{styles:{maxWidth:"150px"}},d);
-        this.ds.dataStore.getColumnList("text").forEach(x=> createEl("option",{value:x.field,text:x.name},this.heatMapSel));  
-
-
-
-        const bu = createEl("button",{classes:["ciview-button-sm"],text:"Add All"},this.columns[1]);
-        bu.addEventListener("click",e=>{
-            this.parseNames();
-        });
-
-        this.cm.addListener(this.rn,(type,c,data)=>{
-            switch(type){
-                case "chart_added":
-                    this._addColorChartOption(data);
-                    break;
-                case "chart_removed":
-                    this._addColorChartOption(data,true);
-                    break;
-                case "filtered":
-                    console.log("ss");
-                    break;
-                case "view_laoded":
-                    this.close();
-            }
-        });
-
-        this.itemList=[];
-        const tds=  this.ds_to.dataStore;
-        tds.addListener(this.rn,(type,data)=>{
+            this.ac.addListener((type,data)=>this.addColumn(data));
             
-            if (type==="data_highlighted"){
-                const l = data.indexes.length;
-                if (l==1){
-                    const index = data.indexes[0];
-                    const value= tds.getRowText(index,this.link.name_column);
-                    this.ac.setSelectedItem({value,index})
-                }
-                else if (l<200){
-                    this.ta.value = data.indexes.map(x=>tds.getRowText(x,this.link.name_column)).join("\n");
-                }
-                else{
-                    this.ta.value = "Too many items selected";
-                }
+
+            
+            //add the radio buttons for type
+            this.rn = getRandomString();
+            for (let sg in this.link.subgroups){
+                createEl("label",{
+                    text:this.link.subgroups[sg].label
+                },this.footer);
+                createEl("input",{
+                    type:"radio",
+                    name:this.rn,
+                    value:sg,
+                    checked:true
+                },this.footer);
             }
-            else if (type==="filtered"){
-                if (tds.filterSize<max_genes && tds.isFiltered()){
-                    this.ta.value =  tds.getFilteredValues(this.link.name_column).join("\n");
+
+
+            
+            this._addOptionsSection();
+
+            const b = createEl("button",{classes:["ciview-button-sm"],styles:[],text:"Apply"},this.columns[0]);
+            b.addEventListener("click",()=>{
+                this.addColumn(this.ac.getSelectedItem());
+            });
+
+            this.ta  = createEl("textarea",{rows:10},this.columns[1]);
+
+            this.errorDiv = createEl("div",{classes:["mdv-section"]},this.columns[1]);  
+
+            let d = createEl("div",{classes:["mdv-section"]},this.columns[1]);  
+            this.addHeatMapCheck= createEl("input",{type:"checkbox"},d);
+            createEl("span",{text:"Create Heat Map:",styles:{marginRight:"4px"}},d);
+            d = createEl("div",{classes:["mdv-section"]},this.columns[1]);
+            createEl("span",{text:"Categories:",styles:{marginRight:"4px"}},d);
+            this.heatMapSel = createEl("select",{styles:{maxWidth:"150px"}},d);
+            this.ds.dataStore.getColumnList("text").forEach(x=> createEl("option",{value:x.field,text:x.name},this.heatMapSel));  
+
+
+
+            const bu = createEl("button",{classes:["ciview-button-sm"],text:"Add All"},this.columns[1]);
+            bu.addEventListener("click",e=>{
+                this.parseNames();
+            });
+
+            this.cm.addListener(this.rn,(type,c,data)=>{
+                switch(type){
+                    case "chart_added":
+                        this._addColorChartOption(data);
+                        break;
+                    case "chart_removed":
+                        this._addColorChartOption(data,true);
+                        break;
+                    case "filtered":
+                        console.log("ss");
+                        break;
+                    case "view_laoded":
+                        this.close();
                 }
-                else{
-                    this.ta.value = "Too many items selected";
+            });
+
+            this.itemList=[];
+            const tds=  this.ds_to.dataStore;
+            tds.addListener(this.rn,(type,data)=>{
+                
+                if (type==="data_highlighted"){
+                    const l = data.indexes.length;
+                    if (l==1){
+                        const index = data.indexes[0];
+                        const value= tds.getRowText(index,this.link.name_column);
+                        this.ac.setSelectedItem({value,index})
+                    }
+                    else if (l<200){
+                        this.ta.value = data.indexes.map(x=>tds.getRowText(x,this.link.name_column)).join("\n");
+                    }
+                    else{
+                        this.ta.value = "Too many items selected";
+                    }
                 }
-            }
+                else if (type==="filtered"){
+                    if (tds.filterSize<max_genes && tds.isFiltered()){
+                        this.ta.value =  tds.getFilteredValues(this.link.name_column).join("\n");
+                    }
+                    else{
+                        this.ta.value = "Too many items selected";
+                    }
+                }
+            });
         });
     }
 

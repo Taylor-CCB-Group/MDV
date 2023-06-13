@@ -7,6 +7,7 @@ import gzip
 import shlex
 import subprocess
 import fasteners
+import warnings
 from os.path import join,split,exists
 from  shutil import copytree,ignore_patterns,copyfile
 
@@ -15,7 +16,9 @@ datatype_mappings={
     "float64":"double",
     "float32":"double",
     "object":"text",
-    "category":"text"
+    "category":"text",
+    "bool":"text",
+    "int32":"double"
 }
 
 class MDVProject:
@@ -116,10 +119,12 @@ class MDVProject:
             mode="a"
         return h5py.File(self.h5file,mode)
         
-    def get_column(self,datasource,column):
+    def get_column(self,datasource,column,raw=False):
         cm  = self.get_column_metadata(datasource,column)
         h5 = self._get_h5_handle()
-        raw_data = h5[datasource][column]
+        raw_data = numpy.array(h5[datasource][column])
+        if raw:
+            return raw_data
         dt =  cm["datatype"]
         if dt == "text":
             data= [cm["values"][x] for x in raw_data]
@@ -134,13 +139,60 @@ class MDVProject:
         h5.close()
         return data
     
-    def get_column_metadata(self,datasource,column):
+
+    def add_column(self,datasource,column,data):
+        li = pandas.Series(data)
+        h5 = self._get_h5_handle()
+        gr = h5[datasource]
+        if not column.get("field"):
+            column["field"]=column["name"]
+        if not column.get("datatype"):
+            column["datatype"]= datatype_mappings.get(str(li.dtype),"text")
+        add_column_to_group(column,li,gr,len(li))
+        h5.close()
         ds= self.get_datasource_metadata(datasource)
-        col = [x for x in ds["columns"] if x["field"]== column]
-        if len(col) == 0:
-             raise AttributeError(f'column {column} not found in {datasource} datasource')
-        return col[0]
-    
+        ds["columns"].append(column)
+        self.set_datasource_metadata(ds)
+        
+
+    def add_annotations(self,datasource,data,separator="\t",missing_value="ND",columns=None,
+                        supplied_columns_only=False):
+        '''Adds annotations based on an existing column
+        Args:
+            datasource (str): The name of the data source.
+            data (dataframe|str): Either a pandas dataframe or a text file. The first column
+                should be the 'index' column and match a column in the datasource. Tne other columns should
+                contain the annotations to add.
+            separator (str,optional): The delimiter if a text file is supplied (tab by default)
+            missing_value(str,optional): The value to put if the index value is missing in the input data.
+                Default is 'ND'
+        '''
+        if type(data) == str:
+            data= pandas.read_csv(data,sep=separator)
+        ds  = self.get_datasource_metadata(datasource)
+        index_col = data.columns[0]
+        data=data.set_index(index_col)
+        columns= get_column_info(columns,data,supplied_columns_only)
+        col = [x for x in ds["columns"] if x["field"]==index_col]
+        if len(col)==0:
+            raise AttributeError(f'index column {index_col} not found in {datasource} datasource') 
+        cols= data.columns
+        
+        newdf= pandas.DataFrame({index_col:self.get_column(datasource,index_col)})
+        h5 = self._get_h5_handle()
+        gr = h5[datasource]
+        for c in cols:
+             d= {k:v for k,v in zip(data.index,data[c])}
+             #v slow - needs improving
+             ncol = newdf.apply(lambda row:d.get(row[0],missing_value),axis=1)
+             col={"datatype":"text","name":c,"field":c}
+             add_column_to_group(col,ncol,gr,len(ncol))
+             ds["columns"].append(col)
+        self.set_datasource_metadata(ds)
+        h5.close()
+        
+
+
     def set_column_group(self,datasource,groupname,columns):
         '''Adds (or changes) a column group
         Args:
@@ -233,19 +285,8 @@ class MDVProject:
         '''
         if type(dataframe)==str:
             dataframe= pandas.read_csv(dataframe,sep=separator)
-        #add any missing field names
-        if columns:
-            for col in columns:
-                if not col.get("field"):
-                    col["field"]=col["name"]
-        size=len(dataframe)
-        if not supplied_columns_only:
-            cols = [{"datatype":datatype_mappings[d.name], "name":c,"field":c} for d,c in zip(dataframe.dtypes,dataframe.columns)]
-            #replace with user given column metadata
-            if columns:
-                col_map={x["field"]:x for x in columns}
-                cols = [col_map.get(x["field"],x) for x in cols]
-            columns= cols
+        #get the columns to add
+        columns= get_column_info(columns,dataframe,supplied_columns_only)
         #does the datasource exist
         try:
             ds = self.get_datasource_metadata(self,name)
@@ -260,9 +301,17 @@ class MDVProject:
         #create the h5 group
         h5 = self._get_h5_handle()
         gr= h5.create_group(name)
+        size = len(dataframe)
+        dodgy_columns=[]
         for col in columns:
-            add_column_to_group(col,dataframe[col["field"]],gr,size)
+            try:
+                add_column_to_group(col,dataframe[col["field"]],gr,size)
+            except Exception as e:
+                dodgy_columns.append(col["field"])
+                warnings.warn(f"cannot add column {col['field']} to datasource {name}\n{e}")
+
         h5.close()
+        columns = [x for x in columns if x["field"] not in dodgy_columns]
         #add the metadata
         ds = None
         ds = {
@@ -300,22 +349,25 @@ class MDVProject:
         }
         self.insert_link(ds_row,ds_col,"rows_as_columns",data)
 
-    def add_rows_as_columns_subgroup(self,row_ds,col_ds,stub,data,name=None,label=None,sparse=False):
-        row_ds,col_ds
-        l = data.shape[0]
+    def add_rows_as_columns_subgroup(self,row_ds,col_ds,stub,data,name=None,label=None,sparse=False):  
         name = name if name else stub
         label = label if label else name
-        total_len = data.shape[0] * data.shape[1]
         h5 = self._get_h5_handle()
         gr = h5[row_ds].create_group(name)
-
-        gr.create_dataset("x",(total_len,),data=data.flatten("F"),dtype=numpy.float32)
-        gr["length"]=[l]
-
+        if sparse:
+            gr.create_dataset("x",(len(data.data),),data=data.data,dtype=numpy.float32)
+            gr.create_dataset("i",(len(data.indices),),data=data.indices,dtype=numpy.uint32)
+            gr.create_dataset("p",(len(data.indptr),),data=data.indptr)
+        else:    
+            l = data.shape[0]
+            total_len = data.shape[0] * data.shape[1]
+            gr.create_dataset("x",(total_len,),data=data.flatten("F"),dtype=numpy.float32)
+            gr["length"]=[l]
         ds = self.get_datasource_metadata(row_ds)
         ds["links"][col_ds]["rows_as_columns"]["subgroups"][stub]={
             "name":name,
-            "label":label
+            "label":label,
+            "type":"sparse" if sparse else "dense"
         }
         self.set_datasource_metadata(ds)
         h5.close()
@@ -367,15 +419,14 @@ class MDVProject:
             page=page.replace("_mdvInit()","_mdvInit(true)")
              #correct config
             conf  = self.state
+            #can't edit static page
             conf["permission"]="view"
+            #throttle the dataloading so don't get network errors
             conf["dataloading"]={
-                "split":1,
-                "threads":5
+                "split":5,
+                "threads":2
             }
-            save_json(join(outdir,"state.json"),conf)
-       
-
-            
+            save_json(join(outdir,"state.json"),conf)     
         #add service worker for cross origin headers
         if include_sab_headers and not debug:
             page=page.replace("<!--sw-->",'<script src="serviceworker.js"></script>')
@@ -419,6 +470,8 @@ class MDVProject:
         else:
             state["all_views"].remove(name)
             iv = state.get("initial_view")
+            #if the deleted view is the default view then
+            #change the default view to the first view in the list
             if iv:
                 state["initial_view"]=state["all_views"][0]
         self.state=state
@@ -509,11 +562,17 @@ def get_subgroup_bytes(grp,index,sparse=False):
 
 
 def add_column_to_group(col,data,group,length):
-    if col["datatype"]=="text":
+   
+
+    if col["datatype"]=="text" or col["datatype"]=="unique":
+        if data.dtype=="category":
+            data =data.cat.add_categories("ND")
+            data=data.fillna("ND")
+          
         values = data.value_counts()
-        if len(values)<256:
+        if len(values)<256 and col["datatype"]!="unique":
             if not col.get("values"):
-                col["values"]= list(values.index)
+                col["values"]= [ x for x in values.index if values[x] != 0 ]
             vdict =  {k: v for v, k in enumerate(col["values"])}          
             group.create_dataset(col["field"],length,dtype=numpy.ubyte,data =data.map(vdict))
         else:
@@ -577,6 +636,22 @@ def add_column_to_group(col,data,group,length):
                 numpy.percentile(na,100*q),
                 numpy.percentile(na,100*(1-q))
             ]     
+
+
+def get_column_info(columns,dataframe,supplied_columns_only):
+    if columns:
+        for col in columns:
+            if not col.get("field"):
+                col["field"]=col["name"]
+   
+    if not supplied_columns_only:
+        cols = [{"datatype":datatype_mappings[d.name], "name":c,"field":c} for d,c in zip(dataframe.dtypes,dataframe.columns)]
+        #replace with user given column metadata
+        if columns:
+            col_map={x["field"]:x for x in columns}
+            cols = [col_map.get(x["field"],x) for x in cols]
+        columns= cols
+    return columns
 
 ##!! will not work in windows and requires htslib installed
 def create_bed_gz_file(infile,outfile):
