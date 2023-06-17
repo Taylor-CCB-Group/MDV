@@ -65,15 +65,24 @@ async function executeProjectAction(action, args) {
         method: action,
         args: args
     }
-    const resp = await fetch("/meths/execute_project_action/",
+
+    console.log("window.CSRF_TOKEN", window["CSRF_TOKEN"]);
+
+    const request = new Request(
+        "meths/execute_project_action/",
         {
-            method: "POST",
-            body: JSON.stringify(data),
+            method: 'POST',
             headers: {
+                'X-CSRFToken': window["CSRF_TOKEN"],
                 "Accept": "application/json,text/plain,*/*",
                 "Content-Type": "application/json"
-            }
-        });
+            },
+            mode: 'same-origin',
+            body: JSON.stringify(data),
+        }
+    );
+
+    const resp = await fetch(request);
     let rspData = {success: false};
     try {
         rspData = await resp.json();
