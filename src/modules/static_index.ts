@@ -57,6 +57,49 @@ async function fetchAndPatchJSON(url) {
     return config;
 }
 
+async function executeProjectAction(action, args) {
+    if (!args) {
+        args = {}
+    }
+    let data = {
+        method: action,
+        args: args
+    }
+    const resp = await fetch("/meths/execute_project_action/",
+        {
+            method: "POST",
+            body: JSON.stringify(data),
+            headers: {
+                "Accept": "application/json,text/plain,*/*",
+                "Content-Type": "application/json"
+            }
+        });
+    let rspData = {success: false};
+    try {
+        rspData = await resp.json();
+    } catch (error) {
+        console.error(error);
+    }
+    return rspData;
+}
+
+function listener(type,cm,info){
+    switch(type){
+        case "state_saved":
+            console.log("listener state_saved", cm, info)
+            executeProjectAction("save_state",{state: info}).then(resp=>{
+                if (resp.success){
+                    cm.createInfoAlert("Data Saved",{duration:2000});
+                    cm.setAllColumnsClean();
+                }
+                else{
+                    cm.createInfoAlert("UnableToSaveData",{duration:3000,type:"danger"});
+                }
+            });
+            break;
+    }
+}
+
 async function loadData() {
     const datasources = await fetchAndPatchJSON(`${root}/datasources.json`);
     const config = await fetchAndPatchJSON(`${root}/state.json`);
@@ -65,7 +108,7 @@ async function loadData() {
         function: getLocalCompressedBinaryDataLoader(datasources, root),
         viewLoader: async (view) => views[view]
     }
-    const cm = new ChartManager("app1", datasources, dataLoader, config);
+    const cm = new ChartManager("app1", datasources, dataLoader, config, listener);
     const dsName = datasources[0].name;
     const ds = cm.dsIndex[dsName];
     const tadModel = new TagModel(ds.dataStore);
