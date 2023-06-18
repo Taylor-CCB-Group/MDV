@@ -293,9 +293,9 @@ In each case, data can either be an array of values or a SharedArrayBuffer conta
 
 
 ### datatype - text
-JavaScript Array -  strings - there should be no more than 256 unique values.
-
-SharedArrayBuffer - A uint8, each position in the underlying array represents the index in the column's value array 
+The column should not contain more than 256 unique values.
+* JavaScript Array(string) 
+* SharedArrayBuffer(uint8) - each position in the underlying array represents the index in the column's value array 
 
 ```
     ["blue","green","green","yellow","blue","green"]
@@ -304,10 +304,10 @@ SharedArrayBuffer - A uint8, each position in the underlying array represents th
     data:[1,0,0,2,1,0] //(Uint8Array)
 ```
 
-
 ### datatype- mulitext
-
-uint16 each data item is stringLength portion of the array with each position being the index of the value's array. 65535 represents no value
+A column that can hold multiple (or no values)
+* JavaScript Array(string) - each string should contain comma delimited values (or an empty string) 
+* SharedArrayBuffer(uint16) - each data item is stringLength portion of the array with each position being the index of the value's array. 65535 represents no value
 
 ```
     [ "A,B,C", "B,A", "A,B", "D,E", "E,C,D" ]
@@ -317,9 +317,10 @@ uint16 each data item is stringLength portion of the array with each position be
     data:[0,1,2, 1,0,65535, 0,1,65535, 3,4,65535, 0,2,3] //(Uint16Array)
 ```
 
-
 ### datatype - unique
-A unique column represents text that can contain more than 256 values and is represented by a Uint8Array. Each value is encoded by stringLength digits, padded by 0 values .  
+A unique column represents text that can contain more than 256 values and is
+* JavaScript Array(string) - there should be no more than 256 unique values.
+* SharedArrayBuffer(uint8)  - Each value is encoded by stringLength digits, padded by 0 values .  
 ```
     ["ZX1212","X21","F232","D1"]
     //would be converted to
@@ -327,17 +328,20 @@ A unique column represents text that can contain more than 256 values and is rep
     stringLength:6
 ```
 
-
 ### datatype integer/double
 These are treated the same and are represented by Float32Array
+* JavaScript Array(number) -  an array of numbers
+* SharedArrayBuffer(Float32) 
 ```
 [1.2,3,4.5.7]
 //would be converted to
 data:[1.2,3,4.5.7] //(Float32Array)
 ```
 
-### datatype integer/double
+### datatype int32
 This is represented by a Int32Array and is better far larger integers. e.g.  genomic locations. However, it can't hold an NaN which represents missing data
+* JavaScript Array(number) -  an array of numbers
+* SharedArrayBuffer(int32) 
 ```
 [1.2,3,4.5.7]
 //would be converted to

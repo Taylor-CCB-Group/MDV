@@ -111,7 +111,7 @@ def create_app(project,open_browser=True, port =5000):
         success=True
         try:
             state=request.json
-            project.set_state(state)
+            project.save_state(state)
         except Exception as e:
             success=False
 

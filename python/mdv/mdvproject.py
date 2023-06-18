@@ -21,6 +21,15 @@ datatype_mappings={
     "int32":"double"
 }
 
+numpy_dtypes={
+    "text":numpy.ubyte,
+    "multitext":numpy.uint16,
+    "double":numpy.float32,
+    "integer":numpy.float32,
+    "int32":numpy.int32
+    #unique created in fly (depends on string length)
+}
+
 class MDVProject:
     def __init__(self,dir):
         self.dir=dir
@@ -140,6 +149,32 @@ class MDVProject:
         return data
     
 
+    def set_column_with_raw_data(self,datasource,column,raw_data):
+        '''Adds or updates a column with raw data
+        Args:
+            datasource (str): The name of the datasource.
+            column (dict): The complete metadata for the column
+            raw_data (list|array): The raw binary data for the column
+        '''
+        h5= self._get_h5_handle()
+        cid= column["field"]
+        if h5[datasource].get(cid):
+            del h5[datasource][cid]
+        dt = numpy_dtypes.get(column["datatype"])
+        if not dt:
+            dt =h5py.string_dtype('utf-8',column["stringLength"])
+        h5[datasource].create_dataset(cid,len(raw_data),data = raw_data,dtype=dt)
+        ds =self.get_datasource_metadata(datasource)
+        cols= ds["columns"]
+        ind = [c for c,x in enumerate(cols) if x["field"]==cid]
+        if len(ind)==0:
+            cols.append(column)
+        else:
+            cols[ind[0]]=column
+        self.set_datasource_metadata(ds)
+        
+        
+
     def add_column(self,datasource,column,data):
         li = pandas.Series(data)
         h5 = self._get_h5_handle()
@@ -153,6 +188,23 @@ class MDVProject:
         ds= self.get_datasource_metadata(datasource)
         ds["columns"].append(column)
         self.set_datasource_metadata(ds)
+
+    def remove_column(self,datasource,column):
+        '''Removes the specified column
+        Args:
+            datasource (str): The name of the data source.
+            column (str): The id (field) of the column.
+        '''
+        ds = self.get_datasource_metadata(datasource)
+        cols = [x for x in ds["columns"] if x["field"] != column]
+        if len(cols)==len(ds["columns"]):
+            warnings.warn(f"deleting non existing column: {column} from {datasource}")
+            return
+        ds["columns"]=ds
+        h5= self._get_h5_handle()
+        del h5[datasource][column]
+        self.set_datasource_metadata(ds)
+
         
 
     def add_annotations(self,datasource,data,separator="\t",missing_value="ND",columns=None,
@@ -434,15 +486,32 @@ class MDVProject:
         with open(join(outdir,"index.html"),"w") as o:
             o.write(page)
 
-    def set_state(self,state):
+    def save_state(self,state):
+        #update/add or view
+        #view will be deleted if view is null
         if state.get("currentView"):
             self.set_view(state["currentView"],state["view"])
         ud=  state.get("updatedColumns")
+        #update/add/delete any columns
         if ud:
-            for group in ud:
-                item= ud[group]
+            for ds in ud:
+                item= ud[ds]
                 for data in item["colors_changed"]:
-                    self.set_column_metadata(group,data["column"],"colors",data["colors"])
+                    self.set_column_metadata(ds,data["column"],"colors",data["colors"])
+                for data in  item["columns"]:
+                    self.set_column_with_raw_data(ds,data["metadata"],data["data"])
+                for col in item["removed"]:
+                    self.remove_column(ds,col)
+        #update any datasource metadata
+        md = state.get("metadata")
+        if md:
+            for ds in md:
+                datasource= self.get_datasource_metadata(ds)
+                for param in md[ds]:
+                    datasource[param]=md[ds][param]
+                self.set_datasource_metadata(datasource)
+
+
                 
     def get_view(self,view):
         views = self.views

@@ -357,6 +357,12 @@ class VivViewer {
     //domains may not be the same as contrast limits -  again need way of calculating
     //temp default values
     const domains=info.contrastLimits.map(x=>[0,200]);
+
+    /*this.loader[0].getRaster(
+        {selection:{c:43,t:0,z:0}}).then(data=>{
+        console.log(data)
+    });
+    */
     const layerConfig = {
       loader:this.loader,
       contrastLimits:info.contrastLimits.slice(0),
