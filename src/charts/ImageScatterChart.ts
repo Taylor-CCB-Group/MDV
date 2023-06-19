@@ -5,7 +5,7 @@ import { createEl } from "../utilities/Elements.js";
 import { ImageArray } from "../webgl/ImageArray.js";
 //import { ScatterplotLayer } from 'deck.gl/typed'; // -no, using ScatterplotExLayer
 import { ScatterplotExLayer, ImageArrayDeckExtension } from '../webgl/ImageArrayDeckExtension.js';
-import { OrbitView } from "deck.gl/typed";
+import { OrthographicView } from "deck.gl/typed";
 import Dimension from "../datastore/Dimension.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
@@ -47,7 +47,7 @@ class ImageScatterChart extends BaseChart {
             this.updateDeck();
         }
         const layers = this.updateDeck(); //...
-        const view = new OrbitView();
+        const view = new OrthographicView({});
         this.deck = new Deck({
             canvas,
             layers,
@@ -59,10 +59,19 @@ class ImageScatterChart extends BaseChart {
                 zoom: 0, //0 means "one pixel is one unit", 1 scales by 2
             },
             getTooltip: (info) => {
-                const {index, picked} = info;
+                const { index, picked } = info;
+                const { param } = this.config;
+                const { columnIndex } = this.dataStore;
+                const cx = columnIndex[param[0]] as Column;
+                const cy = columnIndex[param[1]] as Column;
+
                 const titleColumn = this.config.image_title;
                 const text = this.dataModel.getItemField(index, titleColumn);
-                return picked && {html: `<div>${titleColumn}: '${text}'</div>`,}
+                return picked && {html: `
+                <div>${titleColumn}: '${text}'</div>
+                <div>x: '${param[0]}' = '${cx.data[index]}'</div>
+                <div>y: '${param[1]}' = '${cy.data[index]}'</div>
+                `,}
             },
             // glOptions: {},
             // parameters: {},
@@ -74,7 +83,7 @@ class ImageScatterChart extends BaseChart {
         
         const cx = columnIndex[param[0]] as Column;
         const cy = columnIndex[param[1]] as Column;
-        const cz = columnIndex[param[2]] as Column;
+        // const cz = columnIndex[param[2]] as Column;
         function n(col: Column, i: number) {
             const {minMax} = col;
             return 200*(col.data[i] - minMax[0]) / (minMax[1] - minMax[0]) - 100;
@@ -105,7 +114,7 @@ class ImageScatterChart extends BaseChart {
                 //[n(cx, i), n(cy, i), n(cz, i)] // say no to garbage
                 target[0] = n(cx, i);
                 target[1] = n(cy, i);
-                target[2] = n(cz, i);
+                target[2] = 0;//n(cz, i);
                 return target;
             },
             getRadius: 1,
@@ -251,10 +260,10 @@ BaseChart.types["ImageScatterChart"] = {
             type: "number",
             name: "Y axis"
         },
-        {
-            type: "number",
-            name: "Z axis"
-        },
+        // {
+        //     type: "number",
+        //     name: "Z axis"
+        // },
         // ... some params should be optional
         // {
         //     type: "number",
