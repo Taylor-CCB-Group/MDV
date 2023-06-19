@@ -16,6 +16,7 @@ export type ImageArrayEntry = {
     zIndex: number,
     /** use in shader to scale uv coordinates */
     aspectRatio: number,
+    url: string,
 }
 
 /**
@@ -72,15 +73,16 @@ export class ImageArray {
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels, gl.RGBA8, width, height, col.data.length);
-        const memUsage = (width * height * 4 * col.data.length) / 1024 / 1024;
+        gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels, gl.RGBA8, width, height, col.values.length);
+        const memUsage = (width * height * 4 * col.values.length) / 1024 / 1024;
         //consider showing this in the UI ('i' for info?)
         console.log(`Allocated ${memUsage.toFixed(2)}MB for image array (not accounting for mipmaps)`);
         let nLoaded = 0;
         col.data.map((d, i: number) => {
             // XXX: still not working --- need to better grasp how DataModel works
             // this.dataView.updateModel();
-            const imageName = d;//this.dataView.getItemField(d, image_key);
+            // -> would be better to map over col.values in the first place?
+            const imageName = col.values[d];//this.dataView.getItemField(d, image_key);
             if (this.textures.has(imageName)) {
                 this.texturesByIndex.set(i, this.textures.get(imageName));
                 nLoaded++;
@@ -89,7 +91,7 @@ export class ImageArray {
             const url = `${base_url}/${imageName}.${image_type}`;
             const zIndex = i;
             const image = new Image(); //may want to use fetch instead for better control?
-            const entry = { zIndex, aspectRatio: 1 }; //not holding image ref, so we can garbage collect
+            const entry = { zIndex, aspectRatio: 1, url }; //not holding image ref, so we can garbage collect
             this.textures.set(imageName, entry);
             this.texturesByIndex.set(i, entry);
             image.src = url;
@@ -107,7 +109,6 @@ export class ImageArray {
                     console.error(`glError ${error} loading image #${zIndex} '${url}'`);
                 }
                 gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
-                // probably not going to hurt to leave it bound in this case
                 this.drawProgress(nLoaded++ / col.data.length);
             }
             image.onerror = () => {
