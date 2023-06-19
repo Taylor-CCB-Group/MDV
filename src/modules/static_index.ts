@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import 'nouislider/dist/nouislider.min.css'
 import "microtip/microtip.css";
 import "../../src/css/fontawesome-5.15.3/all.css";
@@ -55,6 +56,8 @@ async function loadData() {
     const datasources = await fetchAndPatchJSON(`${root}/datasources.json`);
     const config = await fetchAndPatchJSON(`${root}/state.json`);
     const views = await fetchAndPatchJSON(`${root}/views.json`);
+    // TODO: add a way of specifying a different type of data loader.
+    /// perhaps via another URLSearchParam, to avoid messing with datasources spec.
     const dataLoader = {
         function: getLocalCompressedBinaryDataLoader(datasources, root),
         viewLoader: async (view) => views[view]
@@ -65,8 +68,11 @@ async function loadData() {
     const tadModel = new TagModel(ds.dataStore);
     // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
     setTimeout(() => {
+        // TODO - add a 'save' button, if supported (another URLSearchParam? Security?)
         cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, tadModel); });
-        cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tadModel); });
+        if (import.meta.env.DEV) {
+            cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tadModel); });
+        }
         cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => { 
             const columns = datasources[0].columns.map(c => c.name);
             cm.loadColumnSet(columns, dsName, () => { console.log("done loadColumnSet"); });
