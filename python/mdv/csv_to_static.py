@@ -16,9 +16,11 @@ parser.add_argument('--discard_redundant', help='discard redundant columns', def
 # grouping options? rename columns so numbers have leading zeros?
 parser.add_argument('-g', '--group', help='group columns by regex', default=False)
 parser.add_argument('--group_by', help='group columns by regex', default=r'(.*?)(\d+)(.*)')
+parser.add_argument('-s', '--separator', help='multitext separator', default=',')
 parse_multitext = True
 
 args = parser.parse_args()
+separator = args.separator
 filename = args.input
 while not os.path.exists(filename):
     input(f'file "{filename}" does not exist. Press enter to try again.')
@@ -51,6 +53,9 @@ types = {
     'bool': 'boolean', # 0 or 1? currently breaks this script if I make this integer
 }
 
+# if we were processing multiple sources, we should review global df / col_types...
+col_types = {}
+
 def rename_columns():
     return
     # rename columns that are numbers to have leading zeros
@@ -63,21 +68,32 @@ def rename_columns():
         df.rename(columns={name: new_name}, inplace=True)
 
 def get_column_type(name):
+    # get_column_type is called from get_datasource() then convert_data_to_binary()
+    # second call was getting wrong type, so remembering the values should help.
+    if name in col_types:
+        return col_types[name]
     v = df[name]
     unique_values = set(v)
-    ttype = types[str(v.dtype)]
-    # if type == 'text' and len(unique_values) == v.size:
-    #     return 'unique'
-
+    dtype = str(v.dtype)
+    ttype = types[dtype]
+    # if dtype == 'text' and len(unique_values) == v.size:
+    #     print(f'unique text column "{name}"')
+    #     ttype = 'unique'
     if ttype == 'text' and parse_multitext:
         # does it look like comma-separated tags?
         # 'argument of type 'bool' is not iterable'???
         # when we have something like "unique_values: {False, True, nan}"
         # print(f'{name}: ({type}) unique_values: {unique_values}')
-        if any([',' in str(s) for s in unique_values]):
-            return 'multitext'
+        n = len(unique_values)
+        if n > 65536:
+            print(f'detected unique column "{name}" (not well tested with this script)')
+            ttype = 'unique'
+        elif n > 256 or any([separator in str(s) for s in unique_values]):
+            print(f'detected multitext column "{name}"')
+            ttype = 'multitext'
     if ttype is None:
         raise ValueError(f'unknown type {v.dtype} for {name}')
+    col_types[name] = ttype
     return ttype
 
 
@@ -143,6 +159,8 @@ def get_datasource():
         "columns": []
     }
     if has_images:
+        # todo: make this able to take some config, set proper type / key_column etc.
+        # ideally, find a column that has values corresponding to the names of images in the folder...
         descriptor['images'] = {
             "images": {
                 "base_url": "./images/",
@@ -170,6 +188,9 @@ def get_datasource():
             # col_desc['datatype'] = 'text'
             indices, values = get_text_indices(col)
             col_desc['values'] = values
+            if datatype == 'multitext':
+                col_desc['separator'] = separator
+            # mutating df here...
             df[name] = indices
         elif datatype == 'unique':
             col_desc['stringLength'] = max([len(v) for v in col])
@@ -199,8 +220,14 @@ def convert_data_to_binary(df):
         # 'integer' and 'double' should be converted to float32 according to the spec
         type = get_column_type(name)
         if type == 'integer' or type == 'double' or type == 'boolean':
-            print('converting', name, 'to float32')
+            print(f'converting {name} {type} to float32')
             df[name] = df[name].astype('float32')
+        if type == 'text':
+            print(f'converting {name} {type} to uint8')
+            df[name] = df[name].astype('uint8')
+        if type == 'multitext':
+            print(f'converting {name} {type} to uint16')
+            df[name] = df[name].astype('uint16')
         comp = gzip.compress(df[name].to_numpy().tobytes())
         new_pos = current_pos + len(comp)
         index[name] = [current_pos, new_pos-1]
@@ -217,9 +244,10 @@ def main():
         print('creating output directory')
         os.makedirs(outdir)
 
+    ds = get_datasource()
     with open(f'{outdir}/datasources.json', 'w') as f:
         print('writing datasources.json')
-        f.write(json.dumps([get_datasource()]))
+        f.write(json.dumps([ds]))
 
     print('writing data binary')
     convert_data_to_binary(df)
