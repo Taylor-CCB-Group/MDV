@@ -18,7 +18,7 @@ class ImageScatterChart extends BaseChart {
     dataModel: DataModel;
     progress = 0;
     billboard = true;
-    size = 20;
+    size = 13;
     opacity = 255;
     colorBy?: (index: number) => number[];
     id: number;
@@ -37,7 +37,7 @@ class ImageScatterChart extends BaseChart {
 
         this.imageArray = new ImageArray(dataStore, canvas, this.dataModel, {
             base_url,
-            image_type: "png",
+            image_type: config.images.type,
             image_key,
             width: texture_size,
             height: texture_size,
@@ -86,7 +86,8 @@ class ImageScatterChart extends BaseChart {
         // const cz = columnIndex[param[2]] as Column;
         function n(col: Column, i: number) {
             const {minMax} = col;
-            return 200*(col.data[i] - minMax[0]) / (minMax[1] - minMax[0]) - 100;
+            //TODO scaling options
+            return 600*(col.data[i] - minMax[0]) / (minMax[1] - minMax[0]) - 300;
         }
         
         /// deck can take any 'data' with a 'length' property, if we have accessors for synthesizing the data by index,
@@ -147,6 +148,10 @@ class ImageScatterChart extends BaseChart {
         this.colorBy = this.getColorFunction(col, true);
         this.updateDeck();
     }
+    colorByDefault() {
+        this.colorBy = null;
+        this.updateDeck();
+    }
 
     
     getColorOptions() {
@@ -172,8 +177,8 @@ class ImageScatterChart extends BaseChart {
                 name: "size",
                 label: "Size",
                 current_value: this.size,
-                min: 5,
-                max: 100,
+                min: 1,
+                max: 20,
                 step: 1,
                 continuous: true,
                 func: (v) => {
@@ -213,7 +218,7 @@ BaseChart.types["ImageScatterChart"] = {
         //set the base url and type
         config.images = {
             base_url: i.base_url,
-            type: "png", //todo: allow this to be specified
+            type: i.type,
             image_key: i.key_column, //nb ImageTableChart has this as config.param
             texture_size: extraControls.texture_size,
         };
