@@ -28,6 +28,8 @@
  * different types
  */
 import {MLVTrack,RulerTrack} from "./tracks.js";
+import "./bam_track.js";
+import "./BamCoverageTrack.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog.js";
 import canvasToSvg from "canvas-to-svg"

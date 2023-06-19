@@ -19,6 +19,7 @@ import "./SankeyChart.js";
 import "./MultiLineChart.js";
 import "./DensityScatterPlot";
 import "./SelectionDialog.js";
+import "./StackedRowChart";
 
 
 
@@ -528,7 +529,7 @@ class ChartManager{
 
         //need to create a set to create track of 
         //charts loaded
-        const charts= view.initialCharts || {};
+        const charts= view?view.initialCharts || {}: {}
         this._toLoadCharts = new Set();
         for (let ds in charts){         
             for (let ch of charts[ds]){

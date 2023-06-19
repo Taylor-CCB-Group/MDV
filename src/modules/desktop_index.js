@@ -21,8 +21,6 @@ import "../charts/RowSummaryBox.js";
 
 
 import "../browser/css/browser.css";
-import "../browser/bam_track.js";
-import "../browser/BamCoverageTrack.js";
 import "../charts/GenomeBrowser.js";
 import { createEl } from "../utilities/Elements";
 

@@ -1,6 +1,5 @@
 import BaseChart from "./BaseChart.js";
 import {createEl} from "../utilities/Elements.js";
-import MLVPanel from "../browser/panel.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 
 
@@ -14,58 +13,63 @@ class GenomeBrowser extends BaseChart{
         this.contentDiv.style.width="100%";
         this.contentDiv.style.height="100%";
         c.type="genome_browser";
-        const add_ruler= c.tracks.find(x=>x["format"]==="ruler")?false:true
-        this.browser = new MLVPanel(this.contentDiv,{
-            allow_user_interactions:true,
-            show_scale:true,
-            ruler_track:add_ruler
-        },c.tracks
-        );
+        const add_ruler= c.tracks.find(x=>x["format"]==="ruler")?false:true;
 
-        this.bamscatrack=this.browser.getTrack("_atac_bam_track");
-        this.baseTrack= this.browser.getTrack("_base_track");
-        this.baseTrack.dataStore = this.dataStore;
-   
-        this.addMenuIcon("fa fa-eye-slash",config.legend || "Shoow/Hide Tracks",
-            {
-                func:e=>this.showHideDialog()
-
-            });
-        this.locText=createEl("input",{styles:{fontSize:"11px"}},this.menuSpace);
-        this.locText.addEventListener("keypress",e=>{
-            if (e.keyCode==13){
-                const loc = this._calculatePosition(this.locText.value);
-                this.browser.update(loc.chr,loc.start,loc.end);
+        import ('../browser/panel.js').then(({default:MLVPanel})=>{
+            this.browser = new MLVPanel(this.contentDiv,{
+                allow_user_interactions:true,
+                show_scale:true,
+                ruler_track:add_ruler
+            },c.tracks
+            );
+    
+            this.bamscatrack=this.browser.getTrack("_atac_bam_track");
+            this.baseTrack= this.browser.getTrack("_base_track");
+            this.baseTrack.dataStore = this.dataStore;
+       
+            this.addMenuIcon("fa fa-eye-slash",config.legend || "Shoow/Hide Tracks",
+                {
+                    func:e=>this.showHideDialog()
+    
+                });
+            this.locText=createEl("input",{styles:{fontSize:"11px"}},this.menuSpace);
+            this.locText.addEventListener("keypress",e=>{
+                if (e.keyCode==13){
+                    const loc = this._calculatePosition(this.locText.value);
+                    this.browser.update(loc.chr,loc.start,loc.end);
+                }
+            })
+            this.browser.addListener(this.config.id,(type,data)=>this.onBrowserAction(type,data));
+            if (c.feature_label){
+                this.setLabelFunction(c.feature_label);
             }
-        })
-        this.browser.addListener(this.config.id,(type,data)=>this.onBrowserAction(type,data));
-        if (c.feature_label){
-            this.setLabelFunction(c.feature_label);
-        }
-        if (c.color_by){
-             this.colorByColumn(c.color_by,false)
-        }
-        if (c.color_wig_tracks_by){
-            const col = c.color_wig_tracks_by;
-            const vc= this.dataStore.getValueToColor(col);
-            //color any wig tracks
-            for (let v in vc){
-                const tr =this.browser.tracks[`${col}|${v}`];
-                if (tr){
-                    tr.config.color= vc[v];
+            if (c.color_by){
+                 this.colorByColumn(c.color_by,false)
+            }
+            if (c.color_wig_tracks_by){
+                const col = c.color_wig_tracks_by;
+                const vc= this.dataStore.getValueToColor(col);
+                //color any wig tracks
+                for (let v in vc){
+                    const tr =this.browser.tracks[`${col}|${v}`];
+                    if (tr){
+                        tr.config.color= vc[v];
+                    }
+                }
+            }    
+            if (!this.bamscatrack){
+                const g= this.config.genome_location;
+                if (g){
+                    
+                    this.browser.update(g.chr,Math.round(g.start),Math.round(g.end),true);
+                }
+                else{
+                    this.onDataHighlighted({indexes:[0]});
                 }
             }
-        }    
-        if (!this.bamscatrack){
-            const g= this.config.genome_location;
-            if (g){
-                
-                this.browser.update(g.chr,Math.round(g.start),Math.round(g.end),true);
-            }
-            else{
-                this.onDataHighlighted({indexes:[0]});
-            }
-        }
+           
+        });
+       
        
 	}
 
