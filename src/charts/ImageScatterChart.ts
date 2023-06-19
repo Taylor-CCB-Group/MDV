@@ -21,7 +21,7 @@ class ImageScatterChart extends BaseChart {
     size = 13;
     opacity = 255;
     spaceX = 600;
-    spaceY = 600;
+    spaceY = 392;
     colorBy?: (index: number) => number[];
     id: number;
     constructor(dataStore, div, config) {
