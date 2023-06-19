@@ -20,6 +20,8 @@ class ImageScatterChart extends BaseChart {
     billboard = true;
     size = 13;
     opacity = 255;
+    spaceX = 600;
+    spaceY = 600;
     colorBy?: (index: number) => number[];
     id: number;
     constructor(dataStore, div, config) {
@@ -84,10 +86,10 @@ class ImageScatterChart extends BaseChart {
         const cx = columnIndex[param[0]] as Column;
         const cy = columnIndex[param[1]] as Column;
         // const cz = columnIndex[param[2]] as Column;
-        function n(col: Column, i: number) {
+        function n(col: Column, i: number, space: number) {
             const {minMax} = col;
             //TODO scaling options
-            return 600*(col.data[i] - minMax[0]) / (minMax[1] - minMax[0]) - 300;
+            return space*(col.data[i] - minMax[0]) / (minMax[1] - minMax[0]) - space/2;
         }
         
         /// deck can take any 'data' with a 'length' property, if we have accessors for synthesizing the data by index,
@@ -113,8 +115,8 @@ class ImageScatterChart extends BaseChart {
             getImageAspect: (i: K) => imageArray.getImageAspect(i),
             getPosition: (i: K, {target}) => {
                 //[n(cx, i), n(cy, i), n(cz, i)] // say no to garbage
-                target[0] = n(cx, i);
-                target[1] = n(cy, i);
+                target[0] = n(cx, i, this.spaceX);
+                target[1] = n(cy, i, this.spaceY);
                 target[2] = 0;//n(cz, i);
                 return target;
             },
@@ -130,6 +132,7 @@ class ImageScatterChart extends BaseChart {
                 // It seems like all attributes are updated when we make this new layer descriptor anyway...
                 // It should be be able to avoid updating position etc when unrelated data changes, but that's not happening.
                 getImageAspect: this.progress,
+                getPosition: [this.spaceX, this.spaceY],
                 getFillColor: [this.colorBy, this.opacity],
             },
             extensions: [new ImageArrayDeckExtension()]
@@ -197,6 +200,34 @@ class ImageScatterChart extends BaseChart {
                 continuous: true,
                 func: (v) => {
                     this.opacity = v;
+                    this.updateDeck();
+                }
+            },
+            {
+                type: "slider",
+                name: "spaceX",
+                label: "spaceX",
+                current_value: this.spaceX,
+                min: 1,
+                max: 800,
+                step: 1,
+                continuous: true,
+                func: (v) => {
+                    this.spaceX = v;
+                    this.updateDeck();
+                }
+            },
+            {
+                type: "slider",
+                name: "spaceY",
+                label: "spaceY",
+                current_value: this.spaceY,
+                min: 1,
+                max: 800,
+                step: 1,
+                continuous: true,
+                func: (v) => {
+                    this.spaceY = v;
                     this.updateDeck();
                 }
             },
