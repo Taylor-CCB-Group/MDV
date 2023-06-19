@@ -19,8 +19,12 @@ onmessage= function(e){
     }
     else if (config.method==="proportion"){
         const data2= new Uint8Array(e.data[4]);
-     
         result = getProportionData(lFilter,gFilter,data,data2,config);
+    }
+    else if (config.method==="stacked"){
+        const data2= new Uint8Array(e.data[4]);
+        result = getStackedData(lFilter,gFilter,data,data2,config);
+
     }
     else{     
         result =getNumberInCategory(lFilter,gFilter,data,config)
@@ -173,6 +177,38 @@ function getNumberInCategory(lFilter,gFilter,data,config){
 
 }
 
+function getStackedData(lFilter,gFilter,data,data2,config){
+    const len = data.length;
+    const matrix = Array.from(config.values,(x,i)=>{
+        return {
+            id:i,
+            values:Array.from(config.values2,(x,i)=>({id:i,count:0})),
+            total:0
+        }
+    });
+    for (let i=0;i<len;i++){
+        if (gFilter[i]!==0){
+            if  (gFilter[i] !==lFilter[i]){
+                continue;
+            }           
+        }
+        matrix[data[i]].values[data2[i]].count++;
+        matrix[data[i]].total++;
+    }
+    for (let r of matrix){
+        let rt = 0;
+        let rpt=0;
+        for (let i of r.values){
+            const per= r.total===0?0:i.count/r.total;
+            i.pos=rt;
+            i.per=per;
+            i.perpos=rpt;
+            rt+=i.count;
+            rpt+=per;
+        }
+    }
+    return matrix;
+}
 
 function getSankeyData(lFilter,gFilter,data,data2,config){
     const len1 = config.values.length;

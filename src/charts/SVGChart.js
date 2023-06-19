@@ -62,9 +62,7 @@ class SVGChart extends BaseChart{
             this.x_axis_label=this.x_axis_svg.append("text")
                 .style("text-anchor", "middle")
                 .style("fill","black")
-                .attr("alignment-baseline","auto");  
-        
-           
+                .attr("alignment-baseline","auto");     
         }
        
         const ya = axisTypes["y"];
@@ -101,16 +99,12 @@ class SVGChart extends BaseChart{
         };
     }
 
-    
-
-    _getContentDimensions(){
-           
+    _getContentDimensions(){     
         return {
             top:this.margins.top,
             left:this.margins.left,
             height:this.height-this.margins.bottom- this.margins.top,
-            width:this.width-this.margins.left-this.margins.right
-            
+            width:this.width-this.margins.left-this.margins.right        
         }
     }
 
@@ -119,6 +113,12 @@ class SVGChart extends BaseChart{
             case "tx":
                 this.margins.top=size;
                 break;
+
+            case "ry":
+                this.config.axis.ry.size=size;
+                this.margins.right=size;
+                break;
+
             case "y":
                 this.config.axis.y.size=size;
                 this.margins.left=size;
@@ -402,6 +402,28 @@ class SVGChart extends BaseChart{
                             this.setSize();
                     }
                 }]);
+
+                
+            if (this.config.axis.ry){
+
+                arr =arr.concat([
+                 
+
+                    {
+                        type:"slider",
+                        max:200,
+                        min:20,
+                        step:1,
+                        doc:this.__doc__,
+                        current_value:c.axis.x.size,
+                        label:"Right Y Axis size",
+                        func:(x)=>{
+                            this.setAxisSize("ry",x);
+                            this.setSize();
+                    }
+                }]);
+
+            }
 
 
         }

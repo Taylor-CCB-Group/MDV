@@ -163,9 +163,7 @@ class HierarchicalClustering{
          }
          this.clusters[i].index = i;
       }
-    
       // clean up metadata used for clustering
-   
       delete c1.key; delete c2.key;
       delete c1.index; delete c2.index;
 
@@ -180,20 +178,16 @@ class HierarchicalClustering{
    	    	}
    	    	if (item==="value"){
                 obj[item]._order=this.order++;
-   	    		this.node_order.push(obj[item]._id);
-   	    		
+   	    		this.node_order.push(obj[item]._id);		
    	    	}
    	    }
    }
-
 }
 
 function getHierarchicalNodes(data,config={}){
     const hc = new HierarchicalClustering(config.distance,config.linkage,config.threshold);
     hc.cluster(data);
     const nodes =d3_hierarchy(hc.clusters[0]);
-    
-
     for (let node of nodes.descendants()){
         let d = node.data;
         delete d.size;
@@ -202,12 +196,8 @@ function getHierarchicalNodes(data,config={}){
             d.order = d.value._order;
             delete d.value;
         }
-
     }
-
     return {nodes:nodes,order:hc.node_order}
-
-    
 }
 
 export {HierarchicalClustering,getHierarchicalNodes};
