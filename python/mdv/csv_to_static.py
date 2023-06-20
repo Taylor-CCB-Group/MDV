@@ -16,7 +16,7 @@ parser.add_argument('--discard_redundant', help='discard redundant columns', def
 # grouping options? rename columns so numbers have leading zeros?
 parser.add_argument('-g', '--group', help='group columns by regex', default=False)
 parser.add_argument('--group_by', help='group columns by regex', default=r'(.*?)(\d+)(.*)')
-parser.add_argument('-s', '--separator', help='multitext separator', default=',')
+parser.add_argument('-s', '--separator', help='multitext separator', default=';')
 parse_multitext = True
 
 args = parser.parse_args()

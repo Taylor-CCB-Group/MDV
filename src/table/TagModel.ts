@@ -4,13 +4,13 @@ import { DataModel } from "./DataModel";
 
 type TagColumn = DataColumn<'multitext'>; //multitext...?
 
-const SEP = /\W*\,\W*/; //separate by comma with whitespace trimmed
-const JOIN = ', '; //join with comma and space.
+const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
+const JOIN = '; '; //join with semi-colon and space.
 
 const splitTags = (value: string) => value.split(SEP).filter(v=>v);
 
 
-/** Treating `col.values` as strings containing comma-separated 'tags',
+/** Treating `col.values` as strings containing semi-colon-separated 'tags',
  * find all the indices that include 'tag' as one of those tags.
  */
 function getTagValueIndices(tag: string, col: TagColumn) {
