@@ -169,16 +169,16 @@ class BaseChart{
     * @returns {DOMElement} - the icon
     */
     addMenuIcon(icon,tooltip,config={}){
-        const sp= createEl("span",{
-            "aria-label":tooltip,
-            "data-microtip-color":"red",
-            role:"tooltip",
-            "data-microtip-size":config.size || "small",
-            "data-microtip-position":config.position || "bottom-left",
-            styles:{
+        const sp = createEl("span", {
+            "aria-label": tooltip,
+            "data-microtip-color": "red",
+            role: "button", //a11y - we could use an actual button rather than span here, would need styling.
+            "data-microtip-size": config.size || "small",
+            "data-microtip-position": config.position || "bottom-left",
+            styles: {
                 margin:"0px 1px"
             }
-            },this.menuSpace);
+        }, this.menuSpace);
     
         createEl("i",{  
             classes:["ciview-chart-icon"].concat(icon.split(" "))

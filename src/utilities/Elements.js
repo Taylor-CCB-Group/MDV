@@ -65,12 +65,12 @@ function splitPane(el,config={}){
 
 function createMenuIcon(icon,config,parent){
     const attrs={
+        role: "button", //a11y - we could use an actual button rather than span here, would need styling.
     };
     const t  =config.tooltip;
     if(t){
         Object.assign(attrs,{
             "aria-label":t.text,
-            role:"tooltip",
             "data-microtip-size":t.size || "small",
             "data-microtip-position":t.position || "bottom-left"
         });
@@ -82,7 +82,6 @@ function createMenuIcon(icon,config,parent){
         classes:["ciview-menu-icon"].concat(icon.split(" ")),
         styles:{
             fontSize: config.size || "18px",
-          
         }
     },sp);
     if (config.func){
