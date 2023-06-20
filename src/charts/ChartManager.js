@@ -1831,7 +1831,7 @@ class ChartManager{
                 onresize:(doc,box)=>{
                     chart.setSize(box.width,box.height)
                 },
-                url:this.config.popouturl || "/"
+                url:this.config.popouturl || "/?popout=true",
         
             }
         );

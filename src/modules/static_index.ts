@@ -24,7 +24,9 @@ document.addEventListener("DOMContentLoaded", () => loadData());
 
 // if URLSearchParams has a 'dir' parameter, use that as the data directory.
 const urlParams = new URLSearchParams(window.location.search);
-const dir = urlParams.get('dir') || prompt("Enter data URL", "https://mdvstatic.netlify.app/ytrap2");
+// if we're in a popout window, ignore the dir parameter and don't load data
+const isPopout = urlParams.get('popout') === "true";
+const dir = urlParams.get('dir') || (isPopout ? '' : prompt("Enter data URL", "https://mdvstatic.netlify.app/ytrap2"));
 const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
 // set title of page to the data directory
 document.title = `MDV - ${root}`;
@@ -53,6 +55,7 @@ async function fetchAndPatchJSON(url) {
 }
 
 async function loadData() {
+    if (isPopout) return;
     const datasources = await fetchAndPatchJSON(`${root}/datasources.json`);
     const config = await fetchAndPatchJSON(`${root}/state.json`);
     const views = await fetchAndPatchJSON(`${root}/views.json`);
