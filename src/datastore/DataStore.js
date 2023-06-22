@@ -32,7 +32,7 @@ import {quantileSorted} from 'd3-array';
 */
 
 class DataStore{
-    constructor(size,config={}){       
+    constructor(size,config={},rowDataLoader){       
         this.size=size;
         this.filterSize=size;
         this.columns=[];
@@ -56,7 +56,8 @@ class DataStore{
         this.syncColumnColors=[];
         this.linkColumns=[];
 
-
+        this.rowDataLoader =rowDataLoader;
+        this.rowData= new Map();
         this.columnsWithData=[];
         this.dirtyColumns={
             added:{},
@@ -72,6 +73,7 @@ class DataStore{
         }
         this.images= config.images;
         this.genome_browser = config.genome_browser;
+        this.tree_diagram=config.tree_diagram;
        
         if (config.columns){
             for (let c of config.columns){
@@ -187,7 +189,7 @@ class DataStore{
             dim.filterMethod=null;
             if (dim.bgfArray){
                 for (let i=0;i<this.size;i++){
-                    if  (dim.bgfArray[i]===0){
+                    if  (dim.bgfArray[i]===0){F
                         dim.filterArray[i]=2;
                     }                      
                 } 
@@ -251,7 +253,21 @@ class DataStore{
      */
     dataHighlighted(indexes,source){
         this.highightedData=indexes;
-        this._callListeners("data_highlighted",{indexes,source});
+        this.loadRowData(indexes[0]).then(data=> this._callListeners("data_highlighted",{indexes,source,data}))     
+    }
+
+    async loadRowData(index){
+        //no data loader
+        if (!this.rowDataLoader){
+            return null;
+        }
+        // is it in cache (stores null values as well)
+        if (this.rowData.has(index)){
+            return this.rowData.get(index)
+        }
+        const rd =await this.rowDataLoader(this.name,index);
+        this.rowData.set(index,rd);
+        return rd;
     }
 
     /**
@@ -986,12 +1002,6 @@ class DataStore{
         const arr=[];
         const cols=[];
         const headers=["index"].concat(columns);
-        for (let c of columns){    
-            const col= this.columnIndex[c];
-            cols.push(col);
-            headers.push(col.name);
-
-        }
         const len =indexes?indexes.length:this.size
         arr.push(headers.join(delimiter));
         for (let i=0;i<len;i++){

@@ -83,8 +83,7 @@ class RowSummaryBox extends BaseChart{
     }
 
     onDataFiltered(){
-        const i =this.dataStore.getFirstFilteredIndex();
-        this.onDataHighlighted({indexes:[i]})   
+         
     }
 
     changeBaseDocument(doc){

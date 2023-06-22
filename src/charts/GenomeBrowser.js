@@ -15,7 +15,7 @@ class GenomeBrowser extends BaseChart{
         c.type="genome_browser";
         const add_ruler= c.tracks.find(x=>x["format"]==="ruler")?false:true;
 
-        import ('../browser/panel.js').then(({default:MLVPanel})=>{
+        import ('../browser/panel.js?v0.1').then(({default:MLVPanel})=>{
             this.browser = new MLVPanel(this.contentDiv,{
                 allow_user_interactions:true,
                 show_scale:true,
@@ -67,10 +67,7 @@ class GenomeBrowser extends BaseChart{
                     this.onDataHighlighted({indexes:[0]});
                 }
             }
-           
         });
-       
-       
 	}
 
 
@@ -132,14 +129,10 @@ class GenomeBrowser extends BaseChart{
         })
         func([cat],()=>{
             const ind = dataStore.getColumnIndex(index);
-          
             const colors = dataStore.getColumnColors(cat);
             const col = dataStore.columnIndex[cat];
             this.bamscatrack.setCategories(cat,col.data,col.values,colors);
-                //get basic dimension from the other datastore
-               
-
-         
+                //get basic dimension from the other datastore         
             this.cellDim= dataStore.getDimension("base_dimension");
           
             this.bamscatrack.addIndex(ind);
@@ -162,9 +155,7 @@ class GenomeBrowser extends BaseChart{
             }
             else{
                 this.onDataHighlighted({indexes:[0]});
-            }
-        
-           
+            }  
         })
     }
 
@@ -263,13 +254,37 @@ class GenomeBrowser extends BaseChart{
     onDataHighlighted(data){
         if (data.source===this){
             return;
-        }
+        }       
         const p = this.config.param;
         const vm = this.config.view_margins;
         const o = this.dataStore.getRowAsObject(data.indexes[0],p);
         //some basic checks
         let st = o[p[2]]>o[p[1]]?o[p[1]]:o[p[2]];
         let en = o[p[2]]>o[p[1]]?o[p[2]]:o[p[1]];
+        const rowData = data.data;
+
+       
+        if (rowData && rowData.phase_data){
+            for (let id of this.browser.track_order){
+                let pd = rowData.phase_data[id];           
+                if (pd){
+                    if (pd.ratio[0]==0 && pd.ratio[1]==0){
+                        this.browser.setTrackAttribute(id,"phase_data",null)
+                    } 
+                    else{       
+                        this.browser.setTrackAttribute(id,"phase_data",
+                        {
+                            ratio:pd.ratio[0]/(pd.ratio[0]+pd.ratio[1]),
+                            st,
+                            en
+                        });
+                    }
+                }
+                else{
+                    this.browser.setTrackAttribute(id,"phase_data",null)
+                }
+            }
+        }
         let margin =1000;
         if  (vm.type==="percentage"){
             en =  st===en?st+1:en;
@@ -373,6 +388,10 @@ class GenomeBrowser extends BaseChart{
     }
 
     onDataFiltered(data){
+        if (!this.browser){
+            setTimeout(()=>this.onDataFiltered(data),100);
+            return;
+        }
         if (!this.dataStore.isFiltered()){
             this.browser.setTrackFeatureFilter("_base_track",null);      
         }
@@ -384,6 +403,7 @@ class GenomeBrowser extends BaseChart{
                 return false;
             });
         }
+        
         this.browser.update();
     }
 

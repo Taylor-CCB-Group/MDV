@@ -200,5 +200,20 @@ function getHierarchicalNodes(data,config={}){
     return {nodes:nodes,order:hc.node_order}
 }
 
-export {HierarchicalClustering,getHierarchicalNodes};
+
+function parseNewick(tree){
+    let r={};
+    for(let e=[],s=tree.split(/\s*(;|\(|\)|,|:)\s*/),t=0;t<s.length;t++){
+        let n=s[t];
+        switch(n){
+            case"(":var c={};r.children=[c],e.push(r),r=c;break;
+            case",":var c={};e[e.length-1].children.push(c),r=c;break;
+            case")":r=e.pop();break;case":":break;
+            default:var h=s[t-1];")"===h||"("===h||","===h?r.name=n:":"===h&&(r.length=parseFloat(n));
+        }
+    }
+    return d3_hierarchy(r);    
+}
+
+export {HierarchicalClustering,getHierarchicalNodes,parseNewick};
 

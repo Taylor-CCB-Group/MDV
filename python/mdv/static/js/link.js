@@ -20,12 +20,14 @@ function _mdvInit(staticFolder){
         if (config.all_views && view && config.all_views.indexOf(view) !==-1){
             config["initial_view"]=view;
         }
+        
     
         const dataLoader={
             function:staticFolder?getLocalCompressedBinaryDataLoader(data.datasources,".")
                                 :getArrayBufferDataLoader("/get_data"),
             viewLoader:staticFolder?async (view)=> data.views[view]
-                                    :_mdvGetView
+                                    :_mdvGetView,
+            rowDataLoader:staticFolder?_loadRowDataStatic:_loadRowData
         }
     
         const listener = (type,cm,info)=>{
@@ -51,6 +53,18 @@ function _mdvInit(staticFolder){
     });
    
 
+}
+
+async function _loadRowData(datasource,index){
+    return await _mdvGetData("/get_row_data",{datasource,index})
+}
+
+async function _loadRowDataStatic(datasource,index){
+    const resp = await fetch(`./rowdata/${datasource}/${index}.json`);
+    if (resp.status !=200){
+        return null
+    }
+    return await resp.json()
 }
 
 async function _getConfigs(folder){

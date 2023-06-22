@@ -139,11 +139,11 @@ class StackedRowChart extends SVGChart{
             update=>update.transition(trans)
                 .attr("x",d=>d.perpos*box.width)
                 .attr("width",d=>d.per*box.width)
-                .attr("height",bheight)               
+                .attr("height",bheight)  
+                .attr("fill",d=>colors[d.id])  //if color scheme changed           
         );
     }
 }
-
 
 BaseChart.types["stacked_row_chart"]={
     "class":StackedRowChart,
@@ -158,7 +158,6 @@ BaseChart.types["stacked_row_chart"]={
             name:"Category x axis"
         }
     ]
-
 }
 
 export default StackedRowChart;

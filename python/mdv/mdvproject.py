@@ -175,18 +175,36 @@ class MDVProject:
         
         
 
-    def add_column(self,datasource,column,data):
-        li = pandas.Series(data)
-        h5 = self._get_h5_handle()
-        gr = h5[datasource]
+    def set_column(self,datasource,column,data):
+        '''Adds (or replaces an existing column) with the data supplied
+        Args:
+            datasource (str): The name of the datasource.
+            column (str|dict):  metadata for the column. Can be a string with the column's name,
+                although datatype should also be included as the inferred datatype 
+                is not always correct
+            raw_data (list|array): Anything that can be converted into a pandas Series
+              The data should be in the correct order
+        '''
+        if type(column) == str:
+            column={"name":column}
         if not column.get("field"):
             column["field"]=column["name"]
+        ds= self.get_datasource_metadata(datasource)
+        ind = [c for c,x in enumerate(ds["columns"]) if x["field"]==column["field"]]
+        col_exists= len(ind)>0
+        li = pandas.Series(data)
         if not column.get("datatype"):
             column["datatype"]= datatype_mappings.get(str(li.dtype),"text")
+        h5 = self._get_h5_handle()
+        gr = h5[datasource]
+        if col_exists:
+            del h5[datasource][column["field"]]
         add_column_to_group(column,li,gr,len(li))
         h5.close()
-        ds= self.get_datasource_metadata(datasource)
-        ds["columns"].append(column)
+        if col_exists:
+            ds["columns"][ind[0]]=column
+        else:
+            ds["columns"].append(column)
         self.set_datasource_metadata(ds)
 
     def remove_column(self,datasource,column):
@@ -455,7 +473,8 @@ class MDVProject:
         return config
 
     def convert_to_static_page(self,outdir,debug=False,include_sab_headers=True):
-        fdir = split(os.path.abspath(__file__))[0]  
+        fdir = split(os.path.abspath(__file__))[0]
+        tdir = join(fdir,"templates")
         #copy everything except the data 
         copytree(self.dir,outdir,ignore=ignore_patterns("*.h5"))
         #copy the js and images
@@ -465,7 +484,7 @@ class MDVProject:
         self.convert_data_to_binary(outdir)
         #write out the index file
         page = "page.html" if not debug else "debug_page.html" 
-        template = join(fdir,"templates",page)
+        template = join(tdir,page)
         page = open(template).read()
         if not debug:
             page=page.replace("_mdvInit()","_mdvInit(true)")
@@ -473,6 +492,8 @@ class MDVProject:
             conf  = self.state
             #can't edit static page
             conf["permission"]="view"
+            conf["popouturl"]="popout.html"
+            copyfile(join(tdir,"popout.html"),join(outdir,"popout.html"))
             #throttle the dataloading so don't get network errors
             conf["dataloading"]={
                 "split":5,
@@ -482,7 +503,7 @@ class MDVProject:
         #add service worker for cross origin headers
         if include_sab_headers and not debug:
             page=page.replace("<!--sw-->",'<script src="serviceworker.js"></script>')
-            copyfile(join(fdir,"templates","serviceworker.js"),join(outdir,"serviceworker.js"))  
+            copyfile(join(tdir,"serviceworker.js"),join(outdir,"serviceworker.js"))  
         with open(join(outdir,"index.html"),"w") as o:
             o.write(page)
 

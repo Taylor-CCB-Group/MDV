@@ -20,6 +20,7 @@ import "./MultiLineChart.js";
 import "./DensityScatterPlot";
 import "./SelectionDialog.js";
 import "./StackedRowChart";
+import "./TreeDiagram";
 
 
 
@@ -32,7 +33,7 @@ import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in impo
 
 
 //order of column data in an array buffer
-//doubles and integers (both represented by float32) need to be first
+//doubles and integers (both represented by float32) and int32 need to be first
 // folowed by multitext (uint16) then text/unique (uint8) 
 const column_orders={
     "double":0,
@@ -86,7 +87,9 @@ function listenPreferredColorScheme(callback) {
 * <ul>
 *   <li> function - The [function]{@tutorial datalaoder} to load the data
     (can be omitted if data loaded from a file)</li>
-*   <li> viewLoader - The function that will load the each view </li>
+*   <li> viewLoader - The function that will load the each view  (not necessay if only one view)</li>
+*   <li> rowDataLoader - (optional) an asunc function which is given the datasource name and row index
+*     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
 *   <li> files - specifies the files to load the data </li>
 * </ul>
 * @param {Object} config extra settings
@@ -123,7 +126,7 @@ class ChartManager{
         for (const d of dataSources){
             const ds= {
                 name:d.name,
-                dataStore:new DataStore(d.size,d),
+                dataStore:new DataStore(d.size,d,d.row_data_loader?dataLoader.rowDataLoader:null),
                 link_to:d.link_to,
                 index_link_to:d.index_link_to,
                 color:d.color || themes[this.theme].background_color,
@@ -135,6 +138,7 @@ class ChartManager{
             this.dsIndex[d.name]=ds;
             this._addDSListeners(ds);
             this.columnsLoading[d.name]={};
+        
             
         }
         if (listener){

@@ -7,7 +7,9 @@ The ChartManager object links DataSources, loads column data on demand and manag
 * **datasources** - list of DataStore [configs]{@tutorial datasource}, these configs should also include a size parameter showing the number of rows in the data set
 * **dataloader** - a dataloader which comprises of three parameters
     * **function** - this [function]{@tutorial dataloader} accepts a list of columns and returns a promise (not needed if all data is to be loaded from files)
-    * **viewLoader** - a function that will return the [view]{@tutorial views} given the view name  
+    * **viewLoader** - a function that will return the [view]{@tutorial views} given the view name
+    * **rowDataLoader** - an optional function that accepts a datasource name and index and returns an an object with data. The
+    function will be called if the datasource's config contains row_data_loader:true and DataHighlighted is invoked  
     * **files** - specifies static files (tsv,csv or json), which contain the data to display. Useful for small amounts of data (100 000s rows) and testing. If all the data is to be loaded dynamically then this is not required.
     ```json
     [
@@ -64,7 +66,7 @@ Called when the user saves the data. The object passed to the listener consists 
 * view - A config containing all data for the view
 * currentView - 
 * all_views -  A list of views 
-* updated columns -  a dictionary with a entry for each datasource 
+* updatedColumns -  a dictionary with a entry for each datasource 
     * columns - a list of all columns that have either been updated or added containing:
         * metadata- the columns metadata
         * data an array of the column's raw data
@@ -81,7 +83,7 @@ Called when the user saves the data. The object passed to the listener consists 
     "view":{....},
     "cuurentView":"default",
     "all_views":["default","myview"],
-    "updateColumns":{
+    "updatedColumns":{
         "cells":{
             "columns":[
                 {

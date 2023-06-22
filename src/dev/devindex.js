@@ -21,9 +21,16 @@ async function init(){
     const cf = await r.json();
     const dataLoader={
         function:getLocalCompressedBinaryDataLoader(ds,"."),
-        viewLoader:async v=> vs[v]
+        viewLoader:async v=> vs[v],
+        rowDataLoader:async (datasource,index)=>{
+            const resp = await fetch(`./rowdata/${datasource}/${index}.json`);
+            if (resp.status !=200){
+                return null;
+            }
+            return await resp.json()
+        } 
     }
-   new ChartManager("holder",ds,dataLoader,cf);
+    new ChartManager("holder",ds,dataLoader,cf);
 }
 
 

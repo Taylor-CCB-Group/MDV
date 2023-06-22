@@ -96,6 +96,17 @@ def create_app(project,open_browser=True, port =5000):
         data=request.json
         return json.dumps(project.get_view(data["view"]))
     
+    #get any custom row data
+    @app.route("/get_row_data",methods=["POST"])
+    def get_row_data():
+        req=request.json
+        try:
+            with open( safe_join(project.dir,"rowdata",req["datasource"],f"{req['index']}.json")) as f:
+                data = f.read()
+        except Exception as e:
+            data=json.dumps({"data":None})
+        return data
+    
     # only the specified region of track files (bam,bigbed,tabix)
     # needs to be returned 
     @app.route("/tracks/<path:path>")

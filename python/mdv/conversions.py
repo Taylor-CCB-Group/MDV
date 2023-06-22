@@ -48,7 +48,7 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3):
         matrix = mdata.X.value if hasattr(mdata.X,"value") else mdata.X
         if matrix.shape[1] !=0:
             p.add_datasource(mod,mdata.var)
-            p.add_column(mod,{"name":"name","datatype":"unique"},mdata.var.index)
+            p.set_column(mod,{"name":"name","datatype":"unique"},mdata.var.index)
             p.add_rows_as_columns_link("cells",mod,"name",mod)
             matrix = scipy.sparse.csr_matrix(matrix).transpose().tocsr()
             p.add_rows_as_columns_subgroup("cells",mod,mod+"_expr",matrix,sparse=True)
