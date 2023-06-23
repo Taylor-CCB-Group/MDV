@@ -14,7 +14,8 @@ class TableChart extends BaseChart{
 		super(dataStore,div,config);
         this.config.type="table_chart";
         let cols = [];
-        //add the index column
+        //add the index column 
+        //TODO fix sorting on index column
         cols = [{field:"__index__",id:"__index__",name:"index",datatype:"integer",sortable:true,width:100}];
         let index=0;
         const cw = config.column_widths || {};
@@ -28,6 +29,8 @@ class TableChart extends BaseChart{
                 sortable:true,
                 width:cw[c]?cw[c]:100
             }
+            // PJT coerce multitext internally... for now(?)
+            if (column.datatype === "multitext") col.datatype = "text";
             
             if (column.editable){
                 col.editor=TextEditor;
@@ -49,7 +52,7 @@ class TableChart extends BaseChart{
            // showHeaderRow:true,
             //headerRowHeight:40
         };	
-        this.dataModel= new DataModel(dataStore,{autoupdate:false});
+        this.dataModel = new DataModel(dataStore, {autoupdate:false});
         this.dataModel.setColumns(this.config.param);
         this.grid= new SlickGrid(this.contentDiv,this.dataModel,cols,this.options);
         this.grid.onHeaderCellRendered.subscribe((e, args)=>{
@@ -227,6 +230,8 @@ class TableChart extends BaseChart{
     getColumnInfo(){
         return this.grid.getColumns()
         .filter(x=>{
+            //PJT suspected "multitext" needed to be handled here, 
+            //now working on the basis that any 'multitext' entering this system will be described as 'text'
             return x.datatype==="text"
         })
         .map(x=>{

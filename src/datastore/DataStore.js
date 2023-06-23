@@ -624,7 +624,7 @@ class DataStore{
         for (let c of columns){
             const col = this.columnIndex[c];
             let v= col.data[index];
-            if (col.datatype==="text"){
+            if (col.datatype === "text" || col.datatype==="multitext") {
                 v= col.values[v];
             }
             else if (col.datatype==="double" || col.datatype==="integer" || col.datatype==="int32"){
