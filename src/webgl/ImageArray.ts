@@ -101,6 +101,7 @@ export class ImageArray {
                 // bind texture and update it
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+                // TODO consider changing how aspect ratio works to allow for non-square texture
                 entry.aspectRatio = image.width / image.height; // mutating entry won't prompt re-computing vertex buffers...
                 const resizedImage = resizeImage(image, width, height)//, this.logEl);
                 gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, zIndex, width, height, 1, gl.RGBA, gl.UNSIGNED_BYTE, resizedImage);
