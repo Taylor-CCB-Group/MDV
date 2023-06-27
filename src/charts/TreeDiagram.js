@@ -31,10 +31,7 @@ class TreeDiagram extends SVGChart{
         const trans =  select(this.contentDiv).transition()
         .duration(500).ease(easeLinear);
         const b= this._getContentDimensions();
-        const width= this.margins.right;
-        const treeMap = cluster().size([b.height,b.width]).separation((a,b)=>{
-            return 1;
-        })
+        const treeMap = cluster().size([b.height,b.width-50]).separation((a,b)=>1);
         
         const nodes= treeMap(this.treeData);
         function maxLength(d) {
@@ -42,7 +39,9 @@ class TreeDiagram extends SVGChart{
         }
     
         this.setBranchLength(this.treeData, this.treeData.data.length = 0,(b.width-50)/maxLength(this.treeData));
-        const desc=  nodes.descendants();   
+        
+        const desc=  nodes.descendants();
+        const nml = max(desc,d=>d.data.length);
         this.graph_area.selectAll(".tree-link")
             .data(desc.slice(1))
             .join("path")
@@ -58,9 +57,10 @@ class TreeDiagram extends SVGChart{
             .join("text")
             .text(d => d.data.name.replace(/_/g, " "))
             .attr("font-size","9px")
+            .attr("alignment-baseline","middle")
             .style("stroke","currentColor")
             .transition(trans)
-            .attr("x", d=>d.y)
+            .attr("x", d=>d.y+2)
             .attr("y", d=>d.x);         
     }
 

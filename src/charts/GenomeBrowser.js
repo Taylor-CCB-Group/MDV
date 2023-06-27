@@ -103,6 +103,9 @@ class GenomeBrowser extends BaseChart{
     //the datastore (ensure column and index are loaded beofre carrying
     //out the function)
     setupLinks(dataStore,index,func){
+        if (! this.browser){
+            setTimeout(()=>this.setupLinks(dataStore,index,func),100)
+        }
        
         this.dataLink= {
             dataStore:dataStore,

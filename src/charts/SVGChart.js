@@ -238,7 +238,7 @@ class SVGChart extends BaseChart{
         const trans =  select(this.contentDiv).transition()
         .duration(400).ease(easeLinear);
         const b= this._getContentDimensions();
-        const treeMap = cluster().size([b.width,height])
+        const treeMap = cluster().size([b.width,height]);
         const nodes= treeMap(nodeData);
         const desc=  nodes.descendants();
         const interval= b.width/number;
@@ -302,7 +302,7 @@ class SVGChart extends BaseChart{
             }
 
         }
-
+        
         const links= this.ry_axis_svg.selectAll(".tree-link")
             .data(desc.slice(1))
             .join("path")
