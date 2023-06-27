@@ -1,11 +1,10 @@
 import WGLScatterPlot from "./WGLScatterPlot.js";
 import BaseChart from "./BaseChart.js";
-import {select} from "d3-selection";
 import { geoPath } from "d3-geo";
-import {easeLinear} from "d3-ease";
 import {scaleLinear} from 'd3-scale';
 import {createEl} from "../utilities/Elements.js";
 import "../datastore/DensityDimension.js";
+
 
 
 
@@ -129,6 +128,23 @@ class DensityScatterPlot extends WGLScatterPlot{
         }
     }
 
+    getContextMenu(){
+        let cm = super.getContextMenu();
+        if (this.dataStore.regions){
+            cm.push({
+                text:"Set as Default Image",
+                icon:"fas fa-file-image",
+                func:()=>{
+                    const c =  this.config;
+                    if (c.background_image){
+                        this.dataStore.regions.all_regions[c.region].default_image=c.background_image.name;
+                        this.dataStore.dirtyMetadata.add("regions");
+                    }
+                }
+              });
+        }
+        return cm;
+    }
 
     _rescaleSVG(){
         const xr= this.x_scale.domain();
@@ -301,6 +317,41 @@ BaseChart.types["density_scatter_plot"]={
 
     ]
 }
+
+BaseChart.types["image_scatter_plot"]={
+    name:"Image Scatter Plot",
+    class:DensityScatterPlot,
+    required:["regions"],
+    extra_controls:(ds)=>{
+        const vals=[];
+        for(let x in ds.regions.all_regions){
+            vals.push({name:x,value:x})
+        }
+        return [
+            {
+                type:"dropdown",
+                name:"region",
+                label:ds.getColumnName(ds.regions.region_field),
+                values:vals
+            }
+        ]
+    },
+    init:(config, ds, ec)=>{
+        const r =  ds.regions;
+        const sr= r.all_regions[ec.region];
+        config.color_by= r.default_color;
+        config.param=r.position_fields.concat([r.default_color]);
+        config.background_filter={
+            column:r.region_field,
+            category:ec.region
+        };
+        config.color_legend={display:false};
+        config.region=ec.region;
+        config.roi=sr.roi;
+        config.background_image=sr.images[sr.default_image];     
+    }
+}
+
 
 
 export default DensityScatterPlot;

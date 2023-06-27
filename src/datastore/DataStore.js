@@ -48,6 +48,7 @@ class DataStore{
         this.textDecoder = new TextDecoder();
         this.columnGroups={};
         this.subtypeToGroup={};
+        this.interactions = config.interactions;
 
         //info about subgroups and their datasources
         this.subgroups={};
@@ -55,6 +56,7 @@ class DataStore{
         this.accessOtherDataStore=[];
         this.syncColumnColors=[];
         this.linkColumns=[];
+        this.regions=config.regions;
 
         this.rowDataLoader =rowDataLoader;
         this.rowData= new Map();
@@ -189,7 +191,7 @@ class DataStore{
             dim.filterMethod=null;
             if (dim.bgfArray){
                 for (let i=0;i<this.size;i++){
-                    if  (dim.bgfArray[i]===0){F
+                    if  (dim.bgfArray[i]===0){
                         dim.filterArray[i]=2;
                     }                      
                 } 

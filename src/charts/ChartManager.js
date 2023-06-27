@@ -21,6 +21,8 @@ import "./DensityScatterPlot";
 import "./SelectionDialog.js";
 import "./StackedRowChart";
 import "./TreeDiagram";
+import "./CellNetworkChart";
+import "./SingleHeatMap"
 
 
 
@@ -145,6 +147,8 @@ class ChartManager{
             this.addListener("_default",listener)
         }
         this.transactions={};
+
+
        
         
         //set up container and top(main menu)
@@ -275,7 +279,43 @@ class ChartManager{
         else{
             this._loadView(config,dataLoader,true);
         }
+
+        //add links
+        for (let ds of this.dataSources){
+            const links = ds.dataStore.links;
+            if (links){
+                for (let ods in links){
+                    if (!this.dsIndex[ods]){
+                        console.warn(`datasource ${ds.name} has link to non-existent datasource ${ods}`);
+                        return;
+                    }
+                    if (links[ods].interactions){
+                        this._addInteractionLinks(ds.dataStore,this.dsIndex[ods].dataStore,links[ods].interactions);
+                    }
+                }
+
+            }
+        }
          
+    }
+
+    _addInteractionLinks(ds,ods,links){
+        const interactionFilter= ods.getDimension("category_dimension");
+        const icols = links.interaction_columns
+        const c1 = icols[0];
+        const c2= icols[1];
+        ds.addListener(`${ds.name}_interaction`,(type,data)=>{
+            if (type==="data_highlighted"){
+                this._getColumnsThen(ds.name,[c1,c2],()=>{
+                    //get the the two interacting items
+                    const info = ds.getRowAsObject(data.indexes[0],[c1,c2]);
+                    this._getColumnsThen(ods.name,[icols[2]],()=>{
+                        //filter the two interacting items 
+                        interactionFilter.filter("filterCategories",[icols[2]],[info[c1],info[c2]])
+                    })
+                })
+            }
+        });
     }
 
     _setUpChangeLayoutMenu(ds){

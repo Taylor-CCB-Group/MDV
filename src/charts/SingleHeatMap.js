@@ -18,10 +18,11 @@ class SingleHeatMap extends SVGChart{
         vals=this.dataStore.getColumnValues(p[1]);
         this.x_scale.domain(vals.slice(0));   
         const c= this.config;   
-        c.color_scale = c.color_scale ||  {log:false};
+        c.color_scale = c.color_scale ||  {log:false,min_max:dataStore.getColumnQuantile(p[2],0.01)};
         if (!c.color_legend){
             c.color_legend={display:true}
         }
+
         this.setColorFunction()
         //no filtering one time set up
         this.initialSetUp();
@@ -266,6 +267,22 @@ class SingleHeatMap extends SVGChart{
             return {t:x,v:x}
         })
 
+        const mm = this.dataStore.getColumnQuantile(c.param[2],0.01)
+
+        settings.push({        
+            type:"doubleslider",
+            max:mm[1],
+            min:mm[0],
+            doc:this.__doc__,
+            current_value:c.color_scale.min_max,
+            label:"Color Scale",
+            func:(x,y)=>{     
+                c.color_scale.min_max=[x,y];
+                this.setColorFunction();
+                this.drawChart();
+            }
+        });
+
         settings.push({
             label:"Change Category",
             type:"dropdown",
@@ -283,14 +300,15 @@ class SingleHeatMap extends SVGChart{
             type:"dropdown",
             values:[params,"name","field"],
             current_value:c.param[2],
-            func:(x)=>{
-               this.changeValues(x);
+            func:(x,controls)=>{
+                const cs= this.dataStore.getColumnQuantile(x,0.01);
+                c.color_scale.min_max= cs
+                const sl =controls["Color Scale"].noUiSlider;
+                sl.updateOptions({range:{max:cs[1],min:cs[0]}});
+                sl.set(cs);
+                this.changeValues(x);
             }
         });
-
-
-
-
         return settings;
     }
 
@@ -315,36 +333,43 @@ class SingleHeatMap extends SVGChart{
 }
 
 BaseChart.types["single_heat_map"]={
-    name:"Single Heat Map",
-    allow_user_add:false,
-    class:SingleHeatMap,
-    params:[
-        {
-            type:"text",
-            name:"Categories on y-axis" //0
-        },
-        {
-            type:"text",
-            name:"categories on x-axis" //1
-        },
-        {
-            type:"number",
-            name:"Value to display" //2
-        },
-        {
-            type:"text",
-            name:"group to display" //3
-        },
-    
-        {
-            type:"text",
-            name:"group1" //4
-        },
-        {
-            type:"text",
-            name:"group2" //5
-        }
-    ]
+    name:"Interaction Matrix",
+    required:["interactions"],
+    methodsUsingColumns:["changeValues"],
+    init:(config, dataSource, extraControls)=>{
+        const i =  dataSource.interactions;
+        const param = dataSource.interactions.interaction_matrix;
+        config.param=[
+            i.interaction_columns[0],
+            i.interaction_columns[1],
+            extraControls["value"],
+            i.pivot_column,
+            param.group1,
+            param.group2
+        ],
+        config.category=extraControls["pivot"]
+    },
+    extra_controls:(dataSource)=>{
+        const pc= dataSource.interactions.pivot_column;
+        const cols  = dataSource.getColumnList("number");
+        return [
+            {
+                type:"dropdown",
+                name:"pivot",
+                label:dataSource.getColumnName(pc),
+                values:dataSource.getColumnValues(pc).map(x=>({name:x,value:x}))
+
+            },
+            {
+                type:"dropdown",
+                name:"value",
+                label:"Value To Display",
+                values:cols.map(x=>({name:x.name,value:x.field}))
+
+            }
+        ];
+    },
+    class:SingleHeatMap
 };
 
 export default SingleHeatMap;

@@ -1001,40 +1001,37 @@ class CellNetworkChart extends SVGChart{
 }
 
 BaseChart.types["cell_network_chart"]={
-    name:"Cell Network Chart",
-    allow_user_add:false,
+    name:"Spatial Connectivity Map",
+    required:["interactions"],
     methodsUsingColumns:["changeLinkThicknessParameter","changeLinkLengthParameter","changeLinkColorParameter"],
     class:CellNetworkChart,
-    params:[
-        {
-            type:"text",
-            name:"category"  //0
-        },
-        {
-            type:"text",
-            name:"Cells 1"  //1
-        },
-        {
-            type:"text",
-            name:"Cells 2"  //2
-        },
-        {
-            type:"number",
-            name:"link length" //3
-        },
-        {
-            type:"number",
-            name:"link thickness" //4
-        },
-        {
-            type:"number",
-            name:"link color"  //5
-        },
-        {
-            type:"number",
-            name:"cell Number"  //6
-        }
-    ]
+    init:(config, dataSource, extraControls)=>{
+        const i =  dataSource.interactions;
+        const param = dataSource.interactions.spatial_connectivity_map;
+        config.param=[
+            i.pivot_column,
+            i.interaction_columns[0],
+            i.interaction_columns[1],
+            param.link_length,
+            param.link_thickness,
+            param.link_color,
+            param.node_size
+        ],
+        config.category=extraControls["pivot"]
+    },
+    extra_controls:(dataSource)=>{
+        const pc= dataSource.interactions.pivot_column;
+        return [
+            {
+                type:"dropdown",
+                name:"pivot",
+                label:dataSource.getColumnName(pc),
+                values:dataSource.getColumnValues(pc).map(x=>({name:x,value:x}))
+
+            }
+        ];
+
+    }
 }
 
 export default CellNetworkChart;

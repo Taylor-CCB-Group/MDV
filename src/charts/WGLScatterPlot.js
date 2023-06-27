@@ -285,16 +285,28 @@ class WGLScatterPlot extends WGLChart{
 			const i = range.imageMoved;
 			const c=this.config
 			const name =c.background_image.name;
-			const inf = c.image_choices.find(x=>x[0]===name);
+			
 			i.position[1]=-(i.position[1]+i.height)
 			c.background_image.height=i.height;
 			c.background_image.width= i.width;
 			c.background_image.position= i.position;
+            //obsolete
+            if (c.image_choices){
+                const inf = c.image_choices.find(x=>x[0]===name);
+                inf[2]=i.width;
+                inf[3]=i.height;
+                inf[4]=i.position[0];
+                inf[5]=i.position[1];
 
-			inf[2]=i.width;
-			inf[3]=i.height;
-			inf[4]=i.position[0];
-			inf[5]=i.position[1];
+            }
+            if (this.dataStore.regions){
+                const im = this.dataStore.regions.all_regions[c.region].images[c.background_image.name];
+                im.position=i.position;
+                im.height=i.height;
+                im.wdith=i.width
+                this.dataStore.dirtyMetadata.add("regions");
+            }
+           
 
 		}
 		else{
@@ -312,11 +324,10 @@ class WGLScatterPlot extends WGLChart{
     }
 
 	addBackgroundImage(ic,change=false){
-		
 		const im = new Image();
 		const c = this.config;
 		c.image_opacity= c.image_opacity || 1;
-		im.src= ic.url;
+		im.src= ic.url?ic.url:this.dataStore.regions.base_url+ic.file;
 		im.onload=()=>{
 			if (change){
 				this.app.changeImage(im,ic,0);
@@ -549,14 +560,36 @@ class WGLScatterPlot extends WGLChart{
 						c.background_image.height=f[3];
 						c.background_image.position=[f[4],f[5]];
 					}
-					
 					this.setTitle(t+"-"+f[0])
 					this.addBackgroundImage(c.background_image,replace);
-
 				}
-				
-
-				
+			})
+		}
+        const rs = this.dataStore.regions
+        if (rs){
+			const ic= rs.all_regions[c.region].images;
+            const vals= [["None","__none__"]];
+			for (let n in ic){
+                vals.push([n,n])
+            }
+			let cv =c.background_image?.name || "__none__";
+			settings.splice(1,0,{
+				type:"dropdown",
+				current_value:cv,
+				values:[vals,0,1],
+				label:"Change Image",
+				func:x=>{
+					if (x==="__none__"){
+						delete c.background_image;
+						this.app.removeImages();
+						this.app.refresh();
+						return;
+					}
+					const replace = c.background_image?true:false;
+					c.background_image=ic[x];	
+					this.setTitle(c.region+"-"+x)
+					this.addBackgroundImage(c.background_image,replace);
+				}
 			})
 		}
 		if (c.background_image){
@@ -570,10 +603,8 @@ class WGLScatterPlot extends WGLChart{
 				           c.image_opacity=x;
 				           this.app.changeImageOpacity(0,x);
 						   this.app.refresh();
-				       } 
-					      
+				       }      
 			})
-
 		}
 		settings.push({
 			type:"radiobuttons",
@@ -595,8 +626,6 @@ class WGLScatterPlot extends WGLChart{
 				}
 				this.app.setBackGroundColor(c.background_color);
 			}
-
-
 		})
 		
 				

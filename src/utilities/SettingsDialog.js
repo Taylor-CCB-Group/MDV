@@ -210,7 +210,7 @@ class SettingsDialog extends BaseDialog{
         d.append(dd);
         dd.value=s.current_value;
         dd.addEventListener("change",(e)=>{
-            s.func(dd.value);
+            s.func(dd.value,this.controls);
             dd.title = dd.value; // for tooltip, not sure if best accessibility practice
             if (s.onchange){
                 s.onchange(this.controls,dd.value);

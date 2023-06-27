@@ -355,6 +355,24 @@ The links parameter of a DataStore's config  allows different types of interacti
 
 
 
+### interaction links
+in one datasource e.g cells has a column specifying cell type and a second datasource has interactions between the cell types e.g. has columns for cell type 1 and cell type 2 and then various columns with stats about the cell type
+```json
+{
+    "links":{
+        "cells":{
+	        "interactions":{
+		        "interaction_columns":["Cell Type 1","Cell Type 2","annotations"],
+	            "pivot_column":["condition"]
+            }
+        }
+    }
+}
+
+```
+
+
+
 ### rows_as_columns
 This specifies that the DataStore can contain data linked to the rows another DataStore. 
 For example, in single cell data, the cell DataStore would be linked to the gene DataStore. Data such as gene expression per cell could then be added to the cell DataStore as columns (on demand - not all at once). It should have the following parameters:-
