@@ -63,11 +63,12 @@ export class ColorChannelDialog extends BaseDialog{
             styles:{
                 display:"flex",
                 padding:"4px",
-                alignItems: "center"
+                alignItems: "center",
+                width:"100%"
             }
         },this.mainDiv);
         createEl("span",{
-            text:item.name,
+            text:item.name || `channel ${item.index}`,
             classes:["mdv-flex-dynamic"],
             styles:{flexBasis:"30%"}
             
@@ -75,7 +76,7 @@ export class ColorChannelDialog extends BaseDialog{
         const sl = createEl("div",{
             classes:["mdv-flex-dynamic"],
             styles:{
-                padding:"0px 10px",
+                margin:"0px 10px",
                 flexBasis:"70%",
                 overflow:"visible"
             }

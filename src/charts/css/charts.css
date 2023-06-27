@@ -4,7 +4,9 @@
         --main_panel_color: black;
         --text_color: white;
         --background_color: rgb(51, 51, 51);
-        --input_border_color: #bbb;
+        --input_border_color: #222;
+        --input_background_color: #222;
+        --dlg_background_color: #111;
         --menu-gradient: linear-gradient(#444, #222);
     }
 }
@@ -14,7 +16,9 @@
         --main_panel_color: #f1f1f1;
         --text_color: black;
         --background_color: rgb(186, 186, 186);
-        --input_border_color: rgb(51, 51, 51);
+        --input_border_color: rgb(230, 230, 230);
+        --input_background_color: rgb(230, 230, 230);
+        --dlg_background_color: white;
         --menu-gradient: linear-gradient(white, darkgray);
     }
 }
@@ -24,7 +28,9 @@
     --main_panel_color: black;
     --text_color: white;
     --background_color: rgb(51, 51, 51);
-    --input_border_color: #bbb;
+    --input_border_color: #222;
+    --input_background_color: #222;
+    --dlg_background_color: #111;
     --menu-gradient: linear-gradient(#444, #222);
 }
 
@@ -33,7 +39,9 @@
     --main_panel_color: #f1f1f1;
     --text_color: black;
     --background_color: rgb(186, 186, 186);
-    --input_border_color: rgb(51, 51, 51);
+    --input_border_color: rgb(230, 230, 230);
+    --input_background_color: rgb(230, 230, 230);
+    --dlg_background_color: white;
     --menu-gradient: linear-gradient(white, darkgray);
 }
 :root {
@@ -45,6 +53,8 @@
 }
 select, input, textarea {
     border: 0.1em solid var(--input_border_color);
+    border-radius: 4px;
+    background-color: var(--input_background_color);
 }
 .mdv-select{
     border-radius: 3px;
@@ -139,7 +149,28 @@ select, input, textarea {
     flex-flow:column;
     border-radius:5px;
     box-shadow: 0 0 1em #888;
-}    
+}
+/*  */
+/* .ciview-chart-panel::-webkit-resizer {
+    z-index: 0;
+    display: inline-block;
+    position: relative;
+    bottom: 0px;
+    right: 0px;
+    background-color: green;
+    width: 100px;
+    height: 100px;
+} */
+.resizer-both {
+  width: 15px;
+  height: 15px;
+  background: transparent;
+  z-index: 10;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  cursor: nw-resize;
+}
 
 .ciview-chart-titlebar{
     display:flex;
@@ -176,6 +207,7 @@ select, input, textarea {
 .ciview-chart-content{
     flex:1 1 auto;
     position:relative;
+    z-index: 0;
     min-height:1px;
     background-color: var(--main_panel_color);
     color: var(--text_color);
@@ -185,6 +217,7 @@ select, input, textarea {
     backdrop-filter: blur(1px);
     padding: 0.4em;
     transition: backdrop-filter 0.2s ease-in-out;
+    z-index: 2;
     /* changing var(--background_color) to rgb() didn't help */
     /* background-color: rgba(var(--background_color), 0.7); */
 }
@@ -381,3 +414,7 @@ select, input, textarea {
     position:absolute;
     text-align: center;
 }
+/* messes up border color...
+.Dark .mlv-tile-missing {
+    filter: invert();
+} */

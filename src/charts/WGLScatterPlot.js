@@ -422,7 +422,7 @@ class WGLScatterPlot extends WGLChart{
 		const c = this.config;
 		const roi = c.roi || {};
 		
-    	let max_x=roi.max_x || this.minMaxX[1];1
+    	let max_x=roi.max_x || this.minMaxX[1];
     	let max_y=roi.max_y || this.minMaxY[1];
     	let min_x=roi.min_x || this.minMaxX[0];
     	let min_y=roi.min_y || this.minMaxY[0];

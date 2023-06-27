@@ -3,7 +3,7 @@ import Split from "split.js"
 
 /**@template {keyof HTMLElementTagNameMap} T
  * @param {T} type
- * @param {{styles?:, classes?:string[], text?:string, [string]:string}=} attrs
+ * @param {{styles?:, classes?:string[], text?:string, [key: string]:string|string[]}=} attrs
  * @param {HTMLElement=} parent
  * @returns {HTMLElementTagNameMap[T]}
  */
@@ -65,12 +65,12 @@ function splitPane(el,config={}){
 
 function createMenuIcon(icon,config,parent){
     const attrs={
+        role: "button", //a11y - we could use an actual button rather than span here, would need styling.
     };
     const t  =config.tooltip;
     if(t){
         Object.assign(attrs,{
             "aria-label":t.text,
-            role:"tooltip",
             "data-microtip-size":t.size || "small",
             "data-microtip-position":t.position || "bottom-left"
         });
@@ -82,7 +82,6 @@ function createMenuIcon(icon,config,parent){
         classes:["ciview-menu-icon"].concat(icon.split(" ")),
         styles:{
             fontSize: config.size || "18px",
-          
         }
     },sp);
     if (config.func){
@@ -195,13 +194,36 @@ function makeResizable(el,config={}){
         resize: el.style.resize,
         overflow:el.style.overflow
     }
-    el.style.resize="both";
+    // el.style.resize="both"; //standard resizer is sometimes visible when it shouldn't be.
     el.style.overflow="hidden";
     //el.style.zIndex="0";
     if (config.onresizeend){
         ri.onresize=addResizeListener(el,(x,y)=>{
             config.onresizeend(x,y);
         }, config.onResizeStart);
+    }
+    //workaround for Safari bug #50
+    //https://codepen.io/jkasun/pen/QrLjXP
+    //(actually, mostly copilot filling in very similar code...)
+    const bottomRight = createEl("div", {
+        classes: ["resizer-both"],
+    }, el);
+    bottomRight.addEventListener("mousedown", initDrag, false);
+    function initDrag(e) {
+        ri.startX = e.clientX;
+        ri.startY = e.clientY;
+        ri.startWidth = parseInt(document.defaultView.getComputedStyle(el).width, 10);
+        ri.startHeight = parseInt(document.defaultView.getComputedStyle(el).height, 10);
+        document.documentElement.addEventListener("mousemove", doDrag, false);
+        document.documentElement.addEventListener("mouseup", stopDrag, false);
+    }
+    function doDrag(e) {
+        el.style.width = (ri.startWidth + e.clientX - ri.startX) + "px";
+        el.style.height = (ri.startHeight + e.clientY - ri.startY) + "px";
+    }
+    function stopDrag(e) {
+        document.documentElement.removeEventListener("mousemove", doDrag, false);
+        document.documentElement.removeEventListener("mouseup", stopDrag, false);
     }
     el.__resizeinfo__=ri;
 }

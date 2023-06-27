@@ -43,11 +43,9 @@ class ImageTable {
 
             }
         },this.parent);
-        this.canvas = createEl("div",{
-            styles:{
-                position:"relative"
-               // backgroundColor:bg
-
+        this.canvas = createEl("div", {
+            styles: {
+                position: "relative",
             }
         },this.view_port);
         this.canvas.addEventListener("click",e=>{
@@ -238,6 +236,11 @@ class ImageTable {
         this.setImageDimensions();
         this.show(fti)     
     }
+    setImageTitle(col){
+        this.config.image_title = col;
+        const fti = this.getFirstTileInView();
+        this.show(fti);
+    }
 
     setImageDimensions(dim,redraw){
         this.lrm = this.config.margins.left_right;
@@ -305,8 +308,9 @@ class ImageTable {
         this.columns=columns 
     }
 
-    setColorBy(color_by){
+    setColorBy(color_by, overlay){
         this.color_by=color_by;
+        this.color_overlay=overlay;
     }
 
     _setCanvasHeight(){
@@ -468,7 +472,7 @@ class ImageTable {
 
     show(first_tile_index){
         if (!first_tile_index){
-            first_tile_index=0;
+            first_tile_index=this.getFirstTileInView();
         }
         this._setCanvasHeight();  
         let obj=this._calculateTopBottomRow(first_tile_index);
@@ -486,24 +490,48 @@ class ImageTable {
         const h = this.t_height+"px";
         const burl = this.config.base_url;
         const type = this.config.image_type;
+        // looking for something to provide a default name; "Gene" is ok for ytrap...
+        const titleColumn = this.config.image_title || "Gene";
+        const hasTitleColumn = this.data_view.dataStore.columnIndex[titleColumn] !== undefined;
         for (let i=st;i<en;i++){
             const id =  this.data_view.getId(i);
             if (id == null){
                 return;
             }
-            const image= this.data_view.getItemField(i,this.config.image_key)
+            const image= this.data_view.getItemField(i,this.config.image_key);
+            const text = hasTitleColumn ? `${titleColumn} '${this.data_view.getItemField(i, titleColumn)}'` : image;
+            const missing = image === "missing";
             let left=x*this.tile_width+this.lrm;
             x++;
             let border=""
             if (this.color_by){
                 let color = this.color_by(id);
                 border= "4px solid "+color;
+                if (this.color_overlay) {
+                    createEl("div",{
+                        styles:{
+                            height:h,
+                            width:w,
+                            left:left+"px",
+                            top:top+"px",
+                            zIndex: 1,
+                            pointerEvents: "none",
+                            backgroundColor: color,
+                            opacity: this.color_overlay
+                        },
+                        classes:["mlv-tile",
+                                `mlv-tile-overlay-${this.domId}`,
+                                `mlv-tile-overlay-${this.domId}-${row}`]
+                    },this.canvas);
+                }
             }
             let extra_classes=[];
             if (this.selected_tiles[id]){
                border="4px solid goldenrod"
             }
-
+            if (missing){
+                extra_classes.push("mlv-tile-missing");
+            }
             createEl("img",{
                 src:`${burl}${image}.${type}`,
                 id:`mlvtile-${this.domId}-${i}`,
@@ -514,6 +542,8 @@ class ImageTable {
                     left:left+"px",
                     top:top+"px"
                 },
+                alt: text,
+                title: text,
                 classes:["mlv-tile",
                         `mlv-tile-${this.domId}`,
                         `mlv-tile-${this.domId}-${row}`]

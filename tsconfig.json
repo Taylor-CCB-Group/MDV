@@ -1,8 +1,9 @@
 {
     "compilerOptions": {
+        "jsx": "react-jsx",
         "outDir": "./dist/",
         "noImplicitAny": false,
-        "module": "es6",
+        "module": "es2022",
         "target": "ESNext",
         "lib": ["ESNext", "DOM"],
         "allowJs": true,
@@ -11,6 +12,8 @@
         "noUnusedParameters": false,
         "noUnusedLocals": false,
         "allowSyntheticDefaultImports": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "noEmit": false,
+        "skipLibCheck": true,
     }
 }

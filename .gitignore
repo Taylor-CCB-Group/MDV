@@ -13,3 +13,6 @@ project1/
 docs/build/
 _test.py
 __pycache__
+vite-dist
+dist
+.env

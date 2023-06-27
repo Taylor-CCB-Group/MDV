@@ -1,7 +1,6 @@
 import {DataModel} from "../table/DataModel.js";
 import BaseChart from "./BaseChart.js"
 import ImageTable from "../table/ImageTable.js";
-import { func } from "../datastore/binWorker.js";
 
 
 
@@ -31,7 +30,7 @@ class ImageTableChart extends BaseChart{
             this.dataStore.dataHighlighted([index],this)
         },c.id);
 
-        this.sortBy(c.sortBy, c.sortOrder);
+        if (c.sortBy) this.sortBy(c.sortBy, c.sortOrder);
 	}
 
     setSize(x,y){
@@ -46,7 +45,8 @@ class ImageTableChart extends BaseChart{
 
     getColorOptions(){
         return {
-            colorby:"all"
+            colorby:"all",
+            color_overlay: 0,
         }
     }
 
@@ -66,7 +66,7 @@ class ImageTableChart extends BaseChart{
     }
 
     colorByColumn(column){
-		this.grid.setColorBy(this.getColorFunction(column,false));
+		this.grid.setColorBy(this.getColorFunction(column,false), this.config.color_overlay);
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
 	}
@@ -83,6 +83,10 @@ class ImageTableChart extends BaseChart{
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
     } 
+    setImageTitle(column){
+        this.config.image_title = column;
+        this.grid.setImageTitle(column);
+    }
 
     getSettings(){
         const od = this.grid.originalDimensions;
@@ -109,6 +113,15 @@ class ImageTableChart extends BaseChart{
             current_value:c.image_label || "__none__",
             func:x=>{
                 this.setImageLabel(x ==="__none__"?null:x)
+            }
+        },
+        {
+            label:"Tooltip",
+            type:"dropdown",
+            values:[cols,"name","field"],
+            current_value:c.image_title || "__none__",
+            func:x=>{
+                this.setImageTitle(x ==="__none__"?undefined:x)
             }
         },
         {
@@ -142,8 +155,8 @@ BaseChart.types["image_table_chart"]={
     "class":ImageTableChart,
     name:"Image Table",
     required:["images"],
-    methodsUsingColumns:["setImageLabel"],
-    configEntriesUsingColumns:["image_label"],
+    methodsUsingColumns:["setImageLabel", "sortBy", "setTitleColumn"],
+    configEntriesUsingColumns:["image_label", "sort_by", "image_title"],
 
     init:(config,dataSource,extraControls)=>{
         //get the available images
@@ -171,6 +184,12 @@ BaseChart.types["image_table_chart"]={
                 label:"Image Set",
                 values:imageSets
             },
+            {
+                type: "dropdown",
+                name: "image_title",
+                label: "Tooltip",
+                values: sortableColumns
+            },
             //drop down of columns to sort by
             {
                 type: "dropdown",
@@ -178,13 +197,13 @@ BaseChart.types["image_table_chart"]={
                 label: "Sort By",
                 values: sortableColumns
             },
-            //sort order checkbox
-            {
-                type:"check",
-                name:"sort_order",
-                label:"Sort Ascending",
-                value:true
-            }
+            //sort order checkbox... broken
+            // {
+            //     type:"checkbox",
+            //     name:"sort_order",
+            //     label:"Sort Ascending",
+            //     value:true
+            // },
         ];
     }
 }

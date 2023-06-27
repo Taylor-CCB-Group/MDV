@@ -751,16 +751,17 @@ class ChartManager{
         }
     }
 
-    _getColumnsRequiredForChart(config,set){
+    _getColumnsRequiredForChart(config){
+        const set = new Set();
         const p = config.param;
       
         if (!p){
-            return;
-        }
-        if (typeof p === "string"){
+            //no 'parameters', 
+            //*but there could be other config entries / methods that refer to columns*
+            // return [];
+        } else if (typeof p === "string"){
             set.add(p);
-        }
-        else{
+        } else{
             for (let i of p ){
                 set.add(i);
             }
@@ -796,7 +797,7 @@ class ChartManager{
                 }
             });
         }
-       
+        return [...set];
     }
    
     /**
@@ -1281,8 +1282,7 @@ class ChartManager{
     */
     addChart(dataSource,config,notify=false){
         //check if columns need loading
-        const neededCols = new Set();
-        this._getColumnsRequiredForChart(config,neededCols);
+        const neededCols = this._getColumnsRequiredForChart(config);
         //check which columns need loading
         if (config.location){
             const l = config.location;
@@ -1312,7 +1312,6 @@ class ChartManager{
 
         }
 
-        const chartType= BaseChart.types[config.type];
         const t = themes[this.theme];
         // PJT may want different behaviour for gridstack
         //MJS this is very messy - create divs in (hopefully) the right location and add chart when data loaded
@@ -1358,12 +1357,11 @@ class ChartManager{
             this._addChart(dataSource,config,div,notify);
         }
         // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
-        const neededColsArr = Array.from(neededCols);
         try {
-            this._getColumnsThen(dataSource, neededColsArr, func);
+            this._getColumnsThen(dataSource, neededCols, func);
         } catch (error) {
             this.clearInfoAlerts();
-            const id = this.createInfoAlert(`Error creating chart with columns [${neededColsArr.join(', ')}]: '${error}'`, {
+            const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
                 type: "warning"
             });
             console.log(error);
@@ -1843,7 +1841,7 @@ class ChartManager{
                 onresize:(doc,box)=>{
                     chart.setSize(box.width,box.height)
                 },
-                url:this.config.popouturl || "/"
+                url:this.config.popouturl || "/?popout=true",
         
             }
         );
@@ -2028,7 +2026,7 @@ class AddChartDialog extends BaseDialog{
         this.defaultType=types[0].type;
 
         createEl("div",{
-            text:"Chart Type",
+            text:"Chart Type", //a11y - should be a label
             classes:["ciview-title-div"]
         },this.columns[0]);
 
@@ -2036,15 +2034,15 @@ class AddChartDialog extends BaseDialog{
             styles:{
                 maxWidth:"200px"
             }
-        });
+        }, this.columns[0]);
         for (let item of types){
-          
             createEl("option",{
                 text:item.name,
                 value:item.type
             },this.chartType)
         }
-        createEl("div",{},this.columns[0]).append(this.chartType);
+        // createEl("div",{},this.columns[0]).append(this.chartType);
+
         this.chartType.addEventListener("change",(e)=>{
             this.setParamDiv(this.chartType.value, content.dataStore);
         });
@@ -2054,13 +2052,13 @@ class AddChartDialog extends BaseDialog{
             classes:["ciview-title-div"]
         },this.columns[0]);
 
-        this.chartName= createEl("input",{styles:{width:"150px"}},this.columns[0]);
+        this.chartName= createEl("input",{},this.columns[0]);
 
         createEl("div",{
             text:"Description",
             classes:["ciview-title-div"]
         },this.columns[0]);
-        this.chartDescription= createEl("textarea",{styles:{width:"150px",height:"100px"}},this.columns[0]);
+        this.chartDescription= createEl("textarea",{styles:{height:"100px"}},this.columns[0]);
       
         createEl("div",{
             text:"Columns",
@@ -2077,7 +2075,7 @@ class AddChartDialog extends BaseDialog{
         createEl("button",{
             text:"Add",
             classes:["ciview-button"]
-        },this.footer).addEventListener("click",()=>this.submit(content.callback));
+    },this.footer).addEventListener("click",()=>this.submit(content.callback));
 
     }
 
@@ -2091,7 +2089,9 @@ class AddChartDialog extends BaseDialog{
         }
         const ed={};
         for (let name in this.extraControls){
-            ed[name]= this.extraControls[name].value;
+            const c = this.extraControls[name];
+            ed[name] = c.type === 'checkbox' ? c.value === 'on' : c.value;
+            config[name] = ed[name]; // pjt: is there a reason we didn't do this before?
         }
         if (this.multiColumns){
             config.param =config.param.concat(this.multiColumns)
@@ -2194,6 +2194,7 @@ class AddChartDialog extends BaseDialog{
                     text:c.label,
                     classes:["ciview-title-div"]
                 },parentDiv);
+                // could this logic be shared with SettingsDialog?
                 if (c.type==="dropdown"){
                     const sel = createEl("select",{
                         styles:{
@@ -2202,7 +2203,10 @@ class AddChartDialog extends BaseDialog{
                     },parentDiv);
                     
                     for (let item of c.values){
-                        createEl("option",{text:item.name,value:item.value},sel)
+                        const option = createEl("option",{text:item.name,value:item.value},sel);
+                        if (item.value===c.defaultVal){
+                            option.selected=true;
+                        }
                     }
                     this.extraControls[c.name]=sel;
                 } else if (c.type === 'string') {
@@ -2211,6 +2215,11 @@ class AddChartDialog extends BaseDialog{
                     //el.onchange // not using callback, value will be read on submit().
                 } else if (c.type === 'textbox') {
                     const el = createEl("textarea", { value: c.defaultVal, styles: {height: '300px'} }, parentDiv);
+                    this.extraControls[c.name] = el;
+                    //el.onchange // not using callback, value will be read on submit().
+                } else if (c.type === 'checkbox' || c.type === 'check') {
+                    const el = createEl("input", { type: 'checkbox' }, parentDiv);
+                    el.checked = c.defaultVal;
                     this.extraControls[c.name] = el;
                     //el.onchange // not using callback, value will be read on submit().
                 }

@@ -2,15 +2,15 @@ import { DataColumn } from "../charts/charts";
 import DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
 
-type TagColumn = DataColumn<'text'>;
+type TagColumn = DataColumn<'multitext'>; //multitext...?
 
-const SEP = /\W*\,\W*/; //separate by comma with whitespace trimmed
-const JOIN = ', '; //join with comma and space.
+const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
+const JOIN = '; '; //join with semi-colon and space.
 
 const splitTags = (value: string) => value.split(SEP).filter(v=>v);
 
 
-/** Treating `col.values` as strings containing comma-separated 'tags',
+/** Treating `col.values` as strings containing semi-colon-separated 'tags',
  * find all the indices that include 'tag' as one of those tags.
  */
 function getTagValueIndices(tag: string, col: TagColumn) {
@@ -34,6 +34,11 @@ export default class TagModel {
     }
     addListener(callback: ()=>void) {
         this.listeners.push(callback);
+        return callback;
+    }
+    removeListener(callback: ()=>void) {
+        const i = this.listeners.indexOf(callback);
+        if (i != -1) this.listeners.splice(i, 1);
     }
     setTag(tag: string, tagValue = true) {
         this.dataModel.updateModel();

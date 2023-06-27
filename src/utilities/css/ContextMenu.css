@@ -106,9 +106,9 @@
 
 .noUi-horizontal .noUi-handle {
   /* fugly. also doubleslider behaviour is a bit broken I think. */
-    width: 20px;
+    width: 8px;
     height: 20px;
-    right: -10px;
+    right: -4px;
     top: -8px;
     border-radius:20px;
     background: rgba(73, 69, 78);
@@ -116,20 +116,13 @@
     transition: border-width 0.5s;
 }
 .noUi-handle:hover, .noUi-handle:active {
-  border-width: 0.2em;
+  border-width: 0.15em;
   transition: border-width 0.2s;
 }
 .noUi-horizontal {
-  top: 4px;
+  /* top: 4px; */
   height: 6px;
-  margin: 6px 10px 14px 10px;
-}
-.ciview-dlg-content label {
-  margin-right: 1em;
-}
-.ciview-dlg-content .ciview-button {
-  display: inline-block;
-  margin: 8px;
+  /* margin: 6px 10px 14px 10px; */
 }
 
 * {
@@ -213,21 +206,65 @@
     height:8px;
   }
   
-   .ciview-dlg-outer {
-    position: absolute;
-    z-index: 1100;
-    background-color: var(--background_color);
-    color: var(--text_color);
-    border: 1px solid #d3d3d3;
-    overflow:auto;
-    display:flex;
-    flex-flow:column;
+  .ciview-dlg-outer {
+  position: absolute;
+  z-index: 1100;
+  background-color: var(--background_color);
+  color: var(--text_color);
+  border: 1px solid #d3d3d3;
+  overflow:auto;
+  display:flex;
+  flex-flow:column;
+}
 
-  }
-  select, input, textarea {
-    color: var(--text_color);
-    background-color: var(--background_color);
-  }
+.ciview-dlg-content {
+  font-size: 0.8rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  background-color: var(--dlg_background_color);
+}
+.ciview-dlg-content > * {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 2px;
+}
+.ciview-dlg-content label {
+  margin-right: 0.4rem;
+  min-width: 42%;
+  flex-shrink: 0;
+}
+.ciview-dlg-content select {
+  /* width: 5em; */
+  /* flex-shrink: 1; */
+  min-width: 5em;
+  /* flex-grow: 1; nb flex-direction is now column */
+}
+.ciview-dlg-content .ciview-button {
+  display: inline-block;
+  margin: 8px;
+}
+.ciview-dlg-content .noUi-horizontal {
+  min-width: 30%;
+  flex-grow: 1;
+}
+/* .ciview-dlg-content .noUi-target {
+  background-color: var(--input_background_color);
+} */
+.ciview-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 2px;
+  padding-left: 6px;
+  padding-bottom: 4px;
+  background-color: var(--input_background_color);
+  border-radius: 8px;
+}
+
+select, input, textarea {
+  color: var(--text_color);
+  background-color: var(--background_color);
+}
   
    .gutter-horizontal{
      float:left;
@@ -242,13 +279,13 @@
    }
   .ciview-dlg-close-icon{
       cursor:pointer;
-      color:black;
+      color:#eee;
       font-size:20px;
       margin-left:auto;
       margin-bottom:8px;
       position:absolute;
       top:3px;
-      right:3px
+      right:7px
   }
 
   .ciview-dlg-content{ 
@@ -266,7 +303,7 @@
     text-overflow: ellipsis;
     overflow:hidden;
     flex:0 0 auto;
-    margin-bottom: 0.2em;
+    /* margin-bottom: 0.2em; */
   }
 
   .ciview-dlg-header-text{

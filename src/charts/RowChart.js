@@ -2,6 +2,8 @@ import {select} from "d3-selection";
 import {easeLinear} from "d3-ease";
 import CategoryChart from "./CategoryChart.js";
 import BaseChart from "./BaseChart.js";
+import { createEl } from "../utilities/Elements.js";
+import WordCloud from "wordcloud";
 
 class RowChart extends CategoryChart{
     constructor(dataStore,div,config){
@@ -10,7 +12,44 @@ class RowChart extends CategoryChart{
         //redraw the chart
         this.onDataFiltered(null);
         this.labelg = this.graph_area.append("g");
+        this.wordcloudCanvas = createEl("canvas",{
+            styles: {
+                position: "absolute",
+                top: "0px",
+                left: "0px",
+                width: "100%",
+                height: "100%",
+            }
+        }, this.contentDiv);
 	}
+
+    drawWordCloud(data){
+        const vals = this.dataStore.getColumnValues(this.config.param);
+        const colors = this.dataStore.getColumnColors(this.config.param); 
+        const color = (word) => {
+            const filtered = this.filter.length>0 && this.filter.indexOf(word) ===-1;
+            return filtered ? 'lightgray' : colors[vals.indexOf(word)];
+        };
+        const click = (item, dimension, e) => this.filterCategories(item[0], e.shiftKey);
+        const list = data.map(d => { return [vals[d[1]], Math.log(d[0])] });
+        const maxVal = Math.max(...list.map(d=>d[1]));
+        const canvas = this.wordcloudCanvas;
+        const w = canvas.width = this.contentDiv.clientWidth;
+        const h = canvas.height = this.contentDiv.clientHeight;
+        const weightFactor = this.config.wordSize/maxVal;
+        const p2 = Math.PI/2;
+        canvas.style.display = "block";
+        this.graph_area.style.display = "none";
+        //won't redraw if we change the theme...
+        const backgroundColor = getComputedStyle(canvas).getPropertyValue("--main_panel_color");
+        const options = {
+            list, color, click, weightFactor, 
+            backgroundColor,
+            minRotation: -p2, maxRotation: p2, rotationSteps: 2
+        };
+        console.log('wordcloud options', options);
+        WordCloud(canvas, options);
+    }
 
     drawChart(tTime=400){
         const c = this.config;
@@ -37,7 +76,13 @@ class RowChart extends CategoryChart{
             maxCount= data.reduce((a,b)=>Math.max(a[0],b[0]))
         }
 
-        
+        if (this.config.wordcloud) {
+            this.drawWordCloud(data);
+            return;
+        }
+        this.wordcloudCanvas.style.display = "none";
+        this.graph_area.style.display = "block";
+
         const nBars = data.length;
        
         const barHeight= (chartHeight-(nBars+1)*3)/nBars;
@@ -92,47 +137,75 @@ class RowChart extends CategoryChart{
 
     }
 
-    getSettings(){
-
-   
-        const settings= super.getSettings();
+    getSettings() {
+        const settings = super.getSettings();
         const c = this.config;
-        const max =Math.max(this.data.length || 60)
+        if (c.wordcloud) return this.getWordCloudSettings();
+        const max = Math.max(this.data.length || 60)
+
 
         return settings.concat([
             {
-                type:"spinner",
-                label:"Max Rows",
-                current_value:c.show_limit || max,
-                max:max,
-                func:x=>{
-                    c.show_limit=x;
+                type: "spinner",
+                label: "Max Rows",
+                current_value: c.show_limit || max,
+                max: max,
+                func: x => {
+                    c.show_limit = x;
                     this.updateData();
                     this.drawChart();
                 }
             },
             {
-                type:"check",
-                label:"Hide zero values",
-                current_value:c.filter_zeros,
-                func:x=>{
-                    c.filter_zeros=x;
+                type: "check",
+                label: "Hide zero values",
+                current_value: c.filter_zeros,
+                func: x => {
+                    c.filter_zeros = x;
                     this.updateData();
                     this.drawChart();
                 }
             },
             {
-                type:"radiobuttons",
-                label:"Sort Order",
-                current_value:c.sort || "default",
-                choices:[["Default","default"],["Size","size"],["Name","name"]],             
-                func:(v)=>{
-                    c.sort=v;
+                type: "radiobuttons",
+                label: "Sort Order",
+                current_value: c.sort || "default",
+                choices: [["Default", "default"], ["Size", "size"], ["Name", "name"]],
+                func: (v) => {
+                    c.sort = v;
                     this.updateData();
-                    this.drawChart();      
+                    this.drawChart();
+                }
+            },
+            {
+                type: "check",
+                label: "Display as WordCloud",
+                current_value: c.wordcloud,
+                func: x => {
+                    c.wordcloud = x;
+                    this.drawChart();
                 }
             }
         ])
+    }
+
+    getWordCloudSettings() {
+        const settings = super.getSettings();
+        const c = this.config;
+        
+        return [
+            {
+                type: "slider",
+                label: "Word Size",
+                current_value: c.wordSize || 100,
+                min: 10,
+                max: 100,
+                func: x => {
+                    c.wordSize = x;
+                    this.drawChart();
+                }
+            }
+        ];
     }
 }
 
@@ -142,8 +215,20 @@ BaseChart.types["row_chart"]={
     params:[{
         type:["text","multitext"],
         name:"Category"
-    }]
+    }],
+}
 
+BaseChart.types["wordcloud"]={
+    "class":RowChart,
+    name:"Word Cloud",
+    params:[{
+        type:["text","multitext"],
+        name:"Category"
+    }],
+    init: (config, dataStore) => {
+        config.wordcloud = true;
+        config.wordSize = 20;
+    }
 }
 
 export default RowChart;

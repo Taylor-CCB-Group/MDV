@@ -134,14 +134,12 @@ class BaseChart{
     * passing the event type and any data. There are the following different types
     * of event:-
     * <ul>
-    * <li> removed - called when thr chart has been removed </li>
+    * <li> removed - called when the chart has been removed </li>
     * </ul>
     * @param {string} id - a unique id indetifying the listener
     * @param {function} listener - a function that accepts two paramaters, the type
-    * of event and the dat associated with it
+    * of event and the data associated with it
     */
-
-
     addListener(id,listener){
         this.listeners[id]=listener;
     }
@@ -171,16 +169,16 @@ class BaseChart{
     * @returns {DOMElement} - the icon
     */
     addMenuIcon(icon,tooltip,config={}){
-        const sp= createEl("span",{
-            "aria-label":tooltip,
-            "data-microtip-color":"red",
-            role:"tooltip",
-            "data-microtip-size":config.size || "small",
-            "data-microtip-position":config.position || "bottom-left",
-            styles:{
+        const sp = createEl("span", {
+            "aria-label": tooltip,
+            "data-microtip-color": "red",
+            role: "button", //a11y - we could use an actual button rather than span here, would need styling.
+            "data-microtip-size": config.size || "small",
+            "data-microtip-position": config.position || "bottom-left",
+            styles: {
                 margin:"0px 1px"
             }
-            },this.menuSpace);
+        }, this.menuSpace);
     
         createEl("i",{  
             classes:["ciview-chart-icon"].concat(icon.split(" "))
@@ -199,9 +197,10 @@ class BaseChart{
 
     /**
     * Called by the datastore when the data is filtered. Needs to
-    * be implemented on any subclasses
+    * be implemented on any subclasses.
+    * @param {Dimension} dim - the dimension that has been filtered
     */
-    onDataFiltered(){}
+    onDataFiltered(dim){}
 
     /**Check if chart is composed of any columns whose data has
      * changed. if so re-calculate and re-draw chart (call onDataFiltered)
@@ -461,6 +460,17 @@ class BaseChart{
 
                 }
             });
+            if (colorOptions.color_overlay !== undefined) {
+                settings.push({
+                    label:"Color Overlay",
+                    type:"slider",
+                    current_value:c.color_overlay,
+                    func:(x)=>{
+                        c.color_overlay=x;
+                        this.colorByColumn(c.color_by);
+                    }
+                });
+            }
             settings.push({
                 label:"Show Color Legend",
                 type:"check",
@@ -717,6 +727,19 @@ class BaseChart{
 
 }
 
+/**
+ * A dictionary of all the chart types
+ * @type {Record<string, {
+ * "class": class, 
+ * name: string,
+ * required?: string[],
+ * init?: (config:object, dataSource:object, extraControls:object)=>void,
+ * extra_controls?: (dataSource:object)=>{type: string, name: string, label?: string, values?: object, defaultVal?: object}[],
+ * params?: {type:string|string[], name:string}[],
+ * configEntriesUsingColumns?: string[],
+ * methodsUsingColumns?: string[],
+ * }>}
+ */
 BaseChart.types={};
 
 function copyStylesInline(destinationNode, sourceNode) {

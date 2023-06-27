@@ -91,7 +91,7 @@ A list of logically grouped columns, in the following format. Columns should be 
 
 
 ### links
-A dictionary where they keys are the dataStores that this dataStore should link with and the entries are objects describing the links. See the section for linking to other DataStores
+A dictionary where the keys are the dataStores that this dataStore should link with and the entries are objects describing the links. See the section for linking to other DataStores
 
 ```
     "links":{
@@ -361,7 +361,7 @@ For example, in single cell data, the cell DataStore would be linked to the gene
 
 * **name_column** - the column in the linked dataset which identifies the row e.g. gene name (must be unique)
 * **name** - the human readable name of the dataset e.g Gene Scores
-* **subgroups** - this specifies the  different groups of data available . It consists of a dictionary, with the identifying stub of the subgroup pointing to the name,type and label (what the user will see) of the subgroup.
+* **subgroups** - this specifies the  different groups of data available. It consists of a dictionary, with the identifying stub of the subgroup pointing to the name, type and label (what the user will see) of the subgroup.
 
         "subgroups": {
             "gs": {

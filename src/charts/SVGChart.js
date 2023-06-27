@@ -10,7 +10,7 @@ import {cluster} from "d3-hierarchy";
 
 
 class SVGChart extends BaseChart{
-    constructor(dataStore,div,config,axisTypes){
+    constructor(dataStore,div,config,axisTypes={}){
       
 		super(dataStore,div,config);
         this.svg = select(this.contentDiv)

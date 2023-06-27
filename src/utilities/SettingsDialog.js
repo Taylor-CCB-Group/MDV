@@ -1,7 +1,7 @@
 import { BaseDialog } from "./Dialog.js";
 import { createEl } from "./Elements.js";
 import noUiSlider from "nouislider";
-import { func } from "../datastore/binWorker.js";
+// import lgui from 'lil-gui';
 
 
 
@@ -13,11 +13,13 @@ class SettingsDialog extends BaseDialog{
 
     init(content){
         this.controls=[]
-        
+        //experimental lil-gui version...
+        // this.initLilGui(content);
+        // return;
         for (let s of content){
             let d = createEl("div",{
                 styles:{
-                    padding:"5px"
+                    // padding:"5px"
                 }
             },this.dialog);
             if (s.type !== "button"){
@@ -36,8 +38,39 @@ class SettingsDialog extends BaseDialog{
             }
             this.controls[s.label] = this[s.type](s,d);
         }
-
     }
+    initLilGui(content){
+        const gui = new lgui({container: this.dialog});
+        //gui.name = this.config.title + " Settings";
+        for (let s of content) {
+            switch (s.type) {
+                case "dropdown":
+                    gui.add(s, 'current_value', s.values[0].map(c => c[s.values[1]])).name(s.label).onChange(s.func);
+                    break;
+                case "check":
+                    if (s.current_value === undefined) s.current_value = false;
+                    gui.add(s, 'current_value').name(s.label).onChange(s.func);
+                    break;
+                case "button":
+                    gui.add(s, 'func').name(s.label);
+                    break;
+                case "slider":
+                    gui.add(s, 'current_value', s.min, s.max).name(s.label).onChange(s.func);
+                    break;
+                case "spinner":
+                    gui.add(s, 'current_value', s.min, s.max).name(s.label).onChange(s.func);
+                    break;
+                case "radiobuttons":
+                    gui.add(s, 'current_value', s.choices).name(s.label).onChange(s.func);
+                    break;
+                case "text":
+                case "textbox":
+                default:
+                    gui.add(s, 'current_value').name(s.label).onChange(s.func);
+            }
+        }
+    }
+            
     /** TODO */
     folder(s, d) {
         const container = d;
@@ -56,7 +89,10 @@ class SettingsDialog extends BaseDialog{
         });
     }
     radiobuttons(s,d){
-        const d1 =createEl("div",{},d)
+        // createEl("br",{},d);
+        const d1 =createEl("div",{
+            classes:["ciview-radio-group"]
+        },d)
         for (let c of s.choices){
             createEl("span",{   
                 text:c[0]
@@ -76,7 +112,6 @@ class SettingsDialog extends BaseDialog{
 
     button(s,d){
         d.style.textAlign = "center";
-        //maybe consider making this a 'button'
         createEl("button",{
             classes:["ciview-button"],
             text:s.label
@@ -89,10 +124,10 @@ class SettingsDialog extends BaseDialog{
     slider(s,d){
         const sl = createEl("div",{},d)
         noUiSlider.create(sl, {
-            start: [s.current_value],
+            start: [s.current_value || 0],
             range: {
-                'min': [s.min],
-                'max': [s.max]
+                'min': [s.min || 0],
+                'max': [s.max || 1]
             },
             step:s.step || null,
             tooltips:true,
@@ -165,7 +200,7 @@ class SettingsDialog extends BaseDialog{
                 maxWidth:"200px"
             }
         });
-        createEl("br",{},d);
+        // createEl("br",{},d);
         for (let item of s.values[0]){
             createEl("option",{
                 text:item[s.values[1]],
@@ -176,6 +211,7 @@ class SettingsDialog extends BaseDialog{
         dd.value=s.current_value;
         dd.addEventListener("change",(e)=>{
             s.func(dd.value);
+            dd.title = dd.value; // for tooltip, not sure if best accessibility practice
             if (s.onchange){
                 s.onchange(this.controls,dd.value);
             }
@@ -210,11 +246,12 @@ class SettingsDialog extends BaseDialog{
     }
 
     text(s,d){
-        d.style.display = "flex";
-        d.style.alignItems = "center";
+        // d.style.display = "flex";
+        // d.style.alignItems = "center";
         const t = createEl("input",{
             value:s.current_value,
-            styles: {flex: 2}
+            size: 10,
+            styles: {flex: 1}
         },d);
         t.addEventListener("keyup",(e)=>{
             if (s.only_update_on_enter){
