@@ -212,7 +212,7 @@ def convert_data_to_binary(df):
     '''
     Converts the dataframe to binary format.
     '''
-    dfile = f'{outdir}/{basename}.b'
+    dfile = f'{outdir}/{basename}.gz'
     o = open(dfile, 'wb')
     index = {}
     current_pos = 0
