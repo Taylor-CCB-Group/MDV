@@ -120,6 +120,41 @@ class MDVProject:
             mds[index[0]]=ds
         self.datasources=mds
         
+    def add_images_to_datasource(self, ds, image_folder, key_column, name="Images", image_type="png"):
+        '''Adds images to a datasource.
+        As of this writing, these will be copied as static assets with `convert_to_static_page()`, but currently not served by `serve()`.
+        Args:
+            ds (str): The name of the datasource.
+            image_folder (str): The folder containing the images.
+            key_column (str): The name of the column in ds containing the image names.
+            name (str, optional): The name of the image set. Defaults to "Images".
+            image_type (str, optional): The image type. Defaults to "png".
+        '''
+        ds_metadata = self.get_datasource_metadata(ds)
+        if "images" not in ds_metadata:
+            ds_metadata["images"] = {}
+        image_meta = ds_metadata["images"]
+        if name in image_meta:
+            raise AttributeError(f'Image set {name} already exists in {ds} datasource')
+        image_meta[name] = {
+            "original_folder": image_folder, #for convenience locally, shouldn't be saved but is
+            "base_url": f"./images/{ds}/{name}/",
+            "key_column": key_column,
+            "type": image_type
+        }
+        print(f"Added image set {name} to {ds} datasource")
+        self.set_datasource_metadata(ds_metadata)
+
+    def get_image(self, path):
+        '''Gets the filename of an image.'''
+        # assume path is of the form <ds>/<name>/<filename>
+        p = path.split("/")
+        ds = p[0]
+        filename = p[-1]
+        ds_metadata = self.get_datasource_metadata(ds)
+        image_meta = ds_metadata["images"][p[1]]
+        return join(image_meta["original_folder"], filename)
+
     def _get_h5_handle(self,read_only=False):
         mode = "r"
         if not exists(self.h5file):
@@ -478,6 +513,7 @@ class MDVProject:
         #copy everything except the data 
         copytree(self.dir,outdir,ignore=ignore_patterns("*.h5"))
         #copy the js and images
+        self.copy_images(outdir)
         if not debug:
             copytree(join(fdir,"static"),join(outdir,"static"))
         #create the static binary files
@@ -506,6 +542,22 @@ class MDVProject:
             copyfile(join(tdir,"serviceworker.js"),join(outdir,"serviceworker.js"))  
         with open(join(outdir,"index.html"),"w") as o:
             o.write(page)
+
+    def copy_images(self, outdir):
+        for ds in self.datasources:
+            name = ds['name']
+            if not 'images' in ds:
+                print("no images for", name)
+                continue
+            image_metadata = ds['images']
+            dsdir = join(outdir, 'images', ds['name'])
+            if not os.path.exists(dsdir):
+                os.makedirs(dsdir)
+            for image_set_name in image_metadata:
+                image_set = image_metadata[image_set_name]
+                print("copying", image_set_name)
+                original_folder = image_set['original_folder']
+                copytree(original_folder, join(outdir, image_set['base_url']))
 
     def save_state(self,state):
         #update/add or view

@@ -83,7 +83,10 @@ def create_app(project,open_browser=True, port =5000):
     #images contained in the project
     @app.route("/images/<path:path>")
     def images(path):
-        return send_file(safe_join(project.imagefolder,path))
+        try:
+            return send_file(project.get_image(path))
+        except:
+            return send_file(safe_join(project.imagefolder, path))
 
     #All the project's metadata
     @app.route('/get_configs',methods =["GET","POST"])
