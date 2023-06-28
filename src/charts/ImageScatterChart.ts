@@ -2,9 +2,9 @@ import { DataModel } from "../table/DataModel.js";
 import { Deck } from '@deck.gl/core/typed';
 import BaseChart from "./BaseChart.js";
 import { createEl } from "../utilities/Elements.js";
-import { ImageArray } from "../webgl/ImageArray.js";
+import { ImageArray } from "../webgl/ImageArray";
 //import { ScatterplotLayer } from 'deck.gl/typed'; // -no, using ScatterplotExLayer
-import { ScatterplotExLayer, ImageArrayDeckExtension } from '../webgl/ImageArrayDeckExtension.js';
+import { ScatterplotExLayer, ImageArrayDeckExtension } from '../webgl/ImageArrayDeckExtension';
 import { OrthographicView } from "deck.gl/typed";
 import Dimension from "../datastore/Dimension.js";
 
@@ -61,19 +61,25 @@ class ImageScatterChart extends BaseChart {
                 zoom: 0, //0 means "one pixel is one unit", 1 scales by 2
             },
             getTooltip: (info) => {
-                const { index, picked } = info;
-                const { param } = this.config;
-                const { columnIndex } = this.dataStore;
-                const cx = columnIndex[param[0]] as Column;
-                const cy = columnIndex[param[1]] as Column;
+                try {
+                    const { index, picked } = info;
+                    const { param } = this.config;
+                    const { columnIndex } = this.dataStore;
+                    const cx = columnIndex[param[0]] as Column;
+                    const cy = columnIndex[param[1]] as Column;
 
-                const titleColumn = this.config.image_title;
-                const text = this.dataModel.getItemField(index, titleColumn);
-                return picked && {html: `
-                <div>${titleColumn}: '${text}'</div>
-                <div>x: '${param[0]}' = '${cx.data[index]}'</div>
-                <div>y: '${param[1]}' = '${cy.data[index]}'</div>
-                `,}
+                    const titleColumn = this.config.image_title;
+                    //no image_title sometimes?
+                    const text = this.dataModel.getItemField(index, titleColumn);
+                    return picked && {html: `
+                    <div>${titleColumn}: '${text}'</div>
+                    <div>x: '${param[0]}' = '${cx.data[index]}'</div>
+                    <div>y: '${param[1]}' = '${cy.data[index]}'</div>
+                    `,}
+                } catch (error) {
+                    console.error(error);
+                    return `error: ${error}`;
+                }
             },
             // glOptions: {},
             // parameters: {},

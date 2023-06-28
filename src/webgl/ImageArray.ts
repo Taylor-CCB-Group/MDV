@@ -73,16 +73,31 @@ export class ImageArray {
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels, gl.RGBA8, width, height, col.values.length);
-        const memUsage = (width * height * 4 * col.values.length) / 1024 / 1024;
+        const isUnique = col.datatype === 'unique';
+        const numImages: number = isUnique ? col.data.length / col.stringLength : col.values.length;
+
+        gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels, gl.RGBA8, width, height, numImages);
+        const memUsage = (width * height * 4 * numImages) / 1024 / 1024;
         //consider showing this in the UI ('i' for info?)
         console.log(`Allocated ${memUsage.toFixed(2)}MB for image array (not accounting for mipmaps)`);
         let nLoaded = 0;
-        col.data.map((d, i: number) => {
+        function getTextArray(): string[] {
+            if (!isUnique) return [...col.data].map((d) => col.values[d]); //slightly garbagey, never mind
+            const tc = new TextDecoder();
+            const textArray = new Array(numImages);
+            for (let i = 0; i < numImages; i++) {
+                const start = i * col.stringLength;
+                const end = start + col.stringLength;
+                textArray[i] = tc.decode(col.data.slice(start, end));
+            }
+            return textArray;
+        }
+        const data = getTextArray();
+        data.forEach((d, i: number) => {
             // XXX: still not working --- need to better grasp how DataModel works
             // this.dataView.updateModel();
             // -> would be better to map over col.values in the first place?
-            const imageName = col.values[d];//this.dataView.getItemField(d, image_key);
+            const imageName = d;//col.values[d];//this.dataView.getItemField(d, image_key);
             if (this.textures.has(imageName)) {
                 this.texturesByIndex.set(i, this.textures.get(imageName));
                 nLoaded++;
@@ -110,7 +125,7 @@ export class ImageArray {
                     console.error(`glError ${error} loading image #${zIndex} '${url}'`);
                 }
                 gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
-                this.drawProgress(nLoaded++ / col.data.length);
+                this.drawProgress(nLoaded++ / numImages);
             }
             image.onerror = () => {
                 console.error(`Error loading image #${zIndex} '${url}'`);

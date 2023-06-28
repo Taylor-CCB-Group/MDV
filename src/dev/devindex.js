@@ -9,6 +9,8 @@ import "../browser/css/browser.css";
 import "../browser/bam_track.js";
 import "../browser/BamCoverageTrack.js";
 import "../charts/GenomeBrowser.js";
+import "../charts/ImageScatterChart";
+
 import ChartManager from '../charts/ChartManager.js';
 import {getLocalCompressedBinaryDataLoader} from "../dataloaders/DataLoaders.js";
 
