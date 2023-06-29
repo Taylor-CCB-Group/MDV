@@ -155,7 +155,7 @@ BaseChart.types["image_table_chart"]={
     "class":ImageTableChart,
     name:"Image Table",
     required:["images"],
-    methodsUsingColumns:["setImageLabel", "sortBy", "setTitleColumn"],
+    methodsUsingColumns:["setImageLabel", "sortBy", "setTitleColumn", "setImageTitle"],
     configEntriesUsingColumns:["image_label", "sort_by", "image_title"],
 
     init:(config,dataSource,extraControls)=>{
