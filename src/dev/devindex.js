@@ -10,6 +10,7 @@ import "../browser/bam_track.js";
 import "../browser/BamCoverageTrack.js";
 import "../charts/GenomeBrowser.js";
 import "../charts/ImageScatterChart";
+import "../charts/ImageTableChart.js";
 
 import ChartManager from '../charts/ChartManager.js';
 import {getLocalCompressedBinaryDataLoader} from "../dataloaders/DataLoaders.js";
