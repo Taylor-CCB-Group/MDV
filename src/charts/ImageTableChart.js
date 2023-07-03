@@ -82,7 +82,11 @@ class ImageTableChart extends BaseChart{
         this.dataModel.sort(columnName, ascending ? "asc" : "desc");
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
-    } 
+    }
+    setPixelated(pixelated){
+        this.config.pixelated=pixelated;
+        this.grid.setPixelated(pixelated);
+    }
     setImageTitle(column){
         this.config.image_title = column;
         this.grid.setImageTitle(column);
@@ -96,7 +100,7 @@ class ImageTableChart extends BaseChart{
         return settings.concat([
         {
             type:"slider",
-            max:od[1]*4,
+            max: Math.max(128, od[1]*4),
             min:10,
             doc:this.__doc__,
             label:"Image Size",
@@ -104,6 +108,14 @@ class ImageTableChart extends BaseChart{
             func:x=>{
                 c.image_width=x;
                 this.grid.setImageWidth(x,true)
+            }
+        },
+        {
+            label: "Pixelated?",
+            type: "check",
+            current_value: c.pixelated || false,
+            func: x => {
+                this.setPixelated(x);
             }
         },
         {

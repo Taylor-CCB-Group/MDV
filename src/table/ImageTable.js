@@ -283,6 +283,9 @@ class ImageTable {
             this.show(ft);
         }
     }
+    setPixelated(pixelated){
+        this.view_port.style.imageRendering = pixelated ? "pixelated" : "auto";
+    }
 
  
 
