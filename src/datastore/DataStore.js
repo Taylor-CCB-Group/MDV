@@ -1283,6 +1283,7 @@ class DataStore{
     * <li> max - the maximum value </li>
     * <li> colors - the color scheme to use </li>
     * <li> colorLogScale- whether to use a log scale </li>
+    * <li> fallbackOnZero- whether to return the fallback color for zeros, as well as NaN </li>
     * </ul
     * @param {boolean} [config.useValue=false]  The returned function will require the
     * columns value, not index
@@ -1294,6 +1295,9 @@ class DataStore{
         const data= c.data;
         const ov = config.overideValues|| {}
         let  colors  =  this.getColumnColors(column,config);
+        function isFallback(v){
+            return isNaN(v) || (ov.fallbackOnZero && v===0);
+        }
         //simply return the color associated with the value
         if (c.datatype==="text"){                   
             return x=>colors[data[x]];
@@ -1307,7 +1311,7 @@ class DataStore{
             //the actual function - bins the value and returns the color for that bin
             if (config.useValue){
                 return v=>{
-                    if (isNaN(v)){
+                    if (isFallback(v)){
                         return fallbackColor;
                     }
                     let bin = Math.floor((v - min) / interval_size);
@@ -1324,7 +1328,7 @@ class DataStore{
                 return x=>{
                     const v= data[x];
                     //missing data
-                    if (isNaN(v)){
+                    if (isFallback(v)){
                         return fallbackColor;
                     }
                     let bin = Math.floor((v - min) / interval_size);

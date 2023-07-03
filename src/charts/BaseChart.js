@@ -312,7 +312,8 @@ class BaseChart{
         const conf ={
             asArray:asArray,
             overideValues:{
-                colorLogScale:this.config.log_color_scale
+                colorLogScale:this.config.log_color_scale,
+                fallbackOnZero: this.config.fallbackOnZero
             }
         }
         this._addTrimmedColor(column,conf);
@@ -493,6 +494,18 @@ class BaseChart{
                 current_value:c.log_color_scale, 
                 func:(x)=>{      
                     c.log_color_scale=x;
+                    if (c.color_by){
+                        this.colorByColumn(c.color_by);
+                    }
+                }
+            });
+            settings.push({
+                label:"Treat zero as missing",
+                type:"check",
+                
+                current_value:c.fallbackOnZero,
+                func:(x)=>{      
+                    c.fallbackOnZero = x;
                     if (c.color_by){
                         this.colorByColumn(c.color_by);
                     }
