@@ -74,7 +74,7 @@ export class ImageArray {
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
         const isUnique = col.datatype === 'unique';
-        const numImages: number = isUnique ? col.data.length / col.stringLength : col.values.length;
+        const numImages: number = isUnique ? col.data.length / col.stringLength : (col.values?.length || col.data.length);
 
         gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels, gl.RGBA8, width, height, numImages);
         const memUsage = (width * height * 4 * numImages) / 1024 / 1024;
@@ -82,7 +82,10 @@ export class ImageArray {
         console.log(`Allocated ${memUsage.toFixed(2)}MB for image array (not accounting for mipmaps)`);
         let nLoaded = 0;
         function getTextArray(): string[] {
-            if (!isUnique) return [...col.data].map((d) => col.values[d]); //slightly garbagey, never mind
+            if (!isUnique) {
+                if (col.values === undefined) return col.data; //not really a string array, but whatever
+                return [...col.data].map((d) => col.values[d]); //slightly garbagey, never mind
+            }
             const tc = new TextDecoder();
             const textArray = new Array(numImages);
             for (let i = 0; i < numImages; i++) {
