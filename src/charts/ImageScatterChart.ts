@@ -20,6 +20,7 @@ class ImageScatterChart extends BaseChart {
     billboard = true;
     size = 13;
     opacity = 255;
+    saturation = 1;
     spaceX = 600;
     spaceY = 392;
     colorBy?: (index: number) => number[];
@@ -130,6 +131,7 @@ class ImageScatterChart extends BaseChart {
             radiusScale: this.size,
             // getFillColor: this.colorBy ? (i: K)=>[...this.colorBy(i), this.opacity] : [255, 255, 255, this.opacity],
             opacity: this.opacity/255,
+            saturation: this.saturation,
             getFillColor: this.colorBy ? (i: K)=>this.colorBy(i) : [255, 255, 255],
             imageArray,
             updateTriggers: {
@@ -234,6 +236,19 @@ class ImageScatterChart extends BaseChart {
                 continuous: true,
                 func: (v) => {
                     this.spaceY = v;
+                    this.updateDeck();
+                }
+            },
+            {
+                type: "slider",
+                name: "saturation",
+                label: "saturation",
+                current_value: this.spaceY,
+                min: 0,
+                max: 1,
+                continuous: true,
+                func: (v) => {
+                    this.saturation = v;
                     this.updateDeck();
                 }
             },
