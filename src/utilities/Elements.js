@@ -214,7 +214,7 @@ function makeResizable(el,config={}){
         ri.startY = e.clientY;
         ri.startWidth = parseInt(document.defaultView.getComputedStyle(el).width, 10);
         ri.startHeight = parseInt(document.defaultView.getComputedStyle(el).height, 10);
-        document.documentElement.addEventListener("mousemove", doDrag, false);
+        document.documentElement.addEventListener("pointermove", doDrag, false);
         document.documentElement.addEventListener("pointerup", stopDrag, false);
     }
     function doDrag(e) {
@@ -222,7 +222,7 @@ function makeResizable(el,config={}){
         el.style.height = (ri.startHeight + e.clientY - ri.startY) + "px";
     }
     function stopDrag(e) {
-        document.documentElement.removeEventListener("mousemove", doDrag, false);
+        document.documentElement.removeEventListener("pointermove", doDrag, false);
         document.documentElement.removeEventListener("pointerup", stopDrag, false);
     }
     el.__resizeinfo__=ri;

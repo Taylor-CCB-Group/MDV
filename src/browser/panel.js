@@ -920,7 +920,7 @@ class MLVPanel {
 					}
 				},10);
 			}
-			this.trackDiv.addEventListener("mousemove",this.foListener)
+			this.trackDiv.addEventListener("pointermove",this.foListener)
 		
     }
 
@@ -1030,7 +1030,7 @@ class MLVPanel {
                }
         }
 
-		this.trackDiv.addEventListener("mousemove",this.drmmListener)
+		this.trackDiv.addEventListener("pointermove",this.drmmListener)
 
         this.drmuListener = e => {   
               this.is_dragging=false;
@@ -1042,7 +1042,7 @@ class MLVPanel {
 
     removeDragHandler(){
     	this.trackDiv.removeEventListener("pointerdown",this.drmdListener);
-		this.trackDiv.removeEventListener("mousemove",this.drmmListener);
+		this.trackDiv.removeEventListener("pointermove",this.drmmListener);
 		this.trackDiv.removeEventListener("pointerup",this.drmuListener);
 		this.drmdListener=null;
 		this.drmmListener=null;
@@ -1115,7 +1115,7 @@ class MLVPanel {
                 e.stopPropagation();
             }
 		}
-        this.trackDiv.addEventListener("mousemove",this.rsmmListener);
+        this.trackDiv.addEventListener("pointermove",this.rsmmListener);
 
 		this.rsmuListener= e =>{
 			if (this.start_select){
@@ -1142,7 +1142,7 @@ class MLVPanel {
     
     removeAllowSelection(){
     	this.trackDiv.removeEventListener("pointerdown",this.rsmdListener);
-		this.trackDiv.removeEventListener("mousemove",this.rsmmListener);
+		this.trackDiv.removeEventListener("pointermove",this.rsmmListener);
 		this.trackDiv.removeEventListener("pointerup",this.rsmuListener);
 		this.rsmdListener=null;
 		this.rsmmListener=null;
