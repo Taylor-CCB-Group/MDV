@@ -29,7 +29,7 @@ class AutoComplete{
                 this.listHolder=null;
             }
         }
-        this.__doc__.addEventListener("mousedown",this.dli);
+        this.__doc__.addEventListener("pointerdown",this.dli);
     }
 
     getSelectedItem(){

@@ -79,7 +79,7 @@ class PopOutWindow {
                 self.focusListener= ()=>{
                     self.window.focus();
                 };
-                document.body.addEventListener("mousedown",self.focusListener)
+                document.body.addEventListener("pointerdown",self.focusListener)
               
             }
             const resized = c.onresize;
@@ -109,7 +109,7 @@ class PopOutWindow {
             this.onclose(doc);
         }
         if (this.focusListener){
-            document.body.removeEventListener("mousedown",this.focusListener);
+            document.body.removeEventListener("pointerdown",this.focusListener);
         }
     }
 

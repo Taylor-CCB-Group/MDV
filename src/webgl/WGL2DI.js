@@ -1172,7 +1172,7 @@ class WGL2DI{
 		})
 
 	
-		this.div_container.addEventListener("mouseup",function(evt){
+		this.div_container.addEventListener("pointerup",function(evt){
 			//just a click event - inform handlers
 			if (self.config.brush){
 				self.div_container.style.cursor="crosshair";
@@ -1307,7 +1307,7 @@ class WGL2DI{
 			}, 350);
 
 		});
-		this.div_container.addEventListener("mousedown",function (evt){
+		this.div_container.addEventListener("pointerdown",function (evt){
 			if (evt.which===3){
 				//add right click behaviour
 			}

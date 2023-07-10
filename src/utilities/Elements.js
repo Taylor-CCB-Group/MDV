@@ -179,7 +179,7 @@ function makeSortable(list,config={}){
         item.addEventListener("dragover",handleDragOver);
         item.addEventListener("dragstart",handleDragStart);
         item.addEventListener("dragend",handleDragEnd);
-        item.addEventListener("mousedown",handleMouseDown);     
+        item.addEventListener("pointerdown",handleMouseDown);     
     }
 }
 
@@ -208,14 +208,14 @@ function makeResizable(el,config={}){
     const bottomRight = createEl("div", {
         classes: ["resizer-both"],
     }, el);
-    bottomRight.addEventListener("mousedown", initDrag, false);
+    bottomRight.addEventListener("pointerdown", initDrag, false);
     function initDrag(e) {
         ri.startX = e.clientX;
         ri.startY = e.clientY;
         ri.startWidth = parseInt(document.defaultView.getComputedStyle(el).width, 10);
         ri.startHeight = parseInt(document.defaultView.getComputedStyle(el).height, 10);
         document.documentElement.addEventListener("mousemove", doDrag, false);
-        document.documentElement.addEventListener("mouseup", stopDrag, false);
+        document.documentElement.addEventListener("pointerup", stopDrag, false);
     }
     function doDrag(e) {
         el.style.width = (ri.startWidth + e.clientX - ri.startX) + "px";
@@ -223,7 +223,7 @@ function makeResizable(el,config={}){
     }
     function stopDrag(e) {
         document.documentElement.removeEventListener("mousemove", doDrag, false);
-        document.documentElement.removeEventListener("mouseup", stopDrag, false);
+        document.documentElement.removeEventListener("pointerup", stopDrag, false);
     }
     el.__resizeinfo__=ri;
 }
@@ -236,7 +236,7 @@ function removeResizable(el){
     el.style.resize=ri.resize;
     el.style.overflow=ri.overflow;
     if (ri.onresize){
-        el.removeEventListener("mouseup",ri.onresize)
+        el.removeEventListener("pointerup",ri.onresize)
     }
     delete el.__resizeinfo__;
 
@@ -381,8 +381,8 @@ function addResizeListener(element, endCallback, startCallback){
         width=box.width;
         height=box.height;
     }
-    if (startCallback) element.addEventListener("mousedown", startCallback);
-    element.addEventListener("mouseup",list)
+    if (startCallback) element.addEventListener("pointerdown", startCallback);
+    element.addEventListener("pointerup",list)
     return list;
 }
 

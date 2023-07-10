@@ -167,7 +167,7 @@ class MLVPanel {
 			this.trackDiv.style.cursor="ne-risize";
 
 		});
-		trackLabel.addEventListener("mousedown",e=>{
+		trackLabel.addEventListener("pointerdown",e=>{
 			e.stopImmediatePropagation();
 
 		});
@@ -987,7 +987,7 @@ class MLVPanel {
             this.mouseDownX = this.lastMouseX;
 
         }
-		this.trackDiv.addEventListener("mousedown",this.drmdListener)
+		this.trackDiv.addEventListener("pointerdown",this.drmdListener)
 
 
        this.drmmListener= e=>{
@@ -1036,14 +1036,14 @@ class MLVPanel {
               this.is_dragging=false;
               this.start_dragging=false;
         }
-		this.trackDiv.addEventListener("mouseup",this.drmuListener)
+		this.trackDiv.addEventListener("pointerup",this.drmuListener)
   
     }
 
     removeDragHandler(){
-    	this.trackDiv.removeEventListener("mousedown",this.drmdListener);
+    	this.trackDiv.removeEventListener("pointerdown",this.drmdListener);
 		this.trackDiv.removeEventListener("mousemove",this.drmmListener);
-		this.trackDiv.removeEventListener("mouseup",this.drmuListener);
+		this.trackDiv.removeEventListener("pointerup",this.drmuListener);
 		this.drmdListener=null;
 		this.drmmListener=null;
 		this.drmuListener=null;
@@ -1099,7 +1099,7 @@ class MLVPanel {
                 e.stopPropagation();
             }
         } 
-        this.trackDiv.addEventListener("mousedown",this.rsmdListener);
+        this.trackDiv.addEventListener("pointerdown",this.rsmdListener);
 
 		this.rsmmListener= e =>{
             if (e.shiftKey && this.start_select){
@@ -1136,14 +1136,14 @@ class MLVPanel {
 				});
             }
 		}
-        this.trackDiv.addEventListener("mouseup",this.rsmuListener);
+        this.trackDiv.addEventListener("pointerup",this.rsmuListener);
     }
 
     
     removeAllowSelection(){
-    	this.trackDiv.removeEventListener("mousedown",this.rsmdListener);
+    	this.trackDiv.removeEventListener("pointerdown",this.rsmdListener);
 		this.trackDiv.removeEventListener("mousemove",this.rsmmListener);
-		this.trackDiv.removeEventListener("mouseup",this.rsmuListener);
+		this.trackDiv.removeEventListener("pointerup",this.rsmuListener);
 		this.rsmdListener=null;
 		this.rsmmListener=null;
 		this.rsmuListener=null;
