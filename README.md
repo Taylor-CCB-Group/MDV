@@ -74,7 +74,8 @@ Open a python shell
 python
 ```
 
-Create an MDV project from the downloaded folder and display it in a browser. Either run the code from the mdv/python folder, add 
+### Create an MDV project from the downloaded folder and display it in a browser. 
+Either run the code from the mdv/python folder, add 
 the folder to the PYTHONPATH environment variable or add the path in the code `sys.path.append("/path/to/mdv/python")`
 ```python
 from mdv.mdvproject import MDVProject
