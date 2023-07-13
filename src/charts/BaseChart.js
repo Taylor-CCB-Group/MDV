@@ -172,7 +172,7 @@ class BaseChart{
         const sp = createEl("span", {
             "aria-label": tooltip,
             "data-microtip-color": "red",
-            role: "button", //a11y - we could use an actual button rather than span here, would need styling.
+            role: "tooltip", 
             "data-microtip-size": config.size || "small",
             "data-microtip-position": config.position || "bottom-left",
             styles: {
@@ -181,7 +181,7 @@ class BaseChart{
         }, this.menuSpace);
     
         createEl("i",{  
-            classes:["ciview-chart-icon"].concat(icon.split(" "))
+            classes:["ciview-chart-icon"].concat(icon.split(" ")) //a11y - we could use an actual button
         },sp);
         if (config.func){
             sp.addEventListener("click",(e)=>config.func(e));

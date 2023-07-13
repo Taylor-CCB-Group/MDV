@@ -1,4 +1,12 @@
 /*!
+ * GridStack 7.1.1
+ * https://gridstackjs.com/
+ *
+ * Copyright (c) 2021-2022 Alain Dumesny
+ * see root license https://github.com/gridstack/gridstack.js/tree/master/LICENSE
+ */
+
+/*!
  * Sizzle CSS Selector Engine v2.3.6
  * https://sizzlejs.com/
  *
@@ -10,7 +18,7 @@
  */
 
 /*!
- * jQuery JavaScript Library v3.6.0
+ * jQuery JavaScript Library v3.6.1
  * https://jquery.com/
  *
  * Includes Sizzle.js
@@ -20,7 +28,15 @@
  * Released under the MIT license
  * https://jquery.org/license
  *
- * Date: 2021-03-02T17:08Z
+ * Date: 2022-08-26T17:52Z
+ */
+
+/*!
+ * wordcloud2.js
+ * http://timdream.org/wordcloud2.js/
+ *
+ * Copyright 2011 - 2019 Tim Guan-tin Chien and contributors.
+ * Released under the MIT license
  */
 
 /**

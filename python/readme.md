@@ -52,7 +52,7 @@ To enable the project to be displayed as a static page without any backend archi
 p.convert_to_static_page(path/to/mywebproject)
 ```
 
-You can then copy the mywebproject folder to the relevant location on your server, where content is served from. The project can be accessed with:-
+You can then copy the mywebproject folder to the relevant location on your server, where content is served from. It needs to be served over https because a service worker is used to add headers. The project can be accessed with:-
 ```
 http://mydomian.com/path/to/mywebproject
 ```
@@ -68,7 +68,7 @@ Because the JavaScript uses WebWorkers and SharedArrayBuffers, a [service worker
 "Cross-Origin-Opener-Policy":"same-origin",
 "Cross-Origin-Embedder-Policy":"require-corp"
 ```
-If your server already adds these headers then the `convert_to_static_page` function can be invoked with `include_sab_headers=False`, which will exclude the service worker.
+If your server already adds these headers then the `convert_to_static_page` function can be invoked with `include_sab_headers=False`, which will exclude the service worker. In this case the project does not have to be served over https
 
 
 ### Serving the Project in Development Mode

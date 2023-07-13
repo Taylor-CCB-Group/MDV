@@ -66,6 +66,8 @@ class AddColumnsFromRowsDialog extends BaseDialog{
             let d = createEl("div",{classes:["mdv-section"]},this.columns[1]);  
             this.addHeatMapCheck= createEl("input",{type:"checkbox"},d);
             createEl("span",{text:"Create Heat Map:",styles:{marginRight:"4px"}},d);
+            this.addDotPlotCheck= createEl("input",{type:"checkbox"},d);
+            createEl("span",{text:"Create DotPlot:",styles:{marginRight:"4px"}},d);
             d = createEl("div",{classes:["mdv-section"]},this.columns[1]);
             createEl("span",{text:"Categories:",styles:{marginRight:"4px"}},d);
             this.heatMapSel = createEl("select",{styles:{maxWidth:"150px"}},d);
@@ -240,6 +242,15 @@ class AddColumnsFromRowsDialog extends BaseDialog{
 
             this.cm.addChart(this.ds.name,{
                 type:"heat_map",
+                param:[this.heatMapSel.value].concat(fs)
+            })
+
+          
+        }
+        if (this.addDotPlotCheck.checked){
+
+            this.cm.addChart(this.ds.name,{
+                type:"dot_plot",
                 param:[this.heatMapSel.value].concat(fs)
             })
 

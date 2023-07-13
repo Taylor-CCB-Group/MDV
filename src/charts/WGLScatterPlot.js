@@ -338,6 +338,9 @@ class WGLScatterPlot extends WGLChart{
 			}		
 			this.app.refresh();
 		}
+        im.onerror=()=>{
+            delete this.config.background_image;
+        }
 	}
 
 	linkToOtherChart(chart){

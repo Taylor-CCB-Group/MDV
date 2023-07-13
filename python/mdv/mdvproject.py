@@ -487,8 +487,9 @@ class MDVProject:
         template = join(tdir,page)
         page = open(template).read()
         if not debug:
+            #call init with the static folder argument
             page=page.replace("_mdvInit()","_mdvInit(true)")
-             #correct config
+            #correct config
             conf  = self.state
             #can't edit static page
             conf["permission"]="view"
@@ -665,6 +666,8 @@ def add_column_to_group(col,data,group,length):
                 col["values"]= [ x for x in values.index if values[x] != 0 ]
             vdict =  {k: v for v, k in enumerate(col["values"])}          
             group.create_dataset(col["field"],length,dtype=numpy.ubyte,data =data.map(vdict))
+            #convert to string 
+            col["values"] = [str(x) for x in col["values"]]
         else:
             max_len=max(data.str.len()) 
             utf8_type = h5py.string_dtype('utf-8',int(max_len))

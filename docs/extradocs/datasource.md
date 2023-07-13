@@ -128,42 +128,90 @@ Charts that use the images in set1 would then associate the row whose set1 _imag
 
 These have exactly the same format as above, but represent much larger images, which are intended only to be displayed one or two at a time.
 
-### background_images
 
-Images which represent a category and have x, y co-ordinates
+
+### regions
+The data contains a number of separate regions , with each data point a location in this region. The name of the field which specifies the region and the fields which specify the x,y co-ordinates , 
+
+all_regions is a dictionary with the name of the region (the value in the region field) as the key, it contains the following
+
+* roi the limits of the regions
+* images a dictionary of images describing the file, its position and height,width and name. The image can be enlarged or offset from the points
+* default_image - the name of the image that will be loaded - if null or missing, no background image will be loaded
+
+scale - in mm
+
+*ome_tiff -  the name of the ometiff image associated with the region. It is assumed to be in the location specified by base_url 
+
+base_url-  url where the images reside the image will be
+
+
 
 ```json
-
-"rois":{
-    "coordinates":["x","y"],
-    "column":"sample_id",
-    "color_by":"cell_type",
-    "images":{
-        "sample_1":[
-           {
+ "regions":{
+        "position_fields":["x","y"],
+        "region_field":"sample_id",
+        "default_color":"annotation",
+        "scale_unit":"mm",
+        "scale":0.001,
+        "base_url":"images/",
+        "all_regions":{
+            "IPF_SAMPLE_104F_ROI_1":{
                 "roi":{
                     "min_x":0,
-                    "mix_y":0,
-                    "max_x":200,
-                    "max_y":200
+                    "max_x":1000,
+                    "min_y":0,
+                    "max_y":1000
                 },
-                "images":[
-                    {
-                        "url":"/...",
-                        "name":"my_image",
+                "default_image":"cellmask",
+                "images":{
+                    "cellmask":{
+                        "file":"jssRG6.png",
                         "position":[0,0],
-                        "height":200,
-                        "width":200
+                        "height":1000,
+                        "width":1000,
+                        "name":"cellmask"
                     }
-                ]
-           }
-        ]
+                },
+                "ome_tiff":"IPF_SAMPLE_104F_ROI_1.ome.tiff"
+            }
+        }
     }
-
-}
 
 ```
 
+### interactions
+
+This is for a dataset that contains information about the interactions of set of objects (cells) for a number of regions/, a pivot column
+
+* **pivot_column** this is the column each pairwise interactions can be in a region or a group of regions
+* **interaction_columns** The two columns that are the objects (cell types) that interact
+* **is_single_region** the interactions are for single region as opposed to a condition/state composed of many regions
+* **
+
+Also the default values for a few charts also need to be described
+
+```json
+ "interactions":{
+        "pivot_column":"condition",
+        "interaction_columns":["Cell Type 1","Cell Type 2"],
+        "is_single_region":false
+
+        "spatial_connectivity_map":{
+            "link_length":"gr20",
+            "link_thickness":"gr20",
+            "link_color":"%contacts",
+            "node_size":"mean cell 1 number"
+        },
+        //optional
+        "interaction_matrix":{
+            "groups":["Cell Type 1 group","Cell Type 2 groups"]
+        },
+        "cell_radial_chart":{
+            "link_thickness":"gr20",
+        }
+    },
+```
 
 ### offsets
 
@@ -363,7 +411,8 @@ in one datasource e.g cells has a column specifying cell type and a second datas
         "cells":{
 	        "interactions":{
 		        "interaction_columns":["Cell Type 1","Cell Type 2","annotations"],
-	            "pivot_column":["condition"]
+	            "pivot_column":["sample_id"],
+                "is_single_region":true
             }
         }
     }

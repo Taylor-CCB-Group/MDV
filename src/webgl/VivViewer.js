@@ -5,6 +5,7 @@ import {
   ColorPaletteExtension,
   ColorPalette3DExtensions,
   DETAIL_VIEW_ID,
+  getChannelStats
 } from '@hms-dbmi/viv';
 
 import {hexToRGB, RGBToHex} from "../datastore/DataStore.js";
@@ -36,7 +37,7 @@ function getTiff(url) {
 
 
 class VivViewer {
-  constructor(canvas,config,initialView){
+  constructor(canvas,config,initialView,baseurl){
     console.log('new VivViewer', config);
     this.canvas = canvas;
 
@@ -47,7 +48,8 @@ class VivViewer {
     this.config=config;
     this.hasRequestedDefaultChannelStats = false;
     this.initClip();
-    getTiff(config.url).then(loader=>{
+    const url = baseurl?baseurl+config.file:config.url
+    getTiff(url).then(loader=>{
       this.tiff = loader;
       this._setUp(loader,initialView);
     });
@@ -116,6 +118,7 @@ class VivViewer {
     chs.selections.splice(i,1);
     chs.contrastLimits.splice(i,1);
     chs.channelsVisible.splice(i,1);
+    chs.domains.splice(i,1);
     this.createLayers(chs);
     this.deck.setProps({
       layers:[this.layers]
@@ -123,7 +126,7 @@ class VivViewer {
 
   }
 
-  addChannel(channel){
+  async addChannel(channel){
     const chs = this.mainVivLayer.props;
     chs.channelsVisible.push(true);
     channel.color= channel.color || "#ff00ff";
@@ -131,14 +134,17 @@ class VivViewer {
     /// --> channel.contrastLimit was always undefined anway
     // channel.contrastLimits = channel.contrastLimit || [20,100];
     //if new channels are addded there are no default values -need to be calculated?
-    channel.contrastLimits = [0,200];//this.defaultContrastLimits[channel.index].slice(0);
-    channel.domains = [0,200];//this.defaultDomains[channel.index].slice(0);
+    const sel ={z:0,t:0,c:channel.index};
+    const data = await this.getDefaultChannelValues([{index:0,sel}]);
+
+    channel.contrastLimits = data[0].stats.contrastLimits;//this.defaultContrastLimits[channel.index].slice(0);
+    channel.domains = data[0].stats.domain;//this.defaultDomains[channel.index].slice(0);
     channel.channelsVisible=true;
     chs.colors.push(hexToRGB(channel.color));
     chs.contrastLimits.push(channel.contrastLimits);
     chs.domains.push(channel.domains);
     channel.id = getRandomString();
-    chs.selections.push({z:0,t:0,c:channel.index,id:channel.id});
+    chs.selections.push({...sel,id:channel.id});
     
     this.createLayers(chs);
     this.deck.setProps({
@@ -147,7 +153,7 @@ class VivViewer {
     
 
     channel.name=this.channels[channel.index].Name;
-    channel._id = chs.selections[chs.selections.length-1]._id;
+    //channel._id = chs.selections[chs.selections.length-1]._id;
     return channel;
 
   }
@@ -156,7 +162,7 @@ class VivViewer {
   getAllChannels() {
     return this.channels;
   }
-  getChannels() {
+  getSelectedChannels() {
     const {props} = this.mainVivLayer;
     const names = props.selections.map(x => this.channels[x.c].Name);
     const colors = props.colors.map(RGBToHex);
@@ -294,6 +300,42 @@ class VivViewer {
     this.deck.setProps({layers: this.layers})
   }
 
+    //parses the config into internal data structure
+    //adding any missing values as necessary
+    _parseChannels(conf){
+        const nconf={
+            selections:[],
+            colors:[],
+            channelsVisible:[],
+            contrastLimits:[],
+            domains:[]
+        }
+        for (let item of conf){
+            nconf.selections.push({z:0,t:0,c:this.channels.findIndex(x=>x.Name===item.name)});
+            let c = item.color;
+            c = c?typeof item.color === "string"?hexToRGB(c):c:[255,0,0];
+            nconf.colors.push(c);
+            nconf.channelsVisible.push(item.visible==undefined?true:item.visible);
+            nconf.contrastLimits.push(item.contrastLimits || null);
+            nconf.domains.push(item.domains || null);
+        }
+        return nconf;
+    }
+
+    //get the channels in a nice format
+    getSelectedChannelsNice(){
+        const k = this.layers[0].props;
+        return k.selections.map((x,i)=>{
+            return {
+                name:this.channels[x.c].Name,
+                color:k.colors[i],
+                visible:k.channelsVisible[i],
+                contrastLimits:k.contrastLimits[i],
+                domains:k.domains[i]
+            }
+        })
+    }
+
   _setUp(loader, iv){
     this.native_x= loader.metadata.Pixels.SizeX;
     this.native_y= loader.metadata.Pixels.SizeY;
@@ -326,15 +368,32 @@ class VivViewer {
       });
     }
     const initialViewState = this.volViewState;
-    const {image_properties} = this.config;
+    let {image_properties} = this.config;
 
     const deckGLView =this.detailView.getDeckGlView();
+    //new more readable config
+    if (this.config.channels){
+        image_properties = this._parseChannels(this.config.channels)
+    }
     if (image_properties?.selections) for (let s of image_properties.selections){
       s.id=getRandomString();
     }
-
-    this.createLayers(image_properties);
-    this.deck=new Deck({
+    //check if there are any channels without contrast limits and get default values
+    const contrastLimitsToGet = [];
+    for (let n=0;n<image_properties.contrastLimits.length;n++){
+        if (image_properties.contrastLimits[n] && image_properties.domains[n]){
+            continue;
+        }
+        contrastLimitsToGet.push({index:n,sel:image_properties.selections[n]})
+    }
+    //get the default values and continue the set up
+    this.getDefaultChannelValues(contrastLimitsToGet).then(data=>{
+        for (let d of data){
+            image_properties.contrastLimits[d.index]=d.stats.contrastLimits;
+            image_properties.domains[d.index]=d.stats.domain;
+        }
+        this.createLayers(image_properties);
+        this.deck=new Deck({
           canvas:this.canvas,
           layers:[this.layers],
           views:[deckGLView],
@@ -344,43 +403,50 @@ class VivViewer {
           useDevicePixels:false,
           initialViewState,
           controller: use3d
-    });
-  }
+        });
 
-  createLayers(info){
-    if (this.config.use3d) {
-      this._createLayers3D();
-      return;
+    })
     }
-    const viewStates=  {id: DETAIL_VIEW_ID}
 
-    //domains may not be the same as contrast limits -  again need way of calculating
-    //temp default values
-    const domains=info.contrastLimits.map(x=>[0,200]);
+    //would be better to sample data that's loaded - but can't find
+    //a way of doing this. Also domainLimits seem way too large and for
+    //very low signals contrast limits are way too high
+    async getDefaultChannelValues(selections){
+        return await Promise.all(selections.map(async (s) => {
+            const data = await this.loader[this.loader.length-1].getRaster({selection:s.sel});
+            return {index:s.index,stats:getChannelStats(data.data)};
+        }))
+    }
 
-    /*this.loader[0].getRaster(
-        {selection:{c:43,t:0,z:0}}).then(data=>{
-        console.log(data)
-    });
-    */
-    const layerConfig = {
-      loader:this.loader,
-      contrastLimits:info.contrastLimits.slice(0),
-      domains,
-      colors:info.colors.slice(0),
-      channelsVisible:info.channelsVisible.slice(0),
-      selections:info.selections.slice(0),
-      extensions:this.extensions,
-      transparentColor:this.transparentColor
-    };
-    if (!this.defaultDomains) this.defaultDomains = layerConfig.contrastLimits; //PJT somewhat tested
-    if (!this.defaultContrastLimits) this.defaultContrastLimits = this.defaultDomains.slice(0);
-    this.layers= this.detailView.getLayers({
-      viewStates,
-      props:layerConfig
-    });
-    this.mainVivLayer = this.layers[0];
-  }
+    createLayers(info){
+        if (this.config.use3d) {
+            this._createLayers3D();
+            return;
+        }
+        const viewStates=  {id: DETAIL_VIEW_ID}
+
+        //domains may not be the same as contrast limits -  again need way of calculating
+        //temp default values
+        
+
+        const layerConfig = {
+            loader:this.loader,
+            contrastLimits:info.contrastLimits.slice(0),
+            domains:info.domains.slice(0),
+            colors:info.colors.slice(0),
+            channelsVisible:info.channelsVisible.slice(0),
+            selections:info.selections.slice(0),
+            extensions:this.extensions,
+            transparentColor:this.transparentColor
+        };
+        if (!this.defaultDomains) this.defaultDomains = layerConfig.contrastLimits; //PJT somewhat tested
+        if (!this.defaultContrastLimits) this.defaultContrastLimits = this.defaultDomains.slice(0);
+        this.layers= this.detailView.getLayers({
+            viewStates,
+            props:layerConfig
+        });
+        this.mainVivLayer = this.layers[0];
+    }
 }
 
 export default VivViewer;

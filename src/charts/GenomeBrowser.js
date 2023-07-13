@@ -2,9 +2,6 @@ import BaseChart from "./BaseChart.js";
 import {createEl} from "../utilities/Elements.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 
-
-
-
 class GenomeBrowser extends BaseChart{
     constructor(dataStore,div,config){
 		super(dataStore,div,config);
@@ -293,6 +290,7 @@ class GenomeBrowser extends BaseChart{
             en =  st===en?st+1:en;
             margin =  Math.round(en-st)*(vm.value/100);
         }
+       
         else{
             margin = vm.value;
         }
@@ -320,9 +318,17 @@ class GenomeBrowser extends BaseChart{
             }
             this.browser.track_order=track_order;
         }
+        if (vm.type==="fixed_length"){
+            const mid= Math.round((en-st)/2)+st;
+            margin= Math.round(margin/2);
+            this.browser.update(o[p[0]],mid-margin,mid+margin) ;
+        }
+        else{
+            this.browser.update(o[p[0]],st-margin,en+margin) 
+        }
 
         
-        this.browser.update(o[p[0]],st-margin,en+margin) 
+        
     }
 
     getImage(callback,type){
@@ -470,7 +476,8 @@ class GenomeBrowser extends BaseChart{
             type:"radiobuttons",
             choices:[
                 ["% of feature length","percentage"],
-                ["absolute (bp)","absolute"]
+                ["absolute (bp)","absolute"],
+                ["Fixed Length (bp)","fixed_length"]
             ],
             current_value:c.view_margins.type,
             func:(x)=>{

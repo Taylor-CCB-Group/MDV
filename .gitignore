@@ -14,5 +14,6 @@ docs/build/
 _test.py
 __pycache__
 vite-dist
-dist
+dist/_mlv
+dist/_avocato
 .env
