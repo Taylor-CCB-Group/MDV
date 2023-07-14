@@ -188,7 +188,7 @@ class CompressedBinaryDataLoader {
                     //get the indexes
                     const indexes = new Uint32Array(b,4,l);
                     //get the values
-                    const values = new Float32Array(b,(l*4)+1,l);
+                    const values = new Float32Array(b,(l*4)+4,l);
                     const sb = new SharedArrayBuffer(size*4)
                     const new_arr= new Float32Array(sb);
                     //fill array with missing values
