@@ -167,7 +167,7 @@ class ImageScatterChart extends BaseChart {
     
     getColorOptions() {
         return {
-            colorby: "all",            
+            colorby: "all",
         }
     }
 
