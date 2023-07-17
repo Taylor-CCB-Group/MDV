@@ -54,31 +54,50 @@ async function fetchAndPatchJSON(url) {
     return config;
 }
 
+// TODO make a better type for this, put it somewhere more sensible.
+type Datasource = { 
+    name: string, 
+    columns: { name: string, type: string }[], images?: any, size: number, columnGroups?: any[] 
+};
+
 async function loadData() {
+    // setupDebug();
     if (isPopout) return;
-    const datasources = await fetchAndPatchJSON(`${root}/datasources.json`);
+    const datasources = await fetchAndPatchJSON(`${root}/datasources.json`) as Datasource[];
     const config = await fetchAndPatchJSON(`${root}/state.json`);
     const views = await fetchAndPatchJSON(`${root}/views.json`);
     // TODO: add a way of specifying a different type of data loader.
     /// perhaps via another URLSearchParam, to avoid messing with datasources spec.
+    // consider localstorage for saving views, state, etc. Ability to download as well.
+    // something on toolbar for 'active links' (so the dialog doesn't have to be open)
+    // this should be saved...
     const dataLoader = {
         function: getLocalCompressedBinaryDataLoader(datasources, root),
-        viewLoader: async (view) => views[view]
+        viewLoader: async (view: string) => {
+            return views[view];
+        },
+        rowDataLoader: async (dsName: string) => {
+            const ds = await fetchAndPatchJSON(`${root}/${dsName}.json`);
+        }
     }
     const cm = new ChartManager("app1", datasources, dataLoader, config);
-    const dsName = datasources[0].name;
-    const ds = cm.dsIndex[dsName];
-    const tadModel = new TagModel(ds.dataStore);
-    // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
-    setTimeout(() => {
-        // TODO - add a 'save' button, if supported (another URLSearchParam? Security?)
-        cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, tadModel); });
-        if (import.meta.env.DEV) {
-            cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tadModel); });
-        }
-        cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => { 
-            const columns = datasources[0].columns.map(c => c.name);
-            cm.loadColumnSet(columns, dsName, () => { console.log("done loadColumnSet"); });
-        });
-    }, 0);
+    function extraFeatures(i: number) {
+        const dsName = datasources[i].name;
+        const ds = cm.dsIndex[dsName];
+        const tagModel = new TagModel(ds.dataStore);
+        // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
+        // should it be in the viewLoader callback? no ref to cm passed there.
+        setTimeout(() => {
+            // TODO - add a 'save' button, if supported (another URLSearchParam? Security?)
+            cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, tagModel); });
+            if (import.meta.env.DEV) {
+                cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tagModel); });
+            }
+            cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => { 
+                const columns = datasources[i].columns.map(c => c.name);
+                cm.loadColumnSet(columns, dsName, () => { console.log("done loadColumnSet"); });
+            });
+        }, 0);
+    }
+    datasources.forEach((ds, i) => extraFeatures(i));
 };
