@@ -120,9 +120,10 @@ class MDVProject:
             mds[index[0]]=ds
         self.datasources=mds
         
-    def add_images_to_datasource(self, ds, image_folder, key_column, name="Images", image_type="png"):
+    def add_images_to_datasource(self, ds: str, image_folder: str, key_column: str, name="Images", image_type="png"):
         '''Adds images to a datasource.
-        As of this writing, these will be copied as static assets with `convert_to_static_page()`, but currently not served by `serve()`.
+        These will be copied as static assets with `convert_to_static_page()`, 
+        and should be served from their original location be `serve()`.
         Args:
             ds (str): The name of the datasource.
             image_folder (str): The folder containing the images.
@@ -145,7 +146,7 @@ class MDVProject:
         print(f"Added image set {name} to {ds} datasource")
         self.set_datasource_metadata(ds_metadata)
 
-    def get_image(self, path):
+    def get_image(self, path: str):
         '''Gets the filename of an image.'''
         # assume path is of the form <ds>/<name>/<filename>
         p = path.split("/")
@@ -435,6 +436,11 @@ class MDVProject:
 
     def insert_link(self,datasource,linkto,linktype,data):
         ds =  self.get_datasource_metadata(datasource)
+        if not ds:
+            raise AttributeError(f"datasource '{datasource}' does not exist")
+        to_ds = self.get_datasource_metadata(linkto)
+        if not to_ds:
+            raise AttributeError(f"datasource for linkto '{linkto}' does not exist")
         links = ds.get("links")
         if not links:
             links={}
@@ -447,6 +453,23 @@ class MDVProject:
         self.set_datasource_metadata(ds)
 
     def add_rows_as_columns_link(self,ds_row,ds_col,column_name,name):
+        '''
+        Adds a link between two datasources, such that columns may be added to the `ds_row` datasource
+        based on the values in the `ds_col` datasource dynamically at runtime. The values in the `column_name` column of the
+        `ds_col` datasource will be used as the names for the columns added to the `ds_row` datasource.
+        
+        Args:
+            ds_row (string): The name of the datasource into which the link will be added
+            ds_col (string): The name of the datasource containing the columns
+            column_name (string): The name of a column in the `ds_col` datasource, the row-value of which will be used
+                as the column name for columns dynamically added to the `ds_row` datasource
+            name (string): The name of the link
+        '''
+        to_ds = self.get_datasource_metadata(ds_col)
+        if not to_ds:
+            raise AttributeError(f"datasource for ds_col '{ds_col}' does not exist")
+        if column_name not in to_ds["columns"]:
+            raise AttributeError(f"column '{column_name}' does not exist in datasource '{ds_col}'")
         data ={
             "name_column":column_name,
             "name":name,
@@ -509,6 +532,7 @@ class MDVProject:
 
     def convert_to_static_page(self,outdir,debug=False,include_sab_headers=True):
         fdir = split(os.path.abspath(__file__))[0]
+        # consider adding an option to do a js build here
         tdir = join(fdir,"templates")
         #copy everything except the data 
         copytree(self.dir,outdir,ignore=ignore_patterns("*.h5"))
