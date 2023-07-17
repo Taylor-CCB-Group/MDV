@@ -42,7 +42,7 @@ def get_range(file_name,range_header):
     file.close()
     return rv
 
-def create_app(project,open_browser=True, port =5000):
+def create_app(project, open_browser=True, port = 5050):
     app=Flask(__name__)
     #add headers to allow web workers
     app.after_request(add_safe_headers)
@@ -56,9 +56,10 @@ def create_app(project,open_browser=True, port =5000):
     #    return send_file(safe_join(js_files,path))
     
 
-    @app.route("/<file>.b")
+    @app.route("/<file>.gz")
     def get_binary_file(file):
-        file_name =safe_join(project.dir,file+".b")
+        # should this now b '.gz'?
+        file_name = safe_join(project.dir, file+".gz")
         range_header = request.headers.get('Range', None) 
         return get_range(file_name,range_header)
 
