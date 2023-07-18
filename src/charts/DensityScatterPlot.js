@@ -130,7 +130,7 @@ class DensityScatterPlot extends WGLScatterPlot{
 
     getContextMenu(){
         let cm = super.getContextMenu();
-        if (this.dataStore.regions){
+        if (this.dataStore.regions && !this.config.viv){
             cm.push({
                 text:"Set as Default Image",
                 icon:"fas fa-file-image",
@@ -319,7 +319,7 @@ BaseChart.types["density_scatter_plot"]={
 }
 
 BaseChart.types["image_scatter_plot"]={
-    name:"Image Scatter Plot",
+    name:"Centroid Plot",
     class:DensityScatterPlot,
     required:["regions"],
     extra_controls:(ds)=>{
@@ -348,7 +348,8 @@ BaseChart.types["image_scatter_plot"]={
         config.color_legend={display:false};
         config.region=ec.region;
         config.roi=sr.roi;
-        config.background_image=sr.images[sr.default_image];     
+        config.background_image=sr.images[sr.default_image];
+        config.title= ec.region + (sr.default_image?`-${sr.default_image}`:"");
     }
 }
 

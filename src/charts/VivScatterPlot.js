@@ -55,8 +55,8 @@ export class ColorChannelDialog extends BaseDialog{
             classes:["ciview-button-sm"],
             text:"Set as Default"
         },addDiv).addEventListener("click",()=>{
-            contents.ds.avivator.default_channels = this.viv.getSelectedChannelsNice();
-            contents.ds.dirtyMetadata.add("avivator");
+            contents.ds.regions.avivator.default_channels = this.viv.getSelectedChannelsNice();
+            contents.ds.dirtyMetadata.add("regions");
         })
 
         
@@ -140,8 +140,6 @@ export class ColorChannelDialog extends BaseDialog{
             cont.remove();
 
         })
-
-
     }
 }
 
@@ -238,8 +236,14 @@ class VivScatterPlot extends DensityScatterPlot{
             
 
             import ('../webgl/VivViewer.js').then(({default:VivViewer})=>{
-                this.viv = new VivViewer(this.vivCanvas,c.viv,this.app,this.dataStore.regions?.base_url);
-            
+                //new config
+                const r  = this.dataStore.regions;
+                //local or remote url
+                if(r){
+                    const i = r.all_regions[c.region].viv_image;                  
+                    c.viv.url = i.url?i.url:r.avivator.base_url + i.file
+                }
+                this.viv = new VivViewer(this.vivCanvas,c.viv,this.app);
                 this.app.addHandler("pan_or_zoom",(offset,x_scale,y_scale)=>{
                     this.viv.setPanZoom(offset,x_scale,y_scale)
                 },c.id+"_viv")
@@ -251,14 +255,13 @@ class VivScatterPlot extends DensityScatterPlot{
 
 BaseChart.types["viv_scatter_plot"]={
     name:"Viv Scatter Plot",
-    required:["avivator","regions"],
+    required:ds=>ds.regions?.avivator,
     extra_controls:(ds)=>{
         const vals=[];
         for(let x in ds.regions.all_regions){
-            if (ds.regions.all_regions[x].ome_tiff){
+            if (ds.regions.all_regions[x].viv_image){
                 vals.push({name:x,value:x});
-            }
-            
+            }      
         }
         return [
             {
@@ -274,11 +277,9 @@ BaseChart.types["viv_scatter_plot"]={
         delete config.background_image;
         config.radius=0.5;
         config.viv={
-            channels:ds.avivator.default_channels,
-            file:ds.regions.all_regions[ec.region].ome_tiff
+            channels:ds.regions.avivator.default_channels,
         }
     },
-
     class:VivScatterPlot
 }
 

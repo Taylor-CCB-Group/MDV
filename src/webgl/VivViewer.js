@@ -37,19 +37,16 @@ function getTiff(url) {
 
 
 class VivViewer {
-  constructor(canvas,config,initialView,baseurl){
+  constructor(canvas,config,initialView){
     console.log('new VivViewer', config);
     this.canvas = canvas;
-
-
-    
     this.height= this.canvas.height;
     this.width= this.canvas.width;
     this.config=config;
     this.hasRequestedDefaultChannelStats = false;
     this.initClip();
-    const url = baseurl?baseurl+config.file:config.url
-    getTiff(url).then(loader=>{
+   
+    getTiff(config.url).then(loader=>{
       this.tiff = loader;
       this._setUp(loader,initialView);
     });

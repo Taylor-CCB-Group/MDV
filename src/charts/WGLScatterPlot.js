@@ -569,7 +569,7 @@ class WGLScatterPlot extends WGLChart{
 			})
 		}
         const rs = this.dataStore.regions
-        if (rs){
+        if (rs && !c.viv){
 			const ic= rs.all_regions[c.region].images;
             const vals= [["None","__none__"]];
 			for (let n in ic){
