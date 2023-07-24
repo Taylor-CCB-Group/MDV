@@ -17,6 +17,7 @@ import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
+import connectWebsocket from '../utilities/WebSocket';
 console.log(SideEffect);
 
 
@@ -26,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => loadData());
 const urlParams = new URLSearchParams(window.location.search);
 // if we're in a popout window, ignore the dir parameter and don't load data
 const isPopout = urlParams.get('popout') === "true";
+const socket = urlParams.get('socket');
 const dir = urlParams.get('dir') || (isPopout ? '' : prompt("Enter data URL", "https://mdvstatic.netlify.app/ytrap2"));
 const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
 // set title of page to the data directory
@@ -81,6 +83,9 @@ async function loadData() {
         }
     }
     const cm = new ChartManager("app1", datasources, dataLoader, config);
+    if (socket) {
+        connectWebsocket(socket, cm);
+    }
     function extraFeatures(i: number) {
         const dsName = datasources[i].name;
         const ds = cm.dsIndex[dsName];

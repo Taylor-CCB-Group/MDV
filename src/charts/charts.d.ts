@@ -77,6 +77,15 @@ export type Chart = {
     config:any;
 };
 
+export type ChartState = {
+    chart: Chart;
+    win?: Window;
+    dataSource: DataSource;
+}
+
 export type ChartManager = {
+    charts: Record<string, ChartState>;
     addMenuIcon: (dataSourceName: string, iconClass: string, text: string, func: ()=>void) => HTMLElement;
+    /** probably not something we really want to use publicly like this */
+    _popOutChart: (chart: Chart) => void;
 };
