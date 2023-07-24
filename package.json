@@ -50,6 +50,7 @@
     "nouislider": "^15.6.1",
     "react": "^18.2.0",
     "regl": "^2.1.0",
+    "socket.io-client": "^4.7.1",
     "split.js": "^1.6.5",
     "wordcloud": "^1.2.2"
   },
