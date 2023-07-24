@@ -181,7 +181,7 @@ class HeatMap extends SVGChart{
                 val:d.av
             });
         })
-        .on("mouseover mousemove",(e,d)=>{ 
+        .on("mouseover pointermove",(e,d)=>{ 
             const row = self.dataStore.columnIndex[self.config.param[d.row_id+1]].name;
 
             self.showToolTip(e,`${vals[d.col_id]}<br>${row}<br>${d.av.toPrecision(2)}`);

@@ -158,7 +158,7 @@ class SingleSeriesChart extends SVGChart{
       this.graph_area.selectAll("circle")
       .data(this.data)
       .join("circle")
-      .on("mouseover mousemove",(e,d)=>{          
+      .on("mouseover pointermove",(e,d)=>{          
         const c1 = xvals[d[1]];
         const sn = svalues[d[2]];
         self.showToolTip(e,`${c1}<br>${sn}<br>${d[0]}`);

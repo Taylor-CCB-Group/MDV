@@ -130,7 +130,7 @@ class StackedRowChart extends SVGChart{
                 .attr("width",d=>d.per*box.width)
                 .attr("height",bheight)
                 .attr("fill",d=>colors[d.id])
-                .on("mouseover mousemove",(e,d)=>{           
+                .on("mouseover pointermove",(e,d)=>{           
                     self.showToolTip(e,`${xvalues[d.id]}<br>${d.count}`);
                 }).
                 on("mouseleave",()=>{

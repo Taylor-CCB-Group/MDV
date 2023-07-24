@@ -81,7 +81,7 @@ class CustomBoxPlot extends SVGChart{
         .data(d=>d)
         .join("circle")
         .attr("class","cbp-circle")
-        .on("mouseover mousemove",(e,d)=>{    
+        .on("mouseover pointermove",(e,d)=>{    
             const h= `${vals[d[1]]}<br>${vals2[d[2]]}`;             
             self.showToolTip(e,h)
         }).

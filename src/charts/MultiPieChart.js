@@ -186,7 +186,7 @@ class MultiPieChart extends SVGChart{
         .on("click",(e,d)=>{
             self.dataStore.dataHighlighted([d.data[3]],self);
         })
-    .on("mouseover mousemove",(e,d)=>{          
+    .on("mouseover pointermove",(e,d)=>{          
         const c1 = v1[d.data[0]];
         const c2 = v2[d.data[1]];
         const p = ((d.data[2]/d.sum)*100).toFixed(2)

@@ -196,7 +196,7 @@ class SingleHeatMap extends SVGChart{
         .on("click",(e,d)=>{
            self.dataStore.dataHighlighted([d[3]],self);
         })
-        .on("mouseover mousemove",(e,d)=>{ 
+        .on("mouseover pointermove",(e,d)=>{ 
             const col = xvals[d[0]];
             const row  =yvals[d[1]];
             self.showToolTip(e,`${col}<br>${row}<br>${d[2].toPrecision(3)}`);

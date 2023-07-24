@@ -124,7 +124,7 @@ class SankeyChart extends SVGChart{
         .join("path")
         .on("click",(e,d)=>{
             self.filterMultipleCategories(d);
-        }).on("mouseover mousemove",(e,d)=>{
+        }).on("mouseover pointermove",(e,d)=>{
             const s = d.source;        
             const sn = self.dataStore.getColumnValues(self.config.param[s.param])[s.ind];  
             const t = d.target;
@@ -172,7 +172,7 @@ class SankeyChart extends SVGChart{
             self.linkFilter=null;
             const values= self.dataStore.getColumnValues(col);
             self.filterCategories(col,values[d.ind]);
-        }).on("mouseover mousemove",(e,d)=>{         
+        }).on("mouseover pointermove",(e,d)=>{         
             const n= self.dataStore.getColumnValues(self.config.param[d.param])[d.ind];
             self.showToolTip(e,n)
         }).
