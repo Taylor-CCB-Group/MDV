@@ -67,6 +67,7 @@ async function loadData() {
     if (isPopout) return;
     const datasources = await fetchAndPatchJSON(`${root}/datasources.json`) as Datasource[];
     const config = await fetchAndPatchJSON(`${root}/state.json`);
+    config.popouturl = undefined;
     const views = await fetchAndPatchJSON(`${root}/views.json`);
     // TODO: add a way of specifying a different type of data loader.
     /// perhaps via another URLSearchParam, to avoid messing with datasources spec.
