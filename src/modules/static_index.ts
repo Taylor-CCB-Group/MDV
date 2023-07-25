@@ -84,7 +84,7 @@ async function loadData() {
     }
     const cm = new ChartManager("app1", datasources, dataLoader, config);
     if (socket) {
-        connectWebsocket(socket, cm);
+        setTimeout(() => connectWebsocket(socket, cm), 2000);
     }
     function extraFeatures(i: number) {
         const dsName = datasources[i].name;
