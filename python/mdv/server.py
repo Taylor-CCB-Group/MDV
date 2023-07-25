@@ -6,6 +6,7 @@ import json
 import sys
 import re
 from werkzeug.utils import safe_join
+from .websocket import mdv_socketio
 
 
 def add_safe_headers(resp):
@@ -43,21 +44,12 @@ def get_range(file_name,range_header):
     file.close()
     return rv
 
-def create_app(project, open_browser=True, port = 5050):
+def create_app(project, open_browser=True, port = 5050, websocket=True):
     app=Flask(__name__)
     #add headers to allow web workers
     app.after_request(add_safe_headers)
-    # todo: this is hacky/needs more thought
-    socketio = SocketIO(app, cors_allowed_origins="*")
-
-    @socketio.on('connect')
-    def test_connect():
-        print('WebSocket client connected')
-        # socketio.emit('popout', "KNkyOT")
-    
-    @socketio.on('popout')
-    def popout(data):
-        print(f'popout: {data}')
+    if websocket:        
+      mdv_socketio(app)
 
     @app.route("/")
     def index():
