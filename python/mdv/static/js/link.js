@@ -34,6 +34,7 @@ function _mdvInit(staticFolder){
             _mdvListener(type,cm,info,data);
         }
         cm = new ChartManager("holder",data.datasources,dataLoader,config,listener);
+        window.cm = cm; //unclean but useful for debugging (and hacking in ws...)
     
         
         //*******legacy

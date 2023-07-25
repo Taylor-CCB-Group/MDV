@@ -18,12 +18,14 @@ import "../charts/VivScatterPlot.js";
 import "../charts/CellNetworkChart.js";
 import "../charts/CellRadialChart.js";
 import "../charts/RowSummaryBox.js";
+import "../charts/ImageScatterChart.js";
+import "../charts/WordCloudChart.js";
 
 
 import "../browser/css/browser.css";
 import "../charts/GenomeBrowser.js";
 import { createEl } from "../utilities/Elements";
-
+import connectWebsocket from '../utilities/WebSocket';
 
 //objects to attach to the window object
 import ChartManager from '../charts/ChartManager.js';
@@ -35,3 +37,5 @@ window.processArrayBuffer = processArrayBuffer;
 window.getArrayBufferDataLoader= getArrayBufferDataLoader;
 window.createEl= createEl;
 window.getLocalCompressedBinaryDataLoader = getLocalCompressedBinaryDataLoader;
+//window.cm will be set in link.js, at least for now
+setTimeout(()=>connectWebsocket('http://localhost:5050', window.cm), 1000);

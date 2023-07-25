@@ -10,6 +10,7 @@
     "dev": "vite --host",
     "vite-build": "tsc && vite build",
     "build": "webpack --config prod.config.js",
+    "build-flask": "webpack --config dist/desktop.config.js",
     "run-hyperion": "webpack  serve --config hyperion.dev.config.js",
     "run-obvios": "webpack  serve --config obvios.config.js",
     "run-ytrap": "webpack  serve --config ytrap.config.js",
