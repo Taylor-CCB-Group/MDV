@@ -48,7 +48,7 @@ def create_app(project, open_browser=True, port = 5050, websocket=True):
     app=Flask(__name__)
     #add headers to allow web workers
     app.after_request(add_safe_headers)
-    if websocket:        
+    if websocket:
       mdv_socketio(app)
 
     @app.route("/")
