@@ -18,7 +18,7 @@ c:\path\to\myenv\Scripts\activate.bat
 
 Next install the dependencies
 ```
-pip install -r requirements.txt
+pip install -e .
 ```
 
 
@@ -86,7 +86,7 @@ webpack serve  --config dev.config.js --env folder=/path/to/myproject
 
 ### To convert CSV data for a simple file server
 
-Given a CSV file associated folder of images, the `csv_to_static` script will create a folder (containing `datasources.json`, `state.json`, `views.json`, `{mydata.csv}.b`, `{mydata.csv}.json`, `images/`) that can be served by a simple file server.
+Given a CSV file associated folder of images, the `csv_to_static` script will create a folder (containing `datasources.json`, `state.json`, `views.json`, `{mydata.csv}.b`, `{mydata.csv}.json`, `images/`) that can be served by a simple file server. This script is 
 
 The script takes arguments for the CSV file and the output folder. If either of these is not present, or if the input file is not found, it will prompt for these interactively.
 
