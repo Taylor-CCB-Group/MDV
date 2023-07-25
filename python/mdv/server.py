@@ -1,4 +1,5 @@
 from flask import Flask,render_template,request,make_response,send_file,Response,jsonify
+from flask_socketio import SocketIO
 import webbrowser
 import mimetypes
 import json
@@ -46,6 +47,17 @@ def create_app(project, open_browser=True, port = 5050):
     app=Flask(__name__)
     #add headers to allow web workers
     app.after_request(add_safe_headers)
+    # todo: this is hacky/needs more thought
+    socketio = SocketIO(app, cors_allowed_origins="*")
+
+    @socketio.on('connect')
+    def test_connect():
+        print('WebSocket client connected')
+        # socketio.emit('popout', "KNkyOT")
+    
+    @socketio.on('popout')
+    def popout(data):
+        print(f'popout: {data}')
 
     @app.route("/")
     def index():
