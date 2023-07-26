@@ -18,8 +18,7 @@ import "../charts/VivScatterPlot.js";
 import "../charts/CellNetworkChart.js";
 import "../charts/CellRadialChart.js";
 import "../charts/RowSummaryBox.js";
-import "../charts/ImageScatterChart.js";
-import "../charts/WordCloudChart.js";
+import "../charts/ImageScatterChart.ts";
 
 
 import "../browser/css/browser.css";
