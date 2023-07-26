@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
 import { ChartManager } from "../charts/charts";
+import { DataModel } from "../table/DataModel";
 
 export default async function connectWebsocket(url: string, cm: ChartManager) {
     const socket = io(url);
@@ -21,5 +22,14 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
             cm._popOutChart(chart.chart);
         }
     });
+    // DataModel: register with all datastore changes & send appropriate updates.
+    // TOOD: Types, Zod?
+    for (const ds of cm.dataSources) {
+        const dataModel = new DataModel(ds.dataStore);
+        dataModel.addListener('socket', () => {
+            socket.emit('filter', {dataSource: ds.name, indices: dataModel.data});
+        });
+    }
+    
     // debugger;
 }

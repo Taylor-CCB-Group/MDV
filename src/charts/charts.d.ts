@@ -83,8 +83,16 @@ export type ChartState = {
     dataSource: DataSource;
 }
 
+export type DataSourceSpec = {
+    name: string;
+    dataStore: DataStore;
+    //links etc TBD
+};
+
 export type ChartManager = {
     charts: Record<string, ChartState>;
+    dataSources: DataSourceSpec[];
+    dsIndex: Record<string, DataSourceSpec>;
     addMenuIcon: (dataSourceName: string, iconClass: string, text: string, func: ()=>void) => HTMLElement;
     /** probably not something we really want to use publicly like this */
     _popOutChart: (chart: Chart) => void;
