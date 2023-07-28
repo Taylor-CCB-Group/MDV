@@ -86,6 +86,7 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
         } else {
             console.log("vuplex doesn't exist yet, waiting for vuplexready");
             window.addEventListener('vuplexready', () => {
+                console.log("vuplexready event received");
                 addMessageListener();
             });
         }
