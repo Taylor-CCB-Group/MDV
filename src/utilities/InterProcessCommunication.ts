@@ -6,7 +6,7 @@ declare global {
     interface Window {
         vuplex?: {
             postMessage: (msg: any) => void;
-            addEventListener: (type: string, func: (msg: string) => void) => void;
+            addEventListener: (type: string, func: (msg: MDVMessage) => void) => void;
         };
     }
 }
@@ -47,21 +47,16 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
         if (!chart) {
             console.error(`Chart ${chartID} not found`);
             sendMessage({ type: "error", message: `Popout failed: chart ${chartID} not found` });
+        } else {
+            cm._popOutChart(chart.chart);
         }
-        cm._popOutChart(chart.chart);
     }
+    // should msg be a string? or a JSON object?
     socket.on("message", async (msg: string) => {
         const data = JSON.parse(msg) as MDVMessage;
         if (data.type === "popout") {
             const { chartID } = data;
-            const chart = cm.charts[chartID];
-            if (!chart) {
-                console.error(`Chart ${chartID} not found`);
-                socket.emit("popout_fail", chartID);
-                sendMessage({ type: "error", message: `Chart ${chartID} not found` });
-            } else {
-                cm._popOutChart(chart.chart);
-            }
+            popout(chartID);
         }
     });
     // DataModel: register with all datastore changes & send appropriate updates.
@@ -76,17 +71,19 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
         console.log("setupVuplex...");
         function addMessageListener() {
             window.vuplex.postMessage({ type: "vuplex_ready" });
-            window.vuplex.addEventListener("message", (msg: string) => {
-                console.log("vuplex message", msg);
+            window.vuplex.addEventListener("message", (msg: MDVMessage | string) => {
+                if (typeof msg === "string") msg = JSON.parse(msg) as MDVMessage;
+                console.log("vuplex message", JSON.stringify(msg, null, 2));
                 // TOOD: Types, Zod?
                 try {
-                    const data = JSON.parse(msg) as MDVMessage;
+                    const data = msg;//JSON.parse(msg) as MDVMessage;
                     if (data.type === "popout") {
                         console.log("chartID: ", data.chartID);
                         popout(data.chartID);
                     }
                 } catch (e) {
                     console.error("Error parsing vuplex message", e);
+                    sendMessage({ type: "error", message: `Error parsing vuplex message: ${e}` });
                 }
             });
         }
