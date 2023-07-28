@@ -24,7 +24,6 @@ type ErrorMessage = {
     type: "error";
     message: string;
 }
-
 type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage;
 
 export default async function connectWebsocket(url: string, cm: ChartManager) {
@@ -73,9 +72,11 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
     function setupVuplex() {
         console.log("setupVuplex...");
         function addMessageListener() {
+            window.vuplex.postMessage({ type: "vuplex_ready" });
             window.vuplex.addEventListener("message", (msg) => {
-                console.log("vuplext message", msg);
+                console.log("vuplext message", JSON.stringify(msg, null, 2));
                 if (msg.type === "popout") {
+                    console.log("chartID: ", msg.chartID);
                     popout(msg.chartID);
                 }
             });
