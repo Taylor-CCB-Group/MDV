@@ -17,7 +17,7 @@ import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
-import connectWebsocket from '../utilities/WebSocket';
+import connectWebsocket from '../utilities/InterProcessCommunication';
 console.log(SideEffect);
 
 

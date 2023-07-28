@@ -24,7 +24,7 @@ import "../charts/ImageScatterChart.ts";
 import "../browser/css/browser.css";
 import "../charts/GenomeBrowser.js";
 import { createEl } from "../utilities/Elements";
-import connectWebsocket from '../utilities/WebSocket';
+import connectWebsocket from '../utilities/InterProcessCommunication';
 
 //objects to attach to the window object
 import ChartManager from '../charts/ChartManager.js';
