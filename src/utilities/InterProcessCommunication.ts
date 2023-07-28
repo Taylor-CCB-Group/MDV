@@ -73,11 +73,12 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
         console.log("setupVuplex...");
         function addMessageListener() {
             window.vuplex.postMessage({ type: "vuplex_ready" });
-            window.vuplex.addEventListener("message", (msg) => {
+            window.vuplex.addEventListener("message", (msg: string) => {
+                const data = JSON.parse(msg) as PopoutMessage;
                 console.log("vuplext message", JSON.stringify(msg, null, 2));
-                if (msg.type === "popout") {
-                    console.log("chartID: ", msg.chartID);
-                    popout(msg.chartID);
+                if (data.type === "popout") {
+                    console.log("chartID: ", data.chartID);
+                    popout(data.chartID);
                 }
             });
         }
