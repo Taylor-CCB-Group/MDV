@@ -6,7 +6,7 @@ declare global {
     interface Window {
         vuplex?: {
             postMessage: (msg: any) => void;
-            addEventListener: (type: string, func: (msg: any) => void) => void;
+            addEventListener: (type: string, func: (msg: string) => void) => void;
         };
     }
 }
