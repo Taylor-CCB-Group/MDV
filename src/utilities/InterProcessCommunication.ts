@@ -46,7 +46,11 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
         const chart = cm.charts[chartID];
         if (!chart) {
             console.error(`Chart ${chartID} not found`);
-            sendMessage({ type: "error", message: `Popout failed: chart ${chartID} not found` });
+            console.log("current chart keys: ", Object.keys(cm.charts).join(", "));
+            sendMessage({ type: "error", message: `Popout failed: chart ${chartID} not found... trying again...` });
+            // maybe introduce timeout retry here... not sure why not all charts are available at the same time.
+            // there should be a different mechanism for this, but for now, this will do.
+            setTimeout(() => popout(chartID), 100);
         } else {
             cm._popOutChart(chart.chart);
         }
