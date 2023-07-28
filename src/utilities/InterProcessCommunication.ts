@@ -11,15 +11,35 @@ declare global {
     }
 }
 
+type PopoutMessage = {
+    type: "popout";
+    chartID: string;
+}
+type FilterMessage = {
+    type: "filter";
+    dataSource: string;
+    indices: Int32Array;
+}
+type ErrorMessage = {
+    type: "error";
+    message: string;
+}
+
+type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage;
 
 export default async function connectWebsocket(url: string, cm: ChartManager) {
     setupVuplex();
     const socket = io(url);
+
+    function sendMessage(msg: MDVMessage) {
+        socket.emit("message", msg);
+        if (window.vuplex) window.vuplex.postMessage(msg);
+    }
+
     const originalPopOutChart = cm._popOutChart;
     cm._popOutChart = (chart) => {
         originalPopOutChart.apply(cm, [chart]);
-        socket.emit("popout", chart.config.id);
-        if (window.vuplex) window.vuplex.postMessage({ type: "popout", chartID: chart.config.id });
+        sendMessage({ type: "popout", chartID: chart.config.id });
     }
 
     socket.connect();
@@ -30,12 +50,13 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
         }
         cm._popOutChart(chart.chart);
     }
-    socket.on("popout", async (chartID: string) => {
+    socket.on("message", async (chartID: string) => {
         // await new Promise((resolve) => setTimeout(resolve, 5000));
         const chart = cm.charts[chartID];
         if (!chart) {
             console.error(`Chart ${chartID} not found`);
             socket.emit("popout_fail", chartID);
+            sendMessage({ type: "error", message: `Chart ${chartID} not found` });
         } else {
             cm._popOutChart(chart.chart);
         }
@@ -44,14 +65,15 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
     // TOOD: Types, Zod?
     for (const ds of cm.dataSources) {
         const dataModel = new DataModel(ds.dataStore);
-        dataModel.addListener('socket', () => {
-            socket.emit('filter', {dataSource: ds.name, indices: dataModel.data});
+        dataModel.addListener('IPC', () => {
+            sendMessage({ type: "filter", dataSource: ds.name, indices: dataModel.data });
         });
     }
     
     function setupVuplex() {
         function addMessageListener() {
             window.vuplex.addEventListener("message", (msg) => {
+                console.log("vuplext message", msg);
                 if (msg.type === "popout") {
                     popout(msg.chartID);
                 }

@@ -14,6 +14,8 @@ def mdv_socketio(app: Flask):
         log('WebSocket client connected')
         # socketio.emit('popout', "KNkyOT")
     
-    @socketio.on('popout')
-    def popout(data):
-        log(f'popout: {data}')
+    @socketio.on('message')
+    def message(data):
+        # 'hello world'... if we have need for more logic here, we'll probably use a dictionay of functions for each message type.
+        if data.type == 'popout':
+            log(f'popout: {data}')
