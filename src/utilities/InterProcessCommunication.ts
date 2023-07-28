@@ -71,6 +71,7 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
     }
     
     function setupVuplex() {
+        console.log("setupVuplex...");
         function addMessageListener() {
             window.vuplex.addEventListener("message", (msg) => {
                 console.log("vuplext message", msg);
@@ -80,8 +81,10 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
             });
         }
         if (window.vuplex) {
+            console.log("vuplex already exists, adding listener");
             addMessageListener();
         } else {
+            console.log("vuplex doesn't exist yet, waiting for vuplexready");
             window.addEventListener('vuplexready', () => {
                 addMessageListener();
             });
