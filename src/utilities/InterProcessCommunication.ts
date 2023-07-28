@@ -6,7 +6,7 @@ declare global {
     interface Window {
         vuplex?: {
             postMessage: (msg: any) => void;
-            addEventListener: (type: string, func: (msg: MDVMessage) => void) => void;
+            addEventListener: (type: string, func: (event: {data: MDVMessage}) => void) => void;
         };
     }
 }
@@ -71,7 +71,8 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
         console.log("setupVuplex...");
         function addMessageListener() {
             window.vuplex.postMessage({ type: "vuplex_ready" });
-            window.vuplex.addEventListener("message", (msg: MDVMessage | string) => {
+            window.vuplex.addEventListener("message", (e) => {
+                let msg = e.data;
                 if (typeof msg === "string") msg = JSON.parse(msg) as MDVMessage;
                 console.log("vuplex message", JSON.stringify(msg, null, 2));
                 // TOOD: Types, Zod?
