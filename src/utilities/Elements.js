@@ -109,6 +109,34 @@ function addElProps(el,attrs){
 }
 
 /**
+ * Make a text input element that can be used to filter a list of items
+ * @param {HTMLSelectElement} selectEl - the element to be filtered
+ * @param {HTMLElement=} parent - (optional) the parent element to which the filter will be added
+ * @returns {HTMLInputElement} - the filter element
+ */
+export function createFilterElement(selectEl, parent) {
+    //consider using AutoComplete here
+    const filter = createEl("input", {
+        placeholder: "Filter",
+        type: "text",
+        styles: {
+            width: "4em"
+        }
+    }, parent);
+    filter.oninput = (e) => {
+        const val = e.target.value.toLowerCase();
+        for (let o of selectEl.options) {
+            if (o.text.toLowerCase().indexOf(val) === -1) {
+                o.style.display = "none";
+            } else {
+                o.style.display = "block";
+            }
+        }
+    };
+    return filter;
+}
+
+/**
  * Enables the children of an HTML element to be sorted by the user
  * via drag and drop
  * @param {HTMLElement} list - an HTML element whose immediate children will

@@ -1,6 +1,6 @@
 import { BaseDialog } from "./Dialog.js";
-import { createEl } from "./Elements.js";
-import noUiSlider from "nouislider";
+import { createEl, createFilterElement } from "./Elements.js";
+import noUiSlider, { create } from "nouislider";
 // import lgui from 'lil-gui';
 
 
@@ -156,14 +156,15 @@ class SettingsDialog extends BaseDialog{
     }
 
 
-    multidropdown(s,d){
+    multidropdown(s, d){
+        const wrapper = createEl("div");
         const dd = createEl("select",{
             multiple:true,
             styles:{
                 maxWidth:"200px",
                 height:"100px"
             }
-        });
+        }, wrapper);
         createEl("br",{},d);
         for (let item of s.values[0]){
             const v =item[s.values[2]];
@@ -178,7 +179,6 @@ class SettingsDialog extends BaseDialog{
 
             createEl("option",args,dd)
         }
-        d.append(dd);
         createEl("br",{},d);
         const b = createEl("button",{
             classes:["ciview-button-sm"],
@@ -187,6 +187,8 @@ class SettingsDialog extends BaseDialog{
         b.addEventListener("click",(e)=>{
             s.func(Array.from(dd.selectedOptions).map(x=>x.value));
         })
+        createFilterElement(dd, wrapper);
+        d.append(wrapper);
         return dd;
     }
        
@@ -194,12 +196,15 @@ class SettingsDialog extends BaseDialog{
 
     
 
-    dropdown(s,d){
+    dropdown(s, d){
+        //todo fuzzy search / filter / autocomplete
+        //(also for multidropdown)
+        const wrapper = createEl("div");
         const dd = createEl("select",{
             styles:{
                 maxWidth:"200px"
             }
-        });
+        }, wrapper);
         // createEl("br",{},d);
         for (let item of s.values[0]){
             createEl("option",{
@@ -207,7 +212,6 @@ class SettingsDialog extends BaseDialog{
                 value:item[s.values[2]]
             },dd)
         }
-        d.append(dd);
         dd.value=s.current_value;
         dd.addEventListener("change",(e)=>{
             s.func(dd.value,this.controls);
@@ -216,7 +220,9 @@ class SettingsDialog extends BaseDialog{
                 s.onchange(this.controls,dd.value);
             }
         });
-        return dd;
+        createFilterElement(dd, wrapper);
+        d.append(wrapper);
+        return wrapper;
     }
 
     doubleslider(s,d){

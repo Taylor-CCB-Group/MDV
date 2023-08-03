@@ -1,4 +1,4 @@
-import { createEl, makeDraggable, makeResizable,MDVProgress,removeDraggable,removeResizable,createMenuIcon,splitPane} from "../utilities/Elements";
+import { createEl, makeDraggable, makeResizable,MDVProgress,removeDraggable,removeResizable,createMenuIcon,splitPane, createFilterElement} from "../utilities/Elements";
 import  BaseChart from "./BaseChart.js";
 import { PopOutWindow } from "../utilities/PopOutWindow";
 import  DataStore from "../datastore/DataStore.js";
@@ -1874,7 +1874,7 @@ class ChartManager{
               this._makeChartRD(chart, chInfo.dataSource);
               chart.popoutIcon.style.display="inline";
               delete chInfo.window
-              
+              //... 'popin' IPC event?
             },
             //config
             { 
@@ -1969,6 +1969,7 @@ class ChooseColumnDialog extends BaseDialog{
         const cols = this.ds.getColumnList(content.filter);
         this.checks=[];
         this.callback=content.callback;
+        //todo let this work with createFilterElement?
         for (let col of cols){
             const d= createEl("div",{
                 styles:{//display:"inline-block",
@@ -2204,22 +2205,22 @@ class AddChartDialog extends BaseDialog{
                             maxWidth:"200px"
                         }
                     },holder);
-                    const ps= this.dataStore.getColumnList(p.type);
+                    const ps = this.dataStore.getColumnList(p.type);
                     const sgs = {}
                     for (let ds of this.dataStore.subgroupDataSources){
-                        sgs[ds]=createEl("optgroup",{label:ds});
+                        sgs[ds] = createEl("optgroup",{label:ds});
                     }
                     for (let item of ps){
                         let ele = dd;
                         if (item.subgroup){
-                            ele=sgs[item.subgroup.dataSource];
+                            ele = sgs[item.subgroup.dataSource];
                         }
-                        createEl("option",{text:item.name,value:item.field},ele);
-
+                        createEl("option",{text:item.name,value:item.field}, ele);
                     }
                     for (let ds of this.dataStore.subgroupDataSources){
                         dd.append(sgs[ds]);
                     }
+                    createFilterElement(dd, holder);
                     this.paramSelects.push(dd);
                 }           
             }
