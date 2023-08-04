@@ -48,6 +48,9 @@ def create_app(project, open_browser=True, port = 5050, websocket=True):
     app=Flask(__name__)
     #add headers to allow web workers
     app.after_request(add_safe_headers)
+    # nb, may make this default to False again soon.
+    ### 'MEW' in Unity is using IWeb PostMessage, not WebSockets.
+    ### but this will be used for local testing in short-term, and potentially other things later.
     if websocket:
       mdv_socketio(app)
 
