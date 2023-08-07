@@ -37,4 +37,5 @@ window.getArrayBufferDataLoader= getArrayBufferDataLoader;
 window.createEl= createEl;
 window.getLocalCompressedBinaryDataLoader = getLocalCompressedBinaryDataLoader;
 //window.cm will be set in link.js, at least for now
+//TODO, rather than arbitary timeout, wait for some point when we're ready to e.g. popout a chart.
 setTimeout(()=>connectWebsocket('http://localhost:5050', window.cm), 1000);
