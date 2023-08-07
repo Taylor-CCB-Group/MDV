@@ -8,6 +8,9 @@ import shlex
 import subprocess
 import fasteners
 import warnings
+import shutil
+import random
+import string
 from os.path import join,split,exists
 from  shutil import copytree,ignore_patterns,copyfile
 
@@ -31,8 +34,10 @@ numpy_dtypes={
 }
 
 class MDVProject:
-    def __init__(self,dir):
+    def __init__(self,dir,delete_existing=False):
         self.dir=dir
+        if delete_existing and exists(dir):
+            shutil.rmtree(dir)
         self.h5file = join(dir,"datafile.h5")
         self.datasourcesfile= join(dir,"datasources.json")
         self.statefile= join(dir,"state.json")
@@ -547,8 +552,9 @@ class MDVProject:
         template = join(tdir,page)
         page = open(template).read()
         if not debug:
+            #call init with the static folder argument
             page=page.replace("_mdvInit()","_mdvInit(true)")
-             #correct config
+            #correct config
             conf  = self.state
             #can't edit static page
             conf["permission"]="view"
@@ -702,6 +708,129 @@ class MDVProject:
         h5.close()
         return b''.join(byte_list)
     
+    def set_region_data(self,datasource,data,region_field="sample_id",
+                    default_color="annotations",
+                    position_fields=["x","y"],scale_unit="um",scale=1,):
+        md = self.get_datasource_metadata(datasource)
+        cols = set([x["field"] for x in md["columns"]])
+        missing = [x for x in  [region_field]+[default_color]+position_fields if not x in cols]
+        if len(missing) >0:
+            raise AttributeError(f"setting region data on {datasource} but the specified columns({','.join(missing)}) are missing")
+        md["regions"]={
+            "position_fields":position_fields,
+            "region_field":region_field,
+            "default_color":default_color,
+            "scale_unit":scale_unit,
+            "scale":scale
+
+        }
+        #convert to dict
+        if not isinstance(data,dict):
+            df = pandas.read_csv(data,sep="\t")
+            df.set_index(df.columns[0],inplace=True)
+            data = df.to_dict("index")
+        all_regions={}
+        for k,v in data.items():
+            x = v.get("x_offset",0)
+            y = v.get("y_offset",0)
+            all_regions[k]={
+                "roi":{
+                    "min_x":x,
+                    "min_y":y,
+                    "max_y":v["height"]+y,
+                    "max_x":v["width"]+x
+                },
+                "images":{}
+            }
+        md["regions"]["all_regions"]=all_regions
+        self.set_datasource_metadata(md)
+
+    def add_region_images(self,datasource,data):
+        imdir = join(self.dir,"images","regions")
+        if not exists(imdir):
+            os.makedirs(imdir)   
+        md = self.get_datasource_metadata(datasource)
+       
+        md["regions"]["base_url"]="images/regions/"
+        #convert flat file to dict
+        if not isinstance(data,dict):
+            df = pandas.read_csv(data,sep="\t")
+            df.set_index(df.columns[0],inplace=True)
+            data = df.to_dict("index")
+        all_regions = md["regions"]["all_regions"]
+        for k,v in data.items():
+            region = all_regions.get(k)
+            if not region:
+                raise AttributeError(f"adding image to non existant region ({k}) in {datasource}")
+            roi= region["roi"]
+            name = v.get("name")
+            x = v.get("offset_x",roi["min_x"])
+            y = v.get("offset_y",roi["min_y"])
+            region["default_image"]=name
+            reg={
+                "position":[x,y],
+                "height":v.get("height",roi["max_y"]-roi["min_y"]),
+                "width":v.get("width",roi["max_x"]-roi["min_x"]),
+                "name":name
+            }
+            #simple url
+            if v["path"].startswith("http"):
+                reg["url"]=v["path"]
+            #local file - need to copy to images directory
+            else:
+                im = split(v["path"])[1]
+                im_details= im.split(".")
+                newname= get_random_string()+"."+im_details[1]
+                shutil.copyfile(v["path"],join(imdir,newname))
+                reg["file"]=newname
+            all_regions[k]["images"][name]=reg
+        self.set_datasource_metadata(md)
+
+    def add_viv_viewer(self, datasource,default_channels):
+        md = self.get_datasource_metadata(datasource)
+        reg = md.get("regions")
+        if not reg:
+             raise AttributeError(f"Adding viv viewer to {datasource}, which does not contain regions")
+        imdir = join(self.dir,"images","avivator")
+        if not exists(imdir):
+            os.makedirs(imdir)   
+       
+        reg["avivator"]={
+            "default_channels":default_channels,
+            "base_url":"images/avivator/"
+        }
+        self.set_datasource_metadata(md)
+
+    def add_viv_images(self,datasource,data):
+        md = self.get_datasource_metadata(datasource)
+        try:
+            a=md["regions"]["avivator"]
+        except:
+            raise AttributeError(f"Adding viv images when viv viewer has not been specified")
+        all_regions = md["regions"]["all_regions"]
+        imdir = join(self.dir,"images","avivator")
+        if not isinstance(data,dict):
+            df = pandas.read_csv(data,sep="\t")
+            df.set_index(df.columns[0],inplace=True)
+            data = df.to_dict("index")
+        for k,v in data.items():
+            region = all_regions.get(k)
+            if not region:
+                raise AttributeError(f"adding image to non existant region ({k}) in {datasource}")
+            if v["path"].startswith("http"):
+                region["viv_image"]={
+                    "url":v["path"]
+                }
+            #local file - need to copy to images directory
+            else:            
+                newname= get_random_string()+".ome.tiff"
+                shutil.copyfile(v["path"],join(imdir,newname))
+                region["viv_image"]={
+                    "file":newname
+                }
+        self.set_datasource_metadata(md)
+
+
 
 
 def get_json(file):
@@ -741,6 +870,8 @@ def add_column_to_group(col,data,group,length):
                 col["values"]= [ x for x in values.index if values[x] != 0 ]
             vdict =  {k: v for v, k in enumerate(col["values"])}          
             group.create_dataset(col["field"],length,dtype=numpy.ubyte,data =data.map(vdict))
+            #convert to string 
+            col["values"] = [str(x) for x in col["values"]]
         else:
             max_len=max(data.str.len()) 
             utf8_type = h5py.string_dtype('utf-8',int(max_len))
@@ -826,3 +957,6 @@ def create_bed_gz_file(infile,outfile):
     os.system(command)
     subprocess.run(["bgzip",outfile])
     subprocess.run(["tabix",outfile+".gz"])
+
+def get_random_string(length=6):
+    return ''.join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=length))

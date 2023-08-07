@@ -96,6 +96,7 @@ class DotPlot extends SVGChart{
         if (l){
             config.fraction_legend.position=[l.offsetLeft,l.offsetTop];
         }
+        return config;
     }
 
 

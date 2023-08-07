@@ -2,6 +2,7 @@ import BaseChart from "./BaseChart.js"
 import { createEl,makeSortable} from "../utilities/Elements.js";
 import noUiSlider from "nouislider";
 import { getRandomString } from "../utilities/Utilities.js";
+import MultiSelectDropdown from "../utilities/MultiSelect";
 
 
 class SelectionDialog extends BaseChart{
@@ -14,7 +15,9 @@ class SelectionDialog extends BaseChart{
         this.numberFilters={};
         c.filters=c.filters || {};
         this.hasFiltred=false;
-        this.contentDiv.style.overflowY="auto"
+        this.contentDiv.style.overflowY="auto";
+       
+       
         for (let c of con){
             const col =dataStore.columnIndex[c];
             const div =createEl("div",{
@@ -23,13 +26,10 @@ class SelectionDialog extends BaseChart{
             //marker to identify which div associated with which column
             div.__fcol__=col.field;
             createEl("div",{text:col.name,classes:["i-title"],styles:{fontWeight:"bold"}},div)
-            if (col.datatype==="text" ){
+            if (col.datatype==="text" || col.datatype==="multitext" ){
                 this.addTextFilter(col,div)
             }
-            else if (col.datatype==="multitext"){
-                this.addMultiTextFilter(col,div);
-            }
-            else if (col.datatype==="integer" || col.datatype==="double"){
+            else if (col.datatype==="integer" || col.datatype==="double" || col.datatype==="int32"){
                 this.addNumberFilter(col,div);
             }
         }
@@ -41,29 +41,17 @@ class SelectionDialog extends BaseChart{
                     this.config.param=li.map(x=>x.__fcol__);
                 }
             });
-
-
         if (this.hasFiltered){
             setTimeout(()=>this.dataStore.triggerFilter(),0);
         }
     }
 
     removeFilter(){
-        const f= this.config.filters;
-      
+        const f= this.config.filters;    
         for (let c in this.textFilters){
-            const t = this.textFilters[c];
-            const is_multi = f[c].operand;
-            if (!is_multi){
-                t[0].value="__none__";
-                t[1].checked=false;
-            }
-            else{
-                t[1].innerHTML="";
-            }
-            
-            f[c].category=is_multi?[]:"__none__";
-            f[c].exclude=false;
+            const t = this.textFilters[c];            
+            t.unSelectAll()
+            f[c].category=[];
         }
         for (let c in this.numberFilters){
             const mm= this.dataStore.getMinMaxForColumn(c);
@@ -75,13 +63,10 @@ class SelectionDialog extends BaseChart{
         for (let c in this.dims){
             this.dims[c].removeFilter(false);
         }
-        this.dataStore.triggerFilter();
-        
+        this.dataStore.triggerFilter();    
     }
 
     onDataFiltered(dim){
-     
-       
     }
 
     addNumberFilter(col,div){
@@ -186,7 +171,6 @@ class SelectionDialog extends BaseChart{
             }
         });
 
-
         if (fil){
             this.filterCategories(col.field,false);
             this.hasFiltered=true;
@@ -194,22 +178,17 @@ class SelectionDialog extends BaseChart{
         this.numberFilters[col.field]=sl;
     }
 
-    
-
     filterCategories(col,notify=true){
         const f= this.config.filters[col];
         const type = this.dataStore.columnIndex[col].datatype;
         if (type=== "text" ){
-            if (f.category === "__none__"){
+            if (!(f.category) || f.category.length===0){
                 this.dims[col].removeFilter();
             }
             else{
-                let vs= [f.category]
-                if (f.exclude){
-                    vs = this.dataStore.getColumnValues(col).filter(x=>x!==f.category)
-                }
+                let vs= f.category;
                 this.resetButton.style.display = "inline";
-                this.dims[col].filter("filterCategories",[col],vs,notify)
+                this.dims[col].filter("filterCategories",[col],f.category,notify)
             }    
         }
         else if (type==="multitext"){
@@ -231,166 +210,85 @@ class SelectionDialog extends BaseChart{
                 this.resetButton.style.display = "inline";
                 this.dims[col].filter("filterRange",[col],{min:f[0],max:f[1]},notify)
             }
-
-        }
-        
-    }
-
-    createTag(div,col,value,add=true){
-        if (add){
-            this.config.filters[col.field].category.push(value);
-        }
-        const d=createEl("div",{},div);
-        createEl("span",{text:value},d);
-        const i = createEl("i",{classes:["fas","fa-times"]},d);
-        i.addEventListener("click",e=>{
-            this.config.filters[col.field].category=this.config.filters[col.field].category.filter(x=>x!==value);
-            console.log(this.config.filters[col.field].category);
-            d.remove();
-            this.filterCategories(col.field);  
-        })
-    }
-
-    addMultiTextFilter(col,hdiv){
-        let div = createEl("div",{style:{whiteSpace:"nowrap"}},hdiv)
-        const c = this.config;     
-        const dim =this.dataStore.getDimension("category_dimension");
-        dim.noclear=true;
-        this.dims[col.field]= dim;
-
-        if (!c.filters[col.field]){
-            c.filters[col.field]={
-                operand:"or",
-                category:[]
-            }
-        }
-        else{
-            this.filterCategories(col.field,false);
-            this.hasFiltered=true;
-        }
-
-        const fil = c.filters[col.field];
-        const dd = createEl("select",{
-            classes:["mdv-select"],
-            styles:{
-                maxWidth:"200px"
-            }
-        });
-       
-        for (let name of col.values.slice(0).sort()){
-            createEl("option",{
-                text:name,
-                value:name
-            },dd)
-        }
-        div.append(dd);
-        const b = createEl("button",{
-            classes:["ciview-button-sm"],
-            text:"Add"
-        },div);
-        const tdiv = createEl("div",{},div);
-        b.addEventListener("click",e=>{
-            if (fil.category.indexOf(dd.value)===-1){
-                this.createTag(tdiv,col,dd.value);
-                this.filterCategories(col.field);  
-            }
-            
-        });
-        div= createEl("div",{},hdiv)
-        const rname = getRandomString();
-        createEl("span",{text:"and"},div)
-        const rb = createEl("input",{   
-            type:"radio",
-            name:rname,
-            value:"and"
-        },div);
-        rb.checked = fil.operand==="and";
-        rb.addEventListener("click",(e)=>{
-            fil.operand="and";
-            this.filterCategories(col.field);  
-
-        });
-        createEl("span",{text:"or"},div)
-        const ra = createEl("input",{   
-            type:"radio",
-            name:rname,
-            value:"or"
-        },div);
-        ra.checked = fil.operand==="or";
-        ra.addEventListener("click",(e)=>{
-            fil.operand="or";
-            this.filterCategories(col.field);  
-
-        })
-        for (let c of fil.category){
-            this.createTag(tdiv,col,c,false);
-        }
-      
-        this.textFilters[col.field]=[dd,tdiv];
-        
+        }    
     }
 
     addTextFilter(col,div){
-        div.style.whiteSpace="nowrap";
+        const ismulti = col.datatype==="multitext";
+        //div.style.whiteSpace="nowrap";
         const c = this.config;     
         const dim =this.dataStore.getDimension("category_dimension");
         dim.noclear=true;
         this.dims[col.field]= dim;
-
-        if (!c.filters[col.field]){
-            c.filters[col.field]={
-                exclude:false,
-                category:"__none__"
+        let fil =c.filters[col.field]
+        if (!fil){
+            fil =c.filters[col.field]={
+                category:[],
+                operand:ismulti?"or":null
             }
         }
         else{
+            //convert legacy
+            if (typeof (fil.category)==="string"){
+                if(fil.category==="__none__"){
+                    fil.category=[];
+                }
+                else{
+                    fil.category=[fil.category];
+                }    
+            }
+            if (fil.exclude){
+                fil.category=this.dataStore.getColumnValues(col.field).filter(x=>x!==fil.category[0])
+            }
+            //end
             this.filterCategories(col.field,false);
             this.hasFiltered=true;
         }
-        const fil = c.filters[col.field];
-        const dd = createEl("select",{
-            classes:["mdv-select"],
-            styles:{
-                maxWidth:"200px"
-            }
-        });
-        createEl("option",{
-            text:"None",
-            value:"__none__"
-        },dd)
-        for (let name of col.values){
-            createEl("option",{
-                text:name,
-                value:name
-            },dd)
-        }
-        div.append(dd);
-        dd.value = fil.category
-        dd.addEventListener("change",(e)=>{
-            fil.category=dd.value;
-            this.filterCategories(col.field);
-          
-        });
-        const cb =createEl("input",{
-            classes:["mdv-checkbox"],
-            type:"checkbox"
-        },div)
-        cb.checked= fil.exclude;
+        
+        const hdiv = createEl("div",{},div);
+        if (ismulti){
+            const div1= createEl("div",{},hdiv)
+            const rname = getRandomString();
+            createEl("span",{text:"and"},div1)
+            const rb = createEl("input",{   
+                type:"radio",
+                name:rname,
+                value:"and"
+            },div1);
+            rb.checked = fil.operand==="and";
+            rb.addEventListener("click",(e)=>{
+                fil.operand="and";
+                this.filterCategories(col.field);  
 
-        cb.addEventListener("click",e=>{
-            fil.exclude = cb.checked;
-            this.filterCategories(col.field);     
-        });
-        
-        createEl("span",{
-            text:"exclude",
-            style:{
-                fontSize:"11px",
-                verticalAlign:"middle"
+            });
+            createEl("span",{text:"or"},div1)
+            const ra = createEl("input",{   
+                type:"radio",
+                name:rname,
+                value:"or"
+            },div1);
+            ra.checked = fil.operand==="or";
+            ra.addEventListener("click",(e)=>{
+                fil.operand="or";
+                this.filterCategories(col.field);  
+
+            })
+        }
+        const dd = createEl("div",{},div);
+        const options = col.values.slice(0).sort((a,b)=>a.localeCompare(b)).map(x=>{
+            return {
+                text:x,
+                value:x,
+                selected:fil.category.indexOf(x) !==-1
             }
-        },div);
-        this.textFilters[col.field]=[dd,cb]   
-        
+        })
+        const ms = new MultiSelectDropdown(dd,options,{
+            onchange:vals=>{
+                fil.category=vals;
+                this.filterCategories(col.field);
+            }
+        });
+        this.textFilters[col.field]=ms; 
     }
 
 
@@ -398,6 +296,7 @@ class SelectionDialog extends BaseChart{
         for (let c in this.dims){
             this.dims[c].destroy(false);
         }
+        Object.values(this.textFilters).forEach(x=>x.remove())
         if (notify){
             this.dataStore.triggerFilter();
         }

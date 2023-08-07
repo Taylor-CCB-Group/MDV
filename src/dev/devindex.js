@@ -1,14 +1,4 @@
-import 'nouislider/dist/nouislider.min.css'
-import "microtip/microtip.css";
-import "../css/fontawesome-5.15.3/all.css";
-import "../utilities/css/ContextMenu.css";
-import "../charts/css/charts.css";
-import "../webgl/css/wgl2di.css";
-import "../table/css/slickgrid.css";
-import "../browser/css/browser.css";
-import "../browser/bam_track.js";
-import "../browser/BamCoverageTrack.js";
-import "../charts/GenomeBrowser.js";
+import "../modules/all_css.js"
 import "../charts/ImageScatterChart";
 import "../charts/ImageTableChart.js";
 
@@ -31,10 +21,14 @@ async function init(){
                 return null;
             }
             return await resp.json()
-        } 
+        } ,
+        binaryDataLoader:async (datasource,name)=>{
+            const resp = await fetch(`./binarydata/${datasource}/${name}.b`);
+            return resp.arrayBuffer();
+        }
+
     }
     new ChartManager("holder",ds,dataLoader,cf);
 }
-
 
 init();

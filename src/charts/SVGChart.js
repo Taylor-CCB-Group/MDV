@@ -39,10 +39,7 @@ class SVGChart extends BaseChart{
                 setDefault(c,"tickfont",10);
             }
         }
-
         this._setMargins();
-          
-
         this.graph_area=this.svg
             .append("g")
             .attr("transform", `translate(${this.margins.left},${this.margins.top})`);

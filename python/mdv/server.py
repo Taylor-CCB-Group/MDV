@@ -9,6 +9,8 @@ from werkzeug.utils import safe_join
 from .websocket import mdv_socketio
 
 
+
+
 def add_safe_headers(resp):
     resp.headers["Cross-Origin-Opener-Policy"]= "same-origin"
     resp.headers["Cross-Origin-Embedder-Policy"]="require-corp"
@@ -118,6 +120,17 @@ def create_app(project, open_browser=True, port = 5050, websocket=True):
             data=json.dumps({"data":None})
         return data
     
+    #get arbitrary data
+    @app.route("/get_binary_data",methods=["POST"])
+    def get_binary_data():
+        req=request.json
+        try:
+            with open( safe_join(project.dir,"binarydata",req["datasource"],f"{req['name']}.b"),"rb") as f:
+                data = f.read()
+        except Exception as e:
+            data=None
+        return data
+
     # only the specified region of track files (bam,bigbed,tabix)
     # needs to be returned 
     @app.route("/tracks/<path:path>")

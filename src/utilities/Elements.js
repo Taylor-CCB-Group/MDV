@@ -65,7 +65,7 @@ function splitPane(el,config={}){
 
 function createMenuIcon(icon,config,parent){
     const attrs={
-        role: "button", //a11y - we could use an actual button rather than span here, would need styling.
+        role: "tooltip", //needs to be tooltip for microtip to work.
     };
     const t  =config.tooltip;
     if(t){
@@ -76,7 +76,7 @@ function createMenuIcon(icon,config,parent){
         });
     }
 
-    const sp= createEl("span",attrs);
+    const sp= createEl("span",attrs); //would changing to buttton make ir a11y compliant
 
     createEl("i",{  
         classes:["ciview-menu-icon"].concat(icon.split(" ")),
@@ -422,6 +422,6 @@ function getElDim(el){
 
 }
 
-export {createEl,createSVGEl,addResizeListener,makeDraggable,
+export {createEl,createSVGEl,addResizeListener,makeDraggable,addElProps,
     makeResizable,removeDraggable,removeResizable,createMenuIcon,makeSortable,
     splitPane,getElDim,MDVProgress};

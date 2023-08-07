@@ -4,9 +4,16 @@ import { PopOutWindow } from "../utilities/PopOutWindow";
 import  DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";
+import {BaseDialog} from "../utilities/Dialog.js";
+import {getRandomString} from "../utilities/Utilities.js";
+import {csv,tsv,json} from "d3-fetch";
+import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
+import ColorChooser from "./dialogs/ColorChooser";
+import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
+
 //default charts 
-import  "./HistogramChart.js";
-import  "./RowChart.js";
+import "./HistogramChart.js";
+import "./RowChart.js";
 import "./TableChart.js";
 import "./WGL3DScatterPlot.js";
 import "./WGLScatterPlot.js";
@@ -22,17 +29,18 @@ import "./SelectionDialog.js";
 import "./StackedRowChart";
 import "./TreeDiagram";
 import "./CellNetworkChart";
-import "./SingleHeatMap"
-
-
-
-import {BaseDialog} from "../utilities/Dialog.js";
-import {getRandomString} from "../utilities/Utilities.js";
-import {csv,tsv,json} from "d3-fetch";
-import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
-import ColorChooser from "./dialogs/ColorChooser";
-import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
-
+import "./SingleHeatMap";
+import "./VivScatterPlot";
+import "./DotPlot";
+import "./ImageTableChart";
+import "./CellRadialChart";
+import "./RowSummaryBox";
+import "./VivScatterPlot";
+import "./ImageTableChart";
+import "./CustomBoxPlot";
+import "./SingleSeriesChart";
+import "./GenomeBrowser";
+import "./DeepToolsHeatMap";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -128,7 +136,7 @@ class ChartManager{
         for (const d of dataSources){
             const ds= {
                 name:d.name,
-                dataStore:new DataStore(d.size,d,d.row_data_loader?dataLoader.rowDataLoader:null),
+                dataStore:new DataStore(d.size,d,dataLoader),
                 link_to:d.link_to,
                 index_link_to:d.index_link_to,
                 color:d.color || themes[this.theme].background_color,
@@ -304,14 +312,34 @@ class ChartManager{
         const icols = links.interaction_columns
         const c1 = icols[0];
         const c2= icols[1];
+        const pc= links.pivot_column;
+        //sync the colors of the matching columns
+        ds.syncColumnColors.push({dataSource:ods.name,columns:[
+            {link_to:icols[2],col:icols[0]},
+            {link_to:icols[2],col:icols[1]},
+            {link_to:pc,col:pc}
+        ]});
         ds.addListener(`${ds.name}_interaction`,(type,data)=>{
             if (type==="data_highlighted"){
-                this._getColumnsThen(ds.name,[c1,c2],()=>{
-                    //get the the two interacting items
-                    const info = ds.getRowAsObject(data.indexes[0],[c1,c2]);
+                //get the two interacting items plus pivot
+                this._getColumnsThen(ds.name,[c1,c2,pc],()=>{
+                    const info = ds.getRowAsObject(data.indexes[0],[c1,c2,pc]);
+                    //get pivot from the other datasource
                     this._getColumnsThen(ods.name,[icols[2]],()=>{
                         //filter the two interacting items 
-                        interactionFilter.filter("filterCategories",[icols[2]],[info[c1],info[c2]])
+                        interactionFilter.filter("filterCategories",[icols[2]],[info[c1],info[c2]]);
+                        //show the region if not already displayed
+                        if (links.is_single_region && ods.regions && this.dsPanes[ods.name]){
+                            if (!this.getAllCharts(ods.name).find(x=>x.config.region===info[pc])){
+                                const conf={
+                                    type:"image_scatter_plot"
+                                }
+                                //add the default parameters
+                                BaseChart.types["image_scatter_plot"].init(conf,ods,{region:info[pc]});
+                                //add the chart
+                                this.addChart(ods.name,conf);
+                            }
+                        }
                     })
                 })
             }
@@ -325,8 +353,7 @@ class ChartManager{
                 {
                     text:"Absolute",
                     ghosted:lo==="absolute",
-                    func:()=>this.changeLayout("absolute",ds)
-                
+                    func:()=>this.changeLayout("absolute",ds)    
                 },    
                 {
                     text:"Grid Stack",
@@ -2043,16 +2070,25 @@ class AddChartDialog extends BaseDialog{
         for (let type in BaseChart.types){
             const t = BaseChart.types[type];
             //check to see if chart has any requirements
-            let allow =true
+            
             if (t.required){
-                for (let r of t.required){
-                    if (!this.dataStore[r]){
-                        allow=false
+                if(typeof t.required=== "function"){
+                    if (!t.required(this.dataStore)){
+                        continue;
                     }
                 }
-                if (!allow){
-                    continue;
-                }
+                //is an array of parameters required in the datasource
+                else{
+                    let allow =true;
+                    for (let r of t.required){
+                        if (!this.dataStore[r]){
+                            allow=false
+                        }
+                    }
+                    if (!allow){
+                        continue;
+                    }
+                }  
             } 
             if (t.allow_user_add===false){
                 continue;
@@ -2132,6 +2168,8 @@ class AddChartDialog extends BaseDialog{
         for (let name in this.extraControls){
             const c = this.extraControls[name];
             ed[name] = c.type === 'checkbox' ? c.value === 'on' : c.value;
+            //mjs: sometimes its not as simple as this and more complex alterations
+            //to the config are required based on the user input the dataSore's config
             config[name] = ed[name]; // pjt: is there a reason we didn't do this before?
         }
         if (this.multiColumns){

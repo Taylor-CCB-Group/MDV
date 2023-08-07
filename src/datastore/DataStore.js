@@ -32,7 +32,7 @@ import {quantileSorted} from 'd3-array';
 */
 
 class DataStore{
-    constructor(size,config={},rowDataLoader){       
+    constructor(size,config={},dataLoader=null){       
         this.size=size;
         this.filterSize=size;
         this.columns=[];
@@ -44,11 +44,13 @@ class DataStore{
         //keep track of dimensions and the columns they represent
         this.dimensions=[];
         this.name= config.name;
+        this.avivator=config.avivator;
     
         this.textDecoder = new TextDecoder();
         this.columnGroups={};
         this.subtypeToGroup={};
         this.interactions = config.interactions;
+        this.deeptools = config.deeptools;
 
         //info about subgroups and their datasources
         this.subgroups={};
@@ -58,8 +60,29 @@ class DataStore{
         this.linkColumns=[];
         this.regions=config.regions;
 
-        this.rowDataLoader =rowDataLoader;
-        this.rowData= new Map();
+        if (config.row_data_loader){
+            if (!dataLoader?.rowDataLoader){
+                console.warning(`datasource ${this.name} requires a row data loader but none has been supplied`);
+            }
+            else{
+                this.rowDataLoader =dataLoader.rowDataLoader;
+                this.rowData= new Map();
+            }
+        }
+        if (config.binary_data_loader){
+            if (!dataLoader?.binaryDataLoader){
+                console.warning(`datasource ${this.name} requires a binary data loader but none has been supplied`);
+            }
+            else{
+                this.binaryDataLoader =dataLoader.binaryDataLoader;
+                this.binaryData= new Map();
+            }
+
+        }
+       
+
+
+
         this.columnsWithData=[];
         this.dirtyColumns={
             added:{},
@@ -271,6 +294,21 @@ class DataStore{
         this.rowData.set(index,rd);
         return rd;
     }
+
+    async loadBinaryData(name){
+        //no data loader
+        if (!this.binaryDataLoader){
+            return null;
+        }
+        // is it in cache (stores null values as well)
+        if (this.binaryData.has(name)){
+            return this.binaryData.get(name)
+        }
+        const rd =await this.binaryDataLoader(this.name,name);
+        this.binaryData.set(name,rd);
+        return rd;
+    }
+
 
     /**
      * @returns {array} The indexes of items that have been highligted
@@ -521,7 +559,10 @@ class DataStore{
     //for columns where the metadata is not housed locally
     //need to create it from the field name
     addColumnFromField(field){
-        const data = field.split("|")
+        const data = field.split("|");
+        if (data.length!==3){
+            throw new Error(`field ${field} cannot be found in datasource ${this.name}`)
+        }
         let g = this.subtypeToGroup[data[0]];
         let sg = null;
         if (!g){
@@ -651,7 +692,7 @@ class DataStore{
         for (let c of columns){
             const col = this.columnIndex[c];
             let v= col.data[index];
-            if (col.datatype === "text" || col.datatype==="multitext") {
+            if (col.datatype === "text") {
                 v= col.values[v];
             }
             else if (col.datatype==="double" || col.datatype==="integer" || col.datatype==="int32"){
@@ -659,6 +700,7 @@ class DataStore{
                     v="missing";
                 }
             }
+            //multitext displayed as comma delimited values
             else if (col.datatype=="multitext"){
                 const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
                 v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(", ")
@@ -1267,7 +1309,8 @@ class DataStore{
     /**
     * Returns a function which gives the appropriate color for the value of
     * the specified column, when supplied with the index of a row/item in the datastore,
-    * @param {string} column The column id(field) to use for the function
+    * @param {string} column The column id(field) to use for the function . Can be null, if
+    * useValue = true i.e.  the functions will be supplied with a value rather than an index
     * @param {object} [config] An optional config with extra parameters
     * @param {integer} [config.bins=100] For columns with continuous data (doubles/integers),
     * bins are calculated across the data range so that only a limited number of 
@@ -1287,11 +1330,20 @@ class DataStore{
     * </ul
     * @param {boolean} [config.useValue=false]  The returned function will require the
     * columns value, not index
+    * @param {string} [config.datatype] Only required if a column is not supplied
     * @returns {function} The function, which when given a row index (or value if this
     * was specified) will return a color.
     */
     getColorFunction(column,config={}){
-        const c = this.columnIndex[column];
+        let c = this.columnIndex[column];
+        //not actually related to column -add dummy column
+        if (column == null){
+            c=column={
+                datatype:config.datatype
+            }
+            config.useValue=true;
+        }
+        
         const data= c.data;
         const ov = config.overideValues|| {}
         let  colors  =  this.getColumnColors(column,config);
@@ -1449,7 +1501,10 @@ class DataStore{
      * to max value
      */
     getColumnColors(column,config={}){
-        const  c=  this.columnIndex[column];
+        let c = column;
+        if (typeof column === "string"){
+            c=  this.columnIndex[column];
+        }
         const rArr= config.asArray;
         if (c.datatype==="double" || c.datatype==="integer" || c.datatype==="int32"){
             const ov = config.overideValues || {};
@@ -1459,7 +1514,7 @@ class DataStore{
             //caclulate the color of each bin
             const ls= linspace(min,max,c_colors.length);
             const scale =scaleLinear().domain(ls).range(c_colors).clamp(true);
-            const bins = config.bins || 100;
+            const bins = ov.bins || 100;
             const interval_size = (max-min)/(bins);
             let colors= new Array(bins+1);   
             for (let i=0;i<bins+1;i++){
@@ -1572,8 +1627,13 @@ class DataStore{
         return this.columns.map(x=>x.field);
     }
 
-    getColumnValues(column){
-        return this.columnIndex[column].values;
+    getColumnValues(column,format=null){
+        const v = this.columnIndex[column].values
+        if (format==="name_value"){
+            const ls =Array.from(v,x=>({name:x,value:x})).sort((a,b)=>a.name.localeCompare(b.name));
+            return ls;
+        }
+        return v
     }
 
 

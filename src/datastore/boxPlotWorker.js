@@ -15,12 +15,15 @@ onmessage= function(e){
     const cats= new Array(catLen).fill(0);
 
     //get the number in each then create arrays
-    //this using normal arrays and push
+    //even though 2 iterations over data this is much faster
     for (let i=0;i<len;i++){
         if (gFilter[i]!==0){
             if  (gFilter[i] !==lFilter[i]){
             continue;
             }           
+        }
+        if (isNaN(values[i])){
+            continue;
         }        
         cats[categories[i]]++;
     }
@@ -38,6 +41,9 @@ onmessage= function(e){
             continue;
             }           
         }
+        if (isNaN(values[n])){
+            continue;
+        }  
         const cat = categories[n];
         arrs[cat][totals[cat]++]=values[n];
     }

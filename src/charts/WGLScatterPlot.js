@@ -338,6 +338,9 @@ class WGLScatterPlot extends WGLChart{
 			}		
 			this.app.refresh();
 		}
+        im.onerror=()=>{
+            delete this.config.background_image;
+        }
 	}
 
 	linkToOtherChart(chart){
@@ -566,7 +569,7 @@ class WGLScatterPlot extends WGLChart{
 			})
 		}
         const rs = this.dataStore.regions
-        if (rs){
+        if (rs && !c.viv){
 			const ic= rs.all_regions[c.region].images;
             const vals= [["None","__none__"]];
 			for (let n in ic){

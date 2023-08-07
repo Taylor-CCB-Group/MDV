@@ -375,7 +375,11 @@ class ImageTable {
                 for (let n=this.row_displayed_first;n<begin_row;n++){
                     this._removeByClass(`.mlv-tile-${this.domId}-${n}`);
                 }
-
+            }
+            if (begin_row==0){
+                for (let n=end_row;n<this.row_displayed_last;n++){
+                    this._removeByClass(`.mlv-tile-${this.domId}-${n}`);
+                }
             }
         }
         this.row_displayed_first=begin_row;
@@ -524,7 +528,7 @@ class ImageTable {
                         },
                         classes:["mlv-tile",
                                 `mlv-tile-overlay-${this.domId}`,
-                                `mlv-tile-overlay-${this.domId}-${row}`]
+                                `mlv-tile-${this.domId}-${row}`] //this class used to remove rows no longer in view
                     },this.canvas);
                 }
             }
