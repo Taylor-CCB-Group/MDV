@@ -121,7 +121,8 @@ class ImageScatterChart extends BaseChart {
             getImageIndex: (i: K) => imageArray.getImageIndex(i),
             getImageAspect: (i: K) => imageArray.getImageAspect(i),
             getPosition: (i: K, {target}) => {
-                //[n(cx, i), n(cy, i), n(cz, i)] // say no to garbage
+                // say no to garbage (probably doesn't matter with generational GC & this being in 'nursery')
+                //[n(cx, i), n(cy, i), n(cz, i)]
                 target[0] = n(cx, i, this.spaceX);
                 target[1] = n(cy, i, this.spaceY);
                 target[2] = 0;//n(cz, i);
