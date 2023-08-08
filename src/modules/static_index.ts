@@ -1,23 +1,13 @@
 /// <reference types="vite/client" />
-import 'nouislider/dist/nouislider.min.css'
-import "microtip/microtip.css";
-import "../../src/css/fontawesome-5.15.3/all.css";
-import "../../src/utilities/css/ContextMenu.css";
-import "../../src/charts/css/charts.css";
-import "../../src/webgl/css/wgl2di.css";
-import "../../src/table/css/slickgrid.css";
+import "./all_css";
 import ChartManager from "../charts/ChartManager.js";
-import "../charts/RowSummaryBox.js";
-import "../charts/ImageTableChart.js";
-import "../charts/ImageScatterChart.js";
-import "../charts/WordCloudChart.js";
+// import "../charts/RowSummaryBox.js"; //> should this be in ChartManager along with default charts? how useful is it?
 import { getLocalCompressedBinaryDataLoader } from "../dataloaders/DataLoaders.js";
 
 import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
-import connectWebsocket from '../utilities/InterProcessCommunication';
 console.log(SideEffect);
 
 
@@ -27,7 +17,6 @@ document.addEventListener("DOMContentLoaded", () => loadData());
 const urlParams = new URLSearchParams(window.location.search);
 // if we're in a popout window, ignore the dir parameter and don't load data
 const isPopout = urlParams.get('popout') === "true";
-const socket = urlParams.get('socket');
 const dir = urlParams.get('dir') || (isPopout ? '' : prompt("Enter data URL", "https://mdvstatic.netlify.app/ytrap2"));
 const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
 // set title of page to the data directory
@@ -69,7 +58,7 @@ async function loadData() {
     const config = await fetchAndPatchJSON(`${root}/state.json`);
     config.popouturl = undefined;
     const views = await fetchAndPatchJSON(`${root}/views.json`);
-    // TODO: add a way of specifying a different type of data loader.
+    // TODO: add a way of specifying a different type of data loader(?)
     /// perhaps via another URLSearchParam, to avoid messing with datasources spec.
     // consider localstorage for saving views, state, etc. Ability to download as well.
     // something on toolbar for 'active links' (so the dialog doesn't have to be open)
@@ -84,9 +73,6 @@ async function loadData() {
         }
     }
     const cm = new ChartManager("app1", datasources, dataLoader, config);
-    if (socket) {
-        setTimeout(() => connectWebsocket(socket, cm), 2000);
-    }
     function extraFeatures(i: number) {
         const dsName = datasources[i].name;
         const ds = cm.dsIndex[dsName];

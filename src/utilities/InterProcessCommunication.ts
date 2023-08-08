@@ -1,12 +1,14 @@
 import { io } from "socket.io-client";
-import { ChartManager } from "../charts/charts";
+import ChartManager from "../charts/ChartManager";
 import { DataModel } from "../table/DataModel";
+
+type VuplexCallback = (event: { data: MDVMessage }) => void;
 
 declare global {
     interface Window {
         vuplex?: {
             postMessage: (msg: any) => void;
-            addEventListener: (type: string, func: (event: {data: MDVMessage}) => void) => void;
+            addEventListener: (type: string, func: VuplexCallback) => void;
         };
     }
 }
@@ -24,10 +26,37 @@ type ErrorMessage = {
     type: "error";
     message: string;
 }
+type ChartEventNames = "state_saved" | "chart_added" | "chart_removed" | "view_loaded";
+type Chart = unknown; //todo
+type ViewId = string;
+type ChartState = ReturnType<typeof ChartManager.prototype.getState>;
+type ChartMsgValue<T extends ChartEventNames> =
+    T extends "chart_added" | "chart_removed" ? Chart
+    : T extends "view_loaded" ? ViewId
+    : T extends "state_saved" ? { state: ChartState }
+    : never;
+
 type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage;
 
-export default async function connectWebsocket(url: string, cm: ChartManager) {
-    setupVuplex();
+/** initial experimental IPC support. As of this writing, will attempt to 
+ * - connect a 'vuplex' PostMessage interface for embedding in a VR environment in Unity
+ * - connect a websocket to a socket.io server that will forward messages to other clients (not used yet)
+ */
+export default async function connectIPC(cm: ChartManager) {
+    const params = new URLSearchParams(window.location.search);
+    const url = params.get("socket") || undefined;
+    let initialized = false;
+    cm.addListener("ipc", <T extends ChartEventNames>(name: T, chartManager: ChartManager, value: ChartMsgValue<T>) => {
+        if (name === "view_loaded") {
+            //value type should be inferred as ViewId, but it's not?
+            //(in contrast to below, where `if (datatype === 'popout')` works as expected)
+            console.log("view_loaded", value, Object.keys(chartManager.charts));
+            if (!initialized) {
+                setupVuplex();
+                initialized = true;
+            }
+        }
+    });
     const socket = io(url);
 
     function sendMessage(msg: MDVMessage) {
@@ -83,6 +112,10 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
                 try {
                     const data = msg;//JSON.parse(msg) as MDVMessage;
                     if (data.type === "popout") {
+                        //TypeScript can infer from data.type === "popout" that data.chartID is a string based on what we've told it.
+                        //(we don't *really* know that because we used 'as MDVMessage' without validating the data...
+                        //so we could get a runtime error if the data is malformed, hence the comment above about Zod, 
+                        //but at least we get nice editor behavior and are explicit about the type we expect)
                         console.log("chartID: ", data.chartID);
                         popout(data.chartID);
                     }
@@ -96,13 +129,11 @@ export default async function connectWebsocket(url: string, cm: ChartManager) {
             console.log("vuplex already exists, adding listener");
             addMessageListener();
         } else {
-            console.log("vuplex doesn't exist yet, waiting for vuplexready");
+            console.log("vuplex doesn't exist (yet?), waiting for vuplexready");
             window.addEventListener('vuplexready', () => {
                 console.log("vuplexready event received");
                 addMessageListener();
             });
         }
     }
-    
-    // debugger;
 }

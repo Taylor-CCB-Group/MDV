@@ -37,10 +37,13 @@ import "./CellRadialChart";
 import "./RowSummaryBox";
 import "./VivScatterPlot";
 import "./ImageTableChart";
+import "./ImageScatterChart";
+import "./WordCloudChart";
 import "./CustomBoxPlot";
 import "./SingleSeriesChart";
 import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
+import connectIPC from "../utilities/InterProcessCommunication";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -154,6 +157,8 @@ class ChartManager{
         if (listener){
             this.addListener("_default",listener)
         }
+        //we may want to move this, for now I don't think it's doing any harm and avoids changes to multiple index files:
+        connectIPC(this);
         this.transactions={};
 
 
@@ -495,7 +500,7 @@ class ChartManager{
         return this.dsIndex[name].dataStore;
     }
 
-    _init(view,firstTime=false){
+    async _init(view,firstTime=false){
 
     
         //no initial view just make one with all available 
@@ -614,11 +619,15 @@ class ChartManager{
         }
         //add charts - any columns will be added dynamically
         this._inInit = true;
+        const chartPromises = [];
         for (let ds in charts){  
             for (let ch of charts[ds]){
-                this.addChart(ds,ch);                            
+                chartPromises.push(this.addChart(ds,ch));
             }
         }
+        await Promise.all(chartPromises);
+        //this could be a time to _callListeners("view_loaded",this.currentView)
+        //but I'm not going to interfere with the current logic
         this._inInit = false;
     }
 
@@ -1327,10 +1336,28 @@ class ChartManager{
        
     }
 
+    /**
+     * Adds a listener to the ChartManager.
+     * 
+     * Note that the signature is different from what might be expected (this is an MDV pattern that may be reviewed in future):
+     * The first argument is a string that identifies the listener (not an event type to listen for).
+     * Subsequent calls to addListener with the same id will overwrite the previous listener (which could lead to
+     * unexpected behaviour, for example if a corresponding `removeListener()` call is made).
+     * The second argument is a function that will be called when the listener is triggered - all registered listeners will be called
+     * for any event.
+     * @param {string} id 
+     * @param {function} func Callback function. 
+     * First argument is the type of event (`"state_saved" | "view_loaded" | "chart_added" | "chart_removed"`), 
+     * second is the `ChartManager` instance, third is the data.
+     */
     addListener(id,func){
         this.listeners[id]=func;
     }
 
+    /**
+     * Removes a listener from the ChartManager.
+     * @param {string} id 
+     */
     removeListener(id){
         delete this.listeners[id];
     }
@@ -1341,13 +1368,14 @@ class ChartManager{
     }
 
     /**
-    * Adds a chart to the app
+    * Adds a chart to the app. Returns asyncronously when needed columns have loaded and the chart has been added 
+    * (will reject if there is an error)
     * @param {string} dataSource The name of the chart's data source 
     * @param {any} config The chart's config
     * @param {boolean} [notify=false] If true any listeners will be informed that 
     * a chart has been loaded
     */
-    addChart(dataSource,config,notify=false){
+    async addChart(dataSource,config,notify=false){
         //check if columns need loading
         const neededCols = this._getColumnsRequiredForChart(config);
         //check which columns need loading
@@ -1420,22 +1448,26 @@ class ChartManager{
             },
             text:config.title
         },div)
-        const func = ()=>{
-            this._addChart(dataSource,config,div,notify);
-        }
-        // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
-        try {
-            this._getColumnsThen(dataSource, neededCols, func);
-        } catch (error) {
-            this.clearInfoAlerts();
-            const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
-                type: "warning"
-            });
-            console.log(error);
-            const idiv = this.infoAlerts[id].div;
-            idiv.onclick = () => idiv.remove();
-            div.remove();
-        }
+        return new Promise((resolve,reject)=>{
+            const func = ()=>{
+                this._addChart(dataSource,config,div,notify);
+                resolve();
+            }
+            // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
+            try {
+                this._getColumnsThen(dataSource, neededCols, func);
+            } catch (error) {
+                this.clearInfoAlerts();
+                const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
+                    type: "warning"
+                });
+                console.log(error);
+                const idiv = this.infoAlerts[id].div;
+                idiv.onclick = () => idiv.remove();
+                div.remove();
+                reject(error);
+            }
+        });
     }
 
     
