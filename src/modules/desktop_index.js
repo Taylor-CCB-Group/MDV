@@ -23,7 +23,7 @@ function _mdvInit(staticFolder){
             binaryDataLoader:staticFolder?loadBinaryDataStatic
                                     :loadBinaryData
         };
-        //lsiten to events
+        //listen to events
         const listener = (type,cm,data)=>{
             switch(type){
                 case "state_saved":
