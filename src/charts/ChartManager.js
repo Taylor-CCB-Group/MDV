@@ -38,7 +38,7 @@ import "./RowSummaryBox";
 import "./VivScatterPlot";
 import "./ImageTableChart";
 import "./ImageScatterChart";
-import "./WordCloudChart";
+// import "./WordCloudChart"; //todo: this only works in vite build, not webpack
 import "./CustomBoxPlot";
 import "./SingleSeriesChart";
 import "./GenomeBrowser";
