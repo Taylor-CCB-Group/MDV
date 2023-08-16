@@ -298,7 +298,7 @@ Allows a genome browser, to be added as a chart. The default feature track will 
 
 * **default_tracks** (optional) A list of track configs for any tracks which will be displayed when the genome browser is added (A ruler track is always added and need not be specified here)
 
-* **atac_bam_track** (optional) This track will cluster reads based on the barcode tag in the bam file. The DataSource needs linked to another DataStore that has these barcodes for the atac_bam_track to display e.g.
+* **atac_bam_track** (optional) This track will cluster reads based on the barcode tag in the bam file. The DataSource needs to be linked to another DataStore that has these barcodes in order for the atac_bam_track to display e.g.
      ```
      "links":{
         "cells":{
