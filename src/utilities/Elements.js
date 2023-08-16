@@ -1,24 +1,10 @@
 
 import Split from "split.js"
+import { createEl } from "./ElementsTyped.ts";
 
-/**@template {keyof HTMLElementTagNameMap} T
- * @param {T} type
- * @param {{styles?:, classes?:string[], text?:string, [key: string]:string|string[]}=} attrs
- * @param {HTMLElement=} parent
- * @returns {HTMLElementTagNameMap[T]}
- */
-function createEl(type,attrs,parent){
-   
-    const el = document.createElement(type);
-    
-    if (attrs){
-        addElProps(el,attrs)
-    } 
-    if (parent){
-        parent.append(el);
-    }
-    return el;
-}
+//PJT: moved to ElementsTyped.ts because I realised type annotations broke jsdoc script
+//(even though there were understood correctly by language server / IDE)
+//function createEl(type,attrs,parent){
 
 function createSVGEl(type,attrs,parent){
   

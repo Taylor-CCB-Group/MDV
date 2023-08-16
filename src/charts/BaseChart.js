@@ -2,14 +2,15 @@ import {getRandomString} from "../utilities/Utilities.js";
 import {ContextMenu} from "../utilities/ContextMenu.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog";
+import { chartTypes } from "./ChartTypes.ts";
 
 
 class BaseChart{
     /**
      * The base constructor
-     * @param {DataStore} dataStore - The datastore object thta contains the data for this chart
-     * @param {string} div - The id of the div element or the element itself to house the graph
-     * @param {Object} config - The config describing the graph
+     * @param {DataStore} dataStore - The datastore object that contains the data for this chart
+     * @param {string | HTMLDivElement} div - The id of the div element or the element itself to house the chart
+     * @param {Object} config - The config describing the chart
      */
     constructor(dataStore,div,config){
         //******adapt legacy configs
@@ -742,18 +743,8 @@ class BaseChart{
 
 /**
  * A dictionary of all the chart types
- * @type {Record<string, {
- * "class": class, 
- * name: string,
- * required?: string[],
- * init?: (config:object, dataSource:object, extraControls:object)=>void,
- * extra_controls?: (dataSource:object)=>{type: string, name: string, label?: string, values?: object, defaultVal?: object}[],
- * params?: {type:string|string[], name:string}[],
- * configEntriesUsingColumns?: string[],
- * methodsUsingColumns?: string[],
- * }>}
  */
-BaseChart.types={};
+BaseChart.types = chartTypes;
 
 function copyStylesInline(destinationNode, sourceNode) {
     var containerElements = ["svg","g"];
@@ -769,7 +760,7 @@ function copyStylesInline(destinationNode, sourceNode) {
              child.style.setProperty(style[st], style.getPropertyValue(style[st]));
         }
     }
- }
+}
  
 
   
