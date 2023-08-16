@@ -14,6 +14,7 @@ from .websocket import mdv_socketio
 def add_safe_headers(resp):
     resp.headers["Cross-Origin-Opener-Policy"]= "same-origin"
     resp.headers["Cross-Origin-Embedder-Policy"]="require-corp"
+    resp.headers["Access-Control-Allow-Origin"]="*"
     return resp
 
 
