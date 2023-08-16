@@ -106,7 +106,8 @@ export function createFilterElement(selectEl, parent) {
         placeholder: "Filter",
         type: "text",
         styles: {
-            width: "4em"
+            width: "4em",
+            margin: "0.2em"
         }
     }, parent);
     filter.oninput = (e) => {
