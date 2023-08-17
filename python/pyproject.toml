@@ -1,3 +1,4 @@
+# nb, still mostly using requirements.txt for now, this is not up to date
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

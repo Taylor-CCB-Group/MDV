@@ -47,7 +47,7 @@ def get_range(file_name,range_header):
     file.close()
     return rv
 
-def create_app(project, open_browser=True, port = 5050, websocket=True):
+def create_app(project, open_browser=True, port = 5050, websocket=False):
     app=Flask(__name__)
     #add headers to allow web workers
     app.after_request(add_safe_headers)

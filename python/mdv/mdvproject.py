@@ -553,6 +553,7 @@ class MDVProject:
         page = open(template).read()
         if not debug:
             #call init with the static folder argument
+            # may want to review this
             page=page.replace("_mdvInit()","_mdvInit(true)")
             #correct config
             conf  = self.state
