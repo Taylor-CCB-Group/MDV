@@ -52,7 +52,7 @@ To enable the project to be displayed as a static page without any backend archi
 p.convert_to_static_page(path/to/mywebproject)
 ```
 
-You can then copy the mywebproject folder to the relevant location on your server, where content is served from. It needs to be served over https because a service worker is used to add headers. The project can be accessed with:-
+You can then copy the mywebproject folder to the relevant location on your server, where content is served from. It needs to be served over https because a service worker is used to add headers. It will also need to be able to use range headers for loading portions of binary data. The project can be accessed with:-
 ```
 http://mydomian.com/path/to/mywebproject
 ```
@@ -79,7 +79,7 @@ p.convert_to_static_page(/path/to/myproject, debug=True)
 Then run webpack with the development config and point towards the folder you have just created.
 
 ```
-webpack serve  --config dev.config.js --env folder=/path/to/myproject
+npx webpack serve --env folder=/path/to/myproject
 ```
 
 
