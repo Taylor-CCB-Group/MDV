@@ -66,9 +66,18 @@ def create_app(project, open_browser=True, port = 5050, websocket=False):
     #    return send_file(safe_join(js_files,path))
     
 
-    @app.route("/<file>.gz")
+    @app.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
+        file_name = safe_join(project.dir, file+".b")
+        range_header = request.headers.get('Range', None) 
+        return get_range(file_name,range_header)
+    
+    # duplicate of above, but for .gz files in case that's needed.
+    # (there was some reason for changing to this, but I can't fully remember the status
+    # so maybe better to support both for now)
+    @app.route("/<file>.gz")
+    def get_binary_file_gz(file):
         file_name = safe_join(project.dir, file+".gz")
         range_header = request.headers.get('Range', None) 
         return get_range(file_name,range_header)
