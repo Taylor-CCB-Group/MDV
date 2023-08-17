@@ -57,10 +57,11 @@ export default async function connectIPC(cm: ChartManager) {
             }
         }
     });
-    const socket = io(url);
+    //temporarily disable websocket connection
+    const socket = {on: (s, f)=>{}};//io(url);
 
     function sendMessage(msg: MDVMessage) {
-        socket.emit("message", msg);
+        // socket.emit("message", msg);
         if (window.vuplex) window.vuplex.postMessage(msg);
     }
 
@@ -70,7 +71,7 @@ export default async function connectIPC(cm: ChartManager) {
         sendMessage({ type: "popout", chartID: chart.config.id });
     }
 
-    socket.connect();
+    // socket.connect();
     function popout(chartID: string) {
         const chart = cm.charts[chartID];
         if (!chart) {
