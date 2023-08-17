@@ -7,7 +7,7 @@ import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
-import { getDataLoader } from "../dataloaders/DataLoaderUtil";
+import { getDataLoader, getPostData } from "../dataloaders/DataLoaderUtil";
 console.log(SideEffect);
 
 const flaskURL = "http://localhost:5050";
@@ -61,13 +61,27 @@ export type Datasource = {
 async function loadData() {
     // setupDebug();
     if (isPopout) return;
+    // move more of this into DataLoaderUtil?
     const datasources = await fetchAndPatchJSON(`${root}/datasources.json`) as Datasource[];
     const config = await fetchAndPatchJSON(`${root}/state.json`);
     config.popouturl = undefined;
     const views = await fetchAndPatchJSON(`${root}/views.json`);
 
     const dataLoader = getDataLoader(staticFolder, datasources, views, dir);
-    const cm = new ChartManager("app1", datasources, dataLoader, config);
+
+    const listener = async (type: string, cm: ChartManager, data: any) => {
+        if (type === "state_saved" && !staticFolder) {
+            const resp = await getPostData('/save_state', data);
+            if (resp.success) {
+                cm.createInfoAlert("State saved", {duration: 2000});
+                cm.setAllColumnsClean();
+            } else {
+                cm.createInfoAlert("State save failed", {duration: 3000, type: "danger"});
+            }
+        }
+    }
+    const cm = new ChartManager("app1", datasources, dataLoader, config, listener);
+
     function extraFeatures(i: number) {
         const dsName = datasources[i].name;
         const ds = cm.dsIndex[dsName];

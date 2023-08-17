@@ -32,7 +32,7 @@ export function getDataLoader(isStaticFolder: boolean, datasources: Datasource[]
     return isStaticFolder ? {
         function: getLocalCompressedBinaryDataLoader(datasources, root),
         viewLoader: async (view: string) => views[view],
-        rowDataLoader: async (dsName: string) => await fetchAndPatchJSON(`${root}/${dsName}.json`),
+        rowDataLoader: loadRowDataStatic,
         binaryDataLoader: loadBinaryDataStatic
     } : {
         function: getArrayBufferDataLoader("/get_data"),
@@ -40,35 +40,37 @@ export function getDataLoader(isStaticFolder: boolean, datasources: Datasource[]
         rowDataLoader: loadRowData,
         binaryDataLoader: loadBinaryData
     }
+    //PJT - want to clarify /binarydata/ & /rowdata/ folders, and use of .b vs .gz
+
+    async function loadRowDataStatic(datasource: string, index: string) {
+        const resp = await fetch(`${root}/rowdata/${datasource}/${index}.json`);
+        if (resp.status != 200) {
+            return null
+        }
+        return await resp.json()
+    }
+    //load arbritray data
+    async function loadBinaryDataStatic(datasource: string, name: string) {
+        const resp = await fetch(`${root}/binarydata/${datasource}/${name}.b`);
+        return await resp.arrayBuffer();
+    }
 }
 
 
 //loads unstructured data for each row
-async function loadRowData(datasource, index) {
+async function loadRowData(datasource: string, index: string) {
     return await getPostData("/get_row_data", { datasource, index })
 }
-async function loadRowDataStatic(datasource, index) {
-    const resp = await fetch(`./rowdata/${datasource}/${index}.json`);
-    if (resp.status != 200) {
-        return null
-    }
-    return await resp.json()
-}
 //load view from API
-async function getView(view) {
-    return await getPostData("/get_view", { view: view })
+async function getView(view: string) {
+    return await getPostData("/get_view", { view })
 }
 
-//load arbritray data
-async function loadBinaryDataStatic(datasource, name) {
-    const resp = await fetch(`./binarydata/${datasource}/${name}.b`);
-    return await resp.arrayBuffer();
-}
-async function loadBinaryData(datasource, name) {
+async function loadBinaryData(datasource: string, name: string) {
     return await getPostData("/get_binary_data", { datasource, name }, "arraybuffer");
 }
 //send json args and return json/array buffer response
-async function getPostData(url: string, args, return_type = "json") {
+export async function getPostData(url: string, args, return_type = "json") {
     const resp = await fetch(url,
         {
             method: "POST",
