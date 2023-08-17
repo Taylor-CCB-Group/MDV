@@ -15,6 +15,8 @@ export default defineConfig(env => { return {
         fs: {
             allow: ["examples", "."],
         },
+        port: 5170,
+        strictPort: true,
     },
     resolve: {
         alias: {
