@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
-
 export default defineConfig(env => { return {
     server: {
         headers: {
@@ -17,6 +16,12 @@ export default defineConfig(env => { return {
         },
         port: 5170,
         strictPort: true,
+        proxy: {
+            '^/get_.*': {
+                target: "http://127.0.0.1:5050",
+                changeOrigin: true,
+            }
+        }
     },
     resolve: {
         alias: {

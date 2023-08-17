@@ -2,14 +2,15 @@
 import "./all_css";
 import ChartManager from "../charts/ChartManager.js";
 // import "../charts/RowSummaryBox.js"; //> should this be in ChartManager along with default charts? how useful is it?
-import { getLocalCompressedBinaryDataLoader } from "../dataloaders/DataLoaders.js";
 
 import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
+import { getDataLoader } from "../dataloaders/DataLoaderUtil";
 console.log(SideEffect);
 
+const flaskURL = "http://localhost:5050";
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
@@ -17,10 +18,15 @@ document.addEventListener("DOMContentLoaded", () => loadData());
 const urlParams = new URLSearchParams(window.location.search);
 // if we're in a popout window, ignore the dir parameter and don't load data
 const isPopout = urlParams.get('popout') === "true";
-const dir = urlParams.get('dir') || (isPopout ? '' : prompt("Enter data URL", "https://mdvstatic.netlify.app/ytrap2"));
+// if there is no dir parameter, use the flaskURL to proxy requests to the python server
+const dir = urlParams.get('dir') || (isPopout ? '' : flaskURL);
 const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
+//hack to load data from local API
+//TODO - make the API allow serving multiple projects?
+const staticFolder = dir !== flaskURL;
+
 // set title of page to the data directory
-document.title = `MDV - ${root}`;
+document.title = staticFolder ? 'MDV - local project' : `MDV - ${root}`;
 
 function rewriteBaseUrlRecursive(config) {
     if (Array.isArray(config)) {
@@ -46,10 +52,11 @@ async function fetchAndPatchJSON(url) {
 }
 
 // TODO make a better type for this, put it somewhere more sensible.
-type Datasource = { 
+export type Datasource = { 
     name: string, 
     columns: { name: string, type: string }[], images?: any, size: number, columnGroups?: any[] 
 };
+
 
 async function loadData() {
     // setupDebug();
@@ -58,20 +65,8 @@ async function loadData() {
     const config = await fetchAndPatchJSON(`${root}/state.json`);
     config.popouturl = undefined;
     const views = await fetchAndPatchJSON(`${root}/views.json`);
-    // TODO: add a way of specifying a different type of data loader(?)
-    /// perhaps via another URLSearchParam, to avoid messing with datasources spec.
-    // consider localstorage for saving views, state, etc. Ability to download as well.
-    // something on toolbar for 'active links' (so the dialog doesn't have to be open)
-    // this should be saved...
-    const dataLoader = {
-        function: getLocalCompressedBinaryDataLoader(datasources, root),
-        viewLoader: async (view: string) => {
-            return views[view];
-        },
-        rowDataLoader: async (dsName: string) => {
-            const ds = await fetchAndPatchJSON(`${root}/${dsName}.json`);
-        }
-    }
+
+    const dataLoader = getDataLoader(staticFolder, datasources, views, dir);
     const cm = new ChartManager("app1", datasources, dataLoader, config);
     function extraFeatures(i: number) {
         const dsName = datasources[i].name;
