@@ -4,6 +4,7 @@ import WGLChart from "./WGLChart.js";
 import BaseChart from "./BaseChart.js";
 import {BaseDialog} from "../utilities/Dialog.js"
 import { createEl } from "../utilities/Elements.js";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
 
 
 
@@ -323,11 +324,11 @@ class WGLScatterPlot extends WGLChart{
         super.onDataAdded(newSize);
     }
 
-	addBackgroundImage(ic,change=false){
+	addBackgroundImage(ic, change=false){
 		const im = new Image();
 		const c = this.config;
-		c.image_opacity= c.image_opacity || 1;
-		im.src= ic.url?ic.url:this.dataStore.regions.base_url+ic.file;
+		c.image_opacity = c.image_opacity || 1;
+		im.src = ic.url ? ic.url : getProjectURL(this.dataStore.regions.base_url) + ic.file;
 		im.onload=()=>{
 			if (change){
 				this.app.changeImage(im,ic,0);

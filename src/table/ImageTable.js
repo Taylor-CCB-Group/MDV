@@ -1,3 +1,4 @@
+import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
 import {createEl} from "../utilities/Elements.js";
 
 class ImageTable {
@@ -25,7 +26,7 @@ class ImageTable {
         this.imageFunc = config.imageFunc;
         //config.background_color=config.background_color?config.background_color:"lightgray";
    
-        this.base_url=config.base_url;
+        this.base_url = getProjectURL(config.base_url);
         this.parent = parent_div;
         this.selected_tiles={};
         
@@ -97,7 +98,7 @@ class ImageTable {
             self._resize();
         }
 
-        const burl = this.config.base_url;
+        const burl = getProjectURL(this.config.base_url);
         const type = this.config.image_type;
         const image= this.data_view.getItemField(1,this.config.image_key)
         im.src=`${burl}${image}.${type}`;
@@ -495,7 +496,7 @@ class ImageTable {
         let x=0;
         const w = this.t_width+"px";
         const h = this.t_height+"px";
-        const burl = this.config.base_url;
+        const burl = getProjectURL(this.config.base_url);
         const type = this.config.image_type;
         // looking for something to provide a default name; "Gene" is ok for ytrap...
         const titleColumn = this.config.image_title || "Gene";

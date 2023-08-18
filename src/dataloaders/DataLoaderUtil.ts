@@ -6,6 +6,8 @@ import { getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./
  * returns the config object.
  */
 export function rewriteBaseUrlRecursive(config, root: string) {
+    console.warn("rewriteBaseUrlRecursive - no-op: use getProjectURL() instead / subject to review.", config, root)
+    return config;
     if (Array.isArray(config)) {
         for (const item of config) {
             rewriteBaseUrlRecursive(item, root);
@@ -19,21 +21,39 @@ export function rewriteBaseUrlRecursive(config, root: string) {
             // we may need a better spec for thinking about this.
             // one hacky solution for now *may* be to make sure we only use these modified base_urls internally, and never save them.
             // which we could possibly do by doing the oposite of this function when saving...
+            // that seems potentially fragile though.
+            // there aren't many places that use base_url, so we could just change them all to use root instead.
+            // want to be a bit careful in case there could at some point be multiple projects in the same global js context.
             const newUrl = config[key].replace("./", `${root}/`);
-            console.log("rewriting base url", config[key], newUrl);
-            config[key] = config[key].replace("./", newUrl);
+            // console.log("rewriting base url", config[key], newUrl);
+            // config[key] = config[key].replace("./", newUrl);
+            // rather than replacing the base_url, we could add a new url_in_project key...
+            // which will get saved along with the base_url, but will be used internally instead.
+            config['url_in_project'] = newUrl;
         } else if (typeof config[key] === "object") {
             rewriteBaseUrlRecursive(config[key], root);
         }
     }
     return config;
 }
-
+let projectRoot = "";
 export async function fetchAndPatchJSON(url: string, root: string) {
-    let resp = await fetch(url)//, { mode: "no-cors" });
+    let resp = await fetch(url);
     const config = await resp.json();
-    rewriteBaseUrlRecursive(config, root); //may be better to do this in the python code
+    rewriteBaseUrlRecursive(config, root);
     return config;
+}
+
+export function setProjectRoot(root: string) {
+    projectRoot = root;
+}
+
+/**
+ * Given a url that is relative to the project root, return a more API-appropriate URL.
+ */
+export function getProjectURL(url: string) {
+    if (url.startsWith(projectRoot)) return url;
+    return (projectRoot + url).replace("./", "/");
 }
 
 

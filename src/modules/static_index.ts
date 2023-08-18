@@ -8,9 +8,9 @@ import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
 console.log(SideEffect);
-import { fetchAndPatchJSON, getDataLoader, getPostData } from "../dataloaders/DataLoaderUtil";
+import { fetchAndPatchJSON, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 
-const flaskURL = "http://localhost:5050";
+const flaskURL = "";
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
@@ -40,6 +40,7 @@ export type Datasource = {
 async function loadData() {
     // setupDebug();
     if (isPopout) return;
+    setProjectRoot(root);
     // move more of this into DataLoaderUtil (which might get renamed)?
     const datasources = await fetchAndPatchJSON(`${root}/datasources.json`, root) as Datasource[];
     const config = await fetchAndPatchJSON(`${root}/state.json`, root);

@@ -1,6 +1,7 @@
 import "./all_css"
 import ChartManager from '../charts/ChartManager.js';
 import { getArrayBufferDataLoader,getLocalCompressedBinaryDataLoader} from "../dataloaders/DataLoaders.js";
+import { setProjectRoot } from "../dataloaders/DataLoaderUtil";
 import { fetchAndPatchJSON, rewriteBaseUrlRecursive } from "../dataloaders/DataLoaderUtil";
 
 let route = '';
@@ -20,6 +21,7 @@ function _mdvInit(routeFromTemplate){
             throw new Error("routeFromTemplate must be undefined, the empty string, or in the form of '/project/<project_id>'");
         }
     }
+    setProjectRoot(route);
     //get the configs for MDV
     getConfigs(staticFolder).then(resp=>{
         const config=resp.state;
@@ -67,7 +69,6 @@ function _mdvInit(routeFromTemplate){
 }
 //only method required
 window._mdvInit=_mdvInit;
-// _mdvInit(true); //temp for testing
 
 //loads unstructured data for each row
 async function loadRowData(datasource,index){
@@ -96,13 +97,13 @@ async function loadBinaryData(datasource,name){
 
 /**
  * get the configs whether from a folder or via a remote API
- * @param {boolean} folder - true if configs are in a folder
+ * @param {boolean} isStaticFolder - true if configs are in a folder
  * @returns {object} - configs
  */
-async function getConfigs(folder){
+async function getConfigs(isStaticFolder){
     let configs={};
     const fetch = async (url) => fetchAndPatchJSON(url, route);
-    if (folder){
+    if (isStaticFolder){
         let resp = await fetch(`${route}/datasources.json`);
         configs.datasources = await resp.json();
         resp = await fetch(`${route}/state.json`);
@@ -119,8 +120,8 @@ async function getConfigs(folder){
     }
     return configs;
 }
-//send json args and return json/array buffer response
-async function getData(url,args,return_type="json"){
+/** send json args and return json/array buffer response */
+async function getData(url, args, return_type="json"){
     const resp = await fetch(url,
     {
         method: "POST",
@@ -139,8 +140,8 @@ async function getData(url,args,return_type="json"){
     else{
         return await resp.arrayBuffer();
     }
-    
 }
+
 //changes or adds a param to the browser address bar
 function changeURLParam(param,value){
     const url = new URL(window.location);

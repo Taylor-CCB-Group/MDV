@@ -1,3 +1,4 @@
+import { getProjectURL } from '../dataloaders/DataLoaderUtil';
 import DataStore from '../datastore/DataStore';
 import { DataModel } from '../table/DataModel';
 import { createEl } from '../utilities/Elements';
@@ -61,7 +62,8 @@ export class ImageArray {
     }
     loadImageColumn(ds: DataStore, gl: WebGL2RenderingContext, config: ImageArrayConfig) {
         // how about also passing a cancellation token or something?
-        const { base_url, image_type, image_key, width, height } = config;
+        const { image_type, image_key, width, height } = config;
+        const base_url = getProjectURL(config.base_url);
         const col = ds.columnIndex[image_key];
         const texture = this.texture;
         gl.activeTexture(gl.TEXTURE0);

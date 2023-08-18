@@ -19,7 +19,14 @@ export default defineConfig(env => { return {
         port: 5170,
         strictPort: true,
         proxy: {
+            // todo proxy /project/ API to flask, but serve page from vite
             '^/(get_|images|tracks|save).*': {
+                target: flaskURL,
+                changeOrigin: true,
+            },
+            //will fail if url has search params
+            //will cause problems if we have json files that don't want to be proxied
+            '^/.*\.(json|b|gz)$': {
                 target: flaskURL,
                 changeOrigin: true,
             },
@@ -32,7 +39,7 @@ export default defineConfig(env => { return {
     },
     publicDir: "examples",
     build: {
-        outDir: "vite-dist",
+        outDir: process.env.OUT_DIR || "vite-dist",
         rollupOptions: {
             input: {
                 index: "./index.html",

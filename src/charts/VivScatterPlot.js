@@ -4,6 +4,7 @@ import BaseChart from "./BaseChart.js";
 import {createEl} from "../utilities/Elements.js";
 import {BaseDialog} from "../utilities/Dialog.js";
 import noUiSlider from "nouislider";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
 
 export class ColorChannelDialog extends BaseDialog{
     constructor(viv,doc,ds){
@@ -241,7 +242,7 @@ class VivScatterPlot extends DensityScatterPlot{
                 //local or remote url
                 if(r){
                     const i = r.all_regions[c.region].viv_image;                  
-                    c.viv.url = i.url?i.url:r.avivator.base_url + i.file
+                    c.viv.url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file
                 }
                 this.viv = new VivViewer(this.vivCanvas,c.viv,this.app);
                 this.app.addHandler("pan_or_zoom",(offset,x_scale,y_scale)=>{
