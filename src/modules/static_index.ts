@@ -7,8 +7,8 @@ import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
-import { getDataLoader, getPostData } from "../dataloaders/DataLoaderUtil";
 console.log(SideEffect);
+import { getDataLoader, getPostData } from "../dataloaders/DataLoaderUtil";
 
 const flaskURL = "http://localhost:5050";
 
@@ -26,7 +26,8 @@ const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
 const staticFolder = dir !== flaskURL;
 
 // set title of page to the data directory
-document.title = staticFolder ? 'MDV - local project' : `MDV - ${root}`;
+document.title = !staticFolder ? 'MDV - local project' : `MDV - ${root}`;
+if (isPopout) document.title = "MDV popout";
 
 function rewriteBaseUrlRecursive(config) {
     if (Array.isArray(config)) {
@@ -61,7 +62,7 @@ export type Datasource = {
 async function loadData() {
     // setupDebug();
     if (isPopout) return;
-    // move more of this into DataLoaderUtil?
+    // move more of this into DataLoaderUtil (which might get renamed)?
     const datasources = await fetchAndPatchJSON(`${root}/datasources.json`) as Datasource[];
     const config = await fetchAndPatchJSON(`${root}/state.json`);
     config.popouturl = undefined;
@@ -89,7 +90,6 @@ async function loadData() {
         // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
         // should it be in the viewLoader callback? no ref to cm passed there.
         setTimeout(() => {
-            // TODO - add a 'save' button, if supported (another URLSearchParam? Security?)
             cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, tagModel); });
             if (import.meta.env.DEV) {
                 cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tagModel); });

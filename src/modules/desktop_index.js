@@ -49,6 +49,7 @@ function _mdvInit(staticFolder){
 }
 //only method required
 window._mdvInit=_mdvInit;
+// _mdvInit(true); //temp for testing
 
 //loads unstructured data for each row
 async function loadRowData(datasource,index){
@@ -75,7 +76,11 @@ async function loadBinaryData(datasource,name){
     return await getData("/get_binary_data",{datasource,name},"arraybuffer");
 }
 
-//get the configs wither from a folder or via a remote API
+/**
+ * get the configs whether from a folder or via a remote API
+ * @param {boolean} folder - true if configs are in a folder
+ * @returns {object} - configs
+ */
 async function getConfigs(folder){
     let configs={};
     if (folder){

@@ -4,31 +4,6 @@ import { getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./
 export function getDataLoader(isStaticFolder: boolean, datasources: Datasource[], views: any, url: string) {
     const root = url.endsWith("/") ? url.substring(0, url.length-1) : url;
 
-    function rewriteBaseUrlRecursive(config) {
-        if (root === "./") return;
-        if (Array.isArray(config)) {
-            for (const item of config) {
-                rewriteBaseUrlRecursive(item);
-            }
-            return;
-        }
-        for (const key in config) {
-            if (key === "base_url") {
-                config[key] = config[key].replace("./", `${root}/`);
-            } else if (typeof config[key] === "object") {
-                rewriteBaseUrlRecursive(config[key]);
-            }
-        }
-    }
-    
-    async function fetchAndPatchJSON(url: string) {
-        let resp = await fetch(url);
-        const config = await resp.json();
-        rewriteBaseUrlRecursive(config);
-        return config;
-    }
-
-
     return isStaticFolder ? {
         function: getLocalCompressedBinaryDataLoader(datasources, root),
         viewLoader: async (view: string) => views[view],
@@ -71,15 +46,14 @@ async function loadBinaryData(datasource: string, name: string) {
 }
 //send json args and return json/array buffer response
 export async function getPostData(url: string, args, return_type = "json") {
-    const resp = await fetch(url,
-        {
-            method: "POST",
-            body: JSON.stringify(args),
-            headers: {
-                "Accept": "application/json,text/plain,*/*",
-                "Content-Type": "application/json"
-            }
-        });
+    const resp = await fetch(url, {
+        method: "POST",
+        body: JSON.stringify(args),
+        headers: {
+            "Accept": "application/json,text/plain,*/*",
+            "Content-Type": "application/json"
+        }
+    });
     if (return_type === "json") {
         return await resp.json();
     }

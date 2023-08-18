@@ -9,6 +9,7 @@ type Attrs = {
     [key: string]: string | string[] | Partial<CSSStyleDeclaration> | undefined
 }
 
+/** Create an HTML element of the given type */
 export function createEl(type: TagKey, attrs: Attrs, parent?: HTMLElement) {
     const el = document.createElement(type);
 
