@@ -49,8 +49,8 @@ def get_range(file_name,range_header):
 
 def create_app(project, open_browser = True, port = 5050, websocket = False, app:Flask = None):
     if app is None:
-        # route = ""
-        route = "/project/" + project.name # for testing new API with simple app...
+        route = ""
+        # route = "/project/" + project.name # for testing new API with simple app...
         app=Flask(__name__)
         #add headers to allow web workers
         app.after_request(add_safe_headers)
@@ -78,9 +78,10 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     #def get_js_files(path):
     #    return send_file(safe_join(js_files,path))
 
-    # @app.route(f"{route}/static/<path:path>")
-    # def get_static_files(path):
-    #     return send_file(safe_join(project.staticfolder,path))
+    @app.route(f"{route}/static/<path:path>")
+    def get_static_files(path):
+        print("get_static_files", path)
+        return send_file(safe_join('./static/',path))
     
 
     @app.route(f"{route}/<file>.b")
