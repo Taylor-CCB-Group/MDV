@@ -8,8 +8,8 @@ module.exports = (env)=> {
     		   path: path.resolve(__dirname,"python/mdv/static/js"),
     		   filename: 'mdv.js',
 			   assetModuleFilename: '../img/[name][ext]',
-			  
   	   	},
+		// devtool: 'eval', //for marginally better debugging
 		resolve: {
 			extensions: ['.ts', '.js', '...']
 		},

@@ -10,7 +10,9 @@
     "dev": "vite --host",
     "vite-build": "tsc && vite build",
     "build": "webpack --config prod.config.js",
-    "build-flask": "webpack --config desktop.config.js",
+    "build-flask": "npm run clean-flask & webpack --config desktop.config.js",
+    "build-flask-vite": "cross-env OUT_DIR=./python/mdv/static vite build",
+    "clean-flask": "rm -r ./python/mdv/static",
     "build-pyinstaller": "pyinstaller --onefile python/mdv_desktop.py --add-data \"mdv/templates:mdv/templates\" --add-data \"mdv/static:mdv/static\"",
     "run-hyperion": "webpack  serve --config hyperion.dev.config.js",
     "run-obvios": "webpack  serve --config obvios.config.js",
@@ -58,6 +60,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.0.1",
+    "cross-env": "^7.0.3",
     "css-loader": "^6.7.1",
     "jsdoc": "^4.0.2",
     "style-loader": "^3.3.1",
