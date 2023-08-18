@@ -261,7 +261,8 @@ BaseChart.types["ImageScatterChart"] = {
     class: ImageScatterChart,
     name: "Image Scatter Plot",
     required: ["images"],
-    methodsUsingColumns: ["updateDeck"],
+    // this wasn't needed here... also my type was wrong (for BaseChart.types).
+    // methodsUsingColumns: ["updateDeck"],
     configEntriesUsingColumns: ["image_key", "image_title"],
 
     init: (config, dataSource, extraControls) => {
@@ -328,6 +329,6 @@ BaseChart.types["ImageScatterChart"] = {
         //     name: "radius"
         // },
     ]
-};
+};// as ChartType<ImageScatterChart>; //doesn't help much
 
 export default ImageScatterChart;

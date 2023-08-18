@@ -46,6 +46,8 @@ export type DataSource = {
     dataStore: DataStore;
     contentDiv: HTMLDivElement;
     menuBar: HTMLDivElement;
+    images?: Record<string, unknown>;
+    getLoadedColumns: () => string[];
 };
 
 export type GuiValueTypes = {
@@ -61,9 +63,10 @@ export type GuiValueTypes = {
 export type GuiSpec<T extends keyof GuiValueTypes> = {
     type: T; 
     label: string;
-    current_value: GuiValueTypes[T];
-    func: (v: GuiValueTypes[T]) => void;
+    current_value?: GuiValueTypes[T];
+    func?: (v: GuiValueTypes[T]) => void;
     values?: GuiValueTypes[T][];
+    defaultVal?: GuiValueTypes[T];
 }
 
 export type Chart = {

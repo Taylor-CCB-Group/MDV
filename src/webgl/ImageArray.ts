@@ -32,7 +32,7 @@ export class ImageArray {
     texturesByIndex: Map<number, ImageArrayEntry>;
     texture: WebGLTexture;
     gl: WebGL2RenderingContext;
-    logEl: HTMLDivElement;
+    logEl: HTMLElement;
     dataView: DataModel;
     onProgress: (n: number) => void;
     constructor(dataStore, canvas: HTMLCanvasElement, dataView: DataModel, config: ImageArrayConfig) {

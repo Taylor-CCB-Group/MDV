@@ -13,7 +13,7 @@ export type ChartType<T extends BaseChart> = {
     extra_controls?: (dataSource: DataSource) => GuiSpec<any>[];
     params?: { type: string | string[], name: string }[];
     configEntriesUsingColumns?: string[];
-    methodsUsingColumns?: (keyof T)[];
+    methodsUsingColumns?: string[]; // (keyof T)[]; //would like better typing here
 }
 
 export type ChartTypeMap = Record<string, ChartType<BaseChart>>;
