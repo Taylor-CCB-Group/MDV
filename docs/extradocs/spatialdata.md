@@ -1,6 +1,6 @@
 
 ## Spatial Data
-Your data should contain an x and y column , which is the centroid for each cell/item and a column specifying which region each cell/item is from e.g. sample_id,roi,slide_number. In addition it needs to contain a column that will be used to color centroid plots e.g. annotations, cell types, cluster designations.
+Your data should contain an x and y column , which is the centroid for each cell/item and a column specifying which region each cell/item is from e.g. sample_id, roi, slide_number. In addition it needs to contain a column that will be used to color centroid plots e.g. annotations, cell types, cluster designations.
 
 ### Adding Regions
 use the `set_region_data` method of the MDVProject. For example to set regions for the cell's datasource
@@ -22,7 +22,7 @@ The first argument is the name of the datasource and the second is a path to a t
 The first column should contain the name of the region (can be any header). The other columns are:-
 * width - the width of the region 
 * height -the height of the region
-* x_offset,y_offset - usually these are 0 and in such cases, these columns can be missing. In some circumstances however the region may be part of a larger region and the hence the x,y co-ordinates will not be 0 and need to be supplied.
+* x_offset, y_offset - usually these are 0 and in such cases, these columns can be missing. In some circumstances however the region may be part of a larger region and the hence the x, y co-ordinates will not be 0 and need to be supplied.
 
 Alternatively instead of a path to a file, a dictionary of region name to data can be used e.g.
 ```json
@@ -37,7 +37,7 @@ The other arguments are:-
 
 * *region_field* - the column in your data specifying regions e.g. ROI, sample_id
 * *default_color* - the default color of the  centroid plots, usually annotations or cluster designations
-* *position_fields* - the fields describing the x,y co-ordinates of each cell/object
+* *position_fields* - the fields describing the x, y co-ordinates of each cell/object
 * *scale unit* - the unit you want the data described in
 * *scale* - the actual value of x and y in terms of the scale unit
 
@@ -58,7 +58,7 @@ The second argument should be a path to a tab delimited table or a dictionary de
 
 The table should contain the region name (first column) then a path column which should contain either a url to an image or a local path to an image and name for the image. Multiple images for the same region are allowed but they must have different names.
 
-x_offset,y_offset,width and height columns can also be included if the background image is larger or offset from the region. If these values are not present, they will be the same as those of the region. The user is also able to try and align the image with centroids.
+x_offset, y_offset, width and height columns can also be included if the background image is larger or offset from the region. If these values are not present, they will be the same as those of the region. The user is also able to try and align the image with centroids.
 
 If a local file path is given in 'path', the image will be copied to the project and the correct url for displaying it will be constructed.
 
@@ -70,7 +70,7 @@ Use `add_viv_viewer` of the `MDVProject'
 p.add_viv_viewer("cells",
     [
         {"name":"DNA1","color":"#23133"},
-        {"name":"collagen","color":[223,21,123]}
+        {"name":"collagen","color":[223, 21, 123]}
     ]
 )
 ```

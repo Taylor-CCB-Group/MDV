@@ -22,7 +22,7 @@ const config={
     columns:myColumns
 }
 
-const m = new ChartManager("my-div",myDataSources,dataLoader,config)
+const m = new ChartManager("my-div", myDataSources, dataLoader, config)
 
 ```
 

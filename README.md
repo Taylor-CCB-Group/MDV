@@ -27,7 +27,7 @@ Multi Dimensional Viewer (MDV) is web based application for analyzing, annotatin
 
 * Data can added and/or modified by the user
 
-* Diverse range of data sources (API calls,static files) can be used by implementing custom data loaders 
+* Diverse range of data sources (API calls, static files) can be used by implementing custom data loaders 
 
 * Runs in a web browser (installation not required for uploading and viewing data)
 

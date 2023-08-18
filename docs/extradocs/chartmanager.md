@@ -1,7 +1,7 @@
 
 The ChartManager object links DataSources, loads column data on demand and manages charts/widgets. It is the main interface for interacting with MDV. The ChartManager's constructor requires list of DataStore configs, a dataloader object, a config for construction and optionally a listener. 
 ```
-    const cm =  new ChartManager("mydiv",datasources,dataloader,config,listener)
+    const cm =  new ChartManager("mydiv", datasources, dataloader, config, listener)
 ```
 * **mydiv** - the id or the element to house the app
 * **datasources** - list of DataStore [configs]{@tutorial datasource}, these configs should also include a size parameter showing the number of rows in the data set
@@ -10,7 +10,7 @@ The ChartManager object links DataSources, loads column data on demand and manag
     * **viewLoader** - a function that will return the [view]{@tutorial views} given the view name
     * **rowDataLoader** - an optional function that accepts a datasource name and index and returns an an object with data. The
     function will be called if the datasource's config contains row_data_loader:true and DataHighlighted is invoked  
-    * **files** - specifies static files (tsv,csv or json), which contain the data to display. Useful for small amounts of data (100 000s rows) and testing. If all the data is to be loaded dynamically then this is not required.
+    * **files** - specifies static files (tsv, csv or json), which contain the data to display. Useful for small amounts of data (100 000s rows) and testing. If all the data is to be loaded dynamically then this is not required.
     ```json
     [
         {
@@ -37,7 +37,7 @@ Can be added with the method *addListener(id, function)* and removed with *remov
 The listener should be a function which receives the type of event, the ChartManager object and any data associated with the event. A typical listener would be:-
 
 ```js
-    (type,cm,data)=>{
+    (type, cm, data)=>{
         switch(type){
             case "view_loaded":
                 ..do stuff with data
@@ -88,11 +88,11 @@ Called when the user saves the data. The object passed to the listener consists 
             "columns":[
                 {
                     "metadata":{"field":"new annotations",...},
-                    "data":[2,1,2.....]
+                    "data":[2, 1, 2.....]
                 },
                 {
                     "metadata":{"field":"annotations",...},
-                    "data":[0,0,2.....]
+                    "data":[0, 0, 2.....]
                 }
             ],
             "added":["new annotations"],

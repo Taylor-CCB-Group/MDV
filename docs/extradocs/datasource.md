@@ -27,7 +27,7 @@ The DataStore can contain a number of columns. Each column can have the followin
   * integer - an integer (represented by float32)
   * double - a floating point number (represented by float32)
   * unique - any text
-  * multitext - A field that can have more than one value eg 'red', 'red,blue'
+  * multitext - A field that can have more than one value eg 'red', 'red, blue'
   * int32 - for larger integers e.g. genomic co-ordinates (represented by an int32)
 
 * **values** - For text and multitext colummns, this will be an array of the possible values, the raw data will contain the index(es) of the value(s) in the array. Text columns can't have more than 256 values and multitext no more than 65536
@@ -45,13 +45,13 @@ integer/double columns. In the former the colors array is mapped to the values a
 
 * **minMax** - for integer and double columns, the minimum/maximum values in an array of length 2
 
-* **quantiles** - an object with 0.05,0.01 and 0.001 as keys, with each entry and array of the x and 1-x quantiles
+* **quantiles** - an object with 0.05, 0.01 and 0.001 as keys, with each entry and array of the x and 1-x quantiles
 ```
     {
         "quantiles":{
-            "0.05":[x,y]
-            "0.01":[x,y]
-            "0.001":[x,y]
+            "0.05":[x, y]
+            "0.01":[x, y]
+            "0.001":[x, y]
         }   
     }
 ```
@@ -131,12 +131,12 @@ These have exactly the same format as above, but represent much larger images, w
 
 
 ### regions
-The data contains a number of separate regions , with each data point a location in this region. The name of the field which specifies the region and the fields which specify the x,y co-ordinates , 
+The data contains a number of separate regions , with each data point a location in this region. The name of the field which specifies the region and the fields which specify the x, y co-ordinates , 
 
 all_regions is a dictionary with the name of the region (the value in the region field) as the key, it contains the following
 
 * roi the limits of the regions
-* images a dictionary of images describing the file, its position and height,width and name. The image can be enlarged or offset from the points
+* images a dictionary of images describing the file, its position and height, width and name. The image can be enlarged or offset from the points
 * default_image - the name of the image that will be loaded - if null or missing, no background image will be loaded
 
 scale - in mm
@@ -167,7 +167,7 @@ base_url-  url where the images reside the image will be
                 "images":{
                     "cellmask":{
                         "file":"jssRG6.png",
-                        "position":[0,0],
+                        "position":[0, 0],
                         "height":1000,
                         "width":1000,
                         "name":"cellmask"
@@ -238,7 +238,7 @@ An example for x and y columns, where each panel can be offset in each ROI and t
         "values":{
             "ROI_1":{
                 "panel1":{
-                    "offset":[10,20],
+                    "offset":[10, 20],
                     "rotation":12
                 }
             }
@@ -253,7 +253,7 @@ If no background filter is specified then a single entry "all" should be used in
         "values":{
             "all":{
                 "panel1":{
-                    "offset":[10,20],
+                    "offset":[10, 20],
                     "rotation":12
                 }
             }
@@ -266,18 +266,18 @@ To set the values use the `setColumnOffset` method
 
 ```
 //rotate by 45 deg
-let  data = {group:"panel1",rotation:45,filter:"ROI_1"};
+let  data = {group:"panel1", rotation:45, filter:"ROI_1"};
 ds.setColumnOffset(data);
-//translate by 30,30
-data = {group:"panel1",offsets:[30,30],filter:"ROI_1"};
+//translate by 30, 30
+data = {group:"panel1", offsets:[30, 30], filter:"ROI_1"};
 //passing true as a second parameter will update all listeners
-ds.setColumnOffset(data,true);
+ds.setColumnOffset(data, true);
 ```
 If no background filter has been specified, you should omit the filter value or set it to "all"
 
 To reset a group's offsets to the original values use `resetColumnOffsets`
 ```
-ds.resetColumnOffsets("ROI_1","panel1",true)
+ds.resetColumnOffsets("ROI_1","panel1", true)
 ```
 The first parameter should be null or "all" if there is no background filter
 
@@ -328,13 +328,13 @@ Column data can be added by the following
 
 * Using the DataStore's `addColumn` method passing the data parameter as the second parameter
     ```
-        ds.addColumn({datatype:"text","field":"myvals",name:"My Vals"},data)
+        ds.addColumn({datatype:"text","field":"myvals", name:"My Vals"}, data)
 
     ```
 
 * If a column has already been added,  use  `setColumn` method with the column's field and data
     ```
-        ds.setColumnData("myvals",data)
+        ds.setColumnData("myvals", data)
     ```
 
 In each case, data can either be an array of values or a SharedArrayBuffer containing the raw format of the column. Using an array, although more convenient, will be slow, as it has to be converted to the native format
@@ -348,8 +348,8 @@ The column should not contain more than 256 unique values.
 ```
     ["blue","green","green","yellow","blue","green"]
     //would be converted to 
-    values:["green","blue",yellow]
-    data:[1,0,0,2,1,0] //(Uint8Array)
+    values:["green","blue", yellow]
+    data:[1, 0, 0, 2, 1, 0] //(Uint8Array)
 ```
 
 ### datatype- mulitext
@@ -358,11 +358,11 @@ A column that can hold multiple (or no values)
 * SharedArrayBuffer(uint16) - each data item is stringLength portion of the array with each position being the index of the value's array. 65535 represents no value
 
 ```
-    [ "A,B,C", "B,A", "A,B", "D,E", "E,C,D" ]
+    [ "A, B, C", "B, A", "A, B", "D, E", "E, C, D" ]
     //would be converted to
     values:["A","B","C","D","E"]
     stringLength:3
-    data:[0,1,2, 1,0,65535, 0,1,65535, 3,4,65535, 0,2,3] //(Uint16Array)
+    data:[0, 1, 2, 1, 0, 65535, 0, 1, 65535, 3, 4, 65535, 0, 2, 3] //(Uint16Array)
 ```
 
 ### datatype - unique
@@ -372,7 +372,7 @@ A unique column represents text that can contain more than 256 values and is
 ```
     ["ZX1212","X21","F232","D1"]
     //would be converted to
-    data:[90,88,49,50,49,50, 88,50,49,0,0,0, 70,50,51,50,0,0, 68,49,0,0,0,0] //(Uint8Array)
+    data:[90, 88, 49, 50, 49, 50, 88, 50, 49, 0, 0, 0, 70, 50, 51, 50, 0, 0, 68, 49, 0, 0, 0, 0] //(Uint8Array)
     stringLength:6
 ```
 
@@ -381,9 +381,9 @@ These are treated the same and are represented by Float32Array
 * JavaScript Array(number) -  an array of numbers
 * SharedArrayBuffer(Float32) 
 ```
-[1.2,3,4.5.7]
+[1.2, 3, 4.5.7]
 //would be converted to
-data:[1.2,3,4.5.7] //(Float32Array)
+data:[1.2, 3, 4.5.7] //(Float32Array)
 ```
 
 ### datatype int32
@@ -391,9 +391,9 @@ This is represented by a Int32Array and is better far larger integers. e.g.  gen
 * JavaScript Array(number) -  an array of numbers
 * SharedArrayBuffer(int32) 
 ```
-[1.2,3,4.5.7]
+[1.2, 3, 4.5.7]
 //would be converted to
-data:[1.2,3,4.5.7] //(Float32Array)
+data:[1.2, 3, 4.5.7] //(Float32Array)
 ```
 
 
@@ -652,32 +652,32 @@ This has two filtering methods filterCategories works on a single column whereas
 
     const dim = datastore.getDimension("range_dimension");
     //filter on between 5 and 10
-    dim.filter("filterRange",["x"],{min:5,min:10});
+    dim.filter("filterRange",["x"],{min:5, min:10});
     dim.removeFilter();
     //filter on x and y (a square)
     dim.filter("filterSquare",["x","y"],{
-        range1:[5,10],
-        range2:[5,10]
+        range1:[5, 10],
+        range2:[5, 10]
     });
     dim.removeFilter();
     //filter based on a polygon- just supply the points
-    dim.filter("filterPoly",["x","y"],[[0,0],[2,0],[1,2]])
+    dim.filter("filterPoly",["x","y"],[[0, 0],[2, 0],[1, 2]])
 ```
 
 All dimensions can filter on an arbitrary set of items using the item's index
 
 ```
 
-    const indexes = new Set([4,5,10,12]);
+    const indexes = new Set([4, 5, 10, 12]);
     const dim = datastore.getDimension("range_dimension");
-    dim.filter("filterOnIndex",null,indexes)
+    dim.filter("filterOnIndex", null, indexes)
 ``` 
 
 When a filter is called on a dimension - the datastore informs all listeners and hence any updates are performed, which is likely to be expensive. Therefore, if you want to perform multiple filters, pass false as the fourth argument and then call triggerFilter on the datastore
 
 ```
-    rangeDim.filter("filterRange",["x"],{min:5,min:10},false);
-    catDim.filter("filterCategories",["color"],"blue",false);
+    rangeDim.filter("filterRange",["x"],{min:5, min:10}, false);
+    catDim.filter("filterCategories",["color"],"blue", false);
     datastore.triggerFilter();
 ```
 

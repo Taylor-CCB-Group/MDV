@@ -22,7 +22,7 @@
 Charts should have a `getImage()` method that takes a function and a type, either 'svg' or 'png'. The callback should pass a serialized svg string in the case of svg or a canvas element in the case of a png.
 
 ```js
-getImage(callback,type){
+getImage(callback, type){
     if (type=="svg"){
         this.getSerializedSVG().then((svg)=>{
             callback(svg);
