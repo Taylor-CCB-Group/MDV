@@ -5,10 +5,10 @@ Your data should contain an x and y column , which is the centroid for each cell
 ### Adding Regions
 use the `set_region_data` method of the MDVProject. For example to set regions for the cell's datasource
  ```python
-p.set_region_data("cells","/path/to/file",
+p.set_region_data("cells", "/path/to/file",
                 region_field="sample_id",
                 default_color="annotations",
-                position_fields=["x","y"],
+                position_fields=["x", "y"],
                 scale_unit="mm",
                 scale=0.001)
 ```
@@ -46,7 +46,7 @@ The other arguments are:-
 
 Use `add_region_images' to add background images:-
 ```python
-p.add_region_images("cells","examples/data/spatial/images.tsv")
+p.add_region_images("cells", "examples/data/spatial/images.tsv")
 ```
 The second argument should be a path to a tab delimited table or a dictionary describing the images
 
@@ -69,8 +69,8 @@ Use `add_viv_viewer` of the `MDVProject'
 ```python
 p.add_viv_viewer("cells",
     [
-        {"name":"DNA1","color":"#23133"},
-        {"name":"collagen","color":[223, 21, 123]}
+        {"name": "DNA1", "color": "#23133"},
+        {"name": "collagen", "color": [223, 21, 123]}
     ]
 )
 ```
@@ -81,12 +81,12 @@ The first argument is the datasource name, and the second the default channels. 
 To add ome-tiffs use `add_viv_images`. The format is the same as for the normal regions images i.e. a path to a file or a dictionary and again can either be a url or a path to a local images
 
 ```python
-p.add_viv_images("cells",{
-     "COVID_OP_SAMPLE_ID_6_ROI_1":{
-        "path":"/path/to/COVID_OP_SAMPLE_ID_6_ROI_1.ome-tiff"
+p.add_viv_images("cells", {
+     "COVID_OP_SAMPLE_ID_6_ROI_1": {
+        "path": "/path/to/COVID_OP_SAMPLE_ID_6_ROI_1.ome-tiff"
     },
-      "COVID_OP_SAMPLE_ID_6_ROI_2":{
-        "path":"https://mysite/images/C_ID_6_2.ome.tiff"
+      "COVID_OP_SAMPLE_ID_6_ROI_2": {
+        "path": "https://mysite/images/C_ID_6_2.ome.tiff"
       }
 })
 ```

@@ -149,7 +149,7 @@ scale - in mm
 
 ```json
  "regions": {
-        "position_fields": ["x","y"],
+        "position_fields": ["x", "y"],
         "region_field": "sample_id",
         "default_color": "annotation",
         "scale_unit": "mm",
@@ -194,7 +194,7 @@ Also the default values for a few charts also need to be described
 ```json
  "interactions": {
         "pivot_column": "condition",
-        "interaction_columns": ["Cell Type 1","Cell Type 2"],
+        "interaction_columns": ["Cell Type 1", "Cell Type 2"],
         "is_single_region": false
 
         "spatial_connectivity_map": {
@@ -205,7 +205,7 @@ Also the default values for a few charts also need to be described
         },
         //optional
         "interaction_matrix": {
-            "groups": ["Cell Type 1 group","Cell Type 2 groups"]
+            "groups": ["Cell Type 1 group", "Cell Type 2 groups"]
         },
         "cell_radial_chart": {
             "link_thickness": "gr20",
@@ -232,7 +232,7 @@ An example for x and y columns, where each panel can be offset in each ROI and t
 
 ```
     "offsets": {
-        "param": ["x","y"]
+        "param": ["x", "y"]
         "groups": "panels",
         "background_filter": "ROI",
         "values": {
@@ -248,7 +248,7 @@ An example for x and y columns, where each panel can be offset in each ROI and t
 If no background filter is specified then a single entry "all" should be used in values:
 ```
     "offsets": {
-        "param": ["x","y"]
+        "param": ["x", "y"]
         "groups": "panels",
         "values": {
             "all": {
@@ -277,7 +277,7 @@ If no background filter has been specified, you should omit the filter value or 
 
 To reset a group's offsets to the original values use `resetColumnOffsets`
 ```
-ds.resetColumnOffsets("ROI_1","panel1", true)
+ds.resetColumnOffsets("ROI_1", "panel1", true)
 ```
 The first parameter should be null or "all" if there is no background filter
 
@@ -328,7 +328,7 @@ Column data can be added by the following
 
 * Using the DataStore's `addColumn` method passing the data parameter as the second parameter
     ```
-        ds.addColumn({datatype: "text","field": "myvals", name: "My Vals"}, data)
+        ds.addColumn({datatype: "text", "field": "myvals", name: "My Vals"}, data)
 
     ```
 
@@ -346,9 +346,9 @@ The column should not contain more than 256 unique values.
 * SharedArrayBuffer(uint8) - each position in the underlying array represents the index in the column's value array 
 
 ```
-    ["blue","green","green","yellow","blue","green"]
+    ["blue", "green", "green", "yellow", "blue", "green"]
     //would be converted to 
-    values: ["green","blue", yellow]
+    values: ["green", "blue", yellow]
     data: [1, 0, 0, 2, 1, 0] //(Uint8Array)
 ```
 
@@ -360,7 +360,7 @@ A column that can hold multiple (or no values)
 ```
     [ "A, B, C", "B, A", "A, B", "D, E", "E, C, D" ]
     //would be converted to
-    values: ["A","B","C","D","E"]
+    values: ["A", "B", "C", "D", "E"]
     stringLength: 3
     data: [0, 1, 2, 1, 0, 65535, 0, 1, 65535, 3, 4, 65535, 0, 2, 3] //(Uint16Array)
 ```
@@ -370,7 +370,7 @@ A unique column represents text that can contain more than 256 values and is
 * JavaScript Array(string) - there should be no more than 256 unique values.
 * SharedArrayBuffer(uint8)  - Each value is encoded by stringLength digits, padded by 0 values .  
 ```
-    ["ZX1212","X21","F232","D1"]
+    ["ZX1212", "X21", "F232", "D1"]
     //would be converted to
     data: [90, 88, 49, 50, 49, 50, 88, 50, 49, 0, 0, 0, 70, 50, 51, 50, 0, 0, 68, 49, 0, 0, 0, 0] //(Uint8Array)
     stringLength: 6
@@ -410,7 +410,7 @@ in one datasource e.g cells has a column specifying cell type and a second datas
     "links": {
         "cells": {
 	        "interactions": {
-		        "interaction_columns": ["Cell Type 1","Cell Type 2","annotations"],
+		        "interaction_columns": ["Cell Type 1", "Cell Type 2", "annotations"],
 	            "pivot_column": ["sample_id"],
                 "is_single_region": true
             }
@@ -531,7 +531,7 @@ You can link columns from two DataStores in order to minimize the duplication of
         ],
         "links": {
             "samples": {
-                "columns": ["condition","sex"],
+                "columns": ["condition", "sex"],
                 "index": "sample_id"
             }
         }
@@ -543,19 +543,19 @@ You can link columns from two DataStores in order to minimize the duplication of
             {
                 "name": "sample_id",
                 "datatype": "text",
-                "values": ["1","2","3","4"]
+                "values": ["1", "2", "3", "4"]
             },
             {
                 "name": "condition",
                 "datatype": "text",
-                "values": ["sick","healthy"],
-                "colors": ["red","green"]
+                "values": ["sick", "healthy"],
+                "colors": ["red", "green"]
             },
             {
                 "name": "sex",
                 "datatype": "text",
-                "values": ["male","female"],
-                "colors": ["blue","pink"]
+                "values": ["male", "female"],
+                "colors": ["blue", "pink"]
             }
         ]
     }
@@ -636,13 +636,13 @@ This has two filtering methods filterCategories works on a single column whereas
 ```
     const dim = datastore.getDimension("category_dimension");
     //filter items with red in color column
-    dim.filter("filterCategories",["color"],"blue");
+    dim.filter("filterCategories", ["color"], "blue");
     dim.removeFilter();
     //filter items that are red or blue
-    dim.filter("filterCategories",["color"],["red","blue"]);
+    dim.filter("filterCategories", ["color"], ["red", "blue"]);
     dim.removeFilter();
     //filter items that are red and have a shape value of square
-    dim.filter("filterMultipleCategories",["color","shape"],["red","square"])
+    dim.filter("filterMultipleCategories", ["color", "shape"], ["red", "square"])
 ``` 
 
 
@@ -652,16 +652,16 @@ This has two filtering methods filterCategories works on a single column whereas
 
     const dim = datastore.getDimension("range_dimension");
     //filter on between 5 and 10
-    dim.filter("filterRange",["x"],{min: 5, min: 10});
+    dim.filter("filterRange", ["x"], {min: 5, min: 10});
     dim.removeFilter();
     //filter on x and y (a square)
-    dim.filter("filterSquare",["x","y"],{
+    dim.filter("filterSquare", ["x", "y"], {
         range1: [5, 10],
         range2: [5, 10]
     });
     dim.removeFilter();
     //filter based on a polygon- just supply the points
-    dim.filter("filterPoly",["x","y"],[[0, 0],[2, 0],[1, 2]])
+    dim.filter("filterPoly", ["x", "y"], [[0, 0], [2, 0], [1, 2]])
 ```
 
 All dimensions can filter on an arbitrary set of items using the item's index
@@ -676,8 +676,8 @@ All dimensions can filter on an arbitrary set of items using the item's index
 When a filter is called on a dimension - the datastore informs all listeners and hence any updates are performed, which is likely to be expensive. Therefore, if you want to perform multiple filters, pass false as the fourth argument and then call triggerFilter on the datastore
 
 ```
-    rangeDim.filter("filterRange",["x"],{min: 5, min: 10}, false);
-    catDim.filter("filterCategories",["color"],"blue", false);
+    rangeDim.filter("filterRange", ["x"], {min: 5, min: 10}, false);
+    catDim.filter("filterCategories", ["color"], "blue", false);
     datastore.triggerFilter();
 ```
 

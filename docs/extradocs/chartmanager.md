@@ -37,7 +37,7 @@ Can be added with the method *addListener(id, function)* and removed with *remov
 The listener should be a function which receives the type of event, the ChartManager object and any data associated with the event. A typical listener would be:-
 
 ```js
-    (type, cm, data)=>{
+    (type, cm, data) => {
         switch(type){
             case "view_loaded":
                 ..do stuff with data
@@ -83,16 +83,16 @@ Called when the user saves the data. The object passed to the listener consists 
 {
     "view": {....},
     "cuurentView": "default",
-    "all_views": ["default","myview"],
+    "all_views": ["default", "myview"],
     "updatedColumns": {
         "cells": {
             "columns": [
                 {
-                    "metadata": {"field":"new annotations",...},
+                    "metadata": {"field": "new annotations", ...},
                     "data": [2, 1, 2.....]
                 },
                 {
-                    "metadata": {"field":"annotations",...},
+                    "metadata": {"field": "annotations", ...},
                     "data": [0, 0, 2.....]
                 }
             ],
@@ -101,7 +101,7 @@ Called when the user saves the data. The object passed to the listener consists 
             "colors_changed": [
                 {
                     "column": "annotations",
-                    "colors": ["#4532FF",....]
+                    "colors": ["#4532FF", ....]
                 }
             ]
         }

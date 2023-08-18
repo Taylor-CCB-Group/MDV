@@ -17,7 +17,7 @@ const dataLoader={
 }
 
 const config={
-    all_views:["view1","view2","view3"],
+    all_views:["view1", "view2", "view3"],
     current_view:"view2",
     columns:myColumns
 }
