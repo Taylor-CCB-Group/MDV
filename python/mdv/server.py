@@ -70,8 +70,7 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
 
     @app.route(f"{route}/")
     def index():
-        # todo: route... via `{{ route }}` in page.html? Can I pass a search string to the page.html template?
-        # not sure I want Flask-specific stuff in the template, but this is pretty minimal.
+        # `_mdvInit('{{route}}')` in template...
         return render_template("page.html", route=route)
     
     #@app.route(f"{route}/static/js/<path:path>")
@@ -80,8 +79,7 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
 
     @app.route(f"{route}/static/<path:path>")
     def get_static_files(path):
-        print("get_static_files", path)
-        return send_file(safe_join('./static/',path))
+        return send_file(safe_join('./static/', path))
     
 
     @app.route(f"{route}/<file>.b")
