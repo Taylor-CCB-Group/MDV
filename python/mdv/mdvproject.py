@@ -36,6 +36,7 @@ numpy_dtypes={
 class MDVProject:
     def __init__(self,dir,delete_existing=False):
         self.dir=dir
+        self.name = dir.split("/")[-1]
         if delete_existing and exists(dir):
             shutil.rmtree(dir)
         self.h5file = join(dir,"datafile.h5")
@@ -128,7 +129,7 @@ class MDVProject:
     def add_images_to_datasource(self, ds: str, image_folder: str, key_column: str, name="Images", image_type="png"):
         '''Adds images to a datasource.
         These will be copied as static assets with `convert_to_static_page()`, 
-        and should be served from their original location be `serve()`.
+        and served from their original location by `serve()`.
         Args:
             ds (str): The name of the datasource.
             image_folder (str): The folder containing the images.
@@ -143,7 +144,7 @@ class MDVProject:
         if name in image_meta:
             raise AttributeError(f'Image set {name} already exists in {ds} datasource')
         image_meta[name] = {
-            "original_folder": image_folder, #for convenience locally, shouldn't be saved but is
+            "original_folder": image_folder, #for convenience locally, maybe shouldn't be saved, may be useful
             "base_url": f"./images/{ds}/{name}/",
             "key_column": key_column,
             "type": image_type
@@ -552,11 +553,10 @@ class MDVProject:
         template = join(tdir,page)
         page = open(template).read()
         if not debug:
-            #call init with the static folder argument
-            # may want to review this
-            page=page.replace("_mdvInit()","_mdvInit(true)")
+            #call init with no route, will be interpreted as static page (at /)
+            page = page.replace("_mdvInit('{{route}}')","_mdvInit()")
             #correct config
-            conf  = self.state
+            conf = self.state
             #can't edit static page
             conf["permission"]="view"
             conf["popouturl"]="popout.html"

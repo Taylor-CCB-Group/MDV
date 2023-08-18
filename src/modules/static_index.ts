@@ -8,7 +8,7 @@ import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
 console.log(SideEffect);
-import { getDataLoader, getPostData } from "../dataloaders/DataLoaderUtil";
+import { fetchAndPatchJSON, getDataLoader, getPostData } from "../dataloaders/DataLoaderUtil";
 
 const flaskURL = "http://localhost:5050";
 
@@ -29,28 +29,6 @@ const staticFolder = dir !== flaskURL;
 document.title = !staticFolder ? 'MDV - local project' : `MDV - ${root}`;
 if (isPopout) document.title = "MDV popout";
 
-function rewriteBaseUrlRecursive(config) {
-    if (Array.isArray(config)) {
-        for (const item of config) {
-            rewriteBaseUrlRecursive(item);
-        }
-        return;
-    }
-    for (const key in config) {
-        if (key === "base_url") {
-            config[key] = config[key].replace("./", `${root}/`);
-        } else if (typeof config[key] === "object") {
-            rewriteBaseUrlRecursive(config[key]);
-        }
-    }
-}
-
-async function fetchAndPatchJSON(url) {
-    let resp = await fetch(url)//, { mode: "no-cors" });
-    const config = await resp.json();
-    rewriteBaseUrlRecursive(config);
-    return config;
-}
 
 // TODO make a better type for this, put it somewhere more sensible.
 export type Datasource = { 
@@ -63,10 +41,10 @@ async function loadData() {
     // setupDebug();
     if (isPopout) return;
     // move more of this into DataLoaderUtil (which might get renamed)?
-    const datasources = await fetchAndPatchJSON(`${root}/datasources.json`) as Datasource[];
-    const config = await fetchAndPatchJSON(`${root}/state.json`);
+    const datasources = await fetchAndPatchJSON(`${root}/datasources.json`, root) as Datasource[];
+    const config = await fetchAndPatchJSON(`${root}/state.json`, root);
     config.popouturl = undefined;
-    const views = await fetchAndPatchJSON(`${root}/views.json`);
+    const views = await fetchAndPatchJSON(`${root}/views.json`, root);
 
     const dataLoader = getDataLoader(staticFolder, datasources, views, dir);
 

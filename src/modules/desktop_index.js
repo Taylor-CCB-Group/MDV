@@ -1,8 +1,25 @@
 import "./all_css"
 import ChartManager from '../charts/ChartManager.js';
 import { getArrayBufferDataLoader,getLocalCompressedBinaryDataLoader} from "../dataloaders/DataLoaders.js";
+import { fetchAndPatchJSON, rewriteBaseUrlRecursive } from "../dataloaders/DataLoaderUtil";
 
-function _mdvInit(staticFolder){
+let route = '';
+
+/**
+ * @param {string=} routeFromTemplate - if undefined, it is assumed that the data is static 
+ * (i.e. the result of `convert_to_static_page()` in python), and located in the root of the current server.
+ * - if it is the empty string, it will use the single-project API (`/get_data` etc).
+ * - otherwise, it should be in the form of `/project/<project_id>`, which will be inserted by the Flask template 
+ * and use multi-project API (`/project/<project_id>/get_data` etc).
+ */
+function _mdvInit(routeFromTemplate){
+    const staticFolder = routeFromTemplate === undefined;
+    if (!staticFolder) {
+        route = routeFromTemplate;
+        if (route && !route.startsWith("/project/")) {
+            throw new Error("routeFromTemplate must be undefined, the empty string, or in the form of '/project/<project_id>'");
+        }
+    }
     //get the configs for MDV
     getConfigs(staticFolder).then(resp=>{
         const config=resp.state;
@@ -15,7 +32,7 @@ function _mdvInit(staticFolder){
         //data loaders depend on whether data is static or retrieved via API
         const dataLoader={
             function:staticFolder?getLocalCompressedBinaryDataLoader(resp.datasources,".")
-                                    :getArrayBufferDataLoader("/get_data"),
+                                    :getArrayBufferDataLoader(route + "/get_data"),
             viewLoader:staticFolder?async (view)=> resp.views[view]
                                     :getView,
             rowDataLoader:staticFolder?loadRowDataStatic
@@ -27,7 +44,8 @@ function _mdvInit(staticFolder){
         const listener = (type,cm,data)=>{
             switch(type){
                 case "state_saved":
-                    getData("/save_state",data).then(resp=>{
+                    //maybe consider rewriting the base URL here...
+                    getData(route + "/save_state",data).then(resp=>{
                         if (resp.success){
                             cm.createInfoAlert("Data Saved",{duration:2000});
                             cm.setAllColumnsClean();
@@ -53,10 +71,10 @@ window._mdvInit=_mdvInit;
 
 //loads unstructured data for each row
 async function loadRowData(datasource,index){
-    return await getData("/get_row_data",{datasource,index})
+    return await getData(route + "/get_row_data",{datasource,index})
 }
 async function loadRowDataStatic(datasource,index){
-    const resp = await fetch(`./rowdata/${datasource}/${index}.json`);
+    const resp = await fetch(`${route}/rowdata/${datasource}/${index}.json`);
     if (resp.status !=200){
         return null
     }
@@ -64,16 +82,16 @@ async function loadRowDataStatic(datasource,index){
 }
 //load view from API
 async function getView(view){
-    return await getData("/get_view",{view:view})
+    return await getData(route + "/get_view",{view:view})
 }
 
 //load arbritray data
 async function loadBinaryDataStatic(datasource,name){
-    const resp = await fetch(`./binarydata/${datasource}/${name}.b`);
+    const resp = await fetch(`${route}/binarydata/${datasource}/${name}.b`);
     return await resp.arrayBuffer();
 }
 async function loadBinaryData(datasource,name){
-    return await getData("/get_binary_data",{datasource,name},"arraybuffer");
+    return await getData(route + "/get_binary_data",{datasource,name},"arraybuffer");
 }
 
 /**
@@ -83,20 +101,21 @@ async function loadBinaryData(datasource,name){
  */
 async function getConfigs(folder){
     let configs={};
+    const fetch = async (url) => fetchAndPatchJSON(url, route);
     if (folder){
-        let resp = await fetch(`./datasources.json`);
+        let resp = await fetch(`${route}/datasources.json`);
         configs.datasources = await resp.json();
-        resp = await fetch(`./state.json`);
+        resp = await fetch(`${route}/state.json`);
         configs.state = await resp.json();
-        resp = await fetch(`./hyperion_config.json`);
+        resp = await fetch(`${route}/hyperion_config.json`);
         if (resp.status==200){
             configs.hyperion_config = await resp.json();
         }   
-        resp = await fetch(`./views.json`);
+        resp = await fetch(`${route}/views.json`);
         configs.views =  await resp.json();  
     }
     else{
-        configs = await getData("/get_configs")
+        configs = await getData(route + "/get_configs")
     }
     return configs;
 }
@@ -112,7 +131,10 @@ async function getData(url,args,return_type="json"){
         }
     });
     if (return_type==="json"){
-        return await resp.json();
+        console.log('returning json, rewriting base_url first...');
+        const original = await resp.json();
+        console.log('original', original);
+        return rewriteBaseUrlRecursive(original, route);
     }
     else{
         return await resp.arrayBuffer();

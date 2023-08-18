@@ -9,7 +9,7 @@ from werkzeug.utils import safe_join
 from .websocket import mdv_socketio
 
 
-
+routes = set()
 
 def add_safe_headers(resp):
     resp.headers["Cross-Origin-Opener-Policy"]= "same-origin"
@@ -47,26 +47,43 @@ def get_range(file_name,range_header):
     file.close()
     return rv
 
-def create_app(project, open_browser=True, port = 5050, websocket=False):
-    app=Flask(__name__)
-    #add headers to allow web workers
-    app.after_request(add_safe_headers)
-    # nb, may make this default to False again soon.
-    ### 'MEW' in Unity is using IWeb PostMessage, not WebSockets.
-    ### but this will be used for local testing in short-term, and potentially other things later.
-    if websocket:
-      mdv_socketio(app)
+def create_app(project, open_browser = True, port = 5050, websocket = False, app:Flask = None):
+    if app is None:
+        # route = ""
+        route = "/project/" + project.name # for testing new API with simple app...
+        app=Flask(__name__)
+        #add headers to allow web workers
+        app.after_request(add_safe_headers)
+        # nb, may make this default to False again soon.
+        ### 'MEW' in Unity is using IWeb PostMessage, not WebSockets.
+        ### but this will be used for local testing in short-term, and potentially other things later.
+        if websocket:
+            mdv_socketio(app)
+    else:
+        # add routes for this project to existing app
+        # set the route prefix to the project name, derived from the dir name.
+        # this is to allow multiple projects to be served from the same server.
+        route = "/project/" + project.name
+    if route in routes:
+        raise Exception("Route already exists - can't have two projects with the same name")
+    routes.add(route)
 
-    @app.route("/")
+    @app.route(f"{route}/")
     def index():
-        return render_template("page.html")
+        # todo: route... via `{{ route }}` in page.html? Can I pass a search string to the page.html template?
+        # not sure I want Flask-specific stuff in the template, but this is pretty minimal.
+        return render_template("page.html", route=route)
     
-    #@app.route("/static/js/<path:path>")
+    #@app.route(f"{route}/static/js/<path:path>")
     #def get_js_files(path):
     #    return send_file(safe_join(js_files,path))
+
+    # @app.route(f"{route}/static/<path:path>")
+    # def get_static_files(path):
+    #     return send_file(safe_join(project.staticfolder,path))
     
 
-    @app.route("/<file>.b")
+    @app.route(f"{route}/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
         file_name = safe_join(project.dir, file+".b")
@@ -76,19 +93,19 @@ def create_app(project, open_browser=True, port = 5050, websocket=False):
     # duplicate of above, but for .gz files in case that's needed.
     # (there was some reason for changing to this, but I can't fully remember the status
     # so maybe better to support both for now)
-    @app.route("/<file>.gz")
+    @app.route(f"{route}/<file>.gz")
     def get_binary_file_gz(file):
         file_name = safe_join(project.dir, file+".gz")
         range_header = request.headers.get('Range', None) 
         return get_range(file_name,range_header)
 
 
-    @app.route("/<file>.json/")
+    @app.route(f"{route}/<file>.json")
     def get_json_file(file):
         return send_file(safe_join(project.dir,file+".json"))
       
     #gets the raw byte data and packages it in the correct response
-    @app.route('/get_data',methods =["POST"])
+    @app.route(f"{route}/get_data", methods=["POST"])
     def get_data():
         try:
             data = request.json
@@ -101,7 +118,7 @@ def create_app(project, open_browser=True, port = 5050, websocket=False):
             return "Problem handling request",400
     
     #images contained in the project
-    @app.route("/images/<path:path>")
+    @app.route(f"{route}/images/<path:path>")
     def images(path):
         try:
             return send_file(project.get_image(path))
@@ -109,18 +126,18 @@ def create_app(project, open_browser=True, port = 5050, websocket=False):
             return send_file(safe_join(project.imagefolder, path))
 
     #All the project's metadata
-    @app.route('/get_configs',methods =["GET","POST"])
+    @app.route(f"{route}/get_configs", methods=["GET","POST"])
     def get_configs():
         return json.dumps(project.get_configs())
 
     #gets a particular view
-    @app.route("/get_view",methods = ["POST"])
+    @app.route(f"{route}/get_view", methods=["POST"])
     def get_view():
         data=request.json
         return json.dumps(project.get_view(data["view"]))
     
     #get any custom row data
-    @app.route("/get_row_data",methods=["POST"])
+    @app.route(f"{route}/get_row_data", methods=["POST"])
     def get_row_data():
         req=request.json
         try:
@@ -131,7 +148,7 @@ def create_app(project, open_browser=True, port = 5050, websocket=False):
         return data
     
     #get arbitrary data
-    @app.route("/get_binary_data",methods=["POST"])
+    @app.route(f"{route}/get_binary_data", methods=["POST"])
     def get_binary_data():
         req=request.json
         try:
@@ -143,7 +160,7 @@ def create_app(project, open_browser=True, port = 5050, websocket=False):
 
     # only the specified region of track files (bam,bigbed,tabix)
     # needs to be returned 
-    @app.route("/tracks/<path:path>")
+    @app.route(f"{route}/tracks/<path:path>")
     def send_track(path):
         file_name =safe_join(project.trackfolder,path)
         range_header = request.headers.get('Range', None)  
@@ -151,7 +168,7 @@ def create_app(project, open_browser=True, port = 5050, websocket=False):
             return send_file(file_name)
         return get_range(file_name,range_header)
     
-    @app.route("/save_state",methods = ["POST"])
+    @app.route(f"{route}/save_state", methods = ["POST"])
     def save_data():
         success=True
         try:
@@ -163,7 +180,7 @@ def create_app(project, open_browser=True, port = 5050, websocket=False):
         return jsonify({"success":success})
 
     if open_browser:
-        webbrowser.open(f"http://localhost:{port}")
+        webbrowser.open(f"http://localhost:{port}/{route}")
           
     app.run(port=port)
 
