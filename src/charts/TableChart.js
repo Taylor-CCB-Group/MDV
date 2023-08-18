@@ -292,9 +292,9 @@ class TableChart extends BaseChart{
     }
 
 
-    // pjt: deprecated
+    // pjt: deprecated?
     themeChanged(){
-        console.warn('themeChanged() deprecated');
+        // console.warn('themeChanged() deprecated');
     }
 
    
