@@ -57,7 +57,7 @@ export class ImageArray {
         return this.texturesByIndex.get(i).zIndex;
     }
     drawProgress(n = 0) {
-        this.logEl.textContent = `Loading images: ${Math.round(n * 100)}%`;
+        // this.logEl.textContent = `Loading images: ${Math.round(n * 100)}%`;
         this.onProgress && this.onProgress(n);
     }
     loadImageColumn(ds: DataStore, gl: WebGL2RenderingContext, config: ImageArrayConfig) {
