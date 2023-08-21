@@ -244,7 +244,7 @@ class ImageScatterChart extends BaseChart {
                 type: "slider",
                 name: "saturation",
                 label: "saturation",
-                current_value: this.spaceY,
+                current_value: this.saturation,
                 min: 0,
                 max: 1,
                 continuous: true,
