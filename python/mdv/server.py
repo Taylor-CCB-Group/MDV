@@ -53,21 +53,10 @@ def create_app(project,open_browser=True, port =5000):
     def index():
         return render_template("page.html")
     
-    #@app.route("/static/js/<path:path>")
-    #def get_js_files(path):
-    #    return send_file(safe_join(js_files,path))
-    
-
-    @app.route("/<file>.b")
-    def get_binary_file(file):
-        file_name =safe_join(project.dir,file+".b")
-        range_header = request.headers.get('Range', None) 
-        return get_range(file_name,range_header)
-
-
-    @app.route("/<file>.json/")
-    def get_json_file(file):
-        return send_file(safe_join(project.dir,file+".json"))
+    #empty page to put popout content
+    @app.route("/popout.html")
+    def popout():
+        return "<!DOCTYPE html><html><head></head><body></body></html>"
       
     #gets the raw byte data and packages it in the correct response
     @app.route('/get_data',methods =["POST"])

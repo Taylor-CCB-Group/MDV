@@ -289,6 +289,11 @@ class MLVPanel {
     	this.force_redraw=true;
     }
 
+    removeAllHighlightedRegions(){
+        this.highlighted_regions={};
+        this.force_redraw=true;
+    }
+
 
     addRulerTrack(){
     	let track=new RulerTrack();

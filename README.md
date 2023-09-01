@@ -96,18 +96,9 @@ p.convert_to_static_page("/path/to/myapp/")
 
 The function also creates a simple home page for the project (index.html), which can be customized. The folder can then be put on the server and accessed via:-
 ```
-http://myserver.com/path/to/myapp
+https://myserver.com/path/to/myapp
 ```
 
-Images and JavaScript files are obtained from /static/mdv/js and /static/mdv/img , so the python/static/mdv folder needs to be copied to the /server folder of the server. 
-
-
-No back end architecture is required , although the server needs to accept range headers and have the following headers on responses from the project folder and /static/mdv/js folder in order to allow SharedArrayBuffers and Webworkers:-
-
-```
-Cross-Origin-Opener-Policy:same-origin
-Cross-Origin-Embedder-Policy:require-corp
-```
 
 
 ## Development

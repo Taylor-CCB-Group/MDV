@@ -13,10 +13,10 @@ module.exports = (env) => {
 			static:env.folder
 		  },
 	
-	   entry: "./src/dev/devindex.js",
+	   entry: "./src/modules/desktop_index.js",
 
   	   output: {
-    		   filename: 'dist/ciview2.js',
+    		   filename: 'static/js/mdv.js',
   	   },
 		 resolve: {
             extensions: ['.ts', '.js', '...']
