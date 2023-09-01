@@ -83,10 +83,6 @@ async function getConfigs(folder){
         configs.datasources = await resp.json();
         resp = await fetch(`./state.json`);
         configs.state = await resp.json();
-        resp = await fetch(`./hyperion_config.json`);
-        if (resp.status==200){
-            configs.hyperion_config = await resp.json();
-        }   
         resp = await fetch(`./views.json`);
         configs.views =  await resp.json();  
     }
