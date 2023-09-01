@@ -38,8 +38,7 @@ constructor (config={},content) {
           width:width,
           height:height
         }
-    })
-    let self = this;
+    });
     this.header = createEl("div",{
         classes:["ciview-dlg-header"]   
     },this.outer);
@@ -62,6 +61,7 @@ constructor (config={},content) {
   },this.outer)
 
     makeResizable(this.outer,{
+      doc:config.doc,
       onresizeend:(x,y)=>{
       this.onResize(x,y)
     }});

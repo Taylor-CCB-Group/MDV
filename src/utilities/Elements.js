@@ -194,6 +194,8 @@ function makeResizable(el,config={}){
         resize: el.style.resize,
         overflow:el.style.overflow
     }
+    //document can change if in another window
+    el.__doc__= config.doc || document;
     // el.style.resize="both"; //standard resizer is sometimes visible when it shouldn't be.
     el.style.overflow="hidden";
     //el.style.zIndex="0";
@@ -214,16 +216,16 @@ function makeResizable(el,config={}){
         ri.startY = e.clientY;
         ri.startWidth = parseInt(document.defaultView.getComputedStyle(el).width, 10);
         ri.startHeight = parseInt(document.defaultView.getComputedStyle(el).height, 10);
-        document.documentElement.addEventListener("mousemove", doDrag, false);
-        document.documentElement.addEventListener("mouseup", stopDrag, false);
+        el.__doc__.documentElement.addEventListener("mousemove", doDrag, false);
+        el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
     }
     function doDrag(e) {
         el.style.width = (ri.startWidth + e.clientX - ri.startX) + "px";
         el.style.height = (ri.startHeight + e.clientY - ri.startY) + "px";
     }
     function stopDrag(e) {
-        document.documentElement.removeEventListener("mousemove", doDrag, false);
-        document.documentElement.removeEventListener("mouseup", stopDrag, false);
+        el.__doc__.documentElement.removeEventListener("mousemove", doDrag, false);
+        el.__doc__.documentElement.removeEventListener("mouseup", stopDrag, false);
     }
     el.__resizeinfo__=ri;
 }
@@ -296,19 +298,17 @@ function makeDraggable(el,config={}){
         };
     }
  
-
-
     handle.onmousedown = dragMouseDown;
     
-        el.__draginfo__={
-            handle:handle,
-            cursor:handle.style.cursor,
-            position:el.style.position,
-        }
-        handle.style.cursor="move";
-        el.style.position="absolute";
-        el.style.margin="0px 0px 0px 0px";
-        el.__doc__=config.doc;
+    el.__draginfo__={
+        handle:handle,
+        cursor:handle.style.cursor,
+        position:el.style.position,
+    }
+    handle.style.cursor="move";
+    el.style.position="absolute";
+    el.style.margin="0px 0px 0px 0px";
+    el.__doc__=config.doc;
     
     function dragMouseDown(e) {
  
@@ -332,31 +332,29 @@ function makeDraggable(el,config={}){
     
   
     function elementDrag(e) {
-      e = e || window.event;
-      e.preventDefault();
-      e.stopPropagation();
-      // calculate the new cursor position:
-      pos1 = pos3 - e.clientX;
-      pos2 = pos4 - e.clientY;
-      pos3 = e.clientX;
-      pos4 = e.clientY;
-      //console.log(pos3+":"+pos4);
-      //console.log(pos1+":"+pos2);
-      // set the element's new position:
-      let nt  = el.offsetTop -pos2;
-      let nl = el.offsetLeft - pos1;
-    if (cont){
-        if (nt<0 || (nt+cont.c_bb.height>cont.p_bb.height && cont.dir !=="topleft")){
-            return;
+        e = e || window.event;
+        e.preventDefault();
+        e.stopPropagation();
+        // calculate the new cursor position:
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        // set the element's new position:
+        let nt  = el.offsetTop -pos2;
+        let nl = el.offsetLeft - pos1;
+        if (cont){
+            if (nt<0 || (nt+cont.c_bb.height>cont.p_bb.height && cont.dir !=="topleft")){
+                return;
+            }
+            if (nl<0 || (nl+cont.c_bb.width>cont.p_bb.width && cont.dir !=="topleft")){
+                return;
+            }
         }
-        if (nl<0 || (nl+cont.c_bb.width>cont.p_bb.width && cont.dir !=="topleft")){
-            return;
+        if (!config.y_axis){
+            el.style.top = (nt) + "px";
         }
-    }
-    if (!config.y_axis){
-      el.style.top = (nt) + "px";
-    }
-      el.style.left = (nl) + "px";
+        el.style.left = (nl) + "px";
     }
   
     function closeDragElement() {
