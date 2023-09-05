@@ -36,6 +36,7 @@ class ImageTableChart extends BaseChart{
 
         if (c.sortBy) this.sortBy(c.sortBy, c.sortOrder);
         if (c.color_by) this.colorByColumn(c.color_by);
+        if (c.pixelated) this.setPixelated(c.pixelated);
 	}
 
     setSize(x,y){
