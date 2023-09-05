@@ -104,22 +104,22 @@ A dictionary where the keys are the dataStores that this dataStore should link w
 
 Represent thumbnails for each data item. It should be an object containing 'image sets', with the key being the name of the set. Each set should have:
 
-* base_url - the base url of the image -  the images key and type will be appended to this url
-* key_column - the column in the dataStore that contains the keys for each image
-* type - the type of image
+* `base_url` - the base url of the image -  the images key and type will be appended to this url
+* `key_column` - the column in the dataStore that contains the keys for each image
+* `type` - the type of image
 
 ```
     {
         "images": {
             "set1": {
-                "base_url": "/my_thumbnails/set1/"
+                "base_url": "./my_thumbnails/set1/"
                 "key_column": "set1_image_key",
                 "type": "png"
             }
         }
     }
 ```
-Charts that use the images in set1 would then associate the row whose set1 _image_key was 26373 with the following url:  
+Charts that use the images in set1 would then associate the row whose `set1_image_key` was `26373` with the following url:  
     
     `/my_thumbnails/set1/26373.png`
 
@@ -133,11 +133,11 @@ These have exactly the same format as above, but represent much larger images, w
 ### regions
 The data contains a number of separate regions, with each data point a location in this region. The name of the field which specifies the region and the fields which specify the x, y co-ordinates, 
 
-all_regions is a dictionary with the name of the region (the value in the region field) as the key, it contains the following
+all_regions is a dictionary with the name of the region (the value in the region field) as the key, it contains the following:
 
-* roi the limits of the regions
-* images a dictionary of images describing the file, its position and height, width and name. The image can be enlarged or offset from the points
-* default_image - the name of the image that will be loaded - if null or missing, no background image will be loaded
+* `roi` the limits of the regions
+* `images` a dictionary of images describing the file, its position and height, width and name. The image can be enlarged or offset from the points
+* `default_image` - the name of the image that will be loaded - if null or missing, no background image will be loaded
 
 scale - in mm
 
@@ -154,7 +154,7 @@ scale - in mm
         "default_color": "annotation",
         "scale_unit": "mm",
         "scale": 0.001,
-        "base_url": "images/",
+        "base_url": "./images/",
         "all_regions": {
             "IPF_SAMPLE_104F_ROI_1": {
                 "roi": {
