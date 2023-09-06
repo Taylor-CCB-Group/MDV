@@ -474,7 +474,7 @@ class MDVProject:
         to_ds = self.get_datasource_metadata(ds_col)
         if not to_ds:
             raise AttributeError(f"datasource for ds_col '{ds_col}' does not exist")
-        if column_name not in to_ds["columns"]:
+        if column_name not in [c['name'] for c in to_ds["columns"]]:
             raise AttributeError(f"column '{column_name}' does not exist in datasource '{ds_col}'")
         data ={
             "name_column":column_name,
