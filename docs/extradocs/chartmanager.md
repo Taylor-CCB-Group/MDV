@@ -9,7 +9,8 @@ The ChartManager object links DataSources, loads column data on demand and manag
     * **function** - this [function]{@tutorial dataloader} accepts a list of columns and returns a promise (not needed if all data is to be loaded from files)
     * **viewLoader** - a function that will return the [view]{@tutorial views} given the view name
     * **rowDataLoader** - an optional function that accepts a datasource name and index and returns an an object with data. The
-    function will be called if the datasource's config contains `row_data_loader:true` and `DataHighlighted` is invoked  
+    function will be called if the datasource's config contains `row_data_loader:true` and `DataHighlighted` is invoked.
+    * **binaryDataLoader** - an optional function that accepts a datasource name and the name of a the binary data to load. the datasource's config should contain `binary_data_laoder: true`
     * **files** - specifies static files (tsv, csv or json), which contain the data to display. Useful for small amounts of data (100 000s rows) and testing. If all the data is to be loaded dynamically then this is not required.
     ```json
     [

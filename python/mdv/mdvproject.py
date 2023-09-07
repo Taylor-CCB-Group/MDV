@@ -239,7 +239,7 @@ class MDVProject:
             column["datatype"]= datatype_mappings.get(str(li.dtype),"text")
         h5 = self._get_h5_handle()
         gr = h5[datasource]
-        if col_exists:
+        if h5[datasource].get(column["field"]):
             del h5[datasource][column["field"]]
         add_column_to_group(column,li,gr,len(li))
         h5.close()
@@ -536,7 +536,7 @@ class MDVProject:
         #end
         return config
 
-    def convert_to_static_page(self,outdir,debug=False,include_sab_headers=True):
+    def convert_to_static_page(self,outdir,include_sab_headers=True):
         fdir = split(os.path.abspath(__file__))[0]
         # consider adding an option to do a js build here
         tdir = join(fdir,"templates")
@@ -544,31 +544,29 @@ class MDVProject:
         copytree(self.dir,outdir,ignore=ignore_patterns("*.h5"))
         #copy the js and images
         self.copy_images(outdir)
-        if not debug:
-            copytree(join(fdir,"static"),join(outdir,"static"))
+        copytree(join(fdir,"static"),join(outdir,"static"))
         #create the static binary files
         self.convert_data_to_binary(outdir)
         #write out the index file
-        page = "page.html" if not debug else "debug_page.html" 
+        page = "page.html"
         template = join(tdir,page)
         page = open(template).read()
-        if not debug:
-            #call init with no route, will be interpreted as static page (at /)
-            page = page.replace("_mdvInit('{{route}}')","_mdvInit()")
-            #correct config
-            conf = self.state
-            #can't edit static page
-            conf["permission"]="view"
-            conf["popouturl"]="popout.html"
-            copyfile(join(tdir,"popout.html"),join(outdir,"popout.html"))
-            #throttle the dataloading so don't get network errors
-            conf["dataloading"]={
-                "split":5,
-                "threads":2
-            }
-            save_json(join(outdir,"state.json"),conf)     
+        #dummy popout page 
+        copyfile(join(tdir,"popout.html"),join(outdir,"popout.html"))
+        #call init with no route, will be interpreted as static page (at /)
+        page = page.replace("_mdvInit('{{route}}')","_mdvInit()")
+        #correct config
+        conf = self.state
+        #can't edit static page
+        conf["permission"]="view"
+        #throttle the dataloading so don't get network errors
+        conf["dataloading"]={
+            "split":5,
+            "threads":2
+        }
+        save_json(join(outdir,"state.json"),conf)     
         #add service worker for cross origin headers
-        if include_sab_headers and not debug:
+        if include_sab_headers:
             page=page.replace("<!--sw-->",'<script src="serviceworker.js"></script>')
             copyfile(join(tdir,"serviceworker.js"),join(outdir,"serviceworker.js"))  
         with open(join(outdir,"index.html"),"w") as o:

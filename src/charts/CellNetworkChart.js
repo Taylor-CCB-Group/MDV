@@ -21,8 +21,7 @@ class CellNetworkChart extends SVGChart{
         config.node_repulsion = config.node_repulsion || -500;
 		super(dataStore,div,config,{});
         const c = this.config;
-        const self = this;
-
+     
         //thickness
         this.linkThicknessScale= scaleLinear();
         c.scales={};
@@ -38,6 +37,15 @@ class CellNetworkChart extends SVGChart{
             this._changeLinkThicknessScale();
         }
 
+        //calculate cell sizes
+        this.cell_sizes={};
+        const cells = this.dataStore.getColumnValues(c.param[1]);
+        const index = this.dataStore.columnIndex;
+        const c1= index[c.param[1]].data;
+        const ns = index[c.param[6]].data;
+        for (let n=0;n<this.dataStore.size;n++){
+            this.cell_sizes[cells[c1[n]]]= ns[n]
+        }
 
         //length
         this.linkLengthScale= scaleLinear();
@@ -79,36 +87,17 @@ class CellNetworkChart extends SVGChart{
         }
 
         c.node_color = c.node_color || "cells"
-
-
-
-
-
-
         c.levels= c.levels || 1;
         c.label_size= c.label_size || 13;
 
         this.extra_legends= ["linkThicknessLegend","nodeColorLegend"];
-
-      
-       
-        
-      
         this.forceManyBody  = forceManyBody().distanceMax(150);
         this.simulation = forceSimulation()
             .force("link", this.forceLink.strength(this.config.link_strength))
             .force("charge", this.forceManyBody.strength(config.node_repulsion))
             .force("center", forceCenter(this.width/2, this.height/2));
-        if (this.config.base_cell){
-            this.getLinks2();
-        }
-        else{
-            this.getLinks();
-        }
-     
-       this.setColorLegend();
-       this.reCalculate();
-
+        this.setColorLegend();
+        this.reCalculate();
 	}
 
     remove(){
@@ -280,8 +269,6 @@ class CellNetworkChart extends SVGChart{
         if (l){
             c.link_thickness.legend_position=[l.offsetLeft,l.offsetTop];
             l.remove();
-            
-            
         }
       
         if (!c.link_thickness.show_legend){
@@ -340,12 +327,10 @@ class CellNetworkChart extends SVGChart{
             if (c.node_color==="cells"){
                 return colors[d.d_index] 
             }
-            return ncolor;
-            
+            return ncolor;          
         });
     }
     
-
     getConfig(){
         const config = super.getConfig();
         const sl = this.linkThicknessLegend;
@@ -626,60 +611,67 @@ class CellNetworkChart extends SVGChart{
   
     getLinks(){
         const p = this.config.param
+        //get cell names
         const cells = this.dataStore.getColumnValues(p[1]);
         const cells2 = this.dataStore.getColumnValues(p[2]);
         this.nodeData=[];
-        let needed=null;
-        const so =this.config.specific_only;
-        if (so){
-            needed= new Set(so[0].map(x=>cells.indexOf(x)))
-        }
-       
-        const linksNeeded= new Set()
-        for (let n1=0;n1<cells.length;n1++){
-            for (let n2=n1+1;n2<cells2.length;n2++){
-                if (needed && (!(needed.has(n1))||!needed.has(n2))){
-                    continue
-                }
-                linksNeeded.add(`${n1}|${n2}`);
-            }
-        }
         const cat_needed= this.dataStore.getColumnValues(p[0]).indexOf(this.config.category);
         const index = this.dataStore.columnIndex;
+        //get the data required to work out links/nodes
         const cat= index[p[0]].data;
         const c1= index[p[1]].data;
         const c2= index[p[2]].data;
-        const ns = index[p[6]].data;
+        const stat= index[p[3]].data;
         this.linkData= [];
-        const ns_map = {};
-      
+        const links={};
+        const nodes = {};
         const f = this.dataStore.filterArray;
         for (let n=0;n<this.dataStore.size;n++){
+            //are any links filtered out
             if (f[n]>0){
                 continue;
             }
-            ns_map[cells[c1[n]]]=ns[n];
-            const l = `${c1[n]}|${c2[n]}`;
-            if (cat[n] === cat_needed && linksNeeded.has(l)){       
+            //are they in the correct category?
+            if (cat[n] === cat_needed){
+                const ce1= cells[c1[n]];
+                const ce2= cells2[c2[n]];
+                //ignore self/self
+                if (ce1===ce2){
+                    continue;
+                }
+                //does the reverse link exist?
+                const rev= links[`${c2[n]}|${c1[n]}`];
+                if (rev != null){
+                    const rd= this.linkData[rev];
+                    //if greater stat value replace otherwise ignore
+                    if (stat[n]>stat[rd.d_index]){
+                        rd.source=ce1;
+                        rd.target=ce2;
+                        rd.d_index=n;
+                    }
+                    continue;
+                }
+                //keep track of nodes required     
+                nodes[ce1]=true;
+                nodes[ce2]=true;
+                //add the link  
                 this.linkData.push({
-                    source:cells[c1[n]],
-                    target:cells2[c2[n]],
+                    source:ce1,
+                    target:ce2,
                     d_index:n
-                });      
+                });
+                //keep record of directionality
+                links[`${c1[n]}|${c2[n]}`]= this.linkData.length-1;
             }
         }
-
-     
+        //add the nodes
         for (let n=0;n<cells.length;n++){
-            if (needed && !(needed.has(n))){
-                continue;
+            const c =cells[n];
+            if (nodes[c]){
+                this.nodeData.push({id:c,d_index:n,node_size:this.cell_sizes[c]});
             }
-            this.nodeData.push({id:cells[n],d_index:n,node_size:ns_map[cells[n]]});
         }
-
     }
-
-  
 
     setSize(x,y){
         super.setSize(x,y);

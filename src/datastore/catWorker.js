@@ -24,13 +24,48 @@ onmessage= function(e){
     else if (config.method==="stacked"){
         const data2= new Uint8Array(e.data[4]);
         result = getStackedData(lFilter,gFilter,data,data2,config);
-
+    }
+    else if (config.method==="double_cat"){
+        const data2 = config.datatype2==="multitext"?new Uint16Array(e.data(4)):new Uint8Array(e.data(4));
+        result = getDoubleCategory(lFilter,gFilter,data,data2,config)
     }
     else{     
         result =getNumberInCategory(lFilter,gFilter,data,config)
     }
     postMessage(result);
 }
+
+
+function getDoubleCategory(lFilter,gFilter,data,data2,config){
+    const len = data.length;
+    const mt2 = config.datatype2==="multitext";
+    const matrix = Array.from(config.values,(x,i1)=>{
+        return Array.from(config.values2,(x,i2)=>({i1:i1,i2:i2,c:0}))       
+    });
+    for (let i=0;i<len;i++){
+        if (gFilter[i]!==0){
+            if  (gFilter[i] !==lFilter[i]){
+                continue;
+            }           
+        }   
+        if (mt2){
+            const st = i*config.stringLength2;
+            for (let n=st;n<config.stringLength2;n++){
+                if (data[n]===65535){
+                    break;
+                }
+                matrix[data[i]][data2[n]].c++;
+            }
+        }
+        else{
+            matrix[data[i]][data2[i]].c++
+        }
+    }
+    return matrix;
+
+}
+
+
 
 //data the x category (groups) 
 function getProportionData(lFilter,gFilter,data,data2,config){

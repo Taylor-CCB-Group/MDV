@@ -87,6 +87,7 @@ class ImageTable {
         }
         //load first image to get the orignal dimensions 
         let im = new Image();
+        im.crossOrigin="anonymous";
         im.onload=function(e){
             self.originalDimensions=[im.width,im.height];
             self.preferred_width=self.img_width=im.width;
@@ -552,6 +553,7 @@ class ImageTable {
                 },
                 alt: text,
                 title: text,
+                crossorigin:"",
                 classes:["mlv-tile",
                         `mlv-tile-${this.domId}`,
                         `mlv-tile-${this.domId}-${row}`]

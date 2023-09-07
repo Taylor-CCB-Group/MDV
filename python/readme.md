@@ -54,7 +54,7 @@ p.convert_to_static_page(path/to/mywebproject)
 
 You can then copy the mywebproject folder to the relevant location on your server, where content is served from. It needs to be served over https because a service worker is used to add headers. It will also need to be able to use range headers for loading portions of binary data. The project can be accessed with:-
 ```
-http://mydomian.com/path/to/mywebproject
+https://mydomian.com/path/to/mywebproject
 ```
 The index.html file contains a single div which houses the app. It can easily be altered to add custom headers/footers or other content e.g.
 ```html
@@ -72,15 +72,16 @@ If your server already adds these headers then the `convert_to_static_page` func
 
 
 ### Serving the Project in Development Mode
-Create a static version of the project with the `debug=True` argument.
+Create a static version of the project.
 ```
-p.convert_to_static_page(/path/to/myproject, debug=True)
+p.convert_to_static_page(/path/to/myproject)
 ```
 Then run webpack with the development config and point towards the folder you have just created.
 
 ```
 npx webpack serve --env folder=/path/to/myproject
 ```
+In this case, the project will be served by  webpack's development server, using the the un-compiled version of the code allowing debugging.  
 
 
 

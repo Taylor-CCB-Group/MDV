@@ -250,6 +250,16 @@ class GenomeBrowser extends BaseChart{
        // this.onDataHighlighted({indexes:[0]});
     }
 
+    _setPhasedSNPs(info,color){
+        if (info){
+            const d = info.split(",").map(x=>x.split(":"));
+            for (let i of d){
+               const st = parseInt(i[1])
+               this.browser.setHighlightedRegion({chr:i[0],start:st,end:st+1},i[0]+i[1],color)
+            }
+       }
+    }
+
     //called when a feature is highlighted 
     onDataHighlighted(data){
         if (data.source===this){
@@ -263,10 +273,18 @@ class GenomeBrowser extends BaseChart{
         let en = o[p[2]]>o[p[1]]?o[p[2]]:o[p[1]];
         const rowData = data.data;
 
-       
+        //this should be done elsewhere
+        const phased= []
+        const not_phased=[]
         if (rowData && rowData.phase_data){
+            this.browser.removeAllHighlightedRegions();
+            this._setPhasedSNPs(rowData.more_peak_haplotype,"blue");
+            this._setPhasedSNPs(rowData.less_peak_haplotype,"red"); 
             for (let id of this.browser.track_order){
-                let pd = rowData.phase_data[id];           
+                let pd = rowData.phase_data[id];
+                if (!id.startsWith("Don")){
+                    continue;
+                }          
                 if (pd){
                     if (pd.ratio[0]==0 && pd.ratio[1]==0){
                         this.browser.setTrackAttribute(id,"phase_data",null)
@@ -279,20 +297,28 @@ class GenomeBrowser extends BaseChart{
                             en
                         });
                     }
+                    phased.push(id)
                 }
                 else{
-                    this.browser.setTrackAttribute(id,"phase_data",null)
+                    this.browser.setTrackAttribute(id,"phase_data",null);
+                    not_phased.push(id)
                 }
             }
-        }
-        let margin =1000;
-        if  (vm.type==="percentage"){
-            en =  st===en?st+1:en;
-            margin =  Math.round(en-st)*(vm.value/100);
-        }
-       
-        else{
-            margin = vm.value;
+            const new_order =phased.concat(not_phased);
+            const track_order=[];
+            let index=0;
+            for (let id of this.browser.track_order){
+                if (id.startsWith("Don")){
+                    track_order.push(new_order[index]);
+                    index++
+                }
+                else{
+                    track_order.push(id)
+                }
+            }
+            //this.browser.track_order=track_order;
+            
+            
         }
         const fcp =this.config.feature_present_column;
         if (fcp){
@@ -316,7 +342,16 @@ class GenomeBrowser extends BaseChart{
                     track_order.push(id)
                 }
             }
-            this.browser.track_order=track_order;
+            //this.browser.track_order=track_order;
+        }
+        let margin =1000;
+        if  (vm.type==="percentage"){
+            en =  st===en?st+1:en;
+            margin =  Math.round(en-st)*(vm.value/100);
+        }
+       
+        else{
+            margin = vm.value;
         }
         if (vm.type==="fixed_length"){
             const mid= Math.round((en-st)/2)+st;

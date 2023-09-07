@@ -94,7 +94,6 @@ export class ColorChannelDialog extends BaseDialog{
                 'min': d ? d[0] : 0,
                 'max': d ? d[1] : 300
             },
-            step:1,
             document:this.config.doc,
             tooltips:true
         },cont);

@@ -619,6 +619,13 @@ class BaseChart{
             this._tooltip.remove();
             this.addToolTip();
         }
+        if (this.extra_legends){
+            for (let l of this.extra_legends){
+                if (this[l]){
+                    this[l].__doc__=doc;
+                }
+            }
+        }
     }
 
     _setConfigValue(conf,value,def){

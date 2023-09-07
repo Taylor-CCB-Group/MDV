@@ -30,7 +30,7 @@ The DataStore can contain a number of columns. Each column can have the followin
   * `multitext` - A field that can have more than one value eg `'red'`, `'red, blue'`
   * `int32` - for larger integers e.g. genomic co-ordinates (represented by an `int32`)
 
-* **values** - For text and multitext colummns, this will be an array of the possible values, the raw data will contain the index(es) of the value(s) in the array. Text columns can't have more than 256 values and multitext no more than 65536
+* **values** - For text and multitext columns, this will be an array of the possible values, the raw data will contain the index(es) of the value(s) in the array. Text columns can't have more than 256 values and multitext no more than 65536
 
 * **colors** - An array of colors (in hex format). Only used for text/multitext and
 integer/double columns. In the former the colors array is mapped to the values array. In the latter, the colors are interpolated between max and min values (or quantiles if specified). Default colors will be used if not supplied
@@ -41,7 +41,7 @@ integer/double columns. In the former the colors array is mapped to the values a
 
 * **editable** - specifies a column can be edited.
 
-* **is_url** - the column contains url links (unique and multitext columns)
+* **is_url** - the column contains url links (unique and text columns)
 
 * **minMax** - for integer and double columns, the minimum/maximum values in an array of length 2
 
@@ -63,7 +63,7 @@ integer/double columns. In the former the colors array is mapped to the values a
 
 If the column's data is supplied as an array, then values and stringLength need not be supplied and can be calculated. However if the column's data is supplied as a SharedArray Buffer these values are required. 
 
-minMax and quantiles will be calculated if not supplied but this may be slow for large datasets and hence should given in the config
+minMax and quantiles will be calculated if not supplied but this may be slow for large datasets and hence should be given in the config
 
 ### columnGroups
 
@@ -205,7 +205,7 @@ Also the default values for a few charts also need to be described
         },
         //optional
         "interaction_matrix": {
-            "groups": ["Cell Type 1 group", "Cell Type 2 groups"]
+            "groups": ["Cell Type 1 group", "Cell Type 2 group"]
         },
         "cell_radial_chart": {
             "link_thickness": "gr20",
@@ -366,9 +366,9 @@ A column that can hold multiple (or no values)
 ```
 
 ### datatype - unique
-A unique column represents text that can contain more than 256 values and is
-* JavaScript Array(string) - there should be no more than 256 unique values.
-* SharedArrayBuffer(uint8)  - Each value is encoded by stringLength digits, padded by 0 values .  
+A unique column represents text that can contain more than 256 values
+* JavaScript Array(string) - Can contain any number of unique values. 
+* SharedArrayBuffer(uint8)  - Each value is encoded by a set number (stringLength) of bytes (utf), padded by 0 values. stringLength is set by the longest value, so is not very efficient for an array containing a few long strings and many shorter ones.  
 ```
     ["ZX1212", "X21", "F232", "D1"]
     //would be converted to
@@ -514,8 +514,13 @@ You can link columns from two DataStores in order to minimize the duplication of
         "size": 101737,
         "columns": [
             {
+<<<<<<< HEAD
                 "name": "sample_id",
                 "datatype2: "text"
+=======
+                "name":"sample_id",
+                "datatype:"text"
+>>>>>>> origin/main
             },
             //the following columns will get their data from the samples DataStore
             {

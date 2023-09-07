@@ -108,10 +108,6 @@ async function getConfigs(isStaticFolder){
         configs.datasources = await resp.json();
         resp = await fetch(`${route}/state.json`);
         configs.state = await resp.json();
-        resp = await fetch(`${route}/hyperion_config.json`);
-        if (resp.status==200){
-            configs.hyperion_config = await resp.json();
-        }   
         resp = await fetch(`${route}/views.json`);
         configs.views =  await resp.json();  
     }

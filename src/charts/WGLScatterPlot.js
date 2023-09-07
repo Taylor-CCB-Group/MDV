@@ -304,7 +304,7 @@ class WGLScatterPlot extends WGLChart{
                 const im = this.dataStore.regions.all_regions[c.region].images[c.background_image.name];
                 im.position=i.position;
                 im.height=i.height;
-                im.wdith=i.width
+                im.width=i.width
                 this.dataStore.dirtyMetadata.add("regions");
             }
            
@@ -569,8 +569,8 @@ class WGLScatterPlot extends WGLChart{
 				}
 			})
 		}
-        const rs = this.dataStore.regions
-        if (rs && !c.viv){
+        const rs = this.dataStore.regions;
+        if (c.region && rs && !c.viv){
 			const ic= rs.all_regions[c.region].images;
             const vals= [["None","__none__"]];
 			for (let n in ic){

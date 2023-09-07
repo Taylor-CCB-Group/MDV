@@ -92,4 +92,13 @@ p.add_viv_images("cells", {
 ```
 
 
+## Adding Interactions
+
+First add a datasource, that describes each cell/cell interaction for each ROI or condition (group of ROIs)
+ * two columns describing the two cell/object types in the interation
+ * two columns with number of cells/objects in each type
+ * a column designating the ROI or condition (also known as the pivot column)
+ * columns with some stats about the interactions
+
+
 

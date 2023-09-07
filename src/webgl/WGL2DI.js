@@ -1082,6 +1082,50 @@ class WGL2DI{
 	}
 
 
+    _finish(evt){
+        if (this.config.brush){
+            this.div_container.style.cursor="crosshair";
+        }
+        if (this.brush && this.brush.resizing){
+            this._brushingStopped();
+            //return;
+        }
+        if (this.poly_brush && this.poly_brush.active){
+            this._finishPolyBrush();
+        }
+        
+        
+            //an object has finshed its drag
+            if (this.object_clicked){
+                this.object_clicked=null;
+                this.refresh(true);              
+            }
+            
+            //update which objects are now in view
+            else{
+                let ret = this.getRange();
+                if (this.loop){
+                    this.loop.cancel();
+                    this.loop=null;
+                }
+            
+                
+            
+                this.refresh();
+                ret.imageMoved= this.imageMoved;
+                this.imageMoved=null;
+                for (var i in this.handlers.panning_stopped){
+                        this.handlers.panning_stopped[i](ret);
+                }
+            }
+            this.dragging=false;
+    
+        this.object_clicked=null;
+        this.mouse_position=null;   
+
+    }
+
+
 	_addHandlers(){
 		var self=this;
 		//consider changing so that some listeners are on window while brush is active...
@@ -1196,21 +1240,34 @@ class WGL2DI{
 			}
 		});
 
-		this.div_container.addEventListener("mouseleave",function(evt){
-			if (self.object_mouse_over){
-				for (var i in self.handlers['object_out']){
-							self.handlers.object_out[i](self.object_mouse_over[2]);
+		this.div_container.addEventListener("mouseleave",(evt)=>{
+			if (this.object_mouse_over){
+				for (var i in this.handlers['object_out']){
+							this.handlers.object_out[i](this.object_mouse_over[2]);
 						}
-						self.object_mouse_over=null;
+						this.object_mouse_over=null;
 			}
-			if (self.brush && self.brush.resizing){
+			/*if (self.brush && self.brush.resizing){
 			    self._brushingStopped();
-			}
+			}*/
+            this._finish(evt)
 		})
 
 	
-		this.div_container.addEventListener("pointerup",function(evt){
-			//just a click event - inform handlers
+		this.div_container.addEventListener("mouseup",(evt)=>{
+            this._finish(evt);
+            if (!this.dragging && !(this.brush || this.poly_brush) && evt.button===0){
+                    var position =this._getMousePosition(evt);
+                    var obj = this._getObjectAtPosition(position);
+                    if (obj){
+                        for (var i in this.handlers.object_clicked){
+                            this.handlers.object_clicked[i](obj);
+                        }  
+                    }
+            }
+        
+            
+			/*//just a click event - inform handlers
 			if (self.config.brush){
 				self.div_container.style.cursor="crosshair";
 			}
@@ -1265,7 +1322,7 @@ class WGL2DI{
 				self.dragging=false;
 			}
 			self.object_clicked=null;
-			self.mouse_position=null;   
+			self.mouse_position=null;   */
 		});  
 
 		this.div_container.addEventListener('wheel', function(event){

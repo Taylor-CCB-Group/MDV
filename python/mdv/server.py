@@ -102,7 +102,12 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     @app.route(f"{route}/<file>.json")
     def get_json_file(file):
         return send_file(safe_join(project.dir,file+".json"))
-      
+    
+    #empty page to put popout content
+    @app.route(f"{route}/popout.html")
+    def popout():
+        return "<!DOCTYPE html><html><head></head><body></body></html>"
+    
     #gets the raw byte data and packages it in the correct response
     @app.route(f"{route}/get_data", methods=["POST"])
     def get_data():
