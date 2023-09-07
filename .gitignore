@@ -20,4 +20,5 @@ dist/_avocato
 .env
 *.spec
 python/build
+python/data
 .ipynb_checkpoints
