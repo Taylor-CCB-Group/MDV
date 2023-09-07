@@ -24,6 +24,10 @@ export default defineConfig(env => { return {
                 target: flaskURL,
                 changeOrigin: true,
             },
+            '^/project/.*/\?': { //still not right
+                target: flaskURL,
+                changeOrigin: true,
+            },
             //will fail if url has search params
             //will cause problems if we have json files that don't want to be proxied
             '^/.*\.(json|b|gz)$': {
