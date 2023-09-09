@@ -50,3 +50,6 @@ removeFromImage(){
 }
 
 ```
+
+# Downloading data
+The chart should have a `getChartData` method which returns a text blob e.g. tab delimited table

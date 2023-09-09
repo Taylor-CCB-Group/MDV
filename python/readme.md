@@ -12,7 +12,7 @@ source /path/to/myenv/bin/activate
 ````
 In windows:-
 ```
-python -m env c:\path\to\myenv
+python -m venv c:\path\to\myenv
 c:\path\to\myenv\Scripts\activate.bat
 ```
 
