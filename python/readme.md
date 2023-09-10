@@ -16,9 +16,11 @@ python -m venv c:\path\to\myenv
 c:\path\to\myenv\Scripts\activate.bat
 ```
 
+Installing mdv (with -e if for development) will include dependencies:
 Next install the dependencies
 ```
-pip install -r requirements.txt
+cd MDV/python
+pip install -e .
 ```
 
 

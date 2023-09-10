@@ -64,9 +64,10 @@ Then cd to the python directory
 cd path/to/mdv/python
 ```
 
-Install the required python packages
+Install `mdv` (using `editable` flag for development):
+
 ```
-pip install -r requirements.txt
+pip install -e .
 ```
 
 Open a python shell
@@ -74,14 +75,22 @@ Open a python shell
 python
 ```
 
+<<<<<<< HEAD
 ### Create an MDV project from the downloaded folder and display it in a browser. 
 Either run the code from the mdv/python folder, add 
 the folder to the PYTHONPATH environment variable or add the path in the code `sys.path.append("/path/to/mdv/python")`
+=======
+Create an MDV project from the downloaded folder and display it in a browser:
+
+>>>>>>> d9dc5559c5b6bd5a6da62cd2180712ea809cdb66
 ```python
 from mdv.mdvproject import MDVProject
 p = MDVProject("/path/to/hyp_example_data")
 p.serve()
 ```
+
+This will open a browser window at http://localhost:5000/ but you will need to go to
+[http://127.0.0.1:5000](http://127.0.0.1:5000) to avoid permissions errors.
 
 ## Running on a server
 
