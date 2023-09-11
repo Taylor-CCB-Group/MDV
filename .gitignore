@@ -17,3 +17,5 @@ vite-dist
 dist/_mlv
 dist/_avocato
 .env
+python/requirements.txt
+python/dist/
