@@ -75,16 +75,10 @@ Open a python shell
 python
 ```
 
-<<<<<<< HEAD
-### Create an MDV project from the downloaded folder and display it in a browser. 
-Either run the code from the mdv/python folder, add 
-the folder to the PYTHONPATH environment variable or add the path in the code `sys.path.append("/path/to/mdv/python")`
-=======
 Create an MDV project from the downloaded folder and display it in a browser:
 
->>>>>>> d9dc5559c5b6bd5a6da62cd2180712ea809cdb66
 ```python
-from mdv.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject
 p = MDVProject("/path/to/hyp_example_data")
 p.serve()
 ```
@@ -98,7 +92,7 @@ This will open a browser window at http://localhost:5000/ but you will need to g
 The default data storage is an hdf5 file which is a compressed files that allows random read/write access to the data. However, it cannot be accessed directly but requires some kind of wrapper e.g. h5py. Hence access via http calls directly is not possible and backend code is required to display an MDV project in a web page. However, it can be converted to simple continuous compressed blocks of data for each column and a json index . This allows direct access via an http request with a range header:-
 
 ```python
-from mdv.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject
 p = MDVProject("/path/to/hyp_example_data")
 p.convert_to_static_page("/path/to/myapp/")
 ```
