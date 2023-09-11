@@ -16,9 +16,11 @@ python -m venv c:\path\to\myenv
 c:\path\to\myenv\Scripts\activate.bat
 ```
 
-Next install the dependencies
+Installing mdv (with -e if for development) will include dependencies:
+
 ```
-pip install -r requirements.txt
+cd MDV/python
+pip install -e .
 ```
 
 
@@ -30,7 +32,7 @@ To make an empty project, just create an MDVProject object specifying a path. Da
 ### Quick Start - to serve an HDF5 based project from a local python server
 
 ```python
-from mdv.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject
 p=MDVProject("/path/to/myproject")
 df = pd.read_csv("cells.tsv",sep="\t")
 p.add_datasource("cells",df)  #or p.add_datasource("cells","cells.tsv")
