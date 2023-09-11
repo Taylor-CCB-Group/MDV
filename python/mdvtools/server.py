@@ -79,13 +79,13 @@ def create_app(project,open_browser=True, port =5000):
     #All the project's metadata
     @app.route('/get_configs',methods =["GET","POST"])
     def get_configs():
-        return json.dumps(project.get_configs())
+        return jsonify(project.get_configs())
 
     #gets a particular view
     @app.route("/get_view",methods = ["POST"])
     def get_view():
         data=request.json
-        return json.dumps(project.get_view(data["view"]))
+        return jsonify(project.get_view(data["view"]))
     
     #get any custom row data
     @app.route("/get_row_data",methods=["POST"])
