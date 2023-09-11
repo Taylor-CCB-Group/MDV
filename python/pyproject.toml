@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mdv"
+name = "mdvtools"
 version = "0.0.1"
 authors = []
 description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
@@ -42,10 +42,10 @@ dependencies = [
  "pynndescent==0.5.10",
  "pyparsing==3.0.9",
  "python-dateutil==2.8.2",
- "2pytz==2023.3",
+ "pytz==2023.3",
  "scanpy==1.9.3",
  "scikit-learn==1.2.2",
- "2scipy==1.10.1",
+ "scipy==1.10.1",
  "seaborn==0.12.2",
  "session-info==1.0.0",
  "six==1.16.0",

@@ -17,7 +17,7 @@ c:\path\to\myenv\Scripts\activate.bat
 ```
 
 Installing mdv (with -e if for development) will include dependencies:
-Next install the dependencies
+
 ```
 cd MDV/python
 pip install -e .
