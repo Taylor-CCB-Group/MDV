@@ -62,7 +62,7 @@ x_offset, y_offset, width and height columns can also be included if the backgro
 
 If a local file path is given in 'path', the image will be copied to the project and the correct url for displaying it will be constructed.
 
-## Adding an Avivator view
+## Adding a Viv view
 
 Use `add_viv_viewer` of the `MDVProject'
 
