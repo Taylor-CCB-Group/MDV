@@ -5,7 +5,7 @@ import json
 import sys
 import re
 from werkzeug.utils import safe_join
-
+import os
 
 
 
@@ -14,6 +14,12 @@ def add_safe_headers(resp):
     resp.headers["Cross-Origin-Embedder-Policy"]="require-corp"
     return resp
 
+#flask send_file can't always cope with relative paths
+#sets the cwd to the python path for some reason
+def _send_file(f):
+    if not os.path.isabs(f):
+        f = os.path.join(os.getcwd(),f)
+    return send_file(f)
 
 
 def get_range(file_name,range_header):
@@ -74,7 +80,7 @@ def create_app(project,open_browser=True, port =5000):
     #images contained in the project
     @app.route("/images/<path:path>")
     def images(path):
-        return send_file(safe_join(project.imagefolder,path))
+        return _send_file(safe_join(project.imagefolder,path))
 
     #All the project's metadata
     @app.route('/get_configs',methods =["GET","POST"])
@@ -116,7 +122,7 @@ def create_app(project,open_browser=True, port =5000):
         file_name =safe_join(project.trackfolder,path)
         range_header = request.headers.get('Range', None)  
         if not range_header:
-            return send_file(file_name)
+            return _send_file(file_name)
         return get_range(file_name,range_header)
     
     @app.route("/save_state",methods = ["POST"])
