@@ -7,7 +7,7 @@ import sys
 import re
 from werkzeug.utils import safe_join
 from .websocket import mdv_socketio
-
+import os
 
 routes = set()
 
@@ -17,6 +17,12 @@ def add_safe_headers(resp):
     resp.headers["Access-Control-Allow-Origin"]="*"
     return resp
 
+#flask send_file can't always cope with relative paths
+#sets the cwd to the python path for some reason
+def _send_file(f):
+    if not os.path.isabs(f):
+        f = os.path.join(os.getcwd(),f)
+    return send_file(f)
 
 
 def get_range(file_name,range_header):
@@ -121,9 +127,9 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     @app.route(f"{route}/images/<path:path>")
     def images(path):
         try:
-            return send_file(project.get_image(path))
+            return _send_file(project.get_image(path))
         except:
-            return send_file(safe_join(project.imagefolder, path))
+            return _send_file(safe_join(project.imagefolder, path))
 
     #All the project's metadata
     @app.route(f"{route}/get_configs", methods=["GET","POST"])
@@ -165,7 +171,7 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
         file_name =safe_join(project.trackfolder,path)
         range_header = request.headers.get('Range', None)  
         if not range_header:
-            return send_file(file_name)
+            return _send_file(file_name)
         return get_range(file_name,range_header)
     
     @app.route(f"{route}/save_state", methods = ["POST"])

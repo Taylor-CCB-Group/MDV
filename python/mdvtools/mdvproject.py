@@ -110,7 +110,17 @@ class MDVProject:
              raise AttributeError(f'column {column} not found in {datasource} datasource')
         ds["columns"][col_index[0]][parameter]=value
         self.set_datasource_metadata(ds)
-        
+    
+
+    def get_datasource_as_dataframe(self,datasource):
+        ds= self.get_datasource_metadata(datasource)
+        df = pandas.DataFrame()
+        for c in ds["columns"]:
+            data = self.get_column(datasource,c["field"])
+            df[c["name"]]=data
+        return df
+
+
     def get_datasource_metadata(self,name):
         ds = [x for x in self.datasources if x["name"]==name]
         if len(ds)==0:
@@ -183,7 +193,7 @@ class MDVProject:
             chunksize = raw_data.shape[0]/cm["stringLength"]
             arr = numpy.split(raw_data,chunksize)
             data =  [",".join([cm["values"][x]for x in y if x != 65535]) for y in arr]
-        elif cm == "unique":
+        elif dt == "unique":
             data =  [x.decode() for x in raw_data]
         else:
             data = list(raw_data)
@@ -260,7 +270,7 @@ class MDVProject:
         if len(cols)==len(ds["columns"]):
             warnings.warn(f"deleting non existing column: {column} from {datasource}")
             return
-        ds["columns"]=ds
+        ds["columns"]=cols
         h5= self._get_h5_handle()
         del h5[datasource][column]
         self.set_datasource_metadata(ds)
@@ -353,7 +363,7 @@ class MDVProject:
         h5.close()
         self.datasources = [x for x in self.datasources if x["name"] !=name]
 
-    def add_genome_browser(self,datasource,parameters=["chr","start","end"]):
+    def add_genome_browser(self,datasource,parameters=["chr","start","end"],name=None):
         # get all the genome locations
         loc = [self.get_column(datasource,x) for x in parameters]
         #write to a bed file
@@ -365,11 +375,17 @@ class MDVProject:
         indexed_bed= join(self.trackfolder,"loc.bed")
         create_bed_gz_file(bed,indexed_bed)
         os.remove(bed)
+        if not name:
+            name = datasource
         gb={
             "location_fields":parameters,
-            "default_track":"tracks/loc.bed.gz"
+            "default_track":{
+                "url":"tracks/loc.bed.gz",
+                "label":name
+            }
         }
         ds= self.datasources[datasource]["genome_browser"]=gb
+        ds["genome_browser"]=gb
         self.set_datasource_metadata(ds)
 
     def add_datasource(self,name,dataframe,columns=None,supplied_columns_only=False,replace_data=False,

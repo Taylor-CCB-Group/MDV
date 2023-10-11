@@ -5,8 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "mdvtools"
 version = "0.0.1"
-authors = []
+authors = [
+    { name= "Martin Sergeant", email="m.j.sergeant1@googlemail.com"},
+    { name= "PeterTodd", email="" },
+]
 description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
+readme = "readme.md"
 requires-python = ">=3.7"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -20,7 +24,7 @@ dependencies = [
  "contourpy==1.0.7",
  "cycler==0.11.0",
  "fasteners==0.18",
- "Flask==2.2.2",
+ "Flask==2.2.5",
  "Flask-SocketIO==5.3.4",
  "fonttools==4.39.4",
  "h5py==3.8.0",
@@ -56,7 +60,7 @@ dependencies = [
  "tqdm==4.65.0",
  "tzdata==2023.3",
  "umap-learn==0.5.3",
- "Werkzeug==2.2.2"
+ "Werkzeug==2.2.3"
 ]
 
 [project.urls]

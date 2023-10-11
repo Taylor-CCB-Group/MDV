@@ -23,3 +23,6 @@ python/build
 python/data
 python/mdvtools/static/*
 .ipynb_checkpoints
+
+python/requirements.txt
+python/dist/
