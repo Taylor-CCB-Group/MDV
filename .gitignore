@@ -21,4 +21,5 @@ dist/_avocato
 *.spec
 python/build
 python/data
+python/mdvtools/static/*
 .ipynb_checkpoints
