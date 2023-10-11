@@ -194,7 +194,7 @@ function makeSortable(list,config={}){
         item.addEventListener("dragover",handleDragOver);
         item.addEventListener("dragstart",handleDragStart);
         item.addEventListener("dragend",handleDragEnd);
-        item.addEventListener("pointerdown",handleMouseDown);     
+        item.addEventListener("mousedown",handleMouseDown);     
     }
 }
 
@@ -225,7 +225,7 @@ function makeResizable(el,config={}){
     const bottomRight = createEl("div", {
         classes: ["resizer-both"],
     }, el);
-    bottomRight.addEventListener("pointerdown", initDrag, false);
+    bottomRight.addEventListener("mousedown", initDrag, false);
     function initDrag(e) {
         ri.startX = e.clientX;
         ri.startY = e.clientY;
@@ -253,7 +253,7 @@ function removeResizable(el){
     el.style.resize=ri.resize;
     el.style.overflow=ri.overflow;
     if (ri.onresize){
-        el.removeEventListener("pointerup",ri.onresize)
+        el.removeEventListener("mouseup",ri.onresize)
     }
     delete el.__resizeinfo__;
 
@@ -394,8 +394,8 @@ function addResizeListener(element, endCallback, startCallback){
         width=box.width;
         height=box.height;
     }
-    if (startCallback) element.addEventListener("pointerdown", startCallback);
-    element.addEventListener("pointerup",list)
+    if (startCallback) element.addEventListener("mousedown", startCallback);
+    element.addEventListener("mouseup",list)
     return list;
 }
 

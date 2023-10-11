@@ -1129,7 +1129,7 @@ class WGL2DI{
 	_addHandlers(){
 		var self=this;
 		//consider changing so that some listeners are on window while brush is active...
-		this.div_container.addEventListener("pointermove",function(e){
+		this.div_container.addEventListener("mousemove",function(e){
 			if (self.brush){
 				if (self.brush.resizing){
 					let origin =self.brush.origin;
@@ -1401,7 +1401,7 @@ class WGL2DI{
 			}, 350);
 
 		});
-		this.div_container.addEventListener("pointerdown",function (evt){
+		this.div_container.addEventListener("mousedown",function (evt){
 			if (evt.which===3){
 				//add right click behaviour
 			}
