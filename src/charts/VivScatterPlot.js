@@ -146,7 +146,7 @@ export class ColorChannelDialog extends BaseDialog{
 
 class VivScatterPlot extends DensityScatterPlot{
     constructor(dataStore,div,config){
-        const x_name= dataStore.getColumnName(config.param[0]);
+        const x_name = dataStore.getColumnName(config.param[0]);
         const y_name = dataStore.getColumnName(config.param[1]);
         if (!config.axis){
 
