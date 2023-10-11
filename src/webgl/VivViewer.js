@@ -308,10 +308,19 @@ class VivViewer {
             domains:[]
         }
         for (let item of conf){
-            nconf.selections.push({z:0,t:0,c:this.channels.findIndex(x=>x.Name===item.name)});
-            let c = item.color;
-            c = c?typeof item.color === "string"?hexToRGB(c):c:[255,0,0];
-            nconf.colors.push(c);
+            const name = item.name || item.Name;
+            const c = this.channels.findIndex(x => x.Name===name);
+            if (c === -1) {
+              //TODO throw error, or show warning in UI
+              console.warn('channel not found', item);
+              console.warn('available channel Names', this.channels.map(c => c.Name));
+              continue;
+            }
+            nconf.selections.push({z:0, t:0, c});
+            let color = item.color;
+            // todo nicer default colors
+            color = color ? typeof item.color === "string" ? hexToRGB(color) : color : [255,0,0];
+            nconf.colors.push(color);
             nconf.channelsVisible.push(item.visible==undefined?true:item.visible);
             nconf.contrastLimits.push(item.contrastLimits || null);
             nconf.domains.push(item.domains || null);
@@ -340,8 +349,8 @@ class VivViewer {
     
     this.extensions = [new ColorPaletteExtension()];
     this.channels = loader.metadata.Pixels.Channels;
-    this.loader= loader.data;
-    this.transparentColor=[255,255,255,0];
+    this.loader = loader.data;
+    this.transparentColor = [255,255,255]; //luma.gl warning 'Uniform size should be multiples of 3'
     const baseViewState = this.getViewState(iv.x_scale,iv.y_scale,iv.offset);
     
     if (use3d) {
@@ -370,7 +379,7 @@ class VivViewer {
     const deckGLView =this.detailView.getDeckGlView();
     //new more readable config
     if (this.config.channels){
-        image_properties = this._parseChannels(this.config.channels)
+      image_properties = this._parseChannels(this.config.channels)
     }
     if (image_properties?.selections) for (let s of image_properties.selections){
       s.id=getRandomString();
@@ -391,13 +400,13 @@ class VivViewer {
         }
         this.createLayers(image_properties);
         this.deck=new Deck({
-          canvas:this.canvas,
-          layers:[this.layers],
-          views:[deckGLView],
-          viewState:baseViewState,
-          width:this.width,
-          height:this.height,
-          useDevicePixels:false,
+          canvas: this.canvas,
+          layers: [this.layers],
+          views: [deckGLView],
+          viewState: baseViewState,
+          width: this.width,
+          height: this.height,
+          useDevicePixels: false, //why false?
           initialViewState,
           controller: use3d
         });
@@ -409,10 +418,11 @@ class VivViewer {
     //a way of doing this. Also domainLimits seem way too large and for
     //very low signals contrast limits are way too high
     async getDefaultChannelValues(selections){
-        return await Promise.all(selections.map(async (s) => {
-            const data = await this.loader[this.loader.length-1].getRaster({selection:s.sel});
-            return {index:s.index,stats:getChannelStats(data.data)};
-        }))
+      const loader = this.loader[this.loader.length - 1]; // lowest resolution
+      return await Promise.all(selections.map(async (s) => {
+        const data = await loader.getRaster({selection:s.sel});
+        return {index:s.index,stats:getChannelStats(data.data)};
+      }))
     }
 
     createLayers(info){
