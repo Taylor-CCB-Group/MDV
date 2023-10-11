@@ -1,5 +1,5 @@
 # from jupyterlab import labapp
-from mdv.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject
 
 """
 for now, just a placeholder for something that will be an entry point for a 'desktop' version of MDV
