@@ -46,6 +46,21 @@ class HeatMap extends SVGChart{
         super.remove();
     }
 
+    getChartData(){
+        //get the data 
+        const d = this.data.transpose;
+        const arr= new Array(d.length+1);
+        const c_name =this.dataStore.getColumnName(this.config.param[0]);
+        //the order is the same as in params
+        const colnames= this.config.param.slice(1).map(x=>this.dataStore.getColumnName(x))
+        arr[0]=[c_name].concat(colnames).join("\t")
+        const vals= this.dataStore.getColumnValues(this.config.param[0]);
+        for (let n=0;n<d.length;n++){
+            arr[n+1]= [vals[d[n]._id]].concat(d[n]).join("\t");
+        }
+        return new Blob([arr.join("\n")],{type:"text/plain"})
+    }
+
 
 
     setColorFunction(){

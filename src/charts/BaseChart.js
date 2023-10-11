@@ -587,6 +587,14 @@ class BaseChart{
                 }
             })
         }
+
+        if (this.getChartData){
+            menu.push({
+                text:"download data",
+                icon:"fas fa-download",
+                func:()=>this.downloadData()
+            })
+        }
         if (this.addToContextMenu){
             menu=menu.concat(this.addToContextMenu());
         }
@@ -710,6 +718,18 @@ class BaseChart{
             link.remove();
             this.contentDiv.style.color = originalColor;
         },im_type);       
+    }
+
+    downloadData(){
+        const blob = this.getChartData();
+        const save = createEl("a",{
+            download:this.config.title,
+            target:"_blank",
+            href:window.URL.createObjectURL(blob)
+
+        },this.__doc__.body)                
+        save.click();
+        save.remove();
     }
 
   

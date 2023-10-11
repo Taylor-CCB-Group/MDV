@@ -5,7 +5,7 @@ The ChartManager object links DataSources, loads column data on demand and manag
 ```
 * **mydiv** - the id or the element to house the app
 * **datasources** - list of `DataStore` [configs]{@tutorial datasource}, these configs should also include a size parameter showing the number of rows in the data set
-* **dataloader** - a dataloader which comprises of three parameters
+* **dataloader** - a dataloader which can have the following parameters
     * **function** - this [function]{@tutorial dataloader} accepts a list of columns and returns a promise (not needed if all data is to be loaded from files)
     * **viewLoader** - a function that will return the [view]{@tutorial views} given the view name
     * **rowDataLoader** - an optional function that accepts a datasource name and index and returns an an object with data. The

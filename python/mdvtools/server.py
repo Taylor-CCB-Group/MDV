@@ -73,10 +73,6 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
         # `_mdvInit('{{route}}')` in template...
         return render_template("page.html", route=route)
     
-    #@app.route(f"{route}/static/js/<path:path>")
-    #def get_js_files(path):
-    #    return send_file(safe_join(js_files,path))
-
     @app.route(f"{route}/static/<path:path>")
     def get_static_files(path):
         return send_file(safe_join('./static/', path))
@@ -132,13 +128,13 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     #All the project's metadata
     @app.route(f"{route}/get_configs", methods=["GET","POST"])
     def get_configs():
-        return json.dumps(project.get_configs())
+        return jsonify(project.get_configs())
 
     #gets a particular view
     @app.route(f"{route}/get_view", methods=["POST"])
     def get_view():
         data=request.json
-        return json.dumps(project.get_view(data["view"]))
+        return jsonify(project.get_view(data["view"]))
     
     #get any custom row data
     @app.route(f"{route}/get_row_data", methods=["POST"])

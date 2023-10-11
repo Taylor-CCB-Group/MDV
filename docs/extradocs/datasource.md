@@ -31,6 +31,7 @@ The DataStore can contain a number of columns. Each column can have the followin
   * `int32` - for larger integers e.g. genomic co-ordinates (represented by an `int32`)
 
 * **values** - For text and multitext columns, this will be an array of the possible values, the raw data will contain the index(es) of the value(s) in the array. Text columns can't have more than 256 values and multitext no more than 65536
+* **values** - For text and multitext columns, this will be an array of the possible values, the raw data will contain the index(es) of the value(s) in the array. Text columns can't have more than 256 values and multitext no more than 65536
 
 * **colors** - An array of colors (in hex format). Only used for text/multitext and
 integer/double columns. In the former the colors array is mapped to the values array. In the latter, the colors are interpolated between max and min values (or quantiles if specified). Default colors will be used if not supplied
@@ -41,6 +42,7 @@ integer/double columns. In the former the colors array is mapped to the values a
 
 * **editable** - specifies a column can be edited.
 
+* **is_url** - the column contains url links (unique and text columns)
 * **is_url** - the column contains url links (unique and text columns)
 
 * **minMax** - for integer and double columns, the minimum/maximum values in an array of length 2
@@ -514,13 +516,8 @@ You can link columns from two DataStores in order to minimize the duplication of
         "size": 101737,
         "columns": [
             {
-<<<<<<< HEAD
                 "name": "sample_id",
-                "datatype2: "text"
-=======
-                "name":"sample_id",
-                "datatype:"text"
->>>>>>> origin/main
+                "datatype": "text"
             },
             //the following columns will get their data from the samples DataStore
             {
@@ -685,5 +682,3 @@ When a filter is called on a dimension - the datastore informs all listeners and
     catDim.filter("filterCategories", ["color"], "blue", false);
     datastore.triggerFilter();
 ```
-
-    
