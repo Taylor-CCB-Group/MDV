@@ -34,7 +34,7 @@
   },
   "homepage": "https://github.com/Taylor-CCB-Group/MDV#readme",
   "dependencies": {
-    "@hms-dbmi/viv": "^0.13.2",
+    "@hms-dbmi/viv": "^0.13.8",
     "@luma.gl/core": "^8.5.16",
     "canvas-to-svg": "^1.0.3",
     "d3": "^7.6.1",
