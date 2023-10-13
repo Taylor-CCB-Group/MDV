@@ -1,4 +1,4 @@
-from flask import Flask,render_template,request,make_response,send_file,Response,jsonify
+from flask import Flask, Blueprint, render_template,request,make_response,send_file,Response,jsonify
 from flask_socketio import SocketIO
 import webbrowser
 import mimetypes
@@ -60,6 +60,8 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
         app=Flask(__name__)
         #add headers to allow web workers
         app.after_request(add_safe_headers)
+        project_bp = app
+        multi_project = False
         # nb, may make this default to False again soon.
         ### 'MEW' in Unity is using IWeb PostMessage, not WebSockets.
         ### but this will be used for local testing in short-term, and potentially other things later.
@@ -69,22 +71,24 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
         # add routes for this project to existing app
         # set the route prefix to the project name, derived from the dir name.
         # this is to allow multiple projects to be served from the same server.
-        route = "/project/" + project.name
+        multi_project = True
+        route = "/project/" + project.name + "/"
+        project_bp = Blueprint(project.name, __name__, url_prefix=route)
     if route in routes:
         raise Exception("Route already exists - can't have two projects with the same name")
     routes.add(route)
 
-    @app.route(f"{route}/")
-    def index():
+    @project_bp.route("/")
+    def project_index():
         # `_mdvInit('{{route}}')` in template...
         return render_template("page.html", route=route)
     
-    @app.route(f"{route}/static/<path:path>")
+    @project_bp.route("/static/<path:path>")
     def get_static_files(path):
         return send_file(safe_join('./static/', path))
     
 
-    @app.route(f"{route}/<file>.b")
+    @project_bp.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?
         file_name = safe_join(project.dir, file+".b")
@@ -94,24 +98,24 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     # duplicate of above, but for .gz files in case that's needed.
     # (there was some reason for changing to this, but I can't fully remember the status
     # so maybe better to support both for now)
-    @app.route(f"{route}/<file>.gz")
+    @project_bp.route("/<file>.gz")
     def get_binary_file_gz(file):
         file_name = safe_join(project.dir, file+".gz")
         range_header = request.headers.get('Range', None) 
         return get_range(file_name,range_header)
 
 
-    @app.route(f"{route}/<file>.json")
+    @project_bp.route("/<file>.json")
     def get_json_file(file):
         return send_file(safe_join(project.dir,file+".json"))
     
     #empty page to put popout content
-    @app.route(f"{route}/popout.html")
+    @project_bp.route("/popout.html")
     def popout():
         return "<!DOCTYPE html><html><head></head><body></body></html>"
     
     #gets the raw byte data and packages it in the correct response
-    @app.route(f"{route}/get_data", methods=["POST"])
+    @project_bp.route("/get_data", methods=["POST"])
     def get_data():
         try:
             data = request.json
@@ -124,7 +128,7 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
             return "Problem handling request",400
     
     #images contained in the project
-    @app.route(f"{route}/images/<path:path>")
+    @project_bp.route("/images/<path:path>")
     def images(path):
         try:
             return _send_file(project.get_image(path))
@@ -132,18 +136,18 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
             return _send_file(safe_join(project.imagefolder, path))
 
     #All the project's metadata
-    @app.route(f"{route}/get_configs", methods=["GET","POST"])
+    @project_bp.route("/get_configs", methods=["GET","POST"])
     def get_configs():
         return jsonify(project.get_configs())
 
     #gets a particular view
-    @app.route(f"{route}/get_view", methods=["POST"])
+    @project_bp.route("/get_view", methods=["POST"])
     def get_view():
         data=request.json
         return jsonify(project.get_view(data["view"]))
     
     #get any custom row data
-    @app.route(f"{route}/get_row_data", methods=["POST"])
+    @project_bp.route("/get_row_data", methods=["POST"])
     def get_row_data():
         req=request.json
         try:
@@ -154,7 +158,7 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
         return data
     
     #get arbitrary data
-    @app.route(f"{route}/get_binary_data", methods=["POST"])
+    @project_bp.route("/get_binary_data", methods=["POST"])
     def get_binary_data():
         req=request.json
         try:
@@ -166,7 +170,7 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
 
     # only the specified region of track files (bam,bigbed,tabix)
     # needs to be returned 
-    @app.route(f"{route}/tracks/<path:path>")
+    @project_bp.route("/tracks/<path:path>")
     def send_track(path):
         file_name =safe_join(project.trackfolder,path)
         range_header = request.headers.get('Range', None)  
@@ -174,7 +178,7 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
             return _send_file(file_name)
         return get_range(file_name,range_header)
     
-    @app.route(f"{route}/save_state", methods = ["POST"])
+    @project_bp.route("/save_state", methods = ["POST"])
     def save_data():
         success=True
         try:
@@ -188,7 +192,11 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     if open_browser:
         webbrowser.open(f"http://localhost:{port}/{route}")
           
-    app.run(port=port)
+    if multi_project:
+        print(f"Adding project {project.name} to existing app")
+        app.register_blueprint(project_bp)
+    else:
+        app.run(port=port)
 
 
   

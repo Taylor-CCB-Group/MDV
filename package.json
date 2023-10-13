@@ -13,7 +13,7 @@
     "build-flask": "npm run clean-flask & webpack --config desktop.config.js",
     "build-flask-vite": "cross-env OUT_DIR=./python/mdvtools/static vite build",
     "clean-flask": "rm -r ./python/mdvtools/static",
-    "build-pyinstaller": "pyinstaller --onefile python/mdv_desktop.py --add-data \"mdv/templates:mdv/templates\" --add-data \"mdv/static:mdv/static\"",
+    "build-pyinstaller": "npm run build-flask & pyinstaller --onefile python/mdvtools/mdv_desktop.py --add-data \"mdvtools/templates:mdvtools/templates\" --add-data \"mdvtools/static:mdvtools/static\"",
     "run-hyperion": "webpack  serve --config hyperion.dev.config.js",
     "run-obvios": "webpack  serve --config obvios.config.js",
     "run-ytrap": "webpack  serve --config ytrap.config.js",
