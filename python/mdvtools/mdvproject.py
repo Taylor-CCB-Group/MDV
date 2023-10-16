@@ -120,6 +120,58 @@ class MDVProject:
         return df
 
 
+    def check_columns_exist(self,datasource,columns):
+        md = self.get_datasource_metadata(datasource)
+        all_cols = set([x["field"] for x in md["columns"]])
+        return [x for x in columns if not x in all_cols]
+
+    def set_interactions(self,interaction_ds,parent_ds,
+                        pivot_column="sample_id",
+                        parent_column="annotation",
+                        is_single_region=True,
+                        interaction_columns=["Cell Type 1","Cell Type 2"],
+                        default_parameter="Cross PCF gr20",
+                        node_size="cell 1 number",
+                        add_view=True):
+        #check columns exist in the appropriate data sets
+        missing_cols= self.check_columns_exist(interaction_ds,[pivot_column,default_parameter,node_size]+interaction_columns )
+        if len(missing_cols)>0:
+            raise AttributeError(f'columns {",".join(missing_cols)} not found in {interaction_ds} datasource')
+        missing_cols= self.check_columns_exist(parent_ds,[pivot_column,parent_column])
+        if len(missing_cols)>0:
+            raise AttributeError(f'columns {",".join(missing_cols)} not found in {parent_ds} datasource')
+        #update the config
+        md = self.get_datasource_metadata(interaction_ds)
+        md["interactions"]={
+            "pivot_column":pivot_column,
+            "is_single_region":is_single_region,
+            "interaction_columns":interaction_columns,
+            "spatial_connectivity_map":{
+                "link_length": default_parameter,
+                "link_thickness":default_parameter,
+                "link_color": default_parameter,
+                "node_size": node_size
+            },
+            "cell_radial_chart":{"link_thickness":default_parameter}
+        }
+        self.set_datasource_metadata(md)
+        #update the links between datasources
+        self.insert_link(interaction_ds,parent_ds,"interactions",
+                         {
+                             "interaction_columns":interaction_columns+[parent_column],
+                             "pivot_column":pivot_column,
+                             "is_single_region":is_single_region
+                         })
+        if add_view:
+            #todo add stuff to the view
+            self.set_view(interaction_ds,{
+                "initialCharts":{
+                    parent_ds:[],
+                    interaction_ds:[]
+                }
+            })
+
+
     def get_datasource_metadata(self,name):
         ds = [x for x in self.datasources if x["name"]==name]
         if len(ds)==0:
@@ -320,11 +372,19 @@ class MDVProject:
             })
         self.set_datasource_metadata(ds)
 
-    def delete_datasource(self,name):
+    def delete_datasource(self,name,delete_views=True):
         h5 = self._get_h5_handle()
         del h5[name]
         h5.close()
         self.datasources = [x for x in self.datasources if x["name"] !=name]
+        #delete all views contining that datasource
+        if delete_views:
+            views = self.views
+            for view in views:
+                data= views[view]
+                if data["initialCharts"].get(name):
+                    self.set_view(view,None)
+
 
     def add_genome_browser(self,datasource,parameters=["chr","start","end"],name=None):
         # get all the genome locations
