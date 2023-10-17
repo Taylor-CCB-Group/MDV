@@ -22,9 +22,6 @@ const isPopout = urlParams.get('popout') === "true";
 const dir = urlParams.get('dir') || (isPopout ? '' : flaskURL);
 const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
 //hack to load data from local API
-//TODO - how to work with the multi-project API?
-//super easy, barely an inconvenience; use 'dir=/project/project_name' and it works...
-//...until it tries to load any data.
 const staticFolder = !dir.startsWith("/project");
 
 // set title of page to the data directory
