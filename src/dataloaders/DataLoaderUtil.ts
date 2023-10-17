@@ -48,12 +48,23 @@ export function setProjectRoot(root: string) {
     projectRoot = root;
 }
 
+//https://stackoverflow.com/questions/29855098/is-there-a-built-in-javascript-function-similar-to-os-path-join
+export function buildPath(...args: string[]) {
+    return args.map((part, i) => {
+        if (i === 0) {
+            return part.trim().replace(/[\/]*$/g, '')
+        } else {
+            return part.trim().replace(/(^[\/]*|[\/]*$)/g, '')
+        }
+    }).filter(x => x.length).join('/')
+}
+
 /**
  * Given a url that is relative to the project root, return a more API-appropriate URL.
  */
 export function getProjectURL(url: string) {
     if (url.startsWith(projectRoot)) return url;
-    return (projectRoot + url).replace("./", "/");
+    return buildPath(projectRoot, url).replace("./", "/") + '/';
 }
 
 
@@ -66,7 +77,8 @@ export function getDataLoader(isStaticFolder: boolean, datasources: Datasource[]
         rowDataLoader: loadRowDataStatic,
         binaryDataLoader: loadBinaryDataStatic
     } : {
-        function: getArrayBufferDataLoader("/get_data"),
+        // need to make these work with the new API
+        function: getArrayBufferDataLoader(root+"/get_data"),
         viewLoader: getView,
         rowDataLoader: loadRowData,
         binaryDataLoader: loadBinaryData
@@ -90,15 +102,15 @@ export function getDataLoader(isStaticFolder: boolean, datasources: Datasource[]
 
 //loads unstructured data for each row
 async function loadRowData(datasource: string, index: string) {
-    return await getPostData("/get_row_data", { datasource, index })
+    return await getPostData(projectRoot+"/get_row_data", { datasource, index })
 }
 //load view from API
 async function getView(view: string) {
-    return await getPostData("/get_view", { view })
+    return await getPostData(projectRoot+"/get_view", { view })
 }
 
 async function loadBinaryData(datasource: string, name: string) {
-    return await getPostData("/get_binary_data", { datasource, name }, "arraybuffer");
+    return await getPostData(projectRoot+"/get_binary_data", { datasource, name }, "arraybuffer");
 }
 //send json args and return json/array buffer response
 export async function getPostData(url: string, args, return_type = "json") {

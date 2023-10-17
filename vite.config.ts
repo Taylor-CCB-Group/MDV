@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
-const flaskURL = "http://127.0.0.1:5050";
+const flaskURL = "http://127.0.0.1:5051";
 
 export default defineConfig(env => { return {
     server: {
@@ -24,7 +24,7 @@ export default defineConfig(env => { return {
                 target: flaskURL,
                 changeOrigin: true,
             },
-            '^/project/.*/\?': { //still not right
+            '^/project/.*/\?': { //this works with ?dir=/project/project_name
                 target: flaskURL,
                 changeOrigin: true,
             },
