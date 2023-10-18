@@ -18,7 +18,8 @@ module.exports = env =>{
 			static: env.folder || "./public/"
 		  },
 	
-	   entry: './src/dev/devindex.js',
+		//entry: './src/dev/devindex.js', // was this broken? how broken? file is gone...
+		entry: './src/modules/desktop_index.js', //not working, contemplating removing this config file
 
   	   output: {
     		   filename: 'dist/ciview2.js',

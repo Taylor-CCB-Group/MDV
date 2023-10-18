@@ -11,16 +11,12 @@
     "vite-build": "tsc && vite build",
     "build": "webpack --config prod.config.js",
     "build-flask": "npm run clean-flask & webpack --config desktop.config.js",
-    "build-flask-vite": "cross-env OUT_DIR=./python/mdvtools/static vite build",
+    "build-flask-vite": "cross-env OUT_DIR=./python/mdvtools/templates vite build",
     "clean-flask": "rm -r ./python/mdvtools/static",
     "build-pyinstaller": "npm run build-flask & pyinstaller --onefile python/mdvtools/mdv_desktop.py --add-data \"mdvtools/templates:mdvtools/templates\" --add-data \"mdvtools/static:mdvtools/static\"",
-    "run-hyperion": "webpack  serve --config hyperion.dev.config.js",
-    "run-obvios": "webpack  serve --config obvios.config.js",
-    "run-ytrap": "webpack  serve --config ytrap.config.js",
     "run-ex": "webpack  serve --config examples.config.js --env process.env",
-    "run-example": "npm run run-ex --env example=basic_example",
+    "run-basic_example": "npm run run-ex --env example=basic_example",
     "run-10Mexample": "npm run run-ex --env example=10Mand1_points",
-    "build-hyperion": "webpack --config hyperion.prod.config.js",
     "build-docs": "jsdoc -c docs/jsdoc.json"
   },
   "repository": {

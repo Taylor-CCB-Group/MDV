@@ -19,7 +19,7 @@ export default defineConfig(env => { return {
         port: 5170,
         strictPort: true,
         proxy: {
-            // todo proxy /project/ API to flask, but serve page from vite
+            // these routes are proxied to flask server in 'single project' mode
             '^/(get_|images|tracks|save).*': {
                 target: flaskURL,
                 changeOrigin: true,
