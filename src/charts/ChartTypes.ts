@@ -8,7 +8,7 @@ export type ChartType<T extends BaseChart> = {
     /** The human-readable name that will appear in the 'add chart' dialog etc. */
     name: string;
     
-    required?: string[];
+    required?: string[] | ((ds: DataSource) => unknown); //TODO: better typing here (& there & everywhere)
     init?: (config: any, dataSource: any, extraControls: any) => void;
     extra_controls?: (dataSource: DataSource) => GuiSpec<any>[];
     params?: { type: string | string[], name: string }[];

@@ -46,8 +46,10 @@ export type DataSource = {
     dataStore: DataStore;
     contentDiv: HTMLDivElement;
     menuBar: HTMLDivElement;
-    images?: Record<string, unknown>;
+    images?: Record<string, any>;
+    regions?: Record<string, any>;
     getLoadedColumns: () => string[];
+    getColumnName: (col: string) => string;
 };
 
 export type GuiValueTypes = {
