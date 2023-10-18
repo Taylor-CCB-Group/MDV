@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import "./all_css";
+// import "../charts/VivScatterPlotNew";
 import ChartManager from "../charts/ChartManager.js";
 // import "../charts/RowSummaryBox.js"; //> should this be in ChartManager along with default charts? how useful is it?
 
@@ -50,7 +51,7 @@ async function loadData() {
 
     const listener = async (type: string, cm: ChartManager, data: any) => {
         if (type === "state_saved" && !staticFolder) {
-            const resp = await getPostData('/save_state', data);
+            const resp = await getPostData(root+'/save_state', data);
             if (resp.success) {
                 cm.createInfoAlert("State saved", {duration: 2000});
                 cm.setAllColumnsClean();
