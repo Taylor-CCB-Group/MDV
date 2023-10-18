@@ -1376,6 +1376,10 @@ class ChartManager{
     * a chart has been loaded
     */
     async addChart(dataSource,config,notify=false){
+        if (!BaseChart.types[config.type]){
+            this.createInfoAlert(`Tried to add unknown chart type '${config.type}'`, {type: 'danger', duration: 2000});
+            throw `Unknown chart type ${config.type}`;
+        }
         //check if columns need loading
         const neededCols = this._getColumnsRequiredForChart(config);
         //check which columns need loading
