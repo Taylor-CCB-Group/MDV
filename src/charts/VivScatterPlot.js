@@ -171,7 +171,7 @@ class VivScatterPlot extends DensityScatterPlot{
         }
     }
 
-    // PJT *Channel methods moved to VivViewer.
+    // PJT *Channel methods moved to VivViewerMDV.
 
     remove(){
         this.viv.deck.finalize();
@@ -235,7 +235,7 @@ class VivScatterPlot extends DensityScatterPlot{
             this.graphDiv.prepend(this.vivCanvas);
             
 
-            import ('../webgl/VivViewer.js').then(({default:VivViewer})=>{
+            import ('../webgl/VivViewerMDV.js').then(({default:VivViewerMDV})=>{
                 //new config
                 const r  = this.dataStore.regions;
                 //local or remote url
@@ -243,7 +243,7 @@ class VivScatterPlot extends DensityScatterPlot{
                     const i = r.all_regions[c.region].viv_image;                  
                     c.viv.url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file
                 }
-                this.viv = new VivViewer(this.vivCanvas,c.viv,this.app);
+                this.viv = new VivViewerMDV(this.vivCanvas,c.viv,this.app);
                 this.app.addHandler("pan_or_zoom",(offset,x_scale,y_scale)=>{
                     this.viv.setPanZoom(offset,x_scale,y_scale)
                 },c.id+"_viv")

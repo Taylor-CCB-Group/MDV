@@ -1,7 +1,7 @@
 import BaseChart from "../charts/BaseChart.js";
 import { ColorChannelDialog } from "../charts/VivScatterPlot.js";
 import { createEl } from "../utilities/Elements.js";
-import VivViewer from '../webgl/VivViewer.js';
+import VivViewerMDV from '../webgl/VivViewerMDV.js';
 
 class VivVolume extends BaseChart {
     constructor(dataStore, div, config) {
@@ -44,9 +44,9 @@ class VivVolume extends BaseChart {
         const iv = {
             x_scale: 1, y_scale: 1, offset: 0
         }
-        // we may not necessarily want to re-use VivViewer?
+        // we may not necessarily want to re-use VivViewerMDV?
         // although some common features with channels etc.
-        this.viv = new VivViewer(this.vivCanvas, vivConfig, iv);
+        this.viv = new VivViewerMDV(this.vivCanvas, vivConfig, iv);
     }
 
     setupScatterplot() {

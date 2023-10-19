@@ -62,7 +62,7 @@ class ImageScatterChart extends BaseChart {
                 height,
             });
 
-            // --- getDefaultChannelStats etc... refer to VivViewer createLayers() &co ---
+            // --- getDefaultChannelStats etc... refer to VivViewerMDV createLayers() &co ---
             
             const layers = this.updateDeck(); //...
             const view = new OrthographicView({});

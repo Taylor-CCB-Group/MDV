@@ -36,9 +36,9 @@ function getTiff(url) {
 // }
 
 
-class VivViewer {
+class VivViewerMDV {
   constructor(canvas, config, initialView){
-    console.log('new VivViewer', config);
+    console.log('new VivViewerMDV', config);
     this.canvas = canvas;
     this.height = this.canvas.height;
     this.width = this.canvas.width;
@@ -457,4 +457,4 @@ class VivViewer {
     }
 }
 
-export default VivViewer;
+export default VivViewerMDV;
