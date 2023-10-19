@@ -1,15 +1,28 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import BaseChart from "../charts/BaseChart";
 import { createRoot } from "react-dom/client";
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer } from "deck.gl/typed";
 import { DataModel } from "../table/DataModel";
+import { PictureInPictureViewer, VivViewer } from "@hms-dbmi/viv";
+import {
+    loadOmeTiff,
+    DetailView,
+    DETAIL_VIEW_ID,
+    getChannelStats
+} from '@hms-dbmi/viv';
 
+type TiffLoader = Awaited<ReturnType<typeof loadOmeTiff>>;
 
 let ID = 0;
 function ReactTest({ parent }: { parent: VivMdvReact }) {
     const { dataStore } = parent;
+    const width = parent.contentDiv.clientWidth;
+    const height = parent.contentDiv.clientHeight;
+
     const [id] = useState(ID++);
+    const [loader, setLoader] = useState<TiffLoader>(null);
+    const [channel, setChannel] = useState(0); //not really more usable than editing the code...
 
     const dataModel = useMemo(() => {
         const dataModel = new DataModel(dataStore, { autoUpdate: true });
@@ -17,6 +30,11 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
         dataModel.updateModel();
         return dataModel;
     }, [dataStore]);
+
+    useEffect(() => {
+        loadOmeTiff(parent.config.imageURL).then(setLoader);
+    }, [parent.config.imageURL]);
+
     const { data } = dataModel;
     const { columnIndex } = dataStore;
     const cx = columnIndex[parent.config.param[0]];
@@ -31,11 +49,37 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
             target[2] = 0;
             return target as unknown as Float32Array; // 🤮 deck.gl types are wrong AFAICT
         }
-    })
+    });
+    const { SizeX, SizeY } = loader?.metadata?.Pixels || { SizeX: 0, SizeY: 0 };
+    if (!loader) return <div>Loading...</div>;
+    console.log('loader', loader);
+    // xxx: logging deckrenderer.js:55 opts.layers.length 
+    //it's growing out of control with Cillian's image (which it doesn't in Avivator)
+    // ^^^ I'd passed SizeX & SizeY where I should be passing size of component...
+
+
+    //channel 20, 0-10000 is legible in test_viv
+    //cillian /project/cillian/images/avivator/BKV3Yc.ome.tiff
     return (
-        <>
-        <DeckGL id={id + 'deck'} layers={[scatterplotLayer]}>
-        </DeckGL>
+        <> 
+            <PictureInPictureViewer 
+                contrastLimits={[90, 70000]} 
+                colors={[[1000, 245, 200]]}
+                channelsVisible={[true]}
+                loader={loader?.data}
+                selections={[{ z: 0, c: channel, t: 0 }]}
+                overview={undefined}
+                overviewOn={false}
+                height={height} width={width}
+                deckProps={{
+                    layers: [scatterplotLayer]
+                }}
+            />
+            <input type="number" value={channel} onChange={(e) => { setChannel(+e.target.value); }}
+                style={{ zIndex: 100 }}
+            />
+        {/* <DeckGL id={id + 'deck'} layers={[scatterplotLayer]}>
+        </DeckGL> */}
         </>
     );
 }
