@@ -27,6 +27,7 @@ export type ImageArrayEntry = {
  * without requiring a lot of draw calls / GL state updates.
  * 
  * Current design is brute-force, loading all images at once, little other logic.
+ * Will fall over and die if you try to use more than "Max Array Texture Layers" (usually 2048) images.
  */
 export class ImageArray {
     textures: Map<string, ImageArrayEntry>;

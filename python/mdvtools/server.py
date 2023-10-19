@@ -10,7 +10,7 @@ from .websocket import mdv_socketio
 import os
 
 routes = set()
-
+# consider using flask_cors...
 def add_safe_headers(resp):
     resp.headers["Cross-Origin-Opener-Policy"]= "same-origin"
     resp.headers["Cross-Origin-Embedder-Policy"]="require-corp"

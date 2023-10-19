@@ -37,18 +37,18 @@ function getTiff(url) {
 
 
 class VivViewer {
-  constructor(canvas,config,initialView){
+  constructor(canvas, config, initialView){
     console.log('new VivViewer', config);
     this.canvas = canvas;
-    this.height= this.canvas.height;
-    this.width= this.canvas.width;
-    this.config=config;
+    this.height = this.canvas.height;
+    this.width = this.canvas.width;
+    this.config = config;
     this.hasRequestedDefaultChannelStats = false;
     this.initClip();
    
-    getTiff(config.url).then(loader=>{
+    getTiff(config.url).then(loader => {
       this.tiff = loader;
-      this._setUp(loader,initialView);
+      this._setUp(loader, initialView);
     });
   }
 
@@ -56,7 +56,8 @@ class VivViewer {
     this.height=y;
     this.width=x;
 
-    const v =this.getViewState(conf.x_scale,conf.y_scale,conf.offset);
+    const { x_scale, y_scale, offset } = conf;
+    const v = this.getViewState(x_scale, y_scale, offset);
     this.canvas.width = x;
     this.canvas.height = y;
     this.canvas.style.width = x;
@@ -448,7 +449,7 @@ class VivViewer {
         };
         if (!this.defaultDomains) this.defaultDomains = layerConfig.contrastLimits; //PJT somewhat tested
         if (!this.defaultContrastLimits) this.defaultContrastLimits = this.defaultDomains.slice(0);
-        this.layers= this.detailView.getLayers({
+        this.layers = this.detailView.getLayers({
             viewStates,
             props:layerConfig
         });

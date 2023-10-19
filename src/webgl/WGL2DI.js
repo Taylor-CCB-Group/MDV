@@ -57,8 +57,8 @@ class WGL2DI{
 		}
 
     
-    	this.regl=null;
-		this.pick_buffer=null;
+    	this.regl = null;
+		this.pickbuffer = null;
 
 		this.hideOnFilter=true;
 
@@ -882,12 +882,12 @@ class WGL2DI{
 		console.log(`${x},${y},${w},${h}`);
 		const  max = w*h*4;
     	var pixels = this.regl.read({
-        x: x,
-        y: this.height -y-h,
-        width:w,
-        height:h ,
-       
-        framebuffer: this.pickbuffer
+			x: x,
+			y: this.height -y-h,
+			width:w,
+			height:h ,
+		
+			framebuffer: this.pickbuffer
     	});
 		const s = new Set()
 		for (let i=0;i<max;i+=4){
