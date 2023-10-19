@@ -17,8 +17,19 @@ type TiffLoader = Awaited<ReturnType<typeof loadOmeTiff>>;
 let ID = 0;
 function ReactTest({ parent }: { parent: VivMdvReact }) {
     const { dataStore } = parent;
-    const width = parent.contentDiv.clientWidth;
-    const height = parent.contentDiv.clientHeight;
+    
+    // this should be a hook, first go...
+    const [width, setWidth] = useState(parent.contentDiv.clientWidth);
+    const [height, setHeight] = useState(parent.contentDiv.clientHeight);
+    useEffect(() => {
+        const resize = () => {
+            setWidth(parent.contentDiv.clientWidth);
+            setHeight(parent.contentDiv.clientHeight);
+        };
+        const observer = new ResizeObserver(resize);
+        observer.observe(parent.contentDiv);
+        return () => observer.unobserve(parent.contentDiv);
+    }, [parent.contentDiv]);
 
     const [id] = useState(ID++);
     const [loader, setLoader] = useState<TiffLoader>(null);
