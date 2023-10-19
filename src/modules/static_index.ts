@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import "./all_css";
-// import "../charts/VivScatterPlotNew";
+import "../charts/VivScatterPlotNew";
 import ChartManager from "../charts/ChartManager.js";
 // import "../charts/RowSummaryBox.js"; //> should this be in ChartManager along with default charts? how useful is it?
 
