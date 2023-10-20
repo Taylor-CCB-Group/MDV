@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import BaseChart from "../charts/BaseChart";
+import BaseChart from "../../charts/BaseChart";
 import { createRoot } from "react-dom/client";
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer } from "deck.gl/typed";
-import { DataModel } from "../table/DataModel";
+import { DataModel } from "../../table/DataModel";
 import { PictureInPictureViewer, VivViewer } from "@hms-dbmi/viv";
 import {
     loadOmeTiff,
@@ -11,6 +11,7 @@ import {
     DETAIL_VIEW_ID,
     getChannelStats
 } from '@hms-dbmi/viv';
+import { useChartSize } from "../hooks";
 
 type TiffLoader = Awaited<ReturnType<typeof loadOmeTiff>>;
 
@@ -18,19 +19,8 @@ let ID = 0;
 function ReactTest({ parent }: { parent: VivMdvReact }) {
     const { dataStore } = parent;
     
-    // this should be a hook, first go...
-    const [width, setWidth] = useState(parent.contentDiv.clientWidth);
-    const [height, setHeight] = useState(parent.contentDiv.clientHeight);
-    useEffect(() => {
-        const resize = () => {
-            setWidth(parent.contentDiv.clientWidth);
-            setHeight(parent.contentDiv.clientHeight);
-        };
-        const observer = new ResizeObserver(resize);
-        observer.observe(parent.contentDiv);
-        return () => observer.unobserve(parent.contentDiv);
-    }, [parent.contentDiv]);
-
+    const [width, height] = useChartSize(parent);
+    
     const [id] = useState(ID++);
     const [loader, setLoader] = useState<TiffLoader>(null);
     const [channel, setChannel] = useState(0); //not really more usable than editing the code...
@@ -74,8 +64,8 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
     return (
         <> 
             <PictureInPictureViewer 
-                contrastLimits={[90, 70000]} 
-                colors={[[1000, 245, 200]]}
+                contrastLimits={[0, 1000000]} 
+                colors={[[100, 245, 200]]}
                 channelsVisible={[true]}
                 loader={loader?.data}
                 selections={[{ z: 0, c: channel, t: 0 }]}
@@ -87,8 +77,9 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
                 }}
             />
             <input type="number" value={channel} onChange={(e) => { setChannel(+e.target.value); }}
-                style={{ zIndex: 100 }}
+                min={0} max={loader?.metadata?.Pixels?.SizeC - 1}
             />
+            {loader?.metadata?.Pixels?.Channels[channel]?.Name}
         {/* <DeckGL id={id + 'deck'} layers={[scatterplotLayer]}>
         </DeckGL> */}
         </>

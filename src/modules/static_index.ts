@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import "./all_css";
 import "../charts/VivScatterPlotNew";
-import vSideEffect from "../components/VivMDVReact";
+import vSideEffect from "../react/components/VivMDVReact";
 console.log(vSideEffect);
 import ChartManager from "../charts/ChartManager.js";
 // import "../charts/RowSummaryBox.js"; //> should this be in ChartManager along with default charts? how useful is it?

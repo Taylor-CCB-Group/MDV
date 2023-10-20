@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import BaseChart from "./BaseChart";
+import BaseChart from "../../charts/BaseChart";
 import { createRoot } from "react-dom/client";
 
 let ID = 0;
