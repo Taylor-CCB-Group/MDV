@@ -11,7 +11,7 @@ import {
     DETAIL_VIEW_ID,
     getChannelStats
 } from '@hms-dbmi/viv';
-import { useChartSize } from "../hooks";
+import { useChartSize, useDataModel, useOmeTiff } from "../hooks";
 
 type TiffLoader = Awaited<ReturnType<typeof loadOmeTiff>>;
 
@@ -20,21 +20,12 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
     const { dataStore } = parent;
     
     const [width, height] = useChartSize(parent);
-    
+    const dataModel = useDataModel(parent);
+    const loader = useOmeTiff(parent.config.imageURL);
+
     const [id] = useState(ID++);
-    const [loader, setLoader] = useState<TiffLoader>(null);
     const [channel, setChannel] = useState(0); //not really more usable than editing the code...
 
-    const dataModel = useMemo(() => {
-        const dataModel = new DataModel(dataStore, { autoUpdate: true });
-        dataModel.setColumns(parent.config.param);
-        dataModel.updateModel();
-        return dataModel;
-    }, [dataStore]);
-
-    useEffect(() => {
-        loadOmeTiff(parent.config.imageURL).then(setLoader);
-    }, [parent.config.imageURL]);
 
     const { data } = dataModel;
     const { columnIndex } = dataStore;
@@ -45,13 +36,16 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
         id: id+'scatter',
         data,
         getPosition: (i, {target}) => {
+            // how slow is a callback function here?
+            // given that we need to draw in data from multiple sources...
+            // ... unless we want to do the work on a worker thread,
+            // I don't think there's a more efficient way
             target[0] = cx.data[i];
             target[1] = cy.data[i];
             target[2] = 0;
             return target as unknown as Float32Array; // 🤮 deck.gl types are wrong AFAICT
         }
     });
-    const { SizeX, SizeY } = loader?.metadata?.Pixels || { SizeX: 0, SizeY: 0 };
     if (!loader) return <div>Loading...</div>;
     console.log('loader', loader);
     // xxx: logging deckrenderer.js:55 opts.layers.length 
