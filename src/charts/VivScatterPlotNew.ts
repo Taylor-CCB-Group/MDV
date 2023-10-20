@@ -28,7 +28,7 @@ type OMEConfig = {
 }
 
 let nextID = 0;
-class ImageScatterChart extends BaseChart {
+class VivScatterPlotNew extends BaseChart {
     canvas: HTMLCanvasElement;
     imageArray: ImageArray;
     deck: Deck;
@@ -44,6 +44,7 @@ class ImageScatterChart extends BaseChart {
     id: number;
     constructor(dataStore, div, config: OMEConfig) {
         super(dataStore, div, config);
+        console.warn('VivScatterPlotNew is only for testing, and will almost certainly be removed soon.');
         this.id = nextID++;
         const canvas = this.canvas = createEl("canvas", {}, this.contentDiv);
         this.dataModel = new DataModel(dataStore, { autoUpdate: true });
@@ -109,6 +110,7 @@ class ImageScatterChart extends BaseChart {
                 // todo: un-hardcode this, sensible defaults & configurable options
                 contrastLimits: [[98, 63307]],
                 channelsVisible: [true],
+                selections: [{z: 0, c: 3, t: 0}]
             }
         });
 
@@ -199,7 +201,7 @@ class ImageScatterChart extends BaseChart {
 // ---> actually, those are too complicated in various ways, and following the un-typed code through is a pain.
 //      I'm going to make something with a much more basic option for imageURL... no use of 'regions' code for now.
 BaseChart.types["VivScatterPlotNew"] = {
-    class: ImageScatterChart,
+    class: VivScatterPlotNew,
     name: "Viv Scatter Plot (New)",
     // required: ds => ds.regions?.avivator,
     params: [
@@ -224,4 +226,4 @@ BaseChart.types["VivScatterPlotNew"] = {
     },
 }
 
-export default ImageScatterChart;
+export default VivScatterPlotNew;
