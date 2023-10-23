@@ -19,6 +19,14 @@ export function useChartSize(chart: BaseChart) {
     return [width, height];
 }
 
+/**
+ * Get the chart's ID.
+ * consider context API for some of these things?
+ */
+export function useChartID(chart: BaseChart) {
+    return chart.config.id;
+}
+
 export function useDataModel(chart: BaseChart) {
     const { dataStore } = chart;
     const [dataModel, setDataModel] = useState(() => new DataModel(dataStore, { autoUpdate: true }));
@@ -41,9 +49,9 @@ export function useParamColumns(chart: BaseChart) {
     return columns;
 }
 
-type OME = Awaited<ReturnType<typeof loadOmeTiff>>;
+type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
 export function useOmeTiff(url: string) {
-    const [tiff, setTiff] = useState<OME>();
+    const [tiff, setTiff] = useState<OME_TIFF>();
     useEffect(() => {
         loadOmeTiff(url).then(setTiff);
     }, [url]);
@@ -55,7 +63,7 @@ export function useOmeTiff(url: string) {
  * @param ome 
  * @param channel - channel index. In future we should support selections with z/c/t.
  */
-export function useChannelStats(ome: OME, channel: number) {
+export function useChannelStats(ome: OME_TIFF, channel: number) {
     const [channelStats, setChannelStats] = useState<ReturnType<typeof getChannelStats> | undefined>();
     useEffect(() => {
         if (!ome) return;
@@ -69,22 +77,24 @@ export function useChannelStats(ome: OME, channel: number) {
 }
 
 /**
- * Bridge between MDV settings and react state... there is a lot more to think about longer-term.
- * I don't much like this approach, but it's a start.
- * Could consider MobX or something similar.
- * Also consider a 'useSettings' hook which will call `chart.getSettings()` and process the result.
- * @param chart
+ * This hook allows you to use a named member from a chart's config object as a react state variable.
+ * 
+ * ## notes:
+ * *This design is not final and may actually be more broken than it appears.*
+ * Probably better to use mobx instead, at least in the short term.
+ * 
+ * @param chart - the chart to get the config item from. If the class of the chart explicity declares the config type,
+ * this will be used to infer the type of the returned value.
+ * 
+ * Otherwise, it will be `any`.
  * @param key 
  */
-export function useConfigItem(chart: BaseChart, key: string) {
-    const [value, setValue] = useState(chart.config[key]);
+export function useConfigItem<T extends BaseChart, K extends keyof T["config"]>(chart: T, key: K) {
+    const [value, setValue] = useState<T["config"][K]>(chart.config[key]);
     useEffect(() => {
-        // test cases to consider:
-        // - referring to the same chart.config[key] in multiple places
-        //   how bad will it be repeatedly calling defineProperty?
-        // - Under what other circumstances may we be liable to call defineProperty multiple times?
         Object.defineProperty(chart.config, key, {
             get() {
+                // **this is closed on the initial value when the property is defined; not what we want.**
                 return value;
             },
             set(val) {

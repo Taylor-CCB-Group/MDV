@@ -1,20 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
 import BaseChart from "../../charts/BaseChart";
 import { createRoot } from "react-dom/client";
-import { ScatterplotLayer } from "deck.gl/typed";
+import DeckGL, { OrthographicView, ScatterplotLayer } from "deck.gl/typed";
 import { PictureInPictureViewer } from "@hms-dbmi/viv";
-import { useChannelStats, useChartSize, useConfigItem, useDataModel, useOmeTiff, useParamColumns } from "../hooks";
+import { useChannelStats, useChartID, useChartSize, useConfigItem, useDataModel, useOmeTiff, useParamColumns } from "../hooks";
+import { useMemo, useState } from "react";
 
-let ID = 0;
 function ReactTest({ parent }: { parent: VivMdvReact }) {
     const [width, height] = useChartSize(parent);
     const ome = useOmeTiff(parent.config.imageURL);
+    const view = useMemo(()=>new OrthographicView({}), []);
+    // const {id} = parent.config; //there should always be a persistent, reliable id here.
+    const id = useChartID(parent); // hook in case we want to change something about implementation later.
+    // (in which case the hook signature will probably also change)
     
-    const [id] = useState(ID++);
     const channelX = useConfigItem(parent, 'channel');
     
     const stats = useChannelStats(ome, channelX);
     const contrastLimits = stats ? stats.contrastLimits : [0, 1];
+
+    const [viewState, setViewState] = useState<any>();
     
     const { data } = useDataModel(parent);
     const [cx, cy] = useParamColumns(parent);
@@ -22,14 +26,14 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
         id: id+'scatter-react',
         data,
         opacity: 0.5,
-        radiusScale: 1000,
-        getFillColor: [255, 200, 200],
+        radiusScale: 10,
+        getFillColor: [0, 200, 200],
         getRadius: 1,
         getPosition: (i, {target}) => {
             // how slow is a callback function here?
             // given that we need to draw in data from multiple sources...
             // ... unless we want to do the work on a worker thread,
-            // I don't think there's a more efficient way
+            // I don't think there's a significantly more efficient way
             target[0] = 2*cx.data[i];
             target[1] = 2*cy.data[i];
             target[2] = 0;
@@ -40,7 +44,7 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
 
     return (
         <> 
-            <PictureInPictureViewer 
+            {true && <PictureInPictureViewer 
                 contrastLimits={[contrastLimits]}
                 colors={[[255, 255, 255]]}
                 channelsVisible={[true]}
@@ -49,23 +53,49 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
                 snapScaleBar={true}
                 overview={undefined}
                 overviewOn={false}
-                // well and good, but why is aspect ratio wrong?
                 height={height} width={width}
-                deckProps={{
-                    layers: [scatterplotLayer]
+                onViewStateChange={(viewState) => {
+                    // setViewState(viewState.viewState);//infinitely recursive
                 }}
-            />
+                deckProps={{
+                    // how to get the appropriate view so that scatterplotLayer is visible?
+                    // can't get a ref to PIPViewer?
+                    views: [view],
+                    layers: [scatterplotLayer],
+                    style: {
+                        opacity: 1,
+                        zIndex: 10,
+                        // display: 'none'
+                    }
+                }}
+            />}
+            {`view id '${id}', channel #${channelX}: `}
             {ome?.metadata?.Pixels?.Channels[channelX]?.Name}
             <br />
             {contrastLimits[0]}-{contrastLimits[1]}
-        {/* <DeckGL id={id + 'deck'} layers={[scatterplotLayer]}>
+        {/* <DeckGL id={id + 'deck'} 
+        views={[view]}
+        initialViewState={{
+            target: [0, 0, 0],
+            zoom: -10,
+        }}
+        // viewState={viewState}
+        // controller={true}
+        layers={[scatterplotLayer]}>
         </DeckGL> */}
         </>
     );
 }
 
+type VivMdvReactConfig = { channel: number, imageURL: string };
+
 class VivMdvReact extends BaseChart {
-    constructor(dataStore, div, config) {
+    declare config: VivMdvReactConfig; // saves us from adding a generic type param on ~BaseChart
+    // ^^ may still consider a BaseReactChart class that extends BaseChart with a few more react-related boilerplate,
+    // as well as a bit more type safety etc.
+    // Given that we may well want to change from each chart calling createRoot to a single root & portals,
+    // it would be good to have a common ancestor class that handles that consistently.
+    constructor(dataStore, div, config: VivMdvReactConfig) {
         if (!config.channel) config.channel = 0;
         super(dataStore, div, config);
         createRoot(this.contentDiv).render(<ReactTest parent={this} />);
