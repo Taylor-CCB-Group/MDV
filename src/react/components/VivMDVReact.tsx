@@ -1,6 +1,6 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { OrthographicView, ScatterplotLayer } from "deck.gl/typed";
-import { PictureInPictureViewer } from "@hms-dbmi/viv";
+import { OverviewView, PictureInPictureViewer } from "@hms-dbmi/viv";
 import { useChannelStats, useChartID, useChartSize, useDataModel, useOmeTiff, useParamColumns } from "../hooks";
 import { useMemo, useState } from "react";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
@@ -53,8 +53,8 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
                 loader={ome?.data}
                 selections={[{ z: 0, c: channelX, t: 0 }]}
                 snapScaleBar={true}
-                overview={undefined}
-                overviewOn={false}
+                overview={{position: 'bottom-left'}}
+                overviewOn={parent.config.overviewOn}
                 height={height} width={width}
                 onViewStateChange={(viewState) => {
                     // setViewState(viewState.viewState);//infinitely recursive
@@ -88,11 +88,13 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
     );
 });
 
-type VivMdvReactConfig = { channel: number, imageURL: string } & BaseConfig;
+type VivMdvReactConfig = { channel: number, imageURL: string, overviewOn: boolean } & BaseConfig;
 
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     constructor(dataStore, div, config: VivMdvReactConfig) {
+        // todo better default config
         if (!config.channel) config.channel = 0;
+        if (config.overviewOn === undefined) config.overviewOn = false;
         super(dataStore, div, config, ReactTest);
     }
     getSettings(): { type: string; label: string; current_value: any; func: (v: any) => void; }[] {
@@ -110,6 +112,14 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 continuous: true,
                 func: x => {
                     c.channel = x;
+                }
+            },
+            {
+                type: "check",
+                label: "overview",
+                current_value: c.overviewOn || false,
+                func: x => {
+                    c.overviewOn = x;
                 }
             }
         ]);
