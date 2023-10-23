@@ -552,6 +552,7 @@ class BaseChart{
                 width:300,
                 title:"Settings",
                 position:[e.pageX,e.pageY],
+                useMobx: this.useMobx,
                 onclose:()=>this.settingsDialog=null
 
             },this.getSettings());

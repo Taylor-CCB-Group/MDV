@@ -20,17 +20,22 @@ type TComponent<T extends BaseConfig> = (props: {parent: BaseReactChart<T>}) => 
 /**
  * Base class for charts that use React.
  * 
+ * Components should be functional, but will require a very thin wrapper class extending this, such
+ * that any BaseChart methods called from outside will appropriately effect the component state.
+ * 
  * Internally, this class uses mobx to make the config object observable, and creates a React root with the given
  * `ReactComponentFunction`. Use of MobX is hidden by this abstraction - but if we change to a different state management
  * system, it will have implications for downstream components that expect to react to changes in the config object.
  * 
- * As of this writing (2023-10-23), we may want to consider a different pattern for use of config properties...
+ * We could probably abstract that away more fully; if we always access the config object through a hook (which might internally
+ * use context API), we can probably save ourselves from even needing to pass 'parent' as a prop.
  * 
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
  */
 export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseChart {
     declare config: TConfig;
+    useMobx = true;
     constructor(dataStore, div, config: TConfig, ReactComponentFunction: TComponent<TConfig> = Fallback) {
         super(dataStore, div, config);
         makeAutoObservable(config);
@@ -41,7 +46,14 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
                 makeAutoObservable(config);
             }
         });
-        const Observed = observer(ReactComponentFunction);
-        createRoot(this.contentDiv).render(<Observed parent={this} />);
+        // note: applying observer here seems nice in that it means we can hide that implementation detail from child components,
+        // but it stops HMR from working.
+        // const Observed = observer(ReactComponentFunction);
+        createRoot(this.contentDiv).render(<ReactComponentFunction parent={this} />);
+    }
+    remove(): void {
+        // make sure dim and anything else relevant is removed...
+        // **is there any React teardown we should be considering?**
+        super.remove();
     }
 }

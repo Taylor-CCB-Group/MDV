@@ -2,7 +2,7 @@ import { BaseDialog } from "./Dialog.js";
 import { createEl, createFilterElement } from "./Elements.js";
 import noUiSlider, { create } from "nouislider";
 // import lgui from 'lil-gui';
-
+import { action } from "mobx";
 
 
 class SettingsDialog extends BaseDialog{
@@ -35,6 +35,10 @@ class SettingsDialog extends BaseDialog{
             if (!this[s.type]) {
                 console.warn(`SettingsDialog doesn't have a method '${s.type}'`);
                 continue;
+            }
+            if (this.config.useMobx && s.func) { //mobx complains about mutating state outside of actions
+                // we could check whether we'd already wrapped the function, but getSettings() returns a new object each time
+                s.func = action(`${s.label} <action>`, s.func);
             }
             this.controls[s.label] = this[s.type](s,d);
         }

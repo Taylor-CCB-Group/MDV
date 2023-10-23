@@ -4,8 +4,10 @@ import { PictureInPictureViewer } from "@hms-dbmi/viv";
 import { useChannelStats, useChartID, useChartSize, useDataModel, useOmeTiff, useParamColumns } from "../hooks";
 import { useMemo, useState } from "react";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
+import { observer } from "mobx-react-lite";
 
-const ReactTest = ({ parent }: { parent: VivMdvReact }) => {
+// we need to add observer here, not just in BaseReactChart, for HMR to work.
+const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
     const [width, height] = useChartSize(parent);
     const ome = useOmeTiff(parent.config.imageURL);
     const view = useMemo(()=>new OrthographicView({}), []);
@@ -64,13 +66,12 @@ const ReactTest = ({ parent }: { parent: VivMdvReact }) => {
                     layers: [scatterplotLayer],
                     style: {
                         opacity: 1,
-                        zIndex: 10,
+                        zIndex: -10,
                         // display: 'none'
                     }
                 }}
             />}
-            {`view id '${id}', channel #${channelX}: `}
-            {ome?.metadata?.Pixels?.Channels[channelX]?.Name}
+            {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
             <br />
             {contrastLimits[0]}-{contrastLimits[1]}
         {/* <DeckGL id={id + 'deck'} 
@@ -85,16 +86,11 @@ const ReactTest = ({ parent }: { parent: VivMdvReact }) => {
         </DeckGL> */}
         </>
     );
-};
+});
 
 type VivMdvReactConfig = { channel: number, imageURL: string } & BaseConfig;
 
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
-    declare config: VivMdvReactConfig; // saves us from adding a generic type param on ~BaseChart
-    // ^^ may still consider a BaseReactChart class that extends BaseChart with a few more react-related boilerplate,
-    // as well as a bit more type safety etc.
-    // Given that we may well want to change from each chart calling createRoot to a single root & portals,
-    // it would be good to have a common ancestor class that handles that consistently.
     constructor(dataStore, div, config: VivMdvReactConfig) {
         if (!config.channel) config.channel = 0;
         super(dataStore, div, config, ReactTest);
@@ -117,10 +113,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 }
             }
         ]);
-    }
-    remove(): void {
-        super.remove();
-        // make sure dim and anything else relevant is removed...
     }
 }
 
