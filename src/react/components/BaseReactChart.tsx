@@ -31,7 +31,6 @@ type TComponent<T extends BaseConfig> = (props: {parent: BaseReactChart<T>}) => 
  */
 export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseChart {
     declare config: TConfig;
-    reactComponentFunction: TComponent<TConfig> = Fallback;
     constructor(dataStore, div, config: TConfig, ReactComponentFunction: TComponent<TConfig> = Fallback) {
         super(dataStore, div, config);
         makeAutoObservable(config);
