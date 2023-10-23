@@ -14,7 +14,7 @@ function Fallback() {
     </>
 }
 
-export type BaseConfig = { id: string, width: number, height: number };
+export type BaseConfig = { id: string, size: [x: number, y: number] };
 type TComponent<T extends BaseConfig> = (props: {parent: BaseReactChart<T>}) => JSX.Element;
 
 /**
@@ -23,6 +23,11 @@ type TComponent<T extends BaseConfig> = (props: {parent: BaseReactChart<T>}) => 
  * Internally, this class uses mobx to make the config object observable, and creates a React root with the given
  * `ReactComponentFunction`. Use of MobX is hidden by this abstraction - but if we change to a different state management
  * system, it will have implications for downstream components that expect to react to changes in the config object.
+ * 
+ * As of this writing (2023-10-23), we may want to consider a different pattern for use of config properties...
+ * 
+ * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
+ * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
  */
 export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseChart {
     declare config: TConfig;

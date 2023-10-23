@@ -1,12 +1,10 @@
 import BaseChart from "../../charts/BaseChart";
-import { createRoot } from "react-dom/client";
 import DeckGL, { OrthographicView, ScatterplotLayer } from "deck.gl/typed";
 import { PictureInPictureViewer } from "@hms-dbmi/viv";
 import { useChannelStats, useChartID, useChartSize, useDataModel, useOmeTiff, useParamColumns } from "../hooks";
 import { useMemo, useState } from "react";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 
-// function ReactTest({ parent }: { parent: VivMdvReact }) {
 const ReactTest = ({ parent }: { parent: VivMdvReact }) => {
     const [width, height] = useChartSize(parent);
     const ome = useOmeTiff(parent.config.imageURL);

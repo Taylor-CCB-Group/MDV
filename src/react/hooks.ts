@@ -4,19 +4,18 @@ import { DataModel } from "../table/DataModel";
 import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
 
 export function useChartSize(chart: BaseChart) {
+    // return chart.config.size; // not so well behaved?
     const div = chart.contentDiv;
-    const [width, setWidth] = useState(div.clientWidth);
-    const [height, setHeight] = useState(div.clientHeight);
+    const [size, setSize] = useState([div.clientWidth, div.clientHeight]);
     useEffect(() => {
         const resize = () => {
-            setWidth(div.clientWidth);
-            setHeight(div.clientHeight);
+            setSize([div.clientWidth, div.clientHeight]);
         };
         const observer = new ResizeObserver(resize);
         observer.observe(div);
         return () => observer.unobserve(div);
     }, [div]);
-    return [width, height];
+    return size;
 }
 
 /**
