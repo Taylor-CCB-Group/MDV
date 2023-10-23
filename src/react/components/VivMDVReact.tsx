@@ -4,11 +4,10 @@ import DeckGL, { OrthographicView, ScatterplotLayer } from "deck.gl/typed";
 import { PictureInPictureViewer } from "@hms-dbmi/viv";
 import { useChannelStats, useChartID, useChartSize, useDataModel, useOmeTiff, useParamColumns } from "../hooks";
 import { useMemo, useState } from "react";
-import { makeAutoObservable } from "mobx";
-import { observer } from "mobx-react-lite";
+import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 
 // function ReactTest({ parent }: { parent: VivMdvReact }) {
-const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
+const ReactTest = ({ parent }: { parent: VivMdvReact }) => {
     const [width, height] = useChartSize(parent);
     const ome = useOmeTiff(parent.config.imageURL);
     const view = useMemo(()=>new OrthographicView({}), []);
@@ -88,11 +87,11 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
         </DeckGL> */}
         </>
     );
-});
+};
 
-type VivMdvReactConfig = { channel: number, imageURL: string };
+type VivMdvReactConfig = { channel: number, imageURL: string } & BaseConfig;
 
-class VivMdvReact extends BaseChart {
+class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     declare config: VivMdvReactConfig; // saves us from adding a generic type param on ~BaseChart
     // ^^ may still consider a BaseReactChart class that extends BaseChart with a few more react-related boilerplate,
     // as well as a bit more type safety etc.
@@ -100,18 +99,7 @@ class VivMdvReact extends BaseChart {
     // it would be good to have a common ancestor class that handles that consistently.
     constructor(dataStore, div, config: VivMdvReactConfig) {
         if (!config.channel) config.channel = 0;
-        super(dataStore, div, config);
-        makeAutoObservable(config);
-        Object.defineProperty(this, 'config', { 
-            enumerable: true,
-            configurable: true,
-            get: () => config,
-            set: (v) => {
-                config = v;
-                makeAutoObservable(config);
-            }
-         });
-        createRoot(this.contentDiv).render(<ReactTest parent={this} />);
+        super(dataStore, div, config, ReactTest);
     }
     getSettings(): { type: string; label: string; current_value: any; func: (v: any) => void; }[] {
         const c = this.config;
