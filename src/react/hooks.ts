@@ -75,32 +75,3 @@ export function useChannelStats(ome: OME_TIFF, channel: number) {
     }, [ome, channel]);
     return channelStats;
 }
-
-/**
- * This hook allows you to use a named member from a chart's config object as a react state variable.
- * 
- * ## notes:
- * *This design is not final and may actually be more broken than it appears.*
- * Probably better to use mobx instead, at least in the short term.
- * 
- * @param chart - the chart to get the config item from. If the class of the chart explicity declares the config type,
- * this will be used to infer the type of the returned value.
- * 
- * Otherwise, it will be `any`.
- * @param key 
- */
-export function useConfigItem<T extends BaseChart, K extends keyof T["config"]>(chart: T, key: K) {
-    const [value, setValue] = useState<T["config"][K]>(chart.config[key]);
-    useEffect(() => {
-        Object.defineProperty(chart.config, key, {
-            get() {
-                // **this is closed on the initial value when the property is defined; not what we want.**
-                return value;
-            },
-            set(val) {
-                setValue(val);
-            }
-        });
-    }, [chart.config, key, chart.config[key]]);
-    return value;
-}

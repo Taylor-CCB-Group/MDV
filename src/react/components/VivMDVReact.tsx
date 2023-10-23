@@ -2,10 +2,13 @@ import BaseChart from "../../charts/BaseChart";
 import { createRoot } from "react-dom/client";
 import DeckGL, { OrthographicView, ScatterplotLayer } from "deck.gl/typed";
 import { PictureInPictureViewer } from "@hms-dbmi/viv";
-import { useChannelStats, useChartID, useChartSize, useConfigItem, useDataModel, useOmeTiff, useParamColumns } from "../hooks";
+import { useChannelStats, useChartID, useChartSize, useDataModel, useOmeTiff, useParamColumns } from "../hooks";
 import { useMemo, useState } from "react";
+import { makeAutoObservable } from "mobx";
+import { observer } from "mobx-react-lite";
 
-function ReactTest({ parent }: { parent: VivMdvReact }) {
+// function ReactTest({ parent }: { parent: VivMdvReact }) {
+const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
     const [width, height] = useChartSize(parent);
     const ome = useOmeTiff(parent.config.imageURL);
     const view = useMemo(()=>new OrthographicView({}), []);
@@ -13,7 +16,7 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
     const id = useChartID(parent); // hook in case we want to change something about implementation later.
     // (in which case the hook signature will probably also change)
     
-    const channelX = useConfigItem(parent, 'channel');
+    const channelX = parent.config.channel;//useConfigItem(parent, 'channel');
     
     const stats = useChannelStats(ome, channelX);
     const contrastLimits = stats ? stats.contrastLimits : [0, 1];
@@ -85,7 +88,7 @@ function ReactTest({ parent }: { parent: VivMdvReact }) {
         </DeckGL> */}
         </>
     );
-}
+});
 
 type VivMdvReactConfig = { channel: number, imageURL: string };
 
@@ -98,6 +101,16 @@ class VivMdvReact extends BaseChart {
     constructor(dataStore, div, config: VivMdvReactConfig) {
         if (!config.channel) config.channel = 0;
         super(dataStore, div, config);
+        makeAutoObservable(config);
+        Object.defineProperty(this, 'config', { 
+            enumerable: true,
+            configurable: true,
+            get: () => config,
+            set: (v) => {
+                config = v;
+                makeAutoObservable(config);
+            }
+         });
         createRoot(this.contentDiv).render(<ReactTest parent={this} />);
     }
     getSettings(): { type: string; label: string; current_value: any; func: (v: any) => void; }[] {
