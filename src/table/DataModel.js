@@ -9,6 +9,7 @@ class DataModel {
             this.data[n]=n;
         }
         this.size=len;
+        this.listeners = {};
         if (config.autoupdate == null || config.autoupdate===true){
             dataStore.addListener("sss",(type)=>{
                 if (type==="filtered"){
@@ -16,8 +17,6 @@ class DataModel {
                 }
             });
         }
-       
-        this.listeners={}
     }
 
     getLength(){
