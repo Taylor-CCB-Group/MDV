@@ -4,6 +4,7 @@ import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@
 import { useChannelStats, useChartID, useChartSize, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
+import { action, makeObservable, observable } from "mobx";
 
 // we need to add observer here, not just in BaseReactChart, for HMR to work.
 const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
@@ -25,7 +26,7 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
         data,
         opacity: 0.5,
         radiusScale: 10,
-        getFillColor: [0, 200, 200],
+        getFillColor: parent.colorBy ?? [0, 200, 200],
         getRadius: 1,
         getPosition: (i, {target}) => {
             // how slow is a callback function here?
@@ -36,9 +37,15 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
             target[1] = cy.data[i];
             target[2] = 0;
             return target as unknown as Float32Array; // 🤮 deck.gl types are wrong AFAICT
+        },
+        updateTriggers: {
+            getFillColor: parent.colorBy,
         }
     });
     if (!ome) return <div>Loading...</div>; // todo suspense.
+    // note: higher-level VivViewer components remove some control over how we use layers
+    // and some other props (e.g. if we wanted to override cursor style for lasso mode, we'd be SOL).
+    // ... that may mean that the specific benefits of React over other frameworks may be less relevant.
     const detailView = new DetailView({
         id: id+'detail-react',
         snapScaleBar: true,
@@ -56,12 +63,11 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
         viewStates: [],
         props: layerConfig
     });
-    const { SizeX, SizeY } = ome.metadata.Pixels;
     return (
         <> 
             {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
             <br />
-            {contrastLimits[0]}-{contrastLimits[1]}
+            {contrastLimits[0][0]}-{contrastLimits[0][1]}
             <br />
             {data.length} points
         <DeckGL id={id + 'deck'} 
@@ -86,7 +92,29 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         if (!config.channel) config.channel = 0;
         if (config.overviewOn === undefined) config.overviewOn = false;
         super(dataStore, div, config, ReactTest);
+        makeObservable(this, {
+            colorBy: observable,
+            colorByColumn: action,
+            colorByDefault: action,
+        });
     }
+    // next up... colorBy (for the scatterplot)...
+    // I'd like to be able to have more of a layer-based thing...
+    // I'd also quite like not to have these classes have non-trivial amounts of code in them...
+    // For now, what I should do is a thing that bridges the existing colorBy stuff
+    colorBy?: (i: number) => [r: number, g: number, b: number];
+    colorByColumn(col: string) {
+        this.colorBy = this.getColorFunction(col, true);
+    }
+    colorByDefault() {
+        this.colorBy = null;
+    }
+    getColorOptions() {
+        return {
+            colorby: "all"
+        }
+    }
+
     getSettings(): { type: string; label: string; current_value: any; func: (v: any) => void; }[] {
         const c = this.config;
         const settings = super.getSettings();
