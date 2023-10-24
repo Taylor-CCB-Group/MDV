@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import BaseChart from "../charts/BaseChart";
-import { DataModel } from "../table/DataModel";
 import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
+import { BaseReactChart } from "./components/BaseReactChart";
 
 export function useChartSize(chart: BaseChart) {
     // return chart.config.size; // not so well behaved?
@@ -26,20 +26,21 @@ export function useChartID(chart: BaseChart) {
     return chart.config.id;
 }
 
-export function useDataModel(chart: BaseChart) {
-    const { dataStore } = chart;
-    const [dataModel, setDataModel] = useState(() => new DataModel(dataStore, { autoUpdate: true }));
+export function useFilteredIndices(chart: BaseReactChart<any>) {
+    const filterArray = chart.dataStore.filterArray as Uint8Array;
+    const [filteredIndices, setFilteredIndices] = useState<Uint32Array>(new Uint32Array(filterArray.length).map((_, i) => i));
     useEffect(() => {
-        dataModel.setColumns(chart.config.param);
-        dataModel.updateModel();
-    }, [dataModel]);
-    // as of now, config.param can't change, but I think it should be able to.
-    // this will need to be tested in that case.
-    useEffect(() => {
-        dataModel.setColumns(chart.config.param);
-        dataModel.updateModel();
-    }, [chart.config.param]);
-    return dataModel;
+        //this should definitely be shared between different charts...
+        //(one per DataStore)
+        //and the work should ideally be done in a worker on the SharedBuffer
+        const size = chart.dataStore.filterSize as number; // is there any chance the dataStore will change?
+        const indices = new Uint32Array(size);
+        for (let i = 0, j = 0; i < filterArray.length; i++) {
+            if (filterArray[i] === 0) indices[j++] = i;
+        }
+        setFilteredIndices(indices);
+    }, [chart.dataFilterSignal]);
+    return filteredIndices;
 }
 
 export function useParamColumns(chart: BaseChart) {
@@ -74,3 +75,26 @@ export function useChannelStats(ome: OME_TIFF, channel: number) {
     }, [ome, channel]);
     return channelStats;
 }
+
+// mobx for everything?
+// we could have a config.channelsState, in which case it shouldn't need
+// too much more architecture to make it work.
+// Color
+export type ChannelsState = {
+    channelsVisible: boolean[],
+    contrastLimits: [number, number][],
+    colors: [number, number, number][],
+    domains: [number, number][],
+    selections: { z: number, c: number, t: number }[],
+    ids: string[]
+}
+const DEFAUlT_CHANNEL_STATE = {
+    channelsVisible: [],
+    contrastLimits: [],
+    colors: [],
+    domains: [],
+    selections: [],
+    ids: [],
+    loader: [{ labels: [], shape: [] }],
+    image: 0
+};

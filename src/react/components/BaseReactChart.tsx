@@ -1,7 +1,8 @@
-import { makeAutoObservable } from "mobx";
+import { action, makeAutoObservable, makeObservable, observable } from "mobx";
 import { observer } from "mobx-react-lite";
 import BaseChart from "../../charts/BaseChart";
 import { createRoot } from "react-dom/client";
+import Dimension from "../../datastore/Dimension";
 
 function Fallback() {
     return <>
@@ -36,6 +37,8 @@ type TComponent<T extends BaseConfig> = (props: {parent: BaseReactChart<T>}) => 
 export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseChart {
     declare config: TConfig;
     useMobx = true;
+    dataFilter: Dimension | null = null;
+    dataFilterSignal = 0;
     constructor(dataStore, div, config: TConfig, ReactComponentFunction: TComponent<TConfig> = Fallback) {
         super(dataStore, div, config);
         makeAutoObservable(config);
@@ -46,10 +49,21 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
                 makeAutoObservable(config);
             }
         });
+        makeObservable(this, {
+            onDataFiltered: action,
+            dataFilter: observable,
+            dataFilterSignal: observable,
+        })
+        
         // note: applying observer here seems nice in that it means we can hide that implementation detail from child components,
         // but it stops HMR from working.
         // const Observed = observer(ReactComponentFunction);
         createRoot(this.contentDiv).render(<ReactComponentFunction parent={this} />);
+    }
+    onDataFiltered(dim: Dimension): void {
+        super.onDataFiltered(dim);
+        this.dataFilter = dim;
+        this.dataFilterSignal++;
     }
     remove(): void {
         // make sure dim and anything else relevant is removed...

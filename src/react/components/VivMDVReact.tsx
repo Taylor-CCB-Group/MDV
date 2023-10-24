@@ -1,7 +1,7 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { OrthographicView, ScatterplotLayer } from "deck.gl/typed";
-import { OverviewView, PictureInPictureViewer } from "@hms-dbmi/viv";
-import { useChannelStats, useChartID, useChartSize, useDataModel, useOmeTiff, useParamColumns } from "../hooks";
+import { PictureInPictureViewer } from "@hms-dbmi/viv";
+import { useChannelStats, useChartID, useChartSize, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
 import { useMemo, useState } from "react";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
@@ -22,7 +22,7 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
 
     const [viewState, setViewState] = useState<any>();
     
-    const { data } = useDataModel(parent);
+    const data = useFilteredIndices(parent); //<< subject to revision
     const [cx, cy] = useParamColumns(parent);
     const scatterplotLayer = new ScatterplotLayer({
         id: id+'scatter-react',
@@ -46,7 +46,7 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
 
     return (
         <> 
-            {true && <PictureInPictureViewer 
+            {false && <PictureInPictureViewer 
                 contrastLimits={[contrastLimits]}
                 colors={[[255, 255, 255]]}
                 channelsVisible={[true]}
@@ -56,16 +56,15 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
                 overview={{position: 'bottom-left'}}
                 overviewOn={parent.config.overviewOn}
                 height={height} width={width}
-                onViewStateChange={(viewState) => {
-                    // setViewState(viewState.viewState);//infinitely recursive
-                }}
+                // onViewStateChange={(viewState) => {
+                // }}
                 deckProps={{
                     // how to get the appropriate view so that scatterplotLayer is visible?
                     // can't get a ref to PIPViewer?
-                    views: [view],
+                    // views: [view],
                     layers: [scatterplotLayer],
                     style: {
-                        opacity: 1,
+                        opacity: 0.2,
                         zIndex: -10,
                         // display: 'none'
                     }
@@ -74,16 +73,18 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
             {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
             <br />
             {contrastLimits[0]}-{contrastLimits[1]}
-        {/* <DeckGL id={id + 'deck'} 
+            <br />
+            {data.length} points
+        <DeckGL id={id + 'deck'} 
         views={[view]}
         initialViewState={{
             target: [0, 0, 0],
             zoom: -10,
         }}
         // viewState={viewState}
-        // controller={true}
+        controller={true}
         layers={[scatterplotLayer]}>
-        </DeckGL> */}
+        </DeckGL>
         </>
     );
 });
