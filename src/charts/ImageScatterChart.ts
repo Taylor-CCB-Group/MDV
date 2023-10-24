@@ -31,7 +31,7 @@ class ImageScatterChart extends BaseChart {
         const canvas = this.canvas = createEl("canvas", {}, this.contentDiv);
         //const gl = canvas.getContext("webgl2"); // do we need to take care of disposing resources as well?
         const { base_url, image_key, texture_size } = config.images;
-        this.dataModel = new DataModel(dataStore, { autoUpdate: false });
+        this.dataModel = new DataModel(dataStore, { autoupdate: false });
         
         //---- PJT XXX::: this always trips me up... wasting too much time here...
         this.dataModel.setColumns([...config.param, image_key, config.image_title]);

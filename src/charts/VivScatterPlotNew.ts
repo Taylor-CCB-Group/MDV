@@ -47,7 +47,7 @@ class VivScatterPlotNew extends BaseChart {
         console.warn('VivScatterPlotNew is only for testing, and will almost certainly be removed soon.');
         this.id = nextID++;
         const canvas = this.canvas = createEl("canvas", {}, this.contentDiv);
-        this.dataModel = new DataModel(dataStore, { autoUpdate: true });
+        this.dataModel = new DataModel(dataStore, { autoupdate: true });
         this.dataModel.setColumns(config.param);
         this.dataModel.updateModel();
         // in future, something slightly more sophisticated than this...
