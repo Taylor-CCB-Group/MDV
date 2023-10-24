@@ -1,8 +1,7 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { OrthographicView, ScatterplotLayer } from "deck.gl/typed";
-import { PictureInPictureViewer } from "@hms-dbmi/viv";
+import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
 import { useChannelStats, useChartID, useChartSize, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
-import { useMemo, useState } from "react";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 
@@ -10,7 +9,6 @@ import { observer } from "mobx-react-lite";
 const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
     const [width, height] = useChartSize(parent);
     const ome = useOmeTiff(parent.config.imageURL);
-    const view = useMemo(()=>new OrthographicView({}), []);
     // const {id} = parent.config; //there should always be a persistent, reliable id here.
     const id = useChartID(parent); // hook in case we want to change something about implementation later.
     // (in which case the hook signature will probably also change)
@@ -18,10 +16,8 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
     const channelX = parent.config.channel;//useConfigItem(parent, 'channel');
     
     const stats = useChannelStats(ome, channelX);
-    const contrastLimits = stats ? stats.contrastLimits : [0, 1];
+    const contrastLimits = [stats ? stats.contrastLimits : [0, 1]];
 
-    const [viewState, setViewState] = useState<any>();
-    
     const data = useFilteredIndices(parent); //<< subject to revision
     const [cx, cy] = useParamColumns(parent);
     const scatterplotLayer = new ScatterplotLayer({
@@ -36,54 +32,47 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
             // given that we need to draw in data from multiple sources...
             // ... unless we want to do the work on a worker thread,
             // I don't think there's a significantly more efficient way
-            target[0] = 2*cx.data[i];
-            target[1] = 2*cy.data[i];
+            target[0] = cx.data[i];
+            target[1] = cy.data[i];
             target[2] = 0;
             return target as unknown as Float32Array; // 🤮 deck.gl types are wrong AFAICT
         }
     });
     if (!ome) return <div>Loading...</div>; // todo suspense.
-
+    const detailView = new DetailView({
+        id: id+'detail-react',
+        snapScaleBar: true,
+        width, height
+    });
+    const layerConfig = {
+        loader: ome.data,
+        selections: [{ z: 0, c: channelX, t: 0 }],
+        contrastLimits,
+        extensions: [new ColorPaletteExtension()], //garbage collection?
+        colors: [[255, 255, 255]],
+        channelsVisible: [true],
+    }
+    const detailLayers = detailView.getLayers({
+        viewStates: [],
+        props: layerConfig
+    });
+    const { SizeX, SizeY } = ome.metadata.Pixels;
     return (
         <> 
-            {false && <PictureInPictureViewer 
-                contrastLimits={[contrastLimits]}
-                colors={[[255, 255, 255]]}
-                channelsVisible={[true]}
-                loader={ome?.data}
-                selections={[{ z: 0, c: channelX, t: 0 }]}
-                snapScaleBar={true}
-                overview={{position: 'bottom-left'}}
-                overviewOn={parent.config.overviewOn}
-                height={height} width={width}
-                // onViewStateChange={(viewState) => {
-                // }}
-                deckProps={{
-                    // how to get the appropriate view so that scatterplotLayer is visible?
-                    // can't get a ref to PIPViewer?
-                    // views: [view],
-                    layers: [scatterplotLayer],
-                    style: {
-                        opacity: 0.2,
-                        zIndex: -10,
-                        // display: 'none'
-                    }
-                }}
-            />}
             {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
             <br />
             {contrastLimits[0]}-{contrastLimits[1]}
             <br />
             {data.length} points
         <DeckGL id={id + 'deck'} 
-        views={[view]}
-        initialViewState={{
-            target: [0, 0, 0],
-            zoom: -10,
+        views={[detailView.getDeckGlView()]}
+        initialViewState={getDefaultInitialViewState(ome.data, {width, height})}
+        style={{
+            zIndex: '-1',
         }}
         // viewState={viewState}
         controller={true}
-        layers={[scatterplotLayer]}>
+        layers={[detailLayers, scatterplotLayer]}>
         </DeckGL>
         </>
     );
@@ -115,14 +104,16 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.channel = x;
                 }
             },
-            {
-                type: "check",
-                label: "overview",
-                current_value: c.overviewOn || false,
-                func: x => {
-                    c.overviewOn = x;
-                }
-            }
+            // no longer using PictureInPictureViewer - would need to re-implement to some extent
+            // in order for combined viewer to work.
+            // {
+            //     type: "check",
+            //     label: "overview",
+            //     current_value: c.overviewOn || false,
+            //     func: x => {
+            //         c.overviewOn = x;
+            //     }
+            // }
         ]);
     }
 }
