@@ -64,7 +64,7 @@ class DataStore{
         makeAutoObservable(this); //for react / mobx
         // for re-usable filteredIndices
         this.addListener('invalidateFilteredIndicesCache',() => {
-            if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
+            //if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
             this._filteredIndicesPromise = null;
         });
 
