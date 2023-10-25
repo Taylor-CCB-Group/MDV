@@ -64,6 +64,7 @@ class DataStore{
         makeAutoObservable(this); //for react / mobx
         // for re-usable filteredIndices
         this.addListener('invalidateFilteredIndicesCache',() => {
+            if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
             this._filteredIndicesPromise = null;
         });
 
@@ -744,14 +745,15 @@ class DataStore{
      * @returns {Promise<Uint32Array>} A promise that resolves to an array of indexes
      */
     async getFilteredIndices() {
-        if (this._filteredIndicesPromise){
+        if (this._filteredIndicesPromise) {
+            // will be null if the filter has changed since the last call
             return this._filteredIndicesPromise;
         }
         this._filteredIndicesPromise = new Promise((resolve, reject) => {
             const worker = this._filteredIndexWorker;
             const byteLength = this.filterSize * Uint32Array.BYTES_PER_ELEMENT;
             const outputBuffer = new SharedArrayBuffer(byteLength);
-            // todo atomics...
+            // todo atomics... not really needed for this, but would be good to illustrate / learn.
             worker.postMessage({
                 filterBuffer: this.filterBuffer, outputBuffer
             });
