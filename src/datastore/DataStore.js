@@ -747,13 +747,15 @@ class DataStore{
             return this._filteredIndicesPromise;
         }
         this._filteredIndicesPromise = new Promise((resolve, reject) => {
-            // todo webworker
-            const indices = new Uint32Array(this.filterSize);
-            const { filterArray } = this;
-            for (let i = 0, j = 0; i < filterArray.length; i++) {
-                if (filterArray[i] === 0) indices[j++] = i;
-            }
-            resolve(indices);
+            const worker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url));
+            const byteLength = this.filterSize * Uint32Array.BYTES_PER_ELEMENT;
+            const outputBuffer = new SharedArrayBuffer(byteLength);
+            worker.postMessage({
+                filterBuffer: this.filterBuffer, outputBuffer
+            });
+            worker.onmessage = (e) => {
+                resolve(new Uint32Array(outputBuffer));
+            };
         });
 
         return this._filteredIndicesPromise;
