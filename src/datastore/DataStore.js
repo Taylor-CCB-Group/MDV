@@ -736,6 +736,7 @@ class DataStore{
     }
 
     _filteredIndicesPromise = null;
+    _filteredIndexWorker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url));
     /**
      * Get an array of indexes of all the items that are not filtered.
      * Subsequent calls will return a cached version of a reference to the promised array.
@@ -747,9 +748,10 @@ class DataStore{
             return this._filteredIndicesPromise;
         }
         this._filteredIndicesPromise = new Promise((resolve, reject) => {
-            const worker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url));
+            const worker = this._filteredIndexWorker;
             const byteLength = this.filterSize * Uint32Array.BYTES_PER_ELEMENT;
             const outputBuffer = new SharedArrayBuffer(byteLength);
+            // todo atomics...
             worker.postMessage({
                 filterBuffer: this.filterBuffer, outputBuffer
             });
