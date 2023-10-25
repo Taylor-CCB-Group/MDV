@@ -37,8 +37,6 @@ type TComponent<T extends BaseConfig> = (props: {parent: BaseReactChart<T>}) => 
 export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseChart {
     declare config: TConfig;
     useMobx = true;
-    dataFilter: Dimension | null = null;
-    dataFilterSignal = 0;
     constructor(dataStore, div, config: TConfig, ReactComponentFunction: TComponent<TConfig> = Fallback) {
         super(dataStore, div, config);
         makeAutoObservable(config);
@@ -49,21 +47,21 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
                 makeAutoObservable(config);
             }
         });
-        makeObservable(this, {
-            onDataFiltered: action,
-            dataFilter: observable,
-            dataFilterSignal: observable,
-        })
+
+        // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
+        // that worked, with extra extraneous number that changed to be observed by the hook...
+        // What I have now done is change DataStore to be observable, and added a method for getting filtered indices
+        // in a way that can be shared by different charts (react or otherwise).
         
         // note: applying observer here seems nice in that it means we can hide that implementation detail from child components,
         // but it stops HMR from working.
         // const Observed = observer(ReactComponentFunction);
-        createRoot(this.contentDiv).render(<ReactComponentFunction parent={this} />);
-    }
-    onDataFiltered(dim: Dimension): void {
-        super.onDataFiltered(dim);
-        this.dataFilter = dim;
-        this.dataFilterSignal++;
+        createRoot(this.contentDiv).render((
+            <>
+            {/* may want to wrap a context provider around this, so that we can use chart etc in hooks in the child components. */}
+            <ReactComponentFunction parent={this} />
+            </>
+        ));
     }
     remove(): void {
         // make sure dim and anything else relevant is removed...

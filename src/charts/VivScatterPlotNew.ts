@@ -34,7 +34,7 @@ class VivScatterPlotNew extends BaseChart {
     deck: Deck;
     detailView: DetailView;
     tiffLoader: Awaited<ReturnType<typeof loadOmeTiff>>;
-    dataModel: DataModel;
+    filteredIndices: Uint32Array;
     progress = 0;
     billboard = true;
     size = 13;
@@ -47,9 +47,11 @@ class VivScatterPlotNew extends BaseChart {
         console.warn('VivScatterPlotNew is only for testing, and will almost certainly be removed soon.');
         this.id = nextID++;
         const canvas = this.canvas = createEl("canvas", {}, this.contentDiv);
-        this.dataModel = new DataModel(dataStore, { autoupdate: true });
-        this.dataModel.setColumns(config.param);
-        this.dataModel.updateModel();
+        this.dataStore.getFilteredIndices().then((indices) => { this.filteredIndices = indices; });
+        this.dataStore.addListener('vivScatterPlotNew' + this.config.id, async () => {
+            this.filteredIndices = await this.dataStore.getFilteredIndices();
+            this.updateDeck();
+        });
         // in future, something slightly more sophisticated than this...
         loadOmeTiff(config.imageURL).then((tiff) => {
             this.tiffLoader = tiff;
@@ -90,7 +92,7 @@ class VivScatterPlotNew extends BaseChart {
         const cx = columnIndex[param[0]] as Column;
         const cy = columnIndex[param[1]] as Column;
         
-        const { data } = this.dataModel;
+        const data = this.filteredIndices;
         type K = number;
 
         function n(col: Column, i: number) {
@@ -141,10 +143,11 @@ class VivScatterPlotNew extends BaseChart {
         return layers;
     }
 
-    onDataFiltered(dim: Dimension) {
-        this.dataModel.updateModel();
-        this.updateDeck();
-    }
+    // no longer required.
+    // onDataFiltered(dim: Dimension) {
+    //     this.dataModel.updateModel();
+    //     this.updateDeck();
+    // }
 
     colorByColumn(col: string) {
         this.colorBy = this.getColorFunction(col, true);

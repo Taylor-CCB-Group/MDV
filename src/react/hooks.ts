@@ -30,16 +30,8 @@ export function useFilteredIndices(chart: BaseReactChart<any>) {
     const filterArray = chart.dataStore.filterArray as Uint8Array;
     const [filteredIndices, setFilteredIndices] = useState<Uint32Array>(new Uint32Array(filterArray.length).map((_, i) => i));
     useEffect(() => {
-        //this should definitely be shared between different charts...
-        //(one per DataStore)
-        //and the work should ideally be done in a worker on the SharedBuffer
-        const size = chart.dataStore.filterSize as number; // is there any chance the dataStore will change?
-        const indices = new Uint32Array(size);
-        for (let i = 0, j = 0; i < filterArray.length; i++) {
-            if (filterArray[i] === 0) indices[j++] = i;
-        }
-        setFilteredIndices(indices);
-    }, [chart.dataFilterSignal]);
+        chart.dataStore.getFilteredIndices().then(setFilteredIndices);
+    }, [chart.dataStore._filteredIndicesPromise]);
     return filteredIndices;
 }
 

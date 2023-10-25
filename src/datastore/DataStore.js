@@ -9,6 +9,7 @@ import "./DensityDimension.js"
 import {scaleLinear,scaleSymlog} from "d3-scale";
 import {getColorLegend,getColorBar} from "../utilities/Color.js"
 import {quantileSorted} from 'd3-array';
+import { makeAutoObservable } from "mobx";
 
 
 /**
@@ -59,6 +60,12 @@ class DataStore{
         this.syncColumnColors=[];
         this.linkColumns=[];
         this.regions=config.regions;
+
+        makeAutoObservable(this); //for react / mobx
+        // for re-usable filteredIndices
+        this.addListener('invalidateFilteredIndicesCache',() => {
+            this._filteredIndicesPromise = null;
+        });
 
         if (config.row_data_loader){
             if (!dataLoader?.rowDataLoader){
@@ -726,6 +733,30 @@ class DataStore{
                 return n;
             }
         }
+    }
+
+    _filteredIndicesPromise = null;
+    /**
+     * Get an array of indexes of all the items that are not filtered.
+     * Subsequent calls will return a cached version of a reference to the promised array.
+     * This cached reference is invalidated by any event that changes the filter.
+     * @returns {Promise<Uint32Array>} A promise that resolves to an array of indexes
+     */
+    async getFilteredIndices() {
+        if (this._filteredIndicesPromise){
+            return this._filteredIndicesPromise;
+        }
+        this._filteredIndicesPromise = new Promise((resolve, reject) => {
+            // todo webworker
+            const indices = new Uint32Array(this.filterSize);
+            const { filterArray } = this;
+            for (let i = 0, j = 0; i < filterArray.length; i++) {
+                if (filterArray[i] === 0) indices[j++] = i;
+            }
+            resolve(indices);
+        });
+
+        return this._filteredIndicesPromise;
     }
 
 
