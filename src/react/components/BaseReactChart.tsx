@@ -37,6 +37,7 @@ type TComponent<T extends BaseConfig> = (props: {parent: BaseReactChart<T>}) => 
 export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseChart {
     declare config: TConfig;
     useMobx = true;
+    root: ReturnType<typeof createRoot>;
     constructor(dataStore, div, config: TConfig, ReactComponentFunction: TComponent<TConfig> = Fallback) {
         super(dataStore, div, config);
         makeAutoObservable(config);
@@ -56,7 +57,8 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
         // note: applying observer here seems nice in that it means we can hide that implementation detail from child components,
         // but it stops HMR from working.
         // const Observed = observer(ReactComponentFunction);
-        createRoot(this.contentDiv).render((
+        this.root = createRoot(this.contentDiv);
+        this.root.render((
             <>
             {/* may want to wrap a context provider around this, so that we can use chart etc in hooks in the child components. */}
             <ReactComponentFunction parent={this} />
@@ -66,6 +68,7 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
     remove(): void {
         // make sure dim and anything else relevant is removed...
         // **is there any React teardown we should be considering?**
+        this.root.unmount();
         super.remove();
     }
 }
