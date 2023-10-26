@@ -205,7 +205,7 @@ class VivScatterPlotNew extends BaseChart {
 //      I'm going to make something with a much more basic option for imageURL... no use of 'regions' code for now.
 BaseChart.types["VivScatterPlotNew"] = {
     class: VivScatterPlotNew,
-    name: "Viv Scatter Plot (New)",
+    name: "Viv Scatter Plot (experimental / deprecated)",
     // required: ds => ds.regions?.avivator,
     params: [
         {
