@@ -1,10 +1,15 @@
 import BaseChart from "../../charts/BaseChart";
-import DeckGL, { OrthographicView, ScatterplotLayer } from "deck.gl/typed";
+import DeckGL, { ScatterplotLayer } from "deck.gl/typed";
 import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
-import { useChannelStats, useChartID, useChartSize, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, useChannelStats, useChartID, useChartSize, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
+import { BaseDialog } from "../../utilities/Dialog";
+
+// this pattern to be refined...
+//const ColorChannelDialog = BaseDialog.experiment['ColorDialogReact'] as typeof ColorDialogReactWrapper;
+
 
 // we need to add observer here, not just in BaseReactChart, for HMR to work.
 const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
@@ -19,13 +24,13 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
     const stats = useChannelStats(ome, channelX);
     const contrastLimits = [stats ? stats.contrastLimits : [0, 1]];
 
-    const data = useFilteredIndices(parent); //<< subject to revision
+    const data = useFilteredIndices(parent); // consider 'gray out' vs 'hide' for filtered points...
     const [cx, cy] = useParamColumns(parent);
     const scatterplotLayer = new ScatterplotLayer({
         id: id+'scatter-react',
         data,
-        opacity: 0.5,
-        radiusScale: 10,
+        opacity: 0.1,
+        radiusScale: 1,
         getFillColor: parent.colorBy ?? [0, 200, 200],
         getRadius: 1,
         getPosition: (i, {target}) => {
@@ -84,19 +89,35 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
     );
 });
 
-type VivMdvReactConfig = { channel: number, imageURL: string, overviewOn: boolean } & BaseConfig;
-
+export type VivMdvReactConfig = 
+{ channel: number, imageURL: string, overviewOn: boolean } 
+& BaseConfig & { image_settings: ChannelsState };
+export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
+    colorDialog: any;
     constructor(dataStore, div, config: VivMdvReactConfig) {
         // todo better default config
         if (!config.channel) config.channel = 0;
         if (config.overviewOn === undefined) config.overviewOn = false;
+        if (config.image_settings === undefined) config.image_settings = DEFAUlT_CHANNEL_STATE;
         super(dataStore, div, config, ReactTest);
         makeObservable(this, {
             colorBy: observable,
             colorByColumn: action,
             colorByDefault: action,
         });
+        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", (e) => {
+            // return;
+            if (!this.colorDialog) {
+                //this.colorDialog = new ColorChannelDialog(this);
+                // 🙄 HMR hack
+                this.colorDialog = new BaseDialog.experiment['ColorDialogReact'](this);
+            }
+        });
+    }
+    remove() {
+        super.remove();
+        if (this.colorDialog) this.colorDialog.close();
     }
     // next up... colorBy (for the scatterplot)...
     // I'd like to be able to have more of a layer-based thing...
@@ -162,6 +183,7 @@ BaseChart.types["VivMdvReact"] = {
     extra_controls: (ds) => {
         return [
             {
+                //todo use `regions` config... or make a different version that uses that...
                 type: "string",
                 name: "imageURL",
                 label: "ome.tiff URL",
@@ -170,7 +192,7 @@ BaseChart.types["VivMdvReact"] = {
         ]
     },
 };
-
+export type VivMdvReactType = typeof VivMdvReact;
 // we rely on the side-effect of this import to register the chart type
 ///- will register otherwise, but this tricks HMR into working...
 export default 42;

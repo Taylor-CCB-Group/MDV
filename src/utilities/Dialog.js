@@ -56,9 +56,8 @@ constructor (config={},content) {
     });
 
     this.dialog=createEl("div",{
-    classes:["ciview-dlg-content"]
-
-  },this.outer)
+      classes:["ciview-dlg-content"]
+    },this.outer);
 
     makeResizable(this.outer,{
       doc:config.doc,
@@ -179,11 +178,13 @@ constructor (config={},content) {
     }
   }
 
+  _closed = false;
   /**
   * Closes the dialog and removes it from the DOM
   */
   close(){
-    
+    if (this._closed) return;
+    this._closed = true;
     if (this.config.onclose){
       this.config.onclose();
     }
@@ -194,7 +195,7 @@ constructor (config={},content) {
   /**
   * This method should be overridden to add content to the dialog
   */
-  init(){}
+  init(content){}
 
   /**
   * This method should be overridden if the layout needs
@@ -246,6 +247,7 @@ function getTextInput(title,event,doc=document){
 
 }
 
+//move this, type it differently... figure out what it is that makes it tick, or not.
 BaseDialog.experiment = {};
 
 export {BaseDialog,getTextInput};

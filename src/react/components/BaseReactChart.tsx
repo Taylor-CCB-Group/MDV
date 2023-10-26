@@ -15,7 +15,7 @@ function Fallback() {
     </>
 }
 
-export type BaseConfig = { id: string, size: [x: number, y: number] };
+export type BaseConfig = { id: string, size: [x: number, y: number], title: string };
 type TComponent<T extends BaseConfig> = (props: {parent: BaseReactChart<T>}) => JSX.Element;
 
 /**
@@ -48,6 +48,7 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
                 makeAutoObservable(config);
             }
         });
+        //TODO get popouts working with this...
 
         // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
         // that worked, with extra extraneous number that changed to be observed by the hook...

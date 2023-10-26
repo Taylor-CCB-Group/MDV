@@ -60,6 +60,7 @@ async function loadData() {
             }
         }
     }
+    //todo fix searchParams when changing view.
     const cm = new ChartManager("app1", datasources, dataLoader, config, listener);
 
     function extraFeatures(i: number) {

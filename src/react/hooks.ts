@@ -27,10 +27,11 @@ export function useChartID(chart: BaseChart) {
 }
 
 export function useFilteredIndices(chart: BaseReactChart<any>) {
-    const filterArray = chart.dataStore.filterArray as Uint8Array;
-    const [filteredIndices, setFilteredIndices] = useState<Uint32Array>(new Uint32Array(filterArray.length).map((_, i) => i));
+    const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
     useEffect(() => {
         chart.dataStore.getFilteredIndices().then(setFilteredIndices);
+        // using _filteredIndicesPromise as a dependency is working reasonably well,
+        // but possibly needs a bit more thought.
     }, [chart.dataStore._filteredIndicesPromise]);
     return filteredIndices;
 }
@@ -80,13 +81,19 @@ export type ChannelsState = {
     selections: { z: number, c: number, t: number }[],
     ids: string[]
 }
-const DEFAUlT_CHANNEL_STATE = {
+export const DEFAUlT_CHANNEL_STATE = {
     channelsVisible: [],
     contrastLimits: [],
     colors: [],
     domains: [],
     selections: [],
     ids: [],
+    // not for serialization... think about this.
     loader: [{ labels: [], shape: [] }],
     image: 0
 };
+
+export function useChannelsState(state: ChannelsState) {
+    const [channelsState, setChannelsState] = useState(state);
+    return channelsState;
+}
