@@ -741,7 +741,8 @@ class DataStore{
     /**
      * Get an array of indexes of all the items that are not filtered.
      * Subsequent calls will return a cached version of a reference to the promised array.
-     * This cached reference is invalidated by any event that changes the filter.
+     * This cached reference is invalidated by any event on this DataStore 
+     * (and will trigger mobx/react when re-assigned).
      * @returns {Promise<Uint32Array>} A promise that resolves to an array of indexes
      */
     async getFilteredIndices() {
