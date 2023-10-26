@@ -1,16 +1,14 @@
 /// <reference types="vite/client" />
 import "./all_css";
 import "../charts/VivScatterPlotNew";
-import vSideEffect from "../react/components/VivMDVReact";
-console.log(vSideEffect);
+import HmrHack from "../react/HmrHack";
+HmrHack();
 import ChartManager from "../charts/ChartManager.js";
 // import "../charts/RowSummaryBox.js"; //> should this be in ChartManager along with default charts? how useful is it?
 
 import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
-import SideEffect from "../charts/dialogs/AnnotationDialogReact";
-console.log(SideEffect);
 import { fetchAndPatchJSON, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 
 const flaskURL = "";
@@ -79,7 +77,7 @@ async function loadData() {
                 const columns = datasources[i].columns.map(c => c.name);
                 cm.loadColumnSet(columns, dsName, () => { console.log("done loadColumnSet"); });
             });
-        }, 0);
+        }, 100);
     }
     datasources.forEach((ds, i) => extraFeatures(i));
 };
