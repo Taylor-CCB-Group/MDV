@@ -9,7 +9,7 @@ import "./DensityDimension.js"
 import {scaleLinear,scaleSymlog} from "d3-scale";
 import {getColorLegend,getColorBar} from "../utilities/Color.js"
 import {quantileSorted} from 'd3-array';
-import { makeAutoObservable } from "mobx";
+import { makeObservable, observable, action } from "mobx";
 
 
 /**
@@ -61,7 +61,15 @@ class DataStore{
         this.linkColumns=[];
         this.regions=config.regions;
 
-        makeAutoObservable(this); //for react / mobx
+        makeObservable(this, {
+            _filteredIndicesPromise: observable,
+            _callListeners: action,
+        }); //for react / mobx... makeAutoObservable causes problems with webworker.postMessage:
+        // `DOMException: Failed to execute 'postMessage' on 'Worker': [object Array] could not be cloned.`
+        // because it adds a mobx proxy to the array, which can't be cloned...
+        // so for now, rather than using makeAutoObservable, we'll just manually add the mobx stuff we need:
+        
+        
         // for re-usable filteredIndices
         this.addListener('invalidateFilteredIndicesCache',() => {
             //if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
@@ -1381,7 +1389,7 @@ class DataStore{
             }
             config.useValue=true;
         }
-        
+
         const data= c.data;
         const ov = config.overideValues|| {}
         let  colors  =  this.getColumnColors(column,config);
