@@ -2,12 +2,14 @@ import { action } from "mobx";
 import { ChannelsState, useOmeTiff } from "../hooks";
 import { VivMDVReact } from "./VivMDVReact";
 import { observer } from "mobx-react-lite";
+import { useChart } from "../context";
 
 
 // this should have enough context to know what channels are available...
 // and I really want to refactor so that I'm not passing the parent like this
 // in a way that is too specifically tied to VivMDVReact...
-export default observer(function MainVivColorDialog({parent}: {parent: VivMDVReact}) {
+export default observer(function MainVivColorDialog() {
+    const parent = useChart() as VivMDVReact;
     if (parent.config.type === 'VivMdvRegionReact') {
         return <div>Color channel selection not available for region views.</div>
     }

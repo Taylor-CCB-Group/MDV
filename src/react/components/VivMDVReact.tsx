@@ -1,13 +1,14 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { ScatterplotLayer } from "deck.gl/typed";
 import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, useChannelStats, useChart, useChartID, useChartSize, useConfig, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
 import { ROI, VivConfig } from "../viv_state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
+import { useChart } from "../context"; 
 
 
 // we need to add observer here, not just in BaseReactChart, for HMR to work.

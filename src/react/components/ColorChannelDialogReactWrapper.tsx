@@ -4,9 +4,10 @@ import type { VivMDVReact } from "./VivMDVReact";
 import { createEl } from "../../utilities/ElementsTyped";
 import { createRoot } from "react-dom/client";
 import Gui from "./ColorChannelComponents";
+import { ChartProvider } from "../context";
 
-const ColorChannelDialogReact = observer(function ColorChannelDialogReact({ parent }: { parent: VivMDVReact }) {
-    return (<Gui parent={parent} />)
+const ColorChannelDialogReact = observer(function ColorChannelDialogReact() {
+    return (<Gui />)
 });
 
 
@@ -28,7 +29,12 @@ class ColorDialogReactWrapper extends BaseDialog {
     init(parent: VivMDVReact) {
         const div = createEl('div', {}, this.dialog);
         this.root = createRoot(div);
-        this.root.render(<ColorChannelDialogReact parent={parent} />);
+        // todo use a portal, share a root & chart context with the parent?
+        this.root.render(
+            <ChartProvider chart={parent}>
+                <ColorChannelDialogReact />
+            </ChartProvider>
+        );
     }
     close() {
         super.close();

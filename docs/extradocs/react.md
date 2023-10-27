@@ -18,6 +18,10 @@ For each new chart type, an entry should be added to `BaseChart.types['ChartName
 
 ## State management
 
+`useConfig()` can be used to return `config` object that can be used to store mutable state. This is a `Proxy` that will trigger re-rendering of the component when it is mutated. This is the recommended way to store state that is specific to a particular chart instance.
+
+### Implementation details
+
 In order to make the mutable `config` object interoperable with React, we use [MobX](https://mobx.js.org/) to make it `observable`. `BaseReactChart` is responsible for this instrumentation.
 
 This means that in the React context, we can reference members of `config`, and the relevant parts of the component will be re-rendered when they change. These changes are incorporated into state-saving by MDV in the same way as other charts.
@@ -45,9 +49,11 @@ Note that the classes referenced in `BaseChart.types` entries **must not themsel
 // untested example illustrating the approach
 import { observer } from 'mobx-react-lite';
 import { BaseReactChart } from '/src/react/BaseReactChart';
+import { useChart } from "./context";
 
 // in future, we may be able to avoid applying `observer` at this point, but make it part of the `BaseReactChart` implementation, and potentially change that implementation to not use mobx
-const ReactGui = observer(({ chart }) => {
+const ReactGui = observer(() => {
+  const chart = useChart(); // this is a hook that returns the chart instance, see `hooks.ts` for others.
   return <div>{chart.title}</div>;
 });
 
@@ -56,6 +62,7 @@ class MyChart extends BaseReactChart {
   constructor(dataStore, div, config) {
     super(dataStore, div, config, ReactGui);
     // console.log('uncomment this line and add a new instance of this chart to see this message in the console')
+    // you could also make all kind of other changes to the class, and/or the `BaseChart.types["MyChart"]` entry, and see them reflected in new instances of the chart, but not existing ones
   }
 }
 
@@ -75,3 +82,6 @@ When the code for the above module changes, HMR will re-evaluate it, mutating th
 The different nature of the way state works in the React context allows those changes to be reflected in existing instances, without the need to refresh the page. Components and hooks should be able to be fairly freely imported and exported in whichever way is most convenient, without needing to worry about this.
 
 It would be possible - but probably unwise - to implement a mechanism that would allow the code for a class to be updated in-place, but this could be a lot of work, and would probably be quite fragile. It would also be somewhat explicitly tied to Vite in a way that should be avoided where possible.
+
+## Non-Chart components
+

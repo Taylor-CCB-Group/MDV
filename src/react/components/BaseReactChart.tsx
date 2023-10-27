@@ -1,9 +1,8 @@
-import { action, makeAutoObservable, makeObservable, observable } from "mobx";
-import { observer } from "mobx-react-lite";
+import { makeAutoObservable } from "mobx";
 import BaseChart from "../../charts/BaseChart";
 import { createRoot } from "react-dom/client";
-import Dimension from "../../datastore/Dimension";
-import { ChartContext } from "../hooks";
+import type DataStore from '../../datastore/DataStore'
+import { ChartProvider } from "../context";
 
 function Fallback() {
     return <>
@@ -12,7 +11,7 @@ function Fallback() {
         <p>As of this writing, in order to implement a new React-based chart, 
             make a class that extends BaseReactChart, and make it call the super constructor
             with an argument for the (mobx observable) function that does the react rendering.</p>
-        <p>TODO: documentation...</p>
+        <p>See `react.md` for more detail...</p>
     </>
 }
 
@@ -30,7 +29,7 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  * Base class for charts that use React.
  * 
  * Components should be functional, but will require a very thin wrapper class extending this, such
- * that any BaseChart methods called from outside will appropriately effect the component state.
+ * that any BaseChart methods called from outside will appropriately affect the component state.
  * 
  * Internally, this class uses mobx to make the config object observable, and creates a React root with the given
  * `ReactComponentFunction`. Use of MobX is hidden by this abstraction - but if we change to a different state management
@@ -46,7 +45,7 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
     declare config: TConfig;
     useMobx = true;
     root: ReturnType<typeof createRoot>;
-    constructor(dataStore, div, config: TConfig, ReactComponentFunction: TComponent<TConfig> = Fallback) {
+    protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: TConfig, ReactComponentFunction: TComponent<TConfig> = Fallback) {
         super(dataStore, div, config);
         makeAutoObservable(config);
         Object.defineProperty(this, 'config', {
@@ -63,14 +62,15 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
         // What I have now done is change DataStore to be observable, and added a method for getting filtered indices
         // in a way that can be shared by different charts (react or otherwise).
         
-        // note: applying observer here seems nice in that it means we can hide that implementation detail from child components,
-        // but it stops HMR from working.
+        // note: observer() needs to be applied at all levels of the component tree that need to react to changes in 
+        // any mobx state, so we can't just hide it in the base class.
+        // (although maybe we could design a hook that hides it?)
         // const Observed = observer(ReactComponentFunction);
         this.root = createRoot(this.contentDiv);
         this.root.render((
-            <ChartContext.Provider value={this}>
+            <ChartProvider chart={this}>
                 <ReactComponentFunction />
-            </ChartContext.Provider>
+            </ChartProvider>
         ));
     }
     remove(): void {

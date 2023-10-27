@@ -1,14 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
-import { BaseConfig, BaseReactChart } from "./components/BaseReactChart";
-
-export const ChartContext = createContext<BaseReactChart<any>>(undefined);
-
-export function useChart() {
-    const chart = useContext(ChartContext);
-    //todo: typing...
-    return chart;
-}
+import { BaseConfig } from "./components/BaseReactChart";
+import { useChart } from "./context";
 
 /**
  * Get the chart's config.
