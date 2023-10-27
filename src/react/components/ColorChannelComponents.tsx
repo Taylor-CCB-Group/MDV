@@ -8,6 +8,10 @@ import { observer } from "mobx-react-lite";
 // and I really want to refactor so that I'm not passing the parent like this
 // in a way that is too specifically tied to VivMDVReact...
 export default observer(function MainVivColorDialog({parent}: {parent: VivMDVReact}) {
+    if (parent.config.type === 'VivMdvRegionReact') {
+        return <div>Color channel selection not available for region views.</div>
+    }
+    else if (parent.config.type !== 'VivMdvReact') throw new Error('unexpected config type');
     // unfortunate to have another loader here - totally separate React root...
     const ome = useOmeTiff(parent.config.imageURL); 
     if (!ome) return <div>loading...</div>;
@@ -21,15 +25,20 @@ export default observer(function MainVivColorDialog({parent}: {parent: VivMDVRea
 
 
 const ChannelSelect = observer(({parent}: {parent: VivMDVReact}) => {
-    const ome = useOmeTiff(parent.config.imageURL);
+    const { config } = parent;
+    if (config.type === 'VivMdvRegionReact') {
+        return <div>Color channel selection not available for region views.</div>
+    }
+    else if (config.type !== 'VivMdvReact') throw new Error('unexpected config type');
+    const ome = useOmeTiff(config.imageURL);
     if (!ome) return <div>loading...</div>;
     const channelOptions = ome.metadata.Pixels.Channels.map((c, i) => (
         <option key={c.ID} value={i}>{c.Name}</option>
     ));
     return (
     <div>
-        <select value={parent.config.channel} onChange={
-            action(e => parent.config.channel = Number.parseInt(e.target.value))}>
+        <select value={config.channel} onChange={
+            action(e => config.channel = Number.parseInt(e.target.value))}>
             {channelOptions}
         </select>
     </div>

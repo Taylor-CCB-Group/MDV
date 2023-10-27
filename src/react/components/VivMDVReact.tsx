@@ -1,37 +1,42 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { ScatterplotLayer } from "deck.gl/typed";
 import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, useChannelStats, useChartID, useChartSize, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, useChannelStats, useChart, useChartID, useChartSize, useConfig, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-
-// this pattern to be refined...
-//const ColorChannelDialog = BaseDialog.experiment['ColorDialogReact'] as typeof ColorDialogReactWrapper;
+import { ROI, VivConfig } from "../viv_state";
+import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 
 
 // we need to add observer here, not just in BaseReactChart, for HMR to work.
-const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
-    const [width, height] = useChartSize(parent);
-    const ome = useOmeTiff(parent.config.imageURL);
-    // const {id} = parent.config; //there should always be a persistent, reliable id here.
-    const id = useChartID(parent); // hook in case we want to change something about implementation later.
+const ReactTest = observer(() => {
+    const config = useConfig<VivMdvReactConfig>();
+    if (config.type === 'VivMdvRegionReact') {
+        return <div>Color channel selection not available for region views.</div>
+    }
+    else if (config.type !== 'VivMdvReact') throw new Error('unexpected config type'); //type can be inferred after this check
+    const [width, height] = useChartSize();
+    const ome = useOmeTiff(config.imageURL);
+    // const {id} = config; //there should always be a persistent, reliable id here.
+    const id = useChartID(); // hook in case we want to change something about implementation later.
     // (in which case the hook signature will probably also change)
     
-    const channelX = parent.config.channel;//useConfigItem(parent, 'channel');
+    const channelX = config.channel;
+    const { colorBy } = useChart() as VivMdvReact; //<<< todo better types
     
     const stats = useChannelStats(ome, channelX);
     const contrastLimits = [stats ? stats.contrastLimits : [0, 1]];
 
-    const data = useFilteredIndices(parent); // consider 'gray out' vs 'hide' for filtered points...
-    const [cx, cy] = useParamColumns(parent);
+    const data = useFilteredIndices(); // consider 'gray out' vs 'hide' for filtered points...
+    const [cx, cy] = useParamColumns();
     const scatterplotLayer = new ScatterplotLayer({
         id: id+'scatter-react',
         data,
         opacity: 0.1,
         radiusScale: 1,
-        getFillColor: parent.colorBy ?? [0, 200, 200],
+        getFillColor: colorBy ?? [0, 200, 200],
         getRadius: 1,
         getPosition: (i, {target}) => {
             // how slow is a callback function here?
@@ -44,7 +49,7 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
             return target as unknown as Float32Array; // 🤮 deck.gl types are wrong AFAICT
         },
         updateTriggers: {
-            getFillColor: parent.colorBy,
+            getFillColor: colorBy,
         }
     });
     if (!ome) return <div>Loading...</div>; // todo suspense.
@@ -89,18 +94,51 @@ const ReactTest = observer(({ parent }: { parent: VivMdvReact }) => {
     );
 });
 
+/// some type stuff... common bits should probably move elsewhere...
+// even if the type isn't constrained beyond 'string' (which potentially in some cases it could be)
+// this kind of thing can potentially help DX and encourage appropriate values to be passed.
+type ColumnName = string; 
+export type ScatterPlotConfig = {
+    radius: number,
+    color_by: ColumnName,
+    color_legend: {
+        display: boolean,
+        // todo: add more options here...
+    },
+};
+export type VivRoiConfig = {
+    // making this 'type' very specific will let us infer the rest of the type, i.e.
+    // `if (config.type === 'VivMdvRegionReact')` will narrow the type to VivScatterConfig
+    // ... except that we also need to check the other condition, because 'string' could also be that.
+    // so it's not completely ideal.
+    type: "VivMdvRegionReact" | "viv_scatter_plot",
+    background_filter: {
+        column: ColumnName,
+        category: string,
+    },
+    roi: ROI,
+    viv: VivConfig,
+} & BaseConfig & ScatterPlotConfig;
+
 export type VivMdvReactConfig = 
-{ channel: number, imageURL: string, overviewOn: boolean } 
-& BaseConfig & { image_settings: ChannelsState };
+BaseConfig & ScatterPlotConfig & (
+    { type: 'VivMdvReact', channel: number, imageURL: string, overviewOn: boolean, } 
+    | VivRoiConfig
+) & { image_settings: ChannelsState };
 export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog: any;
     constructor(dataStore, div, config: VivMdvReactConfig) {
         // todo better default config
-        if (!config.channel) config.channel = 0;
-        if (config.overviewOn === undefined) config.overviewOn = false;
-        if (config.image_settings === undefined) config.image_settings = DEFAUlT_CHANNEL_STATE;
+        if (config.type === 'VivMdvRegionReact') {
+            config.image_settings = DEFAUlT_CHANNEL_STATE;
+        } else if (config.type === 'VivMdvReact') {
+            if (!config.channel) config.channel = 0;
+            if (config.overviewOn === undefined) config.overviewOn = false;
+            if (config.image_settings === undefined) config.image_settings = DEFAUlT_CHANNEL_STATE;
+        }
         super(dataStore, div, config, ReactTest);
+        this.colorByColumn(config.color_by);
         makeObservable(this, {
             colorBy: observable,
             colorByColumn: action,
@@ -124,10 +162,13 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     // I'd also quite like not to have these classes have non-trivial amounts of code in them...
     // For now, what I should do is a thing that bridges the existing colorBy stuff
     colorBy?: (i: number) => [r: number, g: number, b: number];
-    colorByColumn(col: string) {
+    colorByColumn(col?: ColumnName) {
+        if (!col) return this.colorByDefault();
+        this.config.color_by = col; //test this...
         this.colorBy = this.getColorFunction(col, true);
     }
     colorByDefault() {
+        this.config.color_by = null;
         this.colorBy = null;
     }
     getColorOptions() {
@@ -140,7 +181,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const c = this.config;
         const settings = super.getSettings();
         return settings.concat([
-            {
+            c.type === 'VivMdvReact' && {
                 // very crude placeholder for testing mechanism...
                 type: "slider",
                 label: "channel test",
@@ -170,6 +211,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 BaseChart.types["VivMdvReact"] = {
     "class": VivMdvReact,
     name: "VivMdvReact",
+    methodsUsingColumns: ["colorByColumn"], //consider annotations / different approach...
     params: [
         {
             type: "number",
@@ -192,6 +234,13 @@ BaseChart.types["VivMdvReact"] = {
         ]
     },
 };
+
+BaseChart.types["VivMdvRegionReact"] = {
+    ...BaseChart.types["viv_scatter_plot"],
+    "class": VivMdvReact,
+    name: "Viv Scatter Plot (react)",
+}
+
 export type VivMdvReactType = typeof VivMdvReact;
 // we rely on the side-effect of this import to register the chart type
 ///- will register otherwise, but this tricks HMR into working...

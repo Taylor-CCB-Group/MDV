@@ -1,9 +1,30 @@
-import { useEffect, useMemo, useState } from "react";
-import BaseChart from "../charts/BaseChart";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
-import { BaseReactChart } from "./components/BaseReactChart";
+import { BaseConfig, BaseReactChart } from "./components/BaseReactChart";
 
-export function useChartSize(chart: BaseChart) {
+export const ChartContext = createContext<BaseReactChart<any>>(undefined);
+
+export function useChart() {
+    const chart = useContext(ChartContext);
+    //todo: typing...
+    return chart;
+}
+
+/**
+ * Get the chart's config.
+ * 
+ * Must be used within a ChartContext.
+ * 
+ * Provided type parameter is not checked - in future it could probably
+ * be inferred from the chart type.
+ */
+export function useConfig<T extends BaseConfig>() {
+    const { config } = useChart();
+    return config as T; //todo: strict/inferred typing
+}
+
+export function useChartSize() {
+    const chart = useChart();
     // return chart.config.size; // not so well behaved?
     const div = chart.contentDiv;
     const [size, setSize] = useState([div.clientWidth, div.clientHeight]);
@@ -20,13 +41,17 @@ export function useChartSize(chart: BaseChart) {
 
 /**
  * Get the chart's ID.
- * consider context API for some of these things?
+ * 
+ * Must be used within a ChartContext.
  */
-export function useChartID(chart: BaseChart) {
+export function useChartID() {
+    const chart = useChart();
     return chart.config.id;
 }
 
-export function useFilteredIndices(chart: BaseReactChart<any>) {
+
+export function useFilteredIndices() {
+    const chart = useChart();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
     useEffect(() => {
         chart.dataStore.getFilteredIndices().then(setFilteredIndices);
@@ -36,7 +61,8 @@ export function useFilteredIndices(chart: BaseReactChart<any>) {
     return filteredIndices;
 }
 
-export function useParamColumns(chart: BaseChart) {
+export function useParamColumns() {
+    const chart = useChart();
     const { columnIndex } = chart.dataStore;
     const columns = useMemo(() => chart.config.param.map(name => columnIndex[name]), [chart.config.param]);
     return columns;
@@ -92,6 +118,15 @@ export const DEFAUlT_CHANNEL_STATE = {
     loader: [{ labels: [], shape: [] }],
     image: 0
 };
+const DEFAUlT_CHANNEL_VALUES = {
+  channelsVisible: true,
+  contrastLimits: [0, 65535],
+  colors: [255, 255, 255],
+  domains: [0, 65535],
+  selections: { z: 0, c: 0, t: 0 },
+  ids: ''
+};
+
 
 export function useChannelsState(state: ChannelsState) {
     const [channelsState, setChannelsState] = useState(state);

@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import BaseChart from "../../charts/BaseChart";
 import { createRoot } from "react-dom/client";
 import Dimension from "../../datastore/Dimension";
+import { ChartContext } from "../hooks";
 
 function Fallback() {
     return <>
@@ -15,8 +16,15 @@ function Fallback() {
     </>
 }
 
-export type BaseConfig = { id: string, size: [x: number, y: number], title: string };
-type TComponent<T extends BaseConfig> = (props: {parent: BaseReactChart<T>}) => JSX.Element;
+export type BaseConfig = { 
+    id: string, 
+    size: [x: number, y: number], 
+    title: string,
+    legend: string,
+    type: string,
+    param: string[],
+};
+type TComponent<T extends BaseConfig> = () => JSX.Element;
 
 /**
  * Base class for charts that use React.
@@ -60,10 +68,9 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
         // const Observed = observer(ReactComponentFunction);
         this.root = createRoot(this.contentDiv);
         this.root.render((
-            <>
-            {/* may want to wrap a context provider around this, so that we can use chart etc in hooks in the child components. */}
-            <ReactComponentFunction parent={this} />
-            </>
+            <ChartContext.Provider value={this}>
+                <ReactComponentFunction />
+            </ChartContext.Provider>
         ));
     }
     remove(): void {
