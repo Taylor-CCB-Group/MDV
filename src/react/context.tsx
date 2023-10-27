@@ -11,6 +11,7 @@ export function ChartProvider({ chart, children }: { chart: BaseReactChart<any>,
 
 export function useChart() {
     const chart = useContext(ChartContext);
+    if (!chart) throw new Error('no chart context');
     //todo: typing...
     return chart;
 }
