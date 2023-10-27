@@ -38,9 +38,14 @@
     </style>
 </head>
 <body>
+    <!-- todo get vite flask build working with this etc -->
+    <script src="public/serviceworker.js"></script>
     <div id="app1" class="all"></div>
     <!-- vite version... -->
-    <!-- <script src="./src/modules/obvios_index.ts" type="module"></script> -->
     <script src="./src/modules/static_index.ts" type="module"></script>
+    <script>
+        // consider routing... allowing main index to route to MDV vs other pages for managing projects etc.
+        if (window._mdvInit) _mdvInit('{{route}}')
+    </script>
 </body>
 </html>
