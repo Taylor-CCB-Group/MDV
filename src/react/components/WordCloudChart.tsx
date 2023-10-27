@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import BaseChart from "../../charts/BaseChart";
-import { createRoot } from "react-dom/client";
+import { BaseConfig, BaseReactChart } from "./BaseReactChart";
+import { useChart } from "../context";
+import { useChartID } from "../hooks";
 
-let ID = 0;
-function ReactTest({parent}) {
+function ReactTest() {
+    const parent = useChart();
     const {dataStore} = parent;
-    const [id] = useState(ID++);
+    const id = useChartID();
     const [filterSize, setFilterSize] = useState(dataStore.filterSize);
     const [dim] = useState(dataStore.getDimension("catcol_dimension"));
     const [words, setWords] = useState(['hello', 'world']);
@@ -55,20 +57,22 @@ function ReactTest({parent}) {
         }
     }, [dataStore, dim, text]);
     return (
-        <div style={{padding: '0.3em', overflow: 'auto'}}>
+        <div style={{padding: '0.3em', overflow: 'auto', color: 'white'}}>
         <h2>Words:</h2>
+        This component served as an earlier test for React charts, and is not currently used...
+        it might make sense to develop it a bit further, as a way to test out the new architecture.
+        But there are higher priorities.
         <pre>{JSON.stringify(words, null, 2)}</pre>
         </div>
     );
 }
 
-class ReactWordCloudChart extends BaseChart {
+type WordCloudConfig = {
+    wordSize: number;
+} & BaseConfig; //shouldn't BaseConfig be added by the base class?
+class ReactWordCloudChart extends BaseReactChart<WordCloudConfig> {
     constructor(dataStore, div, config) {
-        super(dataStore, div, config);
-        createRoot(this.contentDiv).render(<ReactTest parent={this} />);
-    }
-    drawChart() {
-        this._callListeners("text", "Hello World");
+        super(dataStore, div, config, ReactTest);
     }
     getSettings(): { type: string; label: string; current_value: any; func: (v: any) => void; }[] {
         const c = this.config;
@@ -82,7 +86,6 @@ class ReactWordCloudChart extends BaseChart {
                 max: 100,
                 func: x => {
                     c.wordSize = x;
-                    this.drawChart();
                 }
             }
         ]);
@@ -95,7 +98,7 @@ class ReactWordCloudChart extends BaseChart {
 
 BaseChart.types["WordCloud2"] = {
     "class": ReactWordCloudChart,
-    name: "WordCloud Chart",
+    name: "WordCloud (React)",
     params: [
         {
             type: ["text", "multitext"],

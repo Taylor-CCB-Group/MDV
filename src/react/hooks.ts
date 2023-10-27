@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
 import { BaseConfig } from "./components/BaseReactChart";
-import { useChart } from "./context";
+import { useChart, useDataStore } from "./context";
 
 /**
  * Get the chart's config.
@@ -44,13 +44,13 @@ export function useChartID() {
 
 
 export function useFilteredIndices() {
-    const chart = useChart();
+    const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
     useEffect(() => {
-        chart.dataStore.getFilteredIndices().then(setFilteredIndices);
+        dataStore.getFilteredIndices().then(setFilteredIndices);
         // using _filteredIndicesPromise as a dependency is working reasonably well,
         // but possibly needs a bit more thought.
-    }, [chart.dataStore._filteredIndicesPromise]);
+    }, [dataStore._filteredIndicesPromise]);
     return filteredIndices;
 }
 

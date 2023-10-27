@@ -5,6 +5,8 @@ import SideEffect from "../charts/dialogs/AnnotationDialogReact";
 arr.push(SideEffect);
 import xx from "./components/ColorChannelDialogReactWrapper";
 arr.push(xx);
+import wc from './components/WordCloudChart'
+arr.push(wc);
 
 /**
  * Charts are registered with ChartManager by being added to a BaseChart.types object,
