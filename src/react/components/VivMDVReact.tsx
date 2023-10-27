@@ -72,7 +72,7 @@ const ReactTest = observer(() => {
     const detailLayers = detailView.getLayers({
         viewStates: [],
         props: layerConfig
-    });
+    }); //includes a ScaleBarLayer... but I'm not seeing it. Also... two xr-layer passes? (looking at spector draw calls)
     return (
         <> 
             {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
