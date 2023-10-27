@@ -47,7 +47,6 @@ export default defineConfig(env => { return {
         rollupOptions: {
             input: {
                 index: "./index.html",
-                obvios: resolve(__dirname, "src/obvios.html"),
             }
         }
     },
