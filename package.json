@@ -30,8 +30,12 @@
   },
   "homepage": "https://github.com/Taylor-CCB-Group/MDV#readme",
   "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
     "@hms-dbmi/viv": "^0.13.8",
     "@luma.gl/core": "^8.5.16",
+    "@mui/icons-material": "^5.14.15",
+    "@mui/material": "^5.14.15",
     "canvas-to-svg": "^1.0.3",
     "d3": "^7.6.1",
     "d3-contour": "^4.0.0",
@@ -57,6 +61,7 @@
     "wordcloud": "^1.2.2"
   },
   "devDependencies": {
+    "@types/react-dom": "^18.2.14",
     "@vitejs/plugin-react": "^4.0.1",
     "cross-env": "^7.0.3",
     "css-loader": "^6.7.1",
