@@ -5,6 +5,8 @@ import { useChart, useDataStore } from "./context";
 import { ChannelsState, VivConfig } from "./viv_state";
 import { VivRoiConfig } from "./components/VivMDVReact";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
+import { getRandomString } from "../utilities/Utilities";
+import { action } from "mobx";
 
 /**
  * Get the chart's config.
@@ -42,6 +44,14 @@ export function useChartSize() {
  */
 export function useChartID() {
     const chart = useChart();
+    if (!chart.config.id) {
+        // we were hitting this because of the way BaseReactChart was still using original config
+        // after super constructor had used a copy of it to set up the chart...
+        console.assert(chart.config.id, 'chart.config.id should not be undefined');
+        action(() => {
+            chart.config.id = getRandomString();
+        })();
+    }
     return chart.config.id;
 }
 

@@ -45,6 +45,7 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
     root: ReturnType<typeof createRoot>;
     protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: TConfig, ReactComponentFunction: TComponent<TConfig> = Fallback) {
         super(dataStore, div, config);
+        config = this.config; //original config will be copied by super, before doing things like adding id to it...
         makeAutoObservable(config);
         Object.defineProperty(this, 'config', {
             get: () => config,

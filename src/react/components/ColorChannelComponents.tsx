@@ -16,11 +16,11 @@ export default observer(function MainVivColorDialog() {
     }
     else if (parent.config.type !== 'VivMdvReact') throw new Error('unexpected config type');
     // unfortunate to have another loader here - totally separate React root...
-    const ome = useOmeTiff(parent.config.imageURL); 
+    const ome = useOmeTiff(); 
     if (!ome) return <div>loading...</div>;
     return (
     <div>
-        Name: {ome.metadata.Name}, URL: {parent.config.imageURL}
+        Name: {ome.metadata.Name}
         <ChannelSelect />
     </div>
     )
@@ -33,7 +33,7 @@ const ChannelSelect = observer(() => {
         return <div>Color channel selection not available for region views.</div>
     }
     else if (config.type !== 'VivMdvReact') throw new Error('unexpected config type');
-    const ome = useOmeTiff(config.imageURL);
+    const ome = useOmeTiff();
     if (!ome) return <div>loading...</div>;
     const channelOptions = ome.metadata.Pixels.Channels.map((c, i) => (
         <option key={c.ID} value={i}>{c.Name}</option>

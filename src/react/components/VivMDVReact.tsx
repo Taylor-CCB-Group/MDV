@@ -20,9 +20,10 @@ const ReactTest = observer(() => {
     const id = useChartID(); // hook in case we want to change something about implementation later.
     // (in which case the hook signature will probably also change)
     
-    const channelX = config.channel;
     const { colorBy } = useChart() as VivMdvReact; //<<< todo better types
     
+    const channelX = config.channel; //don't do this... use the proper image_properties
+    // and make it populate the channel state if necessary.
     const stats = useChannelStats(ome, channelX);
     const contrastLimits = [stats ? stats.contrastLimits : [0, 1]];
 
