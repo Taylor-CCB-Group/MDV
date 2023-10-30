@@ -19,7 +19,7 @@ import { makeObservable, observable, action } from "mobx";
 * @param {Object} [config] - setup information for the datastore.
 * @param {Object[]} [config.columns] - an array of column objects, specifying 
 * the metadata for data structure, see {@link DataStore#addColumn}
-* @param {Object[]} [config.columnGroups] - an array of objetcs each has
+* @param {Object[]} [config.columnGroups] - an array of objects each has
 * name, and a list of columns in that group
 * @param {Object} [config.links] - an object describing how this DataStore
 * links with other DataStore
@@ -27,9 +27,9 @@ import { makeObservable, observable, action } from "mobx";
 * are associated with each item/row in the DataStore
 * @param {Object} [config.large_iamges] - an object describing large images which
 * are associated with each item/row in the DataStore
-* @param {Object} [config.offsets] - an object specofying which columns can
+* @param {Object} [config.offsets] - an object specifying which columns can
 * have values that can be transformed and rotated and any transformations/
-* rotations appplied to them
+* rotations applied to them
 */
 
 class DataStore{
@@ -254,7 +254,7 @@ class DataStore{
     }
 
     /** 
-    * This method should be called if the any data has been modified, specifiying the
+    * This method should be called if any data has been modified, specifying the
     * columns involved.
     * Any dimensions will re-filter if necessary i.e. if the modified columns are 
     * involved in the filter and single filtered event will be broadcast.
@@ -287,10 +287,10 @@ class DataStore{
     }
 
     /**
-     * This method calls any listeners to 'highlight' any rows specified e.g
+     * This method calls any listeners to 'highlight' any rows specified e.g.
      * rows in a table or points in a scatter plot
      * @param {array} indexes an array of indexes to items that should be highlighted
-     * @param {object} source the obect doing the highlighting
+     * @param {object} source the object doing the highlighting
      */
     dataHighlighted(indexes,source){
         this.highightedData=indexes;
@@ -490,14 +490,14 @@ class DataStore{
     }
 
     /**
-     * This method will return (case insensetive) any values in the column
+     * This method will return (case-insensitive) any values in the column
      * which contain the specified text (unique/text/multitext columns only)
      * @param {*} text - the query value
      * @param {*} column - the column to query
      * @param {*} number  - the maximum number of results to return
      * @returns {object[]} An array of objects with
      * <ul>
-     *  <li>value-  the actual text match   </li>
+     *  <li>value - the actual text match   </li>
      *  <li>index - for unique columns, the row index and for 
      *   text/multitext its index in the column's values array</li>
      * </ul>
@@ -677,7 +677,7 @@ class DataStore{
 
     /**
     * Creates and returns a dimension that it used to filter and group the data
-    * @param {string} type - the dimension type , the built in dimensions are 
+    * @param {string} type - the dimension type , the built-in dimensions are
     * 'category_dimension' for text  columns and 'range_dimension' for number
     * columns
     * @returns {Dimension} A dimension that can be used for grouping/filtering 
@@ -697,14 +697,15 @@ class DataStore{
     * for all columns. As an object is created, this method is slow,
     * so it is advisable not to use it for many rows at once.
     * @param {integer} index - The index of the row
-    * @returns {Object} An object containg key(field)/value pairs. An extra
-    * variable 'index' contianing the row index is also added to the object
+    * @param {string[]?} columns - The ids of columns to use. If not provided, `columnsWithData` will be used.
+    * @returns {Object} An object containing key(field)/value pairs. An extra
+    * variable 'index' containing the row index is also added to the object
     */
     getRowAsObject(index,columns){
         if (!columns){
             columns= this.columnsWithData;
         }
-        const obj={}
+        const obj={} // pjt consider using Map if this is a bottleneck
         for (let c of columns){
             const col = this.columnIndex[c];
             let v= col.data[index];
@@ -734,7 +735,7 @@ class DataStore{
 
     /**
      * Returns the index of the first filtered item - slow
-     * @returns the index of the first filtered iten
+     * @returns the index of the first filtered item
      */
     getFirstFilteredIndex(){
         for (let n=0;n<this.size;n++){
@@ -776,10 +777,10 @@ class DataStore{
 
 
     /**
-     * Return an array of containing all the filterd values for
-     * the specified column - inefficent for large data sets
+     * Return an array of containing all the filtered values for
+     * the specified column - inefficient for large data sets
      * @param {string} column - the column's field.id
-     * @returns {string[]|number[]}  An array pf filtered valaues
+     * @returns {string[]|number[]}  An array pf filtered values
      */
     getFilteredValues(column){
         const arr =  new Array(this.filterSize);
@@ -883,7 +884,7 @@ class DataStore{
 
     //gets the offset values
     //single - the only value to offset or rotate otherwise
-    //the valuea are obtained from the offsets config
+    //the values are obtained from the offsets config
     //rotate true or false- to rotate if not then offset
     _getOffsetValues(single,rotation){
         const o = this.offsets;
@@ -959,7 +960,7 @@ class DataStore{
 
     /**
      * resets the columns offsets to default values
-     * @param {sring} [filter] - the filter value - or null if no filter
+     * @param {string} [filter] - the filter value - or null if no filter
      * @param {string} group - The group/category to reset
      * @param {boolean} update - whether to inform listeners data has changed 
      */
@@ -1460,7 +1461,7 @@ class DataStore{
      * Makes a color bar/legend based on the give column
      * @param {string} column - the field/id of the column 
      * @param {object} config - see [here]{@link DataStore#getColorFunction} 
-     * @returns {HMTLElemnt} - a color bar or color legend
+     * @returns {HTMLElement} - a color bar or color legend
      */
     getColorLegend(column,config={}){
         const colors = this.getColumnColors(column,config);
@@ -1541,9 +1542,9 @@ class DataStore{
     /**
      * Returns the colors that the column uses or default ones if none have been set
      * @param {string} column - the column's field or id
-     * @param {object} config - see see [here]{@link DataStore#getColorFunction} 
+     * @param {object} config - see [here]{@link DataStore#getColorFunction}
      * @returns {string[]} An array of colors. For text/multitext, the colors will correspond
-     * to the column's values. For double/intgers it will contain binned values fron the min
+     * to the column's values. For double/integers it will contain binned values from the min
      * to max value
      */
     getColumnColors(column,config={}){
@@ -1557,7 +1558,7 @@ class DataStore{
             const c_colors = ov.colors || (c.colors || defaultIPalette);
             const min = ov.min == undefined ? c.minMax[0]:ov.min;
             const max =  ov.max == undefined ? c.minMax[1]:ov.max;
-            //caclulate the color of each bin
+            //calculate the color of each bin
             const ls= linspace(min,max,c_colors.length);
             const scale =scaleLinear().domain(ls).range(c_colors).clamp(true);
             const bins = ov.bins || 100;
