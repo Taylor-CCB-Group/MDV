@@ -4,6 +4,7 @@ import { BaseConfig } from "./components/BaseReactChart";
 import { useChart, useDataStore } from "./context";
 import { ChannelsState, VivConfig } from "./viv_state";
 import { VivRoiConfig } from "./components/VivMDVReact";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 
 /**
  * Get the chart's config.
@@ -68,20 +69,32 @@ export function useParamColumns() {
 }
 
 type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
-export function useOmeTiff(url?: string) {
-    //one option here is to not pass url, but get it from context
-    //could be ambiguous though, and we might want to load multiple tiffs
-    //also I'm still faffing about establishing the types of config
+
+// slightly rough - we might have multiple images in a config, or generally think about this differently
+// this is breaking rules of hooks etc in short term while I figure out how to do this properly
+function useImgUrl() {
+    const config = useConfig() as any;
+    if (config.imageURL) return config.imageURL;
+    // see VivScatterPlot.afterAppCreation() ...
+    const { regions } = useDataStore();
+    if (!regions) throw `No image URL provided and no regions found in data store`; // plenty of other ways this could go wrong
+    const i = regions.all_regions[config.region].viv_image;
+    return i.url ? i.url : getProjectURL(regions.avivator.base_url) + i.file;
+}
+
+/**
+ * Get an OME tiff from the chart's config. As of now, this'll either look for config.imageURL,
+ * or attempt to ascertain a URL based on regions & other config...
+ * 
+ * This is likely to change in future - we want to support other image formats, and likely other forms of config etc.
+ */
+export function useOmeTiff() {
+    const url = useImgUrl();
     const [tiff, setTiff] = useState<OME_TIFF>();
     useEffect(() => {
         loadOmeTiff(url).then(setTiff);
     }, [url]);
     return tiff;
-}
-
-export function useVivRoiImage() {
-    const { viv } = useConfig() as VivRoiConfig;//unsafe
-    // viv.
 }
 
 /**

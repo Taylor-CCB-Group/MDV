@@ -14,12 +14,8 @@ import { useChart } from "../context";
 // we need to add observer here, not just in BaseReactChart, for HMR to work.
 const ReactTest = observer(() => {
     const config = useConfig<VivMdvReactConfig>();
-    if (config.type === 'VivMdvRegionReact') {
-        return <div>Color channel selection not available for region views.</div>
-    }
-    else if (config.type !== 'VivMdvReact') throw new Error('unexpected config type'); //type can be inferred after this check
     const [width, height] = useChartSize();
-    const ome = useOmeTiff(config.imageURL);
+    const ome = useOmeTiff();
     // const {id} = config; //there should always be a persistent, reliable id here.
     const id = useChartID(); // hook in case we want to change something about implementation later.
     // (in which case the hook signature will probably also change)
@@ -121,23 +117,23 @@ export type VivRoiConfig = {
     },
     roi: ROI,
     viv: VivConfig,
-    image_properties: ChannelsState,
+    //image_properties: ChannelsState,
 } & BaseConfig & ScatterPlotConfig;
 
 export type VivMdvReactConfig = 
 BaseConfig & ScatterPlotConfig & (
-    { type: 'VivMdvReact', channel: number, imageURL: string, overviewOn: boolean, image_properties: ChannelsState } 
+    { type: 'VivMdvReact', imageURL: string, overviewOn: boolean, image_properties: ChannelsState } 
     | VivRoiConfig
-);
+) & { channel: number };
 export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog: any;
     constructor(dataStore, div, config: VivMdvReactConfig) {
         // todo better default config
+        if (!config.channel) config.channel = 0;
         if (config.type === 'VivMdvRegionReact') {
-            config.image_properties = DEFAUlT_CHANNEL_STATE;
+            if (!config.viv.image_properties) config.viv.image_properties = DEFAUlT_CHANNEL_STATE;
         } else if (config.type === 'VivMdvReact') {
-            if (!config.channel) config.channel = 0;
             if (config.overviewOn === undefined) config.overviewOn = false;
             if (config.image_properties === undefined) config.image_properties = DEFAUlT_CHANNEL_STATE;
         }
@@ -185,7 +181,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const c = this.config;
         const settings = super.getSettings();
         return settings.concat([
-            c.type === 'VivMdvReact' && {
+            {
                 // very crude placeholder for testing mechanism...
                 type: "slider",
                 label: "channel test",

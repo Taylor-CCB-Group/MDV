@@ -45,7 +45,8 @@ export type ChannelsState = {
 
 export type VivConfig = {
     channels: MdvVivChannelConfig[],
-    image_properties:  ChannelsState
+    image_properties:  ChannelsState,
+    url: string
 }
 
 export type ROI = {

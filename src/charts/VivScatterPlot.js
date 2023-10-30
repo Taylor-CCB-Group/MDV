@@ -240,7 +240,7 @@ class VivScatterPlot extends DensityScatterPlot{
                 const r  = this.dataStore.regions;
                 //local or remote url
                 if(r){
-                    const i = r.all_regions[c.region].viv_image;                  
+                    const i = r.all_regions[c.region].viv_image;
                     c.viv.url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file
                 }
                 this.viv = new VivViewerMDV(this.vivCanvas,c.viv,this.app);
