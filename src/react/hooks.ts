@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
 import { BaseConfig } from "./components/BaseReactChart";
 import { useChart, useDataStore } from "./context";
+import { ChannelsState, VivConfig } from "./viv_state";
+import { VivRoiConfig } from "./components/VivMDVReact";
 
 /**
  * Get the chart's config.
@@ -42,7 +44,11 @@ export function useChartID() {
     return chart.config.id;
 }
 
-
+/**
+ * Get a {Uint32Array} of the currently filtered indices.
+ * When the selection changes, this will asynchronously update.
+ * All users of the same data store share a reference to the same array.
+ */
 export function useFilteredIndices() {
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
@@ -62,12 +68,20 @@ export function useParamColumns() {
 }
 
 type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
-export function useOmeTiff(url: string) {
+export function useOmeTiff(url?: string) {
+    //one option here is to not pass url, but get it from context
+    //could be ambiguous though, and we might want to load multiple tiffs
+    //also I'm still faffing about establishing the types of config
     const [tiff, setTiff] = useState<OME_TIFF>();
     useEffect(() => {
         loadOmeTiff(url).then(setTiff);
     }, [url]);
     return tiff;
+}
+
+export function useVivRoiImage() {
+    const { viv } = useConfig() as VivRoiConfig;//unsafe
+    // viv.
 }
 
 /**
@@ -88,39 +102,8 @@ export function useChannelStats(ome: OME_TIFF, channel: number) {
     return channelStats;
 }
 
-// mobx for everything?
-// we could have a config.channelsState, in which case it shouldn't need
-// too much more architecture to make it work.
-// Color
-export type ChannelsState = {
-    channelsVisible: boolean[],
-    contrastLimits: [number, number][],
-    colors: [number, number, number][],
-    domains: [number, number][],
-    selections: { z: number, c: number, t: number }[],
-    ids: string[]
-}
-export const DEFAUlT_CHANNEL_STATE = {
-    channelsVisible: [],
-    contrastLimits: [],
-    colors: [],
-    domains: [],
-    selections: [],
-    ids: [],
-    // not for serialization... think about this.
-    loader: [{ labels: [], shape: [] }],
-    image: 0
-};
-const DEFAUlT_CHANNEL_VALUES = {
-  channelsVisible: true,
-  contrastLimits: [0, 65535],
-  colors: [255, 255, 255],
-  domains: [0, 65535],
-  selections: { z: 0, c: 0, t: 0 },
-  ids: ''
-};
 
-
+// -- signature/???
 export function useChannelsState(state: ChannelsState) {
     const [channelsState, setChannelsState] = useState(state);
     return channelsState;

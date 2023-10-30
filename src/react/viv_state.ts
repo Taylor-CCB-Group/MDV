@@ -1,7 +1,7 @@
 
 // --- copied straight from Avivator's code::: with notes for MDV ---
 
-const DEFAUlT_CHANNEL_STATE = {
+export const DEFAUlT_CHANNEL_STATE = {
     channelsVisible: [],
     contrastLimits: [],
     colors: [],
@@ -28,9 +28,24 @@ export type MdvVivChannelConfig = {
     visible?: boolean,
     contrastLimits?: [min: number, max: number],
     domains?: [min: number, max: number],
+
 }
+// mobx for everything? (may make sense but I'm not a huge fan)
+// we could have a config.channelsState, in which case it shouldn't need
+// too much more architecture to make it work.
+// Color
+export type ChannelsState = {
+    channelsVisible: boolean[],
+    contrastLimits: [number, number][],
+    colors: [number, number, number][],
+    domains: [number, number][],
+    selections: { z: number, c: number, t: number }[],
+    ids: string[]
+}
+
 export type VivConfig = {
-    channels: MdvVivChannelConfig[]
+    channels: MdvVivChannelConfig[],
+    image_properties:  ChannelsState
 }
 
 export type ROI = {

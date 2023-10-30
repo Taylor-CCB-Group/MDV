@@ -244,10 +244,8 @@ class DataStore{
                 if (f[n] === 1){
                     if(++this.filterArray[n]===1){
                         this.filterSize--;
-                    };
-
+                    }
                 }
-               
             }
         }
         this._callListeners("filtered","all_removed");

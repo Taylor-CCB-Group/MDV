@@ -32,11 +32,9 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  * that any BaseChart methods called from outside will appropriately affect the component state.
  * 
  * Internally, this class uses mobx to make the config object observable, and creates a React root with the given
- * `ReactComponentFunction`. Use of MobX is hidden by this abstraction - but if we change to a different state management
- * system, it will have implications for downstream components that expect to react to changes in the config object.
- * 
- * We could probably abstract that away more fully; if we always access the config object through a hook (which might internally
- * use context API), we can probably save ourselves from even needing to pass 'parent' as a prop.
+ * `ReactComponentFunction`. Use of MobX is intended to be hidden by this abstraction - but if we change to a
+ * different state management system, it will have implications for downstream components that expect to react to
+ * changes in the config object.
  * 
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
@@ -55,8 +53,6 @@ export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseCha
                 makeAutoObservable(config);
             }
         });
-        //TODO get popouts working with this...
-
         // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
         // that worked, with extra extraneous number that changed to be observed by the hook...
         // What I have now done is change DataStore to be observable, and added a method for getting filtered indices

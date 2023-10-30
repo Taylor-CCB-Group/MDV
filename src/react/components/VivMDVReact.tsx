@@ -1,12 +1,12 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { ScatterplotLayer } from "deck.gl/typed";
 import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
+import { useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ROI, VivConfig } from "../viv_state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig } from "../viv_state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useChart } from "../context"; 
 
@@ -57,6 +57,8 @@ const ReactTest = observer(() => {
     // note: higher-level VivViewer components remove some control over how we use layers
     // and some other props (e.g. if we wanted to override cursor style for lasso mode, we'd be SOL).
     // ... that may mean that the specific benefits of React over other frameworks may be less relevant.
+    // TODO get viv working in popouts (not a react thing - happens elsewhere
+    // - probably need to handle lost gl context)
     const detailView = new DetailView({
         id: id+'detail-react',
         snapScaleBar: true,
@@ -119,24 +121,25 @@ export type VivRoiConfig = {
     },
     roi: ROI,
     viv: VivConfig,
+    image_properties: ChannelsState,
 } & BaseConfig & ScatterPlotConfig;
 
 export type VivMdvReactConfig = 
 BaseConfig & ScatterPlotConfig & (
-    { type: 'VivMdvReact', channel: number, imageURL: string, overviewOn: boolean, } 
+    { type: 'VivMdvReact', channel: number, imageURL: string, overviewOn: boolean, image_properties: ChannelsState } 
     | VivRoiConfig
-) & { image_settings: ChannelsState };
+);
 export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog: any;
     constructor(dataStore, div, config: VivMdvReactConfig) {
         // todo better default config
         if (config.type === 'VivMdvRegionReact') {
-            config.image_settings = DEFAUlT_CHANNEL_STATE;
+            config.image_properties = DEFAUlT_CHANNEL_STATE;
         } else if (config.type === 'VivMdvReact') {
             if (!config.channel) config.channel = 0;
             if (config.overviewOn === undefined) config.overviewOn = false;
-            if (config.image_settings === undefined) config.image_settings = DEFAUlT_CHANNEL_STATE;
+            if (config.image_properties === undefined) config.image_properties = DEFAUlT_CHANNEL_STATE;
         }
         super(dataStore, div, config, ReactTest);
         this.colorByColumn(config.color_by);

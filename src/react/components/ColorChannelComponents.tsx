@@ -1,8 +1,9 @@
 import { action } from "mobx";
-import { ChannelsState, useOmeTiff } from "../hooks";
+import { useOmeTiff } from "../hooks";
 import { VivMDVReact } from "./VivMDVReact";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
+import { ChannelsState } from "../viv_state";
 
 
 // this should have enough context to know what channels are available...
@@ -20,14 +21,14 @@ export default observer(function MainVivColorDialog() {
     return (
     <div>
         Name: {ome.metadata.Name}, URL: {parent.config.imageURL}
-        <ChannelSelect parent={parent} />
+        <ChannelSelect />
     </div>
     )
 })
 
 
-const ChannelSelect = observer(({parent}: {parent: VivMDVReact}) => {
-    const { config } = parent;
+const ChannelSelect = observer(() => {
+    const { config } = useChart() as VivMDVReact;
     if (config.type === 'VivMdvRegionReact') {
         return <div>Color channel selection not available for region views.</div>
     }
