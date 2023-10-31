@@ -18,12 +18,6 @@ function ReactTest() {
     )
 }
 
-const Debug = observer(function Debug() {
-    return <div>
-        
-    </div>
-})
-
 // we need to add observer here, not just in BaseReactChart, for HMR to work.
 const MainChart = observer(() => {
     const config = useConfig<VivMdvReactConfig>();
@@ -93,11 +87,20 @@ const MainChart = observer(() => {
 type ColumnName = string; 
 export type ScatterPlotConfig = {
     radius: number,
+    opacity: number,
     color_by: ColumnName,
     color_legend: {
         display: boolean,
         // todo: add more options here...
     },
+};
+const scatterDefaults: ScatterPlotConfig = {
+    radius: 1,
+    opacity: 1,
+    color_by: null,
+    color_legend: {
+        display: false,
+    }
 };
 export type VivRoiConfig = {
     // making this 'type' very specific will let us infer the rest of the type, i.e.
@@ -124,6 +127,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog: any;
     constructor(dataStore, div, config: VivMdvReactConfig) {
         // todo better default config
+        config = {...scatterDefaults, ...config};
         if (!config.channel) config.channel = 0;
         if (config.type === 'VivMdvRegionReact') {
             if (!config.viv.image_properties) config.viv.image_properties = DEFAUlT_CHANNEL_STATE;
@@ -188,6 +192,28 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.channel = x;
                 }
             },
+            {
+                type: "slider",
+                label: "radius",
+                current_value: c.radius || 1,
+                min: 0,
+                max: 50,
+                continuous: true,
+                func: x => {
+                    c.radius = x;
+                }
+            },
+            {
+                type: "slider",
+                label: "opacity",
+                current_value: c.opacity || 1,
+                min: 0,
+                max: 1,
+                continuous: true,
+                func: x => {
+                    c.opacity = x;
+                }
+            }
             // no longer using PictureInPictureViewer - would need to re-implement to some extent
             // in order for combined viewer to work.
             // {

@@ -7,6 +7,7 @@ import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
 import { ScatterplotLayer } from "deck.gl/typed";
+import { ScatterPlotConfig } from "./components/VivMDVReact";
 
 /**
  * Get the chart's config.
@@ -16,7 +17,7 @@ import { ScatterplotLayer } from "deck.gl/typed";
  * Provided type parameter is not checked - in future it could probably
  * be inferred from the chart type.
  */
-export function useConfig<T extends BaseConfig>() {
+export function useConfig<T>() {
     const { config } = useChart();
     return config as T; //todo: strict/inferred typing
 }
@@ -133,13 +134,17 @@ export function useChannelStats(ome: OME_TIFF, channel: number) {
 export function useScatterplotLayer() {
     const id = useChartID();
     const colorBy = (useChart() as any).colorBy;
+    const config = useConfig<ScatterPlotConfig>();
+    // seem to be reacting fine to changes, why did I think I needed to use extra autorun or reaction?
+    const {opacity, radius} = config;
+    
     const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
     const scatterplotLayer = new ScatterplotLayer({
         id: id + 'scatter-react',
         data,
-        opacity: 0.1,
-        radiusScale: 1,
+        opacity,
+        radiusScale: radius,
         getFillColor: colorBy ?? [0, 200, 200],
         getRadius: 1,
         getPosition: (i, { target }) => {
