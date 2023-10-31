@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
 import { BaseConfig } from "./components/BaseReactChart";
 import { useChart, useDataStore } from "./context";
-import { ChannelsState, VivConfig } from "./viv_state";
-import { VivRoiConfig } from "./components/VivMDVReact";
+import type { OME_TIFF } from "./viv_state";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
@@ -78,8 +77,6 @@ export function useParamColumns() {
     return columns;
 }
 
-type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
-
 // slightly rough - we might have multiple images in a config, or generally think about this differently
 // this is breaking rules of hooks etc in short term while I figure out how to do this properly
 function useImgUrl() {
@@ -93,12 +90,19 @@ function useImgUrl() {
 }
 
 /**
+ * **Should only be used in OmeTiffProvider.**
+ * 
  * Get an OME tiff from the chart's config. As of now, this'll either look for config.imageURL,
  * or attempt to ascertain a URL based on regions & other config...
  * 
  * This is likely to change in future - we want to support other image formats, and likely other forms of config etc.
  */
-export function useOmeTiff() {
+export function useOmeTiffLoader() {
+    //uh oh... different ome state for every use of this hook... maybe we should use a context?
+    //or a zustand store?
+    //if we're using multiple images in the same Deck thing, may not fit well with context.
+    //(also wouldn't make sense for no-args function, so we could for now...)
+    ///--- for now, I'm going to reduce the places I call useOmeTiff()
     const url = useImgUrl();
     const [tiff, setTiff] = useState<OME_TIFF>();
     useEffect(() => {
@@ -125,9 +129,3 @@ export function useChannelStats(ome: OME_TIFF, channel: number) {
     return channelStats;
 }
 
-
-// -- signature/???
-export function useChannelsState(state: ChannelsState) {
-    const [channelsState, setChannelsState] = useState(state);
-    return channelsState;
-}

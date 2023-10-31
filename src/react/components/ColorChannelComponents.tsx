@@ -1,28 +1,20 @@
 import { action } from "mobx";
-import { useOmeTiff } from "../hooks";
+import { useChannelStats } from "../hooks";
 import { VivMDVReact } from "./VivMDVReact";
 import { observer } from "mobx-react-lite";
-import { useChart } from "../context";
-import { ChannelsState } from "../viv_state";
+import { OmeTiffProvider, useChart, useOmeTiff } from "../context";
+import { ChannelsState, useChannelsState } from "../viv_state";
+import { Button, InputLabel, MenuItem, Select, Slider } from "@mui/material";
 
 
-// this should have enough context to know what channels are available...
-// and I really want to refactor so that I'm not passing the parent like this
-// in a way that is too specifically tied to VivMDVReact...
 export default observer(function MainVivColorDialog() {
-    const parent = useChart() as VivMDVReact;
-    if (parent.config.type === 'VivMdvRegionReact') {
-        return <div>Color channel selection not available for region views.</div>
-    }
-    else if (parent.config.type !== 'VivMdvReact') throw new Error('unexpected config type');
-    // unfortunate to have another loader here - totally separate React root...
-    const ome = useOmeTiff(); 
-    if (!ome) return <div>loading...</div>;
     return (
-    <div>
-        Name: {ome.metadata.Name}
-        <ChannelSelect />
-    </div>
+        <OmeTiffProvider>
+            <div>
+                <ChannelContrastEditor index={0} />
+                <ChannelSelect />
+            </div>
+        </OmeTiffProvider>
     )
 })
 
@@ -36,28 +28,35 @@ const ChannelSelect = observer(() => {
     const ome = useOmeTiff();
     if (!ome) return <div>loading...</div>;
     const channelOptions = ome.metadata.Pixels.Channels.map((c, i) => (
-        <option key={c.ID} value={i}>{c.Name}</option>
+        <MenuItem key={c.ID} value={i}>{c.Name}</MenuItem>
     ));
     return (
     <div>
-        <select value={config.channel} onChange={
+        <InputLabel id="channel-select-label">Channel</InputLabel>
+        <Select value={config.channel} labelId="channel-select-label" label="Channel" onChange={
             action(e => config.channel = Number.parseInt(e.target.value))}>
             {channelOptions}
-        </select>
+        </Select>
+        <Button onClick={action(() => {
+            // add channel...
+        })}>Add channel</Button>
     </div>
     )
 });
 
-function ChannelContrastEditor({channelsState, channel}: {channelsState: ChannelsState, channel: number}) {
-    const [min, max] = channelsState.contrastLimits[channel];
-    // I think I'd rather have an array of channels objects, rather than arrays for each...
-    // number of channels is small, after all...
-    const color = channelsState.colors[channel];
+const ChannelContrastEditor = observer(function ChannelContrastEditor({index}: {index: number}) {
+    const channelsState = useChannelsState();
+    const ome = useOmeTiff();
+    const stats = useChannelStats(ome, 0);
+    //nb, this is unused copilot code... and the 'index' is not used sensibly...
+    const value = channelsState.contrastLimits[index] || stats?.contrastLimits;
     return (
-        <div>
-            <input type="number" value={min} onChange={action(e => channelsState.contrastLimits[channel][0] = Number.parseFloat(e.target.value))} />
-            <input type="number" value={max} onChange={action(e => channelsState.contrastLimits[channel][1] = Number.parseFloat(e.target.value))} />
-        </div>
+        value && <Slider
+            getAriaLabel={() => `Channel ${index} contrast`}
+            value={value}
+            min={0}
+            max={65536}
+            onChange={action((e, v) => channelsState.contrastLimits[index] = v as [number, number])}
+        />
     )
-
-}
+});

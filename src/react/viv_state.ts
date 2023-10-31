@@ -1,3 +1,10 @@
+import { useMemo } from "react";
+import { useConfig } from "./hooks";
+import { ColorPaletteExtension, loadOmeTiff } from "@hms-dbmi/viv";
+import { useOmeTiff } from "./context";
+
+export type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
+
 
 // --- copied straight from Avivator's code::: with notes for MDV ---
 
@@ -21,14 +28,13 @@ const DEFAUlT_CHANNEL_VALUES = {
     ids: ''
 };
 
-// --- following how VivViewMDV _parseChannels() works ---
+// --- following how VivViewerMDV _parseChannels() works ---
 export type MdvVivChannelConfig = {
     name: string,
     color?: `#${string}` | [r: number, g: number, b: number],
     visible?: boolean,
     contrastLimits?: [min: number, max: number],
     domains?: [min: number, max: number],
-
 }
 // mobx for everything? (may make sense but I'm not a huge fan)
 // we could have a config.channelsState, in which case it shouldn't need
@@ -56,3 +62,21 @@ export type ROI = {
     max_y: number,
 }
 
+export function useChannelsState() {
+    const config = useConfig<any>();
+    //todo something useful... some values...
+    return (config.image_properties || config.viv.image_properties) as ChannelsState;
+}
+
+export function useVivLayerConfig() {
+    const imageProps = useChannelsState();
+    const extensions = useMemo(() => [new ColorPaletteExtension()], []);
+
+    const ome = useOmeTiff(); 
+    if (!ome) return undefined;
+    return {
+        ...imageProps,
+        loader: ome.data,
+        extensions
+    }
+}

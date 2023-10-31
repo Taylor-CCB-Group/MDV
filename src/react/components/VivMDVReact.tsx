@@ -1,18 +1,31 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { ScatterplotLayer } from "deck.gl/typed";
 import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
-import { useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useOmeTiff, useParamColumns } from "../hooks";
+import { useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig } from "../viv_state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, useChannelsState, useVivLayerConfig } from "../viv_state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
-import { useChart } from "../context"; 
+import { OmeTiffProvider, useChart, useOmeTiff } from "../context"; 
 
+function ReactTest() {
+    return (
+    <OmeTiffProvider>
+        <MainChart />
+    </OmeTiffProvider>
+    )
+}
+
+const Debug = observer(function Debug() {
+    return <div>
+        
+    </div>
+})
 
 // we need to add observer here, not just in BaseReactChart, for HMR to work.
-const ReactTest = observer(() => {
+const MainChart = observer(() => {
     const config = useConfig<VivMdvReactConfig>();
     const [width, height] = useChartSize();
     const ome = useOmeTiff();
@@ -25,8 +38,11 @@ const ReactTest = observer(() => {
     const channelX = config.channel; //don't do this... use the proper image_properties
     // and make it populate the channel state if necessary.
     const stats = useChannelStats(ome, channelX);
-    const contrastLimits = [stats ? stats.contrastLimits : [0, 1]];
+    const channelsState = useChannelsState();
+    const userSet = channelsState.contrastLimits && channelsState.contrastLimits.length > 0; //hack, for now.
+    const contrastLimits = userSet ? channelsState.contrastLimits : [stats ? stats.contrastLimits : [0, 1]];
 
+    // todo put this into a hook...
     const data = useFilteredIndices(); // consider 'gray out' vs 'hide' for filtered points...
     const [cx, cy] = useParamColumns();
     const scatterplotLayer = new ScatterplotLayer({
@@ -50,7 +66,10 @@ const ReactTest = observer(() => {
             getFillColor: colorBy,
         }
     });
-    if (!ome) return <div>Loading...</div>; // todo suspense.
+
+
+    const layerConfig = useVivLayerConfig();
+    if (!ome || !layerConfig) return <div>Loading...</div>; // todo suspense.
     // note: higher-level VivViewer components remove some control over how we use layers
     // and some other props (e.g. if we wanted to override cursor style for lasso mode, we'd be SOL).
     // ... that may mean that the specific benefits of React over other frameworks may be less relevant.
@@ -61,7 +80,7 @@ const ReactTest = observer(() => {
         snapScaleBar: true,
         width, height
     });
-    const layerConfig = {
+    const layerConfigX = {
         loader: ome.data,
         selections: [{ z: 0, c: channelX, t: 0 }],
         contrastLimits,
@@ -69,9 +88,11 @@ const ReactTest = observer(() => {
         colors: [[255, 255, 255]],
         channelsVisible: [true],
     }
+    // pending proper channel state handling... show that we can set contrast limits.
+    if (userSet) layerConfigX.contrastLimits = contrastLimits;
     const detailLayers = detailView.getLayers({
         viewStates: [],
-        props: layerConfig
+        props: layerConfigX
     }); //includes a ScaleBarLayer... but I'm not seeing it. Also... two xr-layer passes? (looking at spector draw calls)
     return (
         <> 
@@ -165,7 +186,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorBy?: (i: number) => [r: number, g: number, b: number];
     colorByColumn(col?: ColumnName) {
         if (!col) return this.colorByDefault();
-        this.config.color_by = col; //test this...
+        this.config.color_by = col;
         this.colorBy = this.getColorFunction(col, true);
     }
     colorByDefault() {
@@ -212,7 +233,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 BaseChart.types["VivMdvReact"] = {
     "class": VivMdvReact,
     name: "VivMdvReact",
-    methodsUsingColumns: ["colorByColumn"], //consider annotations / different approach...
+    //methodsUsingColumns: ["colorByColumn"], //NO! thought this was relevant, but it's causing stack overflows... and not needed.
     params: [
         {
             type: "number",
