@@ -6,3 +6,8 @@ import "../css/fontawesome-5.15.3/all.min.css";
 import "../webgl/css/wgl2di.css";
 import "../table/css/slickgrid.css";
 import "../browser/css/browser.css";
+
+import '@fontsource/roboto/300.css';
+import '@fontsource/roboto/400.css';
+import '@fontsource/roboto/500.css';
+import '@fontsource/roboto/700.css';
