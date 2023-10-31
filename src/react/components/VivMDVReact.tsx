@@ -9,6 +9,7 @@ import { BaseDialog } from "../../utilities/Dialog";
 import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, useChannelsState, useVivLayerConfig } from "../viv_state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useChart, useOmeTiff } from "../context"; 
+import { useEffect, useState } from "react";
 
 function ReactTest() {
     return (
@@ -17,6 +18,18 @@ function ReactTest() {
     </OmeTiffProvider>
     )
 }
+
+const Debug = observer(() => {
+    const config = useConfig<VivMdvReactConfig>();
+    const id = useChartID();
+    const ome = useOmeTiff();
+    const channelX = config.channel;
+    return (
+        <div>
+            {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
+        </div>
+    )
+});
 
 // we need to add observer here, not just in BaseReactChart, for HMR to work.
 const MainChart = observer(() => {
@@ -36,6 +49,15 @@ const MainChart = observer(() => {
     const scatterplotLayer = useScatterplotLayer();
 
     const layerConfig = useVivLayerConfig();
+    const [viewState, setViewState] = useState<ReturnType<typeof getDefaultInitialViewState>>();
+    useEffect(() => {
+        if (!ome) return;
+        if (!viewState) {
+            //WIP
+            setViewState(getDefaultInitialViewState(ome.data, {width, height}));
+        }
+    }, [ome])
+
     if (!ome || !layerConfig) return <div>Loading...</div>; // todo suspense.
     // note: higher-level VivViewer components remove some control over how we use layers
     // and some other props (e.g. if we wanted to override cursor style for lasso mode, we'd be SOL).
@@ -63,13 +85,12 @@ const MainChart = observer(() => {
     }); //includes a ScaleBarLayer... but I'm not seeing it. Also... two xr-layer passes? (looking at spector draw calls)
     return (
         <> 
-            {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
-            <br />
+            <Debug />
             {contrastLimits[0][0]}-{contrastLimits[0][1]}
-            <br />
         <DeckGL id={id + 'deck'} 
         views={[detailView.getDeckGlView()]}
-        initialViewState={getDefaultInitialViewState(ome.data, {width, height})}
+        initialViewState={viewState}
+        // onViewStateChange={}
         style={{
             zIndex: '-1',
         }}
