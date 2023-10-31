@@ -6,6 +6,7 @@ import type { OME_TIFF } from "./viv_state";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
+import { ScatterplotLayer } from "deck.gl/typed";
 
 /**
  * Get the chart's config.
@@ -129,3 +130,31 @@ export function useChannelStats(ome: OME_TIFF, channel: number) {
     return channelStats;
 }
 
+export function useScatterplotLayer() {
+    const id = useChartID();
+    const colorBy = (useChart() as any).colorBy;
+    const data = useFilteredIndices();
+    const [cx, cy] = useParamColumns();
+    const scatterplotLayer = new ScatterplotLayer({
+        id: id + 'scatter-react',
+        data,
+        opacity: 0.1,
+        radiusScale: 1,
+        getFillColor: colorBy ?? [0, 200, 200],
+        getRadius: 1,
+        getPosition: (i, { target }) => {
+            // how slow is a callback function here?
+            // given that we need to draw in data from multiple sources...
+            // ... unless we want to do the work on a worker thread,
+            // I don't think there's a significantly more efficient way
+            target[0] = cx.data[i];
+            target[1] = cy.data[i];
+            target[2] = 0;
+            return target as unknown as Float32Array; // 🤮 deck.gl types are wrong AFAICT
+        },
+        updateTriggers: {
+            getFillColor: colorBy,
+        }
+    });
+    return scatterplotLayer;
+}

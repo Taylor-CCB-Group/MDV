@@ -1,7 +1,7 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { ScatterplotLayer } from "deck.gl/typed";
 import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
-import { useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import { useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useParamColumns, useScatterplotLayer } from "../hooks";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
@@ -29,11 +29,8 @@ const MainChart = observer(() => {
     const config = useConfig<VivMdvReactConfig>();
     const [width, height] = useChartSize();
     const ome = useOmeTiff();
-    // const {id} = config; //there should always be a persistent, reliable id here.
-    const id = useChartID(); // hook in case we want to change something about implementation later.
-    // (in which case the hook signature will probably also change)
     
-    const { colorBy } = useChart() as VivMdvReact; //<<< todo better types
+    const id = useChartID();
     
     const channelX = config.channel; //don't do this... use the proper image_properties
     // and make it populate the channel state if necessary.
@@ -42,31 +39,7 @@ const MainChart = observer(() => {
     const userSet = channelsState.contrastLimits && channelsState.contrastLimits.length > 0; //hack, for now.
     const contrastLimits = userSet ? channelsState.contrastLimits : [stats ? stats.contrastLimits : [0, 1]];
 
-    // todo put this into a hook...
-    const data = useFilteredIndices(); // consider 'gray out' vs 'hide' for filtered points...
-    const [cx, cy] = useParamColumns();
-    const scatterplotLayer = new ScatterplotLayer({
-        id: id+'scatter-react',
-        data,
-        opacity: 0.1,
-        radiusScale: 1,
-        getFillColor: colorBy ?? [0, 200, 200],
-        getRadius: 1,
-        getPosition: (i, {target}) => {
-            // how slow is a callback function here?
-            // given that we need to draw in data from multiple sources...
-            // ... unless we want to do the work on a worker thread,
-            // I don't think there's a significantly more efficient way
-            target[0] = cx.data[i];
-            target[1] = cy.data[i];
-            target[2] = 0;
-            return target as unknown as Float32Array; // 🤮 deck.gl types are wrong AFAICT
-        },
-        updateTriggers: {
-            getFillColor: colorBy,
-        }
-    });
-
+    const scatterplotLayer = useScatterplotLayer();
 
     const layerConfig = useVivLayerConfig();
     if (!ome || !layerConfig) return <div>Loading...</div>; // todo suspense.
@@ -100,7 +73,6 @@ const MainChart = observer(() => {
             <br />
             {contrastLimits[0][0]}-{contrastLimits[0][1]}
             <br />
-            {data.length} points
         <DeckGL id={id + 'deck'} 
         views={[detailView.getDeckGlView()]}
         initialViewState={getDefaultInitialViewState(ome.data, {width, height})}
