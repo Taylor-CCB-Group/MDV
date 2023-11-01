@@ -9,7 +9,7 @@ import { BaseDialog } from "../../utilities/Dialog";
 import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, useChannelsState, useVivLayerConfig } from "../viv_state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useChart, useOmeTiff } from "../context"; 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 function ReactTest() {
     return (
@@ -31,14 +31,12 @@ const Debug = observer(() => {
     )
 });
 
-// we need to add observer here, not just in BaseReactChart, for HMR to work.
-const MainChart = observer(() => {
+const DeckImpl = observer(() => {
+    const ome = useOmeTiff();
     const config = useConfig<VivMdvReactConfig>();
     const [width, height] = useChartSize();
-    const ome = useOmeTiff();
-    
     const id = useChartID();
-    
+
     const channelX = config.channel; //don't do this... use the proper image_properties
     // and make it populate the channel state if necessary.
     const stats = useChannelStats(ome, channelX);
@@ -54,53 +52,62 @@ const MainChart = observer(() => {
         if (!ome) return;
         if (!viewState) {
             //WIP
-            setViewState(getDefaultInitialViewState(ome.data, {width, height}));
+            setViewState(getDefaultInitialViewState(ome.data, { width, height }));
         }
-    }, [ome])
-
-    if (!ome || !layerConfig) return <div>Loading...</div>; // todo suspense.
+    }, [ome]);
+    const extensions = useMemo(() => [new ColorPaletteExtension()], []);
+    const detailView = useMemo(() => new DetailView({
+        id: id + 'detail-react',
+        snapScaleBar: true,
+        width, height //thought it wasn't making a difference if these get updated, but it does. HMR weirdness?
+    }), [id, width, height]);
+    const views = useMemo(() => [detailView.getDeckGlView()], [detailView]);
     // note: higher-level VivViewer components remove some control over how we use layers
     // and some other props (e.g. if we wanted to override cursor style for lasso mode, we'd be SOL).
     // ... that may mean that the specific benefits of React over other frameworks may be less relevant.
     // TODO get viv working in popouts (not a react thing - happens elsewhere
     // - probably need to handle lost gl context)
-    const detailView = new DetailView({
-        id: id+'detail-react',
-        snapScaleBar: true,
-        width, height
-    });
     const layerConfigX = {
         loader: ome.data,
         selections: [{ z: 0, c: channelX, t: 0 }],
         contrastLimits,
-        extensions: [new ColorPaletteExtension()], //garbage collection?
+        extensions,
         colors: [[255, 255, 255]],
         channelsVisible: [true],
     }
     // pending proper channel state handling... show that we can set contrast limits.
     if (userSet) layerConfigX.contrastLimits = contrastLimits;
-    const detailLayers = detailView.getLayers({
+    const detailLayers = useMemo(() => detailView.getLayers({
         viewStates: [],
         props: layerConfigX
-    }); //includes a ScaleBarLayer... but I'm not seeing it. Also... two xr-layer passes? (looking at spector draw calls)
+    }), [layerConfigX]); //includes a ScaleBarLayer... but I'm not seeing it. Also... two xr-layer passes? (looking at spector draw calls)
     return (
-        <> 
+        <>
+            {width}x{height}
             <Debug />
             {contrastLimits[0][0]}-{contrastLimits[0][1]}
-        <DeckGL id={id + 'deck'} 
-        views={[detailView.getDeckGlView()]}
-        initialViewState={viewState}
-        // onViewStateChange={}
-        style={{
-            zIndex: '-1',
-        }}
-        // viewState={viewState}
-        controller={true}
-        layers={[detailLayers, scatterplotLayer]}>
-        </DeckGL>
+            <DeckGL id={id + 'deck'}
+                views={views}
+                /// either
+                initialViewState={viewState}
+                /// or (--slow--)
+                // onViewStateChange={e => setViewState(e.viewState)}
+                // viewState={viewState}
+                style={{
+                    zIndex: '-1',
+                }}
+                controller={true}
+                layers={[detailLayers, scatterplotLayer]}>
+            </DeckGL>
         </>
     );
 });
+
+const MainChart = () => {
+    const ome = useOmeTiff();
+    if (!ome) return <div>Loading...</div>; // todo suspense.
+    return <DeckImpl />;
+};
 
 /// some type stuff... common bits should probably move elsewhere...
 // even if the type isn't constrained beyond 'string' (which potentially in some cases it could be)
