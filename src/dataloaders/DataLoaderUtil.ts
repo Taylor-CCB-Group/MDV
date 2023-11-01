@@ -77,7 +77,6 @@ export function getDataLoader(isStaticFolder: boolean, datasources: Datasource[]
         rowDataLoader: loadRowDataStatic,
         binaryDataLoader: loadBinaryDataStatic
     } : {
-        // need to make these work with the new API
         function: getArrayBufferDataLoader(root+"/get_data"),
         viewLoader: getView,
         rowDataLoader: loadRowData,
