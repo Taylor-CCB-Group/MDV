@@ -6,15 +6,23 @@ import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, useChannelsState, useVivLayerConfig } from "../viv_state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useMetadata, useVivLayerConfig } from "../viv_state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useChart, useOmeTiff } from "../context"; 
 import { useEffect, useMemo, useState } from "react";
 
 function ReactTest() {
+    // to make this look more like Avivator...
+    // we probably don't want OmeTiffProvider to be a thing...
+    // we should use a VivProvider, with hooks that look more like Avivator's
+    // so VivProvider should have whatever is necessary to adapt our config to that
+    // and we'd useLoader() as opposed to useOmeTiff()
+    // ... and hopefully our version of Avivator hooks will have better types ...
     return (
     <OmeTiffProvider>
-        <MainChart />
+        <VivProvider>
+            <MainChart />
+        </VivProvider>
     </OmeTiffProvider>
     )
 }
@@ -23,10 +31,15 @@ const Debug = observer(() => {
     const config = useConfig<VivMdvReactConfig>();
     const id = useChartID();
     const ome = useOmeTiff();
+    const meta = useMetadata();
     const channelX = config.channel;
     return (
         <div>
             {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
+            <br />
+            <pre>
+                {JSON.stringify(meta, null, 2)}
+            </pre>
         </div>
     )
 });
@@ -241,9 +254,9 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 func: x => {
                     c.opacity = x;
                 }
-            }
+            },
             // no longer using PictureInPictureViewer - would need to re-implement to some extent
-            // in order for combined viewer to work.
+            // in order for combined viewer to work (also add overviewOn to every config)
             // {
             //     type: "check",
             //     label: "overview",
