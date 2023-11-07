@@ -436,7 +436,7 @@ class MDVProject:
                 add_column_to_group(col,dataframe[col["field"]],gr,size)
             except Exception as e:
                 dodgy_columns.append(col["field"])
-                warnings.warn(f"cannot add column {col['field']} to datasource {name}\n{e}")
+                warnings.warn(f"cannot add column '{col['field']}' to datasource '{name}'\n{e}")
 
         h5.close()
         columns = [x for x in columns if x["field"] not in dodgy_columns]
@@ -603,6 +603,7 @@ class MDVProject:
                 print("copying", image_set_name)
                 original_folder = image_set['original_folder']
                 copytree(original_folder, join(outdir, image_set['base_url']))
+            # TODO also copy any linked avivator images
 
     def save_state(self,state):
         #update/add or view
@@ -757,6 +758,8 @@ class MDVProject:
                 },
                 "images":{}
             }
+        # maybe warn if replacing existing regions
+        # or add to existing regions
         md["regions"]["all_regions"]=all_regions
         self.set_datasource_metadata(md)
 
@@ -816,7 +819,7 @@ class MDVProject:
         }
         self.set_datasource_metadata(md)
 
-    def add_viv_images(self,datasource,data):
+    def add_viv_images(self, datasource, data, link_images=True):
         md = self.get_datasource_metadata(datasource)
         try:
             a=md["regions"]["avivator"]
@@ -833,16 +836,29 @@ class MDVProject:
             if not region:
                 raise AttributeError(f"adding image to non existant region ({k}) in {datasource}")
             if v["path"].startswith("http"):
-                region["viv_image"]={
-                    "url":v["path"]
+                region["viv_image"] = {
+                    "url": v["path"]
                 }
             #local file - need to copy to images directory
+            #or remember where the file is - could make a link I suppose
+            #would that be safer?
             else:            
-                newname= get_random_string()+".ome.tiff"
-                shutil.copyfile(v["path"],join(imdir,newname))
-                region["viv_image"]={
-                    "file":newname
-                }
+                if not link_images:
+                    newname = get_random_string()+".ome.tiff"
+                    shutil.copyfile(v["path"],join(imdir,newname))
+                    region["viv_image"]={
+                        "file": newname
+                    }
+                else:
+                    try:
+                        os.link(v["path"], join(imdir, os.path.basename(v["path"])))
+                    except Exception as e:
+                        raise AttributeError(f"Cannot link viv image {v['path']} to {datasource}")
+                    region["viv_image"]={
+                        "file": os.path.basename(v["path"]),
+                        "linked_file": True
+                        # "original_folder": os.path.dirname(v["path"])
+                    }
         self.set_datasource_metadata(md)
 
 
