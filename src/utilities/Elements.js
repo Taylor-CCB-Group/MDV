@@ -111,9 +111,10 @@ export function createFilterElement(selectEl, parent) {
         }
     }, parent);
     filter.oninput = (e) => {
-        const val = e.target.value.toLowerCase();
+        const val = e.target.value.toLowerCase().split(" ");
         for (let o of selectEl.options) {
-            if (o.text.toLowerCase().indexOf(val) === -1) {
+            const filter = val.some((v) => o.text.toLowerCase().indexOf(v) === -1);
+            if (filter) {
                 o.style.display = "none";
             } else {
                 o.style.display = "block";
