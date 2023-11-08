@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
 import { BaseConfig } from "./components/BaseReactChart";
 import { useChart, useDataStore } from "./context";
@@ -7,7 +7,7 @@ import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
 import { ScatterplotLayer } from "deck.gl/typed";
-import { ScatterPlotConfig } from "./components/VivMDVReact";
+import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
 
 /**
  * Get the chart's config.
@@ -62,10 +62,26 @@ export function useChartID() {
  * All users of the same data store share a reference to the same array.
  */
 export function useFilteredIndices() {
+    // in the case of region data, it should be filtered by that as well...
+    // I really want to sort out how I use types here...
+    const config = useConfig<VivRoiConfig>();
+    const filterColumn = config.background_filter?.column;
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
     useEffect(() => {
-        dataStore.getFilteredIndices().then(setFilteredIndices);
+        dataStore.getFilteredIndices().then((indices) => {
+            if (filterColumn) {
+                const col = dataStore.columnIndex[filterColumn];
+                const filterValue = config.background_filter?.category;
+                if (filterValue) {
+                    const filterIndex = col.values.indexOf(filterValue);
+                    const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
+                    setFilteredIndices(filteredIndices);
+                    return;
+                }
+            }
+            setFilteredIndices(indices);
+        });
         // using _filteredIndicesPromise as a dependency is working reasonably well,
         // but possibly needs a bit more thought.
     }, [dataStore._filteredIndicesPromise]);
@@ -81,7 +97,7 @@ export function useParamColumns() {
 
 // slightly rough - we might have multiple images in a config, or generally think about this differently
 // this is breaking rules of hooks etc in short term while I figure out how to do this properly
-function useImgUrl() {
+export function useImgUrl() {
     const config = useConfig() as any;
     if (config.imageURL) return config.imageURL;
     // see VivScatterPlot.afterAppCreation() ...
