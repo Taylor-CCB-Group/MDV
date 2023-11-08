@@ -91,7 +91,12 @@ export function useFilteredIndices() {
 export function useParamColumns() {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
-    const columns = useMemo(() => chart.config.param.map(name => columnIndex[name]), [chart.config.param]);
+    const columns = useMemo(() => {
+        const param = chart.config.param;
+        if (!param) return [];
+        if (typeof chart.config.param === 'string') return [columnIndex[chart.config.param]];
+        return chart.config.param.map(name => columnIndex[name])
+    }, [chart.config.param]);
     return columns;
 }
 

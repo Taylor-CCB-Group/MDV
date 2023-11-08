@@ -21,7 +21,7 @@ export type BaseConfig = {
     title: string,
     legend: string,
     type: string,
-    param: string[],
+    param: string[] | string,
 };
 type TComponent<T extends BaseConfig> = () => JSX.Element;
 
