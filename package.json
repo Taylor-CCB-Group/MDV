@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite --host",
     "vite-build": "tsc && vite build",
-    "build": "webpack --config prod.config.js",
+    "build": "webpack --config prod.config.js --env process.env",
     "run-hyperion": "webpack  serve --config hyperion.dev.config.js",
     "run-obvios": "webpack  serve --config obvios.config.js",
     "run-ytrap": "webpack  serve --config ytrap.config.js",

@@ -2,7 +2,8 @@ const path = require('path');
 webpack = require("webpack");
 module.exports = (env) => {
     return {
-        entry: './src/modules/basic_index.js',
+        entry: env.nofont?'./src/modules/basic_index_nf.js':'./src/modules/basic_index.js',
+        mode:env.mode || "production",
         output: {
             path: env.outputpath || path.resolve(__dirname, "dist/basic"),
             filename: 'mdv.js',
