@@ -1,15 +1,30 @@
-import { createContext, useContext, useMemo, useRef } from "react";
+import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useRef } from "react";
 import { useConfig } from "./hooks";
 import { ColorPaletteExtension, loadOmeTiff } from "@hms-dbmi/viv";
 import { useOmeTiff } from "./context";
 import { createStore, useStore } from "zustand";
 import { observer } from "mobx-react-lite";
 import { VivMdvReactConfig } from "./components/VivMDVReact";
+import type { StoreApi } from "zustand";
 
+// what about loadOmeZarr, loadBioformatsZarr...
+// ... not to mention HTJ2K?
 export type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
 
+// --- some bits of Zustand type stuff that could go elsewhere (can't seem to import) ---
 
-// --- copied straight from Avivator's code::: with notes for MDV ---
+export type ExtractState<S> = S extends {
+  getState: () => infer T;
+}
+  ? T
+  : never;
+type ReadonlyStoreApi<T> = Pick<StoreApi<T>, "getState" | "subscribe">;
+type WithReact<S extends ReadonlyStoreApi<unknown>> = S & {
+  getServerState?: () => ExtractState<S>;
+};
+export type StoreType<T> = WithReact<StoreApi<T>>;
+
+// --- copied straight from Avivator's code::: with notes / changes for MDV ---
 import { RENDERING_MODES } from '@hms-dbmi/viv';
 
 const capitalize = string => string.charAt(0).toUpperCase() + string.slice(1);
@@ -120,6 +135,7 @@ export type VivConfig = {
   /// no: we should consider image_properties to be the 'state' - using zustand.
   // not part of the config - although we should make sure that config has appropriate
   // values to serialize.
+  // -- so this perhaps shouldn't be here...
   image_properties: ChannelsState,
   url: string
 }
@@ -138,7 +154,12 @@ export type ROI = {
  * So in order to have appropriate state for multiple MDV charts, we have a context that contains the stores for each.
  * Within this context, we should be able to use much the same API as Avivator.
  */
-const VivContext = createContext(null);
+type VivContextType = {
+  channelsStore: StoreType<ChannelsState>,
+  imageSettingsStore: StoreType<ImageState>,
+  viewerStore: StoreType<typeof DEFAULT_VIEWER_STATE>
+}
+const VivContext = createContext<VivContextType>(null);
 /**
  * not sure if it's a good idea to have an observer here...
  * vivConfig is the config from the MDV chart... For it to be any use, it should be
@@ -147,7 +168,7 @@ const VivContext = createContext(null);
  * 
  * But as for observing... I'm not sure we want to be messing with integrating mobx reactions into zustand?
  */
-export const VivProvider = observer(({ children }: { children: any }) => {
+export const VivProvider = observer(({ children }: PropsWithChildren) => {
   const vivConfig = useConfig<VivMdvReactConfig>();
   const channelsStoreRef = useRef(null);
   if (!channelsStoreRef.current) {
@@ -231,7 +252,7 @@ export const VivProvider = observer(({ children }: { children: any }) => {
   return (
     <VivContext.Provider value={{
       channelsStore: channelsStoreRef.current,
-      imageSettingsStoreRef: imageSettingsStoreRef.current,
+      imageSettingsStore: imageSettingsStoreRef.current,
       viewerStore: viewerStoreRef.current,
     }}>
       {children}
@@ -239,35 +260,39 @@ export const VivProvider = observer(({ children }: { children: any }) => {
   )
 });
 
+type StoreName = keyof VivContextType;
+// I don't think it's possible to make things like useChannelsStore.setState() work...
+// so we have these extra functions...
+function useStoreApi(storeName: StoreName) {
+  const store = useContext(VivContext);
+  if (!store) throw 'Viv state hooks must be used within a VivProvider';
+  return store[storeName];
+}
+export const useChannelsStoreApi = () => useStoreApi('channelsStore');
+export const useImageSettingsStoreApi = () => useStoreApi('imageSettingsStore');
+export const useViewerStoreApi = () => useStoreApi('viewerStore');
+
+
 /** should be more-or-less equivalent to equivalent avivator hook - 
  * but there can be multiple viv viewers, so we have context for that.
  */
 export const useChannelsStore = (selector) => {
-  const store = useContext(VivContext);
-  if (!store) {
-    throw new Error('useChannelStore must be used within a ChannelStoreProvider');
-  }
+  const store = useChannelsStoreApi();
   // apparently this is deprecated, even though it's still in the docs...
   // so, what was right with zustand v3 was changed in v4, and then changed again in v5?
   // smells like tedious maintenance to me - questioning the wisdom of using zustand in that case.
   // https://docs.pmnd.rs/zustand/previous-versions/zustand-v3-create-context#migration
-  return useStore(store.channelsStore, selector);
+  return useStore(store, selector);
 }
 
 export const useImageSettingsStore = (selector) => {
-  const store = useContext(VivContext);
-  if (!store) {
-    throw new Error('useImageSettingsStore must be used within a ChannelStoreProvider');
-  }
-  return useStore(store.imageSettingsStore, selector);
+  const store = useImageSettingsStoreApi();
+  return useStore(store, selector);
 }
 
-export const useViewerStore = (selector) => {
-  const store = useContext(VivContext);
-  if (!store) {
-    throw new Error('useViewerStore must be used within a ChannelStoreProvider');
-  }
-  return useStore(store.viewerStore, selector);
+export const useViewerStore = function useViewerStore(selector?) {
+  const store = useViewerStoreApi();
+  return useStore(store, selector);
 }
 
 export const useLoader = () => {

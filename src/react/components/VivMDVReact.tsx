@@ -1,12 +1,12 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { ScatterplotLayer } from "deck.gl/typed";
 import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
-import { useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useParamColumns, useScatterplotLayer } from "../hooks";
+import { useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useImgUrl, useParamColumns, useScatterplotLayer } from "../hooks";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useMetadata, useVivLayerConfig } from "../viv_state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useMetadata, useViewerStore, useViewerStoreApi, useVivLayerConfig } from "../viv_state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useChart, useOmeTiff } from "../context"; 
 import { useEffect, useMemo, useState } from "react";
@@ -45,6 +45,12 @@ const Debug = observer(() => {
 });
 
 const DeckImpl = observer(() => {
+    const imgUrl = useImgUrl();
+    const viewerStore = useViewerStoreApi();
+    useEffect(() => {
+        if (!imgUrl) return;
+        viewerStore.setState({ source: imgUrl });
+    }, [imgUrl, viewerStore]);
     const ome = useOmeTiff();
     const config = useConfig<VivMdvReactConfig>();
     const [width, height] = useChartSize();
@@ -97,7 +103,7 @@ const DeckImpl = observer(() => {
     return (
         <>
             {width}x{height}
-            <Debug />
+            {/* <Debug /> */}
             {contrastLimits[0][0]}-{contrastLimits[0][1]}
             <DeckGL id={id + 'deck'}
                 views={views}
