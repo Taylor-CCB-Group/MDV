@@ -877,13 +877,14 @@ def add_column_to_group(col,data,group,length):
             col["stringLength"]=max_len
             group.create_dataset(col["field"],length,data = data,dtype=utf8_type)
     elif col["datatype"]=="multitext":
+        delim = col.get("delimiter",",")
         values = set()
         maxv=0
         #first parse - get all possible values and max number
         #of values in a single field
         for v in data:
             try:
-                vs = v.split(",")
+                vs = v.split(delim)
             except:
                 continue
             values.update([x.strip() for x in vs])
@@ -902,7 +903,7 @@ def add_column_to_group(col,data,group,length):
             if v=="":
                 continue
             try:
-                vs = v.split(",")
+                vs = v.split(delim)
                 vs = [x.strip() for x in vs]
             except:
                 continue

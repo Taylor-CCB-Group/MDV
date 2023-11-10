@@ -416,12 +416,12 @@ class DataStore{
     * displayed on a log scale- useful if the dataset contains outliers. Because a symlog
     * scale is used the data can contain 0 and negative values
     * @param {SharedArrayBuffer|Array} [data] In the case of a double/integer (number) column, the array
-    * buffer should be the appropriate size to contain float32s. For text it shuold be Uint8
+    * buffer should be the appropriate size to contain float32s. For text it should be Uint8
     * and contain numbers corresponding to the indexes in the values parameter. For a column of
     * type unique it should be a JavaScript array. This parameter is optional as the data can
     * be added later see {@link DataStore#setColumnData}
     * @param {boolean} [dirty=false] if true then the store will keep a record that this column has
-    * been added and is not permanatly stored in the backend
+    * been added and is not permanently stored in the backend
     */
     addColumn(column,data=null,dirty=false){
         let c  = {
@@ -447,10 +447,11 @@ class DataStore{
             c.sgindex= column.sgindex;
             c.sgtype=column.sgtype;
         }
-       
-        
         if (column.datatype === "text" || column.datatype === "multitext"){
             c.stringLength= column.stringLength;
+            if (column.delimiter){
+                c.delimiter=column.delimiter;
+            }
             c.values = column.values || [`Error: no values for '${c.name}'`];
         }
         else if (column.datatype==="double" || column.datatype ==="integer" ||  column.datatype==="int32"){
@@ -474,7 +475,7 @@ class DataStore{
     }
 
     /**
-     * This method will return (case insensetive) any values in the column
+     * This method will return (case insensitive) any values in the column
      * which contain the specified text (unique/text/multitext columns only)
      * @param {*} text - the query value
      * @param {*} column - the column to query
@@ -702,8 +703,9 @@ class DataStore{
             }
             //multitext displayed as comma delimited values
             else if (col.datatype=="multitext"){
+                const delim = col.delimiter || ", ";
                 const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
-                v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(", ")
+                v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(delim);
 
             }
             else{
@@ -1242,6 +1244,7 @@ class DataStore{
 
         }
         else if (col.datatype=== "multitext"){
+            const delim = col.delimiter || ",";
             let vals = new Set();
             let max=0;
             //first parse - get all possible values and max number
