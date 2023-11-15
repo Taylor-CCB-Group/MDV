@@ -30,7 +30,7 @@ export default defineConfig(env => { return {
             },
             //will fail if url has search params
             //will cause problems if we have json files that don't want to be proxied
-            '^/.*\.(json|b|gz)$': {
+            '^/.*\\.(json|b|gz)$': {
                 target: flaskURL,
                 changeOrigin: true,
             },
