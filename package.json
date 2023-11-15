@@ -33,7 +33,7 @@
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@fontsource/roboto": "^5.0.8",
-    "@hms-dbmi/viv": "^0.13.8",
+    "@hms-dbmi/viv": "^0.14.2",
     "@luma.gl/core": "^8.5.16",
     "@mui/icons-material": "^5.14.15",
     "@mui/material": "^5.14.15",
