@@ -7,7 +7,7 @@ name = "mdvtools"
 version = "0.0.1"
 authors = [
     { name= "Martin Sergeant", email="m.j.sergeant1@googlemail.com"},
-    { name= "PeterTodd", email="" },
+    { name= "PeterTodd", email="peter.todd@well.ox.ac.uk" },
 ]
 description = "Multi Dimensional Viewer (MDV) is web based application for analyzing data"
 readme = "readme.md"
@@ -49,7 +49,7 @@ dependencies = [
  "python-dateutil==2.8.2",
  "pytz==2023.3",
  "scanpy==1.9.3",
- "scikit-learn==1.2.2",
+ "scikit-learn==1.3.0",
  "scipy==1.10.1",
  "seaborn==0.12.2",
  "session-info==1.0.0",
