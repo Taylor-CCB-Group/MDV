@@ -81,11 +81,11 @@ class TableChart extends BaseChart{
       
         this.grid.init();
       
-        const sort = (args) => {
-            this.dataModel.sort(args.columnId, args.sortAsc?"asc":"desc");
+        const sort = ({columnId, sortAsc}) => {
+            this.dataModel.sort(columnId, sortAsc?"asc":"desc");
             this.grid.invalidateAllRows();
             this.grid.render();
-            this.config.sort = args;
+            this.config.sort = {columnId, sortAsc};
         }
         this.grid.onSort.subscribe( (e, args)=> {
             sort(args);
