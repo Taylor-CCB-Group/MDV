@@ -15,7 +15,7 @@ class TableChart extends BaseChart{
         this.config.type="table_chart";
         let cols = [];
         //add the index column 
-        //TODO fix sorting on index column
+        //TODO fix sorting on index column, make index column optional?
         cols = [{field:"__index__",id:"__index__",name:"index",datatype:"integer",sortable:true,width:100}];
         let index=0;
         const cw = config.column_widths || {};
@@ -29,7 +29,7 @@ class TableChart extends BaseChart{
                 sortable:true,
                 width:cw[c]?cw[c]:100
             }
-            // PJT coerce multitext internally... for now(?)
+            // TODO review PJT coerce multitext internally... for now(?)
             if (column.datatype === "multitext") col.datatype = "text";
             
             if (column.editable){
@@ -49,7 +49,7 @@ class TableChart extends BaseChart{
             autoEdit: true,
             enableAsyncPostRender: true,
             frozenColumn:null,
-           // showHeaderRow:true,
+            //showHeaderRow:true,
             //headerRowHeight:40
         };	
         this.dataModel = new DataModel(dataStore, {autoupdate:false});
@@ -75,24 +75,26 @@ class TableChart extends BaseChart{
        
 
 
-       
         this.mode="select";
         //this._changeMode();
         this.grid.setSelectionModel(new RowSelectionModel());
       
         this.grid.init();
       
-        this.grid.onSort.subscribe( (e, args)=> {
-            this.dataModel.sort(args.columnId,args.sortAsc?"asc":"desc");
+        const sort = (args) => {
+            this.dataModel.sort(args.columnId, args.sortAsc?"asc":"desc");
             this.grid.invalidateAllRows();
             this.grid.render();
+            this.config.sort = args;
+        }
+        this.grid.onSort.subscribe( (e, args)=> {
+            sort(args);
         });
-
+        
         this.grid.onSelectedRowsChanged.subscribe( (e, args)=> {
             if (this.mode==="select"){
                 this._rowsSelected(args);
-            }
-            
+            }            
         });
         
 
@@ -117,9 +119,7 @@ class TableChart extends BaseChart{
         this.filter=[];
         this.themeChanged();
         this.onDataFiltered();
-
-      
-     
+        if (this.config.sort) sort(this.config.sort);
 	}
 
    
