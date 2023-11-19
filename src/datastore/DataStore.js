@@ -447,7 +447,7 @@ class DataStore{
             c.sgindex= column.sgindex;
             c.sgtype=column.sgtype;
         }
-        if (column.datatype === "text" || column.datatype === "multitext"){
+        if (column.datatype === "text" || column.datatype === "multitext" || column.datatype === "text16"){
             c.stringLength= column.stringLength;
             if (column.delimiter){
                 c.delimiter=column.delimiter;
@@ -617,7 +617,7 @@ class DataStore{
                     }
                 }
                 else if (filter==="number"){
-                    if (c.datatype === "text" || c.datatype==="unique" ||  c.datatype==="multitext" ){
+                    if (c.datatype === "text" || c.datatype==="unique" ||  c.datatype==="multitext" || c.datatype==="text16" ){
                         continue;
                     }
                 }
@@ -693,7 +693,7 @@ class DataStore{
         for (let c of columns){
             const col = this.columnIndex[c];
             let v= col.data[index];
-            if (col.datatype === "text") {
+            if (col.datatype === "text" || col.datatype === "text16") {
                 v= col.values[v];
             }
             else if (col.datatype==="double" || col.datatype==="integer" || col.datatype==="int32"){
@@ -703,7 +703,7 @@ class DataStore{
             }
             //multitext displayed as comma delimited values
             else if (col.datatype=="multitext"){
-                const delim = col.delimiter || ", ";
+                const delim = ", ";
                 const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
                 v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(delim);
 
@@ -1111,7 +1111,7 @@ class DataStore{
                 }
             }         
         }
-        else if (c.datatype==="multitext"){
+        else if (c.datatype==="multitext"  || c.datatype==="text16"){ 
             c.data= new Uint16Array(buffer);
         }
         else {
@@ -1203,8 +1203,10 @@ class DataStore{
     _convertColumn(col,arr){
        
         const len =arr.length;
-        if (col.datatype==="text"){
-            const buff =new SharedArrayBuffer(this.size);
+        if (col.datatype==="text" || "text16"){
+            const t8 = col.datatype==="text";
+            const buff =new SharedArrayBuffer(t8?this.size:this.size*2);
+            //work out number or rows with each value
             const v_to_n={}
             for (let i=0;i<len;i++){
                 const v= arr[i]
@@ -1215,11 +1217,13 @@ class DataStore{
                     v_to_n[v]++
                 }
             }
+            //sort values by number of rows
             const li=[];
             for (let v in v_to_n){
                 li.push([v,v_to_n[v]])
             }
             col.values=[];
+            //dictionary to convert value to index
             const v_to_i={};
             li.sort((a,b)=>b[1]-a[1]);
             for (let i=0;i<li.length;i++){
@@ -1227,7 +1231,7 @@ class DataStore{
                 v_to_i[li[i][0]]=i;
             }
            
-            const a  = new Uint8Array(buff);
+            const a  = t8?new Uint8Array(buff):new Uint16Array(buff);
             for (let i=0;i<len;i++){
                 a[i]= v_to_i[arr[i]]
             }
@@ -1350,7 +1354,7 @@ class DataStore{
         const ov = config.overideValues|| {}
         let  colors  =  this.getColumnColors(column,config);
         //simply return the color associated with the value
-        if (c.datatype==="text"){                   
+        if (c.datatype==="text" || c.datatype==="text16"){                   
             return x=>colors[data[x]];
         }
         else if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
@@ -1427,7 +1431,7 @@ class DataStore{
             }
             return getColorBar(colors,{range:range,label:name});
         }
-        if (c.datatype==="text"){
+        if (c.datatype==="text" || c.datatype==="text16"){
             return getColorLegend(colors,c.values,{label:name});
         }  
     }
@@ -1538,7 +1542,7 @@ class DataStore{
             }
             return colors
         }
-        else if (c.datatype==="text" || c.datatype==="multitext"){
+        else if (c.datatype==="text" || c.datatype==="multitext" || c.datatype==="text16"){
 
             let colors=  c.colors;
             if (! colors){

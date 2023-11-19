@@ -213,7 +213,7 @@ BaseChart.types["row_chart"]={
     "class":RowChart,
     name:"Row Chart",
     params:[{
-        type:["text","multitext"],
+        type:["text","multitext","text16"],
         name:"Category"
     }],
 }

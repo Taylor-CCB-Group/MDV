@@ -44,12 +44,13 @@ import "./DeepToolsHeatMap";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
-// folowed by multitext (uint16) then text/unique (uint8) 
+// followed by multitext/text16 (uint16) then text/unique (uint8) 
 const column_orders={
     "double":0,
     "integer":0,
     "int32":0,
     "multitext":1,
+    "text16":1,
     "text":2,
     "unique":2
 }

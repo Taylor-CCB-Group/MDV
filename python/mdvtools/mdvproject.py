@@ -407,7 +407,7 @@ class MDVProject:
                 "label":name
             }
         }
-        ds= self.datasources[datasource]["genome_browser"]=gb
+        ds= self.get_datasource_metadata(datasource)
         ds["genome_browser"]=gb
         self.set_datasource_metadata(ds)
 
@@ -857,19 +857,23 @@ def get_subgroup_bytes(grp,index,sparse=False):
 def add_column_to_group(col,data,group,length):
    
 
-    if col["datatype"]=="text" or col["datatype"]=="unique":
+    if col["datatype"]=="text" or col["datatype"]=="unique" or col["datatype"]=="text16":
         if data.dtype=="category":
             data =data.cat.add_categories("ND")
             data=data.fillna("ND")
           
         values = data.value_counts()
-        if len(values)<256 and col["datatype"]!="unique":
+        if (len(values)<65537 and col["datatype"]!="unique"):
+            t8 = len(values)<257
+            col["datatype"]="text" if t8 else "text16"
+            dtype = numpy.ubyte if t8 else numpy.uint16
             if not col.get("values"):
                 col["values"]= [ x for x in values.index if values[x] != 0 ]
             vdict =  {k: v for v, k in enumerate(col["values"])}          
-            group.create_dataset(col["field"],length,dtype=numpy.ubyte,data =data.map(vdict))
+            group.create_dataset(col["field"],length,dtype=dtype,data =data.map(vdict))
             #convert to string 
             col["values"] = [str(x) for x in col["values"]]
+        
         else:
             max_len=max(data.str.len()) 
             utf8_type = h5py.string_dtype('utf-8',int(max_len))

@@ -5,7 +5,7 @@
 
 onmessage= function(e){
     const config = e.data[3];
-    const dtype = config.datatype=="multitext"?Uint16Array:Uint8Array;
+    const dtype = config.datatype=="text"?Uint8Array:Uint16Array
     const data=new dtype(e.data[2]);
     const lFilter=new  Uint8Array(e.data[0]);
     const gFilter = new  Uint8Array(e.data[1]);

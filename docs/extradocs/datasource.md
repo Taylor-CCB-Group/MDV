@@ -352,7 +352,13 @@ The column should not contain more than 256 unique values.
     data:[1,0,0,2,1,0] //(Uint8Array)
 ```
 
-### datatype- mulitext
+### datatype - text16
+The same as as text except can have have up to 65536 unique values, but cannot be used in as many charts
+* JavaScript Array(string) 
+* SharedArrayBuffer(uint16) - each position in the underlying array represents the index in the column's value array 
+
+
+### datatype- multitext
 A column that can hold multiple (or no values)
 * JavaScript Array(string) - each string should contain comma delimited values (or an empty string) 
 * SharedArrayBuffer(uint16) - each data item is stringLength portion of the array with each position being the index of the value's array. 65535 represents no value
