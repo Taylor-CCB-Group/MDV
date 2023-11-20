@@ -598,7 +598,11 @@ class ChartManager{
                     this._sync_colors(d.column_link_to.columns,this.dsIndex[d.column_link_to.dataSource].dataStore,ds);
                 }
                 for (let scc of ds.syncColumnColors){
-                    this._sync_colors(scc.columns,this.dsIndex[scc.dataSource].dataStore,ds);
+                    try {
+                        this._sync_colors(scc.columns,this.dsIndex[scc.dataSource].dataStore,ds);
+                    } catch (error) {
+                        console.warn(`error syncing colors for '${ds.name}' and '${scc.dataSource}'`)
+                    }
                 }
             }
         }
