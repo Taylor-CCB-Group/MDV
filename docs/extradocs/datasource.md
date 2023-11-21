@@ -195,7 +195,7 @@ Also the default values for a few charts also need to be described
  "interactions":{
         "pivot_column":"condition",
         "interaction_columns":["Cell Type 1","Cell Type 2"],
-        "is_single_region":false
+        "is_single_region":false,
 
         "spatial_connectivity_map":{
             "link_length":"gr20",
@@ -599,7 +599,7 @@ For a dataStore to access from a another datastore, specify access_data in the l
     }
 }
 ```
-With the above example, when a chart in the gene's datasource is created, the setupLinks method (if it exists) will be called passing the cell datastore, the name of the index and a function. This functions will load (if necessary) any column data from the cell's datastore. The 'index' column is implicitly loaded and need not be specified in this function
+With the above example, when a chart in the gene's datasource is created, the setupLinks method (if it exists) will be called passing the cell datastore, the name of the index and a function. This function will load (if necessary) any column data from the cell's datastore. The 'index' column is implicitly loaded and need not be specified in this function
 ```javascript
 setupLinks(dataStore,index,func){
     //keep for future use
@@ -616,13 +616,8 @@ setupLinks(dataStore,index,func){
         //do stuff
         //add listeners to the datastore
     })
-
 }
-
-
 ```
-
-
 
 ### sync_column_colors
 
