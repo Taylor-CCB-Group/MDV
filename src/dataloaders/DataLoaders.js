@@ -44,6 +44,11 @@ function processArrayBuffer(data,columns,size){
             bytes=column.stringLength*2;
             arr_len=size*column.stringLength;
         }
+        else if (column.datatype==="text16"){
+            arrayType=Uint16Array;
+            bytes=2;
+            arr_len=size;
+        }
         //special way to deal with sparse data 
         //assumes all sparse data is integer/double
         //the first 4 bytes specifies the number of values (n)

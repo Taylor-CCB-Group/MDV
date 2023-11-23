@@ -354,7 +354,13 @@ The column should not contain more than 256 unique values.
     data: [1, 0, 0, 2, 1, 0] //(Uint8Array)
 ```
 
-### datatype- mulitext
+### datatype - text16
+The same as as text except can have have up to 65536 unique values, but cannot be used in as many charts
+* JavaScript Array(string) 
+* SharedArrayBuffer(uint16) - each position in the underlying array represents the index in the column's value array 
+
+
+### datatype- multitext
 A column that can hold multiple (or no values)
 * JavaScript Array(string) - each string should contain comma delimited values (or an empty string) 
 * SharedArrayBuffer(uint16) - each data item is stringLength portion of the array with each position being the index of the value's array. 65535 represents no value
@@ -401,18 +407,28 @@ data: [1.2, 3, 4.5.7] //(Float32Array)
 
 ## Linking to other DataStores
 
-The links parameter of a DataStore's config  allows different types of interaction between DataStores
+The links parameter of a DataStore's config  allows different types of communication between other datastores.
 
 
+### interactions
+For the situation, where one datasource e.g cells has a column specifying cell types (e.g. annotations) and a second datasource has interactions between these cell types e.g. has columns for cell type 1, cell type 2 and sphere of interaction (e.g. ROI,sample,disease_state) plus various columns with stats about the interactions ( e.g. gr(20), %contacts etc.)
 
-### interaction links
-in one datasource e.g cells has a column specifying cell type and a second datasource has interactions between the cell types e.g. has columns for cell type 1 and cell type 2 and then various columns with stats about the cell type
+The link needs to contain the following information
+* interaction columns -  a list where the first two entries are the columns in the interaction datastore which specify which two cell types are interacting. The third entry is the column in the 'cells' dataset which defines the cell types e.g. annotations
+* pivot column -  a column present in both the interaction and cell datasets which defines the sphere of interaction e.g sample_id, ROI, disease state etc.
+* is_single_region - if true then the sphere of interaction is a single region
+
+example
+
 ```json
 {
+    "name":"spatial stats",
     "links": {
         "cells": {
 	        "interactions": {
-		        "interaction_columns": ["Cell Type 1", "Cell Type 2", "annotations"],
+		        "interaction_columns": ["Cell Type 1",
+                                         "Cell Type 2",
+                                         "annotations"],
 	            "pivot_column": ["sample_id"],
                 "is_single_region": true
             }
@@ -421,14 +437,17 @@ in one datasource e.g cells has a column specifying cell type and a second datas
 }
 
 ```
+The above will have the following effects:-
+* It will sync the colors of the  Cell Type 1  and Cell Type 2  columns in the spatial stats datasource with the colors of the annotations in the cell's datasource. It will also sunc colors in the pivot column (sample_id) between datasources.
+* When  an item (interaction) is highlighted in the spatial stats datasource, the two interacting cell types will be filtered in the annotations column of the cell's datasource. In addition, if is_single_region is true, then a centroid plot of the highlighted region will be created in the cell's view (if one is not already present)
 
 
 
 ### rows_as_columns
 This specifies that the DataStore can contain data linked to the rows another DataStore. 
-For example, in single cell data, the cell DataStore would be linked to the gene DataStore. Data such as gene expression per cell could then be added to the cell DataStore as columns (on demand - not all at once). It should have the following parameters:
+For example, in single cell data, the cell DataStore would be linked to the gene DataStore. Data such as gene expression per cell could then be added to the cell DataStore as columns (on demand - not all at once). It should have the following parameters:-
 
-* **name_column** - the column in the linked dataset which identifies the row e.g. gene name (must be unique)
+* **name_column** - the column in the linked dataset which identifies the row e.g. gene name (must be datatype unique)
 * **name** - the human readable name of the dataset e.g Gene Scores
 * **subgroups** - this specifies the  different groups of data available. It consists of a dictionary, with the identifying stub of the subgroup pointing to the name, type and label (what the user will see) of the subgroup.
 
@@ -466,8 +485,7 @@ The columns's data will be loaded in the normal way by the specified dataloader,
 
 
 example
-```
-
+```json
    [
         {
             "name": "cells",
@@ -506,11 +524,13 @@ example
 ``` 
 
 
-### Linking to Columns
+### columns
 
 You can link columns from two DataStores in order to minimize the duplication of data. For example if a cell dataset contained cells from different samples and a sample dataset contained information about these samples, the cell DataStore should have access to this metadata, without the duplication of data. To achieve this, include a link to the other DatStore, specifying which columns are needed from that DataStore and the index, which is the column that the two DataStores share and must be of datatype text. You must also describe the  linked columns in the 'columns' parameter with the fields matching the linked DataStore.  The colors/values can be omitted as these will be taken from the linked DataStore.  However column names(what the user sees) can differ
 
-```
+example
+
+```json
  {
         "name": "cells",
         "size": 101737,
@@ -565,46 +585,74 @@ You can link columns from two DataStores in order to minimize the duplication of
 ```
 
 
-### Accessing columns
+### access_data
 
+For a dataStore to access from a another datastore, specify access_data in the link. The index specifies a column in the linked datastore, but does not have to be used 
 
-For a dataStore to access columns of another it needs to specify this in the links and index column
-
-```
-links: {
-      "cells": {
-        "index": "cell_id",
-        "access_data": true
-      }
-
-}
-```
-
-### synchronizing column colors
-
-To link column colors , specify the column from the linked DataStore you wish the colors to match 'link_to" and the column you want to match this column 'col'. You can link one column to many
-
-```
+```json
 {
-    name: "cell interactions",
-    links: {
-        "cells": {
-            "sync_column_colors": [
-                {
-                    link_to: "Cell Type",
-                    col: "Cell Type 1"
-
-                },
-                {
-                    link_to: "Cell Type",
-                    col: "Cell Type 2"
-                }
-            ]
+    "name":"genes",
+    "links":{
+        "cells":{
+            "index":"cell_id",
+            "access_data":true
         }
 
     }
 }
 ```
+With the above example, when a chart in the gene's datasource is created, the setupLinks method (if it exists) will be called passing the cell datastore, the name of the index and a function. This functions will load (if necessary) any column data from the cell's datastore. The 'index' column is implicitly loaded and need not be specified in this function
+```javascript
+setupLinks(dataStore,index,func){
+    //keep for future use
+    this.dataLink= {
+        dataStore:dataStore,
+        index:index,
+        getDataFunction:func
+    }
+    //make sure cell_size data has been loaded
+    func(["cell_size"],()=>{
+        //if you need an index
+        const cell_index = dataStore.getColumnIndex(index);
+        const cell_size = dataStore.getRawColumn("cell_size");
+        //do stuff
+        //add listeners to the datastore
+    })
+
+}
+
+
+```
+
+
+
+### sync_column_colors
+
+To link column colors , specify the column from the linked DataStore you wish the colors to match (link_to) and the column you want to match  (col) . You can link one column to many
+
+example
+
+```json
+{
+    "name":"cell interactions",
+    "links":{
+        "cells":{
+            "sync_column_colors":[
+                {
+                    "link_to":"annotations",
+                    "col":"Cell Type 1"
+
+                },
+                {
+                    "link_to":"annotations",
+                    "col":"Cell Type 2"
+                }
+            ]
+        }
+    }
+}
+```
+In the above a value in the Cell Type 1 or Cell Type 2 columns in the cell interactions datasource will be the same color as it is in the cells annotation column
 
 ## Listeners
 

@@ -121,6 +121,58 @@ class MDVProject:
         return df
 
 
+    def check_columns_exist(self,datasource,columns):
+        md = self.get_datasource_metadata(datasource)
+        all_cols = set([x["field"] for x in md["columns"]])
+        return [x for x in columns if not x in all_cols]
+
+    def set_interactions(self,interaction_ds,parent_ds,
+                        pivot_column="sample_id",
+                        parent_column="annotation",
+                        is_single_region=True,
+                        interaction_columns=["Cell Type 1","Cell Type 2"],
+                        default_parameter="Cross PCF gr20",
+                        node_size="cell 1 number",
+                        add_view=True):
+        #check columns exist in the appropriate data sets
+        missing_cols= self.check_columns_exist(interaction_ds,[pivot_column,default_parameter,node_size]+interaction_columns )
+        if len(missing_cols)>0:
+            raise AttributeError(f'columns {",".join(missing_cols)} not found in {interaction_ds} datasource')
+        missing_cols= self.check_columns_exist(parent_ds,[pivot_column,parent_column])
+        if len(missing_cols)>0:
+            raise AttributeError(f'columns {",".join(missing_cols)} not found in {parent_ds} datasource')
+        #update the config
+        md = self.get_datasource_metadata(interaction_ds)
+        md["interactions"]={
+            "pivot_column":pivot_column,
+            "is_single_region":is_single_region,
+            "interaction_columns":interaction_columns,
+            "spatial_connectivity_map":{
+                "link_length": default_parameter,
+                "link_thickness":default_parameter,
+                "link_color": default_parameter,
+                "node_size": node_size
+            },
+            "cell_radial_chart":{"link_thickness":default_parameter}
+        }
+        self.set_datasource_metadata(md)
+        #update the links between datasources
+        self.insert_link(interaction_ds,parent_ds,"interactions",
+                         {
+                             "interaction_columns":interaction_columns+[parent_column],
+                             "pivot_column":pivot_column,
+                             "is_single_region":is_single_region
+                         })
+        if add_view:
+            #todo add stuff to the view
+            self.set_view(interaction_ds,{
+                "initialCharts":{
+                    parent_ds:[],
+                    interaction_ds:[]
+                }
+            })
+
+
     def get_datasource_metadata(self,name):
         ds = [x for x in self.datasources if x["name"]==name]
         if len(ds)==0:
@@ -357,11 +409,19 @@ class MDVProject:
             })
         self.set_datasource_metadata(ds)
 
-    def delete_datasource(self,name):
+    def delete_datasource(self,name,delete_views=True):
         h5 = self._get_h5_handle()
         del h5[name]
         h5.close()
         self.datasources = [x for x in self.datasources if x["name"] !=name]
+        #delete all views contining that datasource
+        if delete_views:
+            views = self.views
+            for view in views:
+                data= views[view]
+                if data["initialCharts"].get(name):
+                    self.set_view(view,None)
+
 
     def add_genome_browser(self,datasource,parameters=["chr","start","end"],name=None):
         # get all the genome locations
@@ -384,7 +444,7 @@ class MDVProject:
                 "label":name
             }
         }
-        ds= self.datasources[datasource]["genome_browser"]=gb
+        ds= self.get_datasource_metadata(datasource)
         ds["genome_browser"]=gb
         self.set_datasource_metadata(ds)
 
@@ -890,19 +950,23 @@ def get_subgroup_bytes(grp,index,sparse=False):
 def add_column_to_group(col,data,group,length):
    
 
-    if col["datatype"]=="text" or col["datatype"]=="unique":
+    if col["datatype"]=="text" or col["datatype"]=="unique" or col["datatype"]=="text16":
         if data.dtype=="category":
             data =data.cat.add_categories("ND")
             data=data.fillna("ND")
           
         values = data.value_counts()
-        if len(values)<256 and col["datatype"]!="unique":
+        if (len(values)<65537 and col["datatype"]!="unique"):
+            t8 = len(values)<257
+            col["datatype"]="text" if t8 else "text16"
+            dtype = numpy.ubyte if t8 else numpy.uint16
             if not col.get("values"):
                 col["values"]= [ x for x in values.index if values[x] != 0 ]
             vdict =  {k: v for v, k in enumerate(col["values"])}          
-            group.create_dataset(col["field"],length,dtype=numpy.ubyte,data =data.map(vdict))
+            group.create_dataset(col["field"],length,dtype=dtype,data =data.map(vdict))
             #convert to string 
             col["values"] = [str(x) for x in col["values"]]
+        
         else:
             max_len=max(data.str.len()) 
             utf8_type = h5py.string_dtype('utf-8',int(max_len))
@@ -910,13 +974,14 @@ def add_column_to_group(col,data,group,length):
             col["stringLength"]=max_len
             group.create_dataset(col["field"],length,data = data,dtype=utf8_type)
     elif col["datatype"]=="multitext":
+        delim = col.get("delimiter",",")
         values = set()
         maxv=0
         #first parse - get all possible values and max number
         #of values in a single field
         for v in data:
             try:
-                vs = v.split(",")
+                vs = v.split(delim)
             except:
                 continue
             values.update([x.strip() for x in vs])
@@ -935,7 +1000,7 @@ def add_column_to_group(col,data,group,length):
             if v=="":
                 continue
             try:
-                vs = v.split(",")
+                vs = v.split(delim)
                 vs = [x.strip() for x in vs]
             except:
                 continue

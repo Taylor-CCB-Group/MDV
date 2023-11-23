@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite --host",
     "vite-build": "tsc && vite build",
-    "build": "webpack --config prod.config.js",
+    "build": "webpack --config prod.config.js --env process.env",
     "build-flask": "npm run clean-flask & webpack --config desktop.config.js",
     "build-flask-vite": "cross-env OUT_DIR=./python/mdvtools/templates vite build",
     "clean-flask": "rm -r ./python/mdvtools/static",

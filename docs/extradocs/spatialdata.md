@@ -94,11 +94,36 @@ p.add_viv_images("cells", {
 
 ## Adding Interactions
 
-First add a datasource, that describes each cell/cell interaction for each ROI or condition (group of ROIs)
- * two columns describing the two cell/object types in the interation
- * two columns with number of cells/objects in each type
+First add a datasource, that describes each cell/cell interaction for each ROI or condition (group of ROIs). The datasource should contain the following:-
+ * two columns describing the two cell/object types in the interaction these two columns should contain values that are
+ present in a column in the parent dataset
+ * two columns with the number of cells/objects of each type
  * a column designating the ROI or condition (also known as the pivot column)
- * columns with some stats about the interactions
+ * any number of columns with  stats about the interaction
+
+|Cell Type 1|Cell Type 2|cell 1 number|cell 2 number|sample_id|gr20|contacts|
+|-----------|-----------|-------------|-------------|---------|----|--------|
+|B cell|T cell |143|36|sample_6_roi_1|2.3|100|
+|B cell|CD24   |143|24|sample_6_roi_1|0.8|27|
+
+
+Then use the set_interactions methods to specify that the dataset contains interaction data and to link it to parent dataset e.g. cells
+```python
+p.set_interactions("my_interactions","cells,
+                    pivot_column="sample_id",
+                    parent_column="annotation",
+                    is_single_region=True,
+                    interaction_columns=["Cell Type 1","Cell Type 2"],
+                    default_parameter="Cross PCF gr20",
+                    node_size="cell 1 number",
+                    add_view=True)
+```
+
+ * interaction_columns - a list of the two columns which specify the two cell types/items
+ * node_size - the name of column in the interaction dataset that describes the number of cells/items in the interaction e.g. cell 1 number 
+ * parent_column - the name of the column in the parent dataset that defines the  interacting items e.g. annotation, cell type
+ * pivot_column - the column in both the interaction and parent dataset that specifies the extent of the interaction e.g.sample_id, condition, roi, disease
+ * is_single_region - if True, the pivot column specifies a single roi i.e. it is not composed of several regions e.g.condition,disease state
 
 
 

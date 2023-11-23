@@ -430,12 +430,12 @@ class DataStore{
     * displayed on a log scale- useful if the dataset contains outliers. Because a symlog
     * scale is used the data can contain 0 and negative values
     * @param {SharedArrayBuffer|Array} [data] In the case of a double/integer (number) column, the array
-    * buffer should be the appropriate size to contain float32s. For text it shuold be Uint8
+    * buffer should be the appropriate size to contain float32s. For text it should be Uint8
     * and contain numbers corresponding to the indexes in the values parameter. For a column of
     * type unique it should be a JavaScript array. This parameter is optional as the data can
     * be added later see {@link DataStore#setColumnData}
     * @param {boolean} [dirty=false] if true then the store will keep a record that this column has
-    * been added and is not permanatly stored in the backend
+    * been added and is not permanently stored in the backend
     */
     addColumn(column,data=null,dirty=false){
         let c  = {
@@ -461,10 +461,11 @@ class DataStore{
             c.sgindex= column.sgindex;
             c.sgtype=column.sgtype;
         }
-       
-        
-        if (column.datatype === "text" || column.datatype === "multitext"){
+        if (column.datatype === "text" || column.datatype === "multitext" || column.datatype === "text16"){
             c.stringLength= column.stringLength;
+            if (column.delimiter){
+                c.delimiter=column.delimiter;
+            }
             c.values = column.values || [`Error: no values for '${c.name}'`];
         }
         else if (column.datatype==="double" || column.datatype ==="integer" ||  column.datatype==="int32"){
@@ -630,7 +631,7 @@ class DataStore{
                     }
                 }
                 else if (filter==="number"){
-                    if (c.datatype === "text" || c.datatype==="unique" ||  c.datatype==="multitext" ){
+                    if (c.datatype === "text" || c.datatype==="unique" ||  c.datatype==="multitext" || c.datatype==="text16" ){
                         continue;
                     }
                 }
@@ -707,7 +708,7 @@ class DataStore{
         for (let c of columns){
             const col = this.columnIndex[c];
             let v= col.data[index];
-            if (col.datatype === "text") {
+            if (col.datatype === "text" || col.datatype === "text16") {
                 v= col.values[v];
             }
             else if (col.datatype==="double" || col.datatype==="integer" || col.datatype==="int32"){
@@ -717,8 +718,9 @@ class DataStore{
             }
             //multitext displayed as comma delimited values
             else if (col.datatype=="multitext"){
+                const delim = ", ";
                 const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
-                v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(", ")
+                v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(delim);
 
             }
             else{
@@ -1154,7 +1156,7 @@ class DataStore{
                 }
             }         
         }
-        else if (c.datatype==="multitext"){
+        else if (c.datatype==="multitext"  || c.datatype==="text16"){ 
             c.data= new Uint16Array(buffer);
         }
         else {
@@ -1246,8 +1248,10 @@ class DataStore{
     _convertColumn(col,arr){
        
         const len =arr.length;
-        if (col.datatype==="text"){
-            const buff =new SharedArrayBuffer(this.size);
+        if (col.datatype==="text" || "text16"){
+            const t8 = col.datatype==="text";
+            const buff =new SharedArrayBuffer(t8?this.size:this.size*2);
+            //work out number or rows with each value
             const v_to_n={}
             for (let i=0;i<len;i++){
                 const v= arr[i]
@@ -1258,11 +1262,13 @@ class DataStore{
                     v_to_n[v]++
                 }
             }
+            //sort values by number of rows
             const li=[];
             for (let v in v_to_n){
                 li.push([v,v_to_n[v]])
             }
             col.values=[];
+            //dictionary to convert value to index
             const v_to_i={};
             li.sort((a,b)=>b[1]-a[1]);
             for (let i=0;i<li.length;i++){
@@ -1270,7 +1276,7 @@ class DataStore{
                 v_to_i[li[i][0]]=i;
             }
            
-            const a  = new Uint8Array(buff);
+            const a  = t8?new Uint8Array(buff):new Uint16Array(buff);
             for (let i=0;i<len;i++){
                 a[i]= v_to_i[arr[i]]
             }
@@ -1287,6 +1293,7 @@ class DataStore{
 
         }
         else if (col.datatype=== "multitext"){
+            const delim = col.delimiter || ",";
             let vals = new Set();
             let max=0;
             //first parse - get all possible values and max number
@@ -1396,7 +1403,7 @@ class DataStore{
             return isNaN(v) || (ov.fallbackOnZero && v===0);
         }
         //simply return the color associated with the value
-        if (c.datatype==="text"){                   
+        if (c.datatype==="text" || c.datatype==="text16"){                   
             return x=>colors[data[x]];
         }
         else if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
@@ -1473,7 +1480,7 @@ class DataStore{
             }
             return getColorBar(colors,{range:range,label:name});
         }
-        if (c.datatype==="text"){
+        if (c.datatype==="text" || c.datatype==="text16"){
             return getColorLegend(colors,c.values,{label:name});
         }  
     }
@@ -1584,7 +1591,7 @@ class DataStore{
             }
             return colors
         }
-        else if (c.datatype==="text" || c.datatype==="multitext"){
+        else if (c.datatype==="text" || c.datatype==="multitext" || c.datatype==="text16"){
 
             let colors=  c.colors;
             if (! colors){
