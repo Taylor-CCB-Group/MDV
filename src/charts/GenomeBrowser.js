@@ -1,10 +1,6 @@
 import BaseChart from "./BaseChart.js";
 import {createEl} from "../utilities/Elements.js";
-import MLVPanel from "../browser/panel.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
-
-
-
 
 class GenomeBrowser extends BaseChart{
     constructor(dataStore,div,config){
@@ -14,59 +10,61 @@ class GenomeBrowser extends BaseChart{
         this.contentDiv.style.width="100%";
         this.contentDiv.style.height="100%";
         c.type="genome_browser";
-        const add_ruler= c.tracks.find(x=>x["format"]==="ruler")?false:true
-        this.browser = new MLVPanel(this.contentDiv,{
-            allow_user_interactions:true,
-            show_scale:true,
-            ruler_track:add_ruler
-        },c.tracks
-        );
+        const add_ruler= c.tracks.find(x=>x["format"]==="ruler")?false:true;
 
-        this.bamscatrack=this.browser.getTrack("_atac_bam_track");
-        this.baseTrack= this.browser.getTrack("_base_track");
-        this.baseTrack.dataStore = this.dataStore;
-   
-        this.addMenuIcon("fa fa-eye-slash",config.legend || "Shoow/Hide Tracks",
-            {
-                func:e=>this.showHideDialog()
-
-            });
-        this.locText=createEl("input",{styles:{fontSize:"11px"}},this.menuSpace);
-        this.locText.addEventListener("keypress",e=>{
-            if (e.keyCode==13){
-                const loc = this._calculatePosition(this.locText.value);
-                this.browser.update(loc.chr,loc.start,loc.end);
+        import ('../browser/panel.js?v0.1').then(({default:MLVPanel})=>{
+            this.browser = new MLVPanel(this.contentDiv,{
+                allow_user_interactions:true,
+                show_scale:true,
+                ruler_track:add_ruler
+            },c.tracks
+            );
+    
+            this.bamscatrack=this.browser.getTrack("_atac_bam_track");
+            this.baseTrack= this.browser.getTrack("_base_track");
+            this.baseTrack.dataStore = this.dataStore;
+       
+            this.addMenuIcon("fa fa-eye-slash",config.legend || "Shoow/Hide Tracks",
+                {
+                    func:e=>this.showHideDialog()
+    
+                });
+            this.locText=createEl("input",{styles:{fontSize:"11px"}},this.menuSpace);
+            this.locText.addEventListener("keypress",e=>{
+                if (e.keyCode==13){
+                    const loc = this._calculatePosition(this.locText.value);
+                    this.browser.update(loc.chr,loc.start,loc.end);
+                }
+            })
+            this.browser.addListener(this.config.id,(type,data)=>this.onBrowserAction(type,data));
+            if (c.feature_label){
+                this.setLabelFunction(c.feature_label);
             }
-        })
-        this.browser.addListener(this.config.id,(type,data)=>this.onBrowserAction(type,data));
-        if (c.feature_label){
-            this.setLabelFunction(c.feature_label);
-        }
-        if (c.color_by){
-             this.colorByColumn(c.color_by,false)
-        }
-        if (c.color_wig_tracks_by){
-            const col = c.color_wig_tracks_by;
-            const vc= this.dataStore.getValueToColor(col);
-            //color any wig tracks
-            for (let v in vc){
-                const tr =this.browser.tracks[`${col}|${v}`];
-                if (tr){
-                    tr.config.color= vc[v];
+            if (c.color_by){
+                 this.colorByColumn(c.color_by,false)
+            }
+            if (c.color_wig_tracks_by){
+                const col = c.color_wig_tracks_by;
+                const vc= this.dataStore.getValueToColor(col);
+                //color any wig tracks
+                for (let v in vc){
+                    const tr =this.browser.tracks[`${col}|${v}`];
+                    if (tr){
+                        tr.config.color= vc[v];
+                    }
+                }
+            }    
+            if (!this.bamscatrack){
+                const g= this.config.genome_location;
+                if (g){
+                    
+                    this.browser.update(g.chr,Math.round(g.start),Math.round(g.end),true);
+                }
+                else{
+                    this.onDataHighlighted({indexes:[0]});
                 }
             }
-        }    
-        if (!this.bamscatrack){
-            const g= this.config.genome_location;
-            if (g){
-                
-                this.browser.update(g.chr,Math.round(g.start),Math.round(g.end),true);
-            }
-            else{
-                this.onDataHighlighted({indexes:[0]});
-            }
-        }
-       
+        });
 	}
 
 
@@ -102,6 +100,9 @@ class GenomeBrowser extends BaseChart{
     //the datastore (ensure column and index are loaded beofre carrying
     //out the function)
     setupLinks(dataStore,index,func){
+        if (! this.browser){
+            setTimeout(()=>this.setupLinks(dataStore,index,func),100)
+        }
        
         this.dataLink= {
             dataStore:dataStore,
@@ -128,14 +129,10 @@ class GenomeBrowser extends BaseChart{
         })
         func([cat],()=>{
             const ind = dataStore.getColumnIndex(index);
-          
             const colors = dataStore.getColumnColors(cat);
             const col = dataStore.columnIndex[cat];
             this.bamscatrack.setCategories(cat,col.data,col.values,colors);
-                //get basic dimension from the other datastore
-               
-
-         
+                //get basic dimension from the other datastore         
             this.cellDim= dataStore.getDimension("base_dimension");
           
             this.bamscatrack.addIndex(ind);
@@ -158,9 +155,7 @@ class GenomeBrowser extends BaseChart{
             }
             else{
                 this.onDataHighlighted({indexes:[0]});
-            }
-        
-           
+            }  
         })
     }
 
@@ -255,26 +250,120 @@ class GenomeBrowser extends BaseChart{
        // this.onDataHighlighted({indexes:[0]});
     }
 
+    _setPhasedSNPs(info,color){
+        if (info){
+            const d = info.split(",").map(x=>x.split(":"));
+            for (let i of d){
+               const st = parseInt(i[1])
+               this.browser.setHighlightedRegion({chr:i[0],start:st,end:st+1},i[0]+i[1],color)
+            }
+       }
+    }
+
     //called when a feature is highlighted 
     onDataHighlighted(data){
         if (data.source===this){
             return;
-        }
+        }       
         const p = this.config.param;
         const vm = this.config.view_margins;
         const o = this.dataStore.getRowAsObject(data.indexes[0],p);
         //some basic checks
         let st = o[p[2]]>o[p[1]]?o[p[1]]:o[p[2]];
         let en = o[p[2]]>o[p[1]]?o[p[2]]:o[p[1]];
+        const rowData = data.data;
+
+        //this should be done elsewhere
+        const phased= []
+        const not_phased=[]
+        if (rowData && rowData.phase_data){
+            this.browser.removeAllHighlightedRegions();
+            this._setPhasedSNPs(rowData.more_peak_haplotype,"blue");
+            this._setPhasedSNPs(rowData.less_peak_haplotype,"red"); 
+            for (let id of this.browser.track_order){
+                let pd = rowData.phase_data[id];
+                if (!id.startsWith("Don")){
+                    continue;
+                }          
+                if (pd){
+                    if (pd.ratio[0]==0 && pd.ratio[1]==0){
+                        this.browser.setTrackAttribute(id,"phase_data",null)
+                    } 
+                    else{       
+                        this.browser.setTrackAttribute(id,"phase_data",
+                        {
+                            ratio:pd.ratio[0]/(pd.ratio[0]+pd.ratio[1]),
+                            st,
+                            en
+                        });
+                    }
+                    phased.push(id)
+                }
+                else{
+                    this.browser.setTrackAttribute(id,"phase_data",null);
+                    not_phased.push(id)
+                }
+            }
+            const new_order =phased.concat(not_phased);
+            const track_order=[];
+            let index=0;
+            for (let id of this.browser.track_order){
+                if (id.startsWith("Don")){
+                    track_order.push(new_order[index]);
+                    index++
+                }
+                else{
+                    track_order.push(id)
+                }
+            }
+            //this.browser.track_order=track_order;
+            
+            
+        }
+        const fcp =this.config.feature_present_column;
+        if (fcp){
+            const ids =  this.dataStore.getRowText(data.indexes[0],fcp).split(", ");
+            for (let id of ids){
+                this.browser.setTrackAttribute(id,"color","#35de26")
+            }
+            const not =this.dataStore.getColumnValues(fcp).slice(0).filter(x=>ids.indexOf(x) ===-1);
+            for (let id of not){
+                this.browser.setTrackAttribute(id,"color","#939c92")
+            }
+            const new_order = ids.concat(not)
+            const track_order=[];
+            let index=0;
+            for (let id of this.browser.track_order){
+                if (new_order.indexOf(id) !==-1){
+                    track_order.push(new_order[index]);
+                    index++
+                }
+                else{
+                    track_order.push(id)
+                }
+            }
+            //this.browser.track_order=track_order;
+        }
         let margin =1000;
         if  (vm.type==="percentage"){
             en =  st===en?st+1:en;
             margin =  Math.round(en-st)*(vm.value/100);
         }
+       
         else{
             margin = vm.value;
         }
-        this.browser.update(o[p[0]],st-margin,en+margin) 
+        if (vm.type==="fixed_length"){
+            const mid= Math.round((en-st)/2)+st;
+            margin= Math.round(margin/2);
+            this.browser.update(o[p[0]],mid-margin,mid+margin) ;
+        }
+        else{
+            this.browser.update(o[p[0]],st-margin,en+margin) 
+        }
+
+        
+        
     }
 
     getImage(callback,type){
@@ -285,6 +374,10 @@ class GenomeBrowser extends BaseChart{
             callback(this.browser.canvas);
         }
 
+    }
+
+    configure_tracks(){
+        this.dataSrore
     }
 
 
@@ -339,6 +432,10 @@ class GenomeBrowser extends BaseChart{
     }
 
     onDataFiltered(data){
+        if (!this.browser){
+            setTimeout(()=>this.onDataFiltered(data),100);
+            return;
+        }
         if (!this.dataStore.isFiltered()){
             this.browser.setTrackFeatureFilter("_base_track",null);      
         }
@@ -350,6 +447,7 @@ class GenomeBrowser extends BaseChart{
                 return false;
             });
         }
+        
         this.browser.update();
     }
 
@@ -413,7 +511,8 @@ class GenomeBrowser extends BaseChart{
             type:"radiobuttons",
             choices:[
                 ["% of feature length","percentage"],
-                ["absolute (bp)","absolute"]
+                ["absolute (bp)","absolute"],
+                ["Fixed Length (bp)","fixed_length"]
             ],
             current_value:c.view_margins.type,
             func:(x)=>{
@@ -447,7 +546,7 @@ BaseChart.types["genome_browser"]={
     "class":GenomeBrowser,
     name:"Genome Browser",
     methodsUsingColumns:["setLabelFunction"],
-    configEntriesUsingColumns:["feature_label","color_wig_tracks_by"],
+    configEntriesUsingColumns:["feature_label","color_wig_tracks_by","feature_present_column"],
 
     params:[],
     required:["genome_browser"],

@@ -2,7 +2,7 @@ import Dimension from "./Dimension.js";
 class CatColDimension extends Dimension{
     constructor(parent){
         super(parent)
-        this.worker= new Worker (new URL("./catColWorker.js?v=4",import.meta.url));      
+        this.worker= new Worker (new URL("./catColWorker.js?v=6",import.meta.url));      
     }
 
     getAverages(callback,columns,config={}){
@@ -15,6 +15,7 @@ class CatColDimension extends Dimension{
         }
 
         config.values=cIndex[columns[0]].values;
+        config.columns=columns.slice(1);
         const colBuffers=[];
         for (let n=1;n<columns.length;n++){
            colBuffers.push([cIndex[columns[n]].buffer,cIndex[columns[n]].datatype]);
@@ -25,9 +26,7 @@ class CatColDimension extends Dimension{
             cIndex[columns[0]].buffer,
             colBuffers,
             config
-        ]);
-     
-       
+        ]); 
     }
 
     destroy(){

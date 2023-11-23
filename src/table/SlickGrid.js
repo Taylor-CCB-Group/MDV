@@ -20,7 +20,6 @@
 
 import {Slick} from "./Slick.js";
 import $ from "jquery";
-import { makeDraggable } from "../utilities/Elements.js";
 const jQuery = $;
 
 

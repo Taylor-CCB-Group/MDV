@@ -157,7 +157,7 @@ class MultiLineChart extends SVGChart{
         .data(display_data);
         ga.join("path")     
         .attr("class","chart-line")
-        .on("mouseover mousemove",(e,d)=>{          
+        .on("mouseover pointermove",(e,d)=>{          
             const label = vals[d.id];
             self.showToolTip(e,label);
         }).

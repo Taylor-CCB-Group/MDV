@@ -27,7 +27,7 @@ Multi Dimensional Viewer (MDV) is web based application for analyzing, annotatin
 
 * Data can added and/or modified by the user
 
-* Diverse range of data sources (API calls,static files) can be used by implementing custom data loaders 
+* Diverse range of data sources (API calls, static files) can be used by implementing custom data loaders 
 
 * Runs in a web browser (installation not required for uploading and viewing data)
 
@@ -64,9 +64,10 @@ Then cd to the python directory
 cd path/to/mdv/python
 ```
 
-Install the required python packages
+Install `mdv` (using `editable` flag for development):
+
 ```
-pip install -r requirements.txt
+pip install -e .
 ```
 
 Open a python shell
@@ -74,13 +75,16 @@ Open a python shell
 python
 ```
 
-Create an MDV project from the downloaded folder and display it in a browser. Either run the code from the mdv/python folder, add 
-the folder to the PYTHONPATH environment variable or add the path in the code `sys.path.append("/path/to/mdv/python")`
+Create an MDV project from the downloaded folder and display it in a browser:
+
 ```python
-from mdv.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject
 p = MDVProject("/path/to/hyp_example_data")
 p.serve()
 ```
+
+This will open a browser window at http://localhost:5000/ but you will need to go to
+[http://127.0.0.1:5000](http://127.0.0.1:5000) to avoid permissions errors.
 
 ## Running on a server
 
@@ -88,25 +92,16 @@ p.serve()
 The default data storage is an hdf5 file which is a compressed files that allows random read/write access to the data. However, it cannot be accessed directly but requires some kind of wrapper e.g. h5py. Hence access via http calls directly is not possible and backend code is required to display an MDV project in a web page. However, it can be converted to simple continuous compressed blocks of data for each column and a json index . This allows direct access via an http request with a range header:-
 
 ```python
-from mdv.mdvproject import MDVProject
+from mdvtools.mdvproject import MDVProject
 p = MDVProject("/path/to/hyp_example_data")
 p.convert_to_static_page("/path/to/myapp/")
 ```
 
 The function also creates a simple home page for the project (index.html), which can be customized. The folder can then be put on the server and accessed via:-
 ```
-http://myserver.com/path/to/myapp
+https://myserver.com/path/to/myapp
 ```
 
-Images and JavaScript files are obtained from /static/mdv/js and /static/mdv/img , so the python/static/mdv folder needs to be copied to the /server folder of the server. 
-
-
-No back end architecture is required , although the server needs to accept range headers and have the following headers on responses from the project folder and /static/mdv/js folder in order to allow SharedArrayBuffers and Webworkers:-
-
-```
-Cross-Origin-Opener-Policy:same-origin
-Cross-Origin-Embedder-Policy:require-corp
-```
 
 
 ## Development

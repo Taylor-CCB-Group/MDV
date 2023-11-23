@@ -234,7 +234,7 @@ class SimpleBrowser extends BaseBrowser{
 	            self.mouseDownX = self.lastMouseX;
 
 	        })
-	       	.on("mousemove.draghandler",function (e) {
+	       	.on("pointermove.draghandler",function (e) {
 	            let canvasCoords =self._translateCoOrds(e);
 	            if ($._no_drag){
 	            	self.is_dragging=false;

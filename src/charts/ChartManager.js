@@ -1,12 +1,19 @@
-import { createEl, makeDraggable, makeResizable,MDVProgress,removeDraggable,removeResizable,createMenuIcon,splitPane} from "../utilities/Elements";
+import { createEl, makeDraggable, makeResizable,MDVProgress,removeDraggable,removeResizable,createMenuIcon,splitPane, createFilterElement} from "../utilities/Elements";
 import  BaseChart from "./BaseChart.js";
 import { PopOutWindow } from "../utilities/PopOutWindow";
 import  DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";
+import {BaseDialog} from "../utilities/Dialog.js";
+import {getRandomString} from "../utilities/Utilities.js";
+import {csv,tsv,json} from "d3-fetch";
+import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
+import ColorChooser from "./dialogs/ColorChooser";
+import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
+
 //default charts 
-import  "./HistogramChart.js";
-import  "./RowChart.js";
+import "./HistogramChart.js";
+import "./RowChart.js";
 import "./TableChart.js";
 import "./WGL3DScatterPlot.js";
 import "./WGLScatterPlot.js";
@@ -19,25 +26,34 @@ import "./SankeyChart.js";
 import "./MultiLineChart.js";
 import "./DensityScatterPlot";
 import "./SelectionDialog.js";
-
-
-
-import {BaseDialog} from "../utilities/Dialog.js";
-import {getRandomString} from "../utilities/Utilities.js";
-import {csv,tsv,json} from "d3-fetch";
-import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
-import ColorChooser from "./dialogs/ColorChooser";
-import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
-
+import "./StackedRowChart";
+import "./TreeDiagram";
+import "./CellNetworkChart";
+import "./SingleHeatMap";
+import "./VivScatterPlot";
+import "./DotPlot";
+import "./ImageTableChart";
+import "./CellRadialChart";
+import "./RowSummaryBox";
+import "./VivScatterPlot";
+import "./ImageTableChart";
+import "./ImageScatterChart";
+// import "./WordCloudChart"; //todo: this only works in vite build, not webpack
+import "./CustomBoxPlot";
+import "./SingleSeriesChart";
+import "./GenomeBrowser";
+import "./DeepToolsHeatMap";
+import connectIPC from "../utilities/InterProcessCommunication";
 
 //order of column data in an array buffer
-//doubles and integers (both represented by float32) need to be first
-// folowed by multitext (uint16) then text/unique (uint8) 
+//doubles and integers (both represented by float32) and int32 need to be first
+// followed by multitext/text16 (uint16) then text/unique (uint8) 
 const column_orders={
     "double":0,
     "integer":0,
     "int32":0,
     "multitext":1,
+    "text16":1,
     "text":2,
     "unique":2
 }
@@ -85,7 +101,9 @@ function listenPreferredColorScheme(callback) {
 * <ul>
 *   <li> function - The [function]{@tutorial datalaoder} to load the data
     (can be omitted if data loaded from a file)</li>
-*   <li> viewLoader - The function that will load the each view </li>
+*   <li> viewLoader - The function that will load the each view  (not necessay if only one view)</li>
+*   <li> rowDataLoader - (optional) an asunc function which is given the datasource name and row index
+*     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
 *   <li> files - specifies the files to load the data </li>
 * </ul>
 * @param {Object} config extra settings
@@ -122,7 +140,7 @@ class ChartManager{
         for (const d of dataSources){
             const ds= {
                 name:d.name,
-                dataStore:new DataStore(d.size,d),
+                dataStore:new DataStore(d.size,d,dataLoader),
                 link_to:d.link_to,
                 index_link_to:d.index_link_to,
                 color:d.color || themes[this.theme].background_color,
@@ -134,12 +152,17 @@ class ChartManager{
             this.dsIndex[d.name]=ds;
             this._addDSListeners(ds);
             this.columnsLoading[d.name]={};
+        
             
         }
         if (listener){
             this.addListener("_default",listener)
         }
+        //we may want to move this, for now I don't think it's doing any harm and avoids changes to multiple index files:
+        connectIPC(this);
         this.transactions={};
+
+
        
         
         //set up container and top(main menu)
@@ -270,7 +293,63 @@ class ChartManager{
         else{
             this._loadView(config,dataLoader,true);
         }
+
+        //add links
+        for (let ds of this.dataSources){
+            const links = ds.dataStore.links;
+            if (links){
+                for (let ods in links){
+                    if (!this.dsIndex[ods]){
+                        console.warn(`datasource ${ds.name} has link to non-existent datasource ${ods}`);
+                        return;
+                    }
+                    if (links[ods].interactions){
+                        this._addInteractionLinks(ds.dataStore,this.dsIndex[ods].dataStore,links[ods].interactions);
+                    }
+                }
+
+            }
+        }
          
+    }
+
+    _addInteractionLinks(ds,ods,links){
+        const interactionFilter= ods.getDimension("category_dimension");
+        const icols = links.interaction_columns
+        const c1 = icols[0];
+        const c2= icols[1];
+        const pc= links.pivot_column;
+        //sync the colors of the matching columns
+        ds.syncColumnColors.push({dataSource:ods.name,columns:[
+            {link_to:icols[2],col:icols[0]},
+            {link_to:icols[2],col:icols[1]},
+            {link_to:pc,col:pc}
+        ]});
+        ds.addListener(`${ds.name}_interaction`,(type,data)=>{
+            if (type==="data_highlighted"){
+                //get the two interacting items plus pivot
+                this._getColumnsThen(ds.name,[c1,c2,pc],()=>{
+                    const info = ds.getRowAsObject(data.indexes[0],[c1,c2,pc]);
+                    //get pivot from the other datasource
+                    this._getColumnsThen(ods.name,[icols[2]],()=>{
+                        //filter the two interacting items 
+                        interactionFilter.filter("filterCategories",[icols[2]],[info[c1],info[c2]]);
+                        //show the region if not already displayed
+                        if (links.is_single_region && ods.regions && this.dsPanes[ods.name]){
+                            if (!this.getAllCharts(ods.name).find(x=>x.config.region===info[pc])){
+                                const conf={
+                                    type:"image_scatter_plot"
+                                }
+                                //add the default parameters
+                                BaseChart.types["image_scatter_plot"].init(conf,ods,{region:info[pc]});
+                                //add the chart
+                                this.addChart(ods.name,conf);
+                            }
+                        }
+                    })
+                })
+            }
+        });
     }
 
     _setUpChangeLayoutMenu(ds){
@@ -280,8 +359,7 @@ class ChartManager{
                 {
                     text:"Absolute",
                     ghosted:lo==="absolute",
-                    func:()=>this.changeLayout("absolute",ds)
-                
+                    func:()=>this.changeLayout("absolute",ds)    
                 },    
                 {
                     text:"Grid Stack",
@@ -423,7 +501,7 @@ class ChartManager{
         return this.dsIndex[name].dataStore;
     }
 
-    _init(view,firstTime=false){
+    async _init(view,firstTime=false){
 
     
         //no initial view just make one with all available 
@@ -521,14 +599,18 @@ class ChartManager{
                     this._sync_colors(d.column_link_to.columns,this.dsIndex[d.column_link_to.dataSource].dataStore,ds);
                 }
                 for (let scc of ds.syncColumnColors){
-                    this._sync_colors(scc.columns,this.dsIndex[scc.dataSource].dataStore,ds);
+                    try {
+                        this._sync_colors(scc.columns,this.dsIndex[scc.dataSource].dataStore,ds);
+                    } catch (error) {
+                        console.warn(`error syncing colors for '${ds.name}' and '${scc.dataSource}'`)
+                    }
                 }
             }
         }
 
         //need to create a set to create track of 
         //charts loaded
-        const charts= view.initialCharts || {};
+        const charts= view?view.initialCharts || {}: {}
         this._toLoadCharts = new Set();
         for (let ds in charts){         
             for (let ch of charts[ds]){
@@ -542,11 +624,15 @@ class ChartManager{
         }
         //add charts - any columns will be added dynamically
         this._inInit = true;
+        const chartPromises = [];
         for (let ds in charts){  
             for (let ch of charts[ds]){
-                this.addChart(ds,ch);                            
+                chartPromises.push(this.addChart(ds,ch));
             }
         }
+        await Promise.all(chartPromises);
+        //this could be a time to _callListeners("view_loaded",this.currentView)
+        //but I'm not going to interfere with the current logic
         this._inInit = false;
     }
 
@@ -623,7 +709,7 @@ class ChartManager{
                         //only one datasource
                         if (this.dataSources.length===1){
                             state.view.initialCharts[this.dataSources[0].name]=[];
-                            state.viewDataSources[this.dataSources[0].name]={};
+                            state.view.dataSources[this.dataSources[0].name]={};
                         }
                         else{
                             for (let ds in this.dsIndex){
@@ -707,14 +793,16 @@ class ChartManager{
     }
 
     deleteCurrentView(){
+        //remove the view choice and change view to the next one
         const opt = this.viewSelect.querySelector(`option[value='${this.viewSelect.value}']`);
-        const state = this.getState();
-        this.currentView= this.viewSelect.value;
         opt.remove();
-        this.changeView(this.viewSelect.value);
+        const state = this.getState();
+        //want to delete view and update any listeners
+        state.view=null;
+        this._callListeners("state_saved",state);
         
-        
-       
+        this.currentView= this.viewSelect.value;
+        this.changeView(this.viewSelect.value);  
     }
 
     _columnRemoved(ds,col){      
@@ -1062,6 +1150,9 @@ class ChartManager{
     */
     loadColumnSet(columns,dataSource,callback,split=10,threads=2){
         const id = getRandomString();
+        const lc = this.config.dataloading || {};
+        split  = lc.split || 10;
+        threads= lc.threads || 2;
         this.transactions[id]={
             callback:callback,
             columns:[],
@@ -1250,10 +1341,28 @@ class ChartManager{
        
     }
 
+    /**
+     * Adds a listener to the ChartManager.
+     * 
+     * Note that the signature is different from what might be expected (this is an MDV pattern that may be reviewed in future):
+     * The first argument is a string that identifies the listener (not an event type to listen for).
+     * Subsequent calls to addListener with the same id will overwrite the previous listener (which could lead to
+     * unexpected behaviour, for example if a corresponding `removeListener()` call is made).
+     * The second argument is a function that will be called when the listener is triggered - all registered listeners will be called
+     * for any event.
+     * @param {string} id 
+     * @param {function} func Callback function. 
+     * First argument is the type of event (`"state_saved" | "view_loaded" | "chart_added" | "chart_removed"`), 
+     * second is the `ChartManager` instance, third is the data.
+     */
     addListener(id,func){
         this.listeners[id]=func;
     }
 
+    /**
+     * Removes a listener from the ChartManager.
+     * @param {string} id 
+     */
     removeListener(id){
         delete this.listeners[id];
     }
@@ -1264,13 +1373,18 @@ class ChartManager{
     }
 
     /**
-    * Adds a chart to the app
+    * Adds a chart to the app. Returns asyncronously when needed columns have loaded and the chart has been added 
+    * (will reject if there is an error)
     * @param {string} dataSource The name of the chart's data source 
     * @param {any} config The chart's config
     * @param {boolean} [notify=false] If true any listeners will be informed that 
     * a chart has been loaded
     */
-    addChart(dataSource,config,notify=false){
+    async addChart(dataSource,config,notify=false){
+        if (!BaseChart.types[config.type]){
+            this.createInfoAlert(`Tried to add unknown chart type '${config.type}'`, {type: 'danger', duration: 2000});
+            throw `Unknown chart type ${config.type}`;
+        }
         //check if columns need loading
         const neededCols = this._getColumnsRequiredForChart(config);
         //check which columns need loading
@@ -1343,22 +1457,26 @@ class ChartManager{
             },
             text:config.title
         },div)
-        const func = ()=>{
-            this._addChart(dataSource,config,div,notify);
-        }
-        // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
-        try {
-            this._getColumnsThen(dataSource, neededCols, func);
-        } catch (error) {
-            this.clearInfoAlerts();
-            const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
-                type: "warning"
-            });
-            console.log(error);
-            const idiv = this.infoAlerts[id].div;
-            idiv.onclick = () => idiv.remove();
-            div.remove();
-        }
+        return new Promise((resolve,reject)=>{
+            const func = ()=>{
+                this._addChart(dataSource,config,div,notify);
+                resolve();
+            }
+            // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
+            try {
+                this._getColumnsThen(dataSource, neededCols, func);
+            } catch (error) {
+                this.clearInfoAlerts();
+                const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
+                    type: "warning"
+                });
+                console.log(error);
+                const idiv = this.infoAlerts[id].div;
+                idiv.onclick = () => idiv.remove();
+                div.remove();
+                reject(error);
+            }
+        });
     }
 
     
@@ -1824,14 +1942,14 @@ class ChartManager{
               this._makeChartRD(chart, chInfo.dataSource);
               chart.popoutIcon.style.display="inline";
               delete chInfo.window
-              
+              //... 'popin' IPC event?
             },
             //config
             { 
                 onresize:(doc,box)=>{
                     chart.setSize(box.width,box.height)
                 },
-                url:this.config.popouturl || "/"
+                url:this.config.popouturl || "/?popout=true",
         
             }
         );
@@ -1919,6 +2037,7 @@ class ChooseColumnDialog extends BaseDialog{
         const cols = this.ds.getColumnList(content.filter);
         this.checks=[];
         this.callback=content.callback;
+        //todo let this work with createFilterElement?
         for (let col of cols){
             const d= createEl("div",{
                 styles:{//display:"inline-block",
@@ -1992,16 +2111,25 @@ class AddChartDialog extends BaseDialog{
         for (let type in BaseChart.types){
             const t = BaseChart.types[type];
             //check to see if chart has any requirements
-            let allow =true
+            
             if (t.required){
-                for (let r of t.required){
-                    if (!this.dataStore[r]){
-                        allow=false
+                if(typeof t.required=== "function"){
+                    if (!t.required(this.dataStore)){
+                        continue;
                     }
                 }
-                if (!allow){
-                    continue;
-                }
+                //is an array of parameters required in the datasource
+                else{
+                    let allow =true;
+                    for (let r of t.required){
+                        if (!this.dataStore[r]){
+                            allow=false
+                        }
+                    }
+                    if (!allow){
+                        continue;
+                    }
+                }  
             } 
             if (t.allow_user_add===false){
                 continue;
@@ -2081,6 +2209,8 @@ class AddChartDialog extends BaseDialog{
         for (let name in this.extraControls){
             const c = this.extraControls[name];
             ed[name] = c.type === 'checkbox' ? c.value === 'on' : c.value;
+            //mjs: sometimes its not as simple as this and more complex alterations
+            //to the config are required based on the user input the dataSore's config
             config[name] = ed[name]; // pjt: is there a reason we didn't do this before?
         }
         if (this.multiColumns){
@@ -2154,22 +2284,22 @@ class AddChartDialog extends BaseDialog{
                             maxWidth:"200px"
                         }
                     },holder);
-                    const ps= this.dataStore.getColumnList(p.type);
+                    const ps = this.dataStore.getColumnList(p.type);
                     const sgs = {}
                     for (let ds of this.dataStore.subgroupDataSources){
-                        sgs[ds]=createEl("optgroup",{label:ds});
+                        sgs[ds] = createEl("optgroup",{label:ds});
                     }
                     for (let item of ps){
                         let ele = dd;
                         if (item.subgroup){
-                            ele=sgs[item.subgroup.dataSource];
+                            ele = sgs[item.subgroup.dataSource];
                         }
-                        createEl("option",{text:item.name,value:item.field},ele);
-
+                        createEl("option",{text:item.name,value:item.field}, ele);
                     }
                     for (let ds of this.dataStore.subgroupDataSources){
                         dd.append(sgs[ds]);
                     }
+                    createFilterElement(dd, holder);
                     this.paramSelects.push(dd);
                 }           
             }

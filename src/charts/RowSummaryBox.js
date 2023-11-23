@@ -2,6 +2,7 @@
 import BaseChart from "./BaseChart.js"
 import ImagePanZoom from "../utilities/PanZoom.js";
 import { createEl,makeSortable} from "../utilities/Elements.js";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
 
 class RowSummaryBox extends BaseChart{
     constructor(dataStore,div,config){
@@ -62,7 +63,7 @@ class RowSummaryBox extends BaseChart{
         const  p  = c.param[c.image.param];
         this.img_param=p;
         const data =this.dataStore.getRowText(index,p);
-        return `${c.image.base_url}${data}.${c.image.type}`
+        return getProjectURL(`${c.image.base_url}${data}.${c.image.type}`);
 
     }
 
@@ -83,8 +84,7 @@ class RowSummaryBox extends BaseChart{
     }
 
     onDataFiltered(){
-        const i =this.dataStore.getFirstFilteredIndex();
-        this.onDataHighlighted({indexes:[i]})   
+         
     }
 
     changeBaseDocument(doc){
@@ -109,7 +109,7 @@ BaseChart.types["row_summary_box"]={
                 config.param = config.param || [];
                 config.param.push(li.key_column);
                 config.image={
-                    base_url:li.base_url,
+                    base_url: getProjectURL(li.base_url),
                     type:li.type,
                     param:config.param.length-1
                 }

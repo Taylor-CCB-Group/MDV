@@ -2,14 +2,15 @@ import {getRandomString} from "../utilities/Utilities.js";
 import {ContextMenu} from "../utilities/ContextMenu.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog";
+import { chartTypes } from "./ChartTypes.ts";
 
 
 class BaseChart{
     /**
      * The base constructor
-     * @param {DataStore} dataStore - The datastore object thta contains the data for this chart
-     * @param {string} div - The id of the div element or the element itself to house the graph
-     * @param {Object} config - The config describing the graph
+     * @param {DataStore} dataStore - The datastore object that contains the data for this chart
+     * @param {string | HTMLDivElement} div - The id of the div element or the element itself to house the chart
+     * @param {Object} config - The config describing the chart
      */
     constructor(dataStore,div,config){
         //******adapt legacy configs
@@ -169,19 +170,19 @@ class BaseChart{
     * @returns {DOMElement} - the icon
     */
     addMenuIcon(icon,tooltip,config={}){
-        const sp= createEl("span",{
-            "aria-label":tooltip,
-            "data-microtip-color":"red",
-            role:"tooltip",
-            "data-microtip-size":config.size || "small",
-            "data-microtip-position":config.position || "bottom-left",
-            styles:{
+        const sp = createEl("span", {
+            "aria-label": tooltip,
+            "data-microtip-color": "red",
+            role: "tooltip", 
+            "data-microtip-size": config.size || "small",
+            "data-microtip-position": config.position || "bottom-left",
+            styles: {
                 margin:"0px 1px"
             }
-            },this.menuSpace);
+        }, this.menuSpace);
     
         createEl("i",{  
-            classes:["ciview-chart-icon"].concat(icon.split(" "))
+            classes:["ciview-chart-icon"].concat(icon.split(" ")) //a11y - we could use an actual button
         },sp);
         if (config.func){
             sp.addEventListener("click",(e)=>config.func(e));
@@ -312,7 +313,8 @@ class BaseChart{
         const conf ={
             asArray:asArray,
             overideValues:{
-                colorLogScale:this.config.log_color_scale
+                colorLogScale:this.config.log_color_scale,
+                fallbackOnZero: this.config.fallbackOnZero
             }
         }
         this._addTrimmedColor(column,conf);
@@ -440,7 +442,7 @@ class BaseChart{
         
         if (colorOptions.colorby){
             //cannot color by multitext or unique (at the moment)
-            const filter = colorOptions.colorby==="all"?["int32","text","integer","double"]:colorOptions.colorby;
+            const filter = colorOptions.colorby==="all"?["int32","text","integer","double","text16"]:colorOptions.colorby;
             const cols = this.dataStore.getColumnList(filter);
             cols.push({name:"None",field:"_none"})
             settings.push({
@@ -499,6 +501,18 @@ class BaseChart{
                 }
             });
             settings.push({
+                label:"Treat zero as missing",
+                type:"check",
+                
+                current_value:c.fallbackOnZero,
+                func:(x)=>{      
+                    c.fallbackOnZero = x;
+                    if (c.color_by){
+                        this.colorByColumn(c.color_by);
+                    }
+                }
+            });
+            settings.push({
                 type:"radiobuttons",
                 label:"Trim Color Scale to Percentile",
                 current_value:c.trim_color_scale || "none",
@@ -538,6 +552,7 @@ class BaseChart{
                 width:300,
                 title:"Settings",
                 position:[e.pageX,e.pageY],
+                useMobx: this.useMobx,
                 onclose:()=>this.settingsDialog=null
 
             },this.getSettings());
@@ -573,6 +588,14 @@ class BaseChart{
                 }
             })
         }
+
+        if (this.getChartData){
+            menu.push({
+                text:"download data",
+                icon:"fas fa-download",
+                func:()=>this.downloadData()
+            })
+        }
         if (this.addToContextMenu){
             menu=menu.concat(this.addToContextMenu());
         }
@@ -604,6 +627,13 @@ class BaseChart{
         if (this._tooltip){
             this._tooltip.remove();
             this.addToolTip();
+        }
+        if (this.extra_legends){
+            for (let l of this.extra_legends){
+                if (this[l]){
+                    this[l].__doc__=doc;
+                }
+            }
         }
     }
 
@@ -691,6 +721,18 @@ class BaseChart{
         },im_type);       
     }
 
+    downloadData(){
+        const blob = this.getChartData();
+        const save = createEl("a",{
+            download:this.config.title,
+            target:"_blank",
+            href:window.URL.createObjectURL(blob)
+
+        },this.__doc__.body)                
+        save.click();
+        save.remove();
+    }
+
   
   setTitle(title){
        this.title.textContent=title;
@@ -729,18 +771,8 @@ class BaseChart{
 
 /**
  * A dictionary of all the chart types
- * @type {Record<string, {
- * "class": class, 
- * name: string,
- * required?: string[],
- * init?: (config:object, dataSource:object, extraControls:object)=>void,
- * extra_controls?: (dataSource:object)=>{type: string, name: string, label?: string, values?: object, defaultVal?: object}[],
- * params?: {type:string|string[], name:string}[],
- * configEntriesUsingColumns?: string[],
- * methodsUsingColumns?: string[],
- * }>}
  */
-BaseChart.types={};
+BaseChart.types = chartTypes;
 
 function copyStylesInline(destinationNode, sourceNode) {
     var containerElements = ["svg","g"];
@@ -756,7 +788,7 @@ function copyStylesInline(destinationNode, sourceNode) {
              child.style.setProperty(style[st], style.getPropertyValue(style[st]));
         }
     }
- }
+}
  
 
   

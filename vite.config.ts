@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
+const flaskURL = "http://127.0.0.1:5051";
 
 export default defineConfig(env => { return {
     base: "./",
@@ -16,6 +17,25 @@ export default defineConfig(env => { return {
         fs: {
             allow: ["examples", "."],
         },
+        port: 5170,
+        strictPort: true,
+        proxy: {
+            // these routes are proxied to flask server in 'single project' mode
+            '^/(get_|images|tracks|save).*': {
+                target: flaskURL,
+                changeOrigin: true,
+            },
+            '^/project/.*/\?': { //this works with ?dir=/project/project_name
+                target: flaskURL,
+                changeOrigin: true,
+            },
+            //will fail if url has search params
+            //will cause problems if we have json files that don't want to be proxied
+            '^/.*\\.(json|b|gz)$': {
+                target: flaskURL,
+                changeOrigin: true,
+            },
+        }
     },
     resolve: {
         alias: {
@@ -24,11 +44,10 @@ export default defineConfig(env => { return {
     },
     publicDir: "examples",
     build: {
-        outDir: "vite-dist",
+        outDir: process.env.OUT_DIR || "vite-dist",
         rollupOptions: {
             input: {
                 index: "./index.html",
-                obvios: resolve(__dirname, "src/obvios.html"),
             }
         }
     },

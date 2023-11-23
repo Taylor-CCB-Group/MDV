@@ -39,6 +39,7 @@ class AnnotationDialogReact extends BaseDialog {
     // dataModel: DataModel;
     tagListElement: HTMLDivElement;
     tagInput: any;
+    root: ReturnType<typeof createRoot>;
     constructor(dataStore: DataStore, tagModel: TagModel) {
         super({
             title: "Annotate selection",
@@ -48,7 +49,12 @@ class AnnotationDialogReact extends BaseDialog {
         this.outer.classList.add('annotationDialog');
         // this.tagModel = new TagModel(dataStore);
         this.tagModel = tagModel;
-        createRoot(this.dialog).render(<AnnotationDialogComponent tagModel={this.tagModel} />);
+        this.root = createRoot(this.dialog);
+        this.root.render(<AnnotationDialogComponent tagModel={this.tagModel} />);
+    }
+    close(): void {
+        super.close();
+        this.root.unmount();
     }
 }
 // https://github.com/Taylor-CCB-Group/MDV/discussions/44

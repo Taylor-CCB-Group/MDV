@@ -48,6 +48,10 @@ class MLVTrack{
 	}
 
 	setConfigAttribute(attribute,value){
+        if (value == null){
+            delete this.config[attribute];
+            return;
+        }
 		this.config[attribute]=value;
     	if (attribute==="url"){
     		this._setFeatureSource();
@@ -72,7 +76,7 @@ class MLVTrack{
     }
 
      /**
-	* Reteives the features requested, the default is just to get the features
+	* Retrieves the features requested, the default is just to get the features
 	* from the feature source 
 	* @param {string} chr - The chromosome 
 	* @param {integer} start - The start of the range from which to obtain features
@@ -997,15 +1001,23 @@ class MLVWigTrack extends MLVTrack{
 	                self.prev_coords.y=y;
 	            }
 	            else{
-	            	 Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
-	            }
-	           
-	            	
-
-	            	
-	          
-	        
-	            
+                    //phase data
+                    const ph = self.config.phase_data;
+                    if(ph){
+                        const pos = (bpPerPixel*x)+bpStart;
+                        if (pos >ph.st && pos <ph.en){
+                            const pro = ph.ratio*height;
+                            Graphics.fillRect(ctx, x, y, width, pro, {fillStyle: "blue"});
+                            Graphics.fillRect(ctx, x, y+pro, width, height-pro, {fillStyle: "red"});
+                        }
+                        else{
+                            Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
+                        }
+                    }
+                    else{
+	            	    Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
+                    }
+	            }           
 	        }
 	        function autoscale(features) {
         		var min = 0,

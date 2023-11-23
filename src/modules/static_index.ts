@@ -1,133 +1,85 @@
-import 'nouislider/dist/nouislider.min.css'
-import "microtip/microtip.css";
-import "../../src/css/fontawesome-5.15.3/all.css";
-import "../../src/utilities/css/ContextMenu.css";
-import "../../src/charts/css/charts.css";
-import "../../src/webgl/css/wgl2di.css";
-import "../../src/table/css/slickgrid.css";
+/// <reference types="vite/client" />
+import "./all_css";
+import "../charts/VivScatterPlotNew";
+import HmrHack from "../react/HmrHack";
+HmrHack();
 import ChartManager from "../charts/ChartManager.js";
-import "../charts/RowSummaryBox.js";
-import "../charts/ImageTableChart.js";
-import "../charts/ImageScatterChart.js";
-import "../charts/WordCloudChart.js";
-import { getLocalCompressedBinaryDataLoader } from "../dataloaders/DataLoaders.js";
+// import "../charts/RowSummaryBox.js"; //> should this be in ChartManager along with default charts? how useful is it?
 
 import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
-import SideEffect from "../charts/dialogs/AnnotationDialogReact";
-console.log(SideEffect);
+import { fetchAndPatchJSON, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 
+const flaskURL = "";
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
 // if URLSearchParams has a 'dir' parameter, use that as the data directory.
 const urlParams = new URLSearchParams(window.location.search);
-const dir = urlParams.get('dir');
-if (!dir) {
-    const newDir = prompt("Enter data URL", "https://mdvstatic.netlify.app/ytrap2");
-    urlParams.set('dir', newDir);
-    const href = document.location.href + "?" + urlParams.toString();
-    document.location = href;
-}
+// if we're in a popout window, ignore the dir parameter and don't load data
+const isPopout = urlParams.get('popout') === "true";
+// if there is no dir parameter, use the flaskURL to proxy requests to the python server
+const dir = urlParams.get('dir') || (isPopout ? '' : flaskURL);
 const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
+//hack to load data from local API
+const staticFolder = !dir.startsWith("/project");
+
 // set title of page to the data directory
-document.title = `MDV - ${root}`;
+document.title = !staticFolder ? 'MDV - local project' : `MDV - ${root}`;
+if (isPopout) document.title = "MDV popout";
 
-function rewriteBaseUrlRecursive(config) {
-    if (Array.isArray(config)) {
-        for (const item of config) {
-            rewriteBaseUrlRecursive(item);
-        }
-        return;
-    }
-    for (const key in config) {
-        if (key === "base_url") {
-            config[key] = config[key].replace("./", `${root}/`);
-        } else if (typeof config[key] === "object") {
-            rewriteBaseUrlRecursive(config[key]);
-        }
-    }
-}
 
-async function fetchAndPatchJSON(url) {
-    let resp = await fetch(url)//, { mode: "no-cors" });
-    const config = await resp.json();
-    rewriteBaseUrlRecursive(config);
-    return config;
-}
+// TODO make a better type for this, put it somewhere more sensible.
+export type Datasource = { 
+    name: string, 
+    columns: { name: string, type: string }[], images?: any, size: number, columnGroups?: any[] 
+};
 
-async function executeProjectAction(action, args) {
-    if (!args) {
-        args = {}
-    }
-    let data = {
-        method: action,
-        args: args
-    }
-
-    console.log("window.CSRF_TOKEN", window["CSRF_TOKEN"]);
-
-    const request = new Request(
-        "meths/execute_project_action/",
-        {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': window["CSRF_TOKEN"],
-                "Accept": "application/json,text/plain,*/*",
-                "Content-Type": "application/json"
-            },
-            mode: 'same-origin',
-            body: JSON.stringify(data),
-        }
-    );
-
-    const resp = await fetch(request);
-    let rspData = {success: false};
-    try {
-        rspData = await resp.json();
-    } catch (error) {
-        console.error(error);
-    }
-    return rspData;
-}
-
-function listener(type,cm,info){
-    switch(type){
-        case "state_saved":
-            console.log("listener state_saved", cm, info)
-            executeProjectAction("save_state",{state: info}).then(resp=>{
-                if (resp.success){
-                    cm.createInfoAlert("Data Saved",{duration:2000});
-                    cm.setAllColumnsClean();
-                }
-                else{
-                    cm.createInfoAlert("UnableToSaveData",{duration:3000,type:"danger"});
-                }
-            });
-            break;
-    }
-}
 
 async function loadData() {
-    const datasources = await fetchAndPatchJSON(`${root}/datasources.json`);
-    const config = await fetchAndPatchJSON(`${root}/state.json`);
-    const views = await fetchAndPatchJSON(`${root}/views.json`);
-    const dataLoader = {
-        function: getLocalCompressedBinaryDataLoader(datasources, root),
-        viewLoader: async (view) => views[view]
+    // setupDebug();
+    if (isPopout) return;
+    setProjectRoot(root);
+    // move more of this into DataLoaderUtil (which might get renamed)?
+    const datasources = await fetchAndPatchJSON(`${root}/datasources.json`, root) as Datasource[];
+    const config = await fetchAndPatchJSON(`${root}/state.json`, root);
+    config.popouturl = undefined;
+    const views = await fetchAndPatchJSON(`${root}/views.json`, root);
+
+    const dataLoader = getDataLoader(staticFolder, datasources, views, dir);
+
+    const listener = async (type: string, cm: ChartManager, data: any) => {
+        if (type === "state_saved" && !staticFolder) {
+            const resp = await getPostData(root+'/save_state', data);
+            if (resp.success) {
+                cm.createInfoAlert("State saved", {duration: 2000});
+                cm.setAllColumnsClean();
+            } else {
+                cm.createInfoAlert("State save failed", {duration: 3000, type: "danger"});
+            }
+        }
     }
+    //todo fix searchParams when changing view.
     const cm = new ChartManager("app1", datasources, dataLoader, config, listener);
-    const dsName = datasources[0].name;
-    const ds = cm.dsIndex[dsName];
-    const tadModel = new TagModel(ds.dataStore);
-    // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
-    setTimeout(() => {
-        cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, tadModel); });
-        cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tadModel); });
-        cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => { 
-            const columns = datasources[0].columns.map(c => c.name);
-            cm.loadColumnSet(columns, dsName, () => { console.log("done loadColumnSet"); });
-        });
-    }, 0);
+
+    function extraFeatures(i: number) {
+        const dsName = datasources[i].name;
+        const ds = cm.dsIndex[dsName];
+        const tagModel = new TagModel(ds.dataStore);
+        // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
+        // should it be in the viewLoader callback? no ref to cm passed there.
+        setTimeout(() => {
+            cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, tagModel); });
+            if (import.meta.env.DEV) {
+                cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tagModel); });
+            }
+            cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => { 
+                const columns = datasources[i].columns.map(c => c.name);
+                cm.loadColumnSet(columns, dsName, () => { console.log("done loadColumnSet"); });
+            });
+        }, 100);
+    }
+
+    datasources.forEach((ds, i) => extraFeatures(i));
 };

@@ -18,7 +18,7 @@ export class ScatterplotExLayer extends ScatterplotLayer<any> {
 }
 
 
-type ImageArrayExtensionProps = { imageArray: ImageArray };
+type ImageArrayExtensionProps = { imageArray: ImageArray, saturation: number };
 export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageArrayExtensionProps> extends LayerExtension<T> {
     static get componentName(): string {
         return 'ImageArrayExtension';
@@ -55,6 +55,21 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         in float vImageIndex;
         in float vImageAspect;
         uniform float opacity;
+        uniform float saturation;
+
+        vec3 rgb2hsv(vec3 c){
+            vec4 K = vec4(0., -1./3., 2./3., -1.);
+            vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+            vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+            float d = q.x - min(q.w, q.y);
+            float e = 1.0e-10;
+            return vec3(abs(q.z + (q.w - q.y) / (6. * d + e)), d / (q.x + e), q.x);
+        }
+        vec3 hsv2rgb(vec3 c){
+            vec4 K = vec4(1., 2./3., 1./3., 3.);
+            vec3 p = abs(fract(c.xxx + K.xyz) * 6. - K.www);
+            return c.z * mix(K.xxx, clamp(p - K.xxx, 0., 1.), c.y);
+        }
         
         `,
         'fs:DECKGL_FILTER_COLOR': `
@@ -67,6 +82,9 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
         if (uv.y > 1. || uv.x > 1.) discard;
         vec3 uvw = vec3(uv, vImageIndex);
         vec4 t = texture(imageArray, uvw);
+        vec3 c = rgb2hsv(t.rgb);
+        c.y *= saturation;
+        t.rgb = hsv2rgb(c);
         color *= t;
         ///--- opacity may well not be correct gamma etc
         color.a = t.a * opacity; //HACK so broken inCircle doesn't break opacity
@@ -89,11 +107,12 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
     }
     updateState(this: Layer<{}>, params: UpdateParameters<Layer<ImageArrayExtensionProps>>) {
         const { texture } = params.props.imageArray;
+        const { saturation } = params.props;
         for (const model of this.getModels()) {
             const gl = model.gl as WebGL2RenderingContext;
             gl.activeTexture(gl.TEXTURE10);
             gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
-            model.setUniforms({ imageArray: 10 });
+            model.setUniforms({ imageArray: 10, saturation });
         }
     }
 }

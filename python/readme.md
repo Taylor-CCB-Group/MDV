@@ -1,7 +1,7 @@
-## Python tools for creating, manipulating and viewing MDV projects. 
+# Python tools for creating, manipulating and viewing MDV projects. 
 
 
-### Installation
+## Installation
 
 It is recommended, but not essential to create a virtual environment so there are no conflicts with modules in the global python.
 
@@ -12,28 +12,84 @@ source /path/to/myenv/bin/activate
 ````
 In windows:-
 ```
-python -m env c:\path\to\myenv
+python -m venv c:\path\to\myenv
 c:\path\to\myenv\Scripts\activate.bat
 ```
 
-Next install the dependencies
+Installing mdv (with -e if for development) will include dependencies:
+
 ```
-pip install -r requirements.txt
+cd MDV/python
+pip install -e .
 ```
 
 
+## Quick Start
+
+### Creating a Project
+
+To make an empty project, just create an MDVProject object specifying a path. Data can then be added using the `add_datasource` method and specifying a pandas dataframe or the path to a text file.
 ### Quick Start - to serve an HDF5 based project from a local python server
 
-Then create an MDV project by giving the location of a folder
 ```python
-from mdv.mdvproject import MDVProject
-p = MDVProject("/path/to/hyp_example_data")
+from mdvtools.mdvproject import MDVProject
+p=MDVProject("/path/to/myproject")
+df = pd.read_csv("cells.tsv", sep="\t")
+p.add_datasource("cells", df)  #or p.add_datasource("cells", "cells.tsv")
+```
+
+Initially an empty default view is created. The easiest way to add content is interactively through the browser. To do this, make the project editable and then serve it:-
+
+```python
+p.set_editable(True)
 p.serve()
 ```
 
-### Quick Start - to convert CSV data for a simple file server
+Then you can add charts and create views in the browser. Make sure that you save any changes you make.
 
-Given a CSV file associated folder of images, the `csv_to_static` script will create a folder (containing `datasources.json`, `state.json`, `views.json`, `{mydata.csv}.b`, `{mydata.csv}.json`, `images/`) that can be served by a simple file server.
+### Serving the Project as a Static Page
+
+To enable the project to be displayed as a static page without any backend architecture, the data needs to be converted to static binary files and the associated assets (JavaScript and images) added. To do this run the following:-
+```python
+p.convert_to_static_page(path/to/mywebproject)
+```
+
+You can then copy the mywebproject folder to the relevant location on your server, where content is served from. It needs to be served over https because a service worker is used to add headers. It will also need to be able to use range headers for loading portions of binary data. The project can be accessed with:-
+```
+https://mydomian.com/path/to/mywebproject
+```
+The index.html file contains a single div which houses the app. It can easily be altered to add custom headers/footers or other content e.g.
+```html
+    <div> My Header </div>
+    <div id="holder"></div>
+    <div> My Footer </div>
+```
+
+Because the JavaScript uses WebWorkers and SharedArrayBuffers, a [service worker](https://github.com/gzuidhof/coi-serviceworker) is added to load the necessary headers:- 
+```
+"Cross-Origin-Opener-Policy":"same-origin",
+"Cross-Origin-Embedder-Policy":"require-corp"
+```
+If your server already adds these headers then the `convert_to_static_page` function can be invoked with `include_sab_headers=False`, which will exclude the service worker. In this case the project does not have to be served over https
+
+
+### Serving the Project in Development Mode
+Create a static version of the project.
+```
+p.convert_to_static_page(/path/to/myproject)
+```
+Then run webpack with the development config and point towards the folder you have just created.
+
+```
+npx webpack serve --env folder=/path/to/myproject
+```
+In this case, the project will be served by  webpack's development server, using the the un-compiled version of the code allowing debugging.  
+
+
+
+### To convert CSV data for a simple file server
+
+Given a CSV file associated folder of images, the `csv_to_static` script will create a folder (containing `datasources.json`, `state.json`, `views.json`, `{mydata.csv}.b`, `{mydata.csv}.json`, `images/`) that can be served by a simple file server. This script is 
 
 The script takes arguments for the CSV file and the output folder. If either of these is not present, or if the input file is not found, it will prompt for these interactively.
 

@@ -46,6 +46,10 @@ export type DataSource = {
     dataStore: DataStore;
     contentDiv: HTMLDivElement;
     menuBar: HTMLDivElement;
+    images?: Record<string, any>;
+    regions?: Record<string, any>;
+    getLoadedColumns: () => string[];
+    getColumnName: (col: string) => string;
 };
 
 export type GuiValueTypes = {
@@ -61,9 +65,10 @@ export type GuiValueTypes = {
 export type GuiSpec<T extends keyof GuiValueTypes> = {
     type: T; 
     label: string;
-    current_value: GuiValueTypes[T];
-    func: (v: GuiValueTypes[T]) => void;
+    current_value?: GuiValueTypes[T];
+    func?: (v: GuiValueTypes[T]) => void;
     values?: GuiValueTypes[T][];
+    defaultVal?: GuiValueTypes[T];
 }
 
 export type Chart = {
@@ -77,6 +82,23 @@ export type Chart = {
     config:any;
 };
 
+export type ChartState = {
+    chart: Chart;
+    win?: Window;
+    dataSource: DataSource;
+}
+
+export type DataSourceSpec = {
+    name: string;
+    dataStore: DataStore;
+    //links etc TBD
+};
+
 export type ChartManager = {
+    charts: Record<string, ChartState>;
+    dataSources: DataSourceSpec[];
+    dsIndex: Record<string, DataSourceSpec>;
     addMenuIcon: (dataSourceName: string, iconClass: string, text: string, func: ()=>void) => HTMLElement;
+    /** probably not something we really want to use publicly like this */
+    _popOutChart: (chart: Chart) => void;
 };

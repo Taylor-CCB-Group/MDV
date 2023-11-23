@@ -1,5 +1,5 @@
 //the following causes errors in jsdoc as the ] is nor parsed
-//does not seem to affect the outout
+//does not seem to affect the output
 /**
  * @param {SharedArrayBuffer} e.data[0] - local filterBuffer
  * @param {SharedArrayBuffer} e.data[1] - global filterBuffer

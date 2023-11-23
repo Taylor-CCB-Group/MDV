@@ -14,7 +14,8 @@ class TableChart extends BaseChart{
 		super(dataStore,div,config);
         this.config.type="table_chart";
         let cols = [];
-        //add the index column
+        //add the index column 
+        //TODO fix sorting on index column, make index column optional?
         cols = [{field:"__index__",id:"__index__",name:"index",datatype:"integer",sortable:true,width:100}];
         let index=0;
         const cw = config.column_widths || {};
@@ -28,6 +29,8 @@ class TableChart extends BaseChart{
                 sortable:true,
                 width:cw[c]?cw[c]:100
             }
+            // TODO review PJT coerce multitext internally... for now(?)
+            if (column.datatype === "multitext") col.datatype = "text";
             
             if (column.editable){
                 col.editor=TextEditor;
@@ -46,10 +49,10 @@ class TableChart extends BaseChart{
             autoEdit: true,
             enableAsyncPostRender: true,
             frozenColumn:null,
-           // showHeaderRow:true,
+            //showHeaderRow:true,
             //headerRowHeight:40
         };	
-        this.dataModel= new DataModel(dataStore,{autoupdate:false});
+        this.dataModel = new DataModel(dataStore, {autoupdate:false});
         this.dataModel.setColumns(this.config.param);
         this.grid= new SlickGrid(this.contentDiv,this.dataModel,cols,this.options);
         this.grid.onHeaderCellRendered.subscribe((e, args)=>{
@@ -72,24 +75,26 @@ class TableChart extends BaseChart{
        
 
 
-       
         this.mode="select";
         //this._changeMode();
         this.grid.setSelectionModel(new RowSelectionModel());
       
         this.grid.init();
       
-        this.grid.onSort.subscribe( (e, args)=> {
-            this.dataModel.sort(args.columnId,args.sortAsc?"asc":"desc");
+        const sort = ({columnId, sortAsc}) => {
+            this.dataModel.sort(columnId, sortAsc?"asc":"desc");
             this.grid.invalidateAllRows();
             this.grid.render();
+            this.config.sort = {columnId, sortAsc};
+        }
+        this.grid.onSort.subscribe( (e, args)=> {
+            sort(args);
         });
-
+        
         this.grid.onSelectedRowsChanged.subscribe( (e, args)=> {
             if (this.mode==="select"){
                 this._rowsSelected(args);
-            }
-            
+            }            
         });
         
 
@@ -114,9 +119,7 @@ class TableChart extends BaseChart{
         this.filter=[];
         this.themeChanged();
         this.onDataFiltered();
-
-      
-     
+        if (this.config.sort) sort(this.config.sort);
 	}
 
    
@@ -227,6 +230,8 @@ class TableChart extends BaseChart{
     getColumnInfo(){
         return this.grid.getColumns()
         .filter(x=>{
+            //PJT suspected "multitext" needed to be handled here, 
+            //now working on the basis that any 'multitext' entering this system will be described as 'text'
             return x.datatype==="text"
         })
         .map(x=>{
@@ -287,9 +292,9 @@ class TableChart extends BaseChart{
     }
 
 
-    // pjt: deprecated
+    // pjt: deprecated?
     themeChanged(){
-        console.warn('themeChanged() deprecated');
+        // console.warn('themeChanged() deprecated');
     }
 
    

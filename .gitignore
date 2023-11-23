@@ -15,4 +15,14 @@ _test.py
 __pycache__
 vite-dist
 dist
+dist/_mlv
+dist/_avocato
 .env
+*.spec
+python/build
+python/data
+python/mdvtools/static/*
+.ipynb_checkpoints
+
+python/requirements.txt
+python/dist/

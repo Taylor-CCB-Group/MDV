@@ -6,8 +6,7 @@ import SVGChart from "./SVGChart.js";
 
 
 class SingleHeatMap extends SVGChart{
-    constructor(dataStore,div,config){
-          
+    constructor(dataStore,div,config){      
 		super(dataStore,div,config,{x:{type:"band"},y:{type:"band"}});
         if (!config.title){
             this._setTitle();
@@ -18,7 +17,7 @@ class SingleHeatMap extends SVGChart{
         vals=this.dataStore.getColumnValues(p[1]);
         this.x_scale.domain(vals.slice(0));   
         const c= this.config;   
-        c.color_scale = c.color_scale ||  {log:false};
+        c.color_scale = c.color_scale ||  {log:false,min_max:dataStore.getColumnQuantile(p[2],0.01)};
         if (!c.color_legend){
             c.color_legend={display:true}
         }
@@ -27,14 +26,11 @@ class SingleHeatMap extends SVGChart{
         this.initialSetUp();
         this.addToolTip();
         this.drawChart();
-       
-         
     }
 
     remove(notify=true){
         super.remove();
     }
-
 
     onDataHighlighted(data){ 
         const i = data.indexes[0];
@@ -47,7 +43,6 @@ class SingleHeatMap extends SVGChart{
             return false;
         }).attr("stroke","black").style("stroke-width", "4px");
         this.highlight=i;
-    
     }
 
     _setTitle(){
@@ -60,10 +55,11 @@ class SingleHeatMap extends SVGChart{
         this.config.category=cat;
         this.initialSetUp();
         this.drawChart();
-        this._setTitle();
-     
+        this._setTitle();   
     }
+
     onDataFiltered(dim){
+        this.initialSetUp();
         this.drawChart();  
 	}
 
@@ -86,21 +82,30 @@ class SingleHeatMap extends SVGChart{
         let oset2 = null;
         let y_len = y_col.values.length;
         let x_len = x_col.values.length;
-        const so = c.specific_only;
-        if (so){
-            oset1 = so[0].map(x=>y_col.values.indexOf(x));
-            oset2 = so[1].map(x=>x_col.values.indexOf(x));
-            y_len = so[0].length;
-            x_len =  so[1].length;
-            this.y_scale.domain(so[0].slice(0)); 
-            this.x_scale.domain(so[1].slice(0));   
+        this.y_scale.domain(y_col.values.slice(0));
+        this.x_scale.domain(x_col.values.slice(0));
+        //get which cells to display - based on selections in dialog
+        for (let d of this.dataStore.dimensions){
+            if (d.filterColumns && d.noclear){
+                if (d.filterColumns[0]===p[0]){
+                    const s1 =d.filterArguments;
+                    oset1 = s1.map(x=>y_col.values.indexOf(x));
+                    y_len = s1.length;
+                    this.y_scale.domain(s1.slice(0)); 
+                }
+                if (d.filterColumns[0]===p[1]){
+                    const s2=d.filterArguments;
+                    oset2 = s2.map(x=>x_col.values.indexOf(x));
+                    x_len =  s2.length;
+                    this.x_scale.domain(s2.slice(0));   
+                }
+            } 
         }
-
         const ci = this.dataStore.columnIndex;
+        //state/pivot column
         const fc = ci[p[3]].data;
-        const vc  = ci[p[2]].data;
-     
-        
+        //value
+        const vc  = ci[p[2]].data;  
         const len = this.dataStore.size;
         const data= new Array();
         for (let n=0;n<y_len;n++){
@@ -113,23 +118,22 @@ class SingleHeatMap extends SVGChart{
             ct1= this.dataStore.getRawColumn(p[4]);
             ct2= this.dataStore.getRawColumn(p[5]);     
         }
-      
         for (let i =0;i<len;i++){
             if (fc[i]===cat){
                 let py = y[i];
                 let px = x[i];
-                if (so){
-                    px= oset1.indexOf(px);
-                    py= oset2.indexOf(py);
-                    if (px===-1 || py===-1){
-                        continue;
-                    }
+                py= oset1?oset1.indexOf(py):py;
+                px = oset2?oset2.indexOf(px):px;
+                
+                if (px===-1 || py===-1){
+                    continue;
                 }
-                let d = data[px][py];
+                
+                let d = data[py][px];
                 if (!d){
-                    data[px][py]=[y[i],x[i],vc[i],i,1];
+                    data[py][px]=[y[i],x[i],vc[i],i,1];
                     if (ct1){
-                        data[px][py].push(`${ct1[i]}-${ct2[i]}`);
+                        data[py][px].push(`${ct1[i]}-${ct2[i]}`);
                     }               
                 }
                 else{
@@ -142,23 +146,21 @@ class SingleHeatMap extends SVGChart{
             for (let x1=0;x1<x_len;x1++){
                 const d= data[y1][x1];
                 d[2]/=d[4];
-
             }
         }
         this.data=data;
     }
 
-
     drawChart(tTime=300){
+        this.updateAxis();
         const trans =  select(this.contentDiv).transition()
         .duration(tTime).ease(easeLinear);
         const c  =this.config;
         const p = c.param
         const yvals= this.dataStore.getColumnValues(this.config.param[0]);
         const xvals= this.dataStore.getColumnValues(this.config.param[1]);
-        const so = this.config.specific_only
-        const y_len = so?so[0].length:yvals.length;
-        const x_len = so?so[1].length:xvals.length;
+        const y_len =  this.y_scale.domain().length;
+        const x_len = this.x_scale.domain().length;
         const dim = this._getContentDimensions();
         const recWidth= dim.width/x_len;
         const self = this;
@@ -166,17 +168,23 @@ class SingleHeatMap extends SVGChart{
         const f  = this.dataStore.filterArray;
         const mcol = "#E0E0E0";//"#f4f0ec"
         let interactions= null;
-        if (this.config.show_group_interactions){
-            interactions={};
-            const gv1 = this.dataStore.getColumnValues(p[4]);
+        let v1 = null;
+        let v2 =null;
+        //two extra columns describing the groups each cell is in
+        //get the group interactions
+        if ( p.length==6){
+            //get the raw columns and create matrix to hold the data 
+            const gv1=this.dataStore.getColumnValues(p[4]);
             const gv2= this.dataStore.getColumnValues(p[5]);
-            for (let v1 in gv1 ){
-                for (let v2 in gv2){
-                    interactions[`${v1}-${v2}`]=0;
-                }
+            v1 = this.dataStore.getRawColumn(p[4]);
+            v2 =this.dataStore.getRawColumn(p[5]);
+            interactions=new Array(gv1.length);
+            for (let n=0;n<interactions.length;n++){
+                const arr = new Array(gv2.length);
+                arr.fill(0)
+                interactions[n]=arr;
             }
         }
-
         this.graph_area.selectAll(".heatmap-row")
         .data(this.data)
         .join("g")
@@ -195,7 +203,7 @@ class SingleHeatMap extends SVGChart{
         .on("click",(e,d)=>{
            self.dataStore.dataHighlighted([d[3]],self);
         })
-        .on("mouseover mousemove",(e,d)=>{ 
+        .on("mouseover pointermove",(e,d)=>{ 
             const col = xvals[d[0]];
             const row  =yvals[d[1]];
             self.showToolTip(e,`${col}<br>${row}<br>${d[2].toPrecision(3)}`);
@@ -214,26 +222,25 @@ class SingleHeatMap extends SVGChart{
             if (f[d[3]]>0){
                 return mcol;
             }
-           
+            //add group interactions
             if (interactions){
-                interactions[d[5]]++;
+                interactions[v1[d[3]]][v2[d[1]]]++;
             }
             return self.colorFunction(d[2]);
         });
+        //label the group interactions
         if (interactions){
-            const v1 = this.dataStore.getColumnValues(p[4]);
-            const v2= this.dataStore.getColumnValues(p[5]);
+            const gv1 = this.dataStore.getColumnValues(p[4]);
+            const gv2= this.dataStore.getColumnValues(p[5]);
             const msg=[];
-            for (let i in interactions){
-                const arr = i.split("-");
-                msg.push(`${v1[arr[0]]}-${v2[arr[1]]}:${interactions[i]}`);
-                this.legendIcon.setAttribute("aria-label",msg.join(", "));
-
+            for (let i =0;i<gv1.length;i++){
+                for (let n=0;n<gv2.length;n++){
+                    msg.push(`${gv1[i]}-${gv2[n]}:${interactions[i][n]}`);
+                }   
             }
+            this.legendIcon.setAttribute("aria-label",msg.join(", "));
         }
-    
         this.updateAxis();
-        
     }
   
     setSize(x,y){
@@ -265,7 +272,20 @@ class SingleHeatMap extends SVGChart{
         const li  = vals.map((x)=>{
             return {t:x,v:x}
         })
-
+        const mm = this.dataStore.getColumnQuantile(c.param[2],0.01)
+        settings.push({        
+            type:"doubleslider",
+            max:mm[1],
+            min:mm[0],
+            doc:this.__doc__,
+            current_value:c.color_scale.min_max,
+            label:"Color Scale",
+            func:(x,y)=>{     
+                c.color_scale.min_max=[x,y];
+                this.setColorFunction();
+                this.drawChart();
+            }
+        });
         settings.push({
             label:"Change Category",
             type:"dropdown",
@@ -275,22 +295,21 @@ class SingleHeatMap extends SVGChart{
                this.changeCategory(x);
             }
         });
-
-
         const params= this.dataStore.getColumnList("number");
         settings.push({
             label:"Change Values",
             type:"dropdown",
             values:[params,"name","field"],
             current_value:c.param[2],
-            func:(x)=>{
-               this.changeValues(x);
+            func:(x,controls)=>{
+                const cs= this.dataStore.getColumnQuantile(x,0.01);
+                c.color_scale.min_max= cs
+                const sl =controls["Color Scale"].noUiSlider;
+                sl.updateOptions({range:{max:cs[1],min:cs[0]}});
+                sl.set(cs);
+                this.changeValues(x);
             }
         });
-
-
-
-
         return settings;
     }
 
@@ -300,8 +319,7 @@ class SingleHeatMap extends SVGChart{
             useValue:true,
             overideValues:{
                 colorLogScale:this.config.color_scale.log,
-                colors:["#313695","#4575B4","#74ADD1","#ABD9E9", "#E0F3F8", "#E0F3F8","#FFFFBF", "#FEE090","#FDAE61","#F46D43" ,"#D73027" ,"#A50026" ],
-        
+                colors:["#313695","#4575B4","#74ADD1","#ABD9E9", "#E0F3F8", "#E0F3F8","#FFFFBF", "#FEE090","#FDAE61","#F46D43" ,"#D73027" ,"#A50026" ],     
             }
         };
         const mm =this.config.color_scale.min_max;
@@ -315,36 +333,41 @@ class SingleHeatMap extends SVGChart{
 }
 
 BaseChart.types["single_heat_map"]={
-    name:"Single Heat Map",
-    allow_user_add:false,
-    class:SingleHeatMap,
-    params:[
-        {
-            type:"text",
-            name:"Categories on y-axis" //0
-        },
-        {
-            type:"text",
-            name:"categories on x-axis" //1
-        },
-        {
-            type:"number",
-            name:"Value to display" //2
-        },
-        {
-            type:"text",
-            name:"group to display" //3
-        },
-    
-        {
-            type:"text",
-            name:"group1" //4
-        },
-        {
-            type:"text",
-            name:"group2" //5
+    name:"Interaction Matrix",
+    required:["interactions"],
+    methodsUsingColumns:["changeValues"],
+    init:(config, dataSource, extraControls)=>{
+        const i =  dataSource.interactions;
+        config.param=[
+            i.interaction_columns[0],
+            i.interaction_columns[1],
+            extraControls["value"],
+            i.pivot_column,  
+        ]
+        if (i.interaction_matrix?.groups){
+            config.param=config.param.concat(i.interaction_matrix.groups)
         }
-    ]
+        config.category=extraControls["pivot"]
+    },
+    extra_controls:(dataSource)=>{
+        const pc= dataSource.interactions.pivot_column;
+        const cols  = dataSource.getColumnList("number");
+        return [
+            {
+                type:"dropdown",
+                name:"pivot",
+                label:dataSource.getColumnName(pc),
+                values:dataSource.getColumnValues(pc).map(x=>({name:x,value:x}))
+            },
+            {
+                type:"dropdown",
+                name:"value",
+                label:"Value To Display",
+                values:cols.map(x=>({name:x.name,value:x.field}))
+            }
+        ];
+    },
+    class:SingleHeatMap
 };
 
 export default SingleHeatMap;

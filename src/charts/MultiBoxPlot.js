@@ -84,7 +84,7 @@ class MultiBoxPlot extends SVGChart{
         .data(this.data)
         .join("rect")     
         .attr("class","boxplot-rect")
-        .on("mouseover mousemove",(e,d)=>{    
+        .on("mouseover pointermove",(e,d)=>{    
             const h= `${self.names[d.id]}`;             
             self.showToolTip(e,h)
         }).

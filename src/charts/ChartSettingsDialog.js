@@ -1,9 +1,11 @@
 import { BaseDialog } from "../utilities/Dialog.js";
-import { createEl } from "../utilities/Elements.js";
+import { createEl, createFilterElement } from "../utilities/Elements.js";
 import noUiSlider from "nouislider";
 
 
-
+/**
+ * PJT: for review - this doesn't seem to be used anywhere?
+ */
 class ChartSettingsDialog extends BaseDialog{
     constructor(config,content){
         super(config,content);
@@ -107,22 +109,24 @@ class ChartSettingsDialog extends BaseDialog{
     }
 
     dropdown(s,d){
+        const wrapper = createEl("div");
         const dd = createEl("select",{
             styles:{
                 maxWidth:"200px"
             }
-        });
+        }, wrapper);
         for (let item of s.values[0]){
             createEl("option",{
                 text:item[s.values[1]],
                 value:item[s.values[2]]
             },dd)
         }
-        d.append(dd);
         dd.value=s.current_value;
         dd.addEventListener("change",(e)=>{
             s.func(dd.value);
-        })
+        });
+        createFilterElement(dd, wrapper);
+        d.append(wrapper);
     }
 
     doubleslider(s,d){

@@ -432,3 +432,7 @@ classes should alter those!
     from { box-shadow: 0 0 6px red; }
     to { box-shadow: none; }
   }
+
+  .slick-font-size{
+    font-size:10px;
+  }

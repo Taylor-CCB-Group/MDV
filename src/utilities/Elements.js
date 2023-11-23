@@ -1,24 +1,10 @@
 
 import Split from "split.js"
+import { createEl } from "./ElementsTyped.ts";
 
-/**@template {keyof HTMLElementTagNameMap} T
- * @param {T} type
- * @param {{styles?:, classes?:string[], text?:string, [key: string]:string|string[]}=} attrs
- * @param {HTMLElement=} parent
- * @returns {HTMLElementTagNameMap[T]}
- */
-function createEl(type,attrs,parent){
-   
-    const el = document.createElement(type);
-    
-    if (attrs){
-        addElProps(el,attrs)
-    } 
-    if (parent){
-        parent.append(el);
-    }
-    return el;
-}
+//PJT: moved to ElementsTyped.ts because I realised type annotations broke jsdoc script
+//(even though there were understood correctly by language server / IDE)
+//function createEl(type,attrs,parent){
 
 function createSVGEl(type,attrs,parent){
   
@@ -65,24 +51,23 @@ function splitPane(el,config={}){
 
 function createMenuIcon(icon,config,parent){
     const attrs={
+        role: "tooltip", //needs to be tooltip for microtip to work.
     };
     const t  =config.tooltip;
     if(t){
         Object.assign(attrs,{
             "aria-label":t.text,
-            role:"tooltip",
             "data-microtip-size":t.size || "small",
             "data-microtip-position":t.position || "bottom-left"
         });
     }
 
-    const sp= createEl("span",attrs);
+    const sp= createEl("span",attrs); //would changing to buttton make ir a11y compliant
 
     createEl("i",{  
         classes:["ciview-menu-icon"].concat(icon.split(" ")),
         styles:{
             fontSize: config.size || "18px",
-          
         }
     },sp);
     if (config.func){
@@ -107,6 +92,36 @@ function addElProps(el,attrs){
             el.setAttribute(idx, attrs[idx]);
         }
     }
+}
+
+/**
+ * Make a text input element that can be used to filter a list of items
+ * @param {HTMLSelectElement} selectEl - the element to be filtered
+ * @param {HTMLElement=} parent - (optional) the parent element to which the filter will be added
+ * @returns {HTMLInputElement} - the filter element
+ */
+export function createFilterElement(selectEl, parent) {
+    //consider using AutoComplete here
+    const filter = createEl("input", {
+        placeholder: "Filter",
+        type: "text",
+        styles: {
+            width: "4em",
+            margin: "0.2em"
+        }
+    }, parent);
+    filter.oninput = (e) => {
+        const val = e.target.value.toLowerCase().split(" ");
+        for (let o of selectEl.options) {
+            const filter = val.some((v) => o.text.toLowerCase().indexOf(v) === -1);
+            if (filter) {
+                o.style.display = "none";
+            } else {
+                o.style.display = "block";
+            }
+        }
+    };
+    return filter;
 }
 
 /**
@@ -195,6 +210,8 @@ function makeResizable(el,config={}){
         resize: el.style.resize,
         overflow:el.style.overflow
     }
+    //document can change if in another window
+    el.__doc__= config.doc || document;
     // el.style.resize="both"; //standard resizer is sometimes visible when it shouldn't be.
     el.style.overflow="hidden";
     //el.style.zIndex="0";
@@ -215,16 +232,16 @@ function makeResizable(el,config={}){
         ri.startY = e.clientY;
         ri.startWidth = parseInt(document.defaultView.getComputedStyle(el).width, 10);
         ri.startHeight = parseInt(document.defaultView.getComputedStyle(el).height, 10);
-        document.documentElement.addEventListener("mousemove", doDrag, false);
-        document.documentElement.addEventListener("mouseup", stopDrag, false);
+        el.__doc__.documentElement.addEventListener("mousemove", doDrag, false);
+        el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
     }
     function doDrag(e) {
         el.style.width = (ri.startWidth + e.clientX - ri.startX) + "px";
         el.style.height = (ri.startHeight + e.clientY - ri.startY) + "px";
     }
     function stopDrag(e) {
-        document.documentElement.removeEventListener("mousemove", doDrag, false);
-        document.documentElement.removeEventListener("mouseup", stopDrag, false);
+        el.__doc__.documentElement.removeEventListener("mousemove", doDrag, false);
+        el.__doc__.documentElement.removeEventListener("mouseup", stopDrag, false);
     }
     el.__resizeinfo__=ri;
 }
@@ -297,19 +314,17 @@ function makeDraggable(el,config={}){
         };
     }
  
-
-
     handle.onmousedown = dragMouseDown;
     
-        el.__draginfo__={
-            handle:handle,
-            cursor:handle.style.cursor,
-            position:el.style.position,
-        }
-        handle.style.cursor="move";
-        el.style.position="absolute";
-        el.style.margin="0px 0px 0px 0px";
-        el.__doc__=config.doc;
+    el.__draginfo__={
+        handle:handle,
+        cursor:handle.style.cursor,
+        position:el.style.position,
+    }
+    handle.style.cursor="move";
+    el.style.position="absolute";
+    el.style.margin="0px 0px 0px 0px";
+    el.__doc__=config.doc;
     
     function dragMouseDown(e) {
  
@@ -333,31 +348,29 @@ function makeDraggable(el,config={}){
     
   
     function elementDrag(e) {
-      e = e || window.event;
-      e.preventDefault();
-      e.stopPropagation();
-      // calculate the new cursor position:
-      pos1 = pos3 - e.clientX;
-      pos2 = pos4 - e.clientY;
-      pos3 = e.clientX;
-      pos4 = e.clientY;
-      //console.log(pos3+":"+pos4);
-      //console.log(pos1+":"+pos2);
-      // set the element's new position:
-      let nt  = el.offsetTop -pos2;
-      let nl = el.offsetLeft - pos1;
-    if (cont){
-        if (nt<0 || (nt+cont.c_bb.height>cont.p_bb.height && cont.dir !=="topleft")){
-            return;
+        e = e || window.event;
+        e.preventDefault();
+        e.stopPropagation();
+        // calculate the new cursor position:
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        // set the element's new position:
+        let nt  = el.offsetTop -pos2;
+        let nl = el.offsetLeft - pos1;
+        if (cont){
+            if (nt<0 || (nt+cont.c_bb.height>cont.p_bb.height && cont.dir !=="topleft")){
+                return;
+            }
+            if (nl<0 || (nl+cont.c_bb.width>cont.p_bb.width && cont.dir !=="topleft")){
+                return;
+            }
         }
-        if (nl<0 || (nl+cont.c_bb.width>cont.p_bb.width && cont.dir !=="topleft")){
-            return;
+        if (!config.y_axis){
+            el.style.top = (nt) + "px";
         }
-    }
-    if (!config.y_axis){
-      el.style.top = (nt) + "px";
-    }
-      el.style.left = (nl) + "px";
+        el.style.left = (nl) + "px";
     }
   
     function closeDragElement() {
@@ -395,6 +408,6 @@ function getElDim(el){
 
 }
 
-export {createEl,createSVGEl,addResizeListener,makeDraggable,
+export {createEl,createSVGEl,addResizeListener,makeDraggable,addElProps,
     makeResizable,removeDraggable,removeResizable,createMenuIcon,makeSortable,
     splitPane,getElDim,MDVProgress};

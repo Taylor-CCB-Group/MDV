@@ -5,7 +5,7 @@
 
 onmessage= function(e){
     const config = e.data[3];
-    const dtype = config.datatype=="multitext"?Uint16Array:Uint8Array;
+    const dtype = config.datatype=="text"?Uint8Array:Uint16Array
     const data=new dtype(e.data[2]);
     const lFilter=new  Uint8Array(e.data[0]);
     const gFilter = new  Uint8Array(e.data[1]);
@@ -19,14 +19,53 @@ onmessage= function(e){
     }
     else if (config.method==="proportion"){
         const data2= new Uint8Array(e.data[4]);
-     
         result = getProportionData(lFilter,gFilter,data,data2,config);
+    }
+    else if (config.method==="stacked"){
+        const data2= new Uint8Array(e.data[4]);
+        result = getStackedData(lFilter,gFilter,data,data2,config);
+    }
+    else if (config.method==="double_cat"){
+        const data2 = config.datatype2==="multitext"?new Uint16Array(e.data(4)):new Uint8Array(e.data(4));
+        result = getDoubleCategory(lFilter,gFilter,data,data2,config)
     }
     else{     
         result =getNumberInCategory(lFilter,gFilter,data,config)
     }
     postMessage(result);
 }
+
+
+function getDoubleCategory(lFilter,gFilter,data,data2,config){
+    const len = data.length;
+    const mt2 = config.datatype2==="multitext";
+    const matrix = Array.from(config.values,(x,i1)=>{
+        return Array.from(config.values2,(x,i2)=>({i1:i1,i2:i2,c:0}))       
+    });
+    for (let i=0;i<len;i++){
+        if (gFilter[i]!==0){
+            if  (gFilter[i] !==lFilter[i]){
+                continue;
+            }           
+        }   
+        if (mt2){
+            const st = i*config.stringLength2;
+            for (let n=st;n<config.stringLength2;n++){
+                if (data[n]===65535){
+                    break;
+                }
+                matrix[data[i]][data2[n]].c++;
+            }
+        }
+        else{
+            matrix[data[i]][data2[i]].c++
+        }
+    }
+    return matrix;
+
+}
+
+
 
 //data the x category (groups) 
 function getProportionData(lFilter,gFilter,data,data2,config){
@@ -173,6 +212,38 @@ function getNumberInCategory(lFilter,gFilter,data,config){
 
 }
 
+function getStackedData(lFilter,gFilter,data,data2,config){
+    const len = data.length;
+    const matrix = Array.from(config.values,(x,i)=>{
+        return {
+            id:i,
+            values:Array.from(config.values2,(x,i)=>({id:i,count:0})),
+            total:0
+        }
+    });
+    for (let i=0;i<len;i++){
+        if (gFilter[i]!==0){
+            if  (gFilter[i] !==lFilter[i]){
+                continue;
+            }           
+        }
+        matrix[data[i]].values[data2[i]].count++;
+        matrix[data[i]].total++;
+    }
+    for (let r of matrix){
+        let rt = 0;
+        let rpt=0;
+        for (let i of r.values){
+            const per= r.total===0?0:i.count/r.total;
+            i.pos=rt;
+            i.per=per;
+            i.perpos=rpt;
+            rt+=i.count;
+            rpt+=per;
+        }
+    }
+    return matrix;
+}
 
 function getSankeyData(lFilter,gFilter,data,data2,config){
     const len1 = config.values.length;

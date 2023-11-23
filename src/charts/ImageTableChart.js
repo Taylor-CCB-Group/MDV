@@ -15,12 +15,16 @@ class ImageTableChart extends BaseChart{
         this.dataModel.updateModel();
         const c = this.config;
         c.margins = c.margins || {top_bottom:10,left_right:10}
-
-     
-
+        //url should only be in one place i.e. in the datasource - makes it easier to update
+        //therefore try and get the image details from the datasource and not store it chart config
+        //can still specify them in the config if image set is missing
+        let imc = this.dataStore.images;
+        if (imc){
+            imc=imc[c.image_set]
+        }
         this.grid= new ImageTable(this.contentDiv,this.dataModel,{
-            base_url:c.images.base_url,
-            image_type:c.images.type,
+            base_url:imc?imc.base_url:c.images.base_url,
+            image_type:imc?imc.type:c.images.type,
             image_key:c.param[0],
             initial_image_width:c.image_width,
             image_label:c.image_label,
@@ -31,6 +35,8 @@ class ImageTableChart extends BaseChart{
         },c.id);
 
         if (c.sortBy) this.sortBy(c.sortBy, c.sortOrder);
+        if (c.color_by) this.colorByColumn(c.color_by);
+        if (c.pixelated) this.setPixelated(c.pixelated);
 	}
 
     setSize(x,y){
@@ -82,7 +88,11 @@ class ImageTableChart extends BaseChart{
         this.dataModel.sort(columnName, ascending ? "asc" : "desc");
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
-    } 
+    }
+    setPixelated(pixelated){
+        this.config.pixelated=pixelated;
+        this.grid.setPixelated(pixelated);
+    }
     setImageTitle(column){
         this.config.image_title = column;
         this.grid.setImageTitle(column);
@@ -96,7 +106,7 @@ class ImageTableChart extends BaseChart{
         return settings.concat([
         {
             type:"slider",
-            max:od[1]*4,
+            max: Math.max(128, od[1]*4),
             min:10,
             doc:this.__doc__,
             label:"Image Size",
@@ -104,6 +114,14 @@ class ImageTableChart extends BaseChart{
             func:x=>{
                 c.image_width=x;
                 this.grid.setImageWidth(x,true)
+            }
+        },
+        {
+            label: "Pixelated?",
+            type: "check",
+            current_value: c.pixelated || false,
+            func: x => {
+                this.setPixelated(x);
             }
         },
         {
@@ -155,27 +173,28 @@ BaseChart.types["image_table_chart"]={
     "class":ImageTableChart,
     name:"Image Table",
     required:["images"],
-    methodsUsingColumns:["setImageLabel", "sortBy", "setTitleColumn"],
-    configEntriesUsingColumns:["image_label", "sort_by", "image_title"],
+    methodsUsingColumns:["setImageLabel", "sortBy", "setImageTitle"],
+    configEntriesUsingColumns:["image_label", "sortBy", "image_title"],
 
     init:(config,dataSource,extraControls)=>{
         //get the available images
         const i = dataSource.images[extraControls.image_set];
         config.param= [i.key_column];
-        //set the base url and type
+        //set the image set
         config.images={
-            base_url:i.base_url,
-            type:i.type
+            image_set:extraControls.image_set
         }
-        config.sortBy = extraControls.sort_by;
-        config.sortOrder = extraControls.sort_order;
+        config.sortBy = extraControls.sort_by==="__none__"?null:extraControls.sort_by;
+        config.image_title =extraControls.image_title==="__none__"?null:extraControls.image_title;
+        //config.sortOrder = extraControls.sort_order;
     },
     extra_controls:(dataSource)=>{
         const imageSets=[];
         for (let iname in dataSource.images){
             imageSets.push({name:iname,value:iname})
         }
-        const sortableColumns = dataSource.getLoadedColumns().map(c=>({name:c,value:c}));
+        const sortableColumns = dataSource.getColumnList().map(c=>({name:c.name,value:c.field}));
+        sortableColumns.unshift({name:"None",value:"__none__"});
         return [
             //drop down of available image sets
             {

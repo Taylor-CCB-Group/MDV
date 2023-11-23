@@ -1,3 +1,7 @@
+// PJT: for review: this seemed to be unused, was pointing at non-existent dev_index.js
+// now making it equivalent to old dev.config.js,
+// so devserver can be started without --config argument.
+
 const path = require('path');
 webpack=require("webpack");
 
@@ -11,10 +15,11 @@ module.exports = env =>{
 				"Cross-Origin-Opener-Policy":"same-origin",
 				"Cross-Origin-Embedder-Policy":"require-corp"		
 			},
-			static:"./public/"
+			static: env.folder || "./public/"
 		  },
 	
-	   entry: './src/modules/dev_index.js',
+		//entry: './src/dev/devindex.js', // was this broken? how broken? file is gone...
+		entry: './src/modules/desktop_index.js', //not working, contemplating removing this config file
 
   	   output: {
     		   filename: 'dist/ciview2.js',
