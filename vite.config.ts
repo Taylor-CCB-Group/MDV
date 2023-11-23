@@ -5,6 +5,7 @@ import { resolve } from 'path';
 const flaskURL = "http://127.0.0.1:5051";
 
 export default defineConfig(env => { return {
+    base: "./",
     server: {
         headers: {
             "Cross-Origin-Embedder-Policy": "require-corp",
