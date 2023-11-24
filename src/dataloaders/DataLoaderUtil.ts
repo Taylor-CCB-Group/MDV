@@ -113,13 +113,17 @@ async function loadBinaryData(datasource: string, name: string) {
 }
 //send json args and return json/array buffer response
 export async function getPostData(url: string, args, return_type = "json") {
+    let headers = {
+        "Accept": "application/json,text/plain,*/*",
+        "Content-Type": "application/json"
+    }
+    if (window["CSRF_TOKEN"]) {
+        headers["X-CSRFToken"] = window["CSRF_TOKEN"];
+    }
     const resp = await fetch(url, {
         method: "POST",
         body: JSON.stringify(args),
-        headers: {
-            "Accept": "application/json,text/plain,*/*",
-            "Content-Type": "application/json"
-        }
+        headers,
     });
     if (return_type === "json") {
         return await resp.json();
