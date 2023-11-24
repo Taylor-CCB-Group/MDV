@@ -23,7 +23,7 @@ const isPopout = urlParams.get('popout') === "true";
 const dir = urlParams.get('dir') || (isPopout ? '' : flaskURL);
 const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
 //hack to load data from local API
-const staticFolder = !dir.startsWith("/project");
+const staticFolder = !(dir.startsWith("/project") || dir.startsWith("project"));
 
 // set title of page to the data directory
 document.title = !staticFolder ? 'MDV - local project' : `MDV - ${root}`;
