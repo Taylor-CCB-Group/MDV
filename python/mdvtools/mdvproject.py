@@ -516,7 +516,7 @@ class MDVProject:
             v["initialCharts"][name]=[]
             self.set_view(add_to_view,v)
 
-    def insert_link(self,datasource,linkto,linktype,data):
+    def insert_link(self, datasource, linkto, linktype, data):
         ds =  self.get_datasource_metadata(datasource)
         if not ds:
             raise AttributeError(f"datasource '{datasource}' does not exist")
@@ -911,7 +911,7 @@ class MDVProject:
                     }
                 else:
                     try:
-                        os.link(v["path"], join(imdir, os.path.basename(v["path"])))
+                        os.symlink(os.path.abspath(v["path"]), join(imdir, os.path.basename(v["path"])))
                     except Exception as e:
                         raise AttributeError(f"Cannot link viv image {v['path']} to {datasource}")
                     region["viv_image"]={
@@ -948,8 +948,13 @@ def get_subgroup_bytes(grp,index,sparse=False):
 
 
 def add_column_to_group(col,data,group,length):
-   
-
+    '''
+    col (dict): The column metadata (may be modified e.g. to add values)
+    data (pandas.Series): The data to add
+    group (h5py.Group): The group to add the data to
+    length (int): The length of the data
+    '''
+    
     if col["datatype"]=="text" or col["datatype"]=="unique" or col["datatype"]=="text16":
         if data.dtype=="category":
             data =data.cat.add_categories("ND")
