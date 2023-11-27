@@ -316,6 +316,31 @@ class ChartManager{
     _addInteractionLinks(ds,ods,links){
         const interactionFilter= ods.getDimension("category_dimension");
         const icols = links.interaction_columns
+        if (!icols || icols.length === 0) {
+            // PJT hack for only 'pivot_column' - unused/experimental...
+            // but keeping as `_getColumnsAsync()` isn't used anywhere else... 
+            const pc = links.pivot_column;
+            ds.addListener(`${ds.name}_interaction`, async (type, data) => {
+                if (type === 'data_highlighted' || type === 'filtered') {
+                    // when type === 'filtered', data.indexes is undefined.
+                    // data is a `RangeDimension` with a `filterArray`, `filterBuffer`, `filterIndexes` (null)...
+                    // I could `await ds.getFilteredIndices()`... will that be the right thing to do?
+                    // do I even need the other _getColumnsAsync() calls etc?
+                    await this._getColumnsAsync(ds.name, [pc]);
+                    const indices = await ds.getFilteredIndices();
+                    const info = ds.getRowAsObject(indices[0], [pc]);
+                    //get pivot from the other datasource
+                    await this._getColumnsAsync(ods.name, [pc]);
+                    //-- no voodoo - not showing the region if not already displayed
+                    //indeed, what does the concept of having an interaction link intrinsically have to do with regions?
+                    //all I want is to be able to filter the other datasource by the value of the pivot column
+                    //I'm not sure what this interactionFilter (ods.getDimension("category_dimension")) should be.
+                    interactionFilter.filter("filterCategories", [pc], [info[pc]]);
+                }
+            });
+
+            return;
+        }
         const c1 = icols[0];
         const c2= icols[1];
         const pc= links.pivot_column;
@@ -1524,6 +1549,12 @@ class ChartManager{
 
     }
 
+
+    async _getColumnsAsync(dataSource, columns) {
+        return new Promise((resolve) => {
+            this._getColumnsThen(dataSource, columns, resolve);
+        });
+    }
 
     _getColumnsThen(dataSource,columns,func){
         const ds  =this.dsIndex[dataSource];
