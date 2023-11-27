@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
+import { loadOmeTiff, getChannelStats, loadOmeZarr } from "@hms-dbmi/viv";
 import { BaseConfig } from "./components/BaseReactChart";
 import { useChart, useDataStore } from "./context";
 import type { OME_TIFF } from "./viv_state";
@@ -102,12 +102,16 @@ export function useParamColumns() {
 
 // slightly rough - we might have multiple images in a config, or generally think about this differently
 // this is breaking rules of hooks etc in short term while I figure out how to do this properly
-export function useImgUrl() {
+export function useImgUrl(): string {
     const config = useConfig() as any;
     if (config.imageURL) return config.imageURL;
     // see VivScatterPlot.afterAppCreation() ...
     const { regions } = useDataStore();
-    if (!regions) throw `No image URL provided and no regions found in data store`; // plenty of other ways this could go wrong
+    if (!regions) {
+        //throw `No image URL provided and no regions found in data store`; // plenty of other ways this could go wrong}
+        console.warn(`No image URL provided and no regions found in data store`); // plenty of other ways this could go wrong}
+        return '';
+    }
     const i = regions.all_regions[config.region].viv_image;
     return i.url ? i.url : getProjectURL(regions.avivator.base_url) + i.file;
 }
@@ -129,7 +133,13 @@ export function useOmeTiffLoader() {
     const url = useImgUrl();
     const [tiff, setTiff] = useState<OME_TIFF>();
     useEffect(() => {
-        loadOmeTiff(url).then(setTiff);
+        if (url.endsWith('.ome.tif') || url.endsWith('.ome.tiff')) {
+            loadOmeTiff(url).then(setTiff);
+        }
+        else {
+            const _url = new URL(url, document.baseURI).href;
+            loadOmeZarr(_url, { type: 'multiscales' }).then(setTiff);
+        }
     }, [url]);
     return tiff;
 }

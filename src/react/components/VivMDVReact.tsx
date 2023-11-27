@@ -27,22 +27,22 @@ function ReactTest() {
     )
 }
 
-const Debug = observer(() => {
-    const config = useConfig<VivMdvReactConfig>();
-    const id = useChartID();
-    const ome = useOmeTiff();
-    const meta = useMetadata();
-    const channelX = config.channel;
-    return (
-        <div>
-            {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
-            <br />
-            <pre>
-                {JSON.stringify(meta, null, 2)}
-            </pre>
-        </div>
-    )
-});
+// const Debug = observer(() => {
+//     const config = useConfig<VivMdvReactConfig>();
+//     const id = useChartID();
+//     const ome = useOmeTiff();
+//     const meta = useMetadata();
+//     const channelX = config.channel;
+//     return (
+//         <div>
+//             {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
+//             <br />
+//             <pre>
+//                 {JSON.stringify(meta, null, 2)}
+//             </pre>
+//         </div>
+//     )
+// });
 
 const DeckImpl = observer(() => {
     const imgUrl = useImgUrl();
@@ -102,9 +102,9 @@ const DeckImpl = observer(() => {
     }), [layerConfigX]); //includes a ScaleBarLayer... but I'm not seeing it. Also... two xr-layer passes? (looking at spector draw calls)
     return (
         <>
-            {width}x{height}
+            {/* {width}x{height} */}
             {/* <Debug /> */}
-            {contrastLimits[0][0]}-{contrastLimits[0][1]}
+            {/* {contrastLimits[0][0]}-{contrastLimits[0][1]} */}
             <DeckGL id={id + 'deck'}
                 views={views}
                 /// either

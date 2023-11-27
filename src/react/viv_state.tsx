@@ -1,6 +1,6 @@
 import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useRef } from "react";
 import { useConfig } from "./hooks";
-import { ColorPaletteExtension, loadOmeTiff } from "@hms-dbmi/viv";
+import { ColorPaletteExtension, loadOmeTiff, loadOmeZarr } from "@hms-dbmi/viv";
 import { useOmeTiff } from "./context";
 import { createStore, useStore } from "zustand";
 import { observer } from "mobx-react-lite";
@@ -9,7 +9,7 @@ import type { StoreApi } from "zustand";
 
 // what about loadOmeZarr, loadBioformatsZarr...
 // ... not to mention HTJ2K?
-export type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
+export type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff | typeof loadOmeZarr>>;
 
 // --- some bits of Zustand type stuff that could go elsewhere (can't seem to import) ---
 
