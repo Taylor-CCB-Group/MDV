@@ -23,7 +23,7 @@ function _mdvInit(staticFolder){
             binaryDataLoader:staticFolder?loadBinaryDataStatic
                                     :loadBinaryData
         };
-        //lsiten to events
+        //listen to events
         const listener = (type,cm,data)=>{
             switch(type){
                 case "state_saved":
@@ -66,7 +66,7 @@ async function getView(view){
     return await getData("/get_view",{view:view})
 }
 
-//load arbritray data
+//load arbitrary data
 async function loadBinaryDataStatic(datasource,name){
     const resp = await fetch(`./binarydata/${datasource}/${name}.b`);
     return await resp.arrayBuffer();
@@ -75,7 +75,7 @@ async function loadBinaryData(datasource,name){
     return await getData("/get_binary_data",{datasource,name},"arraybuffer");
 }
 
-//get the configs wither from a folder or via a remote API
+//get the configs from the home folder (if folder is true) or via a remote API
 async function getConfigs(folder){
     let configs={};
     if (folder){
