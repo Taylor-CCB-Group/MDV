@@ -107,12 +107,16 @@ function processArrayBuffer(data,columns,size){
 function getArrayBufferDataLoader(url){
 	return async(columns,dataSource,size)=>{
 		//get the data
+		let headers = {
+			"Content-Type": "application/json"
+		}
+		if (window["CSRF_TOKEN"]) {
+			headers["X-CSRFToken"] = window["CSRF_TOKEN"];
+		}
 		const response = await fetch(url,{
 			method:"POST",
 			body:JSON.stringify({columns:columns,data_source:dataSource}),
-			headers: {
-				'Content-Type': 'application/json'
-			}
+			headers,
 		});
 		//the data is any arraybuffer containing each individual 
 		//column's raw data
