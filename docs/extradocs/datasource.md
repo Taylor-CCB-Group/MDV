@@ -23,7 +23,8 @@ The DataStore can contain a number of columns. Each column can have the followin
 
 * **datatype**
 
-  * `text` - string can't have more than 256 values 
+  * `text` - string with a maximum of 256 different values 
+  * `text16` - string with a maximum of 65536 different values
   * `integer` - an integer (represented by float32)
   * `double` - a floating point number (represented by float32)
   * `unique` - any text
