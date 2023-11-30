@@ -22,6 +22,7 @@ dist/_avocato
 python/build
 python/data
 python/mdvtools/static/*
+python/mdvtools/template/page.html
 .ipynb_checkpoints
 
 python/requirements.txt

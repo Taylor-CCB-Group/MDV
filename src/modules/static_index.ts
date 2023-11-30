@@ -11,7 +11,8 @@ import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import { fetchAndPatchJSON, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 
-const flaskURL = "";
+const { href } = window.location;
+const flaskURL = href.substring(href.indexOf("/project"));
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
