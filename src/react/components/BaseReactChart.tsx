@@ -39,11 +39,11 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
  */
-export abstract class BaseReactChart<TConfig extends BaseConfig> extends BaseChart {
-    declare config: TConfig;
+export abstract class BaseReactChart<T> extends BaseChart {
+    declare config: T & BaseConfig;
     useMobx = true;
     root: ReturnType<typeof createRoot>;
-    protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: TConfig, ReactComponentFunction: TComponent<TConfig> = Fallback) {
+    protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: T & BaseConfig, ReactComponentFunction: TComponent<T & BaseConfig> = Fallback) {
         super(dataStore, div, config);
         config = this.config; //original config will be copied by super, before doing things like adding id to it...
         makeAutoObservable(config);

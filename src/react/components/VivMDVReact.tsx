@@ -162,17 +162,16 @@ export type VivRoiConfig = {
     roi: ROI,
     viv: VivConfig,
     //image_properties: ChannelsState,
-} & BaseConfig & ScatterPlotConfig;
+} & ScatterPlotConfig;
 
-export type VivMdvReactConfig = 
-BaseConfig & ScatterPlotConfig & (
+export type VivMdvReactConfig = ScatterPlotConfig & (
     { type: 'VivMdvReact', imageURL: string, overviewOn: boolean, image_properties: ChannelsState } 
     | VivRoiConfig
 ) & { channel: number };
 export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog: any;
-    constructor(dataStore, div, config: VivMdvReactConfig) {
+    constructor(dataStore, div, config) {
         // todo better default config
         config = {...scatterDefaults, ...config};
         if (!config.channel) config.channel = 0;
