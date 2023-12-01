@@ -139,7 +139,7 @@ async function getData(url, args, return_type="json"){
 }
 
 //changes or adds a param to the browser address bar
-function changeURLParam(param,value){
+export function changeURLParam(param,value){
     const url = new URL(window.location);
     (url.searchParams.has(param) ? url.searchParams.set(param, value) : url.searchParams.append(param, value));
     url.search = url.searchParams;

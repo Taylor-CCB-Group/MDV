@@ -10,9 +10,10 @@ import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import { fetchAndPatchJSON, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
+import { changeURLParam } from "./desktop_index";
 
-const { href } = window.location;
-const flaskURL = href.substring(href.indexOf("/project"));
+const flaskURL = window.location.pathname;
+alert("flaskURL: " + flaskURL);
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
@@ -25,9 +26,10 @@ const dir = urlParams.get('dir') || (isPopout ? '' : flaskURL);
 const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
 //hack to load data from local API
 const staticFolder = !dir.startsWith("/project");
+const project_name = dir.split("/").pop();
 
 // set title of page to the data directory
-document.title = !staticFolder ? 'MDV - local project' : `MDV - ${root}`;
+document.title = `MDV - ${project_name}`;
 if (isPopout) document.title = "MDV popout";
 
 
@@ -47,6 +49,12 @@ async function loadData() {
     const config = await fetchAndPatchJSON(`${root}/state.json`, root);
     config.popouturl = undefined;
     const views = await fetchAndPatchJSON(`${root}/views.json`, root);
+    //is view in the URL
+    const view = urlParams.get("view");
+    if (config.all_views && view && config.all_views.indexOf(view) !== -1) {
+        config["initial_view"] = view;
+    }
+
 
     const dataLoader = getDataLoader(staticFolder, datasources, views, dir);
 
@@ -59,6 +67,9 @@ async function loadData() {
             } else {
                 cm.createInfoAlert("State save failed", {duration: 3000, type: "danger"});
             }
+        }
+        if (type === "view_loaded") {
+            changeURLParam("view", cm.currentView)
         }
     }
     //todo fix searchParams when changing view.
