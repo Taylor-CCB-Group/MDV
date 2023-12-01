@@ -12,7 +12,10 @@ import { BaseDialog } from "../utilities/Dialog";
 import { fetchAndPatchJSON, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 import { changeURLParam } from "./desktop_index";
 
-const flaskURL = window.location.pathname;
+// const flaskURL = window.location.pathname;
+const { href } = window.location;
+const flaskURL = href.substring(href.indexOf("/project"));
+
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
