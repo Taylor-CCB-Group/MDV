@@ -26,8 +26,9 @@ const isPopout = urlParams.get('popout') === "true";
 // if there is no dir parameter, use the flaskURL to proxy requests to the python server
 const dir = urlParams.get('dir') || (isPopout ? '' : flaskURL);
 const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
-//hack to load data from local API
-const staticFolder = !dir.startsWith("/project");
+//hack to load data from local API... TODO XXX make less hacky, rather than more...
+//this is sort-of-working as of this writing for `MDVProject.serve()`, as long as the default port 5050 is used...
+const staticFolder = !dir.startsWith("/project") && !(window.location.port === "5050");
 const project_name = dir.split("/").pop();
 
 // set title of page to the data directory
