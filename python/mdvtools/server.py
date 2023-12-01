@@ -10,8 +10,12 @@ import os
 
 
 def add_safe_headers(resp):
+    #headers required for web workers
     resp.headers["Cross-Origin-Opener-Policy"]= "same-origin"
     resp.headers["Cross-Origin-Embedder-Policy"]="require-corp"
+    #headers required if serving endpoints for another server e,g dev server
+    resp.headers["Access-Control-Allow-Origin"]="*"
+    resp.headers["Access-Control-Allow-Headers"]="Content-Type"
     return resp
 
 #flask send_file can't always cope with relative paths

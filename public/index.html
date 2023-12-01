@@ -1,48 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>ciview2</title>
-    <style>
-      body{
-        background:lightgrey;
-        height:100%;
-        width:100%;
-        margin:0px;
-      }
+<html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            html,body,#holder{
+                height:100%;
+                margin:0px;
+            }
+        
+        </style>
+    </head>
+    <body>
 
-      html{
-        height:100%;
-        width:100%;
-      }
-      .all{
-        height:100%;
-        width:100%;
-        display:flex;
-        /* safari issue... removing doesn't seem to adversely effect */
-        /* flex-wrap:wrap; */
-      }
-      .holder{
-        height:300px;
-        width:300px;
-        background:white;
-        z-index:40;
-        /* padding:5px; */
-        margin:10px;
-        display:inline-block;
-      }
+        <div id="holder"></div>
+        <script charset ="utf-8" src="static/js/mdv.js"></script>
+        <script>
+            _mdvInit(false,"http://localhost:5000");
+        </script>
 
-
-    </style>
-  </head>
-  <body>
-
-
-<div id="app1" class="all"></div>
-
-
-
-
-    <script src="dist/ciview2.js"></script>
-  </body>
+    </body>
 </html>
