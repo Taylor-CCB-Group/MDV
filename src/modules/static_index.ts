@@ -13,7 +13,6 @@ import { fetchAndPatchJSON, getDataLoader, getPostData, setProjectRoot } from ".
 import { changeURLParam } from "./desktop_index";
 
 const flaskURL = window.location.pathname;
-alert("flaskURL: " + flaskURL);
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
