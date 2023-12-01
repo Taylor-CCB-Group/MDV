@@ -1500,7 +1500,7 @@ class DataStore{
      * @param {string} column - the column's field or id
      * @param {object} config - see see [here]{@link DataStore#getColorFunction} 
      * @returns {string[]} An array of colors. For text/multitext, the colors will correspond
-     * to the column's values. For double/intgers it will contain binned values fron the min
+     * to the column's values. For double/integers it will contain binned values fron the min
      * to max value
      */
     getColumnColors(column,config={}){

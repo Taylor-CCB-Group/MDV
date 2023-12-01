@@ -2,7 +2,7 @@ import Dimension from "./Dimension.js";
 class CategoryDimension extends Dimension{
     constructor(parent){
         super(parent)
-        this.worker= new Worker (new URL("./catWorker.js?v=10",import.meta.url));    
+        this.worker= new Worker (new URL("./catWorker.js?v=11",import.meta.url));    
     }
 
     filterCategories(args,columns){
