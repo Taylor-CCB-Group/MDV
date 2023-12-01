@@ -64,7 +64,10 @@ export function buildPath(...args: string[]) {
  */
 export function getProjectURL(url: string) {
     if (url.startsWith(projectRoot)) return url;
-    return buildPath(projectRoot, url).replace("./", "/") + '/';
+    const p = buildPath(projectRoot, url).replace("./", "/") + '/';
+    // https://github.com/hms-dbmi/viv/issues/756
+    if (p.startsWith("/")) return new URL(p, window.location.href).href;
+    return p;
 }
 
 
