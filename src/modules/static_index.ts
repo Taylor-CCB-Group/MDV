@@ -9,9 +9,10 @@ import ChartManager from "../charts/ChartManager.js";
 import TagModel from '../table/TagModel';
 import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
-import { fetchAndPatchJSON, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
+import { fetchJsonConfig, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 import { changeURLParam } from "./desktop_index";
 
+// todo: change so that *only* ?dir=... is used to determine the root?
 // const flaskURL = window.location.pathname;
 const { href } = window.location;
 const flaskURL = href.substring(href.indexOf("/project"));
@@ -48,10 +49,10 @@ async function loadData() {
     if (isPopout) return;
     setProjectRoot(root);
     // move more of this into DataLoaderUtil (which might get renamed)?
-    const datasources = await fetchAndPatchJSON(`${root}/datasources.json`, root) as Datasource[];
-    const config = await fetchAndPatchJSON(`${root}/state.json`, root);
+    const datasources = await fetchJsonConfig(`${root}/datasources.json`, root) as Datasource[];
+    const config = await fetchJsonConfig(`${root}/state.json`, root);
     config.popouturl = undefined;
-    const views = await fetchAndPatchJSON(`${root}/views.json`, root);
+    const views = await fetchJsonConfig(`${root}/views.json`, root);
     //is view in the URL
     const view = urlParams.get("view");
     if (config.all_views && view && config.all_views.indexOf(view) !== -1) {

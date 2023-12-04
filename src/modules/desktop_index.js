@@ -2,7 +2,7 @@ import "./all_css"
 import ChartManager from '../charts/ChartManager.js';
 import { getArrayBufferDataLoader,getLocalCompressedBinaryDataLoader} from "../dataloaders/DataLoaders.js";
 import { setProjectRoot } from "../dataloaders/DataLoaderUtil";
-import { fetchAndPatchJSON, rewriteBaseUrlRecursive } from "../dataloaders/DataLoaderUtil";
+import { fetchJsonConfig } from "../dataloaders/DataLoaderUtil";
 
 let route = '';
 
@@ -102,7 +102,7 @@ async function loadBinaryData(datasource,name){
  */
 async function getConfigs(isStaticFolder){
     let configs={};
-    const fetch = async (url) => fetchAndPatchJSON(url, route);
+    const fetch = async (url) => fetchJsonConfig(url, route);
     if (isStaticFolder){
         let resp = await fetch(`${route}/datasources.json`);
         configs.datasources = await resp.json();
@@ -131,7 +131,7 @@ async function getData(url, args, return_type="json"){
         console.log('returning json, rewriting base_url first...');
         const original = await resp.json();
         console.log('original', original);
-        return rewriteBaseUrlRecursive(original, route);
+        return original; //rewriteBaseUrlRecursive(original, route);
     }
     else{
         return await resp.arrayBuffer();
