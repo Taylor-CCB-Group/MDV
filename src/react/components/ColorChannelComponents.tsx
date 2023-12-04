@@ -27,21 +27,22 @@ const ChannelSelect = observer(() => {
     else if (config.type !== 'VivMdvReact') throw new Error('unexpected config type');
     const ome = useOmeTiff();
     if (!ome) return <div>loading...</div>;
-    const channelOptions = ome.metadata.Pixels.Channels.map((c, i) => (
-        <MenuItem key={c.ID} value={i}>{c.Name}</MenuItem>
-    ));
-    return (
-    <div>
-        <InputLabel id="channel-select-label">Channel</InputLabel>
-        <Select value={config.channel} labelId="channel-select-label" label="Channel" onChange={
-            action(e => config.channel = Number.parseInt(e.target.value))}>
-            {channelOptions}
-        </Select>
-        <Button onClick={action(() => {
-            // add channel...
-        })}>Add channel</Button>
-    </div>
-    )
+    return <p>TODO</p>
+    // const channelOptions = ome.metadata.Pixels.Channels.map((c, i) => (
+    //     <MenuItem key={c.ID} value={i}>{c.Name}</MenuItem>
+    // ));
+    // return (
+    // <div>
+    //     <InputLabel id="channel-select-label">Channel</InputLabel>
+    //     <Select value={config.channel} labelId="channel-select-label" label="Channel" onChange={
+    //         action(e => config.channel = Number.parseInt(e.target.value))}>
+    //         {channelOptions}
+    //     </Select>
+    //     <Button onClick={action(() => {
+    //         // add channel...
+    //     })}>Add channel</Button>
+    // </div>
+    // )
 });
 
 const ChannelContrastEditor = observer(function ChannelContrastEditor({index}: {index: number}) {
