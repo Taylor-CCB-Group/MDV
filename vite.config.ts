@@ -35,7 +35,7 @@ export default defineConfig(env => { return {
         }
     },
     build: {
-        outDir: process.env.OUT_DIR || "vite-dist",
+        outDir: process.env.OUT_DIR || "python/mdvtools/static",
         sourcemap: true,
         rollupOptions: {
             input: 'src/modules/static_index.ts',

@@ -11,7 +11,7 @@
     "vite-build": "tsc && vite build",
     "build": "webpack --config prod.config.js --env process.env",
     "build-flask": "npm run clean-flask & webpack --config desktop.config.js",
-    "build-flask-vite": "cross-env OUT_DIR=./python/mdvtools/static vite build",
+    "build-flask-vite": "vite build",
     "clean-flask": "rm -r ./python/mdvtools/static",
     "build-pyinstaller": "npm run build-flask & pyinstaller --onefile python/mdvtools/mdv_desktop.py --add-data \"mdvtools/templates:mdvtools/templates\" --add-data \"mdvtools/static:mdvtools/static\"",
     "run-ex": "webpack  serve --config examples.config.js --env process.env",
