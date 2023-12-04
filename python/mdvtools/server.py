@@ -83,15 +83,6 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
         # `_mdvInit('{{route}}')` in template...
         return render_template("page.html", route=route)
     
-    @project_bp.route("/assets/<path:path>")
-    def get_static_asset(path):
-        return send_file(safe_join('./static/assets/', path))
-    
-    @project_bp.route("/static/<path:path>")
-    def get_static_files(path):
-        return send_file(safe_join('./static/', path))
-    
-
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
         # should this now b '.gz'?

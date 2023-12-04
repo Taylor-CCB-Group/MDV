@@ -76,7 +76,7 @@ async function loadData() {
         }
     }
     //todo fix searchParams when changing view.
-    const cm = new ChartManager("app1", datasources, dataLoader, config, listener);
+    const cm = new ChartManager("holder", datasources, dataLoader, config, listener);
 
     function extraFeatures(i: number) {
         const dsName = datasources[i].name;

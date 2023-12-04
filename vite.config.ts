@@ -14,9 +14,6 @@ export default defineConfig(env => { return {
             "Access-Control-Allow-Methods": "GET",
             "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization",
         },
-        fs: {
-            allow: ["examples", "."],
-        },
         port: 5170,
         strictPort: true,
         proxy: {
@@ -29,7 +26,7 @@ export default defineConfig(env => { return {
                 target: flaskURL,
                 changeOrigin: true,
             },
-            //will fail if url has search params
+            //will fail if url has search params <-- ?
             //will cause problems if we have json files that don't want to be proxied
             '^/.*\\.(json|b|gz)$': {
                 target: flaskURL,
@@ -37,18 +34,17 @@ export default defineConfig(env => { return {
             },
         }
     },
-    resolve: {
-        alias: {
-            "/data": "/examples/data",
-        }
-    },
-    publicDir: "examples",
     build: {
         outDir: process.env.OUT_DIR || "vite-dist",
         sourcemap: true,
         rollupOptions: {
-            input: {
-                index: "./index.html",
+            input: 'src/modules/static_index.ts',
+            output: {
+                entryFileNames: 'js/mdv.js',
+                assetFileNames: (assetInfo) => {
+                    if (assetInfo.name === 'static_index.css') return 'assets/mdv.css';
+                    return 'assets/[name]-[hash][extname]'; //could consider not including hash
+                },
             }
         }
     },

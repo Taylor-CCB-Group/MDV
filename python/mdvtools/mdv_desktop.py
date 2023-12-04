@@ -23,7 +23,8 @@ for p in projects:
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # todo: figure out what to do here / how to configure routes
+    return render_template('page.html')
 
 @app.route('/projects')
 def get_projects():
