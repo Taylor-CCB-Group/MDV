@@ -37,7 +37,7 @@ export default defineConfig(env => { return {
     build: {
         outDir: process.env.OUT_DIR || "python/mdvtools/static",
         sourcemap: true,
-        rollupOptions: {
+        rollupOptions: process.env.BUNDLE_TYPE === 'html' ? {} : {
             input: 'src/modules/static_index.ts',
             output: {
                 entryFileNames: 'js/mdv.js',

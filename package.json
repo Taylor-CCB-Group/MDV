@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite --host",
-    "vite-build": "tsc && vite build",
+    "vite-build": "tsc && cross-env BUNDLE_TYPE=html OUT_DIR=./vite-dist vite build",
     "build": "webpack --config prod.config.js --env process.env",
     "build-flask": "npm run clean-flask & webpack --config desktop.config.js",
     "build-flask-vite": "vite build",
