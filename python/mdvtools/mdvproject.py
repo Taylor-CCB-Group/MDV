@@ -247,8 +247,8 @@ class MDVProject:
         Args:
             datasource (str): The name of the datasource.
             column (str|dict):  metadata for the column. Can be a string with the column's name,
-                although datatype should also be included as the inferred datatype 
-                is not always correct
+              although datatype should also be included as the inferred datatype 
+              is not always correct
             raw_data (list|array): Anything that can be converted into a pandas Series
               The data should be in the correct order
         '''
@@ -298,7 +298,7 @@ class MDVProject:
         Args:
             datasource (str): The name of the data source.
             data (dataframe|str): Either a pandas dataframe or a text file. The first column
-                should be the 'index' column and match a column in the datasource. Tne other columns should
+                should be the 'index' column and match a column in the datasource. The other columns should
                 contain the annotations to add.
             separator (str,optional): The delimiter if a text file is supplied (tab by default)
             missing_value(str,optional): The value to put if the index value is missing in the input data.

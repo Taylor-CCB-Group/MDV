@@ -17,12 +17,12 @@ const dataLoader={
 }
 
 const config={
-    all_views:["view1","view2","view3"],
+    all_views:["view1", "view2", "view3"],
     current_view:"view2",
     columns:myColumns
 }
 
-const m = new ChartManager("my-div",myDataSources,dataLoader,config)
+const m = new ChartManager("my-div", myDataSources, dataLoader, config)
 
 ```
 
