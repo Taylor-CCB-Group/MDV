@@ -108,7 +108,46 @@ https://myserver.com/path/to/myapp
 
 * clone the repository
 * npm install
-* run the example - npm run run-ex --env example=basic_example
+
+You can run a project in development mode, which allows you do debug the JavaScript code and make changes, which will be reflected in the browser.
+
+To use a project that has been converted into a static webpage (`convert_to_static_page()`) just specify the location of the folder when you start the dev server.
+
+```
+webpack serve --env dev=folder:/path/to/myproject
+```
+Or you can use data that is being served from a project. Run `serve()` on a project, which by default will start a server on local host at port 5000, and then start the development server
+
+```
+webpack serve --env dev=http://127.0.0.1:5000
+```
+In both cases the server will be running at localhost:8080
+
+### Building the App
+```
+webpack --env build=desktop
+```
+
+This will build JavaScript that is is suitable for use with the 'static' project format and the lightweight inbuilt server in the python module. It puts the JavaScript files and assets in python/mdvtools/static/js and python/mdvtools/static/img respectively. When a static project is created, these files are copied over to the project's folder so that it can run independently.
+
+```
+webpack --env build=production
+```
+The above will build the JavaScript code and exposes ChartManager and a few utility methods for loading data, but it is up to the developer to write methods to load/save data to the app. The js files are put in dist/basic and any assets in dist/basic/images.
+
+
+There are a few options to customize the production build:-
+* mode - by default the mode is production which minifies and optimizes the bundled code. If development is specified, more verbose, easier to debug code is generated
+* outputpath - the default is dist/basic , but any folder can be specified
+* assetpath - this is the path where the app will look for assets, by default it is ./, so the generated images folder needs to be placed in the same directory as the html page. It can be changed to a relative or absolute path e.g. /static/assets/js, in which case the images folder will need to be places the relevant location on the server
+* nofont - if true then fontawesome will not be included in the build, it will need to be imported in the html file
+
+```
+webpack --env build=production mode=development \
+              outputpath=/path/to/myfolder \
+              assetpath =/static/assets \
+              nofont=true \
+```
 
 ## Dev branch
 

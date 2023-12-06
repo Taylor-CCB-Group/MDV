@@ -72,21 +72,6 @@ Because the JavaScript uses WebWorkers and SharedArrayBuffers, a [service worker
 ```
 If your server already adds these headers then the `convert_to_static_page` function can be invoked with `include_sab_headers=False`, which will exclude the service worker. In this case the project does not have to be served over https
 
-
-### Serving the Project in Development Mode
-Create a static version of the project.
-```
-p.convert_to_static_page(/path/to/myproject)
-```
-Then run webpack with the development config and point towards the folder you have just created.
-
-```
-webpack serve  --config dev.config.js --env folder=/path/to/myproject
-```
-In this case, the project will be served by  webpack's development server, using the the un-compiled version of the code allowing debugging.  
-
-
-
 ### To convert CSV data for a simple file server
 
 Given a CSV file associated folder of images, the `csv_to_static` script will create a folder (containing `datasources.json`, `state.json`, `views.json`, `{mydata.csv}.b`, `{mydata.csv}.json`, `images/`) that can be served by a simple file server.
