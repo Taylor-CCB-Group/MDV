@@ -34,7 +34,7 @@ export default defineConfig(env => { return {
             },
         }
     },
-    publicDir: 'examples', //used for netlify.toml??...
+    publicDir: 'examples', //used for netlify.toml??... the rest is noise.
     build: {
         outDir: process.env.OUT_DIR || "python/mdvtools/static",
         sourcemap: true,
