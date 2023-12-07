@@ -116,16 +116,16 @@ To use a project that has been converted into a static webpage (`convert_to_stat
 ```
 webpack serve --env dev=folder:/path/to/myproject
 ```
-Or you can use data that is being served from a project. Run `serve()` on a project, which by default will start a server on local host at port 5000, and then start the development server
+Or you can use data that is being served from a project. Run `serve()` on a project, which by default will start a server on local host at port 5050, and then start the development server
 
 ```
-webpack serve --env dev=http://127.0.0.1:5000
+webpack serve --env dev=http://127.0.0.1:5050
 ```
 In both cases the server will be running at localhost:8080
 
 ### Building the App
 ```
-webpack --env build=desktop
+npm run build
 ```
 
 This will build JavaScript that is is suitable for use with the 'static' project format and the lightweight inbuilt server in the python module. It puts the JavaScript files and assets in python/mdvtools/static/js and python/mdvtools/static/img respectively. When a static project is created, these files are copied over to the project's folder so that it can run independently.

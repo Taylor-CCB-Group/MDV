@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDV test</title>
+    <style>
+        body {
+            background: lightgrey;
+            height: 100%;
+            width: 100%;
+            margin: 0px;
+        }
+
+        html {
+            height: 100%;
+            width: 100%;
+        }
+
+        .all {
+            height: 100%;
+            width: 100%;
+            display: flex;
+            /* safari issue... removing doesn't seem to adversely effect */
+            /* flex-wrap:wrap; */
+        }
+
+        .holder {
+            height: 300px;
+            width: 300px;
+            background: white;
+            z-index: 40;
+            /* padding:5px; */
+            margin: 10px;
+            display: inline-block;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- todo get vite flask build working with this etc -->
+    <!--sw-->
+    <div id="holder" class="all"></div>
+    <!-- vite version... -->
+    <script src="./src/modules/static_index.ts" type="module"></script>
+    <script>
+        // consider routing... allowing main index to route to MDV vs other pages for managing projects etc.
+        if (window._mdvInit) _mdvInit('{{route}}')
+    </script>
+</body>
+
+</html>

@@ -9,10 +9,8 @@
   "scripts": {
     "dev": "vite --host",
     "vite-build": "tsc && cross-env BUNDLE_TYPE=html OUT_DIR=./vite-dist vite build",
-    "build": "webpack --config prod.config.js --env process.env",
-    "build-flask": "npm run clean-flask & webpack --config desktop.config.js",
+    "build": "webpack --env build=desktop",
     "build-flask-vite": "vite build",
-    "clean-flask": "rm -r ./python/mdvtools/static",
     "build-docs": "docs/maindocs/make clean && docs/maindocs/make html",
     "build-jsdocs":"jsdoc -c docs/jsdoc.json"
   },
