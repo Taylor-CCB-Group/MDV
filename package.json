@@ -13,11 +13,6 @@
     "build-flask": "npm run clean-flask & webpack --config desktop.config.js",
     "build-flask-vite": "vite build",
     "clean-flask": "rm -r ./python/mdvtools/static",
-    "build-pyinstaller": "npm run build-flask & pyinstaller --onefile python/mdvtools/mdv_desktop.py --add-data \"mdvtools/templates:mdvtools/templates\" --add-data \"mdvtools/static:mdvtools/static\"",
-    "run-ex": "webpack  serve --config examples.config.js --env process.env",
-    "run-basic_example": "npm run run-ex --env example=basic_example",
-    "run-10Mexample": "npm run run-ex --env example=10Mand1_points",
-    "build-hyperion": "webpack --config hyperion.prod.config.js",
     "build-docs": "docs/maindocs/make clean && docs/maindocs/make html",
     "build-jsdocs":"jsdoc -c docs/jsdoc.json"
   },
