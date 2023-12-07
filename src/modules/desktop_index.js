@@ -86,7 +86,7 @@ async function getView(view){
     return await getData(route + "/get_view",{view:view})
 }
 
-//load arbritray data
+//load arbitrary data
 async function loadBinaryDataStatic(datasource,name){
     const resp = await fetch(`${route}/binarydata/${datasource}/${name}.b`);
     return await resp.arrayBuffer();
@@ -97,8 +97,8 @@ async function loadBinaryData(datasource,name){
 
 /**
  * get the configs whether from a folder or via a remote API
- * @param {boolean} isStaticFolder - true if configs are in a folder
- * @returns {object} - configs
+ * @param {boolean} isStaticFolder - true if configs are in a folder, false for remote API
+ * @returns {object} - configs (state, datasources, views)
  */
 async function getConfigs(isStaticFolder){
     let configs={};

@@ -36,7 +36,7 @@ class GenomeBrowser extends BaseChart{
                     this.browser.update(loc.chr,loc.start,loc.end);
                 }
             })
-            this.browser.addListener(this.config.id,(type,data)=>this.onBrowserAction(type,data));
+            this.browser.addListener(this.config.id,(type,data,e)=>this.onBrowserAction(type,data,e));
             if (c.feature_label){
                 this.setLabelFunction(c.feature_label);
             }
@@ -69,7 +69,7 @@ class GenomeBrowser extends BaseChart{
 
 
 
-    onBrowserAction(type,data){
+    onBrowserAction(type,data,e){
         switch(type){
             case "featureclick":
                 if (data.track.config.track_id==="_base_track"){
@@ -81,7 +81,11 @@ class GenomeBrowser extends BaseChart{
                 }
                 break;
             case "range_selected":
-                if (this.bamscatrack){
+                if (!e.ctrlKey){
+                    this.browser.update(data["chr"],data["start"],data["end"]);
+
+                }
+                else if  (this.bamscatrack){
                     const ids =this.bamscatrack.getIdsInRange(data);
                     this.cellDim.filter("filterOnIndex",[],ids);
                     this.browser.setHighlightedRegion(data,"_filter","blue");

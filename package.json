@@ -17,7 +17,9 @@
     "run-ex": "webpack  serve --config examples.config.js --env process.env",
     "run-basic_example": "npm run run-ex --env example=basic_example",
     "run-10Mexample": "npm run run-ex --env example=10Mand1_points",
-    "build-docs": "jsdoc -c docs/jsdoc.json"
+    "build-hyperion": "webpack --config hyperion.prod.config.js",
+    "build-docs": "docs/maindocs/make clean && docs/maindocs/make html",
+    "build-jsdocs":"jsdoc -c docs/jsdoc.json"
   },
   "repository": {
     "type": "git",

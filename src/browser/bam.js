@@ -410,7 +410,7 @@ class BamFeatureReader{
         this.headPath = config.headURL || this.bamPath;
         this.alignments=[];
         this.features=[];
-        this.alignmentBuffer=new SharedArrayBuffer(8000000);
+        this.alignmentBuffer=new SharedArrayBuffer(20000000);
         this.alignments=new Int32Array(this.alignmentBuffer);
         this.pointer=0;
         this.config=config;

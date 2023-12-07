@@ -77,7 +77,7 @@ class BamSCATrack extends MLVTrack{
     
 
     async getFeatures(chr,bpStart,bpEnd,force,data){
-        if (bpEnd-bpStart>10000000){
+        if (bpEnd-bpStart>40000){
             return "zoom in to see coverage";
         }
         try{

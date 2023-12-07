@@ -350,9 +350,9 @@ class MLVPanel {
 		}
     }
     
-    _callListeners(type,data){
+    _callListeners(type,data,e){
     	for (let id in this.listeners){
-			this.listeners[id](type,data);
+			this.listeners[id](type,data,e);
 		}   
     }
 
@@ -1138,7 +1138,7 @@ class MLVPanel {
 						chr:this.chr,
 						start:start,
 						end:end
-				});
+				},e);
             }
 		}
         this.trackDiv.addEventListener("mouseup",this.rsmuListener);

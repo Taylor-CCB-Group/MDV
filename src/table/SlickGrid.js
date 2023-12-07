@@ -2503,7 +2503,7 @@ const jQuery = $;
             stylesheet = sheets[i];
             break;
           }
-          if (sheets[i].rules[0].selectorText && sheets[i].rules[0].selectorText.includes(uid)){
+          if (sheets[i].cssRules[0] && sheets[i].cssRules[0].selectorText && sheets[i].cssRules[0].selectorText.includes(uid)){
             stylesheet=sheets[i];
             break;
           }
@@ -6334,7 +6334,7 @@ const jQuery = $;
       var sheets = __doc__.styleSheets;
         
       for (let i = 0; i < sheets.length; i++) {
-        if (sheets[i].rules[0].selectorText && sheets[i].rules[0].selectorText.includes(uid)){
+        if (sheets[i].cssRules[0].selectorText && sheets[i].cssRules[0].selectorText.includes(uid)){
           stylesheet=sheets[i];
           break;
         }

@@ -10,7 +10,6 @@ _mlv/
 _avocato/
 project1/
 .DS_Store
-docs/build/
 _test.py
 __pycache__
 vite-dist
@@ -27,3 +26,6 @@ python/mdvtools/template/page.html
 
 python/requirements.txt
 python/dist/
+docs/jsdocs/build/
+docs/maindocs/_build/
+docs/maindocs/autoapi/
