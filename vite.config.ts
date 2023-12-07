@@ -44,7 +44,8 @@ export default defineConfig(env => { return {
                 entryFileNames: 'js/mdv.js',
                 assetFileNames: (assetInfo) => {
                     if (assetInfo.name === 'static_index.css') return 'assets/mdv.css';
-                    return 'assets/[name]-[hash][extname]'; //could consider not including hash
+                    //not including hash, may impact caching, but more similar to previous webpack behavior
+                    return 'img/[name][extname]';
                 },
             }
         }
