@@ -12,7 +12,9 @@
     "build": "webpack --env build=desktop",
     "build-flask-vite": "vite build",
     "build-docs": "docs/maindocs/make clean && docs/maindocs/make html",
-    "build-jsdocs":"jsdoc -c docs/jsdoc.json"
+    "build-jsdocs":"jsdoc -c docs/jsdoc.json",
+    "python-setup": "python -m venv venv && source venv/bin/activate && pip install -e python",
+    "mdv_desktop": "source venv/bin/activate && python -m mdvtools.mdv_desktop"
   },
   "repository": {
     "type": "git",
