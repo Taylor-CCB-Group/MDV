@@ -1,7 +1,3 @@
-// PJT: for review: this seemed to be unused, was pointing at non-existent dev_index.js
-// now making it equivalent to old dev.config.js,
-// so devserver can be started without --config argument.
-
 const path = require('path');
 webpack=require("webpack");
 
