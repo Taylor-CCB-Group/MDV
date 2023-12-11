@@ -13,8 +13,8 @@
     "build-flask-vite": "vite build",
     "build-docs": "docs/maindocs/make clean && docs/maindocs/make html",
     "build-jsdocs":"jsdoc -c docs/jsdoc.json",
-    "python-setup": "python -m venv venv && source venv/bin/activate && pip install -e python",
-    "mdv_desktop": "source venv/bin/activate && python -m mdvtools.mdv_desktop"
+    "python-setup": "npm config set script-shell \"/bin/bash\" && python -m venv venv && source venv/bin/activate && pip install -e python",
+    "mdv_desktop": "npm config set script-shell \"/bin/bash\" && source venv/bin/activate && python -m mdvtools.mdv_desktop"
   },
   "repository": {
     "type": "git",
