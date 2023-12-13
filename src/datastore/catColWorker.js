@@ -257,12 +257,12 @@ function addSimpleMean(data,gFilter,lFilter,catData,conf){
     for (let i=0;i<dlen;i++){
         for (let n=0;n<conf.values.length;n++){
             const item= r[n].values[i];
-            const c = item.count;
             const av= item.count==0?0:item.total/item.count;
             item.frac = r[n].count==0?0:(item.count/r[n].count)*100;
             amax=av>amax?av:amax;
             amin=av<amin?av:amin;
-            item.mean=av;       
+            item.mean=av;
+            item.cat_id=n     
         }
     }
     return {data:r,mean_range:[amin,amax]}
