@@ -1,14 +1,15 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL, { ScatterplotLayer } from "deck.gl/typed";
 import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
-import { useChannelStats, useChartID, useChartSize, useConfig, useFilteredIndices, useImgUrl, useParamColumns, useScatterplotLayer } from "../hooks";
+import { useChannelStats, useChartID, useChartSize, useConfig, useImgUrl } from "../hooks";
+import { useScatterplotLayer } from "../scatter_state";
 import { BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
 import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useMetadata, useViewerStore, useViewerStoreApi, useVivLayerConfig } from "../viv_state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
-import { OmeTiffProvider, useChart, useOmeTiff } from "../context"; 
+import { OmeTiffProvider, useOmeTiff } from "../context"; 
 import { useEffect, useMemo, useState } from "react";
 
 function ReactTest() {
@@ -99,12 +100,9 @@ const DeckImpl = observer(() => {
     const detailLayers = useMemo(() => detailView.getLayers({
         viewStates: [],
         props: layerConfigX
-    }), [layerConfigX]); //includes a ScaleBarLayer... but I'm not seeing it. Also... two xr-layer passes? (looking at spector draw calls)
+    }), [layerConfigX]); //includes a ScaleBarLayer... but with a bad transform.
     return (
         <>
-            {/* {width}x{height} */}
-            {/* <Debug /> */}
-            {/* {contrastLimits[0][0]}-{contrastLimits[0][1]} */}
             <DeckGL id={id + 'deck'}
                 views={views}
                 /// either

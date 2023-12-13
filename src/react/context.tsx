@@ -4,7 +4,7 @@ import { BaseReactChart } from "./components/BaseReactChart";
 import DataStore from "../datastore/DataStore";
 import { OME_TIFF } from "./viv_state";
 import { MaterialWrapper } from "./material";
-import { useOmeTiffLoader } from "./hooks";
+import { useOmeTiffLoader } from "./hooks"; //importing this here stops HMR working for other hooks... use smaller modules...
 
 const ChartContext = createContext<BaseReactChart<any>>(undefined);
 const DataStoreContext = createContext<DataStore>(undefined);
