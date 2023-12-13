@@ -1,15 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
+import * as path from 'path';
 
 const flaskURL = "http://127.0.0.1:5051";
 
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
 
+let hasWarned1 = false;
+let hasWarned2 = false;
 
 function getRollupOptions(): RollupOptions {
-    const build = process.env.build as 'production' | 'netlify' | 'desktop' | 'desktop_pt';
+    const build = process.env.build as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
@@ -35,8 +38,8 @@ function getRollupOptions(): RollupOptions {
                 },
             }
         }
-    } else if (build === 'netlify') {
-        // version of vite build used for netlify deploy preview, using default 'index.html' entrypoint
+    } else if (build === 'dev_pt') {
+        // version of vite build used for netlify deploy preview & devserver, using default 'index.html' entrypoint
         // (which as of writing refers to same static_index.ts as desktop_pt)
         return {}
     } else if (build === 'desktop') {
@@ -52,7 +55,25 @@ function getRollupOptions(): RollupOptions {
             }
         }
     } else {
-        throw new Error(`Unknown build type: ${build}`);
+        if (process.env.VITE_ENTRYPOINT) {
+            // If you want a custom entrypoint - in particular, in order to have a custom DataLoader for interfacing
+            // with another backend, you can specify it with VITE_ENTRYPOINT environment variable, e.g.
+            // `VITE_ENTRYPOINT=path/to/my_index.js npx vite build --outDir path/to/output`
+            // (nb, we may change the logic in this config...)
+            const {name} = path.parse(process.env.VITE_ENTRYPOINT);
+            return {
+                input: process.env.VITE_ENTRYPOINT,
+                output: {
+                    entryFileNames: 'js/mdv.js',
+                    assetFileNames: (assetInfo) => {
+                        if (assetInfo.name === name + '.css') return 'assets/mdv.css';
+                        //not including hash, may impact caching, but more similar to previous webpack behavior
+                        return 'img/[name][extname]';
+                    },
+                }
+            }
+        }
+        throw new Error(`Unknown build type '${build}' and no VITE_ENTRYPOINT specified.`);
     }
 }
 
@@ -89,7 +110,36 @@ export default defineConfig(env => { return {
     publicDir: 'examples', //used for netlify.toml??... the rest is noise.
     build: {
         sourcemap: true,
-        rollupOptions: getRollupOptions(),
+        rollupOptions: { 
+            ...getRollupOptions(), 
+            // this is annoying... lots of warnings in console output otherwise...
+            // https://github.com/vitejs/vite/issues/15012#issuecomment-1815854072
+            onLog(level, log, handler) {
+                if (log.cause && (log.cause as any).message === `Can't resolve original location of error.`) {
+                    if (hasWarned1) return;
+                    hasWarned1 = true;
+                    console.warn('Ignoring "Can\'t resolve original location of error." warnings... see comments in vite.config.mts');
+                    return;
+                }
+                // there are still lots of other warnings, particularly from '@loaders.gl'
+                // `"requireFromFile" is not exported by "__vite-browser-external"` etc...
+                // I think to do with parts of that codebase that are have node code that won't be hit at runtime.
+                // Tried to update deck.gl & luma.gl, which are responsible for @loaders.gl being included,
+                // but that leads to other errors...
+                // (I think because of older @deck.gl/core=8.8.27 being a peerDependency of @vivjs).
+                // `RollupError: "_deepEqual" is not exported by "node_modules/@deck.gl/core/dist/esm/index.js", 
+                //  imported by "node_modules/@deck.gl/extensions/dist/esm/collision-filter/collision-filter-effect.js"`
+                // (in the case of that particular issue, the `_deepEqual` seems to have been added to core at the same 
+                // time as collision-filter-effect.js which uses it, but we have an indirect dependency on older version...)
+                if (log.message.includes('@loaders.gl')) {
+                    if (hasWarned2) return;
+                    hasWarned2 = true;
+                    console.warn('Ignoring "@loaders.gl" warnings... see comments in vite.config.mts');
+                    return;
+                }
+                handler(level, log)
+            }
+        },
     },
     plugins: [
         react({

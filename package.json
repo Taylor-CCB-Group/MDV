@@ -7,11 +7,11 @@
     "example": "examples"
   },
   "scripts": {
-    "dev": "vite --host",
-    "vite-build": "tsc && cross-env build=netlify vite build --outDir ./vite-dist",
+    "dev": "cross-env build=dev_pt vite --host",
+    "vite-build": "tsc && cross-env build=dev_pt vite build --outDir ./vite-dist",
     "build": "webpack --env build=desktop",
     "build-nofont": "cross-env build=production nofont=true vite build --outDir ./dist/basic",
-    "build-flask-vite": "cross-env build=desktop vite build --outDir ./python/mdvtools/static",
+    "build-flask-vite": "cross-env build=desktop_pt vite build --outDir ./python/mdvtools/static",
     "build-docs": "docs/maindocs/make clean && docs/maindocs/make html",
     "build-jsdocs":"jsdoc -c docs/jsdoc.json",
     "python-setup": "npm config set script-shell \"/bin/bash\" && python -m venv venv && source venv/bin/activate && pip install -e python",
