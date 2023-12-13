@@ -101,42 +101,41 @@ class GenomeBrowser extends BaseChart{
 
     //called when chart is created passing the linked datastore
     //and the index key to id as well as the function to get data fron
-    //the datastore (ensure column and index are loaded beofre carrying
-    //out the function)
-    setupLinks(dataStore,index,func){
-        if (! this.browser){
-            setTimeout(()=>this.setupLinks(dataStore,index,func),100)
+    //the datastore (ensure column and index are loaded before calling
+    //the function)
+    setupLinks(dataStore, index, getDataFunction) {
+        if (! this.browser) {
+            //could change this so it could `await browser`
+            //but I don't want to change anything substantial here when
+            //I don't have a working example of this chart in any projects.
+            setTimeout(()=>this.setupLinks(dataStore,index,getDataFunction),100)
         }
        
-        this.dataLink= {
-            dataStore:dataStore,
-            index:index,
-            getDataFunction:func
-        }
+        this.dataLink = { dataStore, index, getDataFunction };
         if (!this.bamscatrack){
             return;
         }
         const cat = this.config.cluster_reads;
       
-        dataStore.addListener("gb_"+this.config.id,(type,data)=>{
-            if (type==="filtered"){
+        dataStore.addListener("gb_"+this.config.id, (type,data) => {
+            if (type==="filtered") {
                 this.filterReads(data);
             }
-            //has the data used to cluster reads changed
+            //has the data used to cluster reads changed?
             //if so update the atac track
-            else if (type==="data_changed"){
+            else if (type==="data_changed") {
                 const cl = this.config.cluster_reads;
                 if (data.columns.indexOf(cl) !==-1){
                     this.changeClusters(cl,true)
                 }
             }
         })
-        func([cat],()=>{
+        getDataFunction([cat], ()=>{
             const ind = dataStore.getColumnIndex(index);
             const colors = dataStore.getColumnColors(cat);
             const col = dataStore.columnIndex[cat];
             this.bamscatrack.setCategories(cat,col.data,col.values,colors);
-                //get basic dimension from the other datastore         
+            //get basic dimension from the other datastore         
             this.cellDim= dataStore.getDimension("base_dimension");
           
             this.bamscatrack.addIndex(ind);
@@ -152,10 +151,9 @@ class GenomeBrowser extends BaseChart{
                 const ci = ind[bc];
                 return cf(ci);
             })*/
-            const g= this.config.genome_location;
-            if (g){
-                
-                this.browser.update(g.chr,g.start,g.end,true);
+            const g = this.config.genome_location;
+            if (g) {
+                this.browser.update(g.chr, g.start, g.end, true);
             }
             else{
                 this.onDataHighlighted({indexes:[0]});
@@ -166,7 +164,7 @@ class GenomeBrowser extends BaseChart{
     changeClusters(column,recalculateCats=false){
         this.config.cluster_reads=column;
         const ds = this.dataLink.dataStore;
-        this.dataLink.getDataFunction([column],()=>{
+        this.dataLink.getDataFunction([column], ()=>{
             const colors = ds.getColumnColors(column);
             const col = ds.columnIndex[column];
             this.bamscatrack.setCategories(column,col.data,col.values,colors,true,recalculateCats);

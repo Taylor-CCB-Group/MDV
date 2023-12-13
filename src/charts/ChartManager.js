@@ -1739,8 +1739,7 @@ class ChartManager{
             }
             for (let lnk of ds.dataStore.accessOtherDataStore){
                 this._giveChartAccess(chart,this.dsIndex[lnk.dataSource].dataStore,lnk.index);
-            }
-            
+            }            
         }
        
         //I think this is obsolete now
@@ -1773,15 +1772,14 @@ class ChartManager{
     }
 
     //gives a chart access to another datasource
-    _giveChartAccess(chart,dataSource,index){
-        const func= (columns,callback)=>{
+    _giveChartAccess(chart, dataSource, index) {
+        const getDataFunction = async (columns, callback) => {
             //make sure index is loaded before use
-            columns.push(index);
-            this._getColumnsThen(dataSource.name,columns,callback);
-          
-
+            columns.push(index); //pjt: might just push `undefined`?
+            await this._getColumnsAsync(dataSource.name, columns);
+            callback();
         } 
-        chart.setupLinks(dataSource,index,func); 
+        chart.setupLinks(dataSource, index, getDataFunction); 
     }
 
     //sets up a link between charts
@@ -1793,10 +1791,9 @@ class ChartManager{
             case "color_by_column":
                 const chart = this.charts[link.source_chart];
                 if (!chart){
-                    console.error(`broken link link:${link.id}`);
+                    console.error(`broken link id:${link.id}`);
                 }
                 
-              
                 chart.chart.addListener(link.id,(type,data)=>{
                     if (type==="cell_clicked"){
                         for (let cid of link.target_charts){

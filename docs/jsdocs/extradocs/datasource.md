@@ -588,41 +588,35 @@ example
 
 ### access_data
 
-For a dataStore to access from a another datastore, specify access_data in the link. The index specifies a column in the linked datastore, but does not have to be used 
+For a datastore to access data from another datastore, specify `"access_data"` in the link.
+
+An optional `index` parameter can be used to specify a column in the linked datastore.
 
 ```json
 {
-    "name":"genes",
-    "links":{
-        "cells":{
-            "index":"cell_id",
-            "access_data":true
+    "name": "genes",
+    "links": {
+        "cells": {
+            "index": "cell_id",
+            "access_data": true
         }
-
     }
 }
 ```
-With the above example, when a chart in the gene's datasource is created, the setupLinks method (if it exists) will be called passing the cell datastore, the name of the index and a function. This functions will load (if necessary) any column data from the cell's datastore. The 'index' column is implicitly loaded and need not be specified in this function
+With the above example, when a chart in the gene's datasource is created, the `setupLinks` method (if it exists for the given type of chart - as of this writing, `GenomeBrowser` is the only chart implementing this) will be called. Arguments will be passed with the cell datastore, the name of the index and a `getDataFunction`. This function will load (if necessary) any column data from the cell's datastore. The 'index' column is implicitly loaded and need not be specified in this function
 ```javascript
-setupLinks(dataStore,index,func){
+setupLinks(dataStore, index, getDataFunction) {
     //keep for future use
-    this.dataLink= {
-        dataStore:dataStore,
-        index:index,
-        getDataFunction:func
-    }
+    this.dataLink = { dataStore, index, getDataFunction };
     //make sure cell_size data has been loaded
-    func(["cell_size"],()=>{
+    getDataFunction(["cell_size"],()=>{
         //if you need an index
         const cell_index = dataStore.getColumnIndex(index);
         const cell_size = dataStore.getRawColumn("cell_size");
         //do stuff
         //add listeners to the datastore
     })
-
 }
-
-
 ```
 
 
