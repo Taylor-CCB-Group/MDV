@@ -1075,12 +1075,13 @@ class MLVPanel {
     	 	}
     	 	
     	 	let canvasCoords = this._getCoords(e);
-            let factor = deltaY>0?2:0.5;
+            // todo test sensitivity with different input devices
+			let factor = deltaY > 0 ? 1.25 : 0.8;
             let mbp= (this.start+ canvasCoords.x * this.bpPerPixel)
             let new_length = (this.end-this.start)*factor;
             let new_start = mbp-((canvasCoords.x/this.canvas.width)*new_length);
-            this.start=  new_start
-            this.end= new_start+new_length;        
+            this.start = new_start;
+            this.end = new_start+new_length;        
             this.repaint();      
 		}
     	this.trackDiv.addEventListener('wheel',this.zmListener);     
