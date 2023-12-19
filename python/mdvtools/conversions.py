@@ -1,6 +1,8 @@
 import scanpy
 import mudata
 import scipy
+import pandas as pd
+import os
 
 from .mdvproject import MDVProject
 
@@ -55,7 +57,78 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3):
 
     return p
 
-    
+def convert_vcf_to_df(vcf_filename):
+    f = open(vcf_filename, 'r')
+    metadata = {}
+    while True:
+        line = f.readline()
+        if line.startswith('##'):
+            key, value = line[2:].strip().split('=', 1)
+            if key in metadata:
+                metadata[key].append(value)
+            else:
+                metadata[key] = [value]
+        if line.startswith('#CHROM'):
+            break
+    # todo - do something with metadata
+    # print(metadata) 
+    temp_file = 'temp.csv'
+    ## todo with tempfile
+    with open(temp_file, 'w') as tmp:
+        while line:
+            tmp.write(line)
+            line = f.readline()
+    f.close()
+
+    df = pd.read_csv(temp_file, sep='\t')
+    os.remove(temp_file)
+    return df
+
+def compute_vcf_end(df):
+    '''
+    Compute the end position of the variant determined from 'POS', 'REF' and 'ALT'.
+
+    This is added as a column 'END' in the given DataFrame.
+    '''
+    def varlen(s):
+        return max([len(s) for s in s.split(',')])
+    df['END'] = df['POS'] + df[['REF', 'ALT']].applymap(varlen).max(axis=1)
+    return df
+
+def convert_vcf_to_mdv(folder, vcf_filename):
+    '''
+    Converts a VCF file to an MDV project. 
+    The VCF file must be tab-delimited, with the header lines starting with "##" and 
+    column names in the line starting with "#CHROM".
+
+    An 'END' column is derived, which is the end position of the variant determined from 'POS', 'REF' and 'ALT'.
+    '''
+    p = MDVProject(folder, delete_existing=True)
+    df = convert_vcf_to_df(vcf_filename)
+    # for single nucleotide variants, we still need an end position for the genome browser
+    # maybe add_genome_browser should be able to understand only one position?
+    # other forms VCF variants have a length, so we could use that...    
+    df = compute_vcf_end(df)
+    # ^^ I should verify that this makes sense from biological perspective
+    columns = [
+        {'name': '#CHROM', 'datatype': 'text'}, # chromosome
+        {'name': 'POS', 'datatype': 'integer'}, # start of the variant
+        {'name': 'END', 'datatype': 'integer'}, # not standard VCF, but useful for genome browser(? maybe temporary)
+        {'name': 'ID', 'datatype': 'unique', 'separator': ';'}, # should be unique, but also semicolon-delimited - could be useful to preserve this
+        {'name': 'REF', 'datatype': 'text'}, # reference base(s)
+        {'name': 'ALT', 'datatype': 'multitext', 'separator': ','}, # comma-delimited list of alternate non-reference alleles
+        {'name': 'QUAL', 'datatype': 'double'}, # phred-scaled quality score for the assertion made in ALT
+        {'name': 'FILTER', 'datatype': 'multitext', 'separator': ';'}, # PASS or semicolon-delimited list of filters that the variant has failed
+        {'name': 'INFO', 'datatype': 'text'}, # comma-delimited list of additional information, no white space, semicolons or equals signs permitted
+        # ^^^ note, the first random vcf file I found has all manner of = and ; in the INFO field, so I'm not enclined to parse this too rigidly
+        # {'name': 'FORMAT', 'datatype': 'text'}, # not sure why copilot thought this should be here - not in the VCF spec
+    ]
+    name = os.path.basename(vcf_filename)
+    p.add_datasource(name, df, columns=columns)
+    p.add_genome_browser(name, ['#CHROM', 'POS', 'END'])
+    p.set_editable(True)
+    return p
+
 def _add_dims(table,dims,max_dims):
     if len(dims.keys())==0:
         return
