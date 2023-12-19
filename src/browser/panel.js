@@ -1035,20 +1035,20 @@ class MLVPanel {
                }
         }
 
-		this.trackDiv.addEventListener("mousemove",this.drmmListener)
+		window.addEventListener("mousemove",this.drmmListener)
 
         this.drmuListener = e => {   
               this.is_dragging=false;
               this.start_dragging=false;
         }
-		this.trackDiv.addEventListener("mouseup",this.drmuListener)
+		window.addEventListener("mouseup",this.drmuListener)
   
     }
 
     removeDragHandler(){
     	this.trackDiv.removeEventListener("mousedown",this.drmdListener);
-		this.trackDiv.removeEventListener("mousemove",this.drmmListener);
-		this.trackDiv.removeEventListener("mouseup",this.drmuListener);
+		window.removeEventListener("mousemove",this.drmmListener);
+		window.removeEventListener("mouseup",this.drmuListener);
 		this.drmdListener=null;
 		this.drmmListener=null;
 		this.drmuListener=null;
