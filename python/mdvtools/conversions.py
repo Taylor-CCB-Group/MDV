@@ -114,12 +114,12 @@ def convert_vcf_to_mdv(folder, vcf_filename):
         {'name': '#CHROM', 'datatype': 'text'}, # chromosome
         {'name': 'POS', 'datatype': 'integer'}, # start of the variant
         {'name': 'END', 'datatype': 'integer'}, # not standard VCF, but useful for genome browser(? maybe temporary)
-        {'name': 'ID', 'datatype': 'unique', 'separator': ';'}, # should be unique, but also semicolon-delimited - could be useful to preserve this
-        {'name': 'REF', 'datatype': 'text'}, # reference base(s)
-        {'name': 'ALT', 'datatype': 'multitext', 'separator': ','}, # comma-delimited list of alternate non-reference alleles
+        {'name': 'ID', 'datatype': 'unique', 'delimiter': ';'}, # should be unique, but also semicolon-delimited - could be useful to preserve this
+        {'name': 'REF', 'datatype': 'multitext', 'delimiter': ','},  # reference base(s)
+        {'name': 'ALT', 'datatype': 'multitext', 'delimiter': ','}, # comma-delimited list of alternate non-reference alleles
         {'name': 'QUAL', 'datatype': 'double'}, # phred-scaled quality score for the assertion made in ALT
-        {'name': 'FILTER', 'datatype': 'multitext', 'separator': ';'}, # PASS or semicolon-delimited list of filters that the variant has failed
-        {'name': 'INFO', 'datatype': 'text'}, # comma-delimited list of additional information, no white space, semicolons or equals signs permitted
+        {'name': 'FILTER', 'datatype': 'multitext', 'delimiter': ';'}, # PASS or semicolon-delimited list of filters that the variant has failed
+        {'name': 'INFO', 'datatype': 'multitext', 'delimiter': ','}, # comma-delimited list of additional information, no white space, semicolons or equals signs permitted
         # ^^^ note, the first random vcf file I found has all manner of = and ; in the INFO field, so I'm not enclined to parse this too rigidly
         # {'name': 'FORMAT', 'datatype': 'text'}, # not sure why copilot thought this should be here - not in the VCF spec
     ]
