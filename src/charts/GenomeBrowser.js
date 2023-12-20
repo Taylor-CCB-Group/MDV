@@ -24,7 +24,7 @@ class GenomeBrowser extends BaseChart{
             this.baseTrack= this.browser.getTrack("_base_track");
             this.baseTrack.dataStore = this.dataStore;
        
-            this.addMenuIcon("fa fa-eye-slash",config.legend || "Shoow/Hide Tracks",
+            this.addMenuIcon("fa fa-eye-slash",config.legend || "Show/Hide Tracks",
                 {
                     func:e=>this.showHideDialog()
     
