@@ -103,6 +103,18 @@ class BaseChart{
            
         //info icon
         this.legendIcon = this.addMenuIcon("fas fa-info",config.legend || "No description",{size:"medium"});
+
+        let isFullScreen = false;
+        this.addMenuIcon("fas fa-expand","fullscreen", {
+            func:()=>{
+                if (isFullScreen) {
+                    document.exitFullscreen();
+                } else {
+                    this.contentDiv.requestFullscreen();
+                }
+                isFullScreen = !isFullScreen;
+            }
+        });
      
         this.div.append(this.titleBar);
         this.div.append(this.contentDiv); 
