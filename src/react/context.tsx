@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import { BaseReactChart } from "./components/BaseReactChart";
 // import { useLocalStore } from "mobx-react-lite";
 import DataStore from "../datastore/DataStore";
-import { OME_TIFF } from "./viv_state";
+import { OME_TIFF } from "./components/avivatorish/state";
 import { MaterialWrapper } from "./material";
 import { useOmeTiffLoader } from "./hooks"; //importing this here stops HMR working for other hooks... use smaller modules...
 

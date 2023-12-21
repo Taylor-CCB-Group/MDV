@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { loadOmeTiff, getChannelStats, loadOmeZarr } from "@hms-dbmi/viv";
 import { BaseConfig } from "./components/BaseReactChart";
 import { useChart, useDataStore } from "./context";
-import type { OME_TIFF } from "./viv_state";
+import type { OME_TIFF } from "./components/avivatorish/state";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
@@ -137,8 +137,9 @@ export function useOmeTiffLoader() {
             loadOmeTiff(url).then(setTiff);
         }
         else {
-            const _url = new URL(url, document.baseURI).href;
-            loadOmeZarr(_url, { type: 'multiscales' }).then(setTiff);
+            throw `Only .ome.tif currently supported - ${url}`;
+            // const _url = new URL(url, document.baseURI).href;
+            // loadOmeZarr(_url, { type: 'multiscales' }).then(setTiff);
         }
     }, [url]);
     return tiff;

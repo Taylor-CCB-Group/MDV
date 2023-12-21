@@ -1,13 +1,13 @@
 import BaseChart from "../../charts/BaseChart";
-import DeckGL, { ScatterplotLayer } from "deck.gl/typed";
-import { ColorPaletteExtension, DetailView, getDefaultInitialViewState } from "@hms-dbmi/viv";
+import DeckGL from "deck.gl/typed";
+import { ColorPaletteExtension, DetailView, getDefaultInitialViewState, ScaleBarLayer } from "@hms-dbmi/viv";
 import { useChannelStats, useChartID, useChartSize, useConfig, useImgUrl } from "../hooks";
 import { useScatterplotLayer } from "../scatter_state";
-import { BaseConfig, BaseReactChart } from "./BaseReactChart";
+import { BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useMetadata, useViewerStore, useViewerStoreApi, useVivLayerConfig } from "../viv_state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useViewerStoreApi, useVivLayerConfig } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useOmeTiff } from "../context"; 
 import { useEffect, useMemo, useState } from "react";
@@ -28,23 +28,6 @@ function ReactTest() {
     )
 }
 
-// const Debug = observer(() => {
-//     const config = useConfig<VivMdvReactConfig>();
-//     const id = useChartID();
-//     const ome = useOmeTiff();
-//     const meta = useMetadata();
-//     const channelX = config.channel;
-//     return (
-//         <div>
-//             {`view id '${id}', channel #${channelX}: '${ome?.metadata?.Pixels?.Channels[channelX]?.Name}'`}
-//             <br />
-//             <pre>
-//                 {JSON.stringify(meta, null, 2)}
-//             </pre>
-//         </div>
-//     )
-// });
-
 const DeckImpl = observer(() => {
     const imgUrl = useImgUrl();
     const viewerStore = useViewerStoreApi();
@@ -64,7 +47,7 @@ const DeckImpl = observer(() => {
     const userSet = channelsState.contrastLimits && channelsState.contrastLimits.length > 0; //hack, for now.
     const contrastLimits = userSet ? channelsState.contrastLimits : [stats ? stats.contrastLimits : [0, 1]];
 
-    const scatterplotLayer = useScatterplotLayer();
+    const [scatterplotLayer, hoverInfo] = useScatterplotLayer();
 
     const layerConfig = useVivLayerConfig();
     const [viewState, setViewState] = useState<ReturnType<typeof getDefaultInitialViewState>>();
@@ -79,7 +62,7 @@ const DeckImpl = observer(() => {
     const detailView = useMemo(() => new DetailView({
         id: id + 'detail-react',
         snapScaleBar: true,
-        width, height //thought it wasn't making a difference if these get updated, but it does. HMR weirdness?
+        width, height
     }), [id, width, height]);
     const views = useMemo(() => [detailView.getDeckGlView()], [detailView]);
     // note: higher-level VivViewer components remove some control over how we use layers
@@ -92,7 +75,7 @@ const DeckImpl = observer(() => {
         selections: [{ z: 0, c: channelX, t: 0 }],
         contrastLimits,
         extensions,
-        colors: [[255, 255, 255]],
+        colors: [[80, 255, 255]],
         channelsVisible: [true],
     }
     // pending proper channel state handling... show that we can set contrast limits.
@@ -101,6 +84,14 @@ const DeckImpl = observer(() => {
         viewStates: [],
         props: layerConfigX
     }), [layerConfigX]); //includes a ScaleBarLayer... but with a bad transform.
+    // still not right
+    const { size, unit } = ome.data[0].meta.physicalSizes.x;
+    const scalebarLayer = false && new ScaleBarLayer({unit, size, snap: true, 
+        // viewState: getDefaultInitialViewState(ome.data, { width, height }),
+        viewState,
+        length: 1,
+        id: id + 'scalebar-react',
+    });
     return (
         <>
             <DeckGL id={id + 'deck'}
@@ -114,7 +105,12 @@ const DeckImpl = observer(() => {
                     zIndex: '-1',
                 }}
                 controller={true}
-                layers={[detailLayers, scatterplotLayer]}>
+                // - works, but needs sensible information in the tooltip
+                getTooltip={({ object }) => hoverInfo && hoverInfo.index !== -1 && 'i: '+hoverInfo.index}
+                
+                // scalebarLayer is not working properly... complaints about changing uniforms length...
+                // make a minimal example and report it?
+                layers={[detailLayers, scatterplotLayer, scalebarLayer]}>
             </DeckGL>
         </>
     );
@@ -199,10 +195,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         super.remove();
         if (this.colorDialog) this.colorDialog.close();
     }
-    // next up... colorBy (for the scatterplot)...
-    // I'd like to be able to have more of a layer-based thing...
-    // I'd also quite like not to have these classes have non-trivial amounts of code in them...
-    // For now, what I should do is a thing that bridges the existing colorBy stuff
     colorBy?: (i: number) => [r: number, g: number, b: number];
     colorByColumn(col?: ColumnName) {
         if (!col) return this.colorByDefault();
@@ -271,33 +263,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         ]);
     }
 }
-
-BaseChart.types["VivMdvReact"] = {
-    "class": VivMdvReact,
-    name: "VivMdvReact",
-    //methodsUsingColumns: ["colorByColumn"], //NO! thought this was relevant, but it's causing stack overflows... and not needed.
-    params: [
-        {
-            type: "number",
-            name: "x",
-        },
-        {
-            type: "number",
-            name: "y",
-        }
-    ],
-    extra_controls: (ds) => {
-        return [
-            {
-                //todo use `regions` config... or make a different version that uses that...
-                type: "string",
-                name: "imageURL",
-                label: "ome.tiff URL",
-                defaultVal: ""
-            }
-        ]
-    },
-};
 
 BaseChart.types["VivMdvRegionReact"] = {
     ...BaseChart.types["viv_scatter_plot"],

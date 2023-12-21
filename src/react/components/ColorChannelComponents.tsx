@@ -3,7 +3,7 @@ import { useChannelStats } from "../hooks";
 import { VivMDVReact } from "./VivMDVReact";
 import { observer } from "mobx-react-lite";
 import { OmeTiffProvider, useChart, useOmeTiff } from "../context";
-import { ChannelsState, useChannelsState } from "../viv_state";
+import { ChannelsState, useChannelsState } from "./avivatorish/state";
 import { Button, InputLabel, MenuItem, Select, Slider } from "@mui/material";
 
 
