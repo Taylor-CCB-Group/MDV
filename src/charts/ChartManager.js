@@ -187,6 +187,7 @@ class ChartManager{
             for (let v of config.all_views){
                 createEl("option",{text:v,value:v},this.viewSelect)
             }
+            createFilterElement(this.viewSelect, this.menuBar);
             this.viewSelect.addEventListener("change",(e)=>{
                 if (this.config.show_save_view_dialog && config.permission ==="edit"){
                     this.showSaveViewDialog(()=>this.changeView(this.viewSelect.value));
