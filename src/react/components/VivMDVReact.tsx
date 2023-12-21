@@ -80,18 +80,13 @@ const DeckImpl = observer(() => {
     }
     // pending proper channel state handling... show that we can set contrast limits.
     if (userSet) layerConfigX.contrastLimits = contrastLimits;
-    const detailLayers = useMemo(() => detailView.getLayers({
-        viewStates: [],
-        props: layerConfigX
-    }), [layerConfigX]); //includes a ScaleBarLayer... but with a bad transform.
-    // still not right
-    const { size, unit } = ome.data[0].meta.physicalSizes.x;
-    const scalebarLayer = false && new ScaleBarLayer({unit, size, snap: true, 
-        // viewState: getDefaultInitialViewState(ome.data, { width, height }),
-        viewState,
-        length: 1,
-        id: id + 'scalebar-react',
-    });
+    const detailLayers = useMemo(() => {
+        // need to figure out how to allow this (and other things) to update smoothly...
+        const viewStates = { [`${id}detail-react`]: viewState };
+        return detailView.getLayers({
+            viewStates,
+            props: layerConfigX});
+    }, [layerConfigX, viewState]); //includes a ScaleBarLayer
     return (
         <>
             <DeckGL id={id + 'deck'}
@@ -99,6 +94,8 @@ const DeckImpl = observer(() => {
                 /// either
                 initialViewState={viewState}
                 /// or (--slow--)
+                //--- re-enabling this means the scalebar updates, but everything is slow...
+                //    and the scalebar is still one frame behind I think...
                 // onViewStateChange={e => setViewState(e.viewState)}
                 // viewState={viewState}
                 style={{
@@ -110,7 +107,7 @@ const DeckImpl = observer(() => {
                 
                 // scalebarLayer is not working properly... complaints about changing uniforms length...
                 // make a minimal example and report it?
-                layers={[detailLayers, scatterplotLayer, scalebarLayer]}>
+                layers={[detailLayers, scatterplotLayer]}>
             </DeckGL>
         </>
     );
