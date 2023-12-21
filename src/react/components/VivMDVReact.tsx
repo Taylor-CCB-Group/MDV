@@ -11,6 +11,7 @@ import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useC
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useOmeTiff } from "../context"; 
 import { useEffect, useMemo, useState } from "react";
+import MDVivViewer from "./avivatorish/MDVivViewer";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -60,11 +61,11 @@ const DeckImpl = observer(() => {
     }, [ome]);
     const extensions = useMemo(() => [new ColorPaletteExtension()], []);
     const detailView = useMemo(() => new DetailView({
-        id: id + 'detail-react',
+        id: id + 'detail-react', //consider getVivId()
         snapScaleBar: true,
         width, height
     }), [id, width, height]);
-    const views = useMemo(() => [detailView.getDeckGlView()], [detailView]);
+    // const views = useMemo(() => [detailView.getDeckGlView()], [detailView]);
     // note: higher-level VivViewer components remove some control over how we use layers
     // and some other props (e.g. if we wanted to override cursor style for lasso mode, we'd be SOL).
     // ... that may mean that the specific benefits of React over other frameworks may be less relevant.
@@ -80,35 +81,37 @@ const DeckImpl = observer(() => {
     }
     // pending proper channel state handling... show that we can set contrast limits.
     if (userSet) layerConfigX.contrastLimits = contrastLimits;
-    const detailLayers = useMemo(() => {
-        // need to figure out how to allow this (and other things) to update smoothly...
-        const viewStates = { [`${id}detail-react`]: viewState };
-        return detailView.getLayers({
-            viewStates,
-            props: layerConfigX});
-    }, [layerConfigX, viewState]); //includes a ScaleBarLayer
+    // getLayers will be handled by VivViewer, so we don't need to do this...
+    // const detailLayers = useMemo(() => {
+    //     // need to figure out how to allow this (and other things) to update smoothly...
+    //     const viewStates = { [`${id}detail-react`]: viewState };
+    //     return detailView.getLayers({
+    //         viewStates,
+    //         props: layerConfigX});
+    // }, [layerConfigX, viewState]); //includes a ScaleBarLayer
+    const deckProps = {
+        // initialViewState: viewState,
+        // controller: true,
+        getTooltip: ({ object }) => hoverInfo && hoverInfo.index !== -1 && 'i: '+hoverInfo.index,
+        style: {
+            zIndex: '-1',
+        },
+        // for now I disabled layerFilter in VivViewer, because this wasn't passing
+        // but it should work if I make sure it has an id that matches expectations.
+        layers: [scatterplotLayer],
+        id: id + 'deck',
+    }
     return (
         <>
-            <DeckGL id={id + 'deck'}
-                views={views}
-                /// either
-                initialViewState={viewState}
-                /// or (--slow--)
-                //--- re-enabling this means the scalebar updates, but everything is slow...
-                //    and the scalebar is still one frame behind I think...
-                // onViewStateChange={e => setViewState(e.viewState)}
-                // viewState={viewState}
-                style={{
-                    zIndex: '-1',
-                }}
-                controller={true}
-                // - works, but needs sensible information in the tooltip
-                getTooltip={({ object }) => hoverInfo && hoverInfo.index !== -1 && 'i: '+hoverInfo.index}
-                
-                // scalebarLayer is not working properly... complaints about changing uniforms length...
-                // make a minimal example and report it?
-                layers={[detailLayers, scatterplotLayer]}>
-            </DeckGL>
+            <MDVivViewer 
+            views={[detailView]}
+            layerProps={[layerConfigX]}
+            viewStates={[{...viewState, id: `${id}detail-react`}]}
+            // todo - modes for lasso, etc.
+            // onViewStateChange={e => setViewState(e.viewState)}
+            
+            deckProps={deckProps} 
+            />
         </>
     );
 });
