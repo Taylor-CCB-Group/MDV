@@ -423,28 +423,41 @@ class MDVProject:
                     self.set_view(view,None)
 
 
-    def add_genome_browser(self,datasource,parameters=["chr","start","end"],name=None):
+    def add_genome_browser(self,datasource,parameters=["chr","start","end"],name=None, overwrite=False):
+        '''
+        args:
+            datasource (string): The name of the datasource
+            parameters (list, optional): The names of the columns containing the chromosome, start and end
+                positions. Defaults to ["chr","start","end"]
+            name (string, optional): The name of the genome browser track. Defaults to the datasource name.
+        '''
+        check_htslib() # will raise an error if htslib is not installed
+        if len(parameters) != 3:
+            raise AttributeError("genome browser parameters should be a list of 3 column names")
+        if not name:
+            name = datasource
+        ds = self.get_datasource_metadata(datasource)
+        if "genome_browser" in ds and not overwrite:
+            raise AttributeError(f"genome browser track already exists for {datasource}")
         # get all the genome locations
         loc = [self.get_column(datasource,x) for x in parameters]
         #write to a bed file
-        bed = join(self.trackfolder,"t.bed")
+        ### nb - should check whether it actually improves anything adding {name} to filenames
+        bed = join(self.trackfolder, f"t_{name}.bed")
         o=open(bed,"w")
         for c,(chr,start,end) in enumerate(zip(loc[0],loc[1],loc[2])):
             o.write(f"{chr}\t{start}\t{end}\t{c}\n")
         o.close()
-        indexed_bed= join(self.trackfolder,"loc.bed")
+        indexed_bed= join(self.trackfolder, f"loc_{name}.bed")
         create_bed_gz_file(bed,indexed_bed)
         os.remove(bed)
-        if not name:
-            name = datasource
         gb={
-            "location_fields":parameters,
-            "default_track":{
-                "url":"tracks/loc.bed.gz",
-                "label":name
+            "location_fields": parameters,
+            "default_track": {
+                "url": f"tracks/loc_{name}.bed.gz",
+                "label": name
             }
         }
-        ds= self.get_datasource_metadata(datasource)
         ds["genome_browser"]=gb
         self.set_datasource_metadata(ds)
 
@@ -461,6 +474,8 @@ class MDVProject:
                 e.g. [{"name":"column_1","datatype":"double"},]. If you want the column to have a
                 different label, the object requires a field (the column name in the dataframe) and 
                 a name (the label seen by the user) e.g. {"field":"column_1","datatype":"double","name":"My Column 1"}
+                In the case of "multitext" columns, you can also supply a "separator" field, otherwise it will 
+                default to a comma. <<< check this >>>
             supplied_columns_only(bool, optional): If True, only the the subset of columns in the columns argument 
                 will be added to the datasource. Default is False
             replace_data(bool, optional): If True, the existing datasource will be overwritten, Default is False,
@@ -786,7 +801,7 @@ class MDVProject:
     
     def set_region_data(self,datasource,data,region_field="sample_id",
                     default_color="annotations",
-                    position_fields=["x","y"],scale_unit="um",scale=1,):
+                    position_fields=["x", "y"], scale_unit="µm", scale=1,):
         md = self.get_datasource_metadata(datasource)
         cols = set([x["field"] for x in md["columns"]])
         missing = [x for x in  [region_field]+[default_color]+position_fields if not x in cols]
@@ -1050,6 +1065,12 @@ def get_column_info(columns,dataframe,supplied_columns_only):
             cols = [col_map.get(x["field"],x) for x in cols]
         columns= cols
     return columns
+
+def check_htslib():
+    try:
+        subprocess.run(["tabix","--version"])
+    except:
+        raise AttributeError("htslib not found, needed for preparing genome browser data")
 
 ##!! will not work in windows and requires htslib installed
 def create_bed_gz_file(infile,outfile):
