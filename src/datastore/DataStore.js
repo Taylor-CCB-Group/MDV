@@ -72,10 +72,11 @@ class DataStore{
         
         
         // for re-usable filteredIndices
-        this.addListener('invalidateFilteredIndicesCache',() => {
+        // todo mobx action
+        this.addListener('invalidateFilteredIndicesCache', action(() => {
             //if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
             this._filteredIndicesPromise = null;
-        });
+        }));
 
         if (config.row_data_loader){
             if (!dataLoader?.rowDataLoader){
@@ -760,7 +761,7 @@ class DataStore{
             // will be null if the filter has changed since the last call
             return this._filteredIndicesPromise;
         }
-        this._filteredIndicesPromise = new Promise((resolve, reject) => {
+        action(() => this._filteredIndicesPromise = new Promise((resolve, reject) => {
             const worker = this._filteredIndexWorker;
             const byteLength = this.filterSize * Uint32Array.BYTES_PER_ELEMENT;
             const outputBuffer = new SharedArrayBuffer(byteLength);
@@ -771,7 +772,7 @@ class DataStore{
             worker.onmessage = (e) => {
                 resolve(new Uint32Array(outputBuffer));
             };
-        });
+        }))();
 
         return this._filteredIndicesPromise;
     }
