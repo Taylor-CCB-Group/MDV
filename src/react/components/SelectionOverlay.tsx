@@ -54,9 +54,10 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
     const viewState = useViewerStore((state) => state.viewState); // for reactivity - still a frame behind...
     const [frameTrigger, setFrameTrigger] = useState(false);
     useEffect(() => {
+        //non-trivial overhead here? must be a better way...
         const t = setTimeout(() => {
             setFrameTrigger(v => !v);
-        }, 20);
+        }, 0);
         return () => clearTimeout(t);
     }, [viewState]);
     const min = [Math.min(start[0], end[0]), Math.min(start[1], end[1])];
