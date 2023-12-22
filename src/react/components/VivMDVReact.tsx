@@ -12,6 +12,7 @@ import "../../charts/VivScatterPlot"; //because we use the BaseChart.types objec
 import { OmeTiffProvider, useOmeTiff } from "../context"; 
 import { useEffect, useMemo, useState } from "react";
 import MDVivViewer from "./avivatorish/MDVivViewer";
+import SelectionOverlay from "./SelectionOverlay";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -65,10 +66,6 @@ const DeckImpl = observer(() => {
         snapScaleBar: true,
         width, height
     }), [id, width, height]);
-    // const views = useMemo(() => [detailView.getDeckGlView()], [detailView]);
-    // note: higher-level VivViewer components remove some control over how we use layers
-    // and some other props (e.g. if we wanted to override cursor style for lasso mode, we'd be SOL).
-    // ... that may mean that the specific benefits of React over other frameworks may be less relevant.
     // TODO get viv working in popouts (not a react thing - happens elsewhere
     // - probably need to handle lost gl context)
     const layerConfigX = {
@@ -81,14 +78,6 @@ const DeckImpl = observer(() => {
     }
     // pending proper channel state handling... show that we can set contrast limits.
     if (userSet) layerConfigX.contrastLimits = contrastLimits;
-    // getLayers will be handled by VivViewer, so we don't need to do this...
-    // const detailLayers = useMemo(() => {
-    //     // need to figure out how to allow this (and other things) to update smoothly...
-    //     const viewStates = { [`${id}detail-react`]: viewState };
-    //     return detailView.getLayers({
-    //         viewStates,
-    //         props: layerConfigX});
-    // }, [layerConfigX, viewState]); //includes a ScaleBarLayer
     const deckProps = {
         // initialViewState: viewState,
         // controller: true,
@@ -103,6 +92,7 @@ const DeckImpl = observer(() => {
     }
     return (
         <>
+            <SelectionOverlay />
             <MDVivViewer 
             views={[detailView]}
             layerProps={[layerConfigX]}
@@ -126,6 +116,7 @@ const MainChart = () => {
 // even if the type isn't constrained beyond 'string' (which potentially in some cases it could be)
 // this kind of thing can potentially help DX and encourage appropriate values to be passed.
 type ColumnName = string; 
+//could we infer or something to avoid having to repeat this?
 export type ScatterPlotConfig = {
     radius: number,
     opacity: number,
