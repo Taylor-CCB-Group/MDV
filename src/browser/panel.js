@@ -1056,8 +1056,9 @@ class MLVPanel {
 
     _getCoords(e){
 		const box = this.canvas.getBoundingClientRect();
-    	const x = e.clientX - Math.round(box.left);
-        const y = e.clientY - Math.round(box.top);
+    	//not sure if removing Math.round helps or not
+		const x = e.clientX - box.left;
+        const y = e.clientY - box.top;
         return {x,y};   	
     }
 
@@ -1077,6 +1078,9 @@ class MLVPanel {
     	 	let canvasCoords = this._getCoords(e);
             // todo test sensitivity with different input devices
 			let factor = deltaY > 0 ? 1.25 : 0.8;
+			if (e.wheelDelta !== undefined) {
+				factor = Math.pow(2, -e.wheelDelta / 36);
+			}
             let mbp= (this.start+ canvasCoords.x * this.bpPerPixel)
             let new_length = (this.end-this.start)*factor;
             let new_start = mbp-((canvasCoords.x/this.canvas.width)*new_length);
