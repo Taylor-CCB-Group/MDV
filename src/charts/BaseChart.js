@@ -112,6 +112,7 @@ class BaseChart{
                 } else {
                     this.contentDiv.requestFullscreen();
                 }
+                setTimeout(() => this.setSize(), 200);
                 isFullScreen = !isFullScreen;
             }
         });
