@@ -3,7 +3,7 @@ import PanToolOutlinedIcon from '@mui/icons-material/PanToolOutlined';
 import PhotoSizeSelectSmallOutlinedIcon from '@mui/icons-material/PhotoSizeSelectSmallOutlined';
 import PolylineOutlinedIcon from '@mui/icons-material/PolylineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useViewerStore } from "./avivatorish/state";
 import { ScatterplotLayer } from "deck.gl/typed";
 
@@ -52,6 +52,13 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
         return p;
     }, [scatterplotLayer]);
     const viewState = useViewerStore((state) => state.viewState); // for reactivity - still a frame behind...
+    const [frameTrigger, setFrameTrigger] = useState(false);
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setFrameTrigger(v => !v);
+        }, 20);
+        return () => clearTimeout(t);
+    }, [viewState]);
     const screenStart = scatterplotLayer.project(start);
     const screenEnd = scatterplotLayer.project(end);
 
