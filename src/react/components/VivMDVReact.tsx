@@ -1,6 +1,6 @@
 import BaseChart from "../../charts/BaseChart";
 import DeckGL from "deck.gl/typed";
-import { ColorPaletteExtension, DetailView, getDefaultInitialViewState, ScaleBarLayer } from "@hms-dbmi/viv";
+import { ColorPaletteExtension, DetailView, getDefaultInitialViewState, ScaleBarLayer, VivViewer } from "@hms-dbmi/viv";
 import { useChannelStats, useChartID, useChartSize, useConfig, useImgUrl } from "../hooks";
 import { useScatterplotLayer } from "../scatter_state";
 import { BaseReactChart } from "./BaseReactChart";
@@ -11,7 +11,7 @@ import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useC
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useOmeTiff } from "../context"; 
 import { useEffect, useMemo, useState } from "react";
-import MDVivViewer from "./avivatorish/MDVivViewer";
+import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import SelectionOverlay from "./SelectionOverlay";
 
 function ReactTest() {
@@ -41,6 +41,8 @@ const DeckImpl = observer(() => {
     const config = useConfig<VivMdvReactConfig>();
     const [width, height] = useChartSize();
     const id = useChartID();
+    // const detailId = getVivId(id + 'detail-react');
+    const detailId = id + 'detail-react';
 
     const channelX = config.channel; //don't do this... use the proper image_properties
     // and make it populate the channel state if necessary.
@@ -62,7 +64,7 @@ const DeckImpl = observer(() => {
     }, [ome]);
     const extensions = useMemo(() => [new ColorPaletteExtension()], []);
     const detailView = useMemo(() => new DetailView({
-        id: id + 'detail-react', //consider getVivId()
+        id: detailId,
         snapScaleBar: true,
         width, height
     }), [id, width, height]);
@@ -92,13 +94,17 @@ const DeckImpl = observer(() => {
     }
     return (
         <>
-            <SelectionOverlay />
-            <MDVivViewer 
+            <SelectionOverlay scatterplotLayer={scatterplotLayer}/>
+            <VivViewer 
             views={[detailView]}
             layerProps={[layerConfigX]}
-            viewStates={[{...viewState, id: `${id}detail-react`}]}
-            // todo - modes for lasso, etc.
-            // onViewStateChange={e => setViewState(e.viewState)}
+            viewStates={[{...viewState, id: detailId}]}
+            onViewStateChange={e => {
+                // Need to clarify what is idiomatic to Viv and what is appropriate for us.
+                // viewerStore is not the place for keeping track of transforms, not sure if Avivator has an equivalent.
+                //xxx --- viewState in avivator is an object [id]: viewState, so we may need to do something similar.
+                viewerStore.setState({ viewState: {...e.viewState, id: detailId } });
+            }}
             
             deckProps={deckProps} 
             />

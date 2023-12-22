@@ -3,7 +3,7 @@ import DeckGL from '@deck.gl/react';
 // import { getVivId } from '@vivjs/views';
 // No need to use the ES6 or React variants.
 import equal from 'fast-deep-equal';
-function getVivId(id) {
+export function getVivId(id) {
     return `-#${id}#`;
 }
 
@@ -89,9 +89,7 @@ class VivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivVie
      */
     // eslint-disable-next-line class-methods-use-this
     layerFilter({ layer, viewport }) {
-        //pjt disabled... may want to review, or make sure our layers are vivId-like. 
-        // return layer.id.includes(getVivId(viewport.id));
-        return true; 
+        return layer.id.includes(getVivId(viewport.id));
     }
 
     /**
@@ -333,6 +331,8 @@ class VivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivVie
 
 /**
  * This is a wrapper around the VivViewer component from @hms-dbmi/viv
- * This may help to customize the VivViewer component in ways that are not otherwise possible.
+ * *** NOT NECESSARY ANYMORE ***
+ * although I may still want to add some types to the regular VivViewer
+ * and this can maybe be useful for debugging sometimes.
  */
 export default (props: VivViewerWrapperProps) => <VivViewerWrapper {...props} />

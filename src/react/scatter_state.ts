@@ -3,6 +3,7 @@ import { ScatterPlotConfig } from "./components/VivMDVReact";
 import { useChart, useOmeTiff } from "./context";
 import { useChartID, useConfig, useFilteredIndices, useParamColumns } from "./hooks";
 import { useMemo, useState } from "react";
+import { getVivId } from "./components/avivatorish/MDVivViewer";
 
 /** this should be able to deal with understanding in a given context, how to scale each axis...
  * right now, hacking together something that works for adenoma/carcinoma data.
@@ -37,7 +38,7 @@ export function useScatterplotLayer(): [ScatterplotLayer, PickingInfo] {
     const [cx, cy] = useParamColumns();
     const [hoverInfo, setHoverInfo] = useState<PickingInfo>(null);
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
-        id: id + 'scatter-react',
+        id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
         opacity,
         radiusScale: radius / scale,

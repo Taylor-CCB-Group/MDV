@@ -4,7 +4,8 @@ import PhotoSizeSelectSmallOutlinedIcon from '@mui/icons-material/PhotoSizeSelec
 import PolylineOutlinedIcon from '@mui/icons-material/PolylineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { useMemo, useState } from "react";
-import zIndex from "@mui/material/styles/zIndex";
+import { useViewerStore } from "./avivatorish/state";
+import { ScatterplotLayer } from "deck.gl/typed";
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
@@ -30,24 +31,36 @@ const Tools = {
 type Tool = typeof Tools[keyof typeof Tools]['name'];
 const ToolArray = Object.values(Tools);
 
-function RectangleEditor({toolActive = false}) {
+function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: boolean, scatterplotLayer: ScatterplotLayer}) {
     // how shall we represent coordinates?
-    const [start, setStart] = useState<[number, number]>([-100,-100]);
+    // - should be in Deck coordinates, we need to convert to/from screen coordinates
+    // - we may still want to use screen coordinates locally, but there should be a store
+    // with the Deck coordinates and also methods for actually doing the selection etc.
+    // (may well be in a worker - or perhaps we can use the GPU for this)
+    const [start, setStart] = useState<[number, number]>([0,0]);
     const [end, setEnd] = useState<[number, number]>([0,0]);
     const [dragging, setDragging] = useState(false);
+
+    const viewState = useViewerStore((state) => state.viewState); // for reactivity - still a frame behind...
+    const screenStart = scatterplotLayer.project(start);
+    const screenEnd = scatterplotLayer.project(end);
 
     return (
     <>
     <div style={{
         position: 'fixed',
-        left: start[0],
-        top: start[1],
-        width: end[0] - start[0],
-        height: end[1] - start[1],
+        left: screenStart[0],
+        top: screenStart[1],
+        width: screenEnd[0] - screenStart[0],
+        height: screenEnd[1] - screenStart[1],
         border: '1px solid white', //todo: make this a theme colour
         backgroundColor: 'rgba(255,255,255,0.1)',
-        pointerEvents: 'none',
-    }}/>
+    }}
+    onMouseDown={(e) => {
+        if (!toolActive) return;
+        //todo: have a different drag mode for the whole rectangle vs. handles...
+    }}
+    />    
     <div style={{
         position: 'absolute',
         width: '100%',
@@ -55,26 +68,33 @@ function RectangleEditor({toolActive = false}) {
     }} 
     onMouseDown={(e) => {
         if (!toolActive) return;
-        setStart([e.clientX, e.clientY]);
-        setEnd([e.clientX, e.clientY]);
+        const p = scatterplotLayer.unproject([e.clientX, e.clientY]) as [number, number];
+        setStart(p);
+        setEnd(p);
         setDragging(true);
         window.addEventListener('mouseup', () => {
             setDragging(false);
         });
     }
     } onMouseMove={(e) => {
+        if (!toolActive) return;
         if (dragging) {
-            setEnd([e.clientX, e.clientY]);
+            const p = scatterplotLayer.unproject([e.clientX, e.clientY]) as [number, number];
+            setEnd(p);
         }
     }} onMouseUp={(e) => {
-        setEnd([e.clientX, e.clientY]);
+        if (!toolActive) return;
+        const p = scatterplotLayer.unproject([e.clientX, e.clientY]) as [number, number];
+        setEnd(p);
         setDragging(false);
     }} />
     </>);
 }
 
 
-export default function SelectionOverlay() {
+export default function SelectionOverlay({scatterplotLayer} : {scatterplotLayer: ScatterplotLayer}) {
+    //for now, passing down scatterplotLayer so we can use it to unproject screen coordinates, 
+    //as we figure out how to knit this together...
     const [selectedTool, setSelectedTool] = useState<Tool>('Pan');
     // add a row of buttons to the top of the chart
     // rectangle, circle, polygon, lasso, magic wand, etc. 
@@ -83,10 +103,14 @@ export default function SelectionOverlay() {
     // Also a brush tool for painting on masks with variable radius.
     const toolButtons = useMemo(() => {
         return ToolArray.map(({name, ToolIcon}) => {
-            return <IconButton key={name} onClick={() => setSelectedTool(name)}><ToolIcon /></IconButton>
+            return <IconButton key={name} style={{
+                backgroundColor: selectedTool === name ? 'rgba(255,255,255,0.2)' : 'transparent',
+                borderRadius: 10,
+                zIndex: 2,
+            }} onClick={() => setSelectedTool(name)}><ToolIcon /></IconButton>
         });
-    }, []);
-
+    }, [selectedTool]);
+    if (!scatterplotLayer || !scatterplotLayer.internalState) return null;
     // state: { selectedTool: 'rectangle' | 'circle' | 'polygon' | 'lasso' | 'magic wand' | 'none' }
     // interaction phases... maybe revert back to pan after making selection
     // - but there should be interaction with drag handles...
@@ -95,7 +119,7 @@ export default function SelectionOverlay() {
     // later: selection layers...
     return (
         <>
-        <ButtonGroup variant="contained" aria-label="choose tool for manipulating view or selection" style={{zIndex: 2}}>
+        <ButtonGroup variant="contained" aria-label="choose tool for manipulating view or selection" style={{zIndex: 2, padding: '0.3em'}}>
             {toolButtons}
         </ButtonGroup>
         <div style={{
@@ -106,11 +130,20 @@ export default function SelectionOverlay() {
             zIndex: 1,
             pointerEvents: selectedTool === 'Pan' ? 'none' : 'auto'
             }}
-            onMouseDown={(e) => {
-                
+            onMouseUp={(e) => {
+                setSelectedTool('Pan');
+            }}
+            onKeyDown={(e) => {
+                //not working as of now... probably want to think more about keyboard shortcuts in general...
+                if (e.key === 'Escape') {
+                    setSelectedTool('Pan');
+                }
+                if (e.key === 'r') {
+                    setSelectedTool('Rectangle');
+                }
             }}
             >
-                <RectangleEditor toolActive={selectedTool==='Rectangle'} />
+                <RectangleEditor toolActive={selectedTool==='Rectangle'} scatterplotLayer={scatterplotLayer}/>
         </div>
         </>
         )
