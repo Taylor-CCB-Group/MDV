@@ -26,10 +26,17 @@ export function buildPath(...args: string[]) {
 
 /**
  * Given a url that is relative to the project root, return a more API-appropriate URL.
+ * 
+ * ==This needs a rethink.==
+ * Been meaning to change to `project=...` in the URL, especially now that `dir` gets rewritten
+ * and ugli-fied.
+ * 
+ * - where does this get applied? I missed `feature.js` - are there other places?
+ * - there may be occasions where a project is setup with references to external resources
  */
-export function getProjectURL(url: string) {
-    if (url.startsWith(projectRoot)) return url;
-    const p = buildPath(projectRoot, url).replace("./", "/") + '/';
+export function getProjectURL(url: string, trailingSlash = true) {
+    if (url.startsWith(projectRoot)) return url;//<<--- review this, test calling it multiple times
+    const p = buildPath(projectRoot, url).replace("./", "/") + (trailingSlash ? '/' : '');
     // https://github.com/hms-dbmi/viv/issues/756
     if (p.startsWith("/")) return new URL(p, window.location.href).href;
     return p;
