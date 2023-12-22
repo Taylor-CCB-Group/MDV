@@ -59,8 +59,10 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
         }, 20);
         return () => clearTimeout(t);
     }, [viewState]);
-    const screenStart = scatterplotLayer.project(start);
-    const screenEnd = scatterplotLayer.project(end);
+    const min = [Math.min(start[0], end[0]), Math.min(start[1], end[1])];
+    const max = [Math.max(start[0], end[0]), Math.max(start[1], end[1])];
+    const screenStart = scatterplotLayer.project(min);
+    const screenEnd = scatterplotLayer.project(max);
 
     return (
     <>
