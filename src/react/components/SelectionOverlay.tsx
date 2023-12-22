@@ -1,9 +1,9 @@
-import { ButtonGroup, IconButton } from "@mui/material"; //check tree-shaking...
+import { ButtonGroup, IconButton, Tooltip } from "@mui/material"; //check tree-shaking...
 import PanToolOutlinedIcon from '@mui/icons-material/PanToolOutlined';
 import PhotoSizeSelectSmallOutlinedIcon from '@mui/icons-material/PhotoSizeSelectSmallOutlined';
 import PolylineOutlinedIcon from '@mui/icons-material/PolylineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useViewerStore } from "./avivatorish/state";
 import { ScatterplotLayer } from "deck.gl/typed";
 
@@ -22,8 +22,8 @@ const Tools = {
         name: 'Polygon',
         ToolIcon: PolylineOutlinedIcon
     },
-    'lasso': {
-        name: 'Lasso',
+    'freehand': {
+        name: 'Freehand',
         ToolIcon: EditOutlinedIcon
     },
 } as const;
@@ -40,7 +40,17 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
     const [start, setStart] = useState<[number, number]>([0,0]);
     const [end, setEnd] = useState<[number, number]>([0,0]);
     const [dragging, setDragging] = useState(false);
-
+    const handleMouseUp = useCallback(() => {
+        setDragging(false);
+        window.removeEventListener('mouseup', handleMouseUp);
+    }, []);
+    const unproject = useCallback((e: React.MouseEvent) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        const y = e.clientY - r.top;
+        const p = scatterplotLayer.unproject([x, y]) as [number, number];
+        return p;
+    }, [scatterplotLayer]);
     const viewState = useViewerStore((state) => state.viewState); // for reactivity - still a frame behind...
     const screenStart = scatterplotLayer.project(start);
     const screenEnd = scatterplotLayer.project(end);
@@ -48,7 +58,8 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
     return (
     <>
     <div style={{
-        position: 'fixed',
+        // position: dragging ? 'fixed' : 'relative',
+        position: 'relative',
         left: screenStart[0],
         top: screenStart[1],
         width: screenEnd[0] - screenStart[0],
@@ -56,35 +67,31 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
         border: '1px solid white', //todo: make this a theme colour
         backgroundColor: 'rgba(255,255,255,0.1)',
     }}
-    onMouseDown={(e) => {
-        if (!toolActive) return;
-        //todo: have a different drag mode for the whole rectangle vs. handles...
-    }}
     />    
     <div style={{
         position: 'absolute',
         width: '100%',
         height: '100%',
+        top: 0,
+        left: 0,
     }} 
     onMouseDown={(e) => {
         if (!toolActive) return;
-        const p = scatterplotLayer.unproject([e.clientX, e.clientY]) as [number, number];
+        const p = unproject(e);
         setStart(p);
         setEnd(p);
         setDragging(true);
-        window.addEventListener('mouseup', () => {
-            setDragging(false);
-        });
+        window.addEventListener('mouseup', handleMouseUp);
     }
     } onMouseMove={(e) => {
         if (!toolActive) return;
         if (dragging) {
-            const p = scatterplotLayer.unproject([e.clientX, e.clientY]) as [number, number];
+            const p = unproject(e);
             setEnd(p);
         }
     }} onMouseUp={(e) => {
         if (!toolActive) return;
-        const p = scatterplotLayer.unproject([e.clientX, e.clientY]) as [number, number];
+        const p = unproject(e);
         setEnd(p);
         setDragging(false);
     }} />
@@ -103,11 +110,13 @@ export default function SelectionOverlay({scatterplotLayer} : {scatterplotLayer:
     // Also a brush tool for painting on masks with variable radius.
     const toolButtons = useMemo(() => {
         return ToolArray.map(({name, ToolIcon}) => {
-            return <IconButton key={name} style={{
+            return <Tooltip title={name} key={name}><IconButton style={{
                 backgroundColor: selectedTool === name ? 'rgba(255,255,255,0.2)' : 'transparent',
                 borderRadius: 10,
                 zIndex: 2,
-            }} onClick={() => setSelectedTool(name)}><ToolIcon /></IconButton>
+            }} onClick={() => setSelectedTool(name)}
+            aria-label={name}
+            ><ToolIcon /></IconButton></Tooltip>
         });
     }, [selectedTool]);
     if (!scatterplotLayer || !scatterplotLayer.internalState) return null;
