@@ -3,6 +3,7 @@ import BaseChart from "../../charts/BaseChart";
 import { createRoot } from "react-dom/client";
 import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
+import { StrictMode } from "react";
 
 function Fallback() {
     return <>
@@ -65,9 +66,11 @@ export abstract class BaseReactChart<T> extends BaseChart {
         // const Observed = observer(ReactComponentFunction);
         this.root = createRoot(this.contentDiv);
         this.root.render((
-            <ChartProvider chart={this}>
-                <ReactComponentFunction />
-            </ChartProvider>
+            <StrictMode>
+                <ChartProvider chart={this}>
+                    <ReactComponentFunction />
+                </ChartProvider>
+            </StrictMode>
         ));
     }
     remove(): void {
