@@ -41,7 +41,6 @@ const DeckImpl = observer(() => {
     const config = useConfig<VivMdvReactConfig>();
     const [width, height] = useChartSize();
     const id = useChartID();
-    // const detailId = getVivId(id + 'detail-react');
     const detailId = id + 'detail-react';
 
     const channelX = config.channel; //don't do this... use the proper image_properties
@@ -81,14 +80,10 @@ const DeckImpl = observer(() => {
     // pending proper channel state handling... show that we can set contrast limits.
     if (userSet) layerConfigX.contrastLimits = contrastLimits;
     const deckProps = {
-        // initialViewState: viewState,
-        // controller: true,
         getTooltip: ({ object }) => hoverInfo && hoverInfo.index !== -1 && 'i: '+hoverInfo.index,
         style: {
             zIndex: '-1',
         },
-        // for now I disabled layerFilter in VivViewer, because this wasn't passing
-        // but it should work if I make sure it has an id that matches expectations.
         layers: [scatterplotLayer],
         id: id + 'deck',
     }
@@ -100,9 +95,6 @@ const DeckImpl = observer(() => {
             layerProps={[layerConfigX]}
             viewStates={[{...viewState, id: detailId}]}
             onViewStateChange={e => {
-                // Need to clarify what is idiomatic to Viv and what is appropriate for us.
-                // viewerStore is not the place for keeping track of transforms, not sure if Avivator has an equivalent.
-                //xxx --- viewState in avivator is an object [id]: viewState, so we may need to do something similar.
                 viewerStore.setState({ viewState: {...e.viewState, id: detailId } });
             }}
             
