@@ -317,31 +317,6 @@ class ChartManager{
     _addInteractionLinks(ds,ods,links){
         const interactionFilter= ods.getDimension("category_dimension");
         const icols = links.interaction_columns
-        if (!icols || icols.length === 0) {
-            // PJT hack for only 'pivot_column' - unused/experimental...
-            // but keeping as `_getColumnsAsync()` isn't used anywhere else... 
-            const pc = links.pivot_column;
-            ds.addListener(`${ds.name}_interaction`, async (type, data) => {
-                if (type === 'data_highlighted' || type === 'filtered') {
-                    // when type === 'filtered', data.indexes is undefined.
-                    // data is a `RangeDimension` with a `filterArray`, `filterBuffer`, `filterIndexes` (null)...
-                    // I could `await ds.getFilteredIndices()`... will that be the right thing to do?
-                    // do I even need the other _getColumnsAsync() calls etc?
-                    await this._getColumnsAsync(ds.name, [pc]);
-                    const indices = await ds.getFilteredIndices();
-                    const info = ds.getRowAsObject(indices[0], [pc]);
-                    //get pivot from the other datasource
-                    await this._getColumnsAsync(ods.name, [pc]);
-                    //-- no voodoo - not showing the region if not already displayed
-                    //indeed, what does the concept of having an interaction link intrinsically have to do with regions?
-                    //all I want is to be able to filter the other datasource by the value of the pivot column
-                    //I'm not sure what this interactionFilter (ods.getDimension("category_dimension")) should be.
-                    interactionFilter.filter("filterCategories", [pc], [info[pc]]);
-                }
-            });
-
-            return;
-        }
         const c1 = icols[0];
         const c2= icols[1];
         const pc= links.pivot_column;
@@ -351,29 +326,27 @@ class ChartManager{
             {link_to:icols[2],col:icols[1]},
             {link_to:pc,col:pc}
         ]});
-        ds.addListener(`${ds.name}_interaction`,(type,data)=>{
+        ds.addListener(`${ds.name}_interaction`, async (type, data) => {
             if (type==="data_highlighted"){
                 //get the two interacting items plus pivot
-                this._getColumnsThen(ds.name,[c1,c2,pc],()=>{
-                    const info = ds.getRowAsObject(data.indexes[0],[c1,c2,pc]);
-                    //get pivot from the other datasource
-                    this._getColumnsThen(ods.name,[icols[2]],()=>{
-                        //filter the two interacting items 
-                        interactionFilter.filter("filterCategories",[icols[2]],[info[c1],info[c2]]);
-                        //show the region if not already displayed
-                        if (links.is_single_region && ods.regions && this.dsPanes[ods.name]){
-                            if (!this.getAllCharts(ods.name).find(x=>x.config.region===info[pc])){
-                                const conf={
-                                    type:"image_scatter_plot"
-                                }
-                                //add the default parameters
-                                BaseChart.types["image_scatter_plot"].init(conf,ods,{region:info[pc]});
-                                //add the chart
-                                this.addChart(ods.name,conf);
-                            }
+                await this._getColumnsAsync(ds.name,[c1,c2,pc]);
+                const info = ds.getRowAsObject(data.indexes[0],[c1,c2,pc]);
+                //get pivot from the other datasource
+                await this._getColumnsAsync(ods.name, [icols[2]]);
+                //filter the two interacting items
+                interactionFilter.filter("filterCategories",[icols[2]],[info[c1],info[c2]]);
+                //show the region if not already displayed
+                if (links.is_single_region && ods.regions && this.dsPanes[ods.name]){
+                    if (!this.getAllCharts(ods.name).find(x=>x.config.region===info[pc])){
+                        const conf={
+                            type:"image_scatter_plot"
                         }
-                    })
-                })
+                        //add the default parameters
+                        BaseChart.types["image_scatter_plot"].init(conf,ods,{region:info[pc]});
+                        //add the chart
+                        this.addChart(ods.name,conf);
+                    }
+                }
             }
         });
     }
