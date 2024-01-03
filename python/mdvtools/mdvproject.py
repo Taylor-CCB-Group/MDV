@@ -492,7 +492,7 @@ class MDVProject:
         columns= get_column_info(columns,dataframe,supplied_columns_only)
         #does the datasource exist
         try:
-            ds = self.get_datasource_metadata(self,name)
+            ds = self.get_datasource_metadata(name)
         except:
             ds= None
         if ds:
@@ -511,7 +511,7 @@ class MDVProject:
                 add_column_to_group(col,dataframe[col["field"]],gr,size)
             except Exception as e:
                 dodgy_columns.append(col["field"])
-                warnings.warn(f"cannot add column '{col['field']}' to datasource '{name}'\n{e}")
+                warnings.warn(f"cannot add column '{col['field']}' to datasource '{name}':\n{repr(e)}")
 
         h5.close()
         columns = [x for x in columns if x["field"] not in dodgy_columns]
@@ -996,7 +996,7 @@ def add_column_to_group(col,data,group,length):
     elif col["datatype"]=="multitext":
         delim = col.get("delimiter",",")
         values = set()
-        maxv=0
+        maxv = 0
         #first parse - get all possible values and max number
         #of values in a single field
         for v in data:
@@ -1007,19 +1007,19 @@ def add_column_to_group(col,data,group,length):
             values.update([x.strip() for x in vs])
             maxv = max(maxv,len(vs))
             
-        if  "" in values:
+        if "" in values:
                 values.remove("")
         ndata = numpy.empty(shape=(length*maxv,))
         ndata.fill(65535)
         values = list(values)
         #dict more efficient than index list
-        vmap  = {k:v  for v,k in enumerate(values)}
+        vmap  = {k:v for v,k in enumerate(values)}
         for i in range(0,length):
-            b= i*maxv
-            v= data[i]
-            if v=="":
-                continue
+            b = i * maxv
             try:
+                v = data[i] # may raise KeyError if data is None at this index
+                if v == "":
+                    continue
                 vs = v.split(delim)
                 vs = [x.strip() for x in vs]
             except:
