@@ -326,7 +326,7 @@ class ChartManager{
             {link_to:icols[2],col:icols[1]},
             {link_to:pc,col:pc}
         ]});
-        ds.addListener(`${ds.name}_interaction`, async (type, data) => {
+        ds.addListener(`${ds.name}-${ods.name}_interaction`, async (type, data) => {
             if (type==="data_highlighted"){
                 //get the two interacting items plus pivot
                 await this._getColumnsAsync(ds.name,[c1,c2,pc]);
@@ -334,6 +334,7 @@ class ChartManager{
                 //get pivot from the other datasource
                 await this._getColumnsAsync(ods.name, [icols[2]]);
                 //filter the two interacting items
+                //would be nice if this could be maybe async / lazy / different ways of composing filters?
                 interactionFilter.filter("filterCategories",[icols[2]],[info[c1],info[c2]]);
                 //show the region if not already displayed
                 if (links.is_single_region && ods.regions && this.dsPanes[ods.name]){
