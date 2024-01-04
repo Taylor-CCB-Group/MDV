@@ -32,6 +32,13 @@ class DataModel {
     }
 
     sort(column,order){
+        if (column === "__index__") {
+            this.data.sort();
+            if (order==="desc"){
+                this.data.reverse();
+            }
+            return;
+        }
         const col = this.dataStore.getRawColumn(column);
         const c = this.dataStore.columnIndex[column];
 
