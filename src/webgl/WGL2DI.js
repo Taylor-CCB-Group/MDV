@@ -1128,8 +1128,9 @@ class WGL2DI{
 
 	_addHandlers(){
 		var self=this;
-		//consider changing so that some listeners are on window while brush is active...
-		this.div_container.addEventListener("mousemove",function(e){
+		//some listeners are on window while brush is active, and removed when brush is finished
+		//allows dragging outside the canvas
+		const mousemove = (e) => {
 			if (self.brush){
 				if (self.brush.resizing){
 					let origin =self.brush.origin;
@@ -1238,23 +1239,12 @@ class WGL2DI{
 					self.object_mouse_over=obj;
 				}         
 			}
-		});
+		};
 
-		this.div_container.addEventListener("mouseleave",(evt)=>{
-			if (this.object_mouse_over){
-				for (var i in this.handlers['object_out']){
-							this.handlers.object_out[i](this.object_mouse_over[2]);
-						}
-						this.object_mouse_over=null;
-			}
-			/*if (self.brush && self.brush.resizing){
-			    self._brushingStopped();
-			}*/
-            this._finish(evt)
-		})
+		const mouseup = (evt) => {
+			window.removeEventListener("mousemove",mousemove);
+			window.removeEventListener("mouseup",mouseup);
 
-	
-		this.div_container.addEventListener("mouseup",(evt)=>{
             this._finish(evt);
             if (!this.dragging && !(this.brush || this.poly_brush) && evt.button===0){
                     var position =this._getMousePosition(evt);
@@ -1323,7 +1313,7 @@ class WGL2DI{
 			}
 			self.object_clicked=null;
 			self.mouse_position=null;   */
-		});  
+		};
 
 		this.div_container.addEventListener('wheel', function(event){
 			event.preventDefault();
@@ -1402,6 +1392,9 @@ class WGL2DI{
 
 		});
 		this.div_container.addEventListener("mousedown",function (evt){
+			window.addEventListener("mousemove",mousemove);
+			window.addEventListener("mouseup",mouseup);
+
 			if (evt.which===3){
 				//add right click behaviour
 			}
@@ -1439,7 +1432,6 @@ class WGL2DI{
 			self.clearBrush();
 			evt.preventDefault();
 		});
-
 	}
 
 
