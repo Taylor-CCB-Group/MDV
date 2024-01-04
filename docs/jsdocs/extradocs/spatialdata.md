@@ -109,7 +109,7 @@ First add a datasource, that describes each cell/cell interaction for each ROI o
 
 Then use the set_interactions methods to specify that the dataset contains interaction data and to link it to parent dataset e.g. cells
 ```python
-p.set_interactions("my_interactions","cells,
+p.set_interactions("my_interactions","cells",
                     pivot_column="sample_id",
                     parent_column="annotation",
                     is_single_region=True,
