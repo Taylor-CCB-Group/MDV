@@ -81,14 +81,8 @@ class TableChart extends BaseChart{
       
         this.grid.init();
       
-        const sort = ({columnId, sortAsc}) => {
-            this.dataModel.sort(columnId, sortAsc?"asc":"desc");
-            this.grid.invalidateAllRows();
-            this.grid.render();
-            this.config.sort = {columnId, sortAsc};
-        }
         this.grid.onSort.subscribe( (e, args)=> {
-            sort(args);
+            this._sort(args);
         });
         
         this.grid.onSelectedRowsChanged.subscribe( (e, args)=> {
@@ -119,9 +113,14 @@ class TableChart extends BaseChart{
         this.filter=[];
         this.themeChanged();
         this.onDataFiltered();
-        if (this.config.sort) sort(this.config.sort);
+        if (this.config.sort) this._sort(this.config.sort);//now done in onDataFiltered()
 	}
-
+    _sort({columnId, sortAsc}) {
+        this.dataModel.sort(columnId, sortAsc ? "asc" : "desc");
+        this.grid.invalidateAllRows();
+        this.grid.render();
+        this.config.sort = { columnId, sortAsc };
+    }
    
 
     onDataHighlighted(data){
@@ -338,8 +337,11 @@ class TableChart extends BaseChart{
     onDataFiltered(){
         if (this.isPinned){
             return;
-        }    
-        this.dataModel.updateModel()
+        }
+        this.dataModel.updateModel();
+        if (this.config.sort) {
+            this._sort(this.config.sort);
+        }
     }    
 }
 
