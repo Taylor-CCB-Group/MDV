@@ -15,7 +15,7 @@ class CategoryDimension extends Dimension{
       
      
         const vals = col.values;
-        const cats=new Set();
+        const cats = new Set();
         const len = this.parent.size;
         
         if (typeof category === "string"){
@@ -75,47 +75,47 @@ class CategoryDimension extends Dimension{
                 }
             }     
         }
-        else{
+        else {
             for (let cat of category){
                 cats.add(vals.indexOf(cat));
             }
             if (col.datatype==="multitext"){
                 const int = col.stringLength;
-                let ao = category.operand==="and";
+                let ao = category.operand === "and";
                 for (let i=0;i<len;i++){
                     const st = i*int;
-                    let has =false;
-                    let num =0;
+                    let has = false;
+                    // let num = 0;
+                    //new set for each row may not be the most efficient way to do this
+                    //need to do something for "and" - shouldn't do any harm for "or"
+                    const catsToFind = ao ? new Set(cats) : undefined;
                     for (let n=st;n<st+int;n++){
                         if (data[n]===65535){
                             break;
                         }
-                        if (cats.has(data[n])){
+                        if (catsToFind.has(data[n])){
                             if (!ao){
                                 has=true;
                                 break
                             }
-                            else{
-                                num++;
-                                if (num === category.length){
+                            else {
+                                // num++; //this allows the same string to be matched twice... we should remove this from cats before checking again
+                                catsToFind.delete(data[n]);
+                                if (catsToFind.size === 0) {
                                     has=true;
                                     break;
                                 }
                             }
-                           
                         }
                     }
-                  
-                    if (has){
+                    if (has) {
                         if (localFilter[i]===1){
                             if (--filter[i] === 0){
                                     parent.filterSize++;
                                 }
                             }
                             localFilter[i]=0;              
-                    }
-                
-                    else{                  
+                    } else {                  
                         if (localFilter[i]===0){
                             if(++filter[i]===1){
                                 parent.filterSize--;
@@ -124,7 +124,7 @@ class CategoryDimension extends Dimension{
                         localFilter[i]=1
                     }
                 }
-            }
+            } //end multitext
             else{
                 for (let i=0;i<len;i++){
                     if (cats.has(data[i])){

@@ -335,7 +335,11 @@ class ChartManager{
                 await this._getColumnsAsync(ods.name, [icols[2]]);
                 //filter the two interacting items
                 //would be nice if this could be maybe async / lazy / different ways of composing filters?
-                interactionFilter.filter("filterCategories",[icols[2]],[info[c1],info[c2]]);
+                
+                const args = [info[c1],info[c2]];
+                args.operand = "and"; //force multitext to use "and"
+
+                interactionFilter.filter("filterCategories", [icols[2]], args);
                 //show the region if not already displayed
                 if (links.is_single_region && ods.regions && this.dsPanes[ods.name]){
                     if (!this.getAllCharts(ods.name).find(x=>x.config.region===info[pc])){
