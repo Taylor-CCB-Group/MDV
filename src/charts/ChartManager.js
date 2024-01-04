@@ -2215,7 +2215,7 @@ class AddChartDialog extends BaseDialog{
         const ed={};
         for (let name in this.extraControls){
             const c = this.extraControls[name];
-            ed[name] = c.type === 'checkbox' ? c.value === 'on' : c.value;
+            ed[name] = c.type === 'checkbox' ? c.checked : c.value;
             //mjs: sometimes its not as simple as this and more complex alterations
             //to the config are required based on the user input the dataSore's config
             config[name] = ed[name]; // pjt: is there a reason we didn't do this before?
