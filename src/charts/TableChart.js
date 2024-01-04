@@ -14,10 +14,8 @@ class TableChart extends BaseChart{
 		super(dataStore,div,config);
         this.config.type="table_chart";
         let cols = [];
-        //add the index column 
-        //TODO fix sorting on index column, make index column optional?
-        cols = [{field:"__index__",id:"__index__",name:"index",datatype:"integer",sortable:true,width:100}];
-        let index=0;
+        //add the index column (unless told not to)
+        if (config.include_index !== false) cols = [{field:"__index__",id:"__index__",name:"index",datatype:"integer",sortable:true,width:100}];
         const cw = config.column_widths || {};
         for (let c of this.config.param){
             const column = dataStore.columnIndex[c];
@@ -478,5 +476,16 @@ BaseChart.types["table_chart"]={
     params:[{
         type:"_multi_column:all",
         name:"Columns To Display"
-    }]
+    }],
+    extra_controls: () => {
+        //maybe '_multi_column:all' should handle this?
+        return [{
+            type: "checkbox",
+            name: "include_index",
+            label: "Include Index",
+        }]
+    },
+    init: (config, ds, ec) => {
+        config.include_index = ec.include_index;
+    }
 }
