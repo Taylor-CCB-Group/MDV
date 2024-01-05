@@ -15,5 +15,12 @@
         "sourceMap": true,
         "noEmit": false,
         "skipLibCheck": true,
-    }
+    },
+    "exclude": [
+        "venv",
+        "node_modules",
+        "dist",
+        "vite-dist",
+        "python",
+    ]
 }
