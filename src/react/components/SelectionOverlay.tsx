@@ -129,13 +129,13 @@ export default function SelectionOverlay({scatterplotLayer} : {scatterplotLayer:
             ><ToolIcon /></IconButton></Tooltip>
         });
     }, [selectedTool]);
-    if (!scatterplotLayer || !scatterplotLayer.internalState) return null;
     // state: { selectedTool: 'rectangle' | 'circle' | 'polygon' | 'lasso' | 'magic wand' | 'none' }
     // interaction phases... maybe revert back to pan after making selection
     // - but there should be interaction with drag handles...
     // add or remove from selection...
     // -> transform into Deck coordinates...
     // later: selection layers...
+    const drawRect = scatterplotLayer && scatterplotLayer.internalState;
     return (
         <>
         <ButtonGroup variant="contained" aria-label="choose tool for manipulating view or selection" style={{zIndex: 2, padding: '0.3em'}}>
@@ -162,7 +162,7 @@ export default function SelectionOverlay({scatterplotLayer} : {scatterplotLayer:
                 }
             }}
             >
-                <RectangleEditor toolActive={selectedTool==='Rectangle'} scatterplotLayer={scatterplotLayer}/>
+                {drawRect && <RectangleEditor toolActive={selectedTool==='Rectangle'} scatterplotLayer={scatterplotLayer}/>}
         </div>
         </>
         )
