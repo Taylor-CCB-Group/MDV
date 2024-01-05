@@ -88,7 +88,9 @@ class CategoryDimension extends Dimension{
                     // let num = 0;
                     //new set for each row may not be the most efficient way to do this
                     //need to do something for "and" - shouldn't do any harm for "or"
-                    const catsToFind = ao ? new Set(cats) : undefined;
+                    //nb, we actually want ['a', 'a'] to require two 'a's. For now add a special case for this?
+                    //or see how it performs using array instead of set...
+                    const catsToFind = ao ? new Set(cats) : cats;
                     for (let n=st;n<st+int;n++){
                         if (data[n]===65535){
                             break;
