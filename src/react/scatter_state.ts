@@ -2,7 +2,7 @@ import { PickingInfo, ScatterplotLayer } from "deck.gl/typed";
 import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
 import { useChart, useDataStore, useOmeTiff } from "./context";
 import { useChartID, useConfig, useParamColumns } from "./hooks";
-import { useCallback, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 
 /**
@@ -97,18 +97,31 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         const index = data[hoverIndex];
         const valueIndex = tooltipCol.data[index];
         const value = tooltipCol.values[valueIndex];
-        // const json = JSON.stringify({
+        // return JSON.stringify({
         //     hoverIndex,
         //     index,
         //     valueIndex,
         //     value,
         // }, null, 2);
         return value;
-    }, [tooltipCol]);
+    }, [tooltipCol, tooltipCol.data, tooltipCol.values, data]);
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
         ({object}) => hoverInfo && hoverInfo.index !== -1 && tooltipCol && `${getTooltipVal(hoverInfo.index)}`,
     [hoverInfo]);
+
+    // debugging...
+    // useEffect(() => {
+    //     // get a unique set of values referred to by the tooltip column as per filtered data
+    //     if (!tooltipCol) return;
+    //     const indices = data.map(fi => tooltipCol.data[fi]);
+    //     const indexCounts = indices.reduce((acc, i) => { acc[i] = (acc[i] ?? 0) + 1; return acc; }, {});
+    //     const strings = Array.from(new Set(indices)).map(i => tooltipCol.values[i]);
+    //     const stringCounts = tooltipCol.values.map(s => `${s}: ${
+    //         Math.round(100*indexCounts[tooltipCol.values.indexOf(s)]/data.length)
+    //     }%`);
+    //     console.table(stringCounts);
+    // }, [tooltipCol, tooltipCol.data, tooltipCol.values, data])
 
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
