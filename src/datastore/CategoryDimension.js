@@ -82,31 +82,31 @@ class CategoryDimension extends Dimension{
             if (col.datatype==="multitext"){
                 const int = col.stringLength;
                 let ao = category.operand === "and";
+                const catsArr = category.map(c => vals.indexOf(c));
                 for (let i=0;i<len;i++){
                     const st = i*int;
                     let has = false;
-                    // let num = 0;
-                    //new set for each row may not be the most efficient way to do this
-                    //need to do something for "and" - shouldn't do any harm for "or"
-                    //nb, we actually want ['a', 'a'] to require two 'a's. For now add a special case for this?
-                    //or see how it performs using array instead of set...
-                    const catsToFind = ao ? new Set(cats) : cats;
+                    //nb, we actually want "and" of ['a', 'a'] to require two 'a's, so using array rather than Set
+                    //in any case, we need to remove found categories for a given row as we go,
+                    //otherwise we end up with a false positive if the same category is used twice
+                    const catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
                     for (let n=st;n<st+int;n++){
                         if (data[n]===65535){
                             break;
                         }
-                        if (catsToFind.has(data[n])){
-                            if (!ao){
-                                has=true;
-                                break
-                            }
-                            else {
-                                // num++; //this allows the same string to be matched twice... we should remove this from cats before checking again
-                                catsToFind.delete(data[n]);
-                                if (catsToFind.size === 0) {
-                                    has=true;
+                        if (ao) {
+                            const index = catsToFind.indexOf(data[n]);
+                            if (index !== -1) {
+                                catsToFind.splice(index, 1);
+                                if (catsToFind.length === 0) {
+                                    has = true;
                                     break;
                                 }
+                            }
+                        } else {
+                            if (catsToFind.has(data[n])){
+                                has=true;
+                                break
                             }
                         }
                     }
