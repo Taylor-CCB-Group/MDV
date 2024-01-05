@@ -5,6 +5,7 @@ import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
 import { StrictMode } from "react";
 import { createEl } from "../../utilities/ElementsTyped";
+import { Chart } from "../../charts/charts";
 
 function Fallback() {
     return <>
@@ -41,7 +42,7 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
  */
-export abstract class BaseReactChart<T> extends BaseChart {
+export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     declare config: T & BaseConfig;
     useMobx = true;
     root: ReturnType<typeof createRoot>;

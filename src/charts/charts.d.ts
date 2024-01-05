@@ -21,10 +21,14 @@ type DataValuesTypes = {
     'multitext': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
     'unique': string[];
 }
+// even if they're just aliases, these could be useful for documentation / clarity
+export type ColumnName = string;
+export type DataSourceName = string;
+export type FieldName = string;
 
 export type DataColumn<T extends DataType> = {
-    name: string;
-    field: string;
+    name: ColumnName;
+    field: FieldName;
     datatype: T;
     data: DataStructureTypes[T];
     values: DataValuesTypes[T];
@@ -41,15 +45,13 @@ export type DataColumn<T extends DataType> = {
 //     columnsWithData: string[];
 // };
 export type DataSource = {
-    name: string;
+    name: DataSourceName;
     charts: Chart[];
     dataStore: DataStore;
     contentDiv: HTMLDivElement;
     menuBar: HTMLDivElement;
     images?: Record<string, any>;
     regions?: Record<string, any>;
-    getLoadedColumns: () => string[];
-    getColumnName: (col: string) => string;
 };
 
 export type GuiValueTypes = {
@@ -70,26 +72,34 @@ export type GuiSpec<T extends keyof GuiValueTypes> = {
     values?: GuiValueTypes[T][];
     defaultVal?: GuiValueTypes[T];
 }
+interface DataStore {
+    getLoadedColumns: () => FieldName[];
+    getColumnName: (col: FieldName) => ColumnName | null;
+    getColumnList: () => DataColumn[];
+    getFilteredIndices: () => Promise<Uint32Array>;
+}
 
-export type Chart = {
-    getDiv: () => HTMLDivElement;
+
+export interface Chart {
+    getDiv: () => HTMLElement;
     remove: () => void;
     addMenuIcon: (classes: string, info: string) => HTMLElement;
     setSize: (x?: number, y?: number) => void;
     changeBaseDocument: (doc: Document) => void;
     getSettings: () => GuiSpec<any>[];
-    removeLayout:()=> void;
+    removeLayout?:()=> void;
     config:any;
-};
+    dataStore: DataStore;
+};    
 
 export type ChartState = {
     chart: Chart;
     win?: Window;
     dataSource: DataSource;
-}
+}    
 
 export type DataSourceSpec = {
-    name: string;
+    name: DataSourceName;
     dataStore: DataStore;
     //links etc TBD
 };
@@ -98,7 +108,7 @@ export type ChartManager = {
     charts: Record<string, ChartState>;
     dataSources: DataSourceSpec[];
     dsIndex: Record<string, DataSourceSpec>;
-    addMenuIcon: (dataSourceName: string, iconClass: string, text: string, func: ()=>void) => HTMLElement;
+    addMenuIcon: (dataSourceName: DataSourceName, iconClass: string, text: string, func: ()=>void) => HTMLElement;
     /** probably not something we really want to use publicly like this */
     _popOutChart: (chart: Chart) => void;
 };
