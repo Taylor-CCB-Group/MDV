@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
 import { StrictMode } from "react";
+import { createEl } from "../../utilities/ElementsTyped";
 
 function Fallback() {
     return <>
@@ -64,7 +65,9 @@ export abstract class BaseReactChart<T> extends BaseChart {
         // any mobx state, so we can't just hide it in the base class.
         // (although maybe we could design a hook that hides it?)
         // const Observed = observer(ReactComponentFunction);
-        this.root = createRoot(this.contentDiv);
+
+        const reactEl = createEl('div', {className: 'react-chart'}, this.contentDiv); //other things may still be added to contentDiv outside react (e.g. legend)
+        this.root = createRoot(reactEl);
         this.root.render((
             <StrictMode>
                 <ChartProvider chart={this}>
