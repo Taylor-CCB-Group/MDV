@@ -92,7 +92,18 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
     }, [config.tooltip.column]);
     const getTooltipVal = useCallback((i: number) => {
         if (!tooltipCol) return '';
-        return tooltipCol.values[tooltipCol.data[i]];
+        // careful now...
+        const hoverIndex = i;
+        const index = data[hoverIndex];
+        const valueIndex = tooltipCol.data[index];
+        const value = tooltipCol.values[valueIndex];
+        // const json = JSON.stringify({
+        //     hoverIndex,
+        //     index,
+        //     valueIndex,
+        //     value,
+        // }, null, 2);
+        return value;
     }, [tooltipCol]);
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
