@@ -109,9 +109,9 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         //todo nicer tooltip interface (and review how this hook works)
         () => {
             const hoverInfo = hoverInfoRef.current;
-            return hoverInfo && hoverInfo.index !== -1 && tooltipCol && `${getTooltipVal(hoverInfo.index)}`;
+            return hoverInfo && hoverInfo.index !== -1 && `${getTooltipVal(hoverInfo.index)}`;
         },
-    [hoverInfoRef, tooltipCol]);
+    [hoverInfoRef, getTooltipVal]);
 
     // debugging...
     // useEffect(() => {
@@ -120,9 +120,9 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
     //     const indices = data.map(fi => tooltipCol.data[fi]);
     //     const indexCounts = indices.reduce((acc, i) => { acc[i] = (acc[i] ?? 0) + 1; return acc; }, {});
     //     const strings = Array.from(new Set(indices)).map(i => tooltipCol.values[i]);
-    //     const stringCounts = tooltipCol.values.map(s => `${s}: ${
+    //     const stringCounts = tooltipCol.values.map(s => [s, `${
     //         Math.round(100*indexCounts[tooltipCol.values.indexOf(s)]/data.length)
-    //     }%`);
+    //     }%`]);
     //     console.table(stringCounts);
     // }, [tooltipCol, tooltipCol.data, tooltipCol.values, data])
 
