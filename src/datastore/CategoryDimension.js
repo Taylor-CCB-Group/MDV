@@ -83,15 +83,24 @@ class CategoryDimension extends Dimension{
                 const int = col.stringLength;
                 let ao = category.operand === "and";
                 const catsArr = category.map(c => vals.indexOf(c));
+                const singleCat = cats.size === 1;
                 for (let i=0;i<len;i++){
                     const st = i*int;
                     let has = false;
                     //nb, we actually want "and" of ['a', 'a'] to require two 'a's, so using array rather than Set
                     //in any case, we need to remove found categories for a given row as we go,
                     //otherwise we end up with a false positive if the same category is used twice
+                    
                     const catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
-                    for (let n=st;n<st+int;n++){
-                        if (data[n]===65535){
+                    
+                    for (let n=st; n < st+int; n++) {
+                        if (data[n]===65535) {
+                            //... if this row only has one item, we can't possibly have two of the same item,
+                            //but I think we still want to match if we're looking for a single category...
+                            //e.g. if we have 'Count Periostin' and we click the 'Periostin / Periostin' element of an interaction matrix.
+                            //In that case, `catsToFind` will have fewer items than `catsArr`
+                            //(testing with cellpairs where I want but should be right for arbitrary multitext??)
+                            if (ao && singleCat && catsToFind.length < catsArr.length) has = true;
                             break;
                         }
                         if (ao) {
