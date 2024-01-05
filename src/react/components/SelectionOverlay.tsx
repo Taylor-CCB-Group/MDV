@@ -6,6 +6,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useViewerStore } from "./avivatorish/state";
 import { ScatterplotLayer } from "deck.gl/typed";
+import { useRegionScale } from "../scatter_state";
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
@@ -40,14 +41,16 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
     const [start, setStart] = useState<[number, number]>([0,0]);
     const [end, setEnd] = useState<[number, number]>([0,0]);
     const uiElement = useRef<HTMLDivElement>(null);
+    const scale = useRegionScale();//todo: this is a hack... should have a better way of reasoning about transforms...
     const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
         if (!uiElement.current) return [0,0] as [number, number];
         const r = uiElement.current.getBoundingClientRect();
         const x = e.clientX - r.left;
         const y = e.clientY - r.top;
         const p = scatterplotLayer.unproject([x, y]) as [number, number];
-        return p;
-    }, [scatterplotLayer, uiElement]);
+        //need to fix this now that we're using modelMatrix rather than scaling coordinates...
+        return p.map(v => v*scale) as [number, number];
+    }, [scatterplotLayer, uiElement, scale]);
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!toolActive) return;
         const p = unproject(e);
