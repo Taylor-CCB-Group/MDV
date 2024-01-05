@@ -2,7 +2,7 @@ import { PickingInfo, ScatterplotLayer } from "deck.gl/typed";
 import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
 import { useChart, useDataStore, useOmeTiff } from "./context";
 import { useChartID, useConfig, useParamColumns } from "./hooks";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 
 /**
@@ -84,7 +84,7 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
 
     const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
-    const [hoverInfo, setHoverInfo] = useState<PickingInfo>(null);
+    const hoverInfoRef = useRef<PickingInfo>(null);
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
@@ -107,8 +107,11 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
     }, [tooltipCol, tooltipCol.data, tooltipCol.values, data]);
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
-        ({object}) => hoverInfo && hoverInfo.index !== -1 && tooltipCol && `${getTooltipVal(hoverInfo.index)}`,
-    [hoverInfo]);
+        () => {
+            const hoverInfo = hoverInfoRef.current;
+            return hoverInfo && hoverInfo.index !== -1 && tooltipCol && `${getTooltipVal(hoverInfo.index)}`;
+        },
+    [hoverInfoRef, tooltipCol]);
 
     // debugging...
     // useEffect(() => {
@@ -141,8 +144,7 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         },
         pickable: true,
         onHover: (info) => {
-            // todo look up text as per config
-            setHoverInfo(info);
+            hoverInfoRef.current = info;
         }        
     }), [id, data, opacity, radius, colorBy, cx, cy]);
     return [scatterplotLayer, getTooltip];
