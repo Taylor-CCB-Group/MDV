@@ -3,7 +3,7 @@ import PanToolOutlinedIcon from '@mui/icons-material/PanToolOutlined';
 import PhotoSizeSelectSmallOutlinedIcon from '@mui/icons-material/PhotoSizeSelectSmallOutlined';
 import PolylineOutlinedIcon from '@mui/icons-material/PolylineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useViewerStore } from "./avivatorish/state";
 import { ScatterplotLayer } from "deck.gl/typed";
 
@@ -39,18 +39,26 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
     // (may well be in a worker - or perhaps we can use the GPU for this)
     const [start, setStart] = useState<[number, number]>([0,0]);
     const [end, setEnd] = useState<[number, number]>([0,0]);
-    const [dragging, setDragging] = useState(false);
-    const handleMouseUp = useCallback(() => {
-        setDragging(false);
-        window.removeEventListener('mouseup', handleMouseUp);
-    }, []);
-    const unproject = useCallback((e: React.MouseEvent) => {
-        const r = e.currentTarget.getBoundingClientRect();
+    const uiElement = useRef<HTMLDivElement>(null);
+    const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
+        if (!uiElement.current) return [0,0] as [number, number];
+        const r = uiElement.current.getBoundingClientRect();
         const x = e.clientX - r.left;
         const y = e.clientY - r.top;
         const p = scatterplotLayer.unproject([x, y]) as [number, number];
         return p;
-    }, [scatterplotLayer]);
+    }, [scatterplotLayer, uiElement]);
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (!toolActive) return;
+        const p = unproject(e);
+        setEnd(p);
+    }, [toolActive]);
+    const handleMouseUp = useCallback((e: MouseEvent) => {
+        handleMouseMove(e);
+        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('mousemove', handleMouseMove);
+    }, [toolActive]);
+    
     const viewState = useViewerStore((state) => state.viewState); // for reactivity - still a frame behind...
     const [frameTrigger, setFrameTrigger] = useState(false);
     useEffect(() => {
@@ -85,26 +93,17 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
         top: 0,
         left: 0,
     }} 
+    ref={uiElement}
     onMouseDown={(e) => {
         if (!toolActive) return;
         const p = unproject(e);
         setStart(p);
         setEnd(p);
-        setDragging(true);
+        // setDragging(true); //dragging state is determined by whether the listeners are attached...
         window.addEventListener('mouseup', handleMouseUp);
-    }
-    } onMouseMove={(e) => {
-        if (!toolActive) return;
-        if (dragging) {
-            const p = unproject(e);
-            setEnd(p);
-        }
-    }} onMouseUp={(e) => {
-        if (!toolActive) return;
-        const p = unproject(e);
-        setEnd(p);
-        setDragging(false);
-    }} />
+        window.addEventListener('mousemove', handleMouseMove);
+    }}
+    />
     </>);
 }
 
