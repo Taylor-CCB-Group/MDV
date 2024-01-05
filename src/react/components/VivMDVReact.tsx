@@ -13,6 +13,7 @@ import { OmeTiffProvider, useOmeTiff } from "../context";
 import { useEffect, useMemo, useState } from "react";
 import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import SelectionOverlay from "./SelectionOverlay";
+import type { ColumnName, DataColumn } from "../../charts/charts";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -50,7 +51,7 @@ const DeckImpl = observer(() => {
     const userSet = channelsState.contrastLimits && channelsState.contrastLimits.length > 0; //hack, for now.
     const contrastLimits = userSet ? channelsState.contrastLimits : [stats ? stats.contrastLimits : [0, 1]];
 
-    const [scatterplotLayer, hoverInfo] = useScatterplotLayer();
+    const [scatterplotLayer, getTooltip] = useScatterplotLayer();
 
     const layerConfig = useVivLayerConfig();
     const [viewState, setViewState] = useState<ReturnType<typeof getDefaultInitialViewState>>();
@@ -80,7 +81,7 @@ const DeckImpl = observer(() => {
     // pending proper channel state handling... show that we can set contrast limits.
     if (userSet) layerConfigX.contrastLimits = contrastLimits;
     const deckProps = {
-        getTooltip: ({ object }) => hoverInfo && hoverInfo.index !== -1 && 'i: '+hoverInfo.index,
+        getTooltip,
         style: {
             zIndex: '-1',
         },
@@ -109,11 +110,13 @@ const MainChart = () => {
     if (!ome) return <div>Loading...</div>; // todo suspense.
     return <DeckImpl />;
 };
+export type TooltipConfig = {
+    tooltip: {
+        show: boolean,
+        column?: ColumnName,
+    }
+};
 
-/// some type stuff... common bits should probably move elsewhere...
-// even if the type isn't constrained beyond 'string' (which potentially in some cases it could be)
-// this kind of thing can potentially help DX and encourage appropriate values to be passed.
-type ColumnName = string; 
 //could we infer or something to avoid having to repeat this?
 export type ScatterPlotConfig = {
     radius: number,
@@ -123,13 +126,16 @@ export type ScatterPlotConfig = {
         display: boolean,
         // todo: add more options here...
     },
-};
+} & TooltipConfig;
 const scatterDefaults: ScatterPlotConfig = {
     radius: 1,
     opacity: 1,
     color_by: null,
     color_legend: {
         display: false,
+    },
+    tooltip: {
+        show: false,
     }
 };
 export type VivRoiConfig = {
@@ -200,10 +206,29 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         }
     }
 
-    getSettings(): { type: string; label: string; current_value: any; func: (v: any) => void; }[] {
+    getSettings() {
         const c = this.config;
+        const { tooltip } = c;
+        const cols = this.dataStore.getColumnList() as DataColumn<any>[];
         const settings = super.getSettings();
         return settings.concat([
+            {
+                type: "check",
+                label: "Show Tooltip",
+                current_value: tooltip.show,
+                func: (x: boolean) => {
+                    tooltip.show = x;
+                }
+            },
+            {
+                type: "dropdown",
+                label: "Tooltip value",
+                current_value: c.tooltip.column || cols[0].field,
+                values: [cols, "name", "field"],
+                func: (c) => {
+                    tooltip.column = c;
+                }
+            },
             {
                 // very crude placeholder for testing mechanism...
                 type: "slider",

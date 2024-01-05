@@ -1,13 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { loadOmeTiff, getChannelStats, loadOmeZarr } from "@hms-dbmi/viv";
-import { BaseConfig } from "./components/BaseReactChart";
+import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
 import { useChart, useDataStore } from "./context";
 import type { OME_TIFF } from "./components/avivatorish/state";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import { ScatterplotLayer } from "deck.gl/typed";
-import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
 
 /**
  * Get the chart's config.
@@ -27,7 +24,7 @@ export function useChartSize() {
     // return chart.config.size; // not so well behaved?
     const div = chart.contentDiv;
     const [size, setSize] = useState([div.clientWidth, div.clientHeight]);
-    useEffect(() => {
+    useLayoutEffect(() => {
         const resize = () => {
             setSize([div.clientWidth, div.clientHeight]);
         };

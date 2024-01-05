@@ -2,7 +2,7 @@ import { PickingInfo, ScatterplotLayer } from "deck.gl/typed";
 import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
 import { useChart, useDataStore, useOmeTiff } from "./context";
 import { useChartID, useConfig, useParamColumns } from "./hooks";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 
 /**
@@ -71,10 +71,11 @@ export function useRegionScale() {
     const scale = ome.metadata.Pixels.PhysicalSizeX / regionScale;
     return scale;
 }
-
-export function useScatterplotLayer(): [ScatterplotLayer, PickingInfo] {
+type Tooltip = (PickingInfo) => string;
+export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
     const id = useChartID();
-    const colorBy = (useChart() as any).colorBy;
+    const chart = useChart();
+    const colorBy = (chart as any).colorBy;
     const config = useConfig<ScatterPlotConfig>();
     const scale = useRegionScale();
 
@@ -84,6 +85,20 @@ export function useScatterplotLayer(): [ScatterplotLayer, PickingInfo] {
     const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
     const [hoverInfo, setHoverInfo] = useState<PickingInfo>(null);
+
+    const tooltipCol = useMemo(() => {
+        if (!config.tooltip) return undefined;
+        return chart.dataStore.columnIndex[config.tooltip.column]
+    }, [config.tooltip.column]);
+    const getTooltipVal = useCallback((i: number) => {
+        if (!tooltipCol) return '';
+        return tooltipCol.values[tooltipCol.data[i]];
+    }, [tooltipCol]);
+    const getTooltip = useCallback(
+        //todo nicer tooltip interface (and review how this hook works)
+        ({object}) => hoverInfo && hoverInfo.index !== -1 && tooltipCol && `${getTooltipVal(hoverInfo.index)}`,
+    [hoverInfo]);
+
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
@@ -106,5 +121,5 @@ export function useScatterplotLayer(): [ScatterplotLayer, PickingInfo] {
             setHoverInfo(info);
         }        
     }), [id, data, opacity, radius, colorBy, cx, cy]);
-    return [scatterplotLayer, hoverInfo];
+    return [scatterplotLayer, getTooltip];
 }
