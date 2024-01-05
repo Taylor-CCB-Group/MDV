@@ -125,7 +125,8 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
     //     }%`]);
     //     console.table(stringCounts);
     // }, [tooltipCol, tooltipCol.data, tooltipCol.values, data])
-
+    const s = 1/scale;
+    const modelMatrix = useMemo(() => [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, s], [s]);
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
@@ -134,11 +135,12 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         getFillColor: colorBy ?? [0, 200, 200],
         getRadius: 1,
         getPosition: (i, { target }) => {
-            target[0] = cx.data[i] / scale;
-            target[1] = cy.data[i] / scale;
+            target[0] = cx.data[i];
+            target[1] = cy.data[i];
             target[2] = 0;
             return target as unknown as Float32Array; // deck.gl types are wrong AFAICT
         },
+        modelMatrix,
         updateTriggers: {
             getFillColor: colorBy,
         },
