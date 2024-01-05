@@ -165,5 +165,5 @@ export default function SelectionOverlay({scatterplotLayer} : {scatterplotLayer:
                 {drawRect && <RectangleEditor toolActive={selectedTool==='Rectangle'} scatterplotLayer={scatterplotLayer}/>}
         </div>
         </>
-        )
+    )
 }
