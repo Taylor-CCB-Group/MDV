@@ -56,37 +56,6 @@ export function useChartID() {
     return chart.config.id;
 }
 
-/**
- * Get a {Uint32Array} of the currently filtered indices.
- * When the selection changes, this will asynchronously update.
- * All users of the same data store share a reference to the same array.
- */
-export function useFilteredIndices() {
-    // in the case of region data, it should be filtered by that as well...
-    // I really want to sort out how I use types here...
-    const config = useConfig<VivRoiConfig>();
-    const filterColumn = config.background_filter?.column;
-    const dataStore = useDataStore();
-    const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
-    useEffect(() => {
-        dataStore.getFilteredIndices().then((indices) => {
-            if (filterColumn) {
-                const col = dataStore.columnIndex[filterColumn];
-                const filterValue = config.background_filter?.category;
-                if (filterValue) {
-                    const filterIndex = col.values.indexOf(filterValue);
-                    const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
-                    setFilteredIndices(filteredIndices);
-                    return;
-                }
-            }
-            setFilteredIndices(indices);
-        });
-        // using _filteredIndicesPromise as a dependency is working reasonably well,
-        // but possibly needs a bit more thought.
-    }, [dataStore._filteredIndicesPromise]);
-    return filteredIndices;
-}
 
 export function useParamColumns() {
     const chart = useChart();
