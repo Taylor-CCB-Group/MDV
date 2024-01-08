@@ -102,7 +102,7 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         //     value,
         // }, null, 2);
         return value;
-    }, [tooltipCol, tooltipCol.data, tooltipCol.values, data]);
+    }, [tooltipCol, tooltipCol?.data, tooltipCol?.values, data]);
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
         () => {
