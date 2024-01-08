@@ -17,7 +17,7 @@ export function useFilteredIndices() {
     const filterColumn = config.background_filter?.column;
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
-    useLayoutEffect(() => {
+    useEffect(() => {
         // return
         let cancelled = false;
         let finished = false;
@@ -93,9 +93,7 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
     const getTooltipVal = useCallback((i: number) => {
         if (!tooltipCol) return '';
         // careful now...
-        const hoverIndex = i;
-        const index = data[hoverIndex];
-        const valueIndex = tooltipCol.data[index];
+        const valueIndex = tooltipCol.data[data[i]];
         const value = tooltipCol.values[valueIndex];
         // return JSON.stringify({
         //     hoverIndex,

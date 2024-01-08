@@ -273,7 +273,6 @@ class WGLChart extends SVGChart{
         })
     
         return settings.concat([
-           
             {
                 type:"check",
                 label:"Show Tooltip",
@@ -292,9 +291,7 @@ class WGLChart extends SVGChart{
                 func:(x)=>{
                     this.setToolTipColumn(x);
                 }
-
             },
-          
             {
                 type:"button",
                 label:"Centre Plot",
@@ -302,7 +299,6 @@ class WGLChart extends SVGChart{
                     this.centerGraph();
                     this.app.refresh();
                 }
-
             },
             {
 				type:"radiobuttons",
@@ -314,14 +310,9 @@ class WGLChart extends SVGChart{
                     this.app.setFilterAction(x);
                     this.app.refresh();
 				}
-
 			}
-
-
-
         ]);
     }
-    
 }
 
 
