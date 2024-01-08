@@ -906,27 +906,26 @@ class WGL2DI{
 			return;
 		}
 		try{
-			var pixel = this.regl.read({
+			const pixel = this.regl.read({
 				x: position[0],
 				y: this.height - position[1],
 				width: 1,
 				height: 1,
 				framebuffer: this.pickbuffer
 			});
-		}catch(e){
-			console.log(position);
-			return;
-		}
-		
-		if (pixel[0]===0 && pixel[1]===0 && pixel[2]===0){
+			if (pixel[0]===0 && pixel[1]===0 && pixel[2]===0) {
+				return null;
+			}
+			//console.log(pixel);
+			const index = this._getIndexFromRGB(pixel);
+			if (index>0){
+				return index-1;
+			}
 			return null;
-		}
-		//console.log(pixel);
-		var index = this._getIndexFromRGB(pixel);
-		if (index>0){
-			return index-1;
-		}
-		return null;
+		} catch(e) {
+			console.log(position);
+			return null;
+		}		
 	}
 
 	addHandler(handler_type,handler,name){
