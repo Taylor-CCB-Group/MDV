@@ -902,7 +902,7 @@ class WGL2DI{
 
 
 	_getObjectAtPosition(position){
-		if(position[1]<=0 || position[0]<=0){
+		if(position[1]<=0 || position[0]<=0 || position[0]>=this.width || position[1]>=this.height){
 			return;
 		}
 		try{
@@ -915,6 +915,7 @@ class WGL2DI{
 			});
 		}catch(e){
 			console.log(position);
+			return;
 		}
 		
 		if (pixel[0]===0 && pixel[1]===0 && pixel[2]===0){
