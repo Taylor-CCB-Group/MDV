@@ -11,6 +11,7 @@ class WGL3DScatterPlot extends WGLChart{
         }
 		super(dataStore,div,config,{});
         const c = this.config;
+        c.axis_scales=c.axis_scales || [1,1,1];
          //get the x,y,z columns
         const p = c.param;
         this.dim = this.dataStore.getDimension("range_dimension",p);
@@ -18,7 +19,7 @@ class WGL3DScatterPlot extends WGLChart{
         const max= Math.max(...ranges);
         this.defaultCDistance = max*4;
         c.brush = c.brush || "default";
-        c.center= c.center || [0,0,0];
+        c.center=  c.center || this._calculateCenter();
        
 		this.app= new WGL2DI(this.graphDiv,{mode:"3d",
             brush:c.brush,
@@ -69,7 +70,10 @@ class WGL3DScatterPlot extends WGLChart{
           
 	}
     setAxisScales(index,val){
+        const c = this.config;
         this.config.axis_scales[index]=val;
+        c.center=  this._calculateCenter();
+        this.app.setCameraProperty("center",[-c.center[0]*2,c.center[1]*2,-c.center[2]*2]);
         this.app.refresh();
     }
 
@@ -120,9 +124,23 @@ class WGL3DScatterPlot extends WGLChart{
             this.app.setCamera(values.distance,values.theta,values.phi);
         }
         else{
+            const c = this.config;
+            c.center = this._calculateCenter();
+            this.app.setCameraProperty("center",[-c.center[0]*2,c.center[1]*2,-c.center[2]*2]);
             this.app.setCamera(this.defaultCDistance,-1.038,0.261);
+            this.app.removeAllLines();
+            this.addAxis();
         }
         
+    }
+
+    _calculateCenter(){
+        //const p = this.config.param;
+        const ranges = this.config.param.map(x=> this.dataStore.getMinMaxForColumn(x));
+        const s =this.config.axis_scales
+        const scaledRanges = ranges.map((range, i) => [range[0] * 1, range[1] * 1]);
+        const c = scaledRanges.map((x,i) => (x[0] + (x[1] - x[0]) / 2));
+        return c.map((x,i)=>x*(s[i]));
     }
 
     getConfig(){
@@ -146,14 +164,14 @@ class WGL3DScatterPlot extends WGLChart{
     }
 
     addAxis(){
+        const c = this.config.center;
+        const s  = this.config.axis_scales;
         for (let index=0;index<3;index++){
             let mm = this.dataStore.getMinMaxForColumn(this.config.param[index]);
-            const from = this.config.center.map((x,i)=>i===1?x:x);
-            from[index]=mm[0];
-            const to = this.config.center.map((x,i)=>i===1?x:x);
-            to[index]=mm[1];
             const color = [0,0,0];
             color[index]=255;
+            const from = c.map((x,i)=>i==index?mm[0]:x/s[i]);
+            const to= c.map((x,i)=>i==index?mm[1]:x/s[i]);
             this.app.addLine(from,to,color);
         }   
     }

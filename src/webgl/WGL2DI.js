@@ -228,10 +228,14 @@ class WGL2DI{
 
 	setBackGroundColor(color){
 		color = color || "";
-		this.div_container.style.background=color;
+		this.
+		div_container.style.background=color;
 	}
 
-
+	setCameraProperty(property,value){
+		this.camera.cameraState[property]=value;
+		this.camera.updateCamera()
+	}
 
 	_setUpDocument(width,height){
 		if (this.config.brush){
