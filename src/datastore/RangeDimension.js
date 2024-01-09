@@ -2,8 +2,11 @@
 import Dimension from "./Dimension.js";
 
 class RangeDimension extends Dimension{
-    constructor(column,parent){
-        super(column, parent);   
+    /**
+     * @param {DataStore} parent
+     */
+    constructor(parent) {
+        super(parent);
         this.worker= new Worker (new URL("./binWorker.js?v=1",import.meta.url));  
     }
 
@@ -20,8 +23,8 @@ class RangeDimension extends Dimension{
         const data2 = this.parent.columnIndex[columns[1]].data;
         const filter = this.parent.filterArray;
         const parent = this.parent;
-        const range1 =args.range1;
-        const range2 =args.range2;
+        const range1 = args.range1;
+        const range2 = args.range2;
       
         const localFilter= this.filterArray;
         for (let i=0;i<this.parent.size;i++){
