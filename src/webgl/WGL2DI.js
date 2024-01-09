@@ -1130,7 +1130,7 @@ class WGL2DI{
 		var self=this;
 		//some listeners are on window while brush is active, and removed when brush is finished
 		//allows dragging outside the canvas
-		const mousemove = (e) => {
+		const mousemoveDragging = (e) => {
 			if (self.brush){
 				if (self.brush.resizing){
 					let origin =self.brush.origin;
@@ -1210,39 +1210,35 @@ class WGL2DI{
 				self.mouse_position[1]=e.pageY;
 				self.mouse_position[0]=e.pageX;      
 			}
-			//no drag event going on call any listners if mouse over/out an object
-			else{
-				var position =self._getMousePosition(e);
-				var obj = self._getObjectAtPosition(position);
-				if (obj!=null && self.object_mouse_over==null){
-					for (var i in self.handlers['object_over']){
-						self.handlers.object_over[i](e,obj);		           
-					}
-				
-					self.object_mouse_over=obj;
-					
-				}
-				else if (obj==null && self.object_mouse_over){
-					for (var i in self.handlers['object_out']){
-						self.handlers.object_out[i](e,self.object_mouse_over);
-					}
-				
-					
-					self.object_mouse_over=null;
-
-				}
-				//move directly from one object to another
-				else if(obj!=null && (obj!==self.object_mouse_over)){
-					for (var i in self.handlers['object_over']){    
-						self.handlers.object_over[i](e,obj);  
-					}
-					self.object_mouse_over=obj;
-				}         
-			}
 		};
+		this.div_container.addEventListener("mousemove", (e) => {
+			if (self.dragging) return;
+			//no drag event going on call any listners if mouse over/out an object
+			const position = self._getMousePosition(e);
+			const obj = self._getObjectAtPosition(position);
+			if (obj != null && self.object_mouse_over == null) {
+				for (const i in self.handlers['object_over']) {
+					self.handlers.object_over[i](e, obj);
+				}
+				self.object_mouse_over = obj;
+			}
+			else if (obj == null && self.object_mouse_over) {
+				for (const i in self.handlers['object_out']) {
+					self.handlers.object_out[i](e, self.object_mouse_over);
+				}
+				self.object_mouse_over = null;
+			}
+			//move directly from one object to another
+			else if (obj != null && (obj !== self.object_mouse_over)) {
+				for (const i in self.handlers['object_over']) {
+					self.handlers.object_over[i](e, obj);
+				}
+				self.object_mouse_over = obj;
+			}
+		})
 
 		const mouseup = (evt) => {
-			window.removeEventListener("mousemove",mousemove);
+			window.removeEventListener("mousemove",mousemoveDragging);
 			window.removeEventListener("mouseup",mouseup);
 
             this._finish(evt);
@@ -1392,7 +1388,7 @@ class WGL2DI{
 
 		});
 		this.div_container.addEventListener("mousedown",function (evt){
-			window.addEventListener("mousemove",mousemove);
+			window.addEventListener("mousemove",mousemoveDragging);
 			window.addEventListener("mouseup",mouseup);
 
 			if (evt.which===3){
