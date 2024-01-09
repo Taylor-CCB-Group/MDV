@@ -307,11 +307,41 @@ class ChartManager{
                     if (links[ods].interactions){
                         this._addInteractionLinks(ds.dataStore,this.dsIndex[ods].dataStore,links[ods].interactions);
                     }
+                    if (links[ods].valueset) {
+                        this._addValuesetLink(ds.dataStore, this.dsIndex[ods].dataStore, links[ods].valueset);
+                    }
                 }
-
             }
-        }
-         
+        }         
+    }
+
+    /**
+     * Adds a link that will filter a column in one datasource based on the values in another:
+     * when the values in the source column are filtered, the values in the destination column
+     * will be filtered so that only those appearing in the selected values of the source column
+     * will be displayed.
+     */
+    _addValuesetLink(ds, ods, link) {
+        const valuesetFilter = ods.getDimension("valueset_dimension");
+        Promise.all([
+            this._getColumnsAsync(ds.name, [link.source_column]),
+            this._getColumnsAsync(ods.name, [link.dest_column])
+        ]).then(() => {
+            ds.addListener(`${ds.name}-${ods.name}_valueset`, async (type, data) => {
+                if (type === "filtered") {
+                    //`data` may be a (Range)Dimension (which has a `filterArray` property),
+                    //or 'undefined', or a string like "all_removed", or who knows what else...
+                    if (!data || typeof data === "string" || !data.filterArray) {
+                        valuesetFilter.removeFilter();
+                        return;
+                    }
+                    await this._getColumnsAsync(ds.name, [link.source_column]);
+                    const resultSet = await data.getValueSet(link.source_column);
+                    await this._getColumnsAsync(ods.name, [link.dest_column]);
+                    valuesetFilter.filter("filterValueset", [link.dest_column], resultSet);
+                }
+            });
+        });
     }
 
     _addInteractionLinks(ds,ods,links){
@@ -327,7 +357,7 @@ class ChartManager{
             {link_to:pc,col:pc}
         ]});
         ds.addListener(`${ds.name}-${ods.name}_interaction`, async (type, data) => {
-            if (type==="data_highlighted"){
+            if (type==="data_highlighted") {
                 //get the two interacting items plus pivot
                 await this._getColumnsAsync(ds.name,[c1,c2,pc]);
                 const info = ds.getRowAsObject(data.indexes[0],[c1,c2,pc]);
@@ -338,7 +368,7 @@ class ChartManager{
                 
                 const args = [info[c1],info[c2]];
                 args.operand = "and"; //force multitext to use "and"
-
+                
                 interactionFilter.filter("filterCategories", [icols[2]], args);
                 //show the region if not already displayed
                 if (links.is_single_region && ods.regions && this.dsPanes[ods.name]){
@@ -1536,7 +1566,7 @@ class ChartManager{
     }
 
     _getColumnsThen(dataSource,columns,func){
-        const ds  =this.dsIndex[dataSource];
+        const ds = this.dsIndex[dataSource];
         const dStore = ds.dataStore;
         //check if need to load column data from linked data set
         if (dStore.links){
@@ -1771,6 +1801,7 @@ class ChartManager{
                 const chart = this.charts[link.source_chart];
                 if (!chart){
                     console.error(`broken link id:${link.id}`);
+                    return;
                 }
                 
                 chart.chart.addListener(link.id,(type,data)=>{

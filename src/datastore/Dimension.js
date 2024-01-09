@@ -1,6 +1,9 @@
 class Dimension{
 
-
+    /**
+     * @constructor
+     * @param {DataStore} parent
+     */
     constructor(parent){ 
         this.filterBuffer = new SharedArrayBuffer(parent.size);       
         this.parent=parent;
@@ -49,8 +52,8 @@ class Dimension{
         return this.filterArray;
     }
 
-    //needs to be removed - produces strange behaviour
-    filterOnIndex(indexSet){
+    //needs to be removed - produces strange behaviour << review
+    filterOnIndex(indexSet) {
         const filter = this.parent.filterArray;
         const len = this.parent.size;
         const localFilter= this.filterArray;
@@ -111,6 +114,22 @@ class Dimension{
         console.log(`method${method}: ${performance.now()-t}`);
     }
 
+    async getValueSet(column) {
+        const col = this.parent.columnIndex[column];
+        const data = col.data;
+        const parentFilter = this.parent.filterArray;
+        const filter = this.filterArray;
+        const len = this.parent.size;
+        const set = new Set();
+        for (let i=0;i<len;i++){
+            if (filter[i]===0 && parentFilter[i]===0){
+                if (col.values) {
+                    set.add(col.values[data[i]]);
+                } else set.add(data[i]);
+            }
+        }
+        return set;
+    }
 
     /**
     * updates the filter if data in the supplied columns has been altered
