@@ -303,12 +303,12 @@ export const useLoader = () => {
   const [fullLoader, image] = useChannelsStore(store => [
     store.loader,
     store.image
-  ]) as any;
+  ]);
   return Array.isArray(fullLoader[0]) ? fullLoader[image] : fullLoader;
 };
 
 export const useMetadata = () => {
-  const image = useChannelsStore(store => store.image) as any;
+  const image = useChannelsStore(store => store.image);
   const metadata = useViewerStore(store => store.metadata);
   return Array.isArray(metadata) ? metadata[image] : metadata;
 };
