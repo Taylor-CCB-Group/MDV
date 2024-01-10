@@ -5,24 +5,11 @@ import { useOmeTiff } from "../../context";
 import { createStore, useStore } from "zustand";
 import { observer } from "mobx-react-lite";
 import { VivMdvReactConfig } from "../VivMDVReact";
-import type { StoreApi } from "zustand";
+import type { ExtractState, ZustandStore } from "./zustandTypes";
 
 // what about loadOmeZarr, loadBioformatsZarr...
 // ... not to mention HTJ2K?
 export type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
-
-// --- some bits of Zustand type stuff that could go elsewhere (can't seem to import) ---
-
-export type ExtractState<S> = S extends {
-  getState: () => infer T;
-}
-  ? T
-  : never;
-type ReadonlyStoreApi<T> = Pick<StoreApi<T>, "getState" | "subscribe">;
-type WithReact<S extends ReadonlyStoreApi<unknown>> = S & {
-  getServerState?: () => ExtractState<S>;
-};
-export type StoreType<T> = WithReact<StoreApi<T>>;
 
 // --- copied straight from Avivator's code::: with notes / changes for MDV ---
 import { RENDERING_MODES } from '@hms-dbmi/viv';
@@ -36,6 +23,7 @@ type BooleanKeys<T> = {
 type TogglesReturnType<T> = {
   [K in BooleanKeys<T> as `toggle${Capitalize<string & K>}`]: () => void;
 }
+type WithToggles<T> = T & TogglesReturnType<T>;
 type SetFunctionType<T> = (fn: (state: T) => T) => void;
 
 function generateToggles<T>(defaults: T, set: any | SetFunctionType<T>): TogglesReturnType<T> {
@@ -63,11 +51,11 @@ export type ChannelsState = {
 }
 
 export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
-  channelsVisible: [],
-  contrastLimits: [],
+  channelsVisible: [] as boolean[],
+  contrastLimits: [] as [number, number][],
   colors: [],
-  domains: [],
-  selections: [],
+  domains: [] as [number, number][],
+  selections: [] as { z: number, c: number, t: number }[],
   ids: [],
   // not for serialization... think about this.
   loader: [{ labels: [], shape: [] }],
@@ -98,7 +86,7 @@ const DEFAULT_IMAGE_STATE = {
 };
 type ImageState = typeof DEFAULT_IMAGE_STATE;
 const DEFAULT_VIEWER_STATE = {
-  isChannelLoading: [],
+  isChannelLoading: [] as boolean[],
   isViewerLoading: true,
   pixelValues: [],
   isOffsetsSnackbarOn: false,
@@ -117,7 +105,10 @@ const DEFAULT_VIEWER_STATE = {
   channelOptions: [],
   metadata: null,
   viewState: null,
-  source: '',
+  source: {
+    urlOrFile: '',
+    description: '',
+  },
   pyramidResolution: 0
 };
 
@@ -155,9 +146,9 @@ export type ROI = {
  * Within this context, we should be able to use much the same API as Avivator.
  */
 type VivContextType = {
-  channelsStore: StoreType<ChannelsState>,
-  imageSettingsStore: StoreType<ImageState>,
-  viewerStore: StoreType<typeof DEFAULT_VIEWER_STATE>
+  channelsStore: ZustandStore<WithToggles<ChannelsState>>,
+  imageSettingsStore: ZustandStore<WithToggles<ImageState>>,
+  viewerStore: ZustandStore<WithToggles<typeof DEFAULT_VIEWER_STATE>>
 }
 const VivContext = createContext<VivContextType>(null);
 /**
@@ -261,13 +252,18 @@ export const VivProvider = observer(({ children }: PropsWithChildren) => {
 });
 
 type StoreName = keyof VivContextType;
+type Selector<S, U> = (state: ExtractState<S>) => U;
+type ImageSettingsStore = VivContextType['imageSettingsStore'];
+type ViewerStore = VivContextType['viewerStore'];
+type ChannelsStore = VivContextType['channelsStore'];
+
 // I don't think it's possible to make things like useChannelsStore.setState() work...
 // so we have these extra functions...
-function useStoreApi(storeName: StoreName) {
+function useStoreApi<S extends StoreName>(storeName: S): VivContextType[S] {
   const store = useContext(VivContext);
   if (!store) throw 'Viv state hooks must be used within a VivProvider';
   return store[storeName];
-}
+}  
 export const useChannelsStoreApi = () => useStoreApi('channelsStore');
 export const useImageSettingsStoreApi = () => useStoreApi('imageSettingsStore');
 export const useViewerStoreApi = () => useStoreApi('viewerStore');
@@ -276,7 +272,7 @@ export const useViewerStoreApi = () => useStoreApi('viewerStore');
 /** should be more-or-less equivalent to equivalent avivator hook - 
  * but there can be multiple viv viewers, so we have context for that.
  */
-export const useChannelsStore = (selector) => {
+export function useChannelsStore<U> (selector: Selector<ChannelsStore, U>) {
   const store = useChannelsStoreApi();
   // apparently this is deprecated, even though it's still in the docs...
   // so, what was right with zustand v3 was changed in v4, and then changed again in v5?
@@ -284,13 +280,12 @@ export const useChannelsStore = (selector) => {
   // https://docs.pmnd.rs/zustand/previous-versions/zustand-v3-create-context#migration
   return useStore(store, selector);
 }
-
-export const useImageSettingsStore = (selector) => {
+export function useImageSettingsStore<U>(selector: Selector<ImageSettingsStore, U>) {
   const store = useImageSettingsStoreApi();
   return useStore(store, selector);
 }
 
-export const useViewerStore = function useViewerStore(selector?) {
+export function useViewerStore<U>(selector?: Selector<ViewerStore, U>) {
   const store = useViewerStoreApi();
   return useStore(store, selector);
 }
