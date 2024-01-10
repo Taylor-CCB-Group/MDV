@@ -7,6 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useViewerStore } from "./avivatorish/state";
 import { ScatterplotLayer } from "deck.gl/typed";
 import { useRegionScale } from "../scatter_state";
+import { useChart } from "../context";
+import RangeDimension from "../../datastore/RangeDimension";
+import { useChartID } from "../hooks";
+import { observer } from "mobx-react-lite";
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
@@ -31,25 +35,54 @@ const Tools = {
 
 type Tool = typeof Tools[keyof typeof Tools]['name'];
 const ToolArray = Object.values(Tools);
-
-function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: boolean, scatterplotLayer: ScatterplotLayer}) {
+type P = [number, number];
+type EditorProps = { toolActive: boolean, scatterplotLayer: ScatterplotLayer, rangeDimension: RangeDimension };
+function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} : EditorProps) {
     // how shall we represent coordinates?
     // - should be in Deck coordinates, we need to convert to/from screen coordinates
     // - we may still want to use screen coordinates locally, but there should be a store
     // with the Deck coordinates and also methods for actually doing the selection etc.
     // (may well be in a worker - or perhaps we can use the GPU for this)
-    const [start, setStart] = useState<[number, number]>([0,0]);
-    const [end, setEnd] = useState<[number, number]>([0,0]);
+    // - should be a RangeDimension, with the ability to use modelMatrix...
+    // - not sure how to make it aware of panelID (need to resolve how filtering works,
+    //   currently I think it's slower than it should be)
+    const cols = useChart().config.param;
+    // using both ref and state here so we can access the current value in the event handlers
+    // can probably simplify this...
+    const [start, setStartX] = useState<P>([0,0]);
+    const [end, setEndX] = useState<P>([0,0]);
+    const setStart = useCallback((p: P) => {
+        startRef.current = p;
+        setStartX(p);
+    }, []);
+    const setEnd = useCallback((p: P) => {
+        endRef.current = p;
+        setEndX(p);
+    }, []);
+    const startRef = useRef<P>([0,0]);
+    const endRef = useRef<P>([0,0]);
     const uiElement = useRef<HTMLDivElement>(null);
     const scale = useRegionScale();//todo: this is a hack... should have a better way of reasoning about transforms...
+    const updateRange = useCallback(() => {
+        if (!rangeDimension) return;
+        const s = startRef.current;
+        const t = endRef.current;
+        //need to convert from model coordinates to data coordinates...
+        //seems like this may already be done somewhere?
+        const range1 = [Math.min(s[0], t[0]), Math.max(s[0], t[0])]; //x range
+        const range2 = [Math.min(s[1], t[1]), Math.max(s[1], t[1])]; //y range
+        const args = { range1, range2 };
+        rangeDimension.filter('filterSquare', cols, args);
+        (window as any).r = rangeDimension;
+    }, [rangeDimension, cols, scale]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
-        if (!uiElement.current) return [0,0] as [number, number];
+        if (!uiElement.current) return [0,0] as P;
         const r = uiElement.current.getBoundingClientRect();
         const x = e.clientX - r.left;
         const y = e.clientY - r.top;
-        const p = scatterplotLayer.unproject([x, y]) as [number, number];
+        const p = scatterplotLayer.unproject([x, y]) as P;
         //need to fix this now that we're using modelMatrix rather than scaling coordinates...
-        return p.map(v => v*scale) as [number, number];
+        return p.map(v => v*scale) as P;
     }, [scatterplotLayer, uiElement, scale]);
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!toolActive) return;
@@ -60,6 +93,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
         handleMouseMove(e);
         window.removeEventListener('mouseup', handleMouseUp);
         window.removeEventListener('mousemove', handleMouseMove);
+        updateRange();
     }, [toolActive]);
     
     const viewState = useViewerStore((state) => state.viewState); // for reactivity - still a frame behind...
@@ -81,6 +115,8 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
     <div style={{
         // position: dragging ? 'fixed' : 'relative',
         position: 'relative',
+        //consider using a ref to this element & updating the style directly...
+        //to avoid needing to re-render the whole thing and keep both state and refs in sync...
         left: screenStart[0],
         top: screenStart[1],
         width: screenEnd[0] - screenStart[0],
@@ -111,7 +147,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer} : {toolActive: b
 }
 
 
-export default function SelectionOverlay({scatterplotLayer} : {scatterplotLayer: ScatterplotLayer}) {
+export default observer(function SelectionOverlay({scatterplotLayer} : {scatterplotLayer: ScatterplotLayer}) {
     //for now, passing down scatterplotLayer so we can use it to unproject screen coordinates, 
     //as we figure out how to knit this together...
     const [selectedTool, setSelectedTool] = useState<Tool>('Pan');
@@ -131,13 +167,28 @@ export default function SelectionOverlay({scatterplotLayer} : {scatterplotLayer:
             ><ToolIcon /></IconButton></Tooltip>
         });
     }, [selectedTool]);
+    const chart = useChart();
+    const ds = useMemo(() => chart.dataStore, [chart]);
+    const id = useChartID();
+    const [rangeDimension, setRangeDimension] = useState<RangeDimension>(undefined);
+    useEffect(() => {
+        if (!ds) return;
+        const rd = ds.getDimension('range_dimension');
+        setRangeDimension(rd);
+
+        return () => {
+            rd.destroy();
+        }
+    }, [ds]);
+
+
     // state: { selectedTool: 'rectangle' | 'circle' | 'polygon' | 'lasso' | 'magic wand' | 'none' }
     // interaction phases... maybe revert back to pan after making selection
     // - but there should be interaction with drag handles...
     // add or remove from selection...
     // -> transform into Deck coordinates...
     // later: selection layers...
-    const drawRect = scatterplotLayer && scatterplotLayer.internalState;
+    const drawRect = scatterplotLayer && scatterplotLayer.internalState; //<< I think this is causing unmounting issues...
     return (
         <>
         <ButtonGroup variant="contained" aria-label="choose tool for manipulating view or selection" style={{zIndex: 2, padding: '0.3em'}}>
@@ -164,8 +215,10 @@ export default function SelectionOverlay({scatterplotLayer} : {scatterplotLayer:
                 }
             }}
             >
-                {drawRect && <RectangleEditor toolActive={selectedTool==='Rectangle'} scatterplotLayer={scatterplotLayer}/>}
+                {drawRect && <RectangleEditor toolActive={selectedTool==='Rectangle'} scatterplotLayer={scatterplotLayer}
+                rangeDimension={rangeDimension}
+                />}
         </div>
         </>
     )
-}
+});
