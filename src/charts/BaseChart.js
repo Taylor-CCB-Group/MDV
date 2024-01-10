@@ -104,30 +104,21 @@ class BaseChart{
         //info icon
         this.legendIcon = this.addMenuIcon("fas fa-info",config.legend || "No description",{size:"medium"});
 
-        let isFullScreen = false;
         let oldSize = config.size;
         this.contentDiv.addEventListener("fullscreenchange", ()=>{
             //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
             if (document.fullscreenElement) {
-                isFullScreen = true;
                 if (this.contentDiv !== document.fullscreenElement) console.error('unexpected fullscreen element');
                 const rect = this.contentDiv.getBoundingClientRect();
                 this.setSize(rect.width, rect.height);
             } else {
-                isFullScreen = false;
                 this.setSize(...oldSize);
             }
         });
         this.addMenuIcon("fas fa-expand","fullscreen", {
             func: async ()=>{
-                if (isFullScreen) {
-                    /// xxx: this doesn't happen - we don't leave fullscreen by pressing the button
-                    // await document.exitFullscreen();
-                    return;
-                } else {
-                    oldSize = this.config.size;
-                    await this.contentDiv.requestFullscreen();
-                }
+                oldSize = this.config.size;
+                await this.contentDiv.requestFullscreen();
             }
         });
      
