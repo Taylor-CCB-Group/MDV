@@ -79,9 +79,9 @@ const DEFAULT_IMAGE_STATE = {
   panLock: true,
   isOverviewOn: false,
   useFixedAxis: true,
-  xSlice: null,
-  ySlice: null,
-  zSlice: null,
+  xSlice: null as [number, number] | null,
+  ySlice: null as [number, number] | null,
+  zSlice: null as [number, number] | null,
   onViewportLoad: () => { }
 };
 type ImageState = typeof DEFAULT_IMAGE_STATE;
