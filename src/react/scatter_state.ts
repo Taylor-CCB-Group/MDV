@@ -94,6 +94,7 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         if (!tooltipCol) return '';
         // careful now...
         const valueIndex = tooltipCol.data[data[i]];
+        if (!tooltipCol.values) return valueIndex;
         const value = tooltipCol.values[valueIndex];
         // return JSON.stringify({
         //     hoverIndex,
