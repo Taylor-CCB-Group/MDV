@@ -10,7 +10,7 @@ import { BaseDialog } from "../../utilities/Dialog";
 import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useViewerStoreApi, useVivLayerConfig } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useOmeTiff } from "../context"; 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import SelectionOverlay from "./SelectionOverlay";
 import type { ColumnName, DataColumn } from "../../charts/charts";
@@ -55,7 +55,7 @@ const DeckImpl = observer(() => {
 
     const layerConfig = useVivLayerConfig();
     const [viewState, setViewState] = useState<ReturnType<typeof getDefaultInitialViewState>>();
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!ome) return;
         if (!viewState) {
             //WIP
@@ -88,6 +88,7 @@ const DeckImpl = observer(() => {
         layers: [scatterplotLayer],
         id: id + 'deck',
     }
+    if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
     return (
         <>
             <SelectionOverlay scatterplotLayer={scatterplotLayer}/>
