@@ -146,9 +146,18 @@ export type ROI = {
  * Within this context, we should be able to use much the same API as Avivator.
  */
 type VivContextType = {
-  channelsStore: ZustandStore<WithToggles<ChannelsState>>,
+  channelsStore: ZustandStore<WithToggles<ChannelsState> & {
+    toggleIsOn: (index: number) => void,
+    setPropertiesForChannel: (channel: number, newProperties: Partial<typeof DEFAUlT_CHANNEL_VALUES>) => void,
+    removeChannel: (channel: number) => void,
+    addChannel: (newProperties: Partial<typeof DEFAUlT_CHANNEL_VALUES>) => void
+  }>,
   imageSettingsStore: ZustandStore<WithToggles<ImageState>>,
-  viewerStore: ZustandStore<WithToggles<typeof DEFAULT_VIEWER_STATE>>
+  viewerStore: ZustandStore<WithToggles<typeof DEFAULT_VIEWER_STATE> & {
+    setIsChannelLoading: (index: number, val: boolean) => void,
+    addIsChannelLoading: (val: boolean) => void,
+    removeIsChannelLoading: (index: number) => void
+  }> //also has some extra methods... setIsChannelLoading, addIsChannelLoading, removeIsChannelLoading
 }
 const VivContext = createContext<VivContextType>(null);
 /**
