@@ -7,13 +7,14 @@ import { BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useViewerStoreApi, useVivLayerConfig } from "./avivatorish/state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useChannelsStore, useViewerStore, useViewerStoreApi, useVivLayerConfig } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useOmeTiff } from "../context"; 
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import SelectionOverlay from "./SelectionOverlay";
 import type { ColumnName, DataColumn } from "../../charts/charts";
+import { useImage } from "./avivatorish/hooks";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -32,13 +33,21 @@ function ReactTest() {
 }
 
 const DeckImpl = observer(() => {
+    
     const imgUrl = useImgUrl();
     const viewerStore = useViewerStoreApi();
     useEffect(() => {
-        if (!imgUrl) return;
-        viewerStore.setState({ source: imgUrl });
-    }, [imgUrl, viewerStore]);
+        // if (!imgUrl) return;
+        const source = { urlOrFile: imgUrl, description: 'test' };
+        viewerStore.setState({source});
+    }, []);
     const ome = useOmeTiff();
+
+    // const source = useViewerStore(store => store.source);
+    // useImage(source, []); //<<< fairly main entry point for Avivator, WIP <<<
+    
+    
+    
     const config = useConfig<VivMdvReactConfig>();
     const [width, height] = useChartSize();
     const id = useChartID();
@@ -53,7 +62,16 @@ const DeckImpl = observer(() => {
 
     const [scatterplotLayer, getTooltip] = useScatterplotLayer();
 
-    const layerConfig = useVivLayerConfig();
+    // const [colors, contrastLimits, channelsVisible, selections] = useChannelsStore(
+    //     store => [
+    //         store.colors,
+    //         store.contrastLimits,
+    //         store.channelsVisible,
+    //         store.selections
+    //     ]
+    // ) as any;
+
+    
     const [viewState, setViewState] = useState<ReturnType<typeof getDefaultInitialViewState>>();
     useLayoutEffect(() => {
         if (!ome) return;
