@@ -279,13 +279,13 @@ BaseChart.types["ImageScatterChart"] = {
         //allows configEntriesUsingColumns to work without this being a param.
         config.image_key = i.key_column;
     },
-    extra_controls: (dataSource) => {
+    extra_controls: (dataStore) => {
         const imageSets = [];
-        for (let iname in dataSource.images) {
+        for (let iname in dataStore.images) {
             imageSets.push({ name: iname, value: iname })
         }
         console.log('imageSets', imageSets);
-        const sortableColumns = dataSource.getLoadedColumns().map(c => ({ name: c, value: c }));
+        const sortableColumns = dataStore.getLoadedColumns().map(c => ({ name: c, value: c }));
         const imageSizes = [32, 64, 128, 256, 512, 1024].map(s => ({ name: s, value: s }));
         return [
             //drop down of available image sets

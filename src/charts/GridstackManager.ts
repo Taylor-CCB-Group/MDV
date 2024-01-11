@@ -15,7 +15,7 @@ function clearPosition(div) {
 }
 
 declare global {
-    interface HTMLDivElement {
+    interface HTMLElement {
         gridstackNode?: any;
         gridstackPopoutCallback?: () => void;
     }

@@ -10,7 +10,7 @@ export type ChartType<T extends BaseChart> = {
     
     required?: string[] | ((ds: DataSource) => unknown); //TODO: better typing here (& there & everywhere)
     init?: (config: any, dataSource: any, extraControls: any) => void;
-    extra_controls?: (dataSource: DataSource) => GuiSpec<any>[];
+    extra_controls?: (dataStore: DataStore) => GuiSpec<any>[];
     params?: { type: string | string[], name: string }[];
     configEntriesUsingColumns?: string[];
     methodsUsingColumns?: string[]; // (keyof T)[]; //would like better typing here
