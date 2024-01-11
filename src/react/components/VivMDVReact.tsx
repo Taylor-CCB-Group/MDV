@@ -1,21 +1,14 @@
 import BaseChart from "../../charts/BaseChart";
-import DeckGL from "deck.gl/typed";
-import { ColorPaletteExtension, DetailView, getDefaultInitialViewState, ScaleBarLayer, VivViewer } from "@hms-dbmi/viv";
-import { useChannelStats, useChartID, useChartSize, useConfig, useImgUrl } from "../hooks";
-import { useScatterplotLayer } from "../scatter_state";
 import { BaseReactChart } from "./BaseReactChart";
-import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, OME_TIFF, ROI, VivConfig, VivProvider, useChannelsState, useChannelsStore, useLoader, useViewerStore, useViewerStoreApi, useVivLayerConfig } from "./avivatorish/state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
-import { OmeTiffProvider, useOmeTiff } from "../context"; 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
-import SelectionOverlay from "./SelectionOverlay";
+import { useEffect } from "react";
 import type { ColumnName, DataColumn } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
-import { shallow } from "zustand/shallow";
+import { VivScatter } from "./VivScatterComponent";
+import { useImgUrl } from "../hooks";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -34,82 +27,7 @@ function ReactTest() {
     )
 }
 
-/** somewhat comparable to avivator `<Viewer />` */
-const DeckImpl = observer(() => {    
-    // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
-    const ome = useLoader() as OME_TIFF['data'];// useOmeTiff();
-    
-    const viewerStore = useViewerStoreApi();
-    
-    const config = useConfig<VivMdvReactConfig>();
-    const [width, height] = useChartSize();
-    const id = useChartID();
-    const detailId = id + 'detail-react';
 
-    const channelX = config.channel; //don't do this... use the proper image_properties
-    // and make it populate the channel state if necessary.
-
-    const [scatterplotLayer, getTooltip] = useScatterplotLayer();
-
-    const [colors, contrastLimits, channelsVisible, selections] = useChannelsStore(
-        store => [
-            store.colors,
-            store.contrastLimits,
-            store.channelsVisible,
-            store.selections
-        ],
-        shallow
-    );
-    
-    const [viewState, setViewState] = useState<ReturnType<typeof getDefaultInitialViewState>>();
-    useLayoutEffect(() => {
-        if (!ome) return;
-        if (!viewState) {
-            //WIP
-            setViewState(getDefaultInitialViewState(ome, { width, height }));
-        }
-    }, [ome]);
-    const extensions = useMemo(() => [new ColorPaletteExtension()], []);
-    const detailView = useMemo(() => new DetailView({
-        id: detailId,
-        snapScaleBar: true,
-        width, height
-    }), [id, width, height]);
-    // TODO get viv working in popouts (not a react thing - happens elsewhere
-    // - probably need to handle lost gl context)
-    const layerConfigX = {
-        loader: ome,
-        selections,
-        contrastLimits,
-        extensions,
-        colors,
-        channelsVisible,
-    }
-    const deckProps = {
-        getTooltip,
-        style: {
-            zIndex: '-1',
-        },
-        layers: [scatterplotLayer],
-        id: id + 'deck',
-    }
-    if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
-    return (
-        <>
-            <SelectionOverlay scatterplotLayer={scatterplotLayer}/>
-            <VivViewer 
-            views={[detailView]}
-            layerProps={[layerConfigX]}
-            viewStates={[{...viewState, id: detailId}]}
-            onViewStateChange={e => {
-                viewerStore.setState({ viewState: {...e.viewState, id: detailId } });
-            }}
-            
-            deckProps={deckProps} 
-            />
-        </>
-    );
-});
 
 /** comparable to main `<Avivator />` component */
 const MainChart = () => {
@@ -132,7 +50,7 @@ const MainChart = () => {
 
     const source = useViewerStore(store => store.source);
     useImage(source);
-    return (!isViewerLoading && <DeckImpl />);
+    return (!isViewerLoading && <VivScatter />);
 };
 
 
