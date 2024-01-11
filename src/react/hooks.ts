@@ -113,6 +113,8 @@ export function useOmeTiffLoader() {
 }
 
 /**
+ * @deprecated in favour of avivatorish hooks for now.
+ * 
  * Get channel statistics for a given channel of an OME tiff.
  * @param ome 
  * @param channel - channel index. In future we should support selections with z/c/t.

@@ -1,9 +1,10 @@
 import { PickingInfo, ScatterplotLayer } from "deck.gl/typed";
 import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
-import { useChart, useDataStore, useOmeTiff } from "./context";
+import { useChart, useDataStore } from "./context";
 import { useChartID, useConfig, useParamColumns } from "./hooks";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
+import { useMetadata } from "./components/avivatorish/state";
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -57,7 +58,8 @@ export function useFilteredIndices() {
  * In future we may want to return a matrix, and allow the user to manipulate it.
  */
 export function useRegionScale() {
-    const ome = useOmeTiff(); //this hook should be valid when we don't have an ome tiff as well
+    // const ome = useOmeTiff(); //this hook should be valid when we don't have an ome tiff as well
+    const metadata = useMetadata();
     const chart = useChart();
     const regionScale = chart.dataStore.regions.scale;
     //see also getPhysicalScalingMatrix
@@ -68,7 +70,8 @@ export function useRegionScale() {
     //Indeed, any type of numerical column should probably have metadata about its scale, 
     //as well as information like comments what it represents.
     //and given the other issues it could be inconsistent anyway?
-    const scale = ome.metadata.Pixels.PhysicalSizeX / regionScale;
+    if (!metadata) return 1;
+    const scale = metadata.Pixels.PhysicalSizeX / regionScale;
     return scale;
 }
 type Tooltip = (PickingInfo) => string;

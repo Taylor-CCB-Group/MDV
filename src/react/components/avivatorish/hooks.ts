@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 // import { useDropzone as useReactDropzone } from 'react-dropzone';
-// import { shallow } from 'zustand/shallow';
+import { shallow } from 'zustand/shallow';
 // eslint-disable-next-line camelcase
 import { unstable_batchedUpdates } from 'react-dom';
 
@@ -23,14 +23,14 @@ import {
 } from './utils';
 import { COLOR_PALLETE, FILL_PIXEL_VALUE } from './constants';
 
-export const useImage = (source, history) => {
+export const useImage = (source: {description: string, urlOrFile: string}, history?: any) => {
     const [use3d, toggleUse3d, toggleIsOffsetsSnackbarOn] = useViewerStore(
         store => [store.use3d, store.toggleUse3d, store.toggleIsOffsetsSnackbarOn],
-        // shallow
+        shallow
     );
     const [lensEnabled, toggleLensEnabled] = useImageSettingsStore(
         store => [store.lensEnabled, store.toggleLensEnabled],
-        // shallow
+        shallow
     );
     const loader = useLoader();
     const metadata = useMetadata();

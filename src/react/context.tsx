@@ -26,6 +26,7 @@ export function ChartProvider({ chart, children }: { chart: BaseReactChart<any>,
 }
 
 
+/** @deprecated */
 export function OmeTiffProvider({ children }) {
     //OmeTiffContext.Provider is not always going to be there for all charts... and we might want to
     //have charts that use multiple OME_TIFFs, different formats, etc.
@@ -48,7 +49,7 @@ export function useDataStore() {
     if (!dataStore) throw new Error('no data store context');
     return dataStore;
 }
-
+/** @deprecated */
 export function useOmeTiff() {
     const ome = useContext(OmeTiffContext);
     return ome;

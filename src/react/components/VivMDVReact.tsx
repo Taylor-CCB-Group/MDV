@@ -7,7 +7,7 @@ import { BaseReactChart } from "./BaseReactChart";
 import { observer } from "mobx-react-lite";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useChannelsState, useChannelsStore, useViewerStore, useViewerStoreApi, useVivLayerConfig } from "./avivatorish/state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, OME_TIFF, ROI, VivConfig, VivProvider, useChannelsState, useChannelsStore, useLoader, useViewerStore, useViewerStoreApi, useVivLayerConfig } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { OmeTiffProvider, useOmeTiff } from "../context"; 
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
@@ -15,6 +15,7 @@ import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import SelectionOverlay from "./SelectionOverlay";
 import type { ColumnName, DataColumn } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
+import { shallow } from "zustand/shallow";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -23,30 +24,22 @@ function ReactTest() {
     // so VivProvider should have whatever is necessary to adapt our config to that
     // and we'd useLoader() as opposed to useOmeTiff()
     // ... and hopefully our version of Avivator hooks will have better types ...
+    console.log('ReactTest rendering...');
     return (
-    <OmeTiffProvider>
+    // <OmeTiffProvider>
         <VivProvider>
             <MainChart />
         </VivProvider>
-    </OmeTiffProvider>
+    // </OmeTiffProvider>
     )
 }
 
-const DeckImpl = observer(() => {
+/** somewhat comparable to avivator `<Viewer />` */
+const DeckImpl = observer(() => {    
+    // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
+    const ome = useLoader() as OME_TIFF['data'];// useOmeTiff();
     
-    const imgUrl = useImgUrl();
     const viewerStore = useViewerStoreApi();
-    useEffect(() => {
-        // if (!imgUrl) return;
-        const source = { urlOrFile: imgUrl, description: 'test' };
-        viewerStore.setState({source});
-    }, []);
-    const ome = useOmeTiff();
-
-    // const source = useViewerStore(store => store.source);
-    // useImage(source, []); //<<< fairly main entry point for Avivator, WIP <<<
-    
-    
     
     const config = useConfig<VivMdvReactConfig>();
     const [width, height] = useChartSize();
@@ -55,29 +48,25 @@ const DeckImpl = observer(() => {
 
     const channelX = config.channel; //don't do this... use the proper image_properties
     // and make it populate the channel state if necessary.
-    const stats = useChannelStats(ome, channelX);
-    const channelsState = useChannelsState();
-    const userSet = channelsState.contrastLimits && channelsState.contrastLimits.length > 0; //hack, for now.
-    const contrastLimits = userSet ? channelsState.contrastLimits : [stats ? stats.contrastLimits : [0, 1]];
 
     const [scatterplotLayer, getTooltip] = useScatterplotLayer();
 
-    // const [colors, contrastLimits, channelsVisible, selections] = useChannelsStore(
-    //     store => [
-    //         store.colors,
-    //         store.contrastLimits,
-    //         store.channelsVisible,
-    //         store.selections
-    //     ]
-    // ) as any;
-
+    const [colors, contrastLimits, channelsVisible, selections] = useChannelsStore(
+        store => [
+            store.colors,
+            store.contrastLimits,
+            store.channelsVisible,
+            store.selections
+        ],
+        shallow
+    );
     
     const [viewState, setViewState] = useState<ReturnType<typeof getDefaultInitialViewState>>();
     useLayoutEffect(() => {
         if (!ome) return;
         if (!viewState) {
             //WIP
-            setViewState(getDefaultInitialViewState(ome.data, { width, height }));
+            setViewState(getDefaultInitialViewState(ome, { width, height }));
         }
     }, [ome]);
     const extensions = useMemo(() => [new ColorPaletteExtension()], []);
@@ -89,15 +78,13 @@ const DeckImpl = observer(() => {
     // TODO get viv working in popouts (not a react thing - happens elsewhere
     // - probably need to handle lost gl context)
     const layerConfigX = {
-        loader: ome.data,
-        selections: [{ z: 0, c: channelX, t: 0 }],
+        loader: ome,
+        selections,
         contrastLimits,
         extensions,
-        colors: [[80, 255, 255]],
-        channelsVisible: [true],
+        colors,
+        channelsVisible,
     }
-    // pending proper channel state handling... show that we can set contrast limits.
-    if (userSet) layerConfigX.contrastLimits = contrastLimits;
     const deckProps = {
         getTooltip,
         style: {
@@ -124,11 +111,32 @@ const DeckImpl = observer(() => {
     );
 });
 
+/** comparable to main `<Avivator />` component */
 const MainChart = () => {
-    const ome = useOmeTiff();
-    if (!ome) return <div>Loading...</div>; // todo suspense.
-    return <DeckImpl />;
+    // const ome = useOmeTiff();
+    // if (!ome) return <div>Loading...</div>; // todo suspense.
+
+    // this is re-rendering a lot more than I think it should...
+    // and somehow useImage(source, []) is ending up with a null source even after the effect runs?
+    // the inner async changeSource() in useImage() is interacting badly with whatever is causing the re-render...
+
+    const imgUrl = useImgUrl();
+    const isViewerLoading = useViewerStore(store => store.isViewerLoading);
+    const viewerStore = useViewerStoreApi();
+
+    useEffect(() => {
+        if (!imgUrl) throw 'no image url';
+        const source = { urlOrFile: imgUrl, description: 'test' };
+        viewerStore.setState({ source });
+    }, [imgUrl]);
+
+    const source = useViewerStore(store => store.source);
+    useImage(source);
+    return (!isViewerLoading && <DeckImpl />);
 };
+
+
+
 export type TooltipConfig = {
     tooltip: {
         show: boolean,

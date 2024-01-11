@@ -2,7 +2,8 @@ import { PropsWithChildren, createContext, useContext, useMemo, useRef } from "r
 import { useConfig } from "../../hooks";
 import { ColorPaletteExtension, loadOmeTiff } from "@hms-dbmi/viv";
 import { useOmeTiff } from "../../context";
-import { createStore, useStore } from "zustand";
+import { createStore } from "zustand";
+import { useStoreWithEqualityFn } from "zustand/traditional";
 import { observer } from "mobx-react-lite";
 import { VivMdvReactConfig } from "../VivMDVReact";
 import type { ExtractState, ZustandStore } from "./zustandTypes";
@@ -105,10 +106,7 @@ const DEFAULT_VIEWER_STATE = {
   channelOptions: [],
   metadata: null,
   viewState: null,
-  source: {
-    urlOrFile: '',
-    description: '',
-  },
+  source: null as { urlOrFile: string, description: string } | null,
   pyramidResolution: 0
 };
 
@@ -277,26 +275,23 @@ export const useChannelsStoreApi = () => useStoreApi('channelsStore');
 export const useImageSettingsStoreApi = () => useStoreApi('imageSettingsStore');
 export const useViewerStoreApi = () => useStoreApi('viewerStore');
 
+type EqFn<U> = (a: U, b: U) => boolean;
 
 /** should be more-or-less equivalent to equivalent avivator hook - 
  * but there can be multiple viv viewers, so we have context for that.
  */
-export function useChannelsStore<U> (selector: Selector<ChannelsStore, U>) {
+export function useChannelsStore<U> (selector: Selector<ChannelsStore, U>, equalityFn?: EqFn<U>) {
   const store = useChannelsStoreApi();
-  // apparently this is deprecated, even though it's still in the docs...
-  // so, what was right with zustand v3 was changed in v4, and then changed again in v5?
-  // smells like tedious maintenance to me - questioning the wisdom of using zustand in that case.
-  // https://docs.pmnd.rs/zustand/previous-versions/zustand-v3-create-context#migration
-  return useStore(store, selector);
+  return useStoreWithEqualityFn(store, selector, equalityFn);
 }
-export function useImageSettingsStore<U>(selector: Selector<ImageSettingsStore, U>) {
+export function useImageSettingsStore<U>(selector: Selector<ImageSettingsStore, U>, equalityFn?: EqFn<U>) {
   const store = useImageSettingsStoreApi();
-  return useStore(store, selector);
+  return useStoreWithEqualityFn(store, selector, equalityFn);
 }
 
-export function useViewerStore<U>(selector?: Selector<ViewerStore, U>) {
+export function useViewerStore<U>(selector?: Selector<ViewerStore, U>, equalityFn?: EqFn<U>) {
   const store = useViewerStoreApi();
-  return useStore(store, selector);
+  return useStoreWithEqualityFn(store, selector, equalityFn);
 }
 
 export const useLoader = () => {
@@ -316,14 +311,14 @@ export const useMetadata = () => {
 
 ///---------
 
-/** xxx: this one maybe shouldn't exist */
+/** @deprecated this one maybe shouldn't exist */
 export function useChannelsState() {
   const config = useConfig<any>();
   //todo something useful... some values...
   return (config.image_properties || config.viv.image_properties) as ChannelsState;
 }
 
-/** xxx: this one maybe shouldn't exist */
+/** @deprecated this one maybe shouldn't exist */
 export function useVivLayerConfig() {
   const imageProps = useChannelsState();
   const extensions = useMemo(() => [new ColorPaletteExtension()], []);
