@@ -46,7 +46,8 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
     // - should be a RangeDimension, with the ability to use modelMatrix...
     // - not sure how to make it aware of panelID (need to resolve how filtering works,
     //   currently I think it's slower than it should be)
-    const cols = useChart().config.param;
+    const chart = useChart();
+    const cols = chart.config.param;
     // using both ref and state here so we can access the current value in the event handlers
     // can probably simplify this...
     const [start, setStartX] = useState<P>([0,0]);
@@ -73,6 +74,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         const range2 = [Math.min(s[1], t[1]), Math.max(s[1], t[1])]; //y range
         const args = { range1, range2 };
         rangeDimension.filter('filterSquare', cols, args);
+        chart.resetButton.style.display = 'inline';
         (window as any).r = rangeDimension;
     }, [rangeDimension, cols, scale]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
@@ -174,9 +176,13 @@ export default observer(function SelectionOverlay({scatterplotLayer} : {scatterp
     useEffect(() => {
         if (!ds) return;
         const rd = ds.getDimension('range_dimension');
+        chart.removeFilter = () => {
+            rd.removeFilter();
+        }
         setRangeDimension(rd);
 
         return () => {
+            chart.removeFilter = () => {};
             rd.destroy();
         }
     }, [ds]);
