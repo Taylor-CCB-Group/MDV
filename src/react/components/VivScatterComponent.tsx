@@ -17,7 +17,8 @@ export const VivScatter = observer(() => {
     const id = useChartID();
     const detailId = id + 'detail-react';
 
-    const [scatterplotLayer, getTooltip] = useScatterplotLayer();
+    const scatterProps = useScatterplotLayer();
+    const {scatterplotLayer, getTooltip} = scatterProps;
 
     const [colors, contrastLimits, channelsVisible, selections] = useChannelsStore(
         store => [
@@ -60,11 +61,12 @@ export const VivScatter = observer(() => {
         },
         layers: [scatterplotLayer],
         id: id + 'deck',
+        // _animate: true,
     }
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
     return (
         <>
-            <SelectionOverlay scatterplotLayer={scatterplotLayer} />
+            <SelectionOverlay {...scatterProps} />
             <VivViewer
                 views={[detailView]}
                 layerProps={[layerConfigX]}

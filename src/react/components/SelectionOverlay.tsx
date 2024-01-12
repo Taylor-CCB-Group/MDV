@@ -6,11 +6,9 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import ControlCameraOutlinedIcon from '@mui/icons-material/ControlCameraOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useViewerStore } from "./avivatorish/state";
-import { ScatterplotLayer } from "deck.gl/typed";
-import { useRegionScale } from "../scatter_state";
+import { useRegionScale, useScatterplotLayer } from "../scatter_state";
 import { useChart } from "../context";
 import RangeDimension from "../../datastore/RangeDimension";
-import { useChartID } from "../hooks";
 import { observer } from "mobx-react-lite";
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
@@ -33,7 +31,7 @@ const Tools = {
         ToolIcon: EditOutlinedIcon
     },
     'transform': {
-        name: 'Transform Scatterplot',
+        name: 'Transform',
         ToolIcon: ControlCameraOutlinedIcon
     },
 } as const;
@@ -41,7 +39,7 @@ const Tools = {
 type Tool = typeof Tools[keyof typeof Tools]['name'];
 const ToolArray = Object.values(Tools);
 type P = [number, number];
-type EditorProps = { toolActive: boolean, scatterplotLayer: ScatterplotLayer, rangeDimension: RangeDimension };
+type EditorProps = { toolActive?: boolean, rangeDimension: RangeDimension } & ReturnType<typeof useScatterplotLayer>;
 function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} : EditorProps) {
     const chart = useChart();
     const cols = chart.config.param;
@@ -59,7 +57,8 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
     }, []);
     const startRef = useRef<P>([0,0]);
     const endRef = useRef<P>([0,0]);
-    const scale = useRegionScale();//todo: this is a hack... should have a better way of reasoning about transforms...
+    
+    
     const updateRange = useCallback(() => {
         if (!rangeDimension) return;
         const s = startRef.current;
@@ -72,8 +71,10 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         rangeDimension.filter('filterSquare', cols, args);
         chart.resetButton.style.display = 'inline';
         (window as any).r = rangeDimension;
-    }, [rangeDimension, cols, scale]);
+    }, [rangeDimension, cols]);
+    
     //should this be a property of the scatterplotLayer?
+    const scale = useRegionScale();//todo: this is a hack... should have a better way of reasoning about transforms...
     const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
         const r = chart.contentDiv.getBoundingClientRect();
         const x = e.clientX - r.left;
@@ -143,8 +144,56 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
     </>);
 }
 
+function TransformEditor({scatterplotLayer, modelMatrix} : EditorProps) {
+    const pLastRef = useRef([NaN, NaN]);
+    const chart = useChart();
+    const scale = useRegionScale();
+    const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
+        const r = chart.contentDiv.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        const y = e.clientY - r.top;
+        const p = scatterplotLayer.unproject([x, y]) as P;
+        //need to fix this now that we're using modelMatrix rather than scaling coordinates...
+        return p.map(v => v*scale) as P;
+    }, [scatterplotLayer, chart.contentDiv, scale]);
 
-export default observer(function SelectionOverlay({scatterplotLayer} : {scatterplotLayer: ScatterplotLayer}) {
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        const p = unproject(e);
+        const pLast = pLastRef.current;
+        const dx = p[0] - pLast[0];
+        const dy = p[1] - pLast[1];
+        pLastRef.current = p;
+        //todo: after mutating this, we mess up RangeDimension's relationship to the modelMatrix...
+        //need a different transform hierarchy?
+        modelMatrix.translate([dx, dy, 0]);
+        scatterplotLayer.setNeedsRedraw();
+    }, []);
+    const handleMouseUp = useCallback((e: MouseEvent) => {
+        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+
+    return (
+        <>
+        <div style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            top: 0,
+            left: 0,
+        }}
+        onMouseDown={(e) => {
+            const p = unproject(e);
+            pLastRef.current = p;
+            window.addEventListener('mouseup', handleMouseUp);
+            window.addEventListener('mousemove', handleMouseMove);
+        }}
+        />
+        </>
+    )
+}
+
+export default observer(function SelectionOverlay(scatterProps : ReturnType<typeof useScatterplotLayer>) {
     //for now, passing down scatterplotLayer so we can use it to unproject screen coordinates, 
     //as we figure out how to knit this together...
     const [selectedTool, setSelectedTool] = useState<Tool>('Pan');
@@ -166,7 +215,6 @@ export default observer(function SelectionOverlay({scatterplotLayer} : {scatterp
     }, [selectedTool]);
     const chart = useChart();
     const ds = useMemo(() => chart.dataStore, [chart]);
-    const id = useChartID();
     const [rangeDimension, setRangeDimension] = useState<RangeDimension>(undefined);
     useEffect(() => {
         if (!ds) return;
@@ -181,14 +229,13 @@ export default observer(function SelectionOverlay({scatterplotLayer} : {scatterp
             rd.destroy();
         }
     }, [ds]);
-
-
     // state: { selectedTool: 'rectangle' | 'circle' | 'polygon' | 'lasso' | 'magic wand' | 'none' }
     // interaction phases... maybe revert back to pan after making selection
     // - but there should be interaction with drag handles...
     // add or remove from selection...
     // -> transform into Deck coordinates...
     // later: selection layers...
+    const { scatterplotLayer } = scatterProps;
     const drawRect = scatterplotLayer && scatterplotLayer.internalState; //<< I think this is causing unmounting issues...
     return (
         <>
@@ -216,9 +263,10 @@ export default observer(function SelectionOverlay({scatterplotLayer} : {scatterp
                 }
             }}
             >
-                {drawRect && <RectangleEditor toolActive={selectedTool==='Rectangle'} scatterplotLayer={scatterplotLayer}
+                {drawRect && <RectangleEditor toolActive={selectedTool==='Rectangle'} {...scatterProps}
                 rangeDimension={rangeDimension}
                 />}
+                {drawRect && selectedTool === 'Transform'  && <TransformEditor {...scatterProps} rangeDimension={rangeDimension}/>}
         </div>
         </>
     )

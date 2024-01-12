@@ -1,3 +1,4 @@
+import { Matrix4 } from '@math.gl/core';
 import { PickingInfo, ScatterplotLayer } from "deck.gl/typed";
 import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
 import { useChart, useDataStore } from "./context";
@@ -63,20 +64,24 @@ export function useRegionScale() {
     return scale;
 }
 
+/** for this to be more useful as a hook will depend on state/context... */
 export function useScatterModelMatrix() {
     const scale = useRegionScale();
     const s = 1/scale;
-    const modelMatrix = useMemo(() => [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, s], [s]);
-    return modelMatrix;
+    const [modelMatrix, setModelMatrix] = useState(new Matrix4().scale(s));
+    // useEffect(() => {
+    //     const m = new Matrix4().scale(s);
+    //     setModelMatrix(m);
+    // }, [scale]);
+    return {modelMatrix, setModelMatrix};
 }
 
 type Tooltip = (PickingInfo) => string;
-export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
+export function useScatterplotLayer() {
     const id = useChartID();
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
     const config = useConfig<ScatterPlotConfig>();
-    const scale = useRegionScale();
 
     // seem to be reacting fine to changes, why did I think I needed to use extra autorun or reaction?
     const { opacity, radius } = config;
@@ -104,12 +109,12 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         },
     [hoverInfoRef, getTooltipVal]);
 
-    const modelMatrix = useScatterModelMatrix();
+    const {modelMatrix, setModelMatrix} = useScatterModelMatrix();
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
         opacity,
-        radiusScale: radius / scale,
+        radiusScale: radius,
         getFillColor: colorBy ?? [0, 200, 200],
         getRadius: 1,
         getPosition: (i, { target }) => {
@@ -121,11 +126,12 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         modelMatrix,
         updateTriggers: {
             getFillColor: colorBy,
+            modelMatrix: modelMatrix
         },
         pickable: true,
         onHover: (info) => {
             hoverInfoRef.current = info;
         }        
     }), [id, data, opacity, radius, colorBy, cx, cy]);
-    return [scatterplotLayer, getTooltip];
+    return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix};
 }

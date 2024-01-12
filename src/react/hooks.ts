@@ -41,7 +41,7 @@ export function useChartSize() {
  * 
  * Must be used within a ChartContext.
  */
-export function useChartID() {
+export function useChartID(): string {
     const chart = useChart();
     if (!chart.config.id) {
         // we were hitting this because of the way BaseReactChart was still using original config
