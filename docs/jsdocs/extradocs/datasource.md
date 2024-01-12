@@ -625,41 +625,87 @@ setupLinks(dataStore, index, getDataFunction) {
 
 ### sync_column_colors
 
-To link column colors , specify the column from the linked DataStore you wish the colors to match (link_to) and the column you want to match  (col) . You can link one column to many
+To link column colors, specify the column from the linked DataStore you wish the colors to match (`link_to`) and the column you want to match (`col`). You can link one column to many
 
-example
+#### example
 
 ```json
 {
-    "name":"cell interactions",
-    "links":{
-        "cells":{
-            "sync_column_colors":[
+    "name": "cell interactions",
+    "links": {
+        "cells": {
+            "sync_column_colors": [
                 {
-                    "link_to":"annotations",
-                    "col":"Cell Type 1"
-
+                    "link_to": "annotations",
+                    "col": "Cell Type 1"
                 },
                 {
-                    "link_to":"annotations",
-                    "col":"Cell Type 2"
+                    "link_to": "annotations",
+                    "col": "Cell Type 2"
                 }
             ]
         }
     }
 }
 ```
-In the above a value in the Cell Type 1 or Cell Type 2 columns in the cell interactions datasource will be the same color as it is in the cells annotation column
+In the above a value in the `Cell Type 1` or `Cell Type 2` columns in the `cell interactions` datasource will be the same color as it is in the `cells` `"annotation"` column
+
+### valueset
+
+This allows a column to be filtered in a target datasource based on the **set of unique values** from the current selection in the source datasource.
+
+#### example
+
+Users can use this to explore how lower-level `cells` data contributes to the `statistics` by making selections on `statistics` charts.
+
+Consider a scenario where the `cells` data source is clustered into regions (identified by a `cell_regionID` column), and there's a `statistics` data source representing region-based statistics. The link's source (`"source_column"`) is the `statistics` data source's `regionID` column, and the target (`"dest_column"`) is the `cells` data source's `cell_regionID` column.
+
+When a new filter (selection) is applied on a `statistics` scatterplot, a `valueset` parameter containing a `Set` of unique `regionID` values from the `statistics` data source is passed to the `cells` data source. This results in corresponding filtering on any charts displayed in `cells`.
+
+To add this functionality to an `MDVProject` `'p'` in Python, the following code:
+
+```python
+valueset_args = {
+    'source_column': "regionID",
+    'dest_column': "cell_regionID",
+}
+p.insert_link('statistics', 'cells', 'valueset', valueset_args)
+```
+
+Will add this config in the `statistics` datasource:
+
+```json
+{
+    "name": "statistics",
+    "links": {
+        "cells": {
+            "valueset": {
+                "source_column": "regionID",
+                "dest_column": "cell_regionID"
+            }
+        }
+    }
+}
+```
 
 ## Listeners
 
-Listeners can be added/removed from the DataStore with the `addListener` and `removeListener` methods. The callback passed to the addListener will be invoked with the type of event and any data relevant to the event.
+Listeners can be added/removed from the DataStore with the `addListener` and `removeListener` methods. The callback passed to the addListener will be invoked with the type of event and any data relevant to the event. Note that the first argument is not an event type, but an ID for the listener. Invoking `addListener` with the same ID will replace the existing listener and care must be taken such that the ID precisely differentiates the subject.
+
+```js
+    const listenerId = ds.addListener(`${chartId} data change listener`, (type, data) => {
+        if (type === "data_changed") {
+            console.log("data changed in columns: ", data.columns);
+        }
+    });
+    ds.removeListener(listenerId);
+```
 
 * data_changed
     *  columns - a list of column fields where the data had changed
     *  hasFiltered - true if the changing the data has caused the refiltering of the DataStore 
 
-* filtered - The DataStore has been filtered, no data is passed to the listener unless all filters have been removed, in which case 'all_removed' is passed.
+* filtered - The DataStore has been filtered, no data is passed to the listener unless all filters have been removed, in which case 'all_removed' is passed. << that's a lie.
 
 * column_removed - called when a column is removed passing the column's field (id)
 
