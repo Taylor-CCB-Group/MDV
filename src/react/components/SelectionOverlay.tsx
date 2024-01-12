@@ -3,6 +3,7 @@ import PanToolOutlinedIcon from '@mui/icons-material/PanToolOutlined';
 import PhotoSizeSelectSmallOutlinedIcon from '@mui/icons-material/PhotoSizeSelectSmallOutlined';
 import PolylineOutlinedIcon from '@mui/icons-material/PolylineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import ControlCameraOutlinedIcon from '@mui/icons-material/ControlCameraOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useViewerStore } from "./avivatorish/state";
 import { ScatterplotLayer } from "deck.gl/typed";
@@ -31,6 +32,10 @@ const Tools = {
         name: 'Freehand',
         ToolIcon: EditOutlinedIcon
     },
+    'transform': {
+        name: 'Transform Scatterplot',
+        ToolIcon: ControlCameraOutlinedIcon
+    },
 } as const;
 
 type Tool = typeof Tools[keyof typeof Tools]['name'];
@@ -38,14 +43,6 @@ const ToolArray = Object.values(Tools);
 type P = [number, number];
 type EditorProps = { toolActive: boolean, scatterplotLayer: ScatterplotLayer, rangeDimension: RangeDimension };
 function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} : EditorProps) {
-    // how shall we represent coordinates?
-    // - should be in Deck coordinates, we need to convert to/from screen coordinates
-    // - we may still want to use screen coordinates locally, but there should be a store
-    // with the Deck coordinates and also methods for actually doing the selection etc.
-    // (may well be in a worker - or perhaps we can use the GPU for this)
-    // - should be a RangeDimension, with the ability to use modelMatrix...
-    // - not sure how to make it aware of panelID (need to resolve how filtering works,
-    //   currently I think it's slower than it should be)
     const chart = useChart();
     const cols = chart.config.param;
     // using both ref and state here so we can access the current value in the event handlers
@@ -62,7 +59,6 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
     }, []);
     const startRef = useRef<P>([0,0]);
     const endRef = useRef<P>([0,0]);
-    const uiElement = useRef<HTMLDivElement>(null);
     const scale = useRegionScale();//todo: this is a hack... should have a better way of reasoning about transforms...
     const updateRange = useCallback(() => {
         if (!rangeDimension) return;
@@ -77,15 +73,15 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         chart.resetButton.style.display = 'inline';
         (window as any).r = rangeDimension;
     }, [rangeDimension, cols, scale]);
+    //should this be a property of the scatterplotLayer?
     const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
-        if (!uiElement.current) return [0,0] as P;
-        const r = uiElement.current.getBoundingClientRect();
+        const r = chart.contentDiv.getBoundingClientRect();
         const x = e.clientX - r.left;
         const y = e.clientY - r.top;
         const p = scatterplotLayer.unproject([x, y]) as P;
         //need to fix this now that we're using modelMatrix rather than scaling coordinates...
         return p.map(v => v*scale) as P;
-    }, [scatterplotLayer, uiElement, scale]);
+    }, [scatterplotLayer, chart.contentDiv, scale]);
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!toolActive) return;
         const p = unproject(e);
@@ -134,7 +130,6 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         top: 0,
         left: 0,
     }} 
-    ref={uiElement}
     onMouseDown={(e) => {
         if (!toolActive) return;
         const p = unproject(e);

@@ -51,29 +51,25 @@ export function useFilteredIndices() {
     return filteredIndices;
 }
 
-
-/** this should be able to deal with understanding in a given context, how to scale each axis...
- * right now, hacking together something that works for adenoma/carcinoma data.
- * We should be more careful about checking that the various scale units are consistent etc.
- * In future we may want to return a matrix, and allow the user to manipulate it.
- */
 export function useRegionScale() {
-    // const ome = useOmeTiff(); //this hook should be valid when we don't have an ome tiff as well
     const metadata = useMetadata();
     const chart = useChart();
     const regionScale = chart.dataStore.regions.scale;
     //see also getPhysicalScalingMatrix
     //- consider state, matrices for image, scatterplot/other layers, and options to manipulate them
-    //MDVProject.set_region_scale assumes that all regions have the same scale.
-    //in the current data-set, that is true, but it could be false in the future.
-    //A-priori it would make sensee for x/y columns to have metadata about their scale, but that's not the case.
-    //Indeed, any type of numerical column should probably have metadata about its scale, 
-    //as well as information like comments what it represents.
-    //and given the other issues it could be inconsistent anyway?
+    //MDVProject.set_region_scale assumes that all regions have the same scale?
     if (!metadata) return 1;
     const scale = metadata.Pixels.PhysicalSizeX / regionScale;
     return scale;
 }
+
+export function useScatterModelMatrix() {
+    const scale = useRegionScale();
+    const s = 1/scale;
+    const modelMatrix = useMemo(() => [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, s], [s]);
+    return modelMatrix;
+}
+
 type Tooltip = (PickingInfo) => string;
 export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
     const id = useChartID();
@@ -98,14 +94,7 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         // careful now...
         const valueIndex = tooltipCol.data[data[i]];
         if (!tooltipCol.values) return valueIndex;
-        const value = tooltipCol.values[valueIndex];
-        // return JSON.stringify({
-        //     hoverIndex,
-        //     index,
-        //     valueIndex,
-        //     value,
-        // }, null, 2);
-        return value;
+        return tooltipCol.values[valueIndex];
     }, [tooltipCol, tooltipCol?.data, tooltipCol?.values, data]);
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
@@ -115,20 +104,7 @@ export function useScatterplotLayer(): [ScatterplotLayer, Tooltip] {
         },
     [hoverInfoRef, getTooltipVal]);
 
-    // debugging...
-    // useEffect(() => {
-    //     // get a unique set of values referred to by the tooltip column as per filtered data
-    //     if (!tooltipCol) return;
-    //     const indices = data.map(fi => tooltipCol.data[fi]);
-    //     const indexCounts = indices.reduce((acc, i) => { acc[i] = (acc[i] ?? 0) + 1; return acc; }, {});
-    //     const strings = Array.from(new Set(indices)).map(i => tooltipCol.values[i]);
-    //     const stringCounts = tooltipCol.values.map(s => [s, `${
-    //         Math.round(100*indexCounts[tooltipCol.values.indexOf(s)]/data.length)
-    //     }%`]);
-    //     console.table(stringCounts);
-    // }, [tooltipCol, tooltipCol.data, tooltipCol.values, data])
-    const s = 1/scale;
-    const modelMatrix = useMemo(() => [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, s], [s]);
+    const modelMatrix = useScatterModelMatrix();
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
