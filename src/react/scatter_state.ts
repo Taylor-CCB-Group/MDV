@@ -109,14 +109,16 @@ export function useScatterplotLayer() {
         },
     [hoverInfoRef, getTooltipVal]);
 
+    const scale = useRegionScale();
     const {modelMatrix, setModelMatrix} = useScatterModelMatrix();
+    const modelMatrixRef = useRef(modelMatrix);
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
         opacity,
         radiusScale: radius,
         getFillColor: colorBy ?? [0, 200, 200],
-        getRadius: 1,
+        getRadius: 1/scale,
         getPosition: (i, { target }) => {
             target[0] = cx.data[i];
             target[1] = cy.data[i];
@@ -133,5 +135,5 @@ export function useScatterplotLayer() {
             hoverInfoRef.current = info;
         }        
     }), [id, data, opacity, radius, colorBy, cx, cy]);
-    return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix};
+    return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix, modelMatrixRef};
 }
