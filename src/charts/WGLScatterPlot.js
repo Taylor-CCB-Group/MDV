@@ -277,6 +277,10 @@ class WGLScatterPlot extends WGLChart{
 
 
 
+	/**
+	 * If called more than once, will result in more than one "RangeDimension" being created
+	 * this probably isn't a specific problem right now, but smells fishy to me.
+	 */
 	getDimension(){
 		return this.dataStore.getDimension("range_dimension");
 	}

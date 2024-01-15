@@ -2,6 +2,9 @@ import DataStore from "../datastore/DataStore";
 import BaseChart from "./BaseChart";
 import type { DataSource, GuiSpec } from "./charts";
 
+/**
+ * Describes how a chart will be displayed in the 'add chart' dialog etc.
+ */
 export type ChartType<T extends BaseChart> = {
     /** A class extending BaseChart */
     "class": new (dataStore: DataStore, contentDiv: HTMLDivElement, config: any) => T;
