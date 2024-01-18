@@ -19,7 +19,10 @@ app = Flask(__name__)
 app.after_request(add_safe_headers)
 
 for p in projects:
-    p.serve(open_browser=False, app=app)
+    try:
+        p.serve(open_browser=False, app=app)
+    except:
+        print(f'error serving {p.name}...')
 
 @app.route('/')
 def index():
