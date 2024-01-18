@@ -134,6 +134,9 @@ class MDVProject:
                         default_parameter="Cross PCF gr20",
                         node_size="cell 1 number",
                         add_view=True):
+        '''
+        See `spatialdata.md` for documentation...
+        '''
         #check columns exist in the appropriate data sets
         missing_cols= self.check_columns_exist(interaction_ds,[pivot_column,default_parameter,node_size]+interaction_columns )
         if len(missing_cols)>0:
@@ -532,7 +535,15 @@ class MDVProject:
             self.set_view(add_to_view,v)
 
     def insert_link(self, datasource, linkto, linktype, data):
-        ds =  self.get_datasource_metadata(datasource)
+        '''
+        Adds a link between two datasources.
+        datasource is the name of the datasource to which the link will be added.
+        linkto is the name of the datasource to which the link will point.
+        linktype is the type of link to add.
+        The data argument is a dictionary containing the data for the link,
+        the format of which depends on the linktype.
+        '''
+        ds = self.get_datasource_metadata(datasource)
         if not ds:
             raise AttributeError(f"datasource '{datasource}' does not exist")
         to_ds = self.get_datasource_metadata(linkto)
@@ -914,9 +925,9 @@ class MDVProject:
                 region["viv_image"] = {
                     "url": v["path"]
                 }
-            #local file - need to copy to images directory
-            #or remember where the file is - could make a link I suppose
-            #would that be safer?
+            #local file - default is to copy to images directory
+            #or link if link_images is True 
+            #todo consider situations where the image is in a different volume etc and may not be linkable.
             else:            
                 if not link_images:
                     newname = get_random_string()+".ome.tiff"
@@ -926,9 +937,14 @@ class MDVProject:
                     }
                 else:
                     try:
-                        os.symlink(os.path.abspath(v["path"]), join(imdir, os.path.basename(v["path"])))
+                        dest = join(imdir,os.path.basename(v["path"]))
+                        # we might want to use the same image in multiple regions / datasources
+                        # in which case, it will already be linked
+                        # this assumes that having the same name means it is actually the same image...
+                        if not os.path.exists(dest):
+                            os.symlink(os.path.abspath(v["path"]), join(imdir, os.path.basename(v["path"])))
                     except Exception as e:
-                        raise AttributeError(f"Cannot link viv image {v['path']} to {datasource}")
+                        print(f"Cannot link viv image '{v['path']}' to '{datasource}'\n{repr(e)}")
                     region["viv_image"]={
                         "file": os.path.basename(v["path"]),
                         "linked_file": True
