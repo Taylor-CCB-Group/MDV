@@ -46,6 +46,8 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     declare config: T & BaseConfig;
     useMobx = true;
     root: ReturnType<typeof createRoot>;
+    reactEl: HTMLDivElement;
+    ComponentFn: TComponent<T & BaseConfig>;
     protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: T & BaseConfig, ReactComponentFunction: TComponent<T & BaseConfig> = Fallback) {
         super(dataStore, div, config);
         config = this.config; //original config will be copied by super, before doing things like adding id to it...
@@ -53,7 +55,8 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         Object.defineProperty(this, 'config', {
             get: () => config,
             set: (v) => {
-                config = v;
+                config = v; // re-assigning config ref in this closure is not really relevant now; 
+                //we are using makeAutoObservable and not referring to config directly...
                 makeAutoObservable(config);
             }
         });
@@ -66,9 +69,13 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         // any mobx state, so we can't just hide it in the base class.
         // (although maybe we could design a hook that hides it?)
         // const Observed = observer(ReactComponentFunction);
-
-        const reactEl = createEl('div', {className: 'react-chart'}, this.contentDiv); //other things may still be added to contentDiv outside react (e.g. legend)
-        this.root = createRoot(reactEl);
+        this.reactEl = createEl('div', { className: 'react-chart' }, this.contentDiv); //other things may still be added to contentDiv outside react (e.g. legend)
+        this.ComponentFn = ReactComponentFunction;
+        this.mountReact();
+    }
+    private mountReact() {
+        this.root = createRoot(this.reactEl);
+        const ReactComponentFunction = this.ComponentFn;
         this.root.render((
             <StrictMode>
                 <ChartProvider chart={this}>
@@ -76,6 +83,14 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
                 </ChartProvider>
             </StrictMode>
         ));
+    }
+
+    changeBaseDocument(doc: Document): void {
+        // how confident are we that this will work?
+        // will need re-testing if we implement different state management...
+        this.root.unmount();
+        super.changeBaseDocument(doc);
+        this.mountReact();
     }
     remove(): void {
         // make sure dim and anything else relevant is removed...
