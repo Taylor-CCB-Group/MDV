@@ -486,6 +486,13 @@ class ChartManager{
             const to_col = to.columnIndex[item.col];
             const newColors = new Array(to_col.values);
             const colors = from.getColumnColors(item.link_to)
+            //"cannot read properties of undefined (reading 'length')"
+            //seems to be related to from_col being type 'integer' when it should be 'text'
+            if (!from_col.values || !to_col.values) {
+                //todo display a 'toast' error...
+                console.error(`failed to _sync_colors '${item.link_to}', '${item.col}' - expected 'text' or similar columns`);
+                continue;
+            }
             for (let i=0;i<from_col.values.length;i++){
                 const val = from_col.values[i];
                 const index = to_col.values.indexOf(val);
@@ -629,6 +636,8 @@ class ChartManager{
                 }
                 //sync any columns
                 //phasing out
+                //todo ^^ PJT this 'phasing out' comment was written a year ago as of 24-01-15...
+                //and this code can cause problems.
                 if (d.column_link_to){
                     this._sync_colors(d.column_link_to.columns,this.dsIndex[d.column_link_to.dataSource].dataStore,ds);
                 }
@@ -1187,7 +1196,7 @@ class ChartManager{
         const lc = this.config.dataloading || {};
         split  = lc.split || 10;
         threads= lc.threads || 2;
-        this.transactions[id]={
+        this.transactions[id] = {
             callback:callback,
             columns:[],
             totalColumns:columns.length,
@@ -1196,7 +1205,7 @@ class ChartManager{
             columnsLoaded:0,
             id:id
         }
-        let col_list=[];
+        let col_list = [];
         const t  = this.transactions[id]; 
         for (let col of columns){
             this.columnsLoading[dataSource][col]=true;
@@ -1211,19 +1220,19 @@ class ChartManager{
             col_list=[];
         }
         t.alertID= this.createInfoAlert(`Loading Columns:0/${columns.length}`,{spinner:true}); 
-        const max = Math.min(t.columns.length,threads);
+        const max = Math.min(t.columns.length, threads);
        
         for (let n=0;n<max;n++){
-            this._loadColumnData(t,dataSource)
+            this._loadColumnData(t, dataSource)
         }
     }
 
 
-    _loadColumnData(trans,dataSource){
-        const dataStore=  this.dsIndex[dataSource].dataStore;
+    _loadColumnData(trans, dataSource) {
+        const dataStore = this.dsIndex[dataSource].dataStore;
        
         const col_list = trans.columns[trans.nextColumn++];
-        const columns=[];
+        const columns = [];
         for (let col of col_list){
            columns.push(dataStore.getColumnInfo(col));
         }
