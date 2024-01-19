@@ -1386,7 +1386,10 @@ class ChartManager{
                 position: "bottom-right"
             },
             func: () => {
-                ds.contentDiv.requestFullscreen();
+                //nb, not sure best way to access the actual div I want here
+                //this could easily break if the layout structure changes
+                // ds.contentDiv.parentElement.requestFullscreen();
+                ds.menuBar.parentElement.requestFullscreen();
             }
         }, ds.menuBar);
     }
