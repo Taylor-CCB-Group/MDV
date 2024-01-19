@@ -152,7 +152,7 @@ export function useScatterplotLayer() {
         onClick: ({index}) => {
             setClickIndex(data[index]);
             //todo properly synchronise state with data store, allow deselection
-            chart.dataStore.dataHighighted([data[index]]);
+            chart.dataStore.dataHighlighted([data[index]]);
         },
         transitions: {
             getFillColor: {
