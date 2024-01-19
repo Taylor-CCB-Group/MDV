@@ -91,7 +91,7 @@ export function useScatterplotLayer() {
     const hoverInfoRef = useRef<PickingInfo>(null);
     const [clickIndex, setClickIndex] = useState(-1);
     const getLineWidth = useCallback((i: number) => {
-        return i === clickIndex ? 0.2*radius : 0;
+        return i === clickIndex ? 0.2*radius/scale : 0;
     }, [radius, clickIndex]);
 
     const tooltipCol = useMemo(() => {
