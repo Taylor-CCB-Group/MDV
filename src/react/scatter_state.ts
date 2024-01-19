@@ -6,6 +6,7 @@ import { useChartID, useConfig, useParamColumns } from "./hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
+import { cli } from 'webpack';
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -83,12 +84,15 @@ export function useScatterplotLayer() {
     const colorBy = (chart as any).colorBy;
     const config = useConfig<ScatterPlotConfig>();
 
-    // seem to be reacting fine to changes, why did I think I needed to use extra autorun or reaction?
     const { opacity, radius } = config;
 
     const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
     const hoverInfoRef = useRef<PickingInfo>(null);
+    const [clickIndex, setClickIndex] = useState(-1);
+    const getLineWidth = useCallback((i: number) => {
+        return i === clickIndex ? 0.2*radius : 0;
+    }, [radius, clickIndex]);
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
@@ -113,6 +117,7 @@ export function useScatterplotLayer() {
     const {modelMatrix, setModelMatrix} = useScatterModelMatrix();
     const modelMatrixRef = useRef(modelMatrix);
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
+        // loaders //<< this will be interesting to learn about
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
         opacity,
@@ -127,13 +132,33 @@ export function useScatterplotLayer() {
         },
         modelMatrix,
         updateTriggers: {
-            getFillColor: colorBy,
-            modelMatrix: modelMatrix
+            getFillColor: colorBy, //this is working; removing it breaks the color change...
+            // modelMatrix: modelMatrix, // this is not necessary, manipulating the matrix works anyway
+            // getLineWith: clickIndex, // this does not work, seems to need something like a function
+            getLineWidth
         },
         pickable: true,
         onHover: (info) => {
             hoverInfoRef.current = info;
-        }        
-    }), [id, data, opacity, radius, colorBy, cx, cy]);
+        },
+        stroked: data.length < 1000, //todo make this configurable, and fix issue...
+        // todo figure out why lineWidth 0 still shows up, particularly when zoomed out
+        // can we make it have zero opacity? Seems like lineColor is rgb, not rgba...
+        // may need a layer extension to do this properly; may want that anyway for other reasons
+        getLineWidth,//: i => i === clickIndexRef.current ? 0.2*radius/scale : 0,
+        //trying to set line color to same as fill, but it makes things very muddy when zoomed out
+        //getLineColor: i => i === clickIndexRef.current ? [255, 255, 255] : colorBy ?? [200, 200, 200],
+        getLineColor: [255, 255, 255],
+        onClick: ({index}) => {
+            setClickIndex(data[index]);
+            //todo properly synchronise state with data store, allow deselection
+            chart.dataStore.dataHighighted([data[index]]);
+        },
+        transitions: {
+            getFillColor: {
+                duration: 300,
+            },
+        }
+    }), [id, data, opacity, radius, colorBy, cx, cy, clickIndex, scale, modelMatrix]);
     return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix, modelMatrixRef};
 }
