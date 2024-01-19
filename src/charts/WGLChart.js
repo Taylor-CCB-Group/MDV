@@ -125,6 +125,12 @@ class WGLChart extends SVGChart{
     setSize(x,y){
 		super.setSize(x,y);
 		const dim = this._getContentDimensions();
+        if (dim.width < 1 || dim.height < 1) {
+            // todo we should think about how we get here, what we do, and how we avoid it
+            dim.width = 50;
+            dim.height = 50;
+            console.error("WGLChart: bad _getContentDimensions()");
+        }
 		this.app.setSize(dim.width,dim.height);
         this.graphDiv.style.left = dim.left+"px";
         this.graphDiv.style.top = dim.top+"px";

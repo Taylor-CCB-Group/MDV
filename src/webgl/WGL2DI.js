@@ -333,7 +333,12 @@ class WGL2DI{
 		this.label_canvas.setAttribute("height",height);
 		this.label_canvas.setAttribute("width",width);	
 		
-		this.pickbuffer.destroy()
+		try {
+			this.pickbuffer.destroy()
+		} catch (e) {
+			// we mostly avoid situations like this, which was arising with -ve width/height leading to inconsistent state.
+			console.error(`caught exception '${e}' when destroying buffer... suggest re-writing app in Rust.`);
+		}
 		this.pickbuffer = this.regl.framebuffer({ colorFormat: 'rgba',height:height,width:width});
 
 		//this is necessary, but I  don't know why?

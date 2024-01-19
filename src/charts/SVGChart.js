@@ -96,7 +96,10 @@ class SVGChart extends BaseChart{
         };
     }
 
-    _getContentDimensions(){     
+    _getContentDimensions() {
+        //this can end up with -ve width/height e.g. in the process of popping out,
+        //or when gridstack does something weird on window resize.
+        //we avoid this in WGLChart, but may want a more general way of making things robust.
         return {
             top:this.margins.top,
             left:this.margins.left,

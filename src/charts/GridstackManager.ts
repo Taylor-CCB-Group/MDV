@@ -159,7 +159,7 @@ export default class GridStackManager {
         //nb, autoPosition property doesn't apply in update()?
         //passing options to makeWidget() or addWidget() does not evoke joy.
         if (!autoPosition) {
-            console.log({w, h, x, y});
+            console.log('gridstack:', chart.config.type, {w, h, x, y});
             grid.update(div, {w, h, x, y});
         } else {
             grid.update(div, {w, h});
