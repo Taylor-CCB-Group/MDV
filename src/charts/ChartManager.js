@@ -588,6 +588,7 @@ class ChartManager{
     
         //add all the appropriate panes (one per datasource)
         const panes = splitPane(this.contentDiv,{number:dsToView.length,sizes:widths});
+        //thinking about adding an optional index to the view so we can control the order
         for (let n=0;n<dsToView.length;n++){        
             const p = panes[n];
             
@@ -1323,9 +1324,8 @@ class ChartManager{
                     this.createInfoAlert("Error making color chooser", {
                         type: "warning", duration: 2000
                     });
-                 }
+                }
             }
-
         },ds.menuBar);
         createMenuIcon("fas fa-th",{
             tooltip:{
@@ -1335,10 +1335,7 @@ class ChartManager{
             func:(e)=>{
                 this.layoutMenus[ds.name].show(e);
             }
-
         },ds.menuBar);
-
-       
 
         if (dataStore.links){
             for (let ods in dataStore.links){
@@ -1347,7 +1344,6 @@ class ChartManager{
                     this._addLinkIcon(ds,this.dsIndex[ods],link.rows_as_columns)
                 }
             }
-
         }
         const idiv = createEl("div",{
             styles:{
@@ -1379,9 +1375,20 @@ class ChartManager{
             value:size,
             text:`${size}`
         }
-        this.progressBars[ds.name]=new MDVProgress(pb,pbConf);
-        
-       
+        this.progressBars[ds.name] = new MDVProgress(pb,pbConf);
+        this._addFullscreenIcon(ds);
+    }
+
+    _addFullscreenIcon(ds) {
+        createMenuIcon("fas fa-expand", {
+            tooltip: {
+                text: "Full Screen",
+                position: "bottom-right"
+            },
+            func: () => {
+                ds.contentDiv.requestFullscreen();
+            }
+        }, ds.menuBar);
     }
 
     /**
