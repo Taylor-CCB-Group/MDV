@@ -1098,3 +1098,7 @@ def create_bed_gz_file(infile,outfile):
 
 def get_random_string(length=6):
     return ''.join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=length))
+
+if __name__ == "__main__":
+    if (os.path.exists('datasources.json')):
+        MDVProject(os.getcwd()).serve()
