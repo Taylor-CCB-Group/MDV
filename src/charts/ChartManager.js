@@ -323,6 +323,9 @@ class ChartManager{
      */
     _addValuesetLink(ds, ods, link) {
         const valuesetFilter = ods.getDimension("valueset_dimension");
+        const srcCol = ds.columnIndex[link.source_column];
+        const destCol = ods.columnIndex[link.dest_column];
+        const isTextLike = srcCol.values && destCol.values;
         Promise.all([
             this._getColumnsAsync(ds.name, [link.source_column]),
             this._getColumnsAsync(ods.name, [link.dest_column])
@@ -339,6 +342,19 @@ class ChartManager{
                     const resultSet = await data.getValueSet(link.source_column);
                     await this._getColumnsAsync(ods.name, [link.dest_column]);
                     valuesetFilter.filter("filterValueset", [link.dest_column], resultSet);
+                } else if (type === "data_highlighted") {
+                    await this._getColumnsAsync(ds.name, [link.source_column]);
+                    await this._getColumnsAsync(ods.name, [link.dest_column]);
+                    const { indexes } = data;
+                    if (isTextLike) {
+                        // given a set of indexes into the source column, get the corresponding values
+                        // the result should be a set of strings, and "filterValueset" will be responsible
+                        // for filtering the destination column based on those strings
+                        const resultSet = new Set(indexes.map(i => srcCol.values[srcCol.data[i]]));
+                        valuesetFilter.filter("filterValueset", [link.dest_column], resultSet);
+                    } else {
+                        valuesetFilter.filter("filterValueset", [link.dest_column], new Set(indexes));
+                    }
                 }
             });
         });
