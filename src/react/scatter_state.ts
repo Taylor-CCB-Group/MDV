@@ -43,7 +43,7 @@ export function useFilteredIndices() {
         // should I have a cleanup function to cancel the promise if it's not resolved
         // by the time the effect is triggered again?
         return () => {
-            if (!finished) console.log('filtered indices promise cancelled');
+            // if (!finished) console.log('filtered indices promise cancelled');
             cancelled = true;
         }
 
@@ -89,10 +89,10 @@ export function useScatterplotLayer() {
     const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
     const hoverInfoRef = useRef<PickingInfo>(null);
-    const [clickIndex, setClickIndex] = useState(-1);
+    const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback((i: number) => {
-        return i === clickIndex ? 0.2*radius/scale : 0;
-    }, [radius, clickIndex]);
+        return i === data[highlightedObjectIndex] ? 0.2*radius/scale : 0;
+    }, [radius, highlightedObjectIndex, data]);
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
@@ -145,12 +145,13 @@ export function useScatterplotLayer() {
         // todo figure out why lineWidth 0 still shows up, particularly when zoomed out
         // can we make it have zero opacity? Seems like lineColor is rgb, not rgba...
         // may need a layer extension to do this properly; may want that anyway for other reasons
-        getLineWidth,//: i => i === clickIndexRef.current ? 0.2*radius/scale : 0,
+        getLineWidth,
         //trying to set line color to same as fill, but it makes things very muddy when zoomed out
         //getLineColor: i => i === clickIndexRef.current ? [255, 255, 255] : colorBy ?? [200, 200, 200],
         getLineColor: [255, 255, 255],
+        // highlightedObjectIndex, // has some undesirable effects, but could be useful when better controlled
         onClick: ({index}) => {
-            setClickIndex(data[index]);
+            setHighlightedObjectIndex(index);
             //todo properly synchronise state with data store, allow deselection
             chart.dataStore.dataHighlighted([data[index]]);
         },
@@ -159,6 +160,6 @@ export function useScatterplotLayer() {
                 duration: 300,
             },
         }
-    }), [id, data, opacity, radius, colorBy, cx, cy, clickIndex, scale, modelMatrix]);
+    }), [id, data, opacity, radius, colorBy, cx, cy, highlightedObjectIndex, scale, modelMatrix]);
     return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix, modelMatrixRef};
 }
