@@ -5,9 +5,11 @@ import mimetypes
 import json
 import sys
 import re
-from werkzeug.utils import safe_join
+from werkzeug.security import safe_join
 from .websocket import mdv_socketio
+from .mdvproject import MDVProject
 import os
+from typing import Optional
 
 routes = set()
 # consider using flask_cors...
@@ -29,11 +31,13 @@ def _send_file(f):
 
 
 def get_range(file_name,range_header):
-    file =open(file_name,"rb")
+    file = open(file_name, "rb")
     size = sys.getsizeof(file_name)
     byte1, byte2 = 0, None
 
-    m = re.search('(\d+)-(\d*)', range_header)
+    m = re.search(r'(\d+)-(\d*)', range_header)
+    if not m:
+        raise Exception("Invalid Range Header")
     g = m.groups()
 
     if g[0]:
@@ -56,7 +60,7 @@ def get_range(file_name,range_header):
     file.close()
     return rv
 
-def create_app(project, open_browser = True, port = 5050, websocket = False, app:Flask = None):
+def create_app(project: MDVProject, open_browser = True, port = 5050, websocket = False, app: Optional[Flask] = None):
     if app is None:
         route = ""
         # route = "/project/" + project.name # for testing new API with simple app...
@@ -104,8 +108,8 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
 
 
     @project_bp.route("/<file>.json")
-    def get_json_file(file):
-        return send_file(safe_join(project.dir,file+".json"))
+    def get_json_file(file: str):
+        return send_file(safe_join(project.dir, file+".json")) # type: ignore - project.dir is a str, but pylance thinks it could be None
     
     #empty page to put popout content
     @project_bp.route("/popout.html")
@@ -117,6 +121,8 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     def get_data():
         try:
             data = request.json
+            if not data or not "columns" in data or not "data_source" in data:
+                raise Exception("Request must contain JSON with 'columns' and 'data_source'")
             bytes_ = project.get_byte_data(data["columns"],data["data_source"])
             response=make_response(bytes_)
             response.headers.set('Content-Type', 'application/octet-stream')
@@ -142,6 +148,8 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     @project_bp.route("/get_view", methods=["POST"])
     def get_view():
         data=request.json
+        if not data or not "view" in data:
+            return "Request must contain JSON with 'view'",400
         return jsonify(project.get_view(data["view"]))
     
     #get any custom row data
@@ -149,7 +157,7 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     def get_row_data():
         req=request.json
         try:
-            with open( safe_join(project.dir,"rowdata",req["datasource"],f"{req['index']}.json")) as f:
+            with open( safe_join(project.dir,"rowdata",req["datasource"],f"{req['index']}.json")) as f: # type: ignore
                 data = f.read()
         except Exception as e:
             data=json.dumps({"data":None})
@@ -160,10 +168,12 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
     def get_binary_data():
         req=request.json
         try:
-            with open( safe_join(project.dir,"binarydata",req["datasource"],f"{req['name']}.b"),"rb") as f:
+            with open( safe_join(project.dir,"binarydata",req["datasource"],f"{req['name']}.b"),"rb") as f: # type: ignore
                 data = f.read()
         except Exception as e:
-            data=None
+            # data='' # satisfy type checker - was None, haven't tested if this is better or worse.
+            # probably better to return an error.
+            return 'Problem getting binary data', 500
         return data
 
     # only the specified region of track files (bam,bigbed,tabix)
@@ -191,6 +201,8 @@ def create_app(project, open_browser = True, port = 5050, websocket = False, app
         webbrowser.open(f"http://localhost:{port}/{route}")
           
     if multi_project:
+        if not isinstance(project_bp, Blueprint):
+            raise Exception("assert: project_bp must be a Flask instance when multi_project is True")
         print(f"Adding project {project.name} to existing app")
         app.register_blueprint(project_bp)
     else:

@@ -1,4 +1,5 @@
 import os
+import sys
 import h5py
 import numpy
 import pandas
@@ -13,6 +14,7 @@ import random
 import string
 from os.path import join,split,exists
 from  shutil import copytree,ignore_patterns,copyfile
+from typing import Optional
 
 datatype_mappings={
     "int64":"integer",
@@ -34,8 +36,8 @@ numpy_dtypes={
 }
 
 class MDVProject:
-    def __init__(self,dir,delete_existing=False):
-        self.dir=dir
+    def __init__(self, dir: str, delete_existing=False):
+        self.dir = dir
         self.name = dir.split("/")[-1]
         if delete_existing and exists(dir):
             shutil.rmtree(dir)
@@ -235,10 +237,10 @@ class MDVProject:
             mode="a"
         return h5py.File(self.h5file,mode)
         
-    def get_column(self,datasource,column,raw=False):
-        cm  = self.get_column_metadata(datasource,column)
+    def get_column(self, datasource: str, column, raw=False):
+        cm  = self.get_column_metadata(datasource, column)
         h5 = self._get_h5_handle()
-        raw_data = numpy.array(h5[datasource][column])
+        raw_data = numpy.array(h5[datasource][column]) # type: ignore
         if raw:
             return raw_data
         dt =  cm["datatype"]
@@ -265,12 +267,15 @@ class MDVProject:
         '''
         h5= self._get_h5_handle()
         cid= column["field"]
-        if h5[datasource].get(cid):
-            del h5[datasource][cid]
+        ds = h5[datasource]
+        if not isinstance(ds, h5py.Group):
+            raise AttributeError(f"{datasource} is not a group")
+        if ds.get(cid):
+            del ds[cid]
         dt = numpy_dtypes.get(column["datatype"])
         if not dt:
             dt =h5py.string_dtype('utf-8',column["stringLength"])
-        h5[datasource].create_dataset(cid,len(raw_data),data = raw_data,dtype=dt)
+        ds.create_dataset(cid,len(raw_data),data = raw_data,dtype=dt)
         ds =self.get_datasource_metadata(datasource)
         cols= ds["columns"]
         ind = [c for c,x in enumerate(cols) if x["field"]==cid]
@@ -304,8 +309,10 @@ class MDVProject:
             column["datatype"]= datatype_mappings.get(str(li.dtype),"text")
         h5 = self._get_h5_handle()
         gr = h5[datasource]
-        if h5[datasource].get(column["field"]):
-            del h5[datasource][column["field"]]
+        if not isinstance(gr, h5py.Group):
+            raise AttributeError(f"{datasource} is not a group")
+        if gr.get(column["field"]):
+            del gr[column["field"]]
         add_column_to_group(column,li,gr,len(li))
         h5.close()
         if col_exists:
@@ -327,7 +334,10 @@ class MDVProject:
             return
         ds["columns"]=cols
         h5= self._get_h5_handle()
-        del h5[datasource][column]
+        gr = h5[datasource]
+        if not isinstance(gr, h5py.Group):
+            raise AttributeError(f"{datasource} is not a group")
+        del gr[column]
         self.set_datasource_metadata(ds)
 
         
@@ -464,8 +474,8 @@ class MDVProject:
         ds["genome_browser"]=gb
         self.set_datasource_metadata(ds)
 
-    def add_datasource(self,name,dataframe,columns=None,supplied_columns_only=False,replace_data=False,
-                       add_to_view="default",separator="\t"):
+    def add_datasource(self,name: str, dataframe, columns: Optional[list]=None,
+                       supplied_columns_only=False, replace_data=False, add_to_view="default", separator="\t"):
         '''Adds a pandas dataframe to the project. Each column's datatype, will be deduced by the
          data it contains, but this is not always accurate. Hence, you can supply a list of column 
          metadata, which will override the names/types deduced from the dataframe.
@@ -509,6 +519,10 @@ class MDVProject:
         gr= h5.create_group(name)
         size = len(dataframe)
         dodgy_columns=[]
+        if not columns:
+            # we could set columns to an empty list, but it's probably better to throw an error
+            # seems unlikely a user would want to add a datasource with no columns
+            raise AttributeError("no columns to add")
         for col in columns:
             try:
                 add_column_to_group(col,dataframe[col["field"]],gr,size)
@@ -589,7 +603,10 @@ class MDVProject:
         name = name if name else stub
         label = label if label else name
         h5 = self._get_h5_handle()
-        gr = h5[row_ds].create_group(name)
+        ds = h5[row_ds]
+        if not isinstance(ds, h5py.Group):
+            raise AttributeError(f"{row_ds} is not a group")
+        gr = ds.create_group(name)
         if sparse:
             gr.create_dataset("x",(len(data.data),),data=data.data,dtype=numpy.float32)
             gr.create_dataset("i",(len(data.indices),),data=data.indices,dtype=numpy.uint32)
@@ -758,6 +775,8 @@ class MDVProject:
         for ds in dss:
             n = ds["name"]
             gr = h5[n]
+            if not isinstance(gr, h5py.Group):
+                raise TypeError("Expected 'gr' to be of type h5py.Group.")
             dfile = join(outdir,"{}.gz".format(n))
             o = open(dfile,"wb")
             index={}
@@ -796,16 +815,19 @@ class MDVProject:
             i.write(json.dumps(index))
             i.close()
 
-    def get_byte_data(self,columns,group):
+    def get_byte_data(self,columns, group):
         h5 = h5py.File(self.h5file,"r")
         byte_list=[]  
+        gr = h5[group]
+        if not isinstance(gr, h5py.Group):
+            raise TypeError("Expected 'gr' to be of type h5py.Group.")
         for column in columns:
             sg = column.get("subgroup")
             if sg:
                 sgindex= int(column["sgindex"])
-                byte_list.append(get_subgroup_bytes(h5[group][sg],sgindex,column.get("sgtype")=="sparse"))
+                byte_list.append(get_subgroup_bytes(gr[sg],sgindex,column.get("sgtype")=="sparse"))
             else:
-                data = h5[group][column["field"]]      
+                data = gr[column["field"]]      
                 byte_list.append(numpy.array(data).tobytes())         
         h5.close()
         return b''.join(byte_list)
@@ -1100,5 +1122,9 @@ def get_random_string(length=6):
     return ''.join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=length))
 
 if __name__ == "__main__":
-    if (os.path.exists('datasources.json')):
-        MDVProject(os.getcwd()).serve()
+    path = os.getcwd()
+    if (len(sys.argv)>1):
+        path = sys.argv[1]
+    if (os.path.exists(os.path.join(path, 'datasources.json'))):
+        MDVProject(path).serve()
+    
