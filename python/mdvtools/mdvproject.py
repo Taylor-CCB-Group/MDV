@@ -444,7 +444,10 @@ class MDVProject:
                 positions. Defaults to ["chr","start","end"]
             name (string, optional): The name of the genome browser track. Defaults to the datasource name.
         '''
-        check_htslib() # will raise an error if htslib is not installed
+        try:
+            check_htslib() # will raise an error if htslib is not installed
+        except:
+            raise Exception("htslib not installed. This is not supported on Windows, other platforms will need to install e.g. via brew install htslib")
         if len(parameters) != 3:
             raise AttributeError("genome browser parameters should be a list of 3 column names")
         if not name:
