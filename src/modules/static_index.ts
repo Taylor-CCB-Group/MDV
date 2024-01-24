@@ -15,22 +15,30 @@ import { changeURLParam } from "./desktop_index";
 // todo: change so that *only* ?dir=... is used to determine the root?
 // const flaskURL = window.location.pathname;
 const { href } = window.location;
-const flaskURL = href.substring(href.indexOf("/project"));
+const flaskURL = new URL(href).origin;//href.substring(href.indexOf("/project"));
 
 
 document.addEventListener("DOMContentLoaded", () => loadData());
 
+/// --- this section is a bit of a mess, but it works for now --- 
+//(copilot suggesting "this is a bit of a mess" is a bit rude, but in this case it's right)
 // if URLSearchParams has a 'dir' parameter, use that as the data directory.
 const urlParams = new URLSearchParams(window.location.search);
 // if we're in a popout window, ignore the dir parameter and don't load data
 const isPopout = urlParams.get('popout') === "true";
 // if there is no dir parameter, use the flaskURL to proxy requests to the python server
 const dir = urlParams.get('dir') || (isPopout ? '' : flaskURL);
-const root = dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
+function getRoot(dir: string) {
+    // const url = new URL(dir);
+    // return url.origin + url.pathname;
+    return dir.endsWith("/") ? dir.substring(0, dir.length-1) : dir;
+}
+const root = getRoot(dir);
 //hack to load data from local API... TODO XXX make less hacky, rather than more...
 //this is sort-of-working as of this writing for `MDVProject.serve()`, as long as the default port 5050 is used...
-const staticFolder = !dir.startsWith("/project") && !(window.location.port === "5050");
+const staticFolder = !dir.startsWith("/project") && !(window.location.port === "5050") && !dir.endsWith("5050");
 const project_name = dir.split("/").pop();
+/// --- end of messy section ---
 
 // set title of page to the data directory
 document.title = `MDV - ${project_name}`;
