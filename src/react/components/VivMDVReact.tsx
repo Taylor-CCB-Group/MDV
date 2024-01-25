@@ -71,6 +71,8 @@ export type ScatterPlotConfig = {
         display: boolean,
         // todo: add more options here...
     },
+    zoom_on_filter: boolean,
+    point_shape: "circle" | "square"
 } & TooltipConfig;
 const scatterDefaults: ScatterPlotConfig = {
     radius: 1,
@@ -81,7 +83,9 @@ const scatterDefaults: ScatterPlotConfig = {
     },
     tooltip: {
         show: false,
-    }
+    },
+    zoom_on_filter: false,
+    point_shape: "circle",
 };
 export type VivRoiConfig = {
     // making this 'type' very specific will let us infer the rest of the type, i.e.
@@ -175,24 +179,11 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 }
             },
             {
-                // very crude placeholder for testing mechanism...
-                type: "slider",
-                label: "channel test",
-                current_value: c.channel || 0,
-                min: 0,
-                max: 10,
-                step: 1,
-                continuous: true,
-                func: x => {
-                    c.channel = x;
-                }
-            },
-            {
                 type: "slider",
                 label: "radius",
                 current_value: c.radius || 1,
                 min: 0,
-                max: 50,
+                max: 500,
                 continuous: true,
                 func: x => {
                     c.radius = x;
@@ -209,8 +200,15 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.opacity = x;
                 }
             },
-            // no longer using PictureInPictureViewer - would need to re-implement to some extent
-            // in order for combined viewer to work (also add overviewOn to every config)
+            {
+                type: "check",
+                label: "zoom on filter",
+                current_value: c.zoom_on_filter || false,
+                func: x => {
+                    c.zoom_on_filter = x;
+                }
+            }
+            // no longer using PictureInPictureViewer - up for review as could be useful
             // {
             //     type: "check",
             //     label: "overview",

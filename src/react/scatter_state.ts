@@ -1,12 +1,15 @@
 import { Matrix4 } from '@math.gl/core';
-import { PickingInfo, ScatterplotLayer } from "deck.gl/typed";
+import { PickingInfo } from "deck.gl/typed";
 import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
 import { useChart, useDataStore } from "./context";
-import { useChartID, useConfig, useParamColumns } from "./hooks";
+import { useChartID, useChartSize, useConfig, useParamColumns } from "./hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
-import { useMetadata } from "./components/avivatorish/state";
-import { cli } from 'webpack';
+import { OME_TIFF, useLoader, useMetadata } from "./components/avivatorish/state";
+import { ViewState } from './components/VivScatterComponent';
+import { getImageSize } from '@hms-dbmi/viv';
+import { ScatterplotExLayer } from '../webgl/ImageArrayDeckExtension';
+import { ScatterDeckExtension } from '../webgl/ScatterDeckExtension';
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -116,7 +119,81 @@ export function useScatterplotLayer() {
     const scale = useRegionScale();
     const {modelMatrix, setModelMatrix} = useScatterModelMatrix();
     const modelMatrixRef = useRef(modelMatrix);
-    const scatterplotLayer = useMemo(() => new ScatterplotLayer({
+    // we don't want to use this if we're not using an OME_TIFF - but for now, pending better reasoning about
+    // what type of chart we're in, we'll use it anyway for scaling the viewState
+    const loader = useLoader() as OME_TIFF['data']; // could be refactored to have a useImageSize hook maybe
+    const [chartWidth, chartHeight] = useChartSize(); //not sure we want this, potentially re-rendering too often...
+    // not using as dependency for scaling viewState to data - we don't want to zoom as chart size changes
+    // (at least for now - may consider making this configurable / testing it out)
+
+    const [viewState, setViewState] = useState<ViewState>(null); //we should consider how this interacts with viv ViewerStore
+    useEffect(() => {
+        if (!config.zoom_on_filter) return;
+        if (data.length === 0) {
+            setViewState(null);
+            return;
+        }
+        const source = Array.isArray(loader) ? loader[0] : loader;
+        const { width: pixelWidth, height: pixelHeight } = getImageSize(source);
+        const trueImageWidth = pixelWidth * scale;
+        const trueImageHeight = pixelHeight * scale;
+        // Step 1: Calculate the bounding box of the data
+        // with a loop to avoid spread operator & stack overflow etc
+        let minX = Number.POSITIVE_INFINITY;
+        let maxX = Number.NEGATIVE_INFINITY;
+        let minY = Number.POSITIVE_INFINITY;
+        let maxY = Number.NEGATIVE_INFINITY;
+        for (let i = 0; i < data.length; i++) {
+            const d = data[i];
+            // todo proper use of transform matrices
+            const x = cx.data[d] / scale;
+            const y = cy.data[d] / scale;
+            if (x === undefined || y === undefined) {
+                console.warn('undefined data in scatterplot');
+                continue;
+            }
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        }
+
+        // Step 2: Calculate the center of the bounding box
+        // - take into account transform matrices
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        // modelMatrix.transformPoint([centerX, centerY, 0]);
+
+        // Step 3: Calculate the zoom level (this is a rough approximation and may need to be adjusted)
+        // should consider aspect ratio of the canvas
+        // should allow some padding around the edges, based on radius, and/or some config value
+        const { max, min, log2 } = Math;
+        const maxZoom = 5;
+        const xZoom = ((maxX - minX) / trueImageWidth);
+        const yZoom = ((maxY - minY) / trueImageHeight);
+        console.log('zoom', xZoom, yZoom);
+        const zoomBackOff = 0;
+        const zoom = min(maxZoom, max(xZoom, yZoom) - zoomBackOff);
+        // Step 4: Set the view state that will be picked up by the user of this hook
+        // may want to use viv viewerStore - but we don't want scatterplot to depend on that
+        setViewState({
+            target: [centerX, centerY, 0],
+            zoom: zoom,
+            minZoom: -10,
+            maxZoom,
+            transitionDuration: 400, // Smooth transition
+            transitionEasing: x => -(Math.cos(Math.PI * x) - 1) / 2, //https://easings.net/#easeInOutSine
+            // transitionInterpolator: new FlyToInterpolator({speed: 1}), //applicable for MapState - latitude is required
+        });
+    }, [data, cx, cy, scale]);
+    const { point_shape } = config;
+
+    const extensions = useMemo(() => {
+        if (point_shape !== 'circle') return [];
+        return [new ScatterDeckExtension()]
+    }, []);
+    const scatterplotLayer = useMemo(() => new ScatterplotExLayer({
         // loaders //<< this will be interesting to learn about
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
@@ -156,10 +233,12 @@ export function useScatterplotLayer() {
             chart.dataStore.dataHighlighted([data[index]]);
         },
         transitions: {
-            getFillColor: {
-                duration: 300,
-            },
-        }
+            // this leads to weird behaviour when filter changes, looks ok when changing colorBy
+            // getFillColor: {
+            //     duration: 300,
+            // },
+        },
+        extensions
     }), [id, data, opacity, radius, colorBy, cx, cy, highlightedObjectIndex, scale, modelMatrix]);
-    return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix, modelMatrixRef};
+    return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix, modelMatrixRef, viewState};
 }

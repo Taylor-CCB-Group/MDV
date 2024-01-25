@@ -1,11 +1,13 @@
 import { getDefaultInitialViewState, ColorPaletteExtension, DetailView, VivViewer } from "@hms-dbmi/viv";
 import { observer } from "mobx-react-lite";
-import { useState, useLayoutEffect, useMemo } from "react";
+import { useState, useLayoutEffect, useMemo, useEffect, useRef } from "react";
 import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID } from "../hooks";
 import { useScatterplotLayer } from "../scatter_state";
 import SelectionOverlay from "./SelectionOverlay";
-import { useLoader, OME_TIFF, useViewerStoreApi, useChannelsStore } from "./avivatorish/state";
+import { useLoader, OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
+
+export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
 /** somewhat comparable to avivator `<Viewer />` */
 export const VivScatter = observer(() => {
@@ -30,12 +32,17 @@ export const VivScatter = observer(() => {
         shallow
     );
 
-    const [viewState, setViewState] = useState<ReturnType<typeof getDefaultInitialViewState>>();
+    // const [viewState, setViewState] = useState<ViewState>();
+    const viewState = useViewerStore(store => store.viewState);
+    const vsRef = useRef<ViewState>();
+    const vsDebugDivRef = useRef<HTMLPreElement>(null);
+    
     useLayoutEffect(() => {
         if (!ome) return;
         if (!viewState) {
-            //WIP
-            setViewState(getDefaultInitialViewState(ome, { width, height }));
+            //WIP <-- c.f. Avivator's useViewerStore() hook
+            // setViewState(getDefaultInitialViewState(ome, { width, height }));
+            viewerStore.setState({ viewState: getDefaultInitialViewState(ome, { width, height }) });
         }
     }, [ome]);
     const extensions = useMemo(() => [new ColorPaletteExtension()], []);
@@ -44,6 +51,13 @@ export const VivScatter = observer(() => {
         snapScaleBar: true,
         width, height
     }), [id, width, height]);
+    useEffect(() => {
+        if (scatterProps.viewState) {
+            viewerStore.setState({ viewState: scatterProps.viewState });
+            // setViewState(scatterProps.viewState);
+            vsRef.current = scatterProps.viewState;
+        }
+    }, [scatterProps.viewState])
     // TODO get viv working in popouts (not a react thing - happens elsewhere
     // - probably need to handle lost gl context)
     const layerConfigX = {
@@ -67,14 +81,32 @@ export const VivScatter = observer(() => {
     return (
         <>
             <SelectionOverlay {...scatterProps} />
+            <pre ref={vsDebugDivRef} 
+            style={{ 
+                position: 'absolute', bottom: 2, left: 2, zIndex: 1000, backgroundColor: 'rgba(40,40,40,0.5)',
+                backdropFilter: 'blur(2px)',
+                outline: '1px solid white',
+                fontSize: '9px',
+                //  pointerEvents: 'none'
+            }}
+            onClick={() => {
+                // center on image
+                const vs = getDefaultInitialViewState(ome, { width, height }) as any;
+                vs.zoom = (vs.zoom || -10) + Math.random()*0.0001; //salt the zoom to force a re-render
+                vsRef.current = vs;
+                // setViewState(vs);
+                viewerStore.setState({ viewState: vs });
+            }}
+            >
+            </pre>
             <VivViewer
                 views={[detailView]}
                 layerProps={[layerConfigX]}
                 viewStates={[{ ...viewState, id: detailId }]}
                 onViewStateChange={e => {
-                    viewerStore.setState({ viewState: { ...e.viewState, id: detailId } });
+                    // viewerStore.setState({ viewState: { ...e.viewState, id: detailId } });
+                    if (vsDebugDivRef.current) vsDebugDivRef.current.innerText = JSON.stringify(e.viewState, null, 2);
                 }}
-
                 deckProps={deckProps}
             />
         </>
