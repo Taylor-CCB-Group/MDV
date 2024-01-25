@@ -83,6 +83,7 @@ export const VivScatter = observer(() => {
             <SelectionOverlay {...scatterProps} />
             <pre ref={vsDebugDivRef} 
             style={{ 
+                display: 'none', // <-- set to block to debug viewState
                 position: 'absolute', bottom: 2, left: 2, zIndex: 1000, backgroundColor: 'rgba(40,40,40,0.5)',
                 backdropFilter: 'blur(2px)',
                 outline: '1px solid white',
