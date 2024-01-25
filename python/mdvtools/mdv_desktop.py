@@ -25,7 +25,10 @@ if os.path.exists(config_file):
         config = json.load(f)
     for d in config['projects']:
         print(f"adding project '{d}' from config file")
-        projects.append(MDVProject(d))
+        try:
+            projects.append(MDVProject(d))
+        except:
+            print(f"error adding project '{d}' from config file")
 else:
     with open(config_file, 'w') as f:
         json.dump({'projects': []}, f)
