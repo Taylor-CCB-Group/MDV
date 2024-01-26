@@ -190,7 +190,7 @@ export function useScatterplotLayer() {
     const { point_shape } = config;
 
     const extensions = useMemo(() => {
-        if (point_shape !== 'circle') return [];
+        if (point_shape === 'circle') return [];
         return [new ScatterDeckExtension()]
     }, []);
     const scatterplotLayer = useMemo(() => new ScatterplotExLayer({
