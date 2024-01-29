@@ -421,6 +421,10 @@ class BaseChart{
         if (this._tooltip){
             this._tooltip.remove();
         }
+        if (this.settingsDialog){
+            this.settingsDialog.close();
+        }
+        // dynamic props?
     }
 
 
