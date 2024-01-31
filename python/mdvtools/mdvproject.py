@@ -15,6 +15,7 @@ import string
 from os.path import join,split,exists
 from  shutil import copytree,ignore_patterns,copyfile
 from typing import Optional
+import time
 
 datatype_mappings={
     "int64":"integer",
@@ -229,13 +230,23 @@ class MDVProject:
         image_meta = ds_metadata["images"][p[1]]
         return join(image_meta["original_folder"], filename)
 
-    def _get_h5_handle(self,read_only=False):
+    def _get_h5_handle(self,read_only=False, attempt=0):
         mode = "r"
         if not exists(self.h5file):
             mode="w"
         elif not read_only:
             mode="a"
-        return h5py.File(self.h5file,mode)
+        try:
+            return h5py.File(self.h5file,mode)
+        except:
+            # certain environments seem to have issues with the handle not being closed instantly
+            # if there is a better way to do this, please change it
+            # if there are multiple processes trying to access the file, this may also help
+            # (although if they're trying to write, who knows what bad things may happen to the project in general)
+            time.sleep(0.1)
+            attempt += 1
+            print(f'error opening h5 file, attempt {attempt}...')
+            return self._get_h5_handle(read_only, attempt)
         
     def get_column(self, datasource: str, column, raw=False):
         cm  = self.get_column_metadata(datasource, column)
