@@ -1102,7 +1102,6 @@ class SequenceTrack extends MLVTrack{
 
 
     drawFeatures(options) {
-
         var sequence = options.features,
             ctx = options.context,
             bpPerPixel = options.bpPerPixel,
@@ -1115,16 +1114,14 @@ class SequenceTrack extends MLVTrack{
         let y_pos2=y_pos1+5;
 
         if (sequence) {
-
             len = sequence.length;
             w = 1 / bpPerPixel;
 
             y = y_pos1+this.height / 2;
             for (pos = bpStart; pos <= bpEnd; pos++) {
-
                 offset = pos - bpStart;
                 if (offset < len) {
-//                            var b = sequence.charAt(offset);
+                    // var b = sequence.charAt(offset);
                     b = sequence[offset];
                     p0 = Math.floor(offset * w);
                     p1 = Math.floor((offset + 1) * w);
@@ -1143,11 +1140,9 @@ class SequenceTrack extends MLVTrack{
                     if (!c) c = "gray";
 
                     if (bpPerPixel >0.18) {
-
                         Graphics.fillRect(ctx, p0, y_pos1, p1 - p0, 10, {fillStyle: c});
                     }
                     else {
-
                         Graphics.strokeText(ctx, b, pc, y, {
                             strokeStyle: c,
                             font: 'normal 10px Arial',
@@ -1157,8 +1152,7 @@ class SequenceTrack extends MLVTrack{
                 }
             }
         }
-      return y_pos1+10;
-
+        return y_pos1+10;
     }
 
 }
