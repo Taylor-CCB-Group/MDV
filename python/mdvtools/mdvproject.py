@@ -115,7 +115,8 @@ class MDVProject:
         self.set_datasource_metadata(ds)
     
 
-    def get_datasource_as_dataframe(self,datasource):
+    def get_datasource_as_dataframe(self, datasource: str) -> pandas.DataFrame:
+        ## nb, I'd quite like to have some 'DataSourceName' type alias so we know it's not just any string...
         ds= self.get_datasource_metadata(datasource)
         df = pandas.DataFrame()
         for c in ds["columns"]:
