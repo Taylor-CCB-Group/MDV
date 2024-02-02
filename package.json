@@ -14,7 +14,7 @@
     "build-flask-vite": "cross-env build=desktop_pt vite build --outDir ./python/mdvtools/static",
     "build-docs": "docs/maindocs/make clean && docs/maindocs/make html",
     "build-jsdocs": "jsdoc -c docs/jsdoc.json",
-    "python-setup": "python -m venv venv && source venv/bin/activate && pip install -e python",
+    "python-setup": "python -m venv venv && source venv/bin/activate && pip install -e python && npm run build-flask-vite",
     "mdv_desktop": "source venv/bin/activate && python -m mdvtools.mdv_desktop",
     "fix_npm_win": "npm config set script-shell \"cmd\""
   },
