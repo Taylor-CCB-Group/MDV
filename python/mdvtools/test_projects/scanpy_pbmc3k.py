@@ -28,7 +28,7 @@ def setup_views():
     All of those should be coloured by 'louvain' which we know from experience will show the clusters.
     The tooltip could be 'cell_id' so that the user can explore how particular gene sequences are distributed in those clusters.
     A table chart alongside that (perhaps not including the UMAP/tsne/PCA columns) can allow the user to see which values are
-    represented as they interactively.
+    represented as they interactively explore the data.
     This 'view' might only include 'cells'.
 
     There is also a 'link' in the project, which means that charts can be created dynamically in 'cells' based on interactions with 'genes'.
