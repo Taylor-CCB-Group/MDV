@@ -18,7 +18,13 @@ const { href } = window.location;
 const flaskURL = new URL(href).origin;//href.substring(href.indexOf("/project"));
 
 
-document.addEventListener("DOMContentLoaded", () => loadData());
+document.addEventListener("DOMContentLoaded", async () => {
+    try {
+        await loadData();
+    } catch (e) {
+        alert(`Error loading data: ${e}`)
+    }
+});
 
 /// --- this section is a bit of a mess, but it works for now --- 
 //(copilot suggesting "this is a bit of a mess" is a bit rude, but in this case it's right)
