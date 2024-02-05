@@ -1098,8 +1098,7 @@ def add_column_to_group(col: dict, data: pandas.Series, group: h5py.Group, lengt
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
         #remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
         na = numpy.array(ds)
-        na = na[~numpy.isnan(na)]
-        na = na[~numpy.isinf(na)]
+        na = na[numpy.isfinite(na)]
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
         quantiles = [0.001,0.01,0.05]
         col["quantiles"] = {}
