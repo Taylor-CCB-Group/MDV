@@ -380,6 +380,7 @@ class MDVProject:
         newdf= pandas.DataFrame({index_col:self.get_column(datasource,index_col)})
         h5 = self._get_h5_handle()
         gr = h5[datasource]
+        assert(isinstance(gr, h5py.Group))
         for c in cols:
              d= {k:v for k,v in zip(data.index,data[c])}
              #v slow - needs improving
@@ -827,7 +828,7 @@ class MDVProject:
             o.close()    
             ifile = dfile[:dfile.rindex(".")]+".json"
             i = open (ifile,"w")
-            i.write(json.dumps(index))
+            i.write(json.dumps(index, allow_nan=False))
             i.close()
 
     def get_byte_data(self,columns, group):
@@ -997,7 +998,11 @@ def get_json(file):
 
 def save_json(file,data):
     o = open(file,"w")
-    o.write(json.dumps(data,indent=2))
+    try:
+        o.write(json.dumps(data, indent=2, allow_nan=False))
+    except Exception as e:
+        print(f"Error saving json to '{file}': some data cleaning may be necessary... project likely to be in a bad state.")
+        raise(e)
     o.close()
 
 def get_subgroup_bytes(grp,index,sparse=False): 
@@ -1015,7 +1020,7 @@ def get_subgroup_bytes(grp,index,sparse=False):
         return numpy.array(grp["x"][offset:offset+_len],numpy.float32).tobytes()
 
 
-def add_column_to_group(col,data,group,length):
+def add_column_to_group(col: dict, data: pandas.Series, group: h5py.Group, length: int):
     '''
     col (dict): The column metadata (may be modified e.g. to add values)
     data (pandas.Series): The data to add
@@ -1087,18 +1092,19 @@ def add_column_to_group(col,data,group,length):
 
     else:
         dt  = numpy.int32 if col["datatype"] == "int32" else numpy.float32
-        clean = data.apply(pandas.to_numeric,errors="coerce")
+        clean = data.apply(pandas.to_numeric, errors="coerce")
         #faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
-        ds= group.create_dataset(col["field"],length,data = clean,dtype=dt)
-        #remove NaNs for min/max and quantiles
+        ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
+        #remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
         na = numpy.array(ds)
         na = na[~numpy.isnan(na)]
-        col["minMax"]=[float(str(numpy.amin(na))),float(str(numpy.amax(na)))]
-        quantiles= [0.001,0.01,0.05]
-        col["quantiles"]={}
+        na = na[~numpy.isinf(na)]
+        col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
+        quantiles = [0.001,0.01,0.05]
+        col["quantiles"] = {}
         for q in quantiles:
-            col["quantiles"][str(q)]=[
+            col["quantiles"][str(q)] = [
                 numpy.percentile(na,100*q),
                 numpy.percentile(na,100*(1-q))
             ]     
