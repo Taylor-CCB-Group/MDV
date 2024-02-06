@@ -31,7 +31,7 @@ class GenomeBrowser extends BaseChart{
                 });
             this.locText=createEl("input",{styles:{fontSize:"11px"}},this.menuSpace);
             this.locText.addEventListener("keypress",e=>{
-                if (e.keyCode==13){
+                if (e.key === "Enter") {
                     const loc = this._calculatePosition(this.locText.value);
                     this.browser.update(loc.chr,loc.start,loc.end);
                 }
