@@ -14,8 +14,13 @@ import random
 import string
 from os.path import join,split,exists
 from  shutil import copytree,ignore_patterns,copyfile
-from typing import Optional
+from typing import Optional, NewType, List, Union
 import time
+
+DataSourceName = str #NewType("DataSourceName", str)
+ColumnName = str #NewType("ColumnName", str)
+# List[ColumnName] gets tricky, `ColumnName | str` syntax needs python>=3.10
+Cols = Union[List[str], NewType("Params", List[ColumnName])]
 
 datatype_mappings={
     "int64":"integer",
@@ -449,7 +454,7 @@ class MDVProject:
                     self.set_view(view,None)
 
 
-    def add_genome_browser(self,datasource,parameters=["chr","start","end"],name=None, overwrite=False):
+    def add_genome_browser(self, datasource: DataSourceName, parameters: Cols=["chr","start","end"], name: Optional[str]=None, overwrite=False):
         '''
         args:
             datasource (string): The name of the datasource

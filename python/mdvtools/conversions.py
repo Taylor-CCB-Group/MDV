@@ -1,13 +1,13 @@
-import scanpy
-import mudata
+from scanpy import AnnData
+from mudata import MuData
 import scipy
 import pandas as pd
 import os
 
 from .mdvproject import MDVProject
 
-def convert_scanpy_to_mdv(folder,scanpy_object,max_dims=3):
-    mdv =  MDVProject(folder)
+def convert_scanpy_to_mdv(folder: str, scanpy_object: AnnData, max_dims=3, delete_existing=False) -> MDVProject:
+    mdv =  MDVProject(folder, delete_existing=delete_existing)
 
     #create datasources 'cells'
     cell_table = scanpy_object.obs
@@ -38,7 +38,7 @@ def convert_scanpy_to_mdv(folder,scanpy_object,max_dims=3):
     return mdv
 
     
-def convert_mudata_to_mdv(folder,mudata_object,max_dims=3):
+def convert_mudata_to_mdv(folder: str, mudata_object: MuData, max_dims=3) -> MDVProject:
     md=mudata_object
     p= MDVProject(folder)
     #add the cells
@@ -57,7 +57,7 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3):
 
     return p
 
-def convert_vcf_to_df(vcf_filename):
+def convert_vcf_to_df(vcf_filename: str) -> pd.DataFrame:
     f = open(vcf_filename, 'r')
     metadata = {}
     while True:
@@ -84,18 +84,20 @@ def convert_vcf_to_df(vcf_filename):
     os.remove(temp_file)
     return df
 
-def compute_vcf_end(df):
+def compute_vcf_end(df: pd.DataFrame) -> pd.DataFrame:
     '''
     Compute the end position of the variant determined from 'POS', 'REF' and 'ALT'.
 
     This is added as a column 'END' in the given DataFrame.
     '''
-    def varlen(s):
+    def varlen(s: str) -> int:
         return max([len(s) for s in s.split(',')])
-    df['END'] = df['POS'] + df[['REF', 'ALT']].applymap(varlen).max(axis=1)
+    # python/panda types aren't clever enough to easily deal with this (tbf fairly gnarly syntax)
+    # df[['REF', 'ALT']] resolves to `Series[Unknown]`
+    df['END'] = df['POS'] + df[['REF', 'ALT']].applymap(varlen).max(axis=1) # type: ignore
     return df
 
-def convert_vcf_to_mdv(folder, vcf_filename):
+def convert_vcf_to_mdv(folder: str, vcf_filename: str) -> MDVProject:
     '''
     Converts a VCF file to an MDV project. 
     The VCF file must be tab-delimited, with the header lines starting with "##" and 
