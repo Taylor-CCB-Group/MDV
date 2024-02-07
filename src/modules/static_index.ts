@@ -11,6 +11,25 @@ import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
 import { BaseDialog } from "../utilities/Dialog";
 import { fetchJsonConfig, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 import { changeURLParam } from "./desktop_index";
+import BaseChart from "../charts/BaseChart";
+
+// see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
+declare global {
+    interface Window {
+        mdv: {
+            ChartManager: typeof ChartManager,
+            chartManager?: ChartManager,
+            chartTypes?: any,
+        };
+    }
+}
+window.mdv = {
+    // does this not want to be a singleton - rather than referring to the class?
+    // not sure what I'd use the class for - would generally import in a module
+    ChartManager,
+    chartTypes: BaseChart.types,
+}
+
 
 // todo: change so that *only* ?dir=... is used to determine the root?
 // const flaskURL = window.location.pathname;
@@ -91,7 +110,7 @@ async function loadData() {
             changeURLParam("view", cm.currentView)
         }
     }
-    //todo fix searchParams when changing view.
+    // this will assign itself to `window.mdv.chartManager` in constructor
     const cm = new ChartManager("holder", datasources, dataLoader, config, listener);
 
     function extraFeatures(i: number) {

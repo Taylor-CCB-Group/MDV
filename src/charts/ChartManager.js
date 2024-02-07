@@ -121,6 +121,15 @@ function listenPreferredColorScheme(callback) {
 class ChartManager{
 
     constructor(div,dataSources,dataLoader,config={},listener=null){
+        // manage global singleton
+        if (!window.mdv) {
+            window.mdv = {};
+        }
+        if (window.mdv.chartManager){
+            console.warn("Making another ChartManager... had believed this to be a singleton");
+        }
+        window.mdv.chartManager=this;
+
         this.listeners={};
         this.infoAlerts={};
         this.progressBars={};
@@ -300,15 +309,21 @@ class ChartManager{
             const links = ds.dataStore.links;
             if (links){
                 for (let ods in links){
-                    if (!this.dsIndex[ods]){
+                    const _ods = this.dsIndex[ods].dataStore;
+                    if (!_ods){
                         console.warn(`datasource ${ds.name} has link to non-existent datasource ${ods}`);
                         return;
                     }
+                    // pjt: could there be cases where we want more than one of a given type of link between two data sources?
+                    // if so, we can support that by making these functions undertand how to interpret the links object appropriately.
                     if (links[ods].interactions){
-                        this._addInteractionLinks(ds.dataStore,this.dsIndex[ods].dataStore,links[ods].interactions);
+                        this._addInteractionLinks(ds.dataStore, _ods, links[ods].interactions);
                     }
                     if (links[ods].valueset) {
-                        this._addValuesetLink(ds.dataStore, this.dsIndex[ods].dataStore, links[ods].valueset);
+                        this._addValuesetLink(ds.dataStore,  _ods, links[ods].valueset);
+                    }
+                    if (links[ods].column_pointer){
+                        this._addColumnPointerLink(ds.dataStore, _ods,links[ods].column_pointer);
                     }
                 }
             }
@@ -357,6 +372,37 @@ class ChartManager{
                     }
                 }
             });
+        });
+    }
+
+    /**
+     * @param {ds} DataStore
+     * @param {ods} DataStore other data store
+     * @param {object} link - information about what properties to target in ods
+     * For instance, `{ source_column: <column_name>, target_chart: <chart_id>, target_property: <property_name> }`
+     * more concretely: `{ source_column: "feature", target_chart: "quadrat_image_chart", target_property: "color_by" }`
+     */
+    _addColumnPointerLink(ds, ods, link) {
+        const srcCol = ds.columnIndex[link.source_column];
+        // do we expect the chart to be there when it might belong to a different view?
+        // look it up in the listener for now, and just ignore/log if it's not there
+        // const targetChart = this.charts[link.target_chart];
+        // if (!targetChart) throw new Error(`No chart with id ${link.target_chart} found`);
+        
+        const isTextLike = srcCol.values; // perhaps 'unique' should also be considered text-like / valid?
+        if (!isTextLike) throw new Error("Only text-like columns are supported for column pointer links");
+        ds.addListener(`${ds.name}-${ods.name}_column_pointer`, async (type, data) => {
+            if (type === "data_highlighted") {
+                const targetChart = this.charts[link.target_chart];
+                if (!targetChart) {
+                    console.log(`No chart with id ${link.target_chart} found - bypassing column pointer link`);
+                    return;
+                }
+                await this._getColumnsAsync(ds.name, [link.source_column]);
+                // data probably looks something like `{indexes: Array(1), source: undefined, data: null, dataStore: DataStore}`
+                const { indexes } = data;
+                targetChart.chart[link.target_property] = srcCol.values[srcCol.data[indexes[0]]];
+            }
         });
     }
 
