@@ -27,8 +27,11 @@ export function useFilteredIndices() {
         // return
         let cancelled = false;
         let finished = false;
-        const promise = dataStore.getFilteredIndices();
-        promise.then((indices) => {
+        if (!filterColumn) return;
+        const indexPromise = dataStore.getFilteredIndices();
+        const colPromise = window.mdv.chartManager?._getColumnsAsync(dataStore.name, [filterColumn]);
+        Promise.all([indexPromise, colPromise]).then(([indices]) => {
+        // indexPromise.then((indices) => {
             if (cancelled) return;
             finished = true;
             if (filterColumn) {
@@ -36,8 +39,13 @@ export function useFilteredIndices() {
                 const filterValue = config.background_filter?.category;
                 if (filterValue) {
                     const filterIndex = col.values.indexOf(filterValue);
-                    const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
-                    setFilteredIndices(filteredIndices);
+                    try {
+                        const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
+                        setFilteredIndices(filteredIndices);
+                    } catch (e) {
+                        console.error('error filtering indices', e);
+                        return;
+                    }
                     return;
                 }
             }
@@ -146,16 +154,21 @@ export function useScatterplotLayer() {
         for (let i = 0; i < data.length; i++) {
             const d = data[i];
             // todo proper use of transform matrices
-            const x = cx.data[d] / scale;
-            const y = cy.data[d] / scale;
-            if (x === undefined || y === undefined) {
-                console.warn('undefined data in scatterplot');
-                continue;
+            try {
+                const x = cx.data[d] / scale;
+                const y = cy.data[d] / scale;
+                if (x === undefined || y === undefined) {
+                    console.warn('undefined data in scatterplot');
+                    continue;
+                }
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            } catch (e) {
+                console.error('error calculating bounding box', e);
+                return;
             }
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
         }
 
         // Step 2: Calculate the center of the bounding box
