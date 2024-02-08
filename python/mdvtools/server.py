@@ -65,6 +65,7 @@ def create_app(project: MDVProject, open_browser = True, port = 5050, websocket 
         route = ""
         # route = "/project/" + project.name # for testing new API with simple app...
         app=Flask(__name__)
+        print(f'created Flask {app}')
         #add headers to allow web workers
         app.after_request(add_safe_headers)
         project_bp = app
@@ -87,6 +88,7 @@ def create_app(project: MDVProject, open_browser = True, port = 5050, websocket 
 
     @project_bp.route("/")
     def project_index():
+        print('recieved request to project_index')
         # `_mdvInit('{{route}}')` in template...
         return render_template("page.html", route=route)
     
@@ -206,7 +208,7 @@ def create_app(project: MDVProject, open_browser = True, port = 5050, websocket 
         print(f"Adding project {project.name} to existing app")
         app.register_blueprint(project_bp)
     else:
-        app.run(port=port)
+        app.run(host='0.0.0.0', port=port, debug=True)
 
 
   
