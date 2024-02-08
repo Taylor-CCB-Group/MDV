@@ -44,6 +44,7 @@ import "./SingleSeriesChart";
 import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
+import { runInAction } from "mobx";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -323,7 +324,8 @@ class ChartManager{
                         this._addValuesetLink(ds.dataStore,  _ods, links[ods].valueset);
                     }
                     if (links[ods].column_pointer){
-                        this._addColumnPointerLink(ds.dataStore, _ods,links[ods].column_pointer);
+                        console.warn("experimental column_pointer links not currently supported");
+                        // this._addColumnPointerLink(ds.dataStore, _ods,links[ods].column_pointer);
                     }
                 }
             }
@@ -391,9 +393,9 @@ class ChartManager{
         
         const isTextLike = srcCol.values; // perhaps 'unique' should also be considered text-like / valid?
         if (!isTextLike) throw new Error("Only text-like columns are supported for column pointer links");
-        ds.addListener(`${ds.name}-${ods.name}_column_pointer`, async (type, data) => {
+        ds.addListener(`${ds.name}-${ods.name}_column_pointer`, async (type, data) => { //don't think we need mobx action as autoObservable is used
             if (type === "data_highlighted") {
-                const targetChart = this.charts[link.target_chart];
+                const targetChart = this.charts[link.target_chart]?.chart;
                 if (!targetChart) {
                     console.log(`No chart with id ${link.target_chart} found - bypassing column pointer link`);
                     return;
@@ -401,7 +403,12 @@ class ChartManager{
                 await this._getColumnsAsync(ds.name, [link.source_column]);
                 // data probably looks something like `{indexes: Array(1), source: undefined, data: null, dataStore: DataStore}`
                 const { indexes } = data;
-                targetChart.chart[link.target_property] = srcCol.values[srcCol.data[indexes[0]]];
+                const newValue = srcCol.values[srcCol.data[indexes[0]]];
+                targetChart.config[link.target_property] = newValue;
+                targetChart.setTitle(newValue); //could be optional - or use some kind of template?
+                if (link.target_property === "color_by") {
+                    targetChart.colorByColumn(newValue);
+                }
             }
         });
     }
@@ -592,7 +599,7 @@ class ChartManager{
             this.viewSelect.value =  this.currentView
             dataLoader.viewLoader(this.currentView).then(data=>{
                 this._init(data,firstTime);
-            })     
+            })
         }
         //only one view hard coded in config
         else{
@@ -1878,6 +1885,7 @@ class ChartManager{
             link.id= getRandomString();
         }
         switch(link.type){
+            // how interesting - hiding in plain sight all this time
             case "color_by_column":
                 const chart = this.charts[link.source_chart];
                 if (!chart){
@@ -1886,12 +1894,43 @@ class ChartManager{
                 }
                 
                 chart.chart.addListener(link.id,(type,data)=>{
-                    if (type==="cell_clicked"){
-                        for (let cid of link.target_charts){
+                    if (type === "cell_clicked") {
+                        // this is specific to HeatMap cells...
+                        for (let cid of link.target_charts) {
                             this.getChart(cid).colorByColumn(data.row)
                         }
                     }
-                })
+                    // this type of event not triggered by 'chart', but is by dataStore (or is it dataSource - what's the difference again?)
+                    // consider making charts also raise events like this.
+                    // if (type === "data_highlighted") { }
+                });
+                const ds = chart.dataSource.dataStore;
+                const srcCol = ds.columnIndex[link.column];
+                if (!srcCol) {
+                    console.log(`"color_by_column" link column "${link.column}" not found in dataStore "${ds.name}"`);
+                    return;
+                }
+                // we should remove this listener when the chart is removed, including when the chart is removed by a view change
+                // not too tragic if we don't as the event will be ignored when raised by different charts, 
+                // and replaced with same id when view is reloaded
+                ds.addListener(link.id, async (type, data) => {
+                    if (data.source.config.id !== link.source_chart) return;
+                    if (type === "data_highlighted") {
+                        await this._getColumnsAsync(ds.name, [link.column]); //may not be necessary as `colorByColumn` is 'decorated' to load column
+                        const newValue = srcCol.values[srcCol.data[data.indexes[0]]];
+                        for (let cid of link.target_charts) {
+                            const chart = this.getChart(cid);
+                            chart.colorByColumn(newValue);
+                            if (link.set_title) chart.setTitle(newValue);
+                            if (link.set_tooltip) {
+                                if (chart.setToolTipColumn) chart.setToolTipColumn(link.column);
+                                else if (chart.config.tooltip) {
+                                    runInAction(()=>chart.config.tooltip.column = newValue);
+                                }
+                            }
+                        }
+                    }
+                });
                 break;
         }
     }
