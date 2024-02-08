@@ -81,6 +81,9 @@ class BaseChart{
                 this.onDataAdded(data);
             }
             else if (type==="data_highlighted"){
+                if (data.source === this) {
+                    this._callListeners("data_highlighted", data);
+                }
                 if (this.onDataHighlighted){
                     this.onDataHighlighted(data);
                 }

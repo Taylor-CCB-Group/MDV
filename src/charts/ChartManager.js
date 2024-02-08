@@ -1892,33 +1892,24 @@ class ChartManager{
                     console.error(`broken link id:${link.id}`);
                     return;
                 }
+                const ds = chart.dataSource.dataStore;
+                const srcCol = ds.columnIndex[link.column];
+                if (!srcCol) {
+                    console.log(`"color_by_column" link column "${link.column}" not found in dataStore "${ds.name}"`);
+                    // return;
+                }
                 
-                chart.chart.addListener(link.id,(type,data)=>{
+                chart.chart.addListener(link.id, async (type, data) => {
                     if (type === "cell_clicked") {
                         // this is specific to HeatMap cells...
                         for (let cid of link.target_charts) {
                             this.getChart(cid).colorByColumn(data.row)
                         }
                     }
-                    // this type of event not triggered by 'chart', but is by dataStore (or is it dataSource - what's the difference again?)
-                    // consider making charts also raise events like this.
-                    // if (type === "data_highlighted") { }
-                });
-                const ds = chart.dataSource.dataStore;
-                const srcCol = ds.columnIndex[link.column];
-                if (!srcCol) {
-                    console.log(`"color_by_column" link column "${link.column}" not found in dataStore "${ds.name}"`);
-                    return;
-                }
-                // we should remove this listener when the chart is removed, including when the chart is removed by a view change
-                // not too tragic if we don't as the event will be ignored when raised by different charts, 
-                // and replaced with same id when view is reloaded
-                ds.addListener(link.id, async (type, data) => {
-                    if (data.source.config.id !== link.source_chart) return;
-                    if (type === "data_highlighted") {
+                    if (type === "data_highlighted" && srcCol) {
                         await this._getColumnsAsync(ds.name, [link.column]); //may not be necessary as `colorByColumn` is 'decorated' to load column
                         const newValue = srcCol.values[srcCol.data[data.indexes[0]]];
-                        for (let cid of link.target_charts) {
+                        for (const cid of link.target_charts) {
                             const chart = this.getChart(cid);
                             chart.colorByColumn(newValue);
                             if (link.set_title) chart.setTitle(newValue);
@@ -1929,7 +1920,7 @@ class ChartManager{
                                 }
                             }
                         }
-                    }
+                     }
                 });
                 break;
         }
