@@ -62,6 +62,7 @@ const root = getRoot(dir);
 //hack to load data from local API... TODO XXX make less hacky, rather than more...
 //this was sort-of-working as of this writing for `MDVProject.serve()`, as long as the default port 5050 is used...
 //need to revisit and actually come up with a proper design.
+// - this means some online projects are currently broken, I should fix that.
 const staticFolder = false; //!dir.startsWith("/project") && !(window.location.port === "5050") && !dir.endsWith("5050");
 const project_name = dir.split("/").pop();
 /// --- end of messy section ---

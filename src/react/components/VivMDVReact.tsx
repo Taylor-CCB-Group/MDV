@@ -61,7 +61,7 @@ export type TooltipConfig = {
         column?: ColumnName,
     }
 };
-
+//viewState should be persisted... maybe a way of saving different snapshots?
 //could we infer or something to avoid having to repeat this?
 export type ScatterPlotConfig = {
     radius: number,
@@ -109,6 +109,9 @@ export type VivMdvReactConfig = ScatterPlotConfig & (
 export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog: any;
+    viewerStore?: ReturnType<typeof useViewerStore>;
+    /** set to true when this is the source of a viewState change etc to prevent circular update */
+    ignoreStateUpdate = false;
     constructor(dataStore, div, config) {
         // todo better default config
         config = {...scatterDefaults, ...config};

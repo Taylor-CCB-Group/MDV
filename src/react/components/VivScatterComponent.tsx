@@ -6,6 +6,7 @@ import { useChartSize, useChartID } from "../hooks";
 import { useScatterplotLayer } from "../scatter_state";
 import SelectionOverlay from "./SelectionOverlay";
 import { useLoader, OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
+import { VivMDVReact } from "./VivMDVReact";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -32,8 +33,35 @@ export const VivScatter = observer(() => {
         shallow
     );
 
-    // const [viewState, setViewState] = useState<ViewState>();
     const viewState = useViewerStore(store => store.viewState);
+    // I want to make links between viewStates of different charts... this could be moved to a hook.
+    useEffect(() => {
+        if (!window.mdv.chartManager?.viewData) return;
+        const cm = window.mdv.chartManager;
+        const { viewData } = cm; // as of now, this won't change in the lifetime of the component - but hope for interactive link edit soon.
+        // 'viewData' is currently just the json metadata for the view, but there could be a UI for manipulating links in it.
+        
+        const thisChart = cm.getChart(id) as VivMDVReact;
+        // find any "view_state" links in the viewData that include this chart's id in "linked_charts"
+        const vsLinks = viewData.links.filter(l => l.type === "view_state" && l.linked_charts.includes(id));
+        if (vsLinks.length === 0) return;
+        console.log('found view state link(s)', vsLinks);
+        // we want to do something like subscribe to our viewState and push changes to the linked charts
+        // but make sure we don't create a circular loop of updates
+        thisChart.viewerStore = viewerStore;
+        const unsubscribe = viewerStore.subscribe(({viewState}) => {
+            thisChart.ignoreStateUpdate = true;
+            vsLinks.forEach(link => {
+                const otherCharts = link.linked_charts.filter(c => c !== id).map(c => cm.getChart(c));
+                otherCharts.forEach(c => {
+                    if (c.ignoreStateUpdate) return;
+                    c.viewerStore?.setState({ viewState });
+                });
+            });
+            thisChart.ignoreStateUpdate = false;
+        });
+        return unsubscribe;
+    }, [viewerStore, id]);
     const vsRef = useRef<ViewState>();
     const vsDebugDivRef = useRef<HTMLPreElement>(null);
     
@@ -105,7 +133,7 @@ export const VivScatter = observer(() => {
                 layerProps={[layerConfigX]}
                 viewStates={[{ ...viewState, id: detailId }]}
                 onViewStateChange={e => {
-                    // viewerStore.setState({ viewState: { ...e.viewState, id: detailId } });
+                    viewerStore.setState({ viewState: { ...e.viewState, id: detailId } });
                     if (vsDebugDivRef.current) vsDebugDivRef.current.innerText = JSON.stringify(e.viewState, null, 2);
                 }}
                 deckProps={deckProps}

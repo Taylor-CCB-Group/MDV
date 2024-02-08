@@ -1885,7 +1885,7 @@ class ChartManager{
             link.id= getRandomString();
         }
         switch(link.type){
-            // how interesting - hiding in plain sight all this time
+            // some other types of link may be interpreted within chart code (e.g. react effect does "view_state")
             case "color_by_column":
                 const chart = this.charts[link.source_chart];
                 if (!chart){
