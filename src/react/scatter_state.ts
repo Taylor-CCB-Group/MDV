@@ -112,7 +112,7 @@ export function useScatterplotLayer() {
         //todo nicer tooltip interface (and review how this hook works)
         () => {
             const hoverInfo = hoverInfoRef.current;
-            return hoverInfo && hoverInfo.index !== -1 && `${getTooltipVal(hoverInfo.index)}`;
+            return hoverInfo && hoverInfo.index !== -1 && `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`;
         },
     [hoverInfoRef, getTooltipVal]);
 
