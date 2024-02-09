@@ -1,11 +1,11 @@
 import { PropsWithChildren, createContext, useContext, useMemo, useRef } from "react";
 import { useConfig } from "../../hooks";
 import { ColorPaletteExtension, loadOmeTiff } from "@hms-dbmi/viv";
-import { useOmeTiff } from "../../context";
+import { useChart, useOmeTiff } from "../../context";
 import { createStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { observer } from "mobx-react-lite";
-import { VivMdvReactConfig } from "../VivMDVReact";
+import { VivMDVReact } from "../VivMDVReact";
 import type { ExtractState, ZustandStore } from "./zustandTypes";
 
 // what about loadOmeZarr, loadBioformatsZarr...
@@ -143,7 +143,7 @@ export type ROI = {
  * So in order to have appropriate state for multiple MDV charts, we have a context that contains the stores for each.
  * Within this context, we should be able to use much the same API as Avivator.
  */
-type VivContextType = {
+export type VivContextType = {
   channelsStore: ZustandStore<WithToggles<ChannelsState> & {
     toggleIsOn: (index: number) => void,
     setPropertiesForChannel: (channel: number, newProperties: Partial<typeof DEFAUlT_CHANNEL_VALUES>) => void,
@@ -157,102 +157,100 @@ type VivContextType = {
     removeIsChannelLoading: (index: number) => void
   }> //also has some extra methods... setIsChannelLoading, addIsChannelLoading, removeIsChannelLoading
 }
+/**
+ * This is somewhat MDV-centric now. As of writing, a chart has a property `vivStores`
+ * which means different <VivProvider>s (currently rendering in different react roots, but referring to the same chart
+ * ie the chart component itself, and a color-change GUI dialog for it)
+ * can share reference to the same stores / act as equivalent contexts
+ */
+function createVivStores(chart: VivMDVReact) {
+  if (chart.vivStores) {
+    console.warn('vivStores already exists for this chart');
+    return;
+  }
+  const channelsStore = createStore(set => ({
+    ...DEFAUlT_CHANNEL_STATE,
+    ...generateToggles(DEFAUlT_CHANNEL_VALUES, set),
+    toggleIsOn: index =>
+      set(state => {
+        const channelsVisible = [...state.channelsVisible];
+        channelsVisible[index] = !channelsVisible[index];
+        return { ...state, channelsVisible };
+      }),
+    setPropertiesForChannel: (channel, newProperties) =>
+      set(state => {
+        const entries = Object.entries(newProperties);
+        const newState = {};
+        entries.forEach(([property, value]) => {
+          newState[property] = [...state[property]];
+          newState[property][channel] = value;
+        });
+        return { ...state, ...newState };
+      }),
+    removeChannel: channel =>
+      set(state => {
+        const newState = {};
+        const channelKeys = Object.keys(DEFAUlT_CHANNEL_VALUES);
+        Object.keys(state).forEach(key => {
+          if (channelKeys.includes(key)) {
+            newState[key] = state[key].filter((_, j) => j !== channel);
+          }
+        });
+        return { ...state, ...newState };
+      }),
+    addChannel: newProperties =>
+      set(state => {
+        const entries = Object.entries(newProperties);
+        const newState = { ...state };
+        entries.forEach(([property, value]) => {
+          newState[property] = [...state[property], value];
+        });
+        Object.entries(DEFAUlT_CHANNEL_VALUES).forEach(([k, v]) => {
+          if (newState[k].length < newState[entries[0][0]].length) {
+            newState[k] = [...state[k], v];
+          }
+        });
+        return newState;
+      })
+  }))// satisfies VivContextType['channelsStore'];
+  const imageSettingsStore = createStore(set => ({
+    ...DEFAULT_IMAGE_STATE,
+    ...generateToggles(DEFAULT_IMAGE_STATE, set)
+  })) satisfies VivContextType['imageSettingsStore'];
+  const viewerStore = createStore(set => ({
+    ...DEFAULT_VIEWER_STATE,
+    ...generateToggles(DEFAULT_VIEWER_STATE, set),
+    setIsChannelLoading: (index, val) =>
+      set(state => {
+        const newIsChannelLoading = [...state.isChannelLoading];
+        newIsChannelLoading[index] = val;
+        return { ...state, isChannelLoading: newIsChannelLoading };
+      }),
+    addIsChannelLoading: val =>
+      set(state => {
+        const newIsChannelLoading = [...state.isChannelLoading, val];
+        return { ...state, isChannelLoading: newIsChannelLoading };
+      }),
+    removeIsChannelLoading: index =>
+      set(state => {
+        const newIsChannelLoading = [...state.isChannelLoading];
+        newIsChannelLoading.splice(index, 1);
+        return { ...state, isChannelLoading: newIsChannelLoading };
+      })
+  })) satisfies VivContextType['viewerStore'];
+  // not sure why 'channelsStore' is misbehaving when other types are ok...
+  return { viewerStore, channelsStore, imageSettingsStore } as unknown as VivContextType;
+}
+
 const VivContext = createContext<VivContextType>(null);
 /**
- * not sure if it's a good idea to have an observer here...
- * vivConfig is the config from the MDV chart... For it to be any use, it should be
- * combined with DEFAULT_CHANNEL_STATE when initialising, and updated with new values from the store
- * as they are set...
- * 
- * But as for observing... I'm not sure we want to be messing with integrating mobx reactions into zustand?
  */
 export const VivProvider = observer(({ children }: PropsWithChildren) => {
-  const vivConfig = useConfig<VivMdvReactConfig>();
-  const channelsStoreRef = useRef(null);
-  if (!channelsStoreRef.current) {
-    channelsStoreRef.current = createStore<ChannelsState>(set => ({
-      ...DEFAUlT_CHANNEL_STATE,
-      ...generateToggles(DEFAUlT_CHANNEL_VALUES, set),
-      toggleIsOn: index =>
-        set(state => {
-          const channelsVisible = [...state.channelsVisible];
-          channelsVisible[index] = !channelsVisible[index];
-          return { ...state, channelsVisible };
-        }),
-      setPropertiesForChannel: (channel, newProperties) =>
-        set(state => {
-          const entries = Object.entries(newProperties);
-          const newState = {};
-          entries.forEach(([property, value]) => {
-            newState[property] = [...state[property]];
-            newState[property][channel] = value;
-          });
-          return { ...state, ...newState };
-        }),
-      removeChannel: channel =>
-        set(state => {
-          const newState = {};
-          const channelKeys = Object.keys(DEFAUlT_CHANNEL_VALUES);
-          Object.keys(state).forEach(key => {
-            if (channelKeys.includes(key)) {
-              newState[key] = state[key].filter((_, j) => j !== channel);
-            }
-          });
-          return { ...state, ...newState };
-        }),
-      addChannel: newProperties =>
-        set(state => {
-          const entries = Object.entries(newProperties);
-          const newState = { ...state };
-          entries.forEach(([property, value]) => {
-            newState[property] = [...state[property], value];
-          });
-          Object.entries(DEFAUlT_CHANNEL_VALUES).forEach(([k, v]) => {
-            if (newState[k].length < newState[entries[0][0]].length) {
-              newState[k] = [...state[k], v];
-            }
-          });
-          return newState;
-        })
-    }));
-  }
-  const imageSettingsStoreRef = useRef(null);
-  if (!imageSettingsStoreRef.current) {
-    imageSettingsStoreRef.current = createStore(set => ({
-      ...DEFAULT_IMAGE_STATE,
-      ...generateToggles(DEFAULT_IMAGE_STATE, set)
-    }));
-  }
-  const viewerStoreRef = useRef(null);
-  if (!viewerStoreRef.current) {
-    viewerStoreRef.current = createStore(set => ({
-      ...DEFAULT_VIEWER_STATE,
-      ...generateToggles(DEFAULT_VIEWER_STATE, set),
-      setIsChannelLoading: (index, val) =>
-        set(state => {
-          const newIsChannelLoading = [...state.isChannelLoading];
-          newIsChannelLoading[index] = val;
-          return { ...state, isChannelLoading: newIsChannelLoading };
-        }),
-      addIsChannelLoading: val =>
-        set(state => {
-          const newIsChannelLoading = [...state.isChannelLoading, val];
-          return { ...state, isChannelLoading: newIsChannelLoading };
-        }),
-      removeIsChannelLoading: index =>
-        set(state => {
-          const newIsChannelLoading = [...state.isChannelLoading];
-          newIsChannelLoading.splice(index, 1);
-          return { ...state, isChannelLoading: newIsChannelLoading };
-        })
-    }));
-  }
+  const vivChart = useChart() as VivMDVReact; //may want to be less MDV-centric here
+  if (!vivChart.vivStores) vivChart.vivStores = createVivStores(vivChart); //<< not very react-y: is this ok?
+  const vivStoresRef = useRef(vivChart.vivStores);
   return (
-    <VivContext.Provider value={{
-      channelsStore: channelsStoreRef.current,
-      imageSettingsStore: imageSettingsStoreRef.current,
-      viewerStore: viewerStoreRef.current,
-    }}>
+    <VivContext.Provider value={vivStoresRef.current}>
       {children}
     </VivContext.Provider>
   )

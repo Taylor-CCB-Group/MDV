@@ -2,13 +2,14 @@ import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivContextType, VivProvider, useChannelsStoreApi, useImageSettingsStoreApi, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
 import type { ColumnName, DataColumn } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
+import { useChart } from "../context";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -17,13 +18,10 @@ function ReactTest() {
     // so VivProvider should have whatever is necessary to adapt our config to that
     // and we'd useLoader() as opposed to useOmeTiff()
     // ... and hopefully our version of Avivator hooks will have better types ...
-    console.log('ReactTest rendering...');
     return (
-    // <OmeTiffProvider>
-        <VivProvider>
-            <MainChart />
-        </VivProvider>
-    // </OmeTiffProvider>
+    <VivProvider>
+        <MainChart />
+    </VivProvider>
     )
 }
 
@@ -109,7 +107,12 @@ export type VivMdvReactConfig = ScatterPlotConfig & (
 export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog: any;
-    viewerStore?: ReturnType<typeof useViewerStore>;
+
+    vivStores?: VivContextType;
+    get viewerStore() {
+        return this.vivStores?.viewerStore;
+    }
+
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
     constructor(dataStore, div, config) {
