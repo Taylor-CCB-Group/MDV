@@ -62,6 +62,9 @@ html_theme_options = {
     #'display_version': False,
 }
 
+# TBD:
+# js_language = 'typescript'
+
 #is there a simpler way to sepcify than having to list every folder?
 #js_source_path = ['../../src/charts','../../src/dataloaders','../../src/utilities']
 js_source_path=['../../src/datastore','../../src/charts','../../src/dataloaders']
