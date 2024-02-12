@@ -1,10 +1,10 @@
 {
     "opts":{
-        "destination":"docs/build",
-        "tutorials":"docs/extradocs",
+        "destination":"docs/jsdocs/build",
+        "tutorials":"docs/jsdocs/extradocs",
         "recurse":true,
         "template":"node_modules/docdash",
-        "readme":"docs/readme.md"
+        "readme":"docs/jsdocs/readme.md"
     },
     "plugins": ["plugins/markdown"],
     "source":{

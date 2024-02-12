@@ -21,7 +21,8 @@ npm run build-docs
 ``` 
 or 
 ```
-docs/maindocs/make clean && docs/maindocs/make html
+sphinx-build -M html docs/maindocs docs/maindocs/_build
+
 ```
 and they will be generated in docs/maindocs/_build/html
 
