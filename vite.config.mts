@@ -111,7 +111,8 @@ export default defineConfig(env => { return {
     build: {
         sourcemap: true,
         rollupOptions: { 
-            ...getRollupOptions(), 
+            ...getRollupOptions(),
+            external: ['./python/**'],
             // this is annoying... lots of warnings in console output otherwise...
             // https://github.com/vitejs/vite/issues/15012#issuecomment-1815854072
             onLog(level, log, handler) {
