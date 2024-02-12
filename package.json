@@ -13,7 +13,7 @@
     "build-nofont": "cross-env build=production nofont=true vite build --outDir ./dist/basic",
     "build-flask-vite": "cross-env build=desktop_pt vite build --outDir ./python/mdvtools/static",
     "build-docs": "docs/maindocs/make clean && docs/maindocs/make html",
-    "build-jsdocs": "jsdoc -c docs/jsdoc.json",
+    "build-jsdocs": "jsdoc -c docs/jsdocs/jsdoc.json",
     "python-setup": "python -m venv venv && source venv/bin/activate && pip install -e python && npm run build-flask-vite",
     "mdv_desktop": "source venv/bin/activate && python -m mdvtools.mdv_desktop",
     "fix_npm_win": "npm config set script-shell \"cmd\""
@@ -70,7 +70,7 @@
     "style-loader": "^3.3.1",
     "ts-loader": "^9.5.1",
     "typescript": "^5.3.3",
-    "vite": "^5.0.6",
+    "vite": "^5.1.1",
     "webpack": "^5.74.0",
     "webpack-bundle-analyzer": "^4.7.0",
     "webpack-cli": "^4.10.0",
