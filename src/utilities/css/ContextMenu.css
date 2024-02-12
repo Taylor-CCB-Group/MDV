@@ -282,10 +282,6 @@ select, input, textarea {
       color:#eee;
       font-size:20px;
       margin-left:auto;
-      margin-bottom:8px;
-      position:absolute;
-      top:3px;
-      right:7px
   }
 
   .ciview-dlg-content{ 
@@ -298,12 +294,12 @@ select, input, textarea {
   .ciview-dlg-header {
     padding: 6px;
     cursor: move;
-    background-color: #2196F3;
+    /* background-color: #2196F3; */
     color: #fff;
     text-overflow: ellipsis;
     overflow:hidden;
     flex:0 0 auto;
-    /* margin-bottom: 0.2em; */
+    display: flex;
   }
 
   .ciview-dlg-header-text{
