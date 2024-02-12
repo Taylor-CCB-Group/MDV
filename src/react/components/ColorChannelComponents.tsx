@@ -1,5 +1,6 @@
-import { VivProvider, useChannelsStore, useChannelsStoreApi, useMetadata } from "./avivatorish/state";
-import { Checkbox, Slider } from "@mui/material";
+import { useId } from "react";
+import { VivProvider, useChannelsStore, useChannelsStoreApi, useLoader, useMetadata } from "./avivatorish/state";
+import { Checkbox, FormControl, InputLabel, MenuItem, Select, Slider } from "@mui/material";
 
 
 export default function MainVivColorDialog() {
@@ -11,11 +12,63 @@ export default function MainVivColorDialog() {
 }
 
 
-const ChannelSliders = ({ index }: { index: number }) => {
+const ChannelChooserMUI = ({ index }: { index: number }) => {
+    const channels = useMetadata().Pixels.Channels.map(c => c.Name) as string[];
+    const selections = useChannelsStore(({selections}) => selections);
+    const channelsStore = useChannelsStoreApi();
+    const id = useId();
+    const name = channels[selections[index].c]
+
+    return (
+        <>
+        <FormControl fullWidth variant="standard">
+            <InputLabel id={id}>{name}</InputLabel>
+            <Select
+            labelId={id}
+            label="Channel"
+            onChange={e => {
+                const newSelections = [...selections];
+                if (typeof e.target.value !== 'number') {
+                    return;
+                }
+                newSelections[index].c = e.target.value;
+                channelsStore.setState({selections: newSelections});
+            }}
+            >
+                {channels.map((c, i) => (<MenuItem key={`${i}_${c}`} value={i}>{c}</MenuItem>))}
+            </Select>
+        </FormControl>
+        </>
+    )
+}
+
+const ChannelChooser = ({index}: {index: number}) => {
+    const channels = useMetadata().Pixels.Channels.map(c => c.Name) as string[];
+    const selections = useChannelsStore(({selections}) => selections);
+    const channelsStore = useChannelsStoreApi();
+    
+    return (
+        <>
+        <select 
+        value={selections[index].c}
+        style={{width: '100%', padding: '0.2em'}} onChange={e => {
+            const newSelections = [...selections];
+            try {
+                newSelections[index].c = Number.parseInt(e.target.value)
+                channelsStore.setState({selections: newSelections});
+            } catch {}
+        }}>
+            {channels.map((c, i) => (<option key={`${i}_${c}`} value={i}>{c}</option>))}
+        </select>
+        </>
+    )
+}
+
+const ChannelController = ({ index }: { index: number }) => {
     const limits = useChannelsStore(({ contrastLimits }) => contrastLimits);
-    const {colors, selections, channelsVisible} = useChannelsStore(({ colors, selections, channelsVisible }) => (
+    const {colors, selections, channelsVisible, removeChannel} = useChannelsStore(({ colors, selections, channelsVisible, removeChannel }) => (
         // trouble with 'domains' for some reason... "Cannot access 'domains' before initialization"
-        { colors, selections, channelsVisible }
+        { colors, selections, channelsVisible, removeChannel }
     ));
     const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
@@ -32,14 +85,14 @@ const ChannelSliders = ({ index }: { index: number }) => {
     return (
         <div
         style = {{
-            padding: '10px',
+            // padding: '10px',
             display: 'grid',
-            gridTemplateColumns: '0.4fr 0.1fr 1fr',
+            gridTemplateColumns: '0.4fr 0.1fr 1fr 0.1fr',
             justifyItems: 'flex-start',
             alignItems: 'center',
         }}
         >
-            {name}
+            <ChannelChooser index={index} />
             <Checkbox
                 checked={channelVisible}
                 onChange={() => {
@@ -49,6 +102,7 @@ const ChannelSliders = ({ index }: { index: number }) => {
                 }}
             />
             <Slider
+                size="small"
                 style={{ color: colorString, marginLeft: '10px' }}
                 value={limits[index]}
                 onChange={(e, v) => {
@@ -57,23 +111,35 @@ const ChannelSliders = ({ index }: { index: number }) => {
                     channelsStore.setState({ contrastLimits });
                 }}
             />
+            <button 
+            style={{marginLeft: '12px'}}
+            onClick={() => {
+                removeChannel(index);
+            }}>
+                x
+            </button>
         </div>
     )
 }
 
-const AddChannelButton = () => {
-    //TBD
-    return <>
-        +
-    </>;
+const AddChannel = () => {
+    const loader = useLoader();
+    const { labels } = loader[0];
+    const channelsStore = useChannelsStoreApi();
+    const addChannel = useChannelsStore(state => state.addChannel);
+    return <button onClick={() => {
+        // addChannel({}); //todo
+    }}>
+        Add channel
+    </button>;
 }
 
 export const Test = () => {
     const colors = useChannelsStore(({ colors }) => colors);
     return <div style={{width: '100%'}}>{
         colors.map((c, i) => (
-            <ChannelSliders key={i} index={i} />
+            <ChannelController key={i} index={i} />
         ))}
-        <AddChannelButton />
+        <AddChannel />
     </div>
 }
