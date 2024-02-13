@@ -15,6 +15,7 @@ export const useViewStateLink = () => {
 
         const thisChart = cm.getChart(id) as VivMDVReact;
         // find any "view_state" links in the viewData that include this chart's id in "linked_charts"
+        if (!viewData.links) return;
         const vsLinks = viewData.links.filter(l => l.type === "view_state" && l.linked_charts.includes(id));
         if (vsLinks.length === 0) return;
         console.log('found view state link(s)', vsLinks);
