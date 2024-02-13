@@ -135,7 +135,12 @@ const AddChannel = () => {
     const channelsStore = useChannelsStoreApi();
     const addChannel = useChannelsStore(state => state.addChannel);
     return <button onClick={() => {
-        // addChannel({}); //todo
+        addChannel({
+            selections: {c: 0, z: 0, t: 0},
+            ids: String(Math.random()),
+            channelsVisible: true,
+            colors: [255, 255, 255],
+        }); //todo isLoading, auto-contrast, palette, etc.
     }}>
         Add channel
     </button>;
