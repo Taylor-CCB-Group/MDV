@@ -1,7 +1,8 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { VivProvider, useChannelsStore, useChannelsStoreApi, useLoader, useMetadata } from "./avivatorish/state";
+// some of this is quite bloated - could use dynamic imports for some of the more complex components
 import { Checkbox, FormControl, InputLabel, MenuItem, Select, Slider } from "@mui/material";
-
+import { PopoverPicker } from "./ColorPicker";
 
 export default function MainVivColorDialog() {
     return (
@@ -72,22 +73,22 @@ const ChannelController = ({ index }: { index: number }) => {
     ));
     const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
+    const [colorPickerVisible, setColorPickerVisible] = useState(false);
     
     if (!metadata) throw 'no metadata'; //TODO type metadata
     const channelVisible = channelsVisible[index];
-    // todo ui for changing channel.
-    const name = metadata?.Pixels.Channels[selections[index].c].Name;
     const color = colors[index];
     const colorString = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
     // not sure I want to be using material.ui... consider adding a widget abstration layer.
     // not jumping right in with using it for all layout etc because I don't want to be tied to it.
     // consider adding tailwind soon...
     return (
+        <>
         <div
         style = {{
             // padding: '10px',
             display: 'grid',
-            gridTemplateColumns: '0.4fr 0.1fr 1fr 0.1fr',
+            gridTemplateColumns: '0.4fr 0.1fr 0.1fr 1fr 0.1fr',
             justifyItems: 'flex-start',
             alignItems: 'center',
         }}
@@ -100,6 +101,23 @@ const ChannelController = ({ index }: { index: number }) => {
                     const visible = [...channelsVisible];
                     channelsStore.setState({ channelsVisible: visible });
                 }}
+            />
+            {/* <button style={{
+                backgroundColor: colorString,
+                color: 'white',
+                border: 'none',
+                padding: '10px',
+                cursor: 'pointer',
+            }}
+            onClick={() => {
+                // todo color picker
+                setColorPickerVisible(!colorPickerVisible);
+            }} */}
+            <PopoverPicker color={color} onChange={c => {
+                colors[index] = c;
+                const newColors = [...colors];
+                channelsStore.setState({ colors: newColors });
+            }}
             />
             <Slider
                 size="small"
@@ -119,6 +137,15 @@ const ChannelController = ({ index }: { index: number }) => {
                 x
             </button>
         </div>
+        {/* {(colorPickerVisible && <PopoverPicker
+            color={color}
+            onChange={c => {
+                colors[index] = c;
+                const newColors = [...colors];
+                channelsStore.setState({ colors: newColors });
+            }}
+        />)} */}
+        </>
     )
 }
 

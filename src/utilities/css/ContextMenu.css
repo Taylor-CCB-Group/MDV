@@ -452,3 +452,7 @@ select, input, textarea {
   .multiselect-dropdown span.maxselected {width:100%;}
   .multiselect-dropdown-all-selector {border-bottom:solid 1px #999;}
   
+.color-picker-no-border::-webkit-color-swatch {
+  padding: 0;
+  border: none;
+}
