@@ -73,7 +73,6 @@ const ChannelController = ({ index }: { index: number }) => {
     ));
     const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
-    const [colorPickerVisible, setColorPickerVisible] = useState(false);
     
     if (!metadata) throw 'no metadata'; //TODO type metadata
     const channelVisible = channelsVisible[index];
@@ -102,17 +101,6 @@ const ChannelController = ({ index }: { index: number }) => {
                     channelsStore.setState({ channelsVisible: visible });
                 }}
             />
-            {/* <button style={{
-                backgroundColor: colorString,
-                color: 'white',
-                border: 'none',
-                padding: '10px',
-                cursor: 'pointer',
-            }}
-            onClick={() => {
-                // todo color picker
-                setColorPickerVisible(!colorPickerVisible);
-            }} */}
             <PopoverPicker color={color} onChange={c => {
                 colors[index] = c;
                 const newColors = [...colors];
@@ -137,14 +125,6 @@ const ChannelController = ({ index }: { index: number }) => {
                 x
             </button>
         </div>
-        {/* {(colorPickerVisible && <PopoverPicker
-            color={color}
-            onChange={c => {
-                colors[index] = c;
-                const newColors = [...colors];
-                channelsStore.setState({ colors: newColors });
-            }}
-        />)} */}
         </>
     )
 }
