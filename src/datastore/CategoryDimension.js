@@ -7,75 +7,31 @@ class CategoryDimension extends Dimension{
 
     filterCategories(args,columns){
         const category =args;
-        const parent = this.parent;
-        const col = parent.columnIndex[columns[0]];
+        const col = this.parent.columnIndex[columns[0]];
         const data = col.data;
-        const filter = parent.filterArray;
-        const localFilter= this.filterArray;
-      
-     
         const vals = col.values;
-        const cats = new Set();
-        const len = this.parent.size;
         
         if (typeof category === "string"){
             const ind = vals.indexOf(category);
-           
+            
             if (col.datatype==="multitext"){
                 const int = col.stringLength;
-                for (let i=0;i<len;i++){
+                const predicate = i => {
                     const st = i*int;
-                    let has =false;
-                    for (let n=st;n<st+int;n++){
-                        if (data[n]===ind){
-                            has=true;
-                            break
-                        }
+                    for (let n=st; n < st+int; n++) {
+                        if (data[n] === ind) return true;
                     }
-                
-                    if (has){
-                        if (localFilter[i]===1){
-                            if (--filter[i] === 0){
-                                    parent.filterSize++;
-                                }
-                            }
-                            localFilter[i]=0;              
-                    }
-                
-                    else{                  
-                        if (localFilter[i]===0){
-                            if(++filter[i]===1){
-                                parent.filterSize--;
-                            }
-                        }              
-                        localFilter[i]=1
-                    }
+                    return false;
                 }
-            }
-
-            else{
-                for (let i=0;i<len;i++){
-                
-                    if (data[i]===ind){
-                        if (localFilter[i]===1){
-                        if (--filter[i] === 0){
-                                parent.filterSize++;
-                            }
-                        }
-                        localFilter[i]=0;              
-                    }
-                    else{                  
-                        if (localFilter[i]===0){
-                            if(++filter[i]===1){
-                                parent.filterSize--;
-                            }
-                        }              
-                        localFilter[i]=1
-                    }
-                }
+                return this.filterPredicate({predicate});
+            } //end multitext
+            else {
+                const predicate = i => data[i] === ind;
+                return this.filterPredicate({predicate});
             }     
-        }
-        else {
+        } //end typeof category === "string"
+        else { //category is an array
+            const cats = new Set();
             for (let cat of category){
                 cats.add(vals.indexOf(cat));
             }
@@ -84,15 +40,13 @@ class CategoryDimension extends Dimension{
                 let ao = category.operand === "and";
                 const catsArr = category.map(c => vals.indexOf(c));
                 const singleCat = cats.size === 1;
-                for (let i=0;i<len;i++){
+
+                const predicate = i => {
                     const st = i*int;
-                    let has = false;
-                    //nb, we actually want "and" of ['a', 'a'] to require two 'a's, so using array rather than Set
+                    //nb, this is based on the premise that we want "and" of ['a', 'a'] to require two 'a's, so using array rather than Set
                     //in any case, we need to remove found categories for a given row as we go,
                     //otherwise we end up with a false positive if the same category is used twice
-                    
-                    const catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
-                    
+                    let catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
                     for (let n=st; n < st+int; n++) {
                         if (data[n]===65535) {
                             //... if this row only has one item, we can't possibly have two of the same item,
@@ -100,61 +54,31 @@ class CategoryDimension extends Dimension{
                             //e.g. if we have 'Count Periostin' and we click the 'Periostin / Periostin' element of an interaction matrix.
                             //In that case, `catsToFind` will have fewer items than `catsArr`
                             //(testing with cellpairs where I want but should be right for arbitrary multitext??)
-                            if (ao && singleCat && catsToFind.length < catsArr.length) has = true;
-                            break;
+                            if (ao && singleCat && catsToFind.length < catsArr.length) {
+                                return true;
+                            }
                         }
                         if (ao) {
                             const index = catsToFind.indexOf(data[n]);
                             if (index !== -1) {
                                 catsToFind.splice(index, 1);
                                 if (catsToFind.length === 0) {
-                                    has = true;
-                                    break;
+                                    return true;
                                 }
                             }
                         } else {
                             if (catsToFind.has(data[n])){
-                                has=true;
-                                break
+                                return true;
                             }
                         }
                     }
-                    if (has) {
-                        if (localFilter[i]===1){
-                            if (--filter[i] === 0){
-                                    parent.filterSize++;
-                                }
-                            }
-                            localFilter[i]=0;              
-                    } else {                  
-                        if (localFilter[i]===0){
-                            if(++filter[i]===1){
-                                parent.filterSize--;
-                            }
-                        }              
-                        localFilter[i]=1
-                    }
+                    return false;
                 }
+                return this.filterPredicate({predicate});
             } //end multitext
             else{
-                for (let i=0;i<len;i++){
-                    if (cats.has(data[i])){
-                        if (localFilter[i]===1){
-                            if (--filter[i] === 0){
-                                parent.filterSize++;
-                            }
-                        }
-                        localFilter[i]=0;              
-                    }
-                    else{                  
-                        if (localFilter[i]===0){
-                            if(++filter[i]===1){
-                                parent.filterSize--;
-                            }
-                        }              
-                        localFilter[i]=1
-                    } 
-                }
+                const predicate = i => cats.has(data[i]);
+                return this.filterPredicate({predicate});
             }
         }  
     }
