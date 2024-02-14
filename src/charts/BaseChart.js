@@ -93,7 +93,15 @@ class BaseChart{
    
         //set up context menu and icon which opens it
         this.contextMenu = new ContextMenu((data)=>{     
-            return this.getContextMenu(data);
+            const menu = this.getContextMenu(data);
+            if (import.meta.env.MODE !== "production") {
+                menu.push({
+                    text:"debug chart",
+                    icon:"fas fa-bug",
+                    func:()=>window.mdv.debugChart = this
+                });
+            }
+            return menu;
         })
 
         this.addMenuIcon("fas fa-bars","more")
