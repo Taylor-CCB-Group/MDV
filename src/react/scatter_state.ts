@@ -119,10 +119,11 @@ export function useScatterplotLayer() {
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
         () => {
+            if (!config.tooltip.show) return;
             const hoverInfo = hoverInfoRef.current;
             return hoverInfo && hoverInfo.index !== -1 && `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`;
         },
-    [hoverInfoRef, getTooltipVal]);
+    [hoverInfoRef, getTooltipVal, config.tooltip.show]);
 
     const scale = useRegionScale();
     const {modelMatrix, setModelMatrix} = useScatterModelMatrix();
