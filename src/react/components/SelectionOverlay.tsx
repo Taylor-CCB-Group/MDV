@@ -6,7 +6,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import ControlCameraOutlinedIcon from '@mui/icons-material/ControlCameraOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useViewerStore } from "./avivatorish/state";
-import { useRegionScale, useScatterplotLayer } from "../scatter_state";
+import { useFilteredIndices, useRegionScale, useScatterplotLayer } from "../scatter_state";
 import { useChart } from "../context";
 import RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
@@ -45,6 +45,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
     const cols = chart.config.param;
     // using both ref and state here so we can access the current value in the event handlers
     // can probably simplify this...
+    // and probably want these in a separate store so the don't get lost when the component unmounts...
     const [start, setStartX] = useState<P>([0,0]);
     const [end, setEndX] = useState<P>([0,0]);
     const setStart = useCallback((p: P) => {
@@ -58,7 +59,6 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
     const startRef = useRef<P>([0,0]);
     const endRef = useRef<P>([0,0]);
     
-    
     const updateRange = useCallback(() => {
         if (!rangeDimension) return;
         const s = startRef.current;
@@ -67,8 +67,27 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         //seems like this may already be done somewhere?
         const range1 = [Math.min(s[0], t[0]), Math.max(s[0], t[0])]; //x range
         const range2 = [Math.min(s[1], t[1]), Math.max(s[1], t[1])]; //y range
-        const args = { range1, range2 };
-        rangeDimension.filter('filterSquare', cols, args);
+
+        // this was not reflecting the background filter... so we select points that are not part of this region.
+        // there needs to be more of a review of how our filters are evaluated...
+
+        // the signature for this should be `(index: number) => boolean`
+        // This 2D range predicate is responsible for the logic about which data to refer to.
+        // columns argument to filter('filterPredicate', columns, args) is not used in the current implementation.
+        // (unless there's some voodoo that signals to load column data)
+        const data1 = rangeDimension.parent.columnIndex[cols[0]].data;
+        const data2 = rangeDimension.parent.columnIndex[cols[1]].data;
+        const predicate = (i: number) => {
+            //filtered indices already include the filtering we do here...
+            //we need a different strategy for this...
+            // if (!indexSet.has(i)) return true; 
+            const v1 = data1[i];
+            const v2 = data2[i];
+            return !(v1 < range1[0] || v1 > range1[1] || v2 < range2[0] || v2 > range2[1] || isNaN(v1) || isNaN(v2))
+        }
+        const args = { range1, range2, predicate };
+        // rangeDimension.filter('filterSquare', cols, args);
+        rangeDimension.filter('filterPredicate', cols, args);
         chart.resetButton.style.display = 'inline';
         (window as any).r = rangeDimension;
     }, [rangeDimension, cols]);
@@ -123,7 +142,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         border: '1px solid white', //todo: make this a theme colour
         backgroundColor: 'rgba(255,255,255,0.1)',
     }}
-    />    
+    />
     <div style={{
         position: 'absolute',
         width: '100%',

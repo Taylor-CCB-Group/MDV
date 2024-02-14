@@ -13,6 +13,42 @@ class Dimension{
         this.filterMethod = null;
     }
 
+    /**
+     * Filters the data based on a predicate function.
+     * The function should return false if the row should be filtered out.
+     */
+    filterPredicate(args, columns) {
+        const filter = this.parent.filterArray;
+        const parent = this.parent;
+        const predicate = args.predicate;
+        const localFilter= this.filterArray;
+        for (let i=0;i<this.parent.size;i++){
+            // try ... catch to handle errors in the predicate
+            let value = false;
+            try {
+                value = !predicate(i);
+            } catch (e) {
+                console.error('Error in evaluating filterPredicate', e);
+            }
+            if (value){
+                if (localFilter[i]===0){
+                    if(++filter[i]===1){
+                        parent.filterSize--;
+                    }
+                }
+                localFilter[i]=1
+            }
+            else{
+                if (localFilter[i]===1){
+                    if(--filter[i]===0){
+                        parent.filterSize++;                    
+                    }                   
+                }
+                localFilter[i]=0;
+            }
+        }
+    }
+    
     removeFilter(notify=true){  
         if (!this.filterMethod){
             return;
@@ -81,7 +117,8 @@ class Dimension{
     
     /**
     * Filters  the data
-    * @param {string} method- The name of the filter method
+    * @param {string} method- The name of the filter method.
+    * if 'filterPredicate' then the args should contain a predicate function
     * @param {string[]} columns - a list of column ids used in the filtering
     * @param {object} args - any extra arguments for filtering
     * @param {boolean} [notify=true] - notify any listeners in the dataStore that the 
