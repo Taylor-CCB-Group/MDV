@@ -35,9 +35,8 @@ class RangeDimension extends Dimension{
                 if (localFilter[i]===0){
                     if(++filter[i]===1){
                         parent.filterSize--;
-                                         
                     }
-                }                  
+                }
                 localFilter[i]=1
             }
             else{
@@ -60,7 +59,6 @@ class RangeDimension extends Dimension{
             maxX= Math.max(maxX,pt[0]);
             minY=Math.min(minY,pt[1]);
             maxY= Math.max(maxY,pt[1]);
-
         }
         let data1= null;
         if (typeof columns[0] !== "string"){
@@ -70,52 +68,26 @@ class RangeDimension extends Dimension{
             data1 = this.parent.columnIndex[columns[0]].data;
         }
         const data2 = this.parent.columnIndex[columns[1]].data;
-        const filter = this.parent.filterArray;
-        const parent = this.parent;
-        const len = parent.size;
-        const vs =points;
-        const localFilter= this.filterArray;
-        for (let n=0;n<len;n++){
-			let x = data1[n], y = data2[n];
-			let inside = false;
+        const vs = points;
+
+        const predicate = i => {
+            const x = data1[i], y = data2[i];
+            let inside = false;
             if (x<minX || x>maxX || y<minY || y>maxY || isNaN(x) || isNaN(y)){
-                if (localFilter[n]===0){
-                    if(++filter[n]===1){
-                        parent.filterSize--;
-                                         
-                    };
-                }                  
-                localFilter[n]=1
+                return false;
             }
-            else{
-                for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-                    let xi = vs[i][0], yi = vs[i][1];
-                    let xj = vs[j][0], yj = vs[j][1];
+            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                let xi = vs[i][0], yi = vs[i][1];
+                let xj = vs[j][0], yj = vs[j][1];
 
-                    let intersect = ((yi > y) != (yj > y))
-                        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-                    if (intersect) inside = !inside;
-                }
+                let intersect = ((yi > y) != (yj > y))
+                    && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
 
-                if(!inside){
-                    if (localFilter[n]===0){
-                        if(++filter[n]===1){
-                            parent.filterSize--;
-                                            
-                        };
-                    }                  
-                    localFilter[n]=1;
-                }
-                else{
-                    if (localFilter[n]===1){
-                        if(--filter[n]===0){
-                            parent.filterSize++;                    
-                        }                   
-                    }
-                    localFilter[n]=0;
-                }
-            }		
-		}
+        return this.filterPredicate({predicate}, columns);
     }
 
     filterRange(args,columns){
