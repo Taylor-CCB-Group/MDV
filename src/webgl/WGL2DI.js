@@ -885,8 +885,29 @@ class WGL2DI{
 
 	getObjectsInRange(x,y,w,h){
 		console.log(`${x},${y},${w},${h}`);
+		// there was a bug here when the x or y is -ve... patching it here
+		if (x < 0) {
+			w += x;
+			x = 0;
+		}
+		if (y < 0) {
+			h += y;
+			y = 0;
+		}
+		// also an issue if the region extends beyond the canvas
+		// pretty sure pickbuffer.width === this.width
+		if (x + w > this.width) {
+			w = this.width - x;
+		}
+		if (y + h > this.height){
+			h = this.height - y;
+		}
+		// Still have issues with dragging the region.
+		// Could also happen elsewhere (ie with lasso tool? maybe not - does it use regl for picking?)
+		// ideally, as a user, I'd like to be able to draw a region that goes off the canvas,
+		// and have it still work - selecting objects that are off-screen.
 		const  max = w*h*4;
-    	var pixels = this.regl.read({
+    	const pixels = this.regl.read({
 			x: x,
 			y: this.height -y-h,
 			width:w,
