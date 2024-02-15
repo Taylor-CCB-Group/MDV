@@ -41,7 +41,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
         await loadData();
     } catch (e) {
-        alert(`Error loading data: ${e}`)
+        // alert(`Error loading data: ${e}`)
+        document.body.innerHTML = `<h1>Error loading data</h1><p>${e}</p>`;
     }
 });
 
