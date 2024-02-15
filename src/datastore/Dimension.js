@@ -21,15 +21,16 @@ class Dimension{
         const filter = this.parent.filterArray;
         const parent = this.parent;
         const predicate = args.predicate;
-        const localFilter= this.filterArray;
-        for (let i=0;i<this.parent.size;i++){
+        const localFilter = this.filterArray;
+        for (let i=0; i<this.parent.size; i++) {
             // try ... catch to handle errors in the predicate
-            let value = false;
-            try {
-                value = !predicate(i);
-            } catch (e) {
-                console.error('Error in evaluating filterPredicate', e);
-            }
+            // let value = false;
+            // try {
+            //     value = !predicate(i);
+            // } catch (e) {
+            //     // console.error('Error in evaluating filterPredicate', e);
+            // }
+            const value = !predicate(i); //not much faster than try...catch
             if (value){
                 if (localFilter[i]===0){
                     if(++filter[i]===1){
@@ -148,7 +149,11 @@ class Dimension{
         if (notify){
             this.parent._callListeners("filtered",this);
         }
-        console.log(`method${method}: ${performance.now()-t}`);
+        if (performance.now()-t > 100) {
+            console.warn(`method${method}: ${performance.now()-t}`);
+        } else {
+            console.log(`method${method}: ${performance.now()-t}`);
+        }
     }
 
     async getValueSet(column) {
