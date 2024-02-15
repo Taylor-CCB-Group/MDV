@@ -211,7 +211,11 @@ class DataStore{
 
     _callListeners(type,data){
         for (let id in this.listeners){
-            this.listeners[id](type,data);
+            try {
+                this.listeners[id](type,data);
+            } catch (e) {
+                console.error(`Error calling listener '${id}' for event '${type}'`, e);
+            }
         }
     }
 

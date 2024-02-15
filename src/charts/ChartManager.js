@@ -2334,16 +2334,10 @@ class AddChartDialog extends BaseDialog{
         this.paramDiv = createEl("div",{},this.columns[1]);
         this.setParamDiv(types[0].type,content.dataStore);
 
-
-        
-
-
-
         createEl("button",{
             text:"Add",
             classes:["ciview-button"]
-    },this.footer).addEventListener("click",()=>this.submit(content.callback));
-
+        },this.footer).addEventListener("click",()=>this.submit(content.callback));
     }
 
     submit(callback){

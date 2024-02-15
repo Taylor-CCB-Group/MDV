@@ -50,8 +50,13 @@ class DensityScatterPlot extends WGLScatterPlot{
         const p =  c.param;
         super.onDataFiltered(dim);
         const vals =this.dataStore.getColumnValues(c.param[2])
-        this.catKeys= [vals.indexOf(c.category1),vals.indexOf(c.category2)];
-        if (this.catKeys[0]===-1 && this.catKeys[1]===-1){
+        try {
+            this.catKeys= [vals.indexOf(c.category1),vals.indexOf(c.category2)];
+            if (this.catKeys[0]===-1 && this.catKeys[1]===-1){
+                this.data=[null,null];
+                return;
+            }
+        } catch (e) {
             this.data=[null,null];
             return;
         }
@@ -168,7 +173,9 @@ class DensityScatterPlot extends WGLScatterPlot{
         const s= super.getSettings();
         const c = this.config;
         const cols = this.dataStore.getColumnList("text")
-        let cats = this.dataStore.getColumnValues(c.param[2]);
+        // returning undefined e.g. for numeric 'DAPI' column...
+        // changing this at least means it doesn't crash (need to review 'Contour Category' stuff though...)
+        let cats = this.dataStore.getColumnValues(c.param[2]) || [];
         cats= cats.map(x=>{
             return {t:x}
         });

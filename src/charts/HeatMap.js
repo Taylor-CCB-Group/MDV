@@ -113,10 +113,14 @@ class HeatMap extends SVGChart{
         }
       
         this.dim.getAverages(data=>{
-           this.data = data;
-           this.clusterRows();
-           this.clusterColumns();
-           this.drawChart();         
+            this.data = data;
+            try {
+                this.clusterRows();
+                this.clusterColumns();
+                this.drawChart();
+            } catch (e) {
+                console.error('Error drawing heatmap:', e);
+            }
         },this.config.param,config)    
     }
 
@@ -139,20 +143,21 @@ class HeatMap extends SVGChart{
 
     clusterColumns(){
         const vals=this.dataStore.getColumnValues(this.config.param[0]);
-        if (this.config.cluster_columns){
-            this.columnClusterNodes=getHierarchicalNodes(this.data.transpose);
-            this.data.transpose.sort((x,y)=>x._order-y._order); 
-            this.x_scale.domain(this.columnClusterNodes.order.map(x=>vals[x]));
-            this.setAxisSize("tx",85);
-       }
-       else{
-        delete this.columnClusterNodes;
-        this.x_scale.domain(this.data.transpose.map(x=>vals[x._id]));
-        this.setAxisSize("tx",45);
-        this.data.transpose.sort((x,y)=>x._id-y._id);
-        this.x_scale.domain(this.data.transpose.map(x=>vals[x._id]));
-        this.tx_axis_svg.selectAll("path").remove();
-       }
+        if (this.config.cluster_columns) {
+            this.columnClusterNodes = getHierarchicalNodes(this.data.transpose);
+            
+            this.data.transpose.sort((x, y) => x._order - y._order); 
+            this.x_scale.domain(this.columnClusterNodes.order.map(x => vals[x]));
+            this.setAxisSize("tx", 85);
+        }
+        else {
+            delete this.columnClusterNodes;
+            this.x_scale.domain(this.data.transpose.map(x => vals[x._id]));
+            this.setAxisSize("tx", 45);
+            this.data.transpose.sort((x, y) => x._id - y._id);
+            this.x_scale.domain(this.data.transpose.map(x => vals[x._id]));
+            this.tx_axis_svg.selectAll("path").remove();
+        }
     }
 
   

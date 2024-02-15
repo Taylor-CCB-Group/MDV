@@ -187,17 +187,23 @@ class HierarchicalClustering{
 function getHierarchicalNodes(data,config={}){
     const hc = new HierarchicalClustering(config.distance,config.linkage,config.threshold);
     hc.cluster(data);
-    const nodes =d3_hierarchy(hc.clusters[0]);
-    for (let node of nodes.descendants()){
-        let d = node.data;
-        delete d.size;
-        if (d.value){
-            d.id= d.value._id;
-            d.order = d.value._order;
-            delete d.value;
-        }
+    try {
+       const nodes = d3_hierarchy(hc.clusters[0]);
+       for (let node of nodes.descendants()){
+           let d = node.data;
+           delete d.size;
+           if (d.value){
+               d.id= d.value._id;
+               d.order = d.value._order;
+               delete d.value;
+           }
+       }
+       return {nodes:nodes,order:hc.node_order}
+    } catch (e){
+        console.error(e);
+        const nodes = {children:[], data: {children:[]}, depth: 0, height: 0, parent: null};
+        return { nodes, order:[] };
     }
-    return {nodes:nodes,order:hc.node_order}
 }
 
 
