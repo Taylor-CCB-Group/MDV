@@ -960,7 +960,7 @@ class MLVPanel {
     	 	this.foto=setTimeout(()=>{
     	 		if (!this.is_dragging){
 					let i=this.getFeatureAt(e);
-					if (i.track){
+					if (i.track && i.feature) {
 						this._callListeners("featureclick",{track:i.track,feature:i.feature,event:e});
 					}
     	 		}
