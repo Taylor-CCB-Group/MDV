@@ -77,8 +77,19 @@ class CategoryDimension extends Dimension{
                 return this.filterPredicate({predicate});
             } //end multitext
             else{
-                //this appears to be taking about twice as long as non-predicate version??
                 const catsArr = Array.from(cats);
+                // special cases for 1 or 2 categories; marginally faster than Set.has
+                if (catsArr.length === 1) {
+                    const val = catsArr[0];
+                    const predicate = i => data[i] === val;
+                    return this.filterPredicate({predicate});
+                } else if (catsArr.length === 2) {
+                    const val1 = catsArr[0];
+                    const val2 = catsArr[1];
+                    const predicate = i => data[i] === val1 || data[i] === val2;
+                    return this.filterPredicate({predicate});
+                }
+                //this appears to be taking about twice as long as non-predicate version??
                 const predicate = i => cats.has(data[i]);
                 // const predicate = i => catsArr.includes(data[i]);
                 return this.filterPredicate({predicate});
@@ -86,6 +97,7 @@ class CategoryDimension extends Dimension{
         }  
     }
     filterCategories(args,columns){
+        if (window.predicateTest) return this.filterCategoriesPredicate(args, columns);
         const category =args;
         const parent = this.parent;
         const col = parent.columnIndex[columns[0]];
