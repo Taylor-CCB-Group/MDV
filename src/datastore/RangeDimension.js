@@ -10,8 +10,7 @@ class RangeDimension extends Dimension{
         this.worker= new Worker (new URL("./binWorker.js?v=1",import.meta.url));  
     }
 
-    filterSquare(args,columns){
-     
+    filterSquare(args, columns) { 
         let data1= null;
         if (typeof columns[0] !== "string"){
             data1= columns[0];
@@ -21,33 +20,14 @@ class RangeDimension extends Dimension{
         }
         
         const data2 = this.parent.columnIndex[columns[1]].data;
-        const filter = this.parent.filterArray;
-        const parent = this.parent;
         const range1 = args.range1;
         const range2 = args.range2;
-      
-        const localFilter= this.filterArray;
-        for (let i=0;i<this.parent.size;i++){
+        const predicate = i => {
             const v1 = data1[i];
             const v2 = data2[i];
-            if ( v1<range1[0] || v1>range1[1] || v2<range2[0] || v2>range2[1] || isNaN(v1) || isNaN(v2)){
-               
-                if (localFilter[i]===0){
-                    if(++filter[i]===1){
-                        parent.filterSize--;
-                    }
-                }
-                localFilter[i]=1
-            }
-            else{
-                if (localFilter[i]===1){
-                    if(--filter[i]===0){
-                        parent.filterSize++;                    
-                    }                   
-                }
-                localFilter[i]=0;
-            }
+            return v1>=range1[0] && v1<=range1[1] && v2>=range2[0] && v2<=range2[1] && !isNaN(v1) && !isNaN(v2);
         }
+        return this.filterPredicate({predicate}, columns);
     }
 
     filterPoly(args,columns){
@@ -94,28 +74,12 @@ class RangeDimension extends Dimension{
         const min = args.min;
         const max=args.max;   
         const arr = this.parent.columnIndex[columns[0]].data;
-        const filter = this.parent.filterArray;
-        const localFilter= this.filterArray;
-        const parent = this.parent;
-        for (let i=0;i<this.parent.size;i++){
+        // performance seems similar to non-predicate version
+        const predicate = i => {
             const v = arr[i];
-            if (v<min || v>max || isNaN(v)){
-                if (localFilter[i]===0){
-                    if(++filter[i]===1){
-                        parent.filterSize--;
-                    };
-                }             
-                localFilter[i]=1
-            }
-            else{
-                if (localFilter[i]===1){
-                    if(--filter[i]===0){
-                        parent.filterSize++;
-                    }
-                }
-                localFilter[i]=0;
-            }
-        }   
+            return v >= min && v <= max && !isNaN(v);
+        }
+        return this.filterPredicate({predicate}, columns);
     }
 
     getBins(callback,column,config={}){
