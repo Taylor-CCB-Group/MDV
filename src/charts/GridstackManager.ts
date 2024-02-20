@@ -223,9 +223,110 @@ export default class GridStackManager {
             chart.remove = oldRemove;
             chart.changeBaseDocument = oldChangeBase;
             ro.disconnect();
-        }
-
-        
+        };
     }
-    
+}
+
+
+/// some more layout stuff, subject to change / moving to a different file
+
+type P = [number, number];
+type Config = Partial<{ size: P; position: P; gssize: P; gsposition: P }>;
+function getVisibleChartBounds(dataSource: DataSource) {
+  const charts = Object.entries(window.mdv.chartManager.charts) as unknown as [
+    [string, { dataSource: DataSource; chart: Chart }],
+  ];
+  return charts
+    .filter((c) => c[1].dataSource === dataSource)
+    .map((c) => c[1].chart.getDiv().getBoundingClientRect());
+}
+
+function getGridInfo(dataSource: DataSource) {
+  const [cellW, cellH] = window.mdv.chartManager.gridStack.getCellDimensions(dataSource);
+  const rect = dataSource.contentDiv.getBoundingClientRect();
+  const rows = Math.floor(rect.height / cellH) * 2; //hack for more rows in layout
+  const cols = Math.floor(rect.width / cellW);
+  return { cellW, cellH: cellH/2, rows, cols };
+}
+
+function findFreeSpace(dataSource: DataSource) {
+  const occupiedRects = getVisibleChartBounds(dataSource);
+  const { cellW, cellH, rows, cols } = getGridInfo(dataSource);
+  const mainRect = dataSource.contentDiv.getBoundingClientRect();
+  const width = 2;
+  const height = 1;
+
+  // Initialize the grid
+  const grid = new Array(rows);
+  for (let i = 0; i < rows; i++) {
+    grid[i] = new Array(cols).fill(false);
+  }
+
+  // Mark the occupied cells
+  for (const rect of occupiedRects) {
+    // get outer-bounds in terms of nominal grid... with appropriate offset relative to mainRect...
+    const left = Math.floor((rect.left-mainRect.left) / cellW);
+    const top = Math.floor((rect.top-mainRect.top) / cellH);
+    const right = Math.min(cols, Math.ceil((rect.right-mainRect.left) / cellW));
+    const bottom = Math.min(rows, Math.ceil((rect.bottom-mainRect.top) / cellH));
+    for (let row = top; row < bottom; row++) {
+      for (let col = left; col < right; col++) {
+        grid[row][col] = true;
+      }
+    }
+  }
+
+  // Find a free space
+  for (let row = 0; row <= rows - height; row++) {
+    for (let col = 0; col <= cols - width; col++) {
+      let isFree = true;
+      for (let i = 0; i < height && isFree; i++) {
+        for (let j = 0; j < width && isFree; j++) {
+          if (grid[row + i][col + j]) {
+            isFree = false;
+          }
+        }
+      }
+      if (isFree) {
+        return { left: col*cellW, top: row*cellH };
+      }
+    }
+  }
+
+  // If no free space was found, return [10, 10]
+  return { left: 10, top: 10 };
+}
+
+export function positionChart(dataSource: DataSource, config: Config) {
+  // some legacy code extracted to here and may be reviewed at some point.
+  let width = 300, height = 300; //consider having a preferred-size...
+  let left = 10, top = 10;
+  if (config.size) {
+    width = config.size[0];
+    height = config.size[1];
+  }
+  const { chartManager } = window.mdv;
+  if (config.position) {
+    left = config.position[0];
+    top = config.position[1];
+  } 
+  else {
+    const pos = findFreeSpace(dataSource)
+    left = pos.left;
+    top = pos.top;
+  }
+  //hack approx position of grid stack elements
+
+  if (
+    chartManager.viewData.dataSources[dataSource.name].layout === "gridstack" &&
+    config.gssize
+  ) {
+    const cellDim = chartManager.gridStack.getCellDimensions(dataSource);
+    width = Math.round(config.gssize[0] * cellDim[0]);
+    height = Math.round(config.gssize[1] * cellDim[1]);
+    left = Math.round(config.gsposition[0] * (cellDim[0] + 5));
+    top = Math.floor(config.gsposition[1] * (cellDim[1] + 5));
+  }
+
+  return { width, height, left, top };
 }

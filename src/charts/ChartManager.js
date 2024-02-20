@@ -9,7 +9,7 @@ import {getRandomString} from "../utilities/Utilities.js";
 import {csv,tsv,json} from "d3-fetch";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
-import GridStackManager from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
+import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 
 //default charts 
 import "./HistogramChart.js";
@@ -1517,26 +1517,8 @@ class ChartManager{
             config.position=[(l.x+1)*b + l.x*90, (l.y+1)*b + l.y*40];
         }
          //**convert legacy data***********
-        const ds  = this.dsIndex[dataSource];
-        let width=300,height= 300;
-        let left=10,top=10;
-        if (config.size){
-            width=config.size[0];
-            height=config.size[1];
-        }
-        if (config.position){
-            left=config.position[0];
-            top=config.position[1];
-        }
-        //hack approx position of grid stack elements
-        if (this.viewData.dataSources[dataSource].layout==="gridstack" && config.gssize){
-            const cellDim = this.gridStack.getCellDimensions(this.dsIndex[dataSource]);
-            width= Math.round(config.gssize[0] * cellDim[0]);
-            height = Math.round(config.gssize[1] * cellDim[1]);
-            left = Math.round(config.gsposition[0] * (cellDim[0]+5));
-            top = Math.floor(config.gsposition[1] * (cellDim[1]+5));
-
-        }
+        const ds = this.dsIndex[dataSource];
+        const { width, height, left, top } = positionChart(ds, config);
 
         const t = themes[this.theme];
         // PJT may want different behaviour for gridstack
