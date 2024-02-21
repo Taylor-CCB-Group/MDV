@@ -23,6 +23,7 @@ export function useFilteredIndices() {
     const filterColumn = config.background_filter?.column;
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
+    // todo useQuery could be better?
     useEffect(() => {
         // return
         let cancelled = false;

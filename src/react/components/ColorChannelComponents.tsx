@@ -47,10 +47,10 @@ const ChannelChooser = ({index}: {index: number}) => {
     const channels = useMetadata().Pixels.Channels.map(c => c.Name) as string[];
     const selections = useChannelsStore(({selections}) => selections);
     const channelsStore = useChannelsStoreApi();
-    
+
     return (
         <>
-        <select 
+        <select
         value={selections[index].c}
         style={{width: '100%', padding: '0.2em'}} onChange={e => {
             const newSelections = [...selections];
@@ -70,10 +70,10 @@ const ChannelController = ({ index }: { index: number }) => {
     const {colors, selections, channelsVisible, removeChannel} = useChannelsStore(({ colors, selections, channelsVisible, removeChannel }) => (
         // trouble with 'domains' for some reason... "Cannot access 'domains' before initialization"
         { colors, selections, channelsVisible, removeChannel }
-    ));
+    )); //channelOptions is a string[] of channel names...
     const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
-    
+
     if (!metadata) throw 'no metadata'; //TODO type metadata
     const channelVisible = channelsVisible[index];
     const color = colors[index];
@@ -111,13 +111,13 @@ const ChannelController = ({ index }: { index: number }) => {
                 size="small"
                 style={{ color: colorString, marginLeft: '10px' }}
                 value={limits[index]}
-                onChange={(e, v) => {
+                onChange={(_, v) => {
                     limits[index] = v as [number, number];
                     const contrastLimits = [...limits];
                     channelsStore.setState({ contrastLimits });
                 }}
             />
-            <button 
+            <button
             style={{marginLeft: '12px'}}
             onClick={() => {
                 removeChannel(index);
@@ -130,9 +130,9 @@ const ChannelController = ({ index }: { index: number }) => {
 }
 
 const AddChannel = () => {
-    const loader = useLoader();
-    const { labels } = loader[0];
-    const channelsStore = useChannelsStoreApi();
+    // const loader = useLoader();
+    // const { labels } = loader[0];
+    // const channelsStore = useChannelsStoreApi();
     const addChannel = useChannelsStore(state => state.addChannel);
     return <button onClick={() => {
         addChannel({
@@ -149,7 +149,7 @@ const AddChannel = () => {
 export const Test = () => {
     const colors = useChannelsStore(({ colors }) => colors);
     return <div style={{width: '100%'}}>{
-        colors.map((c, i) => (
+        colors.map((_, i) => (
             <ChannelController key={i} index={i} />
         ))}
         <AddChannel />

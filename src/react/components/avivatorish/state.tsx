@@ -113,6 +113,7 @@ const DEFAULT_VIEWER_STATE = {
 // --- following how VivViewerMDV _parseChannels() works ---
 export type MdvVivChannelConfig = {
   name: string,
+  selections?: { c: number, z: number, t: number }[],
   color?: `#${string}` | [r: number, g: number, b: number],
   visible?: boolean,
   contrastLimits?: [min: number, max: number],
@@ -120,12 +121,15 @@ export type MdvVivChannelConfig = {
 }
 
 export type VivConfig = {
+  // todo establish how we actually want this to be...
   channels: MdvVivChannelConfig[],
-  /// no: we should consider image_properties to be the 'state' - using zustand.
-  // not part of the config - although we should make sure that config has appropriate
-  // values to serialize.
-  // -- so this perhaps shouldn't be here...
+  // vs...
   image_properties: ChannelsState,
+  // vs...
+  viewerStore?: Partial<ViewerStore>,
+  channelsStore?: Partial<ChannelsStore>,
+  imageSettingsStore?: Partial<ImageSettingsStore>,
+  //>>>?
   url: string
 }
 
@@ -163,13 +167,18 @@ export type VivContextType = {
  * ie the chart component itself, and a color-change GUI dialog for it)
  * can share reference to the same stores / act as equivalent contexts
  */
-function createVivStores(chart: VivMDVReact) {
+export function createVivStores(chart: VivMDVReact) {
   if (chart.vivStores) {
     console.warn('vivStores already exists for this chart');
     return;
   }
+  // get any existing values out of the chart's config...
+  // currently inactive / experimental state - need to review how props are set,
+  // in what way to change these hooks - how much to deviate from Avivator's API
+  // (useImage() needs to be changed along with this)
   const channelsStore = createStore(set => ({
     ...DEFAUlT_CHANNEL_STATE,
+    // ...chart.config.viv.channelsStore,
     ...generateToggles(DEFAUlT_CHANNEL_VALUES, set),
     toggleIsOn: index =>
       set(state => {
@@ -215,10 +224,12 @@ function createVivStores(chart: VivMDVReact) {
   }))// satisfies VivContextType['channelsStore'];
   const imageSettingsStore = createStore(set => ({
     ...DEFAULT_IMAGE_STATE,
+    // ...chart.config.viv.imageSettingsStore,
     ...generateToggles(DEFAULT_IMAGE_STATE, set)
   })) satisfies VivContextType['imageSettingsStore'];
   const viewerStore = createStore(set => ({
     ...DEFAULT_VIEWER_STATE,
+    // ...chart.config.viv.viewerStore,
     ...generateToggles(DEFAULT_VIEWER_STATE, set),
     setIsChannelLoading: (index, val) =>
       set(state => {
@@ -244,6 +255,12 @@ function createVivStores(chart: VivMDVReact) {
 
 const VivContext = createContext<VivContextType>(null);
 /**
+ * This implictly assumes that we are in a context where there is a chart, and that we
+ * can access it with `useChart()`. That design decision may be revisited (and it means
+ * this detail is deviating somewhat from Avivator).
+ * 
+ * Separate providers - referring to the same `chart.vivStores` - are used both by the chart
+ * itself and by the color-change GUI dialog.
  */
 export const VivProvider = observer(({ children }: PropsWithChildren) => {
   const vivChart = useChart() as VivMDVReact; //may want to be less MDV-centric here

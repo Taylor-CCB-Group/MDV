@@ -2,14 +2,13 @@ import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivContextType, VivProvider, useChannelsStoreApi, useImageSettingsStoreApi, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
+import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivContextType, VivProvider, createVivStores, useChannelsStoreApi, useImageSettingsStoreApi, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
 import type { ColumnName, DataColumn } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
-import { useChart } from "../context";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -101,7 +100,12 @@ export type VivRoiConfig = {
 } & ScatterPlotConfig;
 
 export type VivMdvReactConfig = ScatterPlotConfig & (
-    { type: 'VivMdvReact', imageURL: string, overviewOn: boolean, image_properties: ChannelsState } 
+    // 'simpler' version where you can just pass an image URL, don't need all the regions config...
+    // not currently used.
+    // { type: 'VivMdvReact', imageURL: string, 
+    //     overviewOn: boolean, 
+    //     image_properties: ChannelsState 
+    // }
     | VivRoiConfig
 ) & { channel: number };
 export type VivMDVReact = VivMdvReact;
@@ -125,6 +129,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             if (config.overviewOn === undefined) config.overviewOn = false;
             if (config.image_properties === undefined) config.image_properties = DEFAUlT_CHANNEL_STATE;
         }
+        // is this where I should be initialising vivStores? (can't refer to 'this' before super)
+        // this.vivStores = createVivStores(this);
         super(dataStore, div, config, ReactTest);
         this.colorByColumn(config.color_by);
         makeObservable(this, {
@@ -224,6 +230,42 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             //     }
             // }
         ]);
+    }
+    getConfig() {
+        const config = super.getConfig();
+        // todo this is an experimental version of serialisation, WIP / subject to change.
+        if (this.vivStores) {
+            const { viewerStore, channelsStore, imageSettingsStore } = this.vivStores;
+            const channels = channelsStore.getState();
+            const viewer = viewerStore.getState();
+            const imageSettings = imageSettingsStore.getState();
+            const viv = {
+                viewerStore: {
+                    // could be that we want this to be where `'source'` comes from...
+                    // we could be interested in use3d, useLens, useLinkedView... those would come from imageSettingsStore
+                    // we might want an expanded version of 'pixelValues'...
+                    viewState: viewer.viewState,
+                },
+                // we could call this `image_properties` and make it compatible with the 'legacy format' from VivScatterPlot
+                // or we could parse it into a nicer viv.channels[] array-of-objects format, and parse back when we load.
+                channelsStore: {
+                    channelsVisible: channels.channelsVisible,
+                    colors: channels.colors,
+                    contrastLimits: channels.contrastLimits,
+                    domains: channels.domains,
+                    selections: channels.selections,
+                },
+                imageSettingsStore: {
+                    // could be interested in lensEnabled, zoomLock, panLock, etc.
+                },
+            }
+            console.table(viv);
+            config.viv = {
+                ...config.viv,
+                ...viv,
+            }
+        }
+        return config;
     }
 }
 

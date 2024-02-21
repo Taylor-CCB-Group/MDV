@@ -86,7 +86,11 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
             return !(v1 < range1[0] || v1 > range1[1] || v2 < range2[0] || v2 > range2[1] || isNaN(v1) || isNaN(v2))
         }
         const args = { range1, range2, predicate };
-        // rangeDimension.filter('filterSquare', cols, args);
+        // some benchmarking - appear to be within spitting distance here...
+        // for (let i=0; i<4; i++) {
+        //     rangeDimension.filter('filterPredicate', cols, args);
+        //     rangeDimension.filter('filterSquare', cols, args);
+        // }
         rangeDimension.filter('filterPredicate', cols, args);
         chart.resetButton.style.display = 'inline';
         (window as any).r = rangeDimension;

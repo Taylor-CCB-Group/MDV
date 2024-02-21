@@ -26,6 +26,8 @@ export const useViewStateLink = () => {
             const originalZoom = viewState.zoom as number;
             const ourPhysicalSize = metadata.Pixels.PhysicalSizeX;
             const ourUnits = metadata.Pixels.PhysicalSizeXUnit;
+            // should we consider viewerStore.useLinkedView?
+            // best to be clear about what is and isn't similar to Avivator.
             vsLinks.forEach(link => {
                 // as VivMDVReact[] is very much not correct here, we should be checking - and that may not be what we want anyway.
                 const otherCharts = link.linked_charts.filter(c => c !== id).map(c => cm.getChart(c)) as VivMDVReact[];

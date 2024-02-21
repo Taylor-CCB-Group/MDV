@@ -16,7 +16,8 @@ export function ChartProvider({ chart, children }: { chart: BaseReactChart<any>,
 
     //DataStoreContext.Provider would be applied at a wider scope if we had a global root & portals.
 
-    return (<ChartContext.Provider value={chart}>
+    return (
+    <ChartContext.Provider value={chart}>
         <DataStoreContext.Provider value={chart.dataStore}>
             <MaterialWrapper>
                 {children}
