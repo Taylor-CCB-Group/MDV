@@ -42,11 +42,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         await loadData();
     } catch (e) {
         // alert(`Error loading data: ${e}`)
+        document.head.title = "MDV - Error loading data"; // not actually appearing, hey-ho.
+        document.body.style.textAlign = "center";
         document.body.innerHTML = `<h1>Error loading data</h1><p>${e}</p>`;
     }
 });
 
-/// --- this section is a bit of a mess, but it works for now --- 
+/// --- this section is a bit of a mess, but it works for now ---
 //(copilot suggesting "this is a bit of a mess" is a bit rude, but in this case it's right)
 // if URLSearchParams has a 'dir' parameter, use that as the data directory.
 const urlParams = new URLSearchParams(window.location.search);
@@ -63,8 +65,8 @@ const root = getRoot(dir);
 //hack to load data from local API... TODO XXX make less hacky, rather than more...
 //this was sort-of-working as of this writing for `MDVProject.serve()`, as long as the default port 5050 is used...
 //need to revisit and actually come up with a proper design.
-// - this means some online projects are currently broken, I should fix that.
-const staticFolder = false; //!dir.startsWith("/project") && !(window.location.port === "5050") && !dir.endsWith("5050");
+// - this means some online projects are currently broken, I should fix that. <--
+const staticFolder = urlParams.get('static') !== null; //!dir.startsWith("/project") && !(window.location.port === "5050") && !dir.endsWith("5050");
 const project_name = dir.split("/").pop();
 /// --- end of messy section ---
 
@@ -74,9 +76,9 @@ if (isPopout) document.title = "MDV popout";
 
 
 // TODO make a better type for this, put it somewhere more sensible.
-export type Datasource = { 
-    name: string, 
-    columns: { name: string, type: string }[], images?: any, size: number, columnGroups?: any[] 
+export type Datasource = {
+    name: string,
+    columns: { name: string, type: string }[], images?: any, size: number, columnGroups?: any[]
 };
 
 
@@ -126,7 +128,7 @@ async function loadData() {
             if (import.meta.env.DEV) {
                 cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tagModel); });
             }
-            cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => { 
+            cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => {
                 const columns = datasources[i].columns.map(c => c.name);
                 cm.loadColumnSet(columns, dsName, () => { console.log("done loadColumnSet"); });
             });
