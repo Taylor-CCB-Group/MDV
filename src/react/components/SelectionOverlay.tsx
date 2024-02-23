@@ -99,12 +99,14 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         rangeDimension.filter('filterPredicate', cols, args);
         //although the filter is sync, the event that checks zoom_on_filter will happen later...
         //in particular, it runs in an effect that depends on async getFilteredIndices...
-        await chart.dataStore.getFilteredIndices();
-        runInAction(() => {
-          //technically this code doesn't strictly know that there's not some concurrent update to zoom_on_filter...
-          //but we're not in rust and it's hard to imagine an actual bug resulting.
-          chart.config.zoom_on_filter = zoom_on_filter;
-        });
+        //this is not a correct way to do this... also still needs testing with viewState link.
+        //may be another place where react query would be useful?
+        // await chart.dataStore.getFilteredIndices();
+        setTimeout(() => {
+            runInAction(() => {
+              chart.config.zoom_on_filter = zoom_on_filter;
+            });
+        }, 500);
         chart.resetButton.style.display = 'inline';
         (window as any).r = rangeDimension;
     }, [rangeDimension, cols]);
