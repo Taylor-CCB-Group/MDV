@@ -496,7 +496,7 @@ class MDVProject:
         self.set_datasource_metadata(ds)
 
     def add_datasource(self,name: str, dataframe, columns: Optional[list]=None,
-                       supplied_columns_only=False, replace_data=False, add_to_view="default", separator="\t"):
+                       supplied_columns_only=False, replace_data=False, add_to_view="default", separator="\t") -> list[dict[str, str]]:
         '''Adds a pandas dataframe to the project. Each column's datatype, will be deduced by the
          data it contains, but this is not always accurate. Hence, you can supply a list of column 
          metadata, which will override the names/types deduced from the dataframe.
@@ -568,6 +568,7 @@ class MDVProject:
                 v={"initialCharts":{}}
             v["initialCharts"][name]=[]
             self.set_view(add_to_view,v)
+        return dodgy_columns
 
     def insert_link(self, datasource, linkto, linktype, data):
         '''
@@ -1035,9 +1036,9 @@ def add_column_to_group(col: dict, data: pandas.Series, group: h5py.Group, lengt
     
     if col["datatype"]=="text" or col["datatype"]=="unique" or col["datatype"]=="text16":
         if data.dtype=="category":
-            data =data.cat.add_categories("ND")
-            data=data.fillna("ND")
-          
+            data = data.cat.add_categories("ND")
+            data = data.fillna("ND")
+        data = data.fillna('NaN')
         values = data.value_counts()
         if (len(values)<65537 and col["datatype"]!="unique"):
             t8 = len(values)<257

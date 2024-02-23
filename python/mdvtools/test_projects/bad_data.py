@@ -23,6 +23,8 @@ project_folder = os.path.expanduser('~/mdv/bad_data')
 p = MDVProject(project_folder, delete_existing=True)
 df_good = pd.DataFrame({'a': [42]})
 df_mixed = pd.DataFrame({'a': [42, float('nan'), float('inf')]})
+# when explicitly setting a numeric column which we want to interpret as 'text' (so it can be a category, e.g. clusterID)
+df_bad_text = pd.DataFrame({'a': [0, 1, float('nan')]})
 df_bad = pd.DataFrame({'a': [float('nan')]})
 try:
     p.add_datasource('good data', df_good)
@@ -32,6 +34,15 @@ try:
     assert(len(p.datasources[1]['columns']) == 1)
     print('mixed data added ok, column metadata should not contain any NaN/Infinity etc:')
     print(f"{json.dumps(p.datasources[1]['columns'][0])}")
+
+    # providing 'columns' without a 'datatype' key will cause a KeyError, and the column will be ignored
+    # (although the datasource will still think it has a 'length' of 3 even though it has 0 columns)
+    bad_columns = p.add_datasource('bad column metadata', df_bad_text, columns=[{'name': 'a', 'type': 'text'}])
+    assert(len(bad_columns) == 1)
+    # this was co-ercing 'nan' to 0, which means that there is no difference between 'nan' and 0, which is bad.
+    p.add_datasource('bad text data', df_bad_text, columns=[{'name': 'a', 'datatype': 'text'}])
+    assert(len(p.datasources[3]['columns'][0]['values']) == 3) # expect ['0', '1', 'nan']
+
     # expect `ValueError('zero-size array to reduction operation minimum which has no identity')`
     p.add_datasource('bad data', df_bad)
     assert(False) # df_bad is sufficiently degenerate that we don't expect to get this far.
@@ -41,4 +52,4 @@ except Exception as e:
     print(json.dumps(p.datasources, indent=2))
 
 
-p.serve(port=5055)
+# p.serve(port=5055)
