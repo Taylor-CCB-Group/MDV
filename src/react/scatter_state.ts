@@ -27,14 +27,12 @@ export function useFilteredIndices() {
     useEffect(() => {
         // return
         let cancelled = false;
-        let finished = false;
         if (!filterColumn) return;
         const indexPromise = dataStore.getFilteredIndices();
         const colPromise = window.mdv.chartManager?._getColumnsAsync(dataStore.name, [filterColumn]);
         Promise.all([indexPromise, colPromise]).then(([indices]) => {
         // indexPromise.then((indices) => {
             if (cancelled) return;
-            finished = true;
             if (filterColumn) {
                 const col = dataStore.columnIndex[filterColumn];
                 const filterValue = config.background_filter?.category;

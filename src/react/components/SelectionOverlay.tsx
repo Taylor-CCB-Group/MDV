@@ -10,6 +10,8 @@ import { useFilteredIndices, useRegionScale, useScatterplotLayer } from "../scat
 import { useChart } from "../context";
 import RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
+import type { VivMDVReact } from "./VivMDVReact";
+import { runInAction } from "mobx";
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
@@ -41,7 +43,7 @@ const ToolArray = Object.values(Tools);
 type P = [number, number];
 type EditorProps = { toolActive?: boolean, rangeDimension: RangeDimension } & ReturnType<typeof useScatterplotLayer>;
 function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} : EditorProps) {
-    const chart = useChart();
+    const chart = useChart() as VivMDVReact;
     const cols = chart.config.param;
     // using both ref and state here so we can access the current value in the event handlers
     // can probably simplify this...
@@ -58,8 +60,8 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
     }, []);
     const startRef = useRef<P>([0,0]);
     const endRef = useRef<P>([0,0]);
-    
-    const updateRange = useCallback(() => {
+
+    const updateRange = useCallback(async () => {
         if (!rangeDimension) return;
         const s = startRef.current;
         const t = endRef.current;
@@ -80,22 +82,33 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         const predicate = (i: number) => {
             //filtered indices already include the filtering we do here...
             //we need a different strategy for this...
-            // if (!indexSet.has(i)) return true; 
+            // if (!indexSet.has(i)) return true;
             const v1 = data1[i];
             const v2 = data2[i];
             return !(v1 < range1[0] || v1 > range1[1] || v2 < range2[0] || v2 > range2[1] || isNaN(v1) || isNaN(v2))
         }
         const args = { range1, range2, predicate };
-        // some benchmarking - appear to be within spitting distance here...
-        // for (let i=0; i<4; i++) {
-        //     rangeDimension.filter('filterPredicate', cols, args);
-        //     rangeDimension.filter('filterSquare', cols, args);
-        // }
+
+        //make zoom_on_filter only apply to other charts.
+        const zoom_on_filter = chart.config.zoom_on_filter;
+        runInAction(() => {
+          chart.config.zoom_on_filter = false;
+        });
+        //chart.ignoreStateUpdate = true;
+
         rangeDimension.filter('filterPredicate', cols, args);
+        //although the filter is sync, the event that checks zoom_on_filter will happen later...
+        //in particular, it runs in an effect that depends on async getFilteredIndices...
+        await chart.dataStore.getFilteredIndices();
+        runInAction(() => {
+          //technically this code doesn't strictly know that there's not some concurrent update to zoom_on_filter...
+          //but we're not in rust and it's hard to imagine an actual bug resulting.
+          chart.config.zoom_on_filter = zoom_on_filter;
+        });
         chart.resetButton.style.display = 'inline';
         (window as any).r = rangeDimension;
     }, [rangeDimension, cols]);
-    
+
     //should this be a property of the scatterplotLayer?
     const scale = useRegionScale();//todo: this is a hack... should have a better way of reasoning about transforms...
     const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
@@ -117,7 +130,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         window.removeEventListener('mousemove', handleMouseMove);
         updateRange();
     }, [toolActive]);
-    
+
     const viewState = useViewerStore((state) => state.viewState); // for reactivity - still a frame behind...
     const [frameTrigger, setFrameTrigger] = useState(false);
     useEffect(() => {
@@ -153,7 +166,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         height: '100%',
         top: 0,
         left: 0,
-    }} 
+    }}
     onMouseDown={(e) => {
         if (!toolActive) return;
         const p = unproject(e);
@@ -217,11 +230,11 @@ function TransformEditor({scatterplotLayer, modelMatrix} : EditorProps) {
 }
 
 export default observer(function SelectionOverlay(scatterProps : ReturnType<typeof useScatterplotLayer>) {
-    //for now, passing down scatterplotLayer so we can use it to unproject screen coordinates, 
+    //for now, passing down scatterplotLayer so we can use it to unproject screen coordinates,
     //as we figure out how to knit this together...
     const [selectedTool, setSelectedTool] = useState<Tool>('Pan');
     // add a row of buttons to the top of the chart
-    // rectangle, circle, polygon, lasso, magic wand, etc. 
+    // rectangle, circle, polygon, lasso, magic wand, etc.
     // (thanks copilot, that may be over-ambitious)
     // It would be good to have a poly-line tool with draggable points, though.
     // Also a brush tool for painting on masks with variable radius.
@@ -266,7 +279,7 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
             {toolButtons}
         </ButtonGroup>
         <div style={{
-            position: 'absolute', 
+            position: 'absolute',
             top: 0,
             width: '100%',
             height: '100%',
