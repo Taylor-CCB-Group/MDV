@@ -42,7 +42,7 @@ type Tool = typeof Tools[keyof typeof Tools]['name'];
 const ToolArray = Object.values(Tools);
 type P = [number, number];
 type EditorProps = { toolActive?: boolean, rangeDimension: RangeDimension } & ReturnType<typeof useScatterplotLayer>;
-function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} : EditorProps) {
+function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, modelMatrix} : EditorProps) {
     const chart = useChart() as VivMDVReact;
     const cols = chart.config.param;
     // using both ref and state here so we can access the current value in the event handlers
@@ -117,10 +117,13 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension} 
         const r = chart.contentDiv.getBoundingClientRect();
         const x = e.clientX - r.left;
         const y = e.clientY - r.top;
-        const p = scatterplotLayer.unproject([x, y]) as P;
-        //need to fix this now that we're using modelMatrix rather than scaling coordinates...
-        return p.map(v => v*scale) as P;
-    }, [scatterplotLayer, chart.contentDiv, scale]);
+        const p = scatterplotLayer.unproject([x, y]) as P; //not in model coordinates?
+        //need to fix this now that we're using modelMatrix rather than (just) scaling coordinates...
+        const p2 = p.map(v => v*scale) as P;
+        // this fixes the translation for now, still pending more thought about transforms.
+        const m = modelMatrix.clone().invert(); //todo better implementation *without creating a new matrix every time*
+        return m.transform(p2) as P;
+    }, [scatterplotLayer, chart.contentDiv, scale, modelMatrix]);
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!toolActive) return;
         const p = unproject(e);
