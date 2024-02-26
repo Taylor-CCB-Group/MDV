@@ -1,7 +1,6 @@
 import "./all_css"
 import ChartManager from '../charts/ChartManager.js';
-import { getArrayBufferDataLoader,getLocalCompressedBinaryDataLoader} from "../dataloaders/DataLoaders.js";
-
+import { getArrayBufferDataLoader,getLocalCompressedBinaryDataLoader,decompressData} from "../dataloaders/DataLoaders.js";
 function _mdvInit(staticFolder){
     //get the configs for MDV
     getConfigs(staticFolder).then(resp=>{
@@ -68,11 +67,13 @@ async function getView(view){
 
 //load arbitrary data
 async function loadBinaryDataStatic(datasource,name){
-    const resp = await fetch(`./binarydata/${datasource}/${name}.b`);
-    return await resp.arrayBuffer();
+    const resp = await fetch(`./binarydata/${datasource}/${name}.gz`,{responseType: "arraybuffer"});
+    const b=  await resp.arrayBuffer();
+    return await decompressData(b)
 }
 async function loadBinaryData(datasource,name){
-    return await getData("/get_binary_data",{datasource,name},"arraybuffer");
+    const b =  await getData("/get_binary_data",{datasource,name},"arraybuffer");
+    return await decompressData(b)
 }
 
 //get the configs from the home folder (if folder is true) or via a remote API

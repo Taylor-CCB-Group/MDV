@@ -18,7 +18,7 @@
     "run-10Mexample": "npm run run-ex --env example=10Mand1_points",
     "build-hyperion": "webpack --config hyperion.prod.config.js",
     "build-docs": "sphinx-build -M html docs/maindocs docs/maindocs/_build",
-    "build-jsdocs":"jsdoc -c docs/jsdocs/jsdoc.json"
+    "build-jsdocs": "jsdoc -c docs/jsdocs/jsdoc.json"
   },
   "repository": {
     "type": "git",
@@ -31,14 +31,14 @@
   },
   "homepage": "https://github.com/Taylor-CCB-Group/MDV#readme",
   "dependencies": {
-    "@hms-dbmi/viv": "^0.13.2",
+    "@hms-dbmi/viv": "^0.16.0",
     "@luma.gl/core": "^8.5.16",
     "canvas-to-svg": "^1.0.3",
     "d3": "^7.6.1",
     "d3-contour": "^4.0.0",
     "d3-geo": "^3.0.1",
     "d3-sankey": "^0.12.3",
-    "deck.gl": "^8.8.11",
+    "deck.gl": "^8.8.27",
     "docdash": "^2.0.0",
     "dompurify": "^2.4.1",
     "dotenv": "^16.0.3",

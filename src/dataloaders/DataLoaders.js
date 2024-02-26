@@ -216,4 +216,10 @@ class CompressedBinaryDataLoader {
     }
 }
 
-export {getArrayBufferDataLoader,processArrayBuffer,getLocalCompressedBinaryDataLoader};
+async function decompressData(buffer){
+    const {default:pako} = await import ("pako");
+    return pako.inflate(buffer).buffer;
+
+}
+
+export {getArrayBufferDataLoader,processArrayBuffer,getLocalCompressedBinaryDataLoader,decompressData};

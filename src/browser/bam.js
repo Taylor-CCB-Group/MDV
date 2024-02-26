@@ -176,7 +176,8 @@ class BamIndex{
         this.tabix = tabix;
     }
 
-
+    //this seems to work just as well as  blocksForRange
+    //but has not been extensively tested
     getBlocksForRange(refId,min,max){
         const index = this.indices[refId];
         if (!index){
@@ -184,7 +185,7 @@ class BamIndex{
         }
         const lIndex =index.linearIndex;
         const nintv = lIndex.length;
-        const minLin = Math.max(min >> 14, 0);
+        const minLin = Math.min(min >> 14, nintv - 1);
         const  maxLin = Math.min(max >> 14, nintv - 1);
         return [
             {

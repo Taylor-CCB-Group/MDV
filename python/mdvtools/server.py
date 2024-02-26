@@ -113,7 +113,7 @@ def create_app(project,open_browser=True, port =5000):
     def get_binary_data():
         req=request.json
         try:
-            with open( safe_join(project.dir,"binarydata",req["datasource"],f"{req['name']}.b"),"rb") as f:
+            with open( safe_join(project.dir,"binarydata",req["datasource"],f"{req['name']}.gz"),"rb") as f:
                 data = f.read()
         except Exception as e:
             data=None

@@ -5,7 +5,9 @@ import  "./CategoryDimension.js";
 import "./RangeDimension.js";
 import "./CatColDimension.js";
 import  "./CatRangeDimension.js";
-import "./DensityDimension.js"
+import "./DensityDimension.js";
+import "./SortableDimension.js";
+import "./DeepToolsDimension.js";
 import {scaleLinear,scaleSymlog} from "d3-scale";
 import {getColorLegend,getColorBar} from "../utilities/Color.js"
 import {quantileSorted} from 'd3-array';
