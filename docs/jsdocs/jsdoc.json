@@ -4,7 +4,7 @@
         "tutorials":"docs/jsdocs/extradocs",
         "recurse":true,
         "template":"node_modules/docdash",
-        "readme":"docs/readme.md"
+        "readme":"docs/jsdocs/readme.md"
     },
     "plugins": ["plugins/markdown"],
     "source":{

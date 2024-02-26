@@ -13,6 +13,7 @@ import shutil
 import random
 import string
 from os.path import join,split,exists
+from werkzeug.utils import secure_filename
 from  shutil import copytree,ignore_patterns,copyfile
 from typing import Optional, NewType, List, Union
 import time
@@ -306,13 +307,14 @@ class MDVProject:
 
     def set_column(self,datasource,column,data):
         '''Adds (or replaces an existing column) with the data supplied
+
         Args:
             datasource (str): The name of the datasource.
             column (str|dict):  metadata for the column. Can be a string with the column's name,
-              although datatype should also be included as the inferred datatype 
-              is not always correct
+                although datatype should also be included as the inferred datatype 
+                is not always correct
             raw_data (list|array): Anything that can be converted into a pandas Series
-              The data should be in the correct order
+            The data should be in the correct order
         '''
         if type(column) == str:
             column={"name":column}
@@ -340,6 +342,7 @@ class MDVProject:
 
     def remove_column(self,datasource,column):
         '''Removes the specified column
+
         Args:
             datasource (str): The name of the data source.
             column (str): The id (field) of the column.
@@ -359,9 +362,10 @@ class MDVProject:
 
         
 
-    def add_annotations(self,datasource,data,separator="\t",missing_value="ND",columns=None,
+    def add_annotations(self,datasource,data,separator="\t",missing_value="ND",columns=[],
                         supplied_columns_only=False):
         '''Adds annotations based on an existing column
+
         Args:
             datasource (str): The name of the data source.
             data (dataframe|str): Either a pandas dataframe or a text file. The first column
@@ -379,20 +383,17 @@ class MDVProject:
         columns= get_column_info(columns,data,supplied_columns_only)
         col = [x for x in ds["columns"] if x["field"]==index_col]
         if len(col)==0:
-            raise AttributeError(f'index column {index_col} not found in {datasource} datasource') 
-        cols= data.columns
-        
+            raise AttributeError(f'index column {index_col} not found in {datasource} datasource')       
         newdf= pandas.DataFrame({index_col:self.get_column(datasource,index_col)})
         h5 = self._get_h5_handle()
         gr = h5[datasource]
         assert(isinstance(gr, h5py.Group))
-        for c in cols:
-             d= {k:v for k,v in zip(data.index,data[c])}
+        for c in columns:
+             d= {k:v for k,v in zip(data.index,data[c["field"]])}
              #v slow - needs improving
              ncol = newdf.apply(lambda row:d.get(row[0],missing_value),axis=1)
-             col={"datatype":"text","name":c,"field":c}
-             add_column_to_group(col,ncol,gr,len(ncol))
-             ds["columns"].append(col)
+             add_column_to_group(c,ncol,gr,len(ncol))
+             ds["columns"].append(c)
         self.set_datasource_metadata(ds)
         h5.close()
         
@@ -400,6 +401,7 @@ class MDVProject:
 
     def set_column_group(self,datasource,groupname,columns):
         '''Adds (or changes) a column group
+
         Args:
             datasource(string): The name of the datasource
             groupname(string): The name of the column group
@@ -498,8 +500,8 @@ class MDVProject:
     def add_datasource(self,name: str, dataframe, columns: Optional[list]=None,
                        supplied_columns_only=False, replace_data=False, add_to_view="default", separator="\t") -> list[dict[str, str]]:
         '''Adds a pandas dataframe to the project. Each column's datatype, will be deduced by the
-         data it contains, but this is not always accurate. Hence, you can supply a list of column 
-         metadata, which will override the names/types deduced from the dataframe.
+        data it contains, but this is not always accurate. Hence, you can supply a list of column 
+        metadata, which will override the names/types deduced from the dataframe. 
 
         Args:
             name (string): The name of datasource
@@ -755,7 +757,37 @@ class MDVProject:
                     datasource[param]=md[ds][param]
                 self.set_datasource_metadata(datasource)
 
+    def add_image_set(self,datasource,setname,column,folder,type="png"):
+        '''Adds a set of images to a datasource. The images should be in a folder, with the same name as the column
+        Args:
+            datasource (str): The name of the datasource.
+            column (str): The name of the column.
+            folder (str): The path to the folder containing the images.
+        '''
+        ds = self.get_datasource_metadata(datasource)
+        col =self.get_column_metadata(datasource,column)
+       
+        images = [x for x in os.listdir(folder) if x.endswith(type)]
+        #create the image folder
+        fname= secure_filename(setname)
+        imdir = join(self.imagefolder,fname)
+        if not exists(imdir):
+            os.makedirs(imdir)   
+        #copy the images
+        for im in images:
+            copyfile(join(folder,im),join(imdir,im))
+        #update the metadata
+        if not ds.get("images"):
+            ds["images"]={}
+        ds["images"][setname]={
+            "key_column":column,
+            "type":type,
+            "base_url":f"./images/{fname}/"
+        }
 
+
+
+        self.set_datasource_metadata(ds)
                 
     def get_view(self,view):
         views = self.views

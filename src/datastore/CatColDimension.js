@@ -2,7 +2,47 @@ import Dimension from "./Dimension.js";
 class CatColDimension extends Dimension{
     constructor(parent){
         super(parent)
-        this.worker= new Worker (new URL("./catColWorker.js?v=6",import.meta.url));      
+        this.worker= new Worker (new URL("./catColWorker.js?v=7",import.meta.url));      
+    }
+
+
+    filterCatCol(args,columns){
+        const p = this.parent;
+        const filter = p.filterArray;
+        const localFilter= this.filterArray;
+        const catCol= p.columnIndex[columns[0]]
+        const catData = catCol.data;
+        const len = catData.length;
+        const colData = p.columnIndex[columns[1]].data;
+        const thr = args.threshold || 0;
+        const cat = catCol.values.indexOf(args.cat);
+     
+        for (let i=0;i<len;i++){
+            //repetitive code - ideally have inline function
+            const d= colData[i];
+            if (catData[i]===cat && !(isNaN(d)) && d>thr){
+                //is filtered locally
+                if (localFilter[i]===1){
+                    //remove from global filter
+                    if(--filter[i]===0){
+                        //increase unfiltered size if no filters left on this row
+                        p.filterSize++;                    
+                    }                   
+                }
+                //remove local filter
+                localFilter[i]=0;
+            }
+            else{
+                 //not already filtered locally, update global
+                 if (localFilter[i]===0){
+                    if(++filter[i]===1){
+                        p.filterSize--;                   
+                    }
+                }
+                //add local filter
+                localFilter[i]=1;
+            }
+        }
     }
 
     getAverages(callback,columns,config={}){

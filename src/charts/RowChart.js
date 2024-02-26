@@ -36,7 +36,7 @@ class RowChart extends CategoryChart{
         const canvas = this.wordcloudCanvas;
         const w = canvas.width = this.contentDiv.clientWidth;
         const h = canvas.height = this.contentDiv.clientHeight;
-        const weightFactor = this.config.wordSize/maxVal;
+        const weightFactor = (this.config.wordSize || 20)/maxVal;
         const p2 = Math.PI/2;
         canvas.style.display = "block";
         this.graph_area.style.display = "none";

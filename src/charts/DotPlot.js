@@ -40,6 +40,12 @@ class DotPlot extends SVGChart{
         super.remove();
     }
 
+    removeFilter(){
+        this.dim.removeFilter();
+        this.filter=[];  
+        this.drawChart();   
+    }
+  
     setColorFunction(){
         const p =this.config.param;
         const mm = this.data.mean_range;
@@ -107,8 +113,10 @@ class DotPlot extends SVGChart{
             return;
         }
         if (dim === "all_removed"){
-            this.filter=[];
+            this.dim.removeFilter();
+            //this.drawChart();   
             this.resetButton.style.display="none";
+           
         }
         const config={method:"averages_simple",threshold:this.config.threshold_value};
       
@@ -121,57 +129,74 @@ class DotPlot extends SVGChart{
     }
 
 
+    filterCategories(cat,col){
+        this.dim.filter("filterCatCol",[this.config.param[0],col],{threshold:this.config.threshold_value,cat:cat});
+        this.drawChart();
+        this.resetButton.style.display = "inline";
+    }
 
-  
     drawChart(tTime=400){
         const trans =  select(this.contentDiv).transition()
         .duration(tTime).ease(easeLinear);
         const dim = this._getContentDimensions();
         const cWidth= dim.width/(this.config.param.length-1);
         const self = this;
+        const fa=  this.dim.filterMethod;
         this.setColorFunction();
         const vals =this.dataStore.getColumnValues(this.config.param[0]);
-        let inc = ["cl01","cl03","cl04"];
-        inc=inc.map(x=>vals.indexOf(x))
-        const data =  this.data.data.filter(x=>x.count !==0 );//&& inc.indexOf(x.id)!==-1)
-       
-        this.y_scale.domain(data.map(x=>vals[x.id]));
-        
-        this.updateAxis();
-        
+        const data =  this.data.data.filter(x=>x.count !==0 );
+        this.y_scale.domain(data.map(x=>vals[x.id])); 
+        this.updateAxis();  
         const cHeight = dim.height/data.length;
         let r  = (cWidth>cHeight?cHeight:cWidth)/2;
         r= r>25?25:r;
-
         this.fractionScale.range([0,r])
         this.showFractionLegend();
         const cyPos= cHeight/2;
         this.graph_area.selectAll(".dotplot-row")
         .data(data,d=>d.id)
-        .join("g")
-        .attr("transform",(d,i)=>`translate(0,${i*cHeight})`)
-        .attr("class","dotplot-row")
+        .join(
+            enter=>enter.append("g")
+                .attr("class","dotplot-row")
+                .attr("transform",(d,i)=>`translate(${-dim.width},${i*cHeight})`),
+            null,     
+            exit=>exit.transition(trans)
+                .attr("transform",(d,i)=>`translate(${dim.width},${i*cHeight})`)
+                .remove()
+        ).call(a=>a.transition(trans).attr("transform",(d,i)=>`translate(0,${i*cHeight})`)) //use call so can chain selectAll
         .selectAll(".dotplot-circle")
         .data(d=>d.values,d=>d.id)
-        .join("circle")
-        .attr("class","dotplot-circle")
-        .attr("stroke","black")
+        .join(
+            enter=>enter.append("circle")
+            .attr("class","dotplot-circle")
+            .attr("stroke","black")
+            .on("click",(e,d)=>{
+                self.filterCategories(vals[d.cat_id],d.id);
+            })
+        )
+        .attr("stroke-width",d=>{
+            if (fa){
+                if(self.dim.filterArguments.cat===vals[d.cat_id] && self.dim.filterColumns[1]===d.id){
+                    return 4;
+                }
+            }
+            return 1;
+        })
+        .transition(trans)
+      
         .attr("cx",(d,i)=>(i*cWidth)+(0.5*cWidth))
         .attr("cy",cyPos)
         .attr("r",d=>self.fractionScale(d.frac))
         .attr("fill",(d,i)=>{
-           return self.colorFunction(d.mean);
+         
+            return self.colorFunction(d.mean);
         });
     }
   
     setSize(x,y){
         super.setSize(x,y);
-        //
         this.drawChart();
     }
-
-    
-
 
     getSettings(){
         const c= this.config;
@@ -197,7 +222,6 @@ class DotPlot extends SVGChart{
                     this.drawChart();       
                 }
             },
-
             {
                 type:"radiobuttons",
                 label:"Averaging Method",
@@ -218,10 +242,7 @@ class DotPlot extends SVGChart{
                     c.color_scale.trim=v;
                     this.onDataFiltered();
                 }
-            },
-          
-
-
+            }, 
             {
                 label:"Show Color Legend",
                 type:"check",
@@ -233,7 +254,6 @@ class DotPlot extends SVGChart{
                 }
 
             },
-
             {
                 type:"check",
                 label:"Log Color Scale",
@@ -246,7 +266,6 @@ class DotPlot extends SVGChart{
             },
 
         ]);
-
     }
 }
 
