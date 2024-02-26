@@ -7,7 +7,7 @@ import ControlCameraOutlinedIcon from '@mui/icons-material/ControlCameraOutlined
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useViewerStore } from "./avivatorish/state";
 import { useFilteredIndices, useRegionScale, useScatterplotLayer } from "../scatter_state";
-import { useChart } from "../context";
+import { useChart, useRange } from "../context";
 import RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
 import type { VivMDVReact } from "./VivMDVReact";
@@ -46,21 +46,8 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
     const chart = useChart() as VivMDVReact;
     const cols = chart.config.param;
     // using both ref and state here so we can access the current value in the event handlers
-    // can probably simplify this...
-    // and probably want these in a separate store so the don't get lost when the component unmounts...
-    const [start, setStartX] = useState<P>([0,0]);
-    const [end, setEndX] = useState<P>([0,0]);
-    const setStart = useCallback((p: P) => {
-        startRef.current = p;
-        setStartX(p);
-    }, []);
-    const setEnd = useCallback((p: P) => {
-        endRef.current = p;
-        setEndX(p);
-    }, []);
-    const startRef = useRef<P>([0,0]);
-    const endRef = useRef<P>([0,0]);
-
+    // (without needing to recreate them every time the state changes)
+    const { start, setStart, startRef, end, setEnd, endRef } = useRange();
     const updateRange = useCallback(async () => {
         if (!rangeDimension) return;
         const s = startRef.current;
@@ -254,30 +241,17 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
             ><ToolIcon /></IconButton></Tooltip>
         });
     }, [selectedTool]);
-    const chart = useChart();
-    const ds = useMemo(() => chart.dataStore, [chart]);
-    const [rangeDimension, setRangeDimension] = useState<RangeDimension>(undefined);
-    useEffect(() => {
-        if (!ds) return;
-        const rd = ds.getDimension('range_dimension');
-        chart.removeFilter = () => {
-            rd.removeFilter();
-        }
-        setRangeDimension(rd);
-
-        return () => {
-            chart.removeFilter = () => {};
-            rd.destroy();
-        }
-    }, [ds]);
+    const { rangeDimension } = useRange();
     // state: { selectedTool: 'rectangle' | 'circle' | 'polygon' | 'lasso' | 'magic wand' | 'none' }
     // interaction phases... maybe revert back to pan after making selection
     // - but there should be interaction with drag handles...
     // add or remove from selection...
     // -> transform into Deck coordinates...
     // later: selection layers...
+    const [redraw, setRedraw] = useState(false);
     const { scatterplotLayer } = scatterProps;
-    const drawRect = scatterplotLayer && scatterplotLayer.internalState; //<< I think this is causing unmounting issues...
+    const drawRect = scatterplotLayer && scatterplotLayer.internalState; //<< I think this is causing unmounting issues and I don't like it...
+    // if (!scatterplotLayer.internalState) setTimeout(() => setRedraw(v => !v), 10);
     return (
         <>
         <ButtonGroup variant="contained" aria-label="choose tool for manipulating view or selection" style={{zIndex: 2, padding: '0.3em'}}>
@@ -293,6 +267,7 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
             }}
             onMouseUp={(e) => {
                 setSelectedTool('Pan');
+                setRedraw(v => !v); //glitchy
             }}
             onKeyDown={(e) => {
                 //not working as of now... probably want to think more about keyboard shortcuts in general...
