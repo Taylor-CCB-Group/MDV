@@ -248,10 +248,7 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
     // add or remove from selection...
     // -> transform into Deck coordinates...
     // later: selection layers...
-    const [redraw, setRedraw] = useState(false);
-    const { scatterplotLayer } = scatterProps;
-    const drawRect = scatterplotLayer && scatterplotLayer.internalState; //<< I think this is causing unmounting issues and I don't like it...
-    // if (!scatterplotLayer.internalState) setTimeout(() => setRedraw(v => !v), 10);
+    if (!scatterProps.currentLayerHasRendered) return null;
     return (
         <>
         <ButtonGroup variant="contained" aria-label="choose tool for manipulating view or selection" style={{zIndex: 2, padding: '0.3em'}}>
@@ -267,7 +264,6 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
             }}
             onMouseUp={(e) => {
                 setSelectedTool('Pan');
-                setRedraw(v => !v); //glitchy
             }}
             onKeyDown={(e) => {
                 //not working as of now... probably want to think more about keyboard shortcuts in general...
@@ -279,10 +275,9 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
                 }
             }}
             >
-                {drawRect && <RectangleEditor toolActive={selectedTool==='Rectangle'} {...scatterProps}
-                rangeDimension={rangeDimension}
-                />}
-                {drawRect && selectedTool === 'Transform'  && <TransformEditor {...scatterProps} rangeDimension={rangeDimension}/>}
+                <RectangleEditor toolActive={selectedTool==='Rectangle'} {...scatterProps}
+                rangeDimension={rangeDimension} />
+                {selectedTool === 'Transform'  && <TransformEditor {...scatterProps} rangeDimension={rangeDimension}/>}
         </div>
         </>
     )

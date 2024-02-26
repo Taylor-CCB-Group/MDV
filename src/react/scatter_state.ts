@@ -214,7 +214,10 @@ export function useScatterplotLayer() {
         if (point_shape === 'circle') return [];
         return [new ScatterDeckExtension()]
     }, []);
-    const scatterplotLayer = useMemo(() => new ScatterplotExLayer({
+    const [currentLayerHasRendered, setCurrentLayerHasRendered] = useState(false);
+    const scatterplotLayer = useMemo(() => {
+        setCurrentLayerHasRendered(false);
+        return new ScatterplotExLayer({
         // loaders //<< this will be interesting to learn about
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
@@ -260,6 +263,7 @@ export function useScatterplotLayer() {
             // },
         },
         extensions
-    }), [id, data, opacity, radius, colorBy, cx, cy, highlightedObjectIndex, scale, modelMatrix]);
-    return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix, modelMatrixRef, viewState};
+    })}, [id, data, opacity, radius, colorBy, cx, cy, highlightedObjectIndex, scale, modelMatrix]);
+    const onAfterRender = () => setCurrentLayerHasRendered(true);
+    return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix, modelMatrixRef, viewState, currentLayerHasRendered, onAfterRender};
 }

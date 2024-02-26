@@ -76,7 +76,9 @@ export const VivScatter = observer(() => {
         },
         layers: [scatterplotLayer],
         id: id + 'deck',
-        // _animate: true,
+        onAfterRender: () => {
+            scatterProps.onAfterRender();
+        }
     }
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
     return (
