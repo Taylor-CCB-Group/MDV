@@ -170,9 +170,18 @@ export function useScatterplotLayer() {
                 return;
             }
         }
-
+        
         // Step 2: Calculate the center of the bounding box
         // - take into account transform matrices
+        // no internalState in scatterplotLayer, so we can't use project/projectPosition
+        // need to figure this out properly...
+        // const [x, y] = scatterplotLayer.project([x, y, 0]);
+        // const p = scatterplotLayer.projectPosition([x, y, 0]);
+        // const [x, y] = p;
+        // quicker to do once than for every point
+        [minX, minY] = modelMatrix.transformAsPoint([minX, minY, 0]);
+        [maxX, maxY] = modelMatrix.transformAsPoint([maxX, maxY, 0]);
+        
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
 
@@ -183,8 +192,8 @@ export function useScatterplotLayer() {
         // should allow some padding around the edges, based on radius, and/or some config value
         const { max, min, log2 } = Math;
         const maxZoom = 5;
-        const xZoom = ((maxX - minX) / trueImageWidth);
-        const yZoom = ((maxY - minY) / trueImageHeight);
+        const xZoom = 1/log2((maxX - minX) / trueImageWidth);
+        const yZoom = 1/log2((maxY - minY) / trueImageHeight);
         console.log('zoom', xZoom, yZoom);
         const zoomBackOff = 0;
         const zoom = min(maxZoom, max(xZoom, yZoom) - zoomBackOff);
