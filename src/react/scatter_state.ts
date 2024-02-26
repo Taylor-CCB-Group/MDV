@@ -153,11 +153,10 @@ export function useScatterplotLayer() {
         let maxY = Number.NEGATIVE_INFINITY;
         for (let i = 0; i < data.length; i++) {
             const d = data[i];
-            // todo proper use of transform matrices
             try {
                 const x = cx.data[d] / scale;
                 const y = cy.data[d] / scale;
-                if (x === undefined || y === undefined) {
+                if (!Number.isFinite(x) || !Number.isFinite(y)) {
                     console.warn('undefined data in scatterplot');
                     continue;
                 }
@@ -196,7 +195,7 @@ export function useScatterplotLayer() {
         const yZoom = 1/log2((maxY - minY) / trueImageHeight);
         console.log('zoom', xZoom, yZoom);
         const zoomBackOff = 0;
-        const zoom = min(maxZoom, max(xZoom, yZoom) - zoomBackOff);
+        const zoom = min(maxZoom, min(xZoom, yZoom) - zoomBackOff);
         // Step 4: Set the view state that will be picked up by the user of this hook
         // may want to use viv viewerStore - but we don't want scatterplot to depend on that
         setViewState({
