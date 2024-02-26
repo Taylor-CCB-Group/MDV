@@ -1,0 +1,119 @@
+ [
+  {
+    "title": "Activity_H3K27ac",
+    "legend": "",
+    "type": "ring_chart",
+    "param": "Activity_H3K27ac",
+    "id": "activity_pie",
+    "size": [
+      219,
+      225
+    ],
+    "axis": {
+      "x": {
+        "textSize": 13,
+        "label": "",
+        "size": 25,
+        "tickfont": 10
+      }
+    },
+    "position": [
+      814,
+      8
+    ]
+  },
+  {
+    "title": "RE",
+    "type": "row_chart",
+    "param": "RE",
+    "id": "RE_row_chart",
+    "axis": {
+    "x": {
+      "textSize": 13,
+      "label": "",
+      "size": 40,
+      "tickfont": 10,
+      "rotate_labels": true
+    }
+  },
+  "position": [
+    382,
+    7
+  ],
+  "size": [
+    204,
+    225
+  ]
+  },
+  {
+    "title": "",
+    "type": "deeptools_heatmap",
+    "param": [],
+    "map": "default",
+    "heatmap": "default",
+    "id": "deeptools_heatmap",
+    "size": [
+        367,
+        549
+    ],
+    "position": [
+        10,
+        8
+    ]
+  },
+  {
+    "title": "",
+    "legend": "",
+    "type": "table_chart",
+    "param": [
+      "chromosome",
+      "start",
+      "end",
+      "RE",
+      "TSS_RE",
+      "Activity_H3K27ac",
+      "CTCF_auc",
+      "H3K27ac_auc",
+      "H3K4me1_auc",
+      "H3K4me3_auc"
+    ],
+    "id": "LJMLGo",
+    "size": [
+      659,
+      318
+    ],
+    "column_widths": {
+      "__index__": 60,
+      "chromosome": 61,
+      "TSS_RE": 110
+    },
+    "position": [
+      380,
+      243
+    ]
+  },
+  {
+    "title": "TSS_RE",
+    "legend": "",
+    "type": "row_chart",
+    "param": "TSS_RE",
+    "id": "aQG7cc",
+    "size": [
+      203,
+      227
+    ],
+    "axis": {
+      "x": {
+        "textSize": 13,
+        "label": "",
+        "size": 25,
+        "tickfont": 10
+      }
+    },
+    "position": [
+      591,
+      6
+    ]
+  }
+]
+    

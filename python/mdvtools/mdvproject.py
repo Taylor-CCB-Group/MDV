@@ -388,7 +388,65 @@ class MDVProject:
                     self.set_view(view,None)
 
 
-    def add_genome_browser(self,datasource,parameters=["chr","start","end"],name=None):
+    def get_genome_browser(self,datasource):
+        ds = self.get_datasource_metadata(datasource)
+        info =  ds.get("genome_browser")
+        gb = {
+            "type":"genome_browser",
+            "param":info["location_fields"],
+            "tracks":[{
+                "short_label":info["default_track"]["label"],
+                "url": info["default_track"]["url"],
+                "track_id":"_base_track",
+                "decode_function":"generic",
+                "height":15,
+                "displayMode":"EXPANDED"
+            }]
+        }
+        at =  info.get("atac_bam_track")
+        if at:
+            gb["tracks"].append({
+                "short_label":"Coverage",
+                "height":400,
+                "track_id":"_atac_bam_track",
+                "url":at["url"],
+                "type":"bam_sca_track"
+            })
+        dt = info.get("default_tracks")
+        if dt:
+            for t in dt:
+                gb["tracks"].append(t)
+        if info["default_parameters"]:
+            gb.update(info["default_parameters"])
+        return gb
+
+    def add_refseq_track(self,datasource,genome):
+        ds= self.get_datasource_metadata(datasource)
+        gb = ds.get("genome_browser")
+        if not gb:
+            raise AttributeError(f"no genome browser for {datasource}")
+        tdir = join(split(os.path.abspath(__file__))[0],"templates","tracks")
+        reft = join(tdir,f"{genome}.bed.gz")
+        if not  os.path.exists(reft):
+            raise AttributeError(f"no refseq track for {genome}")
+        dt = gb.get("default_tracks")
+        if not dt:
+            dt = gb["default_tracks"]=[]
+        #add to start of list
+        dt.insert(0,{
+            "short_label":"RefSeq",
+            "height":50,
+             "displayMode": "EXPANDED",
+            "decode_function": "decodeRefflat",
+            "track_id":"_refseq_track",
+            "url":f"tracks/{genome}.bed.gz"
+        })
+        #copy to tracks folder
+        shutil.copy(reft,join(self.trackfolder,f"{genome}.bed.gz"))
+        shutil.copy(reft+".tbi",join(self.trackfolder,f"{genome}.bed.gz.tbi"))
+        self.set_datasource_metadata(ds)
+
+    def add_genome_browser(self,datasource,parameters=["chr","start","end"],name=None,extra_params=None):
         # get all the genome locations
         loc = [self.get_column(datasource,x) for x in parameters]
         #write to a bed file
@@ -409,6 +467,8 @@ class MDVProject:
                 "label":name
             }
         }
+        if extra_params:
+            gb.update(extra_params)
         ds= self.get_datasource_metadata(datasource)
         ds["genome_browser"]=gb
         self.set_datasource_metadata(ds)
