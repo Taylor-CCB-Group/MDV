@@ -48,8 +48,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 //(copilot suggesting "this is a bit of a mess" is a bit rude, but in this case it's an understatement)
 // todo: change so that *only* ?dir=... is used to determine the root?
 // const flaskURL = window.location.pathname;
-const { href } = window.location;
-const flaskURL = href//new URL(href).origin;//href.substring(href.indexOf("/project"));
+const { origin, pathname } = window.location;
+const flaskURL = origin + pathname;//new URL(href).origin;//href.substring(href.indexOf("/project"));
 // if URLSearchParams has a 'dir' parameter, use that as the data directory.
 const urlParams = new URLSearchParams(window.location.search);
 // if we're in a popout window, ignore the dir parameter and don't load data
@@ -66,6 +66,7 @@ const root = getRoot(dir);
 //this was sort-of-working as of this writing for `MDVProject.serve()`, as long as the default port 5050 is used...
 //need to revisit and actually come up with a proper design.
 // - this means some online projects are currently broken, I should fix that. <--
+// as of this writing, they work with a `?static` parameter, but that's not a good solution.
 const staticFolder = urlParams.get('static') !== null; //!dir.startsWith("/project") && !(window.location.port === "5050") && !dir.endsWith("5050");
 const project_name = dir.split("/").pop();
 /// --- end of messy section ---
