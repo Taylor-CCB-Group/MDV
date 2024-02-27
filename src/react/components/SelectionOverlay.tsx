@@ -134,6 +134,8 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
     }, [viewState]);
     const min = [Math.min(start[0], end[0]), Math.min(start[1], end[1])];
     const max = [Math.max(start[0], end[0]), Math.max(start[1], end[1])];
+    // if (!currentLayerHasRendered) return null; //if we pass this, I thought it meant we have internalState, but it seems not...
+    if (!scatterplotLayer.internalState) return null;
     const screenStart = scatterplotLayer.project(min);
     const screenEnd = scatterplotLayer.project(max);
 
