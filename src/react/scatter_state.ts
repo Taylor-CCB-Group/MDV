@@ -88,6 +88,7 @@ export function useScatterModelMatrix() {
 }
 
 type Tooltip = (PickingInfo) => string;
+type P = [number, number];
 export function useScatterplotLayer() {
     const id = useChartID();
     const chart = useChart();
@@ -264,6 +265,24 @@ export function useScatterplotLayer() {
         },
         extensions
     })}, [id, data, opacity, radius, colorBy, cx, cy, highlightedObjectIndex, scale, modelMatrix]);
+    const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
+        if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
+        if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;
+        const r = chart.contentDiv.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        const y = e.clientY - r.top;
+        const p = scatterplotLayer.unproject([x, y]) as P;
+        //still need to reason better about transforms...
+        const p2 = p.map(v => v * scale) as P;
+        const m = modelMatrix.invert();
+        const p3 = m.transform(p2) as P;
+        m.invert();
+        return p3;
+    }, [scatterplotLayer, modelMatrix, currentLayerHasRendered, scale]);
+    // const project = 
     const onAfterRender = () => setCurrentLayerHasRendered(true);
-    return {scatterplotLayer, getTooltip, modelMatrix, setModelMatrix, modelMatrixRef, viewState, currentLayerHasRendered, onAfterRender};
+    return {
+        scatterplotLayer, getTooltip, modelMatrix, modelMatrixRef, viewState,
+        currentLayerHasRendered, onAfterRender, unproject
+    };
 }

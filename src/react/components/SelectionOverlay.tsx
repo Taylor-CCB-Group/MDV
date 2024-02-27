@@ -42,7 +42,7 @@ type Tool = typeof Tools[keyof typeof Tools]['name'];
 const ToolArray = Object.values(Tools);
 type P = [number, number];
 type EditorProps = { toolActive?: boolean, rangeDimension: RangeDimension } & ReturnType<typeof useScatterplotLayer>;
-function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, modelMatrix} : EditorProps) {
+function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, unproject, currentLayerHasRendered} : EditorProps) {
     const chart = useChart() as VivMDVReact;
     const cols = chart.config.param;
     // using both ref and state here so we can access the current value in the event handlers
@@ -98,19 +98,6 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
         (window as any).r = rangeDimension;
     }, [rangeDimension, cols]);
 
-    //should this be a property of the scatterplotLayer?
-    const scale = useRegionScale();//todo: this is a hack... should have a better way of reasoning about transforms...
-    const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
-        const r = chart.contentDiv.getBoundingClientRect();
-        const x = e.clientX - r.left;
-        const y = e.clientY - r.top;
-        const p = scatterplotLayer.unproject([x, y]) as P; //not in model coordinates?
-        //need to fix this now that we're using modelMatrix rather than (just) scaling coordinates...
-        const p2 = p.map(v => v*scale) as P;
-        // this fixes the translation for now, still pending more thought about transforms.
-        const m = modelMatrix.clone().invert(); //todo better implementation *without creating a new matrix every time*
-        return m.transform(p2) as P;
-    }, [scatterplotLayer, chart.contentDiv, scale, modelMatrix]);
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!toolActive) return;
         const p = unproject(e);
@@ -123,18 +110,9 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
         updateRange();
     }, [toolActive]);
 
-    const viewState = useViewerStore((state) => state.viewState); // for reactivity - still a frame behind...
-    const [frameTrigger, setFrameTrigger] = useState(false);
-    useEffect(() => {
-        //non-trivial overhead here? must be a better way...
-        const t = setTimeout(() => {
-            setFrameTrigger(v => !v);
-        }, 0);
-        return () => clearTimeout(t);
-    }, [viewState]);
     const min = [Math.min(start[0], end[0]), Math.min(start[1], end[1])];
     const max = [Math.max(start[0], end[0]), Math.max(start[1], end[1])];
-    // if (!currentLayerHasRendered) return null; //if we pass this, I thought it meant we have internalState, but it seems not...
+    if (!currentLayerHasRendered) return null; //if we pass this, I thought it meant we have internalState, but it seems not...
     if (!scatterplotLayer.internalState) return null;
     const screenStart = scatterplotLayer.project(min);
     const screenEnd = scatterplotLayer.project(max);
@@ -174,27 +152,13 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
     </>);
 }
 
-function TransformEditor({scatterplotLayer, modelMatrix} : EditorProps) {
+function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProps) {
     const pLastRef = useRef([NaN, NaN]);
-    const chart = useChart();
-    const scale = useRegionScale();
-    const unproject = useCallback((e: MouseEvent | React.MouseEvent) => {
-        const r = chart.contentDiv.getBoundingClientRect();
-        const x = e.clientX - r.left;
-        const y = e.clientY - r.top;
-        const p = scatterplotLayer.unproject([x, y]) as P;
-        //need to fix this now that we're using modelMatrix rather than scaling coordinates...
-        return p.map(v => v*scale) as P;
-    }, [scatterplotLayer, chart.contentDiv, scale]);
-
     const handleMouseMove = useCallback((e: MouseEvent) => {
         const p = unproject(e);
         const pLast = pLastRef.current;
         const dx = p[0] - pLast[0];
         const dy = p[1] - pLast[1];
-        pLastRef.current = p;
-        //todo: after mutating this, we mess up RangeDimension's relationship to the modelMatrix...
-        //need a different transform hierarchy?
         modelMatrix.translate([dx, dy, 0]);
         scatterplotLayer.setNeedsRedraw();
     }, []);
