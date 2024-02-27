@@ -2,7 +2,7 @@ import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { ChannelsState, DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivContextType, VivProvider, createVivStores, useChannelsStoreApi, useImageSettingsStoreApi, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
+import { DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivContextType, VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
 import type { ColumnName, DataColumn } from "../../charts/charts";
@@ -28,13 +28,6 @@ function ReactTest() {
 
 /** comparable to main `<Avivator />` component */
 const MainChart = () => {
-    // const ome = useOmeTiff();
-    // if (!ome) return <div>Loading...</div>; // todo suspense.
-
-    // this is re-rendering a lot more than I think it should...
-    // and somehow useImage(source, []) is ending up with a null source even after the effect runs?
-    // the inner async changeSource() in useImage() is interacting badly with whatever is causing the re-render...
-
     const imgUrl = useImgUrl();
     const isViewerLoading = useViewerStore(store => store.isViewerLoading);
     const viewerStore = useViewerStoreApi();
@@ -72,7 +65,7 @@ export type ScatterPlotConfig = {
     point_shape: "circle" | "square"
 } & TooltipConfig;
 const scatterDefaults: ScatterPlotConfig = {
-    radius: 1,
+    radius: 10,
     opacity: 1,
     color_by: null,
     color_legend: {
@@ -193,7 +186,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             {
                 type: "slider",
                 label: "radius",
-                current_value: c.radius || 1,
+                current_value: c.radius || 10,
                 min: 0,
                 max: 500,
                 continuous: true,
@@ -204,7 +197,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             {
                 type: "slider",
                 label: "opacity",
-                current_value: c.opacity || 1,
+                current_value: c.opacity || scatterDefaults.opacity,
                 min: 0,
                 max: 1,
                 continuous: true,
@@ -270,7 +263,11 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 }
 
 BaseChart.types["VivMdvRegionReact"] = {
-    ...BaseChart.types["viv_scatter_plot"],
+    ...BaseChart.types["viv_scatter_plot"], //this is doing something that means my default radius isn't being used...
+    init: (config, ds, ec) => {
+        BaseChart.types["viv_scatter_plot"].init(config, ds, ec);
+        config.radius = scatterDefaults.radius;
+    },
     "class": VivMdvReact,
     name: "Viv Scatter Plot (react)",
 }
