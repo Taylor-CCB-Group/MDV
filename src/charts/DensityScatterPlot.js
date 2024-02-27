@@ -343,20 +343,20 @@ BaseChart.types["image_scatter_plot"]={
             }
         ]
     },
-    init:(config, ds, ec)=>{
-        const r =  ds.regions;
-        const sr= r.all_regions[ec.region];
-        config.color_by= r.default_color;
-        config.param=r.position_fields.concat([r.default_color]);
-        config.background_filter={
-            column:r.region_field,
-            category:ec.region
+    init: (config, ds, ec) => {
+        const r = ds.regions;
+        const sr = r.all_regions[ec.region];
+        config.color_by = r.default_color;
+        config.param = r.position_fields.concat([r.default_color]);
+        config.background_filter = {
+            column: r.region_field,
+            category: ec.region
         };
-        config.color_legend={display:false};
-        config.region=ec.region;
-        config.roi=sr.roi;
-        config.background_image=sr.images[sr.default_image];
-        config.title= ec.region + (sr.default_image?`-${sr.default_image}`:"");
+        config.color_legend = { display: false };
+        config.region = ec.region;
+        config.roi = sr.roi;
+        config.background_image = sr.images[sr.default_image];
+        config.title = ec.region + (sr.default_image ? `-${sr.default_image}` : "");
     }
 }
 
