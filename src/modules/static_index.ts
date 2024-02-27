@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 import "./all_css";
-import "../charts/VivScatterPlotNew";
 import HmrHack from "../react/HmrHack";
 HmrHack();
 import ChartManager from "../charts/ChartManager.js";
