@@ -18,13 +18,14 @@ type P = [number, number];
 type RefP = React.MutableRefObject<P>;
 type RangeState = {
     rangeDimension: RangeDimension;
-    start: P; setStart: (P) => void; startRef: RefP;
-    end: P; setEnd: (P) => void; endRef: RefP;
+    start: P; setStart: (p: P) => void; startRef: RefP;
+    end: P; setEnd: (p: P) => void; endRef: RefP;
 };
 
 
 
 const ChartContext = createContext<BaseReactChart<any>>(undefined);
+// Could more usefully be thought of as ScatterplotContext?
 const RangeContext = createContext<RangeState>(undefined);
 const DataStoreContext = createContext<DataStore>(undefined);
 const OmeTiffContext = createContext<OME_TIFF | undefined>(undefined);
@@ -33,19 +34,6 @@ function useCreateRange(chart: BaseReactChart<any>) {
     const ds = chart.dataStore;
     // tried simpler `rangeDimesion = useMemo(...)`, but it can lead to non-destroyed rangeDimensions with HMR.
     const [rangeDimension, setRangeDimension] = useState<RangeDimension>(undefined);
-    useEffect(() => {
-        if (!ds) return;
-        const rd = ds.getDimension('range_dimension');
-        chart.removeFilter = () => {
-            rd.removeFilter();
-        }
-        setRangeDimension(rd);
-
-        return () => {
-            chart.removeFilter = () => { };
-            rd.destroy();
-        }
-    }, [ds]);
     const [start, setStartX] = useState<P>([0, 0]);
     const [end, setEndX] = useState<P>([0, 0]);
     // still not sure I want these refs
@@ -59,6 +47,22 @@ function useCreateRange(chart: BaseReactChart<any>) {
         endRef.current = p;
         setEndX(p);
     };
+    useEffect(() => {
+        if (!ds) return;
+        const rd = ds.getDimension('range_dimension');
+        chart.removeFilter = () => {
+            //todo this is probably bad, especially in the general case - what if there's more than one filter?
+            rd.removeFilter();
+            setStart([0, 0]);
+            setEnd([0, 0]);
+        }
+        setRangeDimension(rd);
+
+        return () => {
+            chart.removeFilter = () => { };
+            rd.destroy();
+        }
+    }, [ds]);
     return { rangeDimension, start, setStart, startRef, end, setEnd, endRef };
 }
 
