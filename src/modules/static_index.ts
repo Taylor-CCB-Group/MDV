@@ -31,10 +31,6 @@ window.mdv = {
 }
 
 
-// todo: change so that *only* ?dir=... is used to determine the root?
-// const flaskURL = window.location.pathname;
-const { href } = window.location;
-const flaskURL = new URL(href).origin;//href.substring(href.indexOf("/project"));
 
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -49,7 +45,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 /// --- this section is a bit of a mess, but it works for now ---
-//(copilot suggesting "this is a bit of a mess" is a bit rude, but in this case it's right)
+//(copilot suggesting "this is a bit of a mess" is a bit rude, but in this case it's an understatement)
+// todo: change so that *only* ?dir=... is used to determine the root?
+// const flaskURL = window.location.pathname;
+const { href } = window.location;
+const flaskURL = new URL(href);//.origin;//href.substring(href.indexOf("/project"));
 // if URLSearchParams has a 'dir' parameter, use that as the data directory.
 const urlParams = new URLSearchParams(window.location.search);
 // if we're in a popout window, ignore the dir parameter and don't load data
