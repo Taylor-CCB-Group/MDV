@@ -188,19 +188,7 @@ class VivScatterPlot extends DensityScatterPlot{
     getConfig(){
         const conf = super.getConfig();
         const k = this.viv.layers[0].props;
-        //legacy format
-        if (!conf.viv.file){
-            conf.viv.image_properties={
-                selections:k.selections.slice(0),
-                colors:k.colors.slice(0),
-                channelsVisible:k.channelsVisible.slice(0),
-                contrastLimits:k.contrastLimits.slice(0),
-                domains: k.domains?.slice(0)
-            }
-        }
-        else{
-            conf.viv.channels= this.viv.getSelectedChannelsNice();
-        }
+        conf.viv.channels= this.viv.getSelectedChannelsNice();
         return conf;
     }
 
@@ -238,12 +226,32 @@ class VivScatterPlot extends DensityScatterPlot{
             import ('../webgl/VivViewerMDV.js').then(({default:VivViewerMDV})=>{
                 //new config
                 const r  = this.dataStore.regions;
+                const vc  = Object.assign({},c.viv);
                 //local or remote url
                 if(r){
                     const i = r.all_regions[c.region].viv_image;
-                    c.viv.url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file
+                    //c.viv.url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file;
+                    let url = i.url;
+                    //is specified by file and base
+                    if (!url){
+                        let base= r.avivator.base_url;
+                        //has to be full url
+                        if (! base.startsWith("http")){
+                            if (base.startsWith("/")){
+                                base=window.location.origin+base;
+                            }
+                            else{
+                                if (base.startsWith("./")){
+                                    base=base.substring(2)
+                                }
+                                base= window.location.href.split("?")[0]+"/"+base;
+                            }
+                        }
+                        url = base + i.file;          
+                    }               
+                    vc.url =url;
                 }
-                this.viv = new VivViewerMDV(this.vivCanvas,c.viv,this.app);
+                this.viv = new VivViewer(this.vivCanvas,vc,this.app);
                 this.app.addHandler("pan_or_zoom",(offset,x_scale,y_scale)=>{
                     this.viv.setPanZoom(offset,x_scale,y_scale)
                 },c.id+"_viv")
@@ -255,7 +263,10 @@ class VivScatterPlot extends DensityScatterPlot{
 
 BaseChart.types["viv_scatter_plot"]={
     name:"Viv Scatter Plot",
-    required:ds=>ds.regions?.avivator,
+    required:ds=>{
+        return ds.regions?.avivator
+    }
+    ,
     extra_controls:(ds)=>{
         const vals=[];
         for(let x in ds.regions.all_regions){

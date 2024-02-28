@@ -170,7 +170,7 @@ def create_app(project: MDVProject, open_browser = True, port = 5050, websocket 
     def get_binary_data():
         req=request.json
         try:
-            with open( safe_join(project.dir,"binarydata",req["datasource"],f"{req['name']}.b"),"rb") as f: # type: ignore
+            with open( safe_join(project.dir,"binarydata",req["datasource"],f"{req['name']}.gz"),"rb") as f: # type: ignore
                 data = f.read()
         except Exception as e:
             # data='' # satisfy type checker - was None, haven't tested if this is better or worse.

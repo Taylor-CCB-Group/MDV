@@ -457,6 +457,13 @@ class WGL2DI{
 		this.lines.opacity = [];
 		this.lines.count=0;
     }
+
+	removeAllRectangles(){
+		this.rects.position= [];
+		this.rects.color = [];
+		this.rects.opacity = [];
+		this.rects.count=0;
+	}
     
 
     addRectangle(position,width,height,color=[0,0,0],opacity=1){	
@@ -1141,7 +1148,7 @@ class WGL2DI{
             
                 
             
-                this.refresh();
+                //this.refresh();
                 ret.imageMoved= this.imageMoved;
                 this.imageMoved=null;
                 for (var i in this.handlers.panning_stopped){
@@ -1275,9 +1282,10 @@ class WGL2DI{
             if (!this.dragging && !(this.brush || this.poly_brush) && evt.button===0){
                     var position =this._getMousePosition(evt);
                     var obj = this._getObjectAtPosition(position);
+					const apos= this._getActualPosition(position);
                     if (obj){
                         for (var i in this.handlers.object_clicked){
-                            this.handlers.object_clicked[i](obj);
+                            this.handlers.object_clicked[i](obj,apos);
                         }  
                     }
             }

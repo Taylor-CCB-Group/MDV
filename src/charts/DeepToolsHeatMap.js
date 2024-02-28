@@ -11,6 +11,7 @@ const color_scheme=["#313695","#4575B4","#74ADD1","#ABD9E9", "#E0F3F8", "#E0F3F8
 class DeepToolsHeatMap extends SVGChart{
     constructor(dataStore,div,config){
         super(dataStore,div,config,{x:{type:"band"},y:{custom:true}});
+        this.dim = this.dataStore.getDimension("deeptools_dimension")
         const box =this._getContentDimensions();
         //create the div to house the webgl
         this.graphDiv = createEl("div",{
@@ -31,23 +32,15 @@ class DeepToolsHeatMap extends SVGChart{
         }
         //create the webgl
         this.app = new WGL2DI(this.graphDiv,{lock_x_axis:true});
-
-        this.app.addHandler("object_clicked",i=>{
-            //get the position in flat non sparse array array
-            const p = this.positions[i];
-            // work out the row
-            const r = Math.floor(p/this.hm_config.cols);
-            //get the locus index
-            const index = this.map_index[r];
+ 
+        this.app.addHandler("object_clicked",(i,apos)=>{
+            const r = Math.floor(apos[1]/20);
+            const index = this.reverse_map[r];
             this.dataStore.dataHighlighted([index],this);
-            
-          //wgl.offset=[10,-r*20];
-          //wgl.y_scale=wgl.height/(10*20);
-          //wgl.addLine([0,r*20],[cols*20+600,r*20],[255,255,0]);
-          //wgl.addLine([0,r*20+20],[cols*20+600,r*20+20],[255,255,0])
-          //wgl.refresh();
-          
-   });
+        });
+        
+
+
         //load the correct data
         this.hm_config =this.dataStore.deeptools.maps[c.heatmap];
         this.x_scale.domain(this.hm_config.groups.slice(0));
@@ -56,80 +49,105 @@ class DeepToolsHeatMap extends SVGChart{
             const r = this.hm_config.rows;
             const c =  this.hm_config.cols;
             this.map_index = new Uint32Array(buff,0,r);
-            this.reverse_map= new Map();
-            for (let n=0;n<this.map_index.length;n++){
-                this.reverse_map.set(this.map_index[n],n)
-            }
-            /*
-            const dd = this.dataStore.getRawColumn("TSS_RE");
-            const vs = this.dataStore.getColumnValues("TSS_RE");
-            const mi = this.map_index;
-            let gr= vs[dd[mi[0]]]
-            let st=0
-            const grps=[{"group":gr,"start":0}]
-            for (let i=0;i<mi.length; i++){
-                const a=dd[mi[i]];
-                if (mi[i]!==0 && vs[a] !==gr){
-                    console.log(i+":"+gr+":"+vs[a]);
-                    grps.push({"group":vs[a],"start":i});
-                    gr=vs[a];
-                 
+            const data = new Uint8Array(buff,r*4,r*c);
+            const len = data.length;
+            this.dataLength=0;
+            //filter out 0 values
+
+            const a = Date.now();
+            for (let n=0;n<data.length;n++){     
+                if (data[n]!==0){
+                    this.dataLength++;
                 }
             }
-            */
-            this.data= new Uint8Array(buff,r*4,r*c);
-            const len = this.data.length;
+           
+            this.data= new SharedArrayBuffer(this.dataLength*5);
+            this.rowPositions = new Uint16Array(this.data,0,this.dataLength);
+            this.colPositions = new Uint16Array(this.data,this.dataLength*2,this.dataLength);
+            this.values = new Uint8Array(this.data,this.dataLength*4,this.dataLength);
+
+
+            this.displayData = new SharedArrayBuffer(this.dataLength*11);
+            this.x= new Float32Array(this.displayData,0,this.dataLength);
+            this.y= new Float32Array(this.displayData,this.dataLength*4,this.dataLength);
+            this.colors= new Uint8Array(this.displayData,this.dataLength*8,this.dataLength*3)
+            
+            //this could done in server side
             let z=0;
-            for (let n=0;n<this.data.length;n++){
-                if (this.data[n]===0){
-                    z++
-                }
-            }
-            this.colors= new Uint8Array(z*3)
-            this.x= new Float32Array(z);
-            this.y= new Float32Array(z);
-            this.positions= new Float32Array(z);
-            const cpg = c/this.hm_config.groups.length;
-            let i=0;
             for (let n=0;n<len;n++){
-                if (this.data[n]===0){
+                if (data[n]===0){
                     continue;
                 }
                 const col = n%c;
                 const row = Math.floor(n/c);
-                this.x[i]=col*20 + (Math.floor(col/cpg)*200)+10;
-                this.y[i]=row*20+10;
-                this.positions[i]=n;
-                i++;
+                this.rowPositions[z]=this.map_index[row];
+                this.colPositions[z]=col;
+                this.values[z]=data[n];
+                z++;
             }
-            this.setColor();
-            const dim = this._getContentDimensions();
-            this.app.x_scale= dim.width/((c*20)+(this.hm_config.groups.length-1)*200);
-            this.app.y_scale = dim.height/(r*20);
-            const gl = this.hm_config.groups.length;
-            const gw= (c/gl)*20;
-            let x=0;
-            const base_color = this.colorScale(0); 
-            for (let n=0;n<gl;n++){
-                this.app.addRectangle([x,0],gw,r*20,base_color);
-                x+=gw+200;
-            }
-            
-           
-           
             this.app.addSquares({
                 x:this.x,
                 y:this.y,
                 colors:this.colors
             });
-            this.app.refresh()              
+            this.dim.setParameters({
+                displayData:this.displayData,
+                data:this.data,
+                columns:c,
+                rows:r,
+                groups:this.hm_config.groups.length,
+                length:z
+
+            })
+            this.sortBy(c.sortBy)           
+        })
+    }
+    updateMap(colorOnly=false){
+        const c =  this.hm_config.cols;
+        const colorScale=   this.getColorScale();
+        this.dim.updateData(colorScale,colorOnly).then(data=>{
+            this.total=data.total;
+            this.app.squares.count=this.total;
+            this.reverse_map = data.reverse_map;
+            this.currentRows=   data.currentRows;
+            const r = this.dataStore.filterSize;
+            const dim = this._getContentDimensions();
+            if (!colorOnly){
+                this.app.x_scale= dim.width/((c*20)+(this.hm_config.groups.length-1)*200);
+                this.app.y_scale = dim.height/(r*20);
+                this.app.offset=[0,0];
+               
+            }
+            const gl = this.hm_config.groups.length;
+            const gw= (c/gl)*20;
+            let x=0;
+            const base_color = colorScale.colors[0];
+            this.app.removeAllRectangles()
+            for (let n=0;n<gl;n++){
+                this.app.addRectangle([x,0],gw,r*20,base_color);
+                x+=gw+200;
+            }
+            this.app.refresh();
+            this.updateAxis();
+
         });
+    }
+
+    sortBy(column){
+        if (column){
+            const sortCols = [{col:column,desc:false}];
+            this.dim.sort(sortCols).then(()=>{
+                this.updateMap();      
+            })
+        }
+        else{
+            this.dim.setSortOrder(this.map_index);
+            this.updateMap();
+        }
     }
 
     setSize(x,y){
 		super.setSize(x,y);
-        //rescale the x axis
-        //const rs = (w,h)=>[w/((this.hm_config.cols*20)+(this.hm_config.groups.length-1)*200),h/(this.hm_config.rows*20)]
 		const dim = this._getContentDimensions();
 		this.app.setSize(dim.width,dim.height);
         this.graphDiv.style.left = dim.left+"px";
@@ -137,26 +155,30 @@ class DeepToolsHeatMap extends SVGChart{
 		this.updateAxis();
 	}
 
+    onDataFiltered(){
+        this.updateMap();
+    }
 
     onDataHighlighted(data){
         this.app.removeAllLines();
-        const r = this.reverse_map.get(data.indexes[0]);
+        const r = this.currentRows[data.indexes[0]];
         const cols= this.hm_config.cols;
         if (r){
             this.app.addLine([0,r*20],[cols*20+600,r*20],[255,255,0]);
             this.app.addLine([0,r*20+20],[cols*20+600,r*20+20],[255,255,0])
         }
         
-        if (data.source!==this && r){
+       /* if (data.source!==this && r){
             this.app.offset=[0,-r*20 +300];
             this.app.y_scale=this.app.height/(30*20);
-        }
+        */
         this.app.refresh();
 
     }
 
+ 
 
-    setColor(){
+    getColorScale(){
         const r= this.config.color_scale.range;
         const conf ={
             datatype:"integer",
@@ -169,23 +191,26 @@ class DeepToolsHeatMap extends SVGChart{
                 bins:200,      
             }
         }
-        this.colorScale = this.dataStore.getColorFunction(null,conf);
-        const c = this.colors;
-        for (let n=0;n<this.data.length;n++){
-            const i =this.positions[n];
-            const col = this.colorScale(this.data[i]);
-            const p = 3*n
-            c[p]=col[0];
-            c[p+1]=col[1];
-            c[p+2]=col[2]
+        return {
+            colors:this.dataStore.getColumnColors({datatype:"integer"},conf),
+            bins:200,
+            min:r[0],
+            max:r[1]
         }
     }
 
+
+    remove(notify=true){
+        this.dim.destroy(notify);
+        super.remove();
+    }
 
     getSettings(){
         let settings= super.getSettings();
         const c = this.config
         const cs= c.color_scale;
+        const sortCols = this.dataStore.getColumnList();
+        sortCols.push(({name:"Default",field:"__default__"}))
         settings = settings.concat([{        
             type:"doubleslider",
             max:255,
@@ -195,9 +220,26 @@ class DeepToolsHeatMap extends SVGChart{
             label:"Color Scale",
             func:(x,y)=>{     
                 cs.range=[x,y];
-                this.setColor();
-                this.app.refresh();
+               this.updateMap(true);
             }
+        },
+            {
+                type:"dropdown",
+                label:"SortBy",
+                current_value:c.sortBy || "__default__",
+                values:[sortCols,"name","field"],
+                func:(x)=>{
+                    if (x=="__default__"){
+                        delete c.sortBy;
+                        this.sortBy()
+                    }
+                    else{
+                        c.sortBy = x
+                        this.sortBy(x);
+                    }
+                   
+                },
+
         }]);
         return settings;
     }
@@ -207,6 +249,8 @@ BaseChart.types["deeptools_heatmap"]={
     class:DeepToolsHeatMap,
     required:["deeptools"],
     name:"DeepTools HeatMap",
+    methodsUsingColumns:["sortBy"],
+    configEntriesUsingColumns:["sortBy"],
     extra_controls:(dataSource)=>{
         const values = Object.keys(dataSource.deeptools.maps).map(x=>({name:x,value:x}))
         return [

@@ -1,6 +1,6 @@
 import "./all_css"
 import ChartManager from '../charts/ChartManager.js';
-import { getArrayBufferDataLoader,getLocalCompressedBinaryDataLoader} from "../dataloaders/DataLoaders.js";
+import { getArrayBufferDataLoader,getLocalCompressedBinaryDataLoader,decompressData} from "../dataloaders/DataLoaders.js";
 import { setProjectRoot } from "../dataloaders/DataLoaderUtil";
 import { fetchJsonConfig } from "../dataloaders/DataLoaderUtil";
 
@@ -13,7 +13,7 @@ let route = '';
  * - otherwise, it should be in the form of `/project/<project_id>`, which will be inserted by the Flask template 
  * and use multi-project API (`/project/<project_id>/get_data` etc).
  */
-function _mdvInit(routeFromTemplate){
+function _mdvInit(routeFromTemplate) {
     const staticFolder = routeFromTemplate === undefined;
     if (!staticFolder) {
         route = routeFromTemplate;
@@ -88,11 +88,13 @@ async function getView(view){
 
 //load arbitrary data
 async function loadBinaryDataStatic(datasource,name){
-    const resp = await fetch(`${route}/binarydata/${datasource}/${name}.b`);
-    return await resp.arrayBuffer();
+    const resp = await fetch(`${route}/binarydata/${datasource}/${name}.gz, {responseType: "arraybuffer"}`);
+    const b = await resp.arrayBuffer();
+    return await decompressData(b);
 }
 async function loadBinaryData(datasource,name){
-    return await getData(route + "/get_binary_data",{datasource,name},"arraybuffer");
+    const b = await getData(route + "/get_binary_data",{datasource,name},"arraybuffer");
+    return await decompressData(b);
 }
 
 /**

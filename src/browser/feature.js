@@ -110,7 +110,7 @@ class FeatureSource{
                 for (let type in ranges_to_get){
                     let range= ranges_to_get[type];
                     promises.push(self.retrieveFeatures(chr, range[0], range[1],force,data));
-                    p_types.push([type,ranges_to_get[type]]);
+                    p_types.push([type,range]);
                 }
                 Promise.all(promises).then(
                     function (all_features) {
@@ -122,25 +122,26 @@ class FeatureSource{
                         for (let featureList of all_features){
                             if (featureList === null){
                                 featureList=[];
-                            }                            
+                            }                        
                             if (p_types[index][0]==="left"){
                                 let end = p_types[index][1][1]; 
-                                //remove any already retieved  
+                                //remove any already retrieved  
                                 let splice=0;
                                 for (let n=featureList.length-1;n>=0;n--){
-                                    if (featureList[n].end< end){
-                                        break;
+                                    if (featureList[n].end>= end){
+                                        featureList[n].remove=true;
+                                        splice++;
                                     }
-                                    splice++;
+                                    
                                 }
                                 if (splice!==0){
-                                    featureList.splice(-splice)
+                                    featureList = featureList.filter(x=>!x.remove)
                                 }
 
                             }
                             if (p_types[index][0]==="right"){
                                 let start=p_types[index][1][0];
-                                //remove any already retieved
+                                //remove any already retrieved
                                 let i=0
                                 for (i=0;i<featureList.length;i++){
                                     if (featureList[i].start> start){
@@ -243,6 +244,7 @@ class TabixBedFeatureSource extends FeatureSource{
     }
 
     retrieveFeatures(chr,start,end){
+        console.log("getting features",chr,start,end);
         return this.reader.readFeatures(chr,start,end);
     }
 
@@ -390,18 +392,19 @@ class FeatureFileReader{
                 refId = tabix ? index.sequenceIndexMap[chr] : chr,
                 promises = [];
 
-            blocks = index.getBlocksForRange(refId, start, end);
-            //blocks= index.blocksForRange(refId, start, end);
+            //blocks = index.getBlocksForRange(refId, start, end);
+            blocks= index.blocksForRange(refId, start, end);
 
             if (!blocks || blocks.length === 0) {
                 fulfill(null);       // TODO -- is this correct?  Should it return an empty array?
             }
             else {
-
                 blocks.forEach(function (block) {
+                    if (!block){
+                        return;
+                    }
 
                     promises.push(new Promise(function (fulfill, reject) {
-
                         var startPos = block.minv.block,
                             startOffset = block.minv.offset,
                             endPos = block.maxv.block + (index.tabix ? F_MAX_GZIP_BLOCK_SIZE : 0),
@@ -468,7 +471,10 @@ class FeatureFileReader{
                     }
 
                     fulfill(allFeatures)
-                }).catch(reject);
+                }).catch((e)=>{
+                    console.log(e);
+                    reject(e)}
+                    );
             }
         });
 
@@ -765,10 +771,7 @@ class FeatureParser{
                     }
                 }
                 cnt++;
-            }
-            else{
-                console.log(null);
-            }
+            }   
         }
 
         return allFeatures;

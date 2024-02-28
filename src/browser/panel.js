@@ -30,6 +30,7 @@
 import {MLVTrack,RulerTrack} from "./tracks.js";
 import "./bam_track.js";
 import "./BamCoverageTrack.js";
+import "./extra/interaction_track.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog.js";
 import canvasToSvg from "canvas-to-svg"
@@ -671,6 +672,7 @@ class MLVPanel {
                         var options ={
                              context: ctx,
                              bpStart: bpStart,
+							 bpEnd: bpEnd,
                              bpPerPixel: self.bpPerPixel,
                              pixelWidth: buffer.width,
                              pixelHeight: buffer.height,
@@ -907,20 +909,25 @@ class MLVPanel {
 					   let i = this.mouse_over_feature;
 					   if (info.feature ){
 						   if(i && i.feature!==info.feature){
-							   this._callListeners("featureout",{track:i.track,feature:i.feature,event:e});
+								const obj = {track:i.track,feature:i.feature,event:e}
+							   	this._callListeners("featureout",obj);
+							   	i.track.onFeatureOut && i.track.onFeatureOut(this,obj);	
 						   }
 					   
 						   if ((!i) || (i.feature!==info.feature)){
-							this._callListeners("featureover",{track:info.track,feature:info.feature,event:e});
-							   this.mouse_over_feature=info;
+								const obj =  {track:info.track,feature:info.feature,event:e}
+								this._callListeners("featureover",obj);
+								info.track.onFeatureOver && info.track.onFeatureOver(this,obj);
+							   	this.mouse_over_feature=info;
 						   }
 					   }
 					   else{
-						   let i = this.mouse_over_feature
-						   if (i){
-							this._callListeners("featureout",{track:i.track,feature:i.feature,event:e});
-							   this.mouse_over_feature=null;
-						   }
+						   	if (i){
+								const obj = {track:i.track,feature:i.feature,event:e}
+								this._callListeners("featureout",obj);
+								i.track.onFeatureOut && i.track.onFeatureOut(this,obj);	
+							   	this.mouse_over_feature=null;
+						   	}
 					   }
 					}
 				},10);
@@ -1184,6 +1191,10 @@ class MLVPanel {
     	 }
     	 return {track:null,feature:null};
     }
+
+	getBpStart(){
+		return  Math.max(0, Math.round(this.start-(this.buffer_level*this.canvas.width*this.bpPerPixel)));
+	}
     
 
 
