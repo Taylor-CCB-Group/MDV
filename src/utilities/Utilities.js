@@ -1,4 +1,4 @@
-function getRandomString(len=6,an){
+export function getRandomString(len=6, an){
     if (!len){
         len=6;
     }
@@ -11,12 +11,12 @@ function getRandomString(len=6,an){
     return str;
 }
 
-function NPOT(n) {
+export function NPOT(n) {
     return Math.pow(2, Math.ceil(Math.log2(n)))
 }
 
 //https://www.freecodecamp.org/news/javascript-debounce-example/
-function debounce(fn, timeout) {
+export function debounce(fn, timeout) {
     let timer;
     return (...args) => {
         clearTimeout(timer);
@@ -24,5 +24,12 @@ function debounce(fn, timeout) {
     };
 }
 
+export function isColumnNumeric(column) {
+    const t = column.datatype;
+    return t === "double" || t === "int32" || t === "integer";
+}
 
-export {getRandomString, NPOT, debounce}
+export function isColumnText(column) {
+    const t = column.datatype;
+    return t === "text" || t === "multitext" || t === "text16";
+}

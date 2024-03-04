@@ -29,7 +29,12 @@ export default class TagModel {
         this.dataModel.addListener("tag", () => {
             this.listeners.map(callback => callback());
         })
-        if (!dataStore.columnIndex[columnName]) this.dataModel.createColumn(columnName, null);
+        if (!dataStore.columnIndex[columnName]) {
+            // subgroup - user annotations?
+            const columnSpec = {name: columnName, datatype: 'multitext', editable: true, delimeter: ';', field: columnName};
+            const data = new SharedArrayBuffer(dataStore.size * 2);
+            dataStore.addColumn(columnSpec, data);
+        }
         this.tagColumn = dataStore.columnIndex[columnName];
     }
     addListener(callback: ()=>void) {

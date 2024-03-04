@@ -12,6 +12,7 @@ import {scaleLinear,scaleSymlog} from "d3-scale";
 import {getColorLegend,getColorBar} from "../utilities/Color.js"
 import {quantileSorted} from 'd3-array';
 import { makeObservable, observable, action } from "mobx";
+import { isColumnNumeric, isColumnText } from "../utilities/Utilities.js";
 
 
 /**
@@ -469,14 +470,14 @@ class DataStore{
             c.sgindex= column.sgindex;
             c.sgtype=column.sgtype;
         }
-        if (column.datatype === "text" || column.datatype === "multitext" || column.datatype === "text16"){
+        if (isColumnText(column)){
             c.stringLength= column.stringLength;
             if (column.delimiter){
                 c.delimiter=column.delimiter;
             }
-            c.values = column.values || [`Error: no values for '${c.name}'`];
+            c.values = column.values || [''];
         }
-        else if (column.datatype==="double" || column.datatype ==="integer" ||  column.datatype==="int32"){
+        else if (isColumnNumeric(column)){
             c.colorLogScale=column.colorLogScale;
             c.minMax=column.minMax;
             c.quantiles=column.quantiles;
@@ -612,7 +613,7 @@ class DataStore{
 
     /**
     * returns a list of column name and fields (which have data) sorted by name 
-    * @param {Array|string} [filter] - can be either be a string -'number', 'all' or a column type.
+    * @param {Array|string} [filter] - can be either be a string -'number', 'string', 'all' or a column type.
     * Or an array of column types
     * @param {boolean} [addNone=false] if true then an extra object will be added to the list
     * with name 'None' and field '__none__'
@@ -639,7 +640,12 @@ class DataStore{
                     }
                 }
                 else if (filter==="number"){
-                    if (c.datatype === "text" || c.datatype==="unique" ||  c.datatype==="multitext" || c.datatype==="text16" ){
+                    if (!isColumnNumeric(c)){
+                        continue;
+                    }
+                }
+                else if (filter === "string") {
+                    if (!isColumnText(c)){
                         continue;
                     }
                 }
@@ -1411,7 +1417,7 @@ class DataStore{
             return isNaN(v) || (ov.fallbackOnZero && v===0);
         }
         //simply return the color associated with the value
-        if (c.datatype==="text" || c.datatype==="text16"){                   
+        if (c.datatype==="text" || c.datatype==="text16" || c.datatype==="multitext"){                   
             return x=>colors[data[x]];
         }
         else if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
@@ -1481,14 +1487,14 @@ class DataStore{
         const c= this.columnIndex[column];
         const name = config.name || c.name;
         if (c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){
-            let   range= c.minMaX;
+            let range = c.minMaX;
             if (config.overideValues){
                 const ov = config.overideValues;
                 range = [ov.min==null?c.minMax[0]:ov.min,ov.max==null?c.minMax[1]:ov.max]
             }
             return getColorBar(colors,{range:range,label:name});
         }
-        if (c.datatype==="text" || c.datatype==="text16"){
+        if (isColumnText(c)){
             return getColorLegend(colors,c.values,{label:name});
         }  
     }

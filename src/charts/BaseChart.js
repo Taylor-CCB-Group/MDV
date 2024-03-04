@@ -474,8 +474,8 @@ class BaseChart{
         const colorOptions = this.getColorOptions();
         
         if (colorOptions.colorby){
-            //cannot color by multitext or unique (at the moment)
-            const filter = colorOptions.colorby==="all"?["int32","text","integer","double","text16"]:colorOptions.colorby;
+            //cannot color by unique (at the moment)
+            const filter = colorOptions.colorby==="all"?["int32","text","integer","double","text16","multitext"]:colorOptions.colorby;
             const cols = this.dataStore.getColumnList(filter);
             cols.push({name:"None",field:"_none"})
             settings.push({

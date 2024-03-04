@@ -106,7 +106,7 @@ class ColorChooser extends BaseDialog{
         const ds = this.cm.getDataSource(name);
         this.dataSource=ds;
         this.dsName=name;
-        const cols = ds.getColumnList("text");
+        const cols = ds.getColumnList("string");
         for (let c of cols){
             createEl("option",{
                 text:c.name,
