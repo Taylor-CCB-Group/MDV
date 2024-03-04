@@ -89,6 +89,7 @@ const ChannelController = ({ index }: { index: number }) => {
             gridTemplateColumns: '0.4fr 0.1fr 0.1fr 1fr 0.1fr',
             justifyItems: 'flex-start',
             alignItems: 'center',
+            gap: '10px',
         }}
         >
             <ChannelChooser index={index} />
@@ -112,6 +113,7 @@ const ChannelController = ({ index }: { index: number }) => {
                 value={limits[index]}
                 min={domains[index][0]}
                 max={domains[index][1]}
+                valueLabelDisplay="auto"
                 onChange={(_, v) => {
                     limits[index] = v as [number, number];
                     const contrastLimits = [...limits];
