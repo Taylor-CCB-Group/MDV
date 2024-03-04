@@ -67,9 +67,8 @@ const ChannelChooser = ({index}: {index: number}) => {
 
 const ChannelController = ({ index }: { index: number }) => {
     const limits = useChannelsStore(({ contrastLimits }) => contrastLimits);
-    const {colors, selections, channelsVisible, removeChannel} = useChannelsStore(({ colors, selections, channelsVisible, removeChannel }) => (
-        // trouble with 'domains' for some reason... "Cannot access 'domains' before initialization"
-        { colors, selections, channelsVisible, removeChannel }
+    const {colors, domains, channelsVisible, removeChannel} = useChannelsStore(({ colors, domains, channelsVisible, removeChannel }) => (
+        { colors, domains, channelsVisible, removeChannel }
     )); //channelOptions is a string[] of channel names...
     const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
@@ -111,6 +110,8 @@ const ChannelController = ({ index }: { index: number }) => {
                 size="small"
                 style={{ color: colorString, marginLeft: '10px' }}
                 value={limits[index]}
+                min={domains[index][0]}
+                max={domains[index][1]}
                 onChange={(_, v) => {
                     limits[index] = v as [number, number];
                     const contrastLimits = [...limits];
