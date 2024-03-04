@@ -134,8 +134,12 @@ const AddChannel = () => {
     // const loader = useLoader();
     // const { labels } = loader[0];
     // const channelsStore = useChannelsStoreApi();
+    const selections = useChannelsStore(state => state.selections);
+    const canAddChannel = selections.length < 6;
     const addChannel = useChannelsStore(state => state.addChannel);
-    return <button onClick={() => {
+    return <button 
+    disabled={!canAddChannel}
+    onClick={() => {
         addChannel({
             selections: {c: 0, z: 0, t: 0},
             ids: String(Math.random()),
