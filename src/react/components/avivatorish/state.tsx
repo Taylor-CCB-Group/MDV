@@ -27,7 +27,7 @@ type TogglesReturnType<T> = {
 type WithToggles<T> = T & TogglesReturnType<T>;
 type SetFunctionType<T> = (fn: (state: T) => T) => void;
 
-function generateToggles<T>(defaults: T, set: any | SetFunctionType<T>): TogglesReturnType<T> {
+function generateToggles<T>(defaults: T, set: SetFunctionType<T>): TogglesReturnType<T> {
   const toggles: any = {};
   Object.entries(defaults).forEach(([k, v]) => {
     if (typeof v === 'boolean') {
