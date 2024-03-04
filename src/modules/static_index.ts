@@ -120,13 +120,18 @@ async function loadData() {
     function extraFeatures(i: number) {
         const dsName = datasources[i].name;
         const ds = cm.dsIndex[dsName];
-        const tagModel = new TagModel(ds.dataStore);
+        let tagModel: TagModel; // = new TagModel(ds.dataStore);
+        function getTagModel() {
+            if (!tagModel) tagModel = new TagModel(ds.dataStore);
+            return tagModel;
+        }
+        // ds.dataStore.removeColumn('__tags');
         // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
         // should it be in the viewLoader callback? no ref to cm passed there.
         setTimeout(() => {
-            cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, tagModel); });
+            cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, getTagModel()); });
             if (import.meta.env.DEV) {
-                cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, tagModel); });
+                cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, getTagModel()); });
             }
             cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => {
                 const columns = datasources[i].columns.map(c => c.name);

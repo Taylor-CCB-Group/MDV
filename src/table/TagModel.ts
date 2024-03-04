@@ -22,15 +22,15 @@ export default class TagModel {
     readonly tagColumn: TagColumn;
     readonly dataModel: DataModel;
     listeners: (()=>void)[] = [];
-    constructor(dataStore: DataStore) {
+    constructor(dataStore: DataStore, columnName: string = '__tags') {
         this.dataModel = new DataModel(dataStore, {autoupdate: true});
         this.dataModel.updateModel();
         //nb, this will replace any other "tag" listener on model (but the model is local to this object)
         this.dataModel.addListener("tag", () => {
             this.listeners.map(callback => callback());
         })
-        if (!dataStore.columnIndex['__tags']) this.dataModel.createColumn('__tags', null);
-        this.tagColumn = dataStore.columnIndex['__tags'];
+        if (!dataStore.columnIndex[columnName]) this.dataModel.createColumn(columnName, null);
+        this.tagColumn = dataStore.columnIndex[columnName];
     }
     addListener(callback: ()=>void) {
         this.listeners.push(callback);
