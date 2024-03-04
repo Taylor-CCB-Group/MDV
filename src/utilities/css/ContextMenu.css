@@ -282,6 +282,8 @@ select, input, textarea {
       color:#eee;
       font-size:20px;
       margin-left:auto;
+      position: absolute;
+      right: 10px;
   }
 
   .ciview-dlg-content{ 
