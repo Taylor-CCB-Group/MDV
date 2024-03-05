@@ -251,7 +251,7 @@ class VivScatterPlot extends DensityScatterPlot{
                     }               
                     vc.url =url;
                 }
-                this.viv = new VivViewer(this.vivCanvas,vc,this.app);
+                this.viv = new VivViewerMDV(this.vivCanvas,vc,this.app);
                 this.app.addHandler("pan_or_zoom",(offset,x_scale,y_scale)=>{
                     this.viv.setPanZoom(offset,x_scale,y_scale)
                 },c.id+"_viv")
