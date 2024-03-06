@@ -6,6 +6,7 @@ import "./RangeDimension.js";
 import "./CatColDimension.js";
 import  "./CatRangeDimension.js";
 import "./DensityDimension.js";
+import "./ValueSetDimension";
 import "./SortableDimension.js";
 import "./DeepToolsDimension.js";
 import {scaleLinear,scaleSymlog} from "d3-scale";
