@@ -78,6 +78,7 @@
     "webpack-dev-server": "^4.11.1"
   },
   "optionalDependencies": {
+    "@esbuild/linux-x64": "^0.20.1",
     "@rollup/rollup-linux-x64-gnu": "^4.12.1"
   }
 }
