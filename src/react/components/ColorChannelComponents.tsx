@@ -58,6 +58,7 @@ const ChannelChooser = ({index}: {index: number}) => {
     return (
         <>
         <select
+        disabled={isChannelLoading[index]}
         value={selections[index].c}
         style={{width: '100%', padding: '0.2em'}} 
         onChange={async e => {
@@ -68,12 +69,10 @@ const ChannelChooser = ({index}: {index: number}) => {
                     c: Number.parseInt(e.target.value)
                 };
                 setIsChannelLoading(index, true);
-                console.log('loading channel', selection);
                 const { domain: domains, contrastLimits } = await getSingleSelectionStats({ loader, selection, use3d });
                 const newProps = {
                     domains, contrastLimits//, leaving out colors for now - keep existing color
                 };
-                console.log(newProps);
                 setPropertiesForChannel(index, newProps);
                 setIsChannelLoading(index, false);
                 setPropertiesForChannel(index, { selections: selection });
@@ -160,21 +159,31 @@ const ChannelController = ({ index }: { index: number }) => {
 }
 
 const AddChannel = () => {
-    // const loader = useLoader();
+    const loader = useLoader();
     // const { labels } = loader[0];
     // const channelsStore = useChannelsStoreApi();
-    const selections = useChannelsStore(state => state.selections);
+    const {selections, setPropertiesForChannel} = useChannelsStore(({selections, setPropertiesForChannel}) => ({selections, setPropertiesForChannel}));
     const canAddChannel = selections.length < 6;
     const addChannel = useChannelsStore(state => state.addChannel);
+    const {use3d, setIsChannelLoading} = useViewerStore(({use3d, setIsChannelLoading}) => ({use3d, setIsChannelLoading}), shallow);
     return <button 
     disabled={!canAddChannel}
-    onClick={() => {
+    onClick={async () => {
+        // would be nice to have less repition of this code here and in ChannelController
+        const index = selections.length;
+        setIsChannelLoading(index, true);
+        const selection = {c: 0, z: 0, t: 0};
         addChannel({
-            selections: {c: 0, z: 0, t: 0},
+            selections: selection,
             ids: String(Math.random()),
             channelsVisible: true,
-            colors: [255, 255, 255],
-        }); //todo isLoading, auto-contrast, palette, etc.
+        });
+        const { domain: domains, contrastLimits } = await getSingleSelectionStats({ loader, selection, use3d }); 
+        const newProps = {
+            domains, contrastLimits
+        };
+        setPropertiesForChannel(index, newProps);
+        setIsChannelLoading(index, false);        
     }}>
         Add channel
     </button>;
