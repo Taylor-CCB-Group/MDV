@@ -1,8 +1,10 @@
 import { useId, useState } from "react";
-import { VivProvider, useChannelsStore, useChannelsStoreApi, useLoader, useMetadata } from "./avivatorish/state";
+import { shallow } from 'zustand/shallow';
+import { VivProvider, useChannelsStore, useChannelsStoreApi, useImageSettingsStoreApi, useLoader, useMetadata, useViewerStore } from "./avivatorish/state";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
 import { Checkbox, FormControl, InputLabel, MenuItem, Select, Slider } from "@mui/material";
 import { PopoverPicker } from "./ColorPicker";
+import { getSingleSelectionStats } from "./avivatorish/utils";
 
 export default function MainVivColorDialog() {
     return (
@@ -45,19 +47,41 @@ const ChannelChooserMUI = ({ index }: { index: number }) => {
 
 const ChannelChooser = ({index}: {index: number}) => {
     const channels = useMetadata().Pixels.Channels.map(c => c.Name) as string[];
-    const selections = useChannelsStore(({selections}) => selections);
-    const channelsStore = useChannelsStoreApi();
+    const {selections, setPropertiesForChannel} = useChannelsStore(({selections, setPropertiesForChannel}) => ({selections, setPropertiesForChannel}), shallow);
+    const loader = useLoader();
+    const {setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d} = useViewerStore(
+        ({setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d}) => (
+            {setIsChannelLoading, isChannelLoading, removeIsChannelLoading, use3d}
+        ), shallow
+    );
 
     return (
         <>
         <select
         value={selections[index].c}
-        style={{width: '100%', padding: '0.2em'}} onChange={e => {
-            const newSelections = [...selections];
+        style={{width: '100%', padding: '0.2em'}} 
+        onChange={async e => {
+            // see Avivator Controller.jsx onSelectionChange
             try {
-                newSelections[index].c = Number.parseInt(e.target.value)
-                channelsStore.setState({selections: newSelections});
-            } catch {}
+                const selection = {
+                    ...selections[index],
+                    c: Number.parseInt(e.target.value)
+                };
+                setIsChannelLoading(index, true);
+                console.log('loading channel', selection);
+                const { domain: domains, contrastLimits } = await getSingleSelectionStats({ loader, selection, use3d });
+                const newProps = {
+                    domains, contrastLimits//, leaving out colors for now - keep existing color
+                };
+                console.log(newProps);
+                setPropertiesForChannel(index, newProps);
+                setIsChannelLoading(index, false);
+                setPropertiesForChannel(index, { selections: selection });
+            } catch (e) {
+                console.error('failed to load channel');
+                console.error(e);
+                removeIsChannelLoading(index);
+            }
         }}>
             {channels.map((c, i) => (<option key={`${i}_${c}`} value={i}>{c}</option>))}
         </select>
@@ -66,10 +90,11 @@ const ChannelChooser = ({index}: {index: number}) => {
 }
 
 const ChannelController = ({ index }: { index: number }) => {
-    const limits = useChannelsStore(({ contrastLimits }) => contrastLimits);
+    const limits = useChannelsStore(({ contrastLimits }) => contrastLimits); //using shallow as per Avivator *prevents* re-rendering which should be happening
     const {colors, domains, channelsVisible, removeChannel} = useChannelsStore(({ colors, domains, channelsVisible, removeChannel }) => (
         { colors, domains, channelsVisible, removeChannel }
-    )); //channelOptions is a string[] of channel names...
+    ));
+    const isChannelLoading = useViewerStore(state => state.isChannelLoading);
     const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
 
@@ -95,6 +120,7 @@ const ChannelController = ({ index }: { index: number }) => {
             <ChannelChooser index={index} />
             <Checkbox
                 checked={channelVisible}
+                disabled={isChannelLoading[index]}
                 onChange={() => {
                     channelsVisible[index] = !channelVisible;
                     const visible = [...channelsVisible];
@@ -109,6 +135,7 @@ const ChannelController = ({ index }: { index: number }) => {
             />
             <Slider
                 size="small"
+                disabled={isChannelLoading[index]}
                 style={{ color: colorString, marginLeft: '10px' }}
                 value={limits[index]}
                 min={domains[index][0]}
