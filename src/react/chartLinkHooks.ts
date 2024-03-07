@@ -32,6 +32,7 @@ export const useViewStateLink = () => {
                 // as VivMDVReact[] is very much not correct here, we should be checking - and that may not be what we want anyway.
                 const otherCharts = link.linked_charts.filter(c => c !== id).map(c => cm.getChart(c)) as VivMDVReact[];
                 otherCharts.forEach(c => {
+                    if (!c) return; // e.g. if the chart has been removed - ideally the link state would be updated to reflect this.
                     if (c.ignoreStateUpdate) return;
                     // todo - viewState may not be directly compatible with other chart's viewState
                     // so there should be a utility function to convert between them - current attempt is not yet correct, and clutters this code.
