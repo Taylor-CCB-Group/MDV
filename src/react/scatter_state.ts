@@ -128,9 +128,6 @@ export function useScatterplotLayer() {
     const scale = useRegionScale();
     const {modelMatrix, setModelMatrix} = useScatterModelMatrix();
     const modelMatrixRef = useRef(modelMatrix);
-    // we don't want to use this if we're not using an OME_TIFF - but for now, pending better reasoning about
-    // what type of chart we're in, we'll use it anyway for scaling the viewState
-    const loader = useLoader() as OME_TIFF['data']; // could be refactored to have a useImageSize hook maybe
     const [chartWidth, chartHeight] = useChartSize(); //not sure we want this, potentially re-rendering too often...
     // not using as dependency for scaling viewState to data - we don't want to zoom as chart size changes
     // (at least for now - may consider making this configurable / testing it out)
@@ -184,8 +181,8 @@ export function useScatterplotLayer() {
         // should allow some padding around the edges, based on radius, and/or some config value
         const { min, log2 } = Math;
         const maxZoom = 5;
-        const trueSelectionWidth = (maxX - minX) * scale;
-        const trueSelectionHeight = (maxY - minY) * scale;
+        const trueSelectionWidth = (maxX - minX);// * scale;
+        const trueSelectionHeight = (maxY - minY);// * scale;
         const xZoom = log2(chartWidth / trueSelectionWidth);
         const yZoom = log2(chartHeight / trueSelectionHeight);
         const zoomBackOff = 0.05;
