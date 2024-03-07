@@ -142,10 +142,6 @@ export function useScatterplotLayer() {
             setViewState(null);
             return;
         }
-        const source = Array.isArray(loader) ? loader[0] : loader;
-        const { width: pixelWidth, height: pixelHeight } = getImageSize(source);
-        const trueImageWidth = pixelWidth * scale;
-        const trueImageHeight = pixelHeight * scale;
         // Step 1: Calculate the bounding box of the data
         // with a loop to avoid spread operator & stack overflow etc
         let minX = Number.POSITIVE_INFINITY;
@@ -173,11 +169,7 @@ export function useScatterplotLayer() {
         
         // Step 2: Calculate the center of the bounding box
         // - take into account transform matrices
-        // no internalState in scatterplotLayer, so we can't use project/projectPosition
-        // need to figure this out properly...
-        // const [x, y] = scatterplotLayer.project([x, y, 0]);
-        // const p = scatterplotLayer.projectPosition([x, y, 0]);
-        // const [x, y] = p;
+        // could review using scatterplotLayer.project / projectPosition
         // quicker to do once than for every point
         [minX, minY] = modelMatrix.transformAsPoint([minX, minY, 0]);
         [maxX, maxY] = modelMatrix.transformAsPoint([maxX, maxY, 0]);
