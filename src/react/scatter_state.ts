@@ -155,8 +155,8 @@ export function useScatterplotLayer() {
         for (let i = 0; i < data.length; i++) {
             const d = data[i];
             try {
-                const x = cx.data[d] / scale;
-                const y = cy.data[d] / scale;
+                const x = cx.data[d];
+                const y = cy.data[d];
                 if (!Number.isFinite(x) || !Number.isFinite(y)) {
                     console.warn('undefined data in scatterplot');
                     continue;
@@ -187,15 +187,16 @@ export function useScatterplotLayer() {
 
         // modelMatrix.transformPoint([centerX, centerY, 0]);
 
-        // Step 3: Calculate the zoom level (this is a rough approximation and may need to be adjusted)
-        // should consider aspect ratio of the canvas
+        // Step 3: Calculate the zoom level
+        // see viv's getDefaultInitialViewState for reference, especially when it comes to 3D in the future
         // should allow some padding around the edges, based on radius, and/or some config value
-        const { max, min, log2 } = Math;
+        const { min, log2 } = Math;
         const maxZoom = 5;
-        const xZoom = 1/log2((maxX - minX) / trueImageWidth);
-        const yZoom = 1/log2((maxY - minY) / trueImageHeight);
-        console.log('zoom', xZoom, yZoom);
-        const zoomBackOff = 0;
+        const trueSelectionWidth = (maxX - minX) * scale;
+        const trueSelectionHeight = (maxY - minY) * scale;
+        const xZoom = log2(chartWidth / trueSelectionWidth);
+        const yZoom = log2(chartHeight / trueSelectionHeight);
+        const zoomBackOff = 0.05;
         const zoom = min(maxZoom, min(xZoom, yZoom) - zoomBackOff);
         // Step 4: Set the view state that will be picked up by the user of this hook
         // may want to use viv viewerStore - but we don't want scatterplot to depend on that
