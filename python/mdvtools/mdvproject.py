@@ -954,7 +954,7 @@ class MDVProject:
     
     def set_region_data(self,datasource,data,region_field="sample_id",
                     default_color="annotations",
-                    position_fields=["x", "y"], scale_unit="µm", scale=1,):
+                    position_fields=["x", "y"], scale_unit="µm", scale=1.0,):
         md = self.get_datasource_metadata(datasource)
         cols = set([x["field"] for x in md["columns"]])
         missing = [x for x in  [region_field]+[default_color]+position_fields if not x in cols]
