@@ -5,6 +5,7 @@
 
 Multi Dimensional Viewer (MDV) is web based application for analyzing, annotating and sharing multi-dimensional data from different modalities.  It is inspired by [dc charts](https://dc-js.github.io/dc.js/) and [crossfilter](https://square.github.io/crossfilter/), but is performant with over 10 million data items due to the use of web workers, shared array buffers and native arrays.  
 &nbsp;
+
 ![summary](images/summary.png)
 
 ## Key Features
@@ -31,6 +32,20 @@ Multi Dimensional Viewer (MDV) is web based application for analyzing, annotatin
 
 * Runs in a web browser (installation not required for uploading and viewing data)
 
+### System Requirements
+
+For running a release version:
+
+* A modern browser
+* python (3.6 or above)
+* only 4GB of ram is required even for large datasets (~10 000 000 items) as data is lazily loaded as raw bytes
+* `htslib` is required only for Genome Browser functionality.
+
+For development, or running the current version from the repository:
+
+* git
+* node.js
+
 
 ## Running On Local Machine
 
@@ -38,36 +53,71 @@ If you have large amounts of data or projects you may wish to install MDV locall
 
 ### Installation
 
-Download and unzip the repository
+#### From a GitHub release version
 
-https://github.com/Taylor-CCB-Group/MDV/archive/refs/heads/main.zip
+Download and unzip, this should be able to work without requiring node to be installed etc.
 
-or clone it
+-- this needs better documentation, and I might want to make a new release soon...
+
+#### For development / using latest features
+
+Clone the repository
+
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
 ```
 
+Then, from the MDV folder:
 
-### System Requirements
+Install front-end dependencies
 
-* A modern browser
-* python (3.6 or above)
-* only 4GB of ram is required even for large datasets (~10 000 000 items) as data is lazily loaded as raw bytes
+```
+npm i
+```
 
-### Displaying example data
+Setup Python virtual environment and build the front-end that it will use. On Unix-like systems, there is an npm script that will do this automatically:
+
+```
+npm run python-setup
+```
+
+This will be equivalent to the following:
+
+```
+python -m venv venv
+source venv/bin/activate
+pip install -e python
+npm run build-flask-vite
+```
+
+On Windows systems, the `source venv/bin/activate` will not work - activating the environment is done by running `venv/bin/activate.bat`.
+
+If you wish to manage your own virtual environment, or use an existing one, instead of that you can install `mdvtools` (using `editable` flag for development):
+
+```
+pip install -e python
+```
+
+### Running a test project
+
+
+This example will build and run a project based on the `pbmc3k_processed` dataset from `scanpy`:
+
+```
+python python/mdvtools/test_projects/scanpy_pbmc3k.py
+```
+
+...homework: make a script (or notebook) that runs example
+
+### Displaying example data (old doc)
 download the  data
 
 https://zenodo.org/record/6513508/files/hyp_example_data.zip?download=1
 
 Then cd to the python directory
+
 ```
 cd path/to/mdv/python
-```
-
-Install `mdv` (using `editable` flag for development):
-
-```
-pip install -e .
 ```
 
 Open a python shell
@@ -84,7 +134,7 @@ p.serve()
 ```
 
 This will open a browser window at http://localhost:5000/ but you will need to go to
-[http://127.0.0.1:5000](http://127.0.0.1:5000) to avoid permissions errors.
+[http://127.0.0.1:5000](http://127.0.0.1:5000) to avoid permissions errors. Note that this will fail if the front-end code has not been built after checking out the repository - `npm run build-flask-vite` to update it, or use a release version which should have the necessary build output already present in `python/templates/static`.
 
 ## Running on a server
 
@@ -109,6 +159,8 @@ https://myserver.com/path/to/myapp
 * clone the repository
 * npm install
 
+### note - this documentation is somewhat deprecated - [for dev-branch](#dev-branch)
+
 You can run a project in development mode, which allows you do debug the JavaScript code and make changes, which will be reflected in the browser.
 
 To use a project that has been converted into a static webpage (`convert_to_static_page()`) just specify the location of the folder when you start the dev server.
@@ -125,8 +177,10 @@ In both cases the server will be running at localhost:8080
 
 ### Building the App
 ```
-npm run build
+npm run build-flask-vite
 ```
+
+#### note - this documentation is somewhat deprecated - [for dev-branch](#dev-branch)
 
 This will build JavaScript that is is suitable for use with the 'static' project format and the lightweight inbuilt server in the python module. It puts the JavaScript files and assets in python/mdvtools/static/js and python/mdvtools/static/img respectively. When a static project is created, these files are copied over to the project's folder so that it can run independently.
 
