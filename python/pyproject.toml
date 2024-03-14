@@ -40,7 +40,7 @@ dependencies = [
  "networkx==3.1",
  "numba==0.59.0",
  "numpy==1.26.4",
- "ome-types==0.4.5",
+ "ome-types==0.5.0",
  "packaging==23.2",
  "pandas==2.1.1",
  "patsy==0.5.3",
