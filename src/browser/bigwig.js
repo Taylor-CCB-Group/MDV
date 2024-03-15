@@ -154,6 +154,11 @@ class BWSource{
 
                     var chrIdx = self.reader.chromTree.dictionary[chr];
                     if (chrIdx === undefined) {
+                        // PJT - this happens when e.g. chr is "1" but the corresponding key should be "chr1"
+                        // maybe user error, but we should handle it more gracefully and display a message
+                        // preferably at the point of building the project in the first place(?),
+                        // but also in the track UI if we make it this far.
+                        // May not always be an error (if the bw doesn't have data for the chromosome)
                         fulfill(null);
                     }
                     else {
