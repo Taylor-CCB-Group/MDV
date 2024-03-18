@@ -610,109 +610,83 @@ class RPTree{
     }
 
 
-    load() {
+    async load() {
+        const rootNodeOffset = this.fileOffset + RPTREE_HEADER_SIZE,
+            bufferedReader = new BufferedReader(this.config, this.filesize, BUFFER_SIZE);
 
-        var self = this;
-
-        return new Promise(function (fulfill, reject) {
-            var rootNodeOffset = self.fileOffset + RPTREE_HEADER_SIZE,
-                bufferedReader = new BufferedReader(self.config, self.filesize, BUFFER_SIZE);
-
-            self.readNode(rootNodeOffset, bufferedReader).then(function (node) {
-                self.rootNode = node;
-                fulfill(self);
-            }).catch(reject);
-        });
+        const node = await this.readNode(rootNodeOffset, bufferedReader)
+        this.rootNode = node;
+        return this;
     }
 
 
-    readNode(filePosition, bufferedReader) {
+    async readNode(filePosition, bufferedReader) {
 
-        var self = this;
+        const dataView = await bufferedReader.dataViewForRange({start: filePosition, size: 4}, false)
+        const binaryParser = new BinaryParser(dataView, this.littleEndian);
 
-        return new Promise(function (fulfill, reject) {
+        const type = binaryParser.getByte();
+        const isLeaf = (type === 1) ? true : false;
+        const reserved = binaryParser.getByte(); //'reserved' is unused but side-effect of getByte() matters.
+        const count = binaryParser.getUShort();
 
-            bufferedReader.dataViewForRange({start: filePosition, size: 4}, false).then(function (dataView) {
-                var binaryParser = new BinaryParser(dataView, self.littleEndian);
+        filePosition += 4;
 
-                var type = binaryParser.getByte();
-                var isLeaf = (type === 1) ? true : false;
-                var reserved = binaryParser.getByte();
-                var count = binaryParser.getUShort();
+        const bytesRequired = count * (isLeaf ? RPTREE_NODE_LEAF_ITEM_SIZE : RPTREE_NODE_CHILD_ITEM_SIZE);
+        const range2 = {start: filePosition, size: bytesRequired};
 
-                filePosition += 4;
+        const dataView2 = await bufferedReader.dataViewForRange(range2, false);
 
-                var bytesRequired = count * (isLeaf ? RPTREE_NODE_LEAF_ITEM_SIZE : RPTREE_NODE_CHILD_ITEM_SIZE);
-                var range2 = {start: filePosition, size: bytesRequired};
+        const items = new Array(count),
+            binaryParser2 = new BinaryParser(dataView2);
 
-                bufferedReader.dataViewForRange(range2, false).then(function (dataView) {
+        if (isLeaf) {
+            for (let i = 0; i < count; i++) {
+                const item = {
+                    isLeaf: true,
+                    startChrom: binaryParser2.getInt(),
+                    startBase: binaryParser2.getInt(),
+                    endChrom: binaryParser2.getInt(),
+                    endBase: binaryParser2.getInt(),
+                    dataOffset: binaryParser2.getLong(),
+                    dataSize: binaryParser2.getLong()
+                };
+                items[i] = item;
+            }
+            return new RPTreeNode(items);
+        }
+        else { // non-leaf
+            for (let i = 0; i < count; i++) {
+                const item = {
+                    isLeaf: false,
+                    startChrom: binaryParser2.getInt(),
+                    startBase: binaryParser2.getInt(),
+                    endChrom: binaryParser2.getInt(),
+                    endBase: binaryParser2.getInt(),
+                    childOffset: binaryParser2.getLong()
+                };
+                items[i] = item;
+            }
 
-                    var i,
-                        items = new Array(count),
-                        binaryParser = new BinaryParser(dataView);
-
-                    if (isLeaf) {
-                        for (i = 0; i < count; i++) {
-                            var item = {
-                                isLeaf: true,
-                                startChrom: binaryParser.getInt(),
-                                startBase: binaryParser.getInt(),
-                                endChrom: binaryParser.getInt(),
-                                endBase: binaryParser.getInt(),
-                                dataOffset: binaryParser.getLong(),
-                                dataSize: binaryParser.getLong()
-                            };
-                            items[i] = item;
-
-                        }
-                        fulfill(new RPTreeNode(items));
-                    }
-                    else { // non-leaf
-                        for (i = 0; i < count; i++) {
-
-                            var item = {
-                                isLeaf: false,
-                                startChrom: binaryParser.getInt(),
-                                startBase: binaryParser.getInt(),
-                                endChrom: binaryParser.getInt(),
-                                endBase: binaryParser.getInt(),
-                                childOffset: binaryParser.getLong()
-                            };
-                            items[i] = item;
-
-                        }
-
-                        fulfill(new RPTreeNode(items));
-                    }
-                }).catch(reject);
-            }).catch(reject);
-        });
+            return new RPTreeNode(items);
+        }
     }
 
 
-    findLeafItemsOverlapping(chrIdx, startBase, endBase) {
-
-        var self = this;
-
-        return new Promise(function (fulfill, reject) {
-
-            var leafItems = [],
+    async findLeafItemsOverlapping(chrIdx, startBase, endBase) {
+        // not refactoring recursive function to use async/await just yet
+        return new Promise((fulfill, reject) => {
+            const leafItems = [],
                 processing = new Set(),
-                bufferedReader = new BufferedReader(self.config, self.filesize, BUFFER_SIZE);
+                bufferedReader = new BufferedReader(this.config, this.filesize, BUFFER_SIZE);
 
             processing.add(0);  // Zero represents the root node
-            findLeafItems(self.rootNode, 0);
-
-            function findLeafItems(node, nodeId) {
-
+            const findLeafItems = async (node, nodeId) => {
                 if (RPTree.overlaps(node, chrIdx, startBase, endBase)) {
-
-                    var items = node.items;
-
-                    items.forEach(function (item) {
-
+                    // note this async forEach is not awaited, but the processing set keeps track of that
+                    // we could Promise.all() here
+                    node.items.forEach(async (item) => {
                         if (RPTree.overlaps(item, chrIdx, startBase, endBase)) {
-
                             if (item.isLeaf) {
                                 leafItems.push(item);
                             }
@@ -723,17 +697,18 @@ class RPTree{
                                 }
                                 else {
                                     processing.add(item.childOffset);  // Represent node to-be-loaded by its file position
-                                    self.readNode(item.childOffset, bufferedReader).then(function (node) {
+                                    try {
+                                        const node = await this.readNode(item.childOffset, bufferedReader);
                                         item.childNode = node;
                                         findLeafItems(node, item.childOffset);
-                                    }).catch(reject);
+                                    } catch (e) {
+                                        reject(e);
+                                    }
                                 }
                             }
                         }
                     });
-
                 }
-
                 if (nodeId != undefined) processing.delete(nodeId);
 
                 // Wait until all nodes are processed
@@ -741,6 +716,7 @@ class RPTree{
                     fulfill(leafItems);
                 }
             }
+            findLeafItems(this.rootNode, 0);
         });
     }
 
