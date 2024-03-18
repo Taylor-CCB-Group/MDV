@@ -155,8 +155,10 @@ class BWSource{
             // preferably at the point of building the project in the first place(?),
             // but also in the track UI if we make it this far.
             // May not always be an error (if the bw doesn't have data for the chromosome)
-            // fulfill(null);
-            throw new Error(`Chromosome '${chr}' not found in BigWig file. Expected one of ${Object.keys(this.reader.chromTree.dictionary)}`);
+            const keys = Object.keys(this.reader.chromTree.dictionary);
+            // show at most 3 keys in the error message
+            const keyString = keys.slice(0, 3).join(", ") + (keys.length > 3 ? ", ..." : "");
+            throw new Error(`Chromosome '${chr}' not found in BigWig file. Expected one of ${keyString}`);
         }
         else {
             const leafItems = await rpTree.findLeafItemsOverlapping(chrIdx, bpStart, bpEnd);

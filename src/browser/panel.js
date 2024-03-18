@@ -543,7 +543,7 @@ class MLVPanel {
     }
 
 
-    async getAllFeatures(bpStart, bpEnd,force,data) {
+    async getAllFeatures(bpStart, bpEnd, force, data) {
         let promises = [];
 		this._display_order=[];
         for (let track_id  of this.track_order){
@@ -554,7 +554,7 @@ class MLVPanel {
 			this._display_order.push(track_id);
         	promises.push(track.getFeatures(this.chr,bpStart,bpEnd,force,data));       
         }
-        return await Promise.all(promises.map(p => p.catch(e => e)));    
+        return await Promise.all(promises.map(p => p.catch(e => e)));
     }
 
     /**
@@ -731,7 +731,16 @@ class MLVPanel {
 							ctx.rect(0,options.top,options.pixelWidth,options.height);
 							ctx.clip();
 							ctx.beginPath();
-							track.drawFeatures(options);
+							try {
+								track.drawFeatures(options);
+							} catch (e) {
+								console.error(e);
+								const txtOptions = {
+									...options,
+									features: e.message
+								}
+								track.drawMessage(txtOptions);
+							}
 							ctx.restore()
                                    
                             if (self.show_scale){

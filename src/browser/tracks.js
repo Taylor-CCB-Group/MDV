@@ -884,162 +884,164 @@ class MLVWigTrack extends MLVTrack{
 	    }
 	    self.prev_coords={x:0,y:0};
 		
-	    if (features) {
-	    	if (self.scale_link_to){
-	    		let t = self.scale_link_to.config;
-	            if (t){
-	            	self.config.scale=t.scale;
-	                self.max_y=self.scale_link_to.max_y;
-	                self.min_y=self.scale_link_to.min_y;
-	            }
-	       }
-	       else if(self.set_scale){
-	       		self.min_y=self.set_scale.min;
-	       		self.max_y=self.set_scale.max;
-	       }
-	       else if ( (self.max_y === undefined && self.config.scale==="automatic") || self.config.scale==="dynamic"){
-	                var s = autoscale(features);
-	                self.min_y = s.min;
-	                self.max_y = s.max;
-	            }
-	            else if (self.config.scale==="fixed") {
-	                self.min_y = self.config.min_y;
-	                self.max_y=self.config.max_y;
-	            }
-	          
-	            featureValueRange = self.max_y - self.min_y;
+        if (features) {
+            if (self.scale_link_to) {
+                let t = self.scale_link_to.config;
+                if (t) {
+                    self.config.scale = t.scale;
+                    self.max_y = self.scale_link_to.max_y;
+                    self.min_y = self.scale_link_to.min_y;
+                }
+            }
+            else if (self.set_scale) {
+                self.min_y = self.set_scale.min;
+                self.max_y = self.set_scale.max;
+            }
+            else if ((self.max_y === undefined && self.config.scale === "automatic") || self.config.scale === "dynamic") {
+                var s = autoscale(features);
+                self.min_y = s.min;
+                self.max_y = s.max;
+            }
+            else if (self.config.scale === "fixed") {
+                self.min_y = self.config.min_y;
+                self.max_y = self.config.max_y;
+            }
 
-	            //$dataRangeTrackLabel = $(this.trackView.trackDiv).find('.igv-data-range-track-label');
-	            //
-	            //min = (Math.floor(track.dataRange.min) === track.dataRange.min) ? track.dataRange.min : track.dataRange.min.toFixed(2);
-	            //max = (Math.floor(track.dataRange.max) === track.dataRange.max) ? track.dataRange.max : track.dataRange.max.toFixed(2);
-	            //str = '[' + min + ' - ' + max + ']';
-	            //
-	            //$dataRangeTrackLabel.text(str);
-	            let prev_x=0;
-	            let prev_y=0;
-	            ctx.globalAlpha   = this.config.opacity?this.config.opacity:1;
-	         
-	            if (self.is_line){  
-	                let y = (1.0 - self.config.value / featureValueRange)*pixelHeight;
-	                Graphics.strokeLine(ctx,0,y,pixelWidth,y,{"strokeStyle":self.config.color,"lineWidth":self.config.width?self.config.width:1});
-	             }
-	         
-	            else{
-	            	features.forEach(renderFeature);
-	            }
-	       
-	            ctx.globalAlpha=1
-	             if (self.config.threshold){
-	             	    let y = y_offset+(1.0 - self.config.threshold/ featureValueRange)*pixelHeight;
-	             	    Graphics.strokeLine(ctx,0,y,pixelWidth,y,{"strokeStyle":"black","lineWidth":1});
-	                 }
-	        }
-	         
-	        function renderFeature(feature, index, featureList) {
+            featureValueRange = self.max_y - self.min_y;
 
-	            var yUnitless,
-	                heightUnitLess,
-	                x,
-	                y,
-	                width,
-	                height,
-	                rectEnd,
-	                rectBaseline;
+            //$dataRangeTrackLabel = $(this.trackView.trackDiv).find('.igv-data-range-track-label');
+            //
+            //min = (Math.floor(track.dataRange.min) === track.dataRange.min) ? track.dataRange.min : track.dataRange.min.toFixed(2);
+            //max = (Math.floor(track.dataRange.max) === track.dataRange.max) ? track.dataRange.max : track.dataRange.max.toFixed(2);
+            //str = '[' + min + ' - ' + max + ']';
+            //
+            //$dataRangeTrackLabel.text(str);
+            let prev_x = 0;
+            let prev_y = 0;
+            ctx.globalAlpha = this.config.opacity ? this.config.opacity : 1;
 
-	            if (feature.end < bpStart) return;
-	            if (feature.start > bpEnd) return;
-	              if (feature.end===feature.start){
-	            	feature.start-=1;
-	            }
-	          
-              
-	            x = Math.floor((feature.start - bpStart) / bpPerPixel);
-	            
-	            rectEnd = Math.floor((feature.end - bpStart) / bpPerPixel);
-	            width = Math.max(0, rectEnd - x);
-	          
+            if (self.is_line) {
+                let y = (1.0 - self.config.value / featureValueRange) * pixelHeight;
+                Graphics.strokeLine(ctx, 0, y, pixelWidth, y, { "strokeStyle": self.config.color, "lineWidth": self.config.width ? self.config.width : 1 });
+            }
 
-	          
+            else {
+                // pass on any error message from feature source...
+                if (!Array.isArray(features)) {
+                    throw features;
+                } else features.forEach(renderFeature);
+            }
 
-	            //height = ((feature.value - featureValueMinimum) / featureValueRange) * pixelHeight;
-	            //rectBaseline = pixelHeight - height;
-	            //canvas.fillRect(rectOrigin, rectBaseline, rectWidth, rectHeight, {fillStyle: track.color});
+            ctx.globalAlpha = 1
+            if (self.config.threshold) {
+                let y = y_offset + (1.0 - self.config.threshold / featureValueRange) * pixelHeight;
+                Graphics.strokeLine(ctx, 0, y, pixelWidth, y, { "strokeStyle": "black", "lineWidth": 1 });
+            }
+        }
+            
+        function renderFeature(feature, index, featureList) {
 
-	            if (signsDiffer(self.min_y, self.max_y)) {
+            var yUnitless,
+                heightUnitLess,
+                x,
+                y,
+                width,
+                height,
+                rectEnd,
+                rectBaseline;
 
-	                if (feature.value < 0) {
-	                    yUnitless = self.max_y/ featureValueRange;
-	                    heightUnitLess = -feature.value / featureValueRange;
-	                } else {
-	                    yUnitless = ((self.max_y - feature.value) / featureValueRange);
-	                    heightUnitLess = feature.value / featureValueRange;
-	                }
+            if (feature.end < bpStart) return;
+            if (feature.start > bpEnd) return;
+                if (feature.end===feature.start){
+                feature.start-=1;
+            }
+            
+            
+            x = Math.floor((feature.start - bpStart) / bpPerPixel);
+            
+            rectEnd = Math.floor((feature.end - bpStart) / bpPerPixel);
+            width = Math.max(0, rectEnd - x);
+            
 
-	            }
-	            else if (self.min_y < 0) {
-	                yUnitless = 0;
-	                heightUnitLess = -feature.value / featureValueRange;
-	            }
-	            else {
-	                yUnitless = 1.0 - ((feature.value-self.min_y) / featureValueRange);
-	                heightUnitLess = (feature.value+self.min_y) / featureValueRange;
-	            }
+            
 
-	           	y = (yUnitless*pixelHeight)+y_offset;
-	            y=y<y_offset?y_offset:y;
-	            height=heightUnitLess * pixelHeight;
-	            height=height>pixelHeight?pixelHeight:height
+            //height = ((feature.value - featureValueMinimum) / featureValueRange) * pixelHeight;
+            //rectBaseline = pixelHeight - height;
+            //canvas.fillRect(rectOrigin, rectBaseline, rectWidth, rectHeight, {fillStyle: track.color});
 
-	            //canvas.fillRect(x, yUnitless * pixelHeight, width, heightUnitLess * pixelHeight, { fillStyle: igv.randomRGB(64, 255) });
-	            if (self.config.display==='line'){
-	                 if (self.prev_coords.x){
-	                    Graphics.strokeLine(ctx,x,y,self.prev_coords.x,self.prev_coords.y,{"strokeStyle":color,"lineWidth":3});
+            if (signsDiffer(self.min_y, self.max_y)) {
 
-	                }
-	                self.prev_coords.x=x;
-	                self.prev_coords.y=y;
-	            }
-	            else{
-                    //phase data
-                    const ph = self.config.phase_data;
-                    if(ph){
-                        const pos = (bpPerPixel*x)+bpStart;
-                        if (pos >ph.st && pos <ph.en){
-                            const pro = ph.ratio*height;
-                            Graphics.fillRect(ctx, x, y, width, pro, {fillStyle: "blue"});
-                            Graphics.fillRect(ctx, x, y+pro, width, height-pro, {fillStyle: "red"});
-                        }
-                        else{
-                            Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
-                        }
+                if (feature.value < 0) {
+                    yUnitless = self.max_y/ featureValueRange;
+                    heightUnitLess = -feature.value / featureValueRange;
+                } else {
+                    yUnitless = ((self.max_y - feature.value) / featureValueRange);
+                    heightUnitLess = feature.value / featureValueRange;
+                }
+
+            }
+            else if (self.min_y < 0) {
+                yUnitless = 0;
+                heightUnitLess = -feature.value / featureValueRange;
+            }
+            else {
+                yUnitless = 1.0 - ((feature.value-self.min_y) / featureValueRange);
+                heightUnitLess = (feature.value+self.min_y) / featureValueRange;
+            }
+
+            y = (yUnitless*pixelHeight)+y_offset;
+            y=y<y_offset?y_offset:y;
+            height=heightUnitLess * pixelHeight;
+            height=height>pixelHeight?pixelHeight:height
+
+            //canvas.fillRect(x, yUnitless * pixelHeight, width, heightUnitLess * pixelHeight, { fillStyle: igv.randomRGB(64, 255) });
+            if (self.config.display==='line'){
+                    if (self.prev_coords.x){
+                    Graphics.strokeLine(ctx,x,y,self.prev_coords.x,self.prev_coords.y,{"strokeStyle":color,"lineWidth":3});
+
+                }
+                self.prev_coords.x=x;
+                self.prev_coords.y=y;
+            }
+            else{
+                //phase data
+                const ph = self.config.phase_data;
+                if(ph){
+                    const pos = (bpPerPixel*x)+bpStart;
+                    if (pos >ph.st && pos <ph.en){
+                        const pro = ph.ratio*height;
+                        Graphics.fillRect(ctx, x, y, width, pro, {fillStyle: "blue"});
+                        Graphics.fillRect(ctx, x, y+pro, width, height-pro, {fillStyle: "red"});
                     }
                     else{
-	            	    Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
+                        Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
                     }
-	            }           
-	        }
-	        function autoscale(features) {
-        		var min = 0,
-            	max = -Number.MAX_VALUE;
-        		features.forEach(function (f) {
-            		min = Math.min(min, f.value);
-           			max = Math.max(max, f.value);
-        		});
-        		return {min: min, max: max};
-    		}
+                }
+                else{
+                    Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
+                }
+            }           
+        }
+        function autoscale(features) {
+            let min = Number.MAX_VALUE, max = -Number.MAX_VALUE;
+            if (!Array.isArray(features)) {
+                console.warn('features is not an array');
+                return {min: 0, max: 100};
+            }
+            features.forEach(function (f) {
+                min = Math.min(min, f.value);
+                max = Math.max(max, f.value);
+            });
+            return {min: min, max: max};
+        }
 
-    		function signsDiffer(a, b) {
-        		return (a > 0 && b < 0 || a < 0 && b > 0);
-    		}
-    		this.top=y_offset;
-    		this.bottom=y_offset+pixelHeight;
-    		
-    		return this.bottom;
-    		
-    		
-
-	    
+        function signsDiffer(a, b) {
+            return (a > 0 && b < 0 || a < 0 && b > 0);
+        }
+        this.top=y_offset;
+        this.bottom=y_offset+pixelHeight;
+        
+        return this.bottom;
 	}
 }
 
