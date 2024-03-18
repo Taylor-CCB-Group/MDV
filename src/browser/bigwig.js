@@ -119,112 +119,80 @@ class BWSource{
 	* @param {object} data - Should contain pixelWidth- the width of the entire canvas and 
 	* bpPerPixel.
 	*/
-    getFeatures(chr, bpStart, bpEnd,use_existing,data) {
+    async getFeatures(chr, bpStart, bpEnd,use_existing,data) {
         this.st = new Date().getTime();
-        var self = this;
-        return new Promise(function (fulfill, reject) {
-            if (self.features && use_existing){
-                fulfill(self.features);
-                return;
-            }
-            self.reader.getZoomHeaders().then(function (zoomLevelHeaders) {
+        if (this.features && use_existing){
+            return this.features;
+        }
+        const zoomLevelHeaders = await this.reader.getZoomHeaders();
 
-                // Select a biwig "zoom level" appropriate for the current resolution
-                var bwReader = self.reader,
-                    bufferedReader = self.bufferedReader,
-                    bpp =data.bpPerPixel,
-                    zoomLevelHeader=BWSource.zoomLevelForScale(bpp, zoomLevelHeaders),
-                    treeOffset
+        // Select a biwig "zoom level" appropriate for the current resolution
+        const bwReader = this.reader,
+            bufferedReader = this.bufferedReader,
+            bpp = data.bpPerPixel,
+            zoomLevelHeader = BWSource.zoomLevelForScale(bpp, zoomLevelHeaders);
+        let treeOffset;
+        
+        
+        if (zoomLevelHeader && bwReader.type==="BigWig") {
+            treeOffset = zoomLevelHeader.indexOffset;
+            this.decodeFunction = BWSource.decodeZoomData;
+        } else {
+            treeOffset = bwReader.header.fullIndexOffset;
+            if (bwReader.type === "BigWig") {
+                this.decodeFunction =BWSource.decodeWigData;
+            }
+            else {
+                this.decodeFunction =this.decodeBedData;
+            }
+        }
+
+        const rpTree = await bwReader.loadRPTree(treeOffset);
+        const chrIdx = this.reader.chromTree.dictionary[chr];
+        if (chrIdx === undefined) {
+            // PJT - this happens when e.g. chr is "1" but the corresponding key should be "chr1"
+            // maybe user error, but we should handle it more gracefully and display a message
+            // preferably at the point of building the project in the first place(?),
+            // but also in the track UI if we make it this far.
+            // May not always be an error (if the bw doesn't have data for the chromosome)
+            // fulfill(null);
+            throw new Error(`Chromosome '${chr}' not found in BigWig file. Expected one of ${Object.keys(this.reader.chromTree.dictionary)}`);
+        }
+        else {
+            const leafItems = await rpTree.findLeafItemsOverlapping(chrIdx, bpStart, bpEnd);
+            if (!leafItems || leafItems.length == 0) fulfill([]);
+            const featureArrays = await Promise.all(leafItems.map(async (item) => {
+                const features = [];
+
+                const uint8Array = await bufferedReader.dataViewForRange({
+                    start: item.dataOffset,
+                    size: item.dataSize
+                }, true);                    
+                const inflate = new Zlib.Inflate(uint8Array);
+                const plain= inflate.decompress();            
                 
-               
-                if (zoomLevelHeader && bwReader.type==="BigWig") {
-                    treeOffset = zoomLevelHeader.indexOffset;
-                    self.decodeFunction = BWSource.decodeZoomData;
-                } else {
-                    treeOffset = bwReader.header.fullIndexOffset;
-                    if (bwReader.type === "BigWig") {
-                        self.decodeFunction =BWSource.decodeWigData;
-                    }
-                    else {
-                        self.decodeFunction =self.decodeBedData;
-                    }
+                //var plain = pako.inflate(uint8Array);
+                this.decodeFunction(new DataView(plain.buffer), chr, chrIdx, bpStart, bpEnd, features);
+
+                return features;
+            }));
+            var en = new Date().getTime();
+            // var e = en-this.st;
+            // var a = bpp;
+            //console.log(e);
+            // const allFeatures = featureArrays.slice(0); //<< no
+            let allFeatures = featureArrays[0];
+            if(featureArrays.length > 1) {
+                for(let i = 1; i < featureArrays.length; i++) {
+                    allFeatures = allFeatures.concat(featureArrays[i]);
                 }
-
-                bwReader.loadRPTree(treeOffset).then(function (rpTree) {
-
-                    var chrIdx = self.reader.chromTree.dictionary[chr];
-                    if (chrIdx === undefined) {
-                        // PJT - this happens when e.g. chr is "1" but the corresponding key should be "chr1"
-                        // maybe user error, but we should handle it more gracefully and display a message
-                        // preferably at the point of building the project in the first place(?),
-                        // but also in the track UI if we make it this far.
-                        // May not always be an error (if the bw doesn't have data for the chromosome)
-                        fulfill(null);
-                    }
-                    else {
-
-                        rpTree.findLeafItemsOverlapping(chrIdx, bpStart, bpEnd).then(function (leafItems) {
-
-                            var promises = [];
-
-                            if (!leafItems || leafItems.length == 0) fulfill([]);
-
-                            leafItems.forEach(function (item) {
-
-                                promises.push(new Promise(function (fulfill, reject) {
-                                    var features = [];
-
-                                    bufferedReader.dataViewForRange({
-                                        start: item.dataOffset,
-                                        size: item.dataSize
-                                    }, true).then(function (uint8Array) {
-                                  
-                                       var inflate = new Zlib.Inflate(uint8Array);
-                                       var plain= inflate.decompress();
-                               
-                                      
-                                       //var plain = pako.inflate(uint8Array);
-                                        self.decodeFunction(new DataView(plain.buffer), chr, chrIdx, bpStart, bpEnd, features);
-
-                                        fulfill(features);
-
-                                    }).catch(reject);
-                                }));
-                            });
-
-
-                            Promise.all(promises).then(function (featureArrays) {
-                                var en = new Date().getTime();
-                                var e = en-self.st;
-                                var a = bpp;
-                                //console.log(e);
-                                var i, allFeatures = featureArrays[0];
-                                if(featureArrays.length > 1) {
-                                   for(i=1; i<featureArrays.length; i++) {
-                                       allFeatures = allFeatures.concat(featureArrays[i]);
-                                   }
-                                }  
-                                allFeatures.sort(function (a, b) {
-                                    return a.start - b.start;
-                                })
-                                self.features=allFeatures;
-                                fulfill(allFeatures)
-                            }).catch(reject);
-
-                        }).catch(function(error){
-                            reject(error);
-                        });
-                    }
-                }).catch(function(error){
-                    reject(error)
-                });
-            }).catch(function(error){
-                reject(error);
-            }
-            );
-
-
-        });
+            }  
+            allFeatures.sort(function (a, b) {
+                return a.start - b.start;
+            });
+            this.features=allFeatures;
+            return allFeatures;
+        }
     }
     
     
