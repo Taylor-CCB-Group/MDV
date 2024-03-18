@@ -303,7 +303,7 @@ class BWSource{
                     break; // Out of interval
                 
                 } else if (chromEnd > bpStart && Number.isFinite(value)) {
-                    featureArray.push({chr, start: chromStart, end: chromEnd, value, minVal, maxVal, sumData, sumSquares});
+                    featureArray.push({chr, start: chromStart, end: chromEnd, value, minVal, maxVal});
                 }
             }
         }
@@ -943,7 +943,7 @@ class BWTotalSummary{
     }
 
 
-     computeStats() {
+    computeStats() {
         var n = this.basesCovered;
         if (n > 0) {
             this.mean = this.sumData / n;
@@ -962,7 +962,7 @@ class BWTotalSummary{
     updateStats(stats) {
 
         this.basesCovered += stats.count;
-        this.sumData += status.sumData;
+        this.sumData += stats.sumData;
         this.sumSquares += sumSquares;
         this.minVal = MIN(_minVal, min);
         this.maxVal = MAX(_maxVal, max);

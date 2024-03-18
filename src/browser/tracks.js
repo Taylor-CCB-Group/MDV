@@ -809,7 +809,20 @@ class MLVWigTrack extends MLVTrack{
 	_setFeatureSource(){
 		this.feature_source=new BWSource(this.config);	
 	}
-
+    getSettings(panel) {
+        return [
+            ...super.getSettings(panel),
+            {
+                type: "check",
+                label: "Show data range",
+                value: this.config.showDataRange,
+                func: v => {
+                    this.setConfigAttribute("showDataRange", v);
+                    panel.update();
+                }
+            }
+        ]
+    }
 
 	drawScale(pixel_height,ctx,defaultColor){
 		if (this.config.scale_link_to && this.config.group){
@@ -865,7 +878,6 @@ class MLVWigTrack extends MLVTrack{
 	    else {
 	    	pixelHeight=this.config.height;	
 	    }
-	          
 	    if (!color){
 	    	color="black";       
 	    }
@@ -916,7 +928,21 @@ class MLVWigTrack extends MLVTrack{
                 // pass on any error message from feature source...
                 if (!Array.isArray(features)) {
                     throw features;
-                } else features.forEach(renderFeature);
+                }
+                features.forEach(renderFeature);
+                if (this.config.showDataRange) {
+                    ctx.save();
+                    features.forEach(f => {
+                        f.valueBak = f.value;
+                        f.value = f.minVal;
+                    });
+                    ctx.globalAlpha *= 0.4;
+                    features.forEach(renderFeature);
+                    features.forEach(f => f.value = f.maxVal);
+                    features.forEach(renderFeature);
+                    features.forEach(f => f.value = f.valueBak);
+                    ctx.restore();
+                }
             }
 
             ctx.globalAlpha = 1
