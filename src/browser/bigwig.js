@@ -242,7 +242,7 @@ class BWSource{
 
     static zoomLevelForScale(bpPerPixel, zoomLevelHeaders) {
 
-        var level = null, i, zl;
+        let level = null, i, zl;
 
         for (i = 0; i < zoomLevelHeaders.length; i++) {
 
@@ -264,7 +264,7 @@ class BWSource{
 
     static decodeWigData(data, chr, chrIdx, bpStart, bpEnd, featureArray) {
 
-        var binaryParser = new BinaryParser(data),
+        let binaryParser = new BinaryParser(data),
             chromId = binaryParser.getInt(),
             chromStart = binaryParser.getInt(),
             chromEnd = binaryParser.getInt(),
@@ -312,7 +312,7 @@ class BWSource{
 
     static decodeZoomData(data, chr, chrIdx, bpStart, bpEnd, featureArray) {
 
-        var binaryParser = new BinaryParser(data),
+        let binaryParser = new BinaryParser(data),
             minSize = 8 * 4,   // Minimum # of bytes required for a zoom record
             chromId,
             chromStart,
@@ -513,7 +513,7 @@ class BWReader{
     }
 
 
-   async loadZoomHeadersAndChrTree() {
+    async loadZoomHeadersAndChrTree() {
         const startOffset = BBFILE_HEADER_SIZE;
 
         const range = {start: startOffset, size: (this.header.fullDataOffset - startOffset + 5)};
@@ -674,50 +674,34 @@ class RPTree{
 
 
     async findLeafItemsOverlapping(chrIdx, startBase, endBase) {
-        // not refactoring recursive function to use async/await just yet
-        return new Promise((fulfill, reject) => {
-            const leafItems = [],
-                processing = new Set(),
-                bufferedReader = new BufferedReader(this.config, this.filesize, BUFFER_SIZE);
+        const leafItems = [],
+            bufferedReader = new BufferedReader(this.config, this.filesize, BUFFER_SIZE);
 
-            processing.add(0);  // Zero represents the root node
-            const findLeafItems = async (node, nodeId) => {
-                if (RPTree.overlaps(node, chrIdx, startBase, endBase)) {
-                    // note this async forEach is not awaited, but the processing set keeps track of that
-                    // we could Promise.all() here
-                    node.items.forEach(async (item) => {
-                        if (RPTree.overlaps(item, chrIdx, startBase, endBase)) {
-                            if (item.isLeaf) {
-                                leafItems.push(item);
+        const findLeafItems = async (node) => {
+            if (RPTree.overlaps(node, chrIdx, startBase, endBase)) {
+                await Promise.all(node.items.map(async (item) => {
+                    if (RPTree.overlaps(item, chrIdx, startBase, endBase)) {
+                        if (item.isLeaf) {
+                            leafItems.push(item);
+                        }
+                        else {
+                            if (item.childNode) {
+                                await findLeafItems(item.childNode);
                             }
-
                             else {
-                                if (item.childNode) {
-                                    findLeafItems(item.childNode);
-                                }
-                                else {
-                                    processing.add(item.childOffset);  // Represent node to-be-loaded by its file position
-                                    try {
-                                        const node = await this.readNode(item.childOffset, bufferedReader);
-                                        item.childNode = node;
-                                        findLeafItems(node, item.childOffset);
-                                    } catch (e) {
-                                        reject(e);
-                                    }
-                                }
+                                //any exceptions that previously called reject will now be thrown implicitly
+                                //these will bubble-up and be shown in the UI
+                                const node = await this.readNode(item.childOffset, bufferedReader);
+                                item.childNode = node;
+                                await findLeafItems(node, item.childOffset);
                             }
                         }
-                    });
-                }
-                if (nodeId != undefined) processing.delete(nodeId);
-
-                // Wait until all nodes are processed
-                if (processing.size===0) {
-                    fulfill(leafItems);
-                }
+                    }
+                }));
             }
-            findLeafItems(this.rootNode, 0);
-        });
+            return leafItems;
+        }
+        return await findLeafItems(this.rootNode, 0);
     }
 
 
@@ -746,7 +730,7 @@ class RPTreeNode{
     constructor(items) {
         this.items = items;
 
-        var minChromId = Number.MAX_VALUE,
+        let minChromId = Number.MAX_VALUE,
             maxChromId = 0,
             minStartBase = Number.MAX_VALUE,
             maxEndBase = 0,
