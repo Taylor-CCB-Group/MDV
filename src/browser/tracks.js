@@ -286,33 +286,26 @@ class RulerTrack extends MLVTrack{
 
     drawFeatures(options) {
 
-        var fontStyle,
-            ctx = options.context,
-            range,
-            ts,
-            spacing,
-            nTick,
-            x;
+        const ctx = options.context;
+        const fontStyle = { textAlign: 'center', font: '10px PT Sans', fillStyle: options.textColor, strokeStyle: options.textColor };
 
-        fontStyle = { textAlign: 'center', font: '10px PT Sans', fillStyle: options.textColor, strokeStyle: options.textColor };
-
-        range = Math.floor(1100 * options.bpPerPixel);
-        ts = RulerTrack.findSpacing(range);
-        spacing = ts.majorTick;
+        const range = Math.floor(1100 * options.bpPerPixel);
+        const ts = RulerTrack.findSpacing(range);
+        const spacing = ts.majorTick;
 
         // Find starting point closest to the current origin
-        nTick = Math.floor(options.bpStart / spacing) - 1;
-        x = 0;
+        let nTick = Math.floor(options.bpStart / spacing) - 1;
+        let x = 0;
 		let y_pos=options.top+this.height;
         //canvas.setProperties({textAlign: 'center'});
         Graphics.setProperties(ctx, fontStyle );
+        const shim = 2;
         while (x < options.pixelWidth) {
 
-            var l = Math.floor(nTick * spacing),
-                shim = 2;
+            const l = Math.floor(nTick * spacing);
 
             x = Math.round(((l - 1) - options.bpStart + 0.5) / options.bpPerPixel);
-            var chrPosition = formatNumber(l / ts.unitMultiplier, 0) + " " + ts.majorUnit;
+            const chrPosition = formatNumber(l / ts.unitMultiplier, 0) + " " + ts.majorUnit;
 
             if (nTick % 1 == 0) {
                 Graphics.fillText(ctx, chrPosition, x, y_pos - 15);
@@ -329,7 +322,7 @@ class RulerTrack extends MLVTrack{
             //decimal  - the number of decimals after the digit from 0 to 3
             //-- Returns the passed number as a string in the xxx,xxx.xx format.
             //anynum = eval(obj.value);
-            var divider = 10;
+            let divider = 10;
             switch (decimal) {
                 case 0:
                     divider = 1;
@@ -344,17 +337,17 @@ class RulerTrack extends MLVTrack{
                     divider = 1000;
             }
 
-            var workNum = Math.abs((Math.round(anynum * divider) / divider));
+            const workNum = Math.abs((Math.round(anynum * divider) / divider));
 
-            var workStr = "" + workNum
+            let workStr = "" + workNum
 
             if (workStr.indexOf(".") == -1) {
                 workStr += "."
             }
 
-            var dStr = workStr.substr(0, workStr.indexOf("."));
-            var dNum = dStr - 0
-            var pStr = workStr.substr(workStr.indexOf("."))
+            let dStr = workStr.substring(0, workStr.indexOf("."));
+            const dNum = dStr - 0
+            let pStr = workStr.substring(workStr.indexOf("."))
 
             while (pStr.length - 1 < decimal) {
                 pStr += "0"
@@ -373,7 +366,7 @@ class RulerTrack extends MLVTrack{
                 dLen = dStr.length
                 dStr = parseInt("" + (dNum / 1000000)) + "," + dStr.substring(dLen - 7, dLen)
             }
-            var retval = dStr + pStr
+            let retval = dStr + pStr
             //-- Put numbers in parentheses if negative.
             if (anynum < 0) {
                 retval = "(" + retval + ")";
