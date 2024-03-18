@@ -850,7 +850,7 @@ class MLVWigTrack extends MLVTrack{
 	drawFeatures(options) {
 		let self = this,
 	    features = options.features,
-	    color=self.config.color,
+	    color=this.config.color,
 	    ctx = options.context,
 	    bpPerPixel = options.bpPerPixel,
 	    bpStart = options.bpStart,
@@ -858,15 +858,9 @@ class MLVWigTrack extends MLVTrack{
 	    pixelHeight =options.pixelHeight,
 	    y_offset=options.top,
 	    bpEnd = bpStart + pixelWidth * bpPerPixel + 1,
-	    featureValueMinimum,
-	    featureValueMaximum,
-	    featureValueRange,
-	    $dataRangeTrackLabel,
-	    str,
-	    min,
-	    max;
+	    featureValueRange;
 	    if (this.config.group){
-	    		pixelHeight=options.height;
+            pixelHeight=options.height;
 	    }
 	    else {
 	    	pixelHeight=this.config.height;	
@@ -875,32 +869,32 @@ class MLVWigTrack extends MLVTrack{
 	    if (!color){
 	    	color="black";       
 	    }
-	    self.prev_coords={x:0,y:0};
+	    this.prev_coords={x:0,y:0};
 		
         if (features) {
-            if (self.scale_link_to) {
-                let t = self.scale_link_to.config;
+            if (this.scale_link_to) {
+                let t = this.scale_link_to.config;
                 if (t) {
-                    self.config.scale = t.scale;
-                    self.max_y = self.scale_link_to.max_y;
-                    self.min_y = self.scale_link_to.min_y;
+                    this.config.scale = t.scale;
+                    this.max_y = this.scale_link_to.max_y;
+                    this.min_y = this.scale_link_to.min_y;
                 }
             }
-            else if (self.set_scale) {
-                self.min_y = self.set_scale.min;
-                self.max_y = self.set_scale.max;
+            else if (this.set_scale) {
+                this.min_y = this.set_scale.min;
+                this.max_y = this.set_scale.max;
             }
-            else if ((self.max_y === undefined && self.config.scale === "automatic") || self.config.scale === "dynamic") {
+            else if ((this.max_y === undefined && this.config.scale === "automatic") || this.config.scale === "dynamic") {
                 var s = autoscale(features);
-                self.min_y = s.min;
-                self.max_y = s.max;
+                this.min_y = s.min;
+                this.max_y = s.max;
             }
-            else if (self.config.scale === "fixed") {
-                self.min_y = self.config.min_y;
-                self.max_y = self.config.max_y;
+            else if (this.config.scale === "fixed") {
+                this.min_y = this.config.min_y;
+                this.max_y = this.config.max_y;
             }
 
-            featureValueRange = self.max_y - self.min_y;
+            featureValueRange = this.max_y - this.min_y;
 
             //$dataRangeTrackLabel = $(this.trackView.trackDiv).find('.igv-data-range-track-label');
             //
@@ -913,9 +907,9 @@ class MLVWigTrack extends MLVTrack{
             let prev_y = 0;
             ctx.globalAlpha = this.config.opacity ? this.config.opacity : 1;
 
-            if (self.is_line) {
-                let y = (1.0 - self.config.value / featureValueRange) * pixelHeight;
-                Graphics.strokeLine(ctx, 0, y, pixelWidth, y, { "strokeStyle": self.config.color, "lineWidth": self.config.width ? self.config.width : 1 });
+            if (this.is_line) {
+                let y = (1.0 - this.config.value / featureValueRange) * pixelHeight;
+                Graphics.strokeLine(ctx, 0, y, pixelWidth, y, { "strokeStyle": this.config.color, "lineWidth": this.config.width ? this.config.width : 1 });
             }
 
             else {
@@ -926,22 +920,20 @@ class MLVWigTrack extends MLVTrack{
             }
 
             ctx.globalAlpha = 1
-            if (self.config.threshold) {
-                let y = y_offset + (1.0 - self.config.threshold / featureValueRange) * pixelHeight;
+            if (this.config.threshold) {
+                let y = y_offset + (1.0 - this.config.threshold / featureValueRange) * pixelHeight;
                 Graphics.strokeLine(ctx, 0, y, pixelWidth, y, { "strokeStyle": "black", "lineWidth": 1 });
             }
         }
-            
-        function renderFeature(feature, index, featureList) {
+        function renderFeature(feature) {
 
-            var yUnitless,
+            let yUnitless,
                 heightUnitLess,
                 x,
                 y,
                 width,
                 height,
-                rectEnd,
-                rectBaseline;
+                rectEnd;
 
             if (feature.end < bpStart) return;
             if (feature.start > bpEnd) return;
@@ -954,14 +946,11 @@ class MLVWigTrack extends MLVTrack{
             
             rectEnd = Math.floor((feature.end - bpStart) / bpPerPixel);
             width = Math.max(0, rectEnd - x);
-            
-
-            
 
             //height = ((feature.value - featureValueMinimum) / featureValueRange) * pixelHeight;
             //rectBaseline = pixelHeight - height;
             //canvas.fillRect(rectOrigin, rectBaseline, rectWidth, rectHeight, {fillStyle: track.color});
-
+            // feature.value = .... think about doing something to anti-alias.
             if (signsDiffer(self.min_y, self.max_y)) {
 
                 if (feature.value < 0) {
@@ -989,12 +978,11 @@ class MLVWigTrack extends MLVTrack{
 
             //canvas.fillRect(x, yUnitless * pixelHeight, width, heightUnitLess * pixelHeight, { fillStyle: igv.randomRGB(64, 255) });
             if (self.config.display==='line'){
-                    if (self.prev_coords.x){
+                if (self.prev_coords.x) {
                     Graphics.strokeLine(ctx,x,y,self.prev_coords.x,self.prev_coords.y,{"strokeStyle":color,"lineWidth":3});
-
                 }
-                self.prev_coords.x=x;
-                self.prev_coords.y=y;
+                self.prev_coords.x = x;
+                self.prev_coords.y = y;
             }
             else{
                 //phase data

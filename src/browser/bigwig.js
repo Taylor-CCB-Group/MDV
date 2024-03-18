@@ -162,7 +162,7 @@ class BWSource{
         }
         else {
             const leafItems = await rpTree.findLeafItemsOverlapping(chrIdx, bpStart, bpEnd);
-            if (!leafItems || leafItems.length == 0) fulfill([]);
+            if (!leafItems || leafItems.length == 0) return [];
             const featureArrays = await Promise.all(leafItems.map(async (item) => {
                 const features = [];
 
@@ -283,39 +283,28 @@ class BWSource{
     static decodeZoomData(data, chr, chrIdx, bpStart, bpEnd, featureArray) {
 
         let binaryParser = new BinaryParser(data),
-            minSize = 8 * 4,   // Minimum # of bytes required for a zoom record
-            chromId,
-            chromStart,
-            chromEnd,
-            validCount,
-            minVal,
-            maxVal,
-            sumData,
-            sumSquares,
-            value;
-
+            minSize = 8 * 4;   // Minimum # of bytes required for a zoom record
         while (binaryParser.remLength() >= minSize) {
-            chromId = binaryParser.getInt();
+            const chromId = binaryParser.getInt();
             if (chromId === chrIdx) {
-
-                chromStart = binaryParser.getInt();
-                chromEnd = binaryParser.getInt();
-                validCount = binaryParser.getInt();
-                minVal = binaryParser.getFloat();
-                maxVal = binaryParser.getFloat();
-                sumData = binaryParser.getFloat();
-                sumSquares = binaryParser.getFloat();
-                value = validCount == 0 ? 0 : sumData / validCount;
+                const chromStart = binaryParser.getInt();
+                const chromEnd = binaryParser.getInt();
+                const validCount = binaryParser.getInt();
+                const minVal = binaryParser.getFloat();
+                const maxVal = binaryParser.getFloat();
+                const sumData = binaryParser.getFloat();
+                const sumSquares = binaryParser.getFloat();
+                // maybe we don't always want mean value... think about this...
+                const value = validCount == 0 ? 0 : sumData / validCount;
 
                 if (chromStart >= bpEnd && chromStart<1000000000) {
-                     console.log("should have broken")
+                    //console.log("should have broken")
 
                     break; // Out of interval
-                   
+                
                 } else if (chromEnd > bpStart && Number.isFinite(value)) {
-                    featureArray.push({chr: chr, start: chromStart, end: chromEnd, value: value});
+                    featureArray.push({chr, start: chromStart, end: chromEnd, value, minVal, maxVal, sumData, sumSquares});
                 }
-
             }
         }
 

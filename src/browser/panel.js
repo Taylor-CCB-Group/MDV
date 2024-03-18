@@ -690,7 +690,7 @@ class MLVPanel {
 							}
 						}
 						
-                        for (var i in all_features){
+                        for (const i in all_features){
                         	let track = self.tracks[self._display_order[i]];
 							
 							const l = self.trackLabels[track.config.track_id];
