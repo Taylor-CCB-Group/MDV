@@ -159,68 +159,60 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
     </>);
 }
 
-function MeasureTool({scatterplotLayer, unproject} : EditorProps) {
+function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
     // click to set start, click to set end, draw line between them.
-    // show length and angle.
+    // UX for tools is generally in need of work...
     const scale = useRegionScale();
     const metadata = useMetadata();
     const physicalSize = metadata?.Pixels?.PhysicalSizeX || 1;
     // const physicalUnits = metadata?.Pixels?.PhysicalSizeXUnit || 'unknown units';
-    const canvasRef = useRef<SVGSVGElement>(null);
     const [w, h] = useChartSize();
-    const [start, setStart] = useState<P>([0, 0]);
-    const [end, setEnd] = useState<P>([0, 0]);
+    const [hasStarted, setHasStarted] = useState(false);
+    const [startPixels, setStart] = useState<P>([0, 0]);
+    const [endPixels, setEnd] = useState<P>([0, 0]);
     const handleMouseMove = useCallback((e: MouseEvent) => {
-        const svg = canvasRef.current;
-        if (!svg) return;
-        const svgRect = svg.getBoundingClientRect();
-
-        const svgX = e.pageX - window.scrollX - svgRect.left;
-        const svgY = e.pageY - window.scrollY - svgRect.top;
-
-        const p = [svgX, svgY] as P;
-        setEnd(p);
-    }, []);
+        setEnd(unproject([e.clientX, e.clientY]));
+    }, [unproject]);
     const handleMouseUp = useCallback((e: MouseEvent) => {
         handleMouseMove(e);
         window.removeEventListener('mouseup', handleMouseUp);
         window.removeEventListener('mousemove', handleMouseMove);
-    }, []);
+    }, [handleMouseMove]);
+    if (!toolActive && !hasStarted) return null;
     // could we unproject into the image layer rather than scatterplotLayer?
-    const startPixels = unproject(start);
-    const endPixels = unproject(end);
+    // const startPixels = unproject(start);
+    // const endPixels = unproject(end);
+    const start = scatterplotLayer.project(startPixels);
+    const end = scatterplotLayer.project(endPixels);
     const length = physicalSize * Math.sqrt((endPixels[0] - startPixels[0])**2 + (endPixels[1] - startPixels[1])**2) / scale;
-    // console.log({length, scale, lenTimesScale: length*scale, lenDivScale: length/scale});
     return (<>
     <div style={{
         position: 'absolute',
         width: '100%',
         height: '100px',
-        // display: 'none',
+        display: hasStarted ? 'block' : 'none',
         top: end[1] + 10,
         left: end[0] + 10,
     }}>
         {(sizeToMeters(length, 'mm')).toFixed(2)}mm
     </div>
-    <svg ref={canvasRef} 
+    <svg
     viewBox={`0 0 ${w} ${h}`}
     style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'transparent'}}
     onMouseDown={e => {
-        const svg = e.currentTarget;
-        const svgRect = svg.getBoundingClientRect();
-
-        const svgX = e.pageX - window.scrollX - svgRect.left;
-        const svgY = e.pageY - window.scrollY - svgRect.top;
-
-        const p = [svgX, svgY] as P;
+        if (!toolActive) return;
+        const p = unproject([e.clientX, e.clientY]);
         setStart(p);
         setEnd(p);
+        setHasStarted(true);
         window.addEventListener('mouseup', handleMouseUp);
         window.addEventListener('mousemove', handleMouseMove);        
     }}>
-        <circle cx={start[0]} cy={start[1]} r={5} fill="white" />
-        <circle cx={end[0]} cy={end[1]} r={5} fill="white" />
-        <line x1={start[0]} y1={start[1]} x2={end[0]} y2={end[1]} stroke="white" strokeWidth={3}/>
+        {hasStarted && (<>
+            <circle cx={start[0]} cy={start[1]} r={5} fill="white" />
+            <circle cx={end[0]} cy={end[1]} r={5} fill="white" />
+            <line x1={start[0]} y1={start[1]} x2={end[0]} y2={end[1]} stroke="white" strokeWidth={3}/>
+        </>)}
     </svg>
     </>)
 }
@@ -317,7 +309,7 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
                 <RectangleEditor toolActive={selectedTool==='Rectangle'} {...scatterProps}
                 rangeDimension={rangeDimension} />
                 {selectedTool === 'Transform'  && <TransformEditor {...scatterProps} rangeDimension={rangeDimension}/>}
-                {selectedTool === 'Measure'  && <MeasureTool {...scatterProps} rangeDimension={rangeDimension}/>}
+                <MeasureTool {...scatterProps} rangeDimension={rangeDimension} toolActive={selectedTool === 'Measure'} />
         </div>
         </>
     )
