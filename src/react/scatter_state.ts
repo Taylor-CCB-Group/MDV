@@ -263,9 +263,10 @@ export function useScatterplotLayer() {
         const y = e.clientY - r.top;
         const p = scatterplotLayer.unproject([x, y]) as P;
         //still need to reason better about transforms...
-        const p2 = p.map(v => v * scale) as P;
+        // const scale = 1; //this was only right when Pixels.PhysicalSizeX === regions.scale
+        // const p2 = p.map(v => v * scale) as P;
         const m = modelMatrix.invert();
-        const p3 = m.transform(p2) as P;
+        const p3 = m.transform(p) as P;
         m.invert();
         return p3;
     }, [scatterplotLayer, modelMatrix, currentLayerHasRendered, scale]);
