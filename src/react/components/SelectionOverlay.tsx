@@ -4,14 +4,17 @@ import PhotoSizeSelectSmallOutlinedIcon from '@mui/icons-material/PhotoSizeSelec
 import PolylineOutlinedIcon from '@mui/icons-material/PolylineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import ControlCameraOutlinedIcon from '@mui/icons-material/ControlCameraOutlined';
+import StraightenIcon from '@mui/icons-material/Straighten';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useViewerStore } from "./avivatorish/state";
+import { useMetadata, useViewerStore } from "./avivatorish/state";
 import { useFilteredIndices, useRegionScale, useScatterplotLayer } from "../scatter_state";
 import { useChart, useRange } from "../context";
 import RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
 import type { VivMDVReact } from "./VivMDVReact";
 import { runInAction } from "mobx";
+import { useChartSize } from "../hooks";
+import { sizeToMeters } from "./avivatorish/utils";
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
@@ -35,6 +38,10 @@ const Tools = {
     'transform': {
         name: 'Transform',
         ToolIcon: ControlCameraOutlinedIcon
+    },
+    'measure': {
+        name: 'Measure',
+        ToolIcon: StraightenIcon
     },
 } as const;
 
@@ -152,6 +159,72 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
     </>);
 }
 
+function MeasureTool({scatterplotLayer, unproject} : EditorProps) {
+    // click to set start, click to set end, draw line between them.
+    // show length and angle.
+    const scale = useRegionScale();
+    const metadata = useMetadata();
+    const physicalSize = metadata?.Pixels?.PhysicalSizeX || 1;
+    // const physicalUnits = metadata?.Pixels?.PhysicalSizeXUnit || 'unknown units';
+    const canvasRef = useRef<SVGSVGElement>(null);
+    const [w, h] = useChartSize();
+    const [start, setStart] = useState<P>([0, 0]);
+    const [end, setEnd] = useState<P>([0, 0]);
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        const svg = canvasRef.current;
+        if (!svg) return;
+        const svgRect = svg.getBoundingClientRect();
+
+        const svgX = e.pageX - window.scrollX - svgRect.left;
+        const svgY = e.pageY - window.scrollY - svgRect.top;
+
+        const p = [svgX, svgY] as P;
+        setEnd(p);
+    }, []);
+    const handleMouseUp = useCallback((e: MouseEvent) => {
+        handleMouseMove(e);
+        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+    // could we unproject into the image layer rather than scatterplotLayer?
+    const startPixels = unproject(start);
+    const endPixels = unproject(end);
+    const length = physicalSize * Math.sqrt((endPixels[0] - startPixels[0])**2 + (endPixels[1] - startPixels[1])**2) / scale;
+    // console.log({length, scale, lenTimesScale: length*scale, lenDivScale: length/scale});
+    return (<>
+    <div style={{
+        position: 'absolute',
+        width: '100%',
+        height: '100px',
+        // display: 'none',
+        top: end[1] + 10,
+        left: end[0] + 10,
+    }}>
+        {(sizeToMeters(length, 'mm')).toFixed(2)}mm
+    </div>
+    <svg ref={canvasRef} 
+    viewBox={`0 0 ${w} ${h}`}
+    style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'transparent'}}
+    onMouseDown={e => {
+        const svg = e.currentTarget;
+        const svgRect = svg.getBoundingClientRect();
+
+        const svgX = e.pageX - window.scrollX - svgRect.left;
+        const svgY = e.pageY - window.scrollY - svgRect.top;
+
+        const p = [svgX, svgY] as P;
+        setStart(p);
+        setEnd(p);
+        window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('mousemove', handleMouseMove);        
+    }}>
+        <circle cx={start[0]} cy={start[1]} r={5} fill="white" />
+        <circle cx={end[0]} cy={end[1]} r={5} fill="white" />
+        <line x1={start[0]} y1={start[1]} x2={end[0]} y2={end[1]} stroke="white" strokeWidth={3}/>
+    </svg>
+    </>)
+}
+
 function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProps) {
     const pLastRef = useRef([NaN, NaN]);
     const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -229,7 +302,7 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
             pointerEvents: selectedTool === 'Pan' ? 'none' : 'auto'
             }}
             onMouseUp={(e) => {
-                setSelectedTool('Pan');
+                // setSelectedTool('Pan');
             }}
             onKeyDown={(e) => {
                 //not working as of now... probably want to think more about keyboard shortcuts in general...
@@ -244,6 +317,7 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
                 <RectangleEditor toolActive={selectedTool==='Rectangle'} {...scatterProps}
                 rangeDimension={rangeDimension} />
                 {selectedTool === 'Transform'  && <TransformEditor {...scatterProps} rangeDimension={rangeDimension}/>}
+                {selectedTool === 'Measure'  && <MeasureTool {...scatterProps} rangeDimension={rangeDimension}/>}
         </div>
         </>
     )

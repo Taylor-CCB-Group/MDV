@@ -544,3 +544,66 @@ export function get3DExtension(colormap, renderingMode) {
     }
     throw new Error(`${renderingMode} rendering mode not supported`);
 }
+
+const SI_PREFIXES = [
+    { symbol: 'Y', exponent: 24 },
+    { symbol: 'Z', exponent: 21 },
+    { symbol: 'E', exponent: 18 },
+    { symbol: 'P', exponent: 15 },
+    { symbol: 'T', exponent: 12 },
+    { symbol: 'G', exponent: 9 },
+    { symbol: 'M', exponent: 6 },
+    { symbol: 'k', exponent: 3 },
+    { symbol: 'h', exponent: 2 },
+    { symbol: 'da', exponent: 1 },
+    { symbol: '', exponent: 0 },
+    { symbol: 'd', exponent: -1 },
+    { symbol: 'c', exponent: -2 },
+    { symbol: 'm', exponent: -3 },
+    { symbol: 'µ', exponent: -6 },
+    { symbol: 'n', exponent: -9 },
+    { symbol: 'p', exponent: -12 },
+    { symbol: 'f', exponent: -15 },
+    { symbol: 'a', exponent: -18 },
+    { symbol: 'z', exponent: -21 },
+    { symbol: 'y', exponent: -24 }
+] as const;
+type SizeUnit = keyof typeof SI_PREFIXES[number]['symbol'];
+/**
+ * Convert a size value to meters.
+ * @param {number} size Size in original units.
+ * @param {string} unit String like 'mm', 'cm', 'dam', 'm', 'km', etc.
+ * @returns {number} Size in meters.
+ */
+export function sizeToMeters(size, unit): number {
+    if (!unit || unit === 'm') {
+        // Already in meters.
+        return size;
+    }
+    if (unit.length > 1) {
+        // We remove the trailing 'm' from the unit, so 'cm' becomes 'c' and 'dam' becomes 'da'.
+        let unitPrefix = unit.substring(0, unit.length - 1);
+        // Support 'u' as a prefix for micrometers.
+        if (unitPrefix === 'u') {
+            unitPrefix = 'µ';
+        }
+        const unitObj = SI_PREFIXES.find(p => p.symbol === unitPrefix);
+        if (unitObj) {
+            return size * 10 ** unitObj.exponent;
+        }
+    }
+    throw new Error('Received unknown unit');
+}
+// export function sizeToNiceUnits(size, unit) {
+//     if (unit === 'm') {
+//         return size;
+//     }
+//     if (unit.length > 1) {
+//         const unitPrefix = unit.substring(0, unit.length - 1);
+//         const unitObj = SI_PREFIXES.find(p => p.symbol === unitPrefix);
+//         if (unitObj) {
+//             return size / 10 ** unitObj.exponent + unitObj.symbol;
+//         }
+//     }
+//     throw new Error('Received unknown unit');
+// }
