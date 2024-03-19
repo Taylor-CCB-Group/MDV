@@ -198,7 +198,10 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
     </div>
     <svg
     viewBox={`0 0 ${w} ${h}`}
-    style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'transparent'}}
+    style={{
+        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'transparent',
+        pointerEvents: toolActive ? 'auto' : 'none',
+    }}
     onMouseDown={e => {
         if (!toolActive) return;
         const p = unproject([e.clientX, e.clientY]);
@@ -207,11 +210,13 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
         setHasStarted(true);
         window.addEventListener('mouseup', handleMouseUp);
         window.addEventListener('mousemove', handleMouseMove);        
-    }}>
+    }}
+    onScroll={e => {e.preventDefault();}}
+    >
         {hasStarted && (<>
-            <circle cx={start[0]} cy={start[1]} r={5} fill="white" />
-            <circle cx={end[0]} cy={end[1]} r={5} fill="white" />
-            <line x1={start[0]} y1={start[1]} x2={end[0]} y2={end[1]} stroke="white" strokeWidth={3}/>
+            <circle cx={start[0]} cy={start[1]} r={3} fill="white" />
+            <circle cx={end[0]} cy={end[1]} r={3} fill="white" />
+            <line x1={start[0]} y1={start[1]} x2={end[0]} y2={end[1]} stroke="white" strokeWidth={1.5}/>
         </>)}
     </svg>
     </>)
