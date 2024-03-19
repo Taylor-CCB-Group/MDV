@@ -67,11 +67,15 @@ export function useRegionScale() {
     const metadata = useMetadata();
     const chart = useChart();
     const regionScale = chart.dataStore.regions.scale;
+    const regionUnit = chart.dataStore.regions.scale_unit;
+
     //see also getPhysicalScalingMatrix
     //- consider state, matrices for image, scatterplot/other layers, and options to manipulate them
     //MDVProject.set_region_scale assumes that all regions have the same scale?
-    if (!metadata) return 1;
-    const scale = metadata.Pixels.PhysicalSizeX / regionScale;
+    if (!metadata) return 1;// / regionScale?; // might want to start using this with non-image data that has real units
+    const { Pixels } = metadata;
+    if (Pixels.PhysicalSizeXUnit !== regionUnit) console.warn(`physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`);
+    const scale = Pixels.PhysicalSizeX / regionScale;
     return scale;
 }
 
@@ -80,10 +84,10 @@ export function useScatterModelMatrix() {
     const scale = useRegionScale();
     const s = 1/scale;
     const [modelMatrix, setModelMatrix] = useState(new Matrix4().scale(s));
-    // useEffect(() => {
-    //     const m = new Matrix4().scale(s);
-    //     setModelMatrix(m);
-    // }, [scale]);
+    useEffect(() => {
+        const m = new Matrix4().scale(s);
+        setModelMatrix(m);
+    }, [scale]);
     return {modelMatrix, setModelMatrix};
 }
 
