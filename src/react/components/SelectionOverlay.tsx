@@ -230,6 +230,7 @@ function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProp
         const dx = p[0] - pLast[0];
         const dy = p[1] - pLast[1];
         modelMatrix.translate([dx, dy, 0]);
+        //this may redraw nice & fast without incurring react overhead, but now we're left with other problems i.e. rectangle editor not updating...
         scatterplotLayer.setNeedsRedraw();
     }, []);
     const handleMouseUp = useCallback((e: MouseEvent) => {
