@@ -1136,7 +1136,9 @@ def add_column_to_group(col: dict, data: pandas.Series, group: h5py.Group, lengt
         if data.dtype=="category":
             data = data.cat.add_categories("ND")
             data = data.fillna("ND")
-        data = data.fillna('NaN')
+        else:
+            #may need to double-check this...
+            data = data.fillna('NaN')
         values = data.value_counts()
         if (len(values)<65537 and col["datatype"]!="unique"):
             t8 = len(values)<257
