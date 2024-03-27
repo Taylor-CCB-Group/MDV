@@ -2168,7 +2168,18 @@ class ChooseColumnDialog extends BaseDialog{
         const cols = this.ds.getColumnList(content.filter);
         this.checks=[];
         this.callback=content.callback;
-        //todo let this work with createFilterElement?
+        //todo let this work with createFilterElement? <-- desperately needed in ad-car... hacking something together for now
+        const filter = createEl('input', {
+            placeholder: 'Search columns',
+            type: 'text',
+        }, cd);
+        filter.addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase().split(" ");
+            for (let check of this.checks) {
+                const f = val.some(v => !check[1].toLowerCase().includes(v));
+                check[0].parentElement.style.display = f ? 'none' : '';
+            }
+        });
         for (let col of cols){
             const d= createEl("div",{
                 styles:{//display:"inline-block",
