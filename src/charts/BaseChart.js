@@ -100,6 +100,11 @@ class BaseChart{
                     icon:"fas fa-bug",
                     func:()=>window.mdv.debugChart = this
                 });
+                menu.push({
+                    text: "copy config JSON to clipboard",
+                    icon: "fas fa-copy",
+                    func: () => navigator.clipboard.writeText(JSON.stringify(this.config, null, 2))
+                });
             }
             return menu;
         })
@@ -400,6 +405,8 @@ class BaseChart{
     onDataAdded(newSize){
         this.onDataFiltered();
     }
+
+    onDataHighlighted(data){}
 
     addToolTip(){
         this._tooltip = createEl("div",{
