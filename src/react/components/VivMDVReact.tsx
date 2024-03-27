@@ -62,7 +62,7 @@ export type ScatterPlotConfig = {
         // todo: add more options here...
     },
     zoom_on_filter: boolean,
-    point_shape: "circle" | "square"
+    point_shape: "circle" | "square" | "gaussian"
 } & TooltipConfig;
 const scatterDefaults: ScatterPlotConfig = {
     radius: 10,

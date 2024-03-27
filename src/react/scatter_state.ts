@@ -5,11 +5,10 @@ import { useChart, useDataStore } from "./context";
 import { useChartID, useChartSize, useConfig, useParamColumns } from "./hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
-import { OME_TIFF, useLoader, useMetadata } from "./components/avivatorish/state";
+import { useMetadata } from "./components/avivatorish/state";
 import { ViewState } from './components/VivScatterComponent';
-import { getImageSize } from '@hms-dbmi/viv';
 import { ScatterplotExLayer } from '../webgl/ImageArrayDeckExtension';
-import { ScatterDeckExtension } from '../webgl/ScatterDeckExtension';
+import { ScatterDeckExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -23,6 +22,7 @@ export function useFilteredIndices() {
     const filterColumn = config.background_filter?.column;
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
+    const [filteredOutIndices, setFilteredOutIndices] = useState(new Uint32Array());
     // todo useQuery could be better?
     useEffect(() => {
         // return
@@ -41,6 +41,9 @@ export function useFilteredIndices() {
                     try {
                         const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
                         setFilteredIndices(filteredIndices);
+                        // thinking about allowing gray-out of non-selected points... should be optional
+                        // const filteredOutIndices = indices.filter(i => col.data[i] !== filterIndex);
+                        // setFilteredOutIndices(filteredOutIndices);
                     } catch (e) {
                         console.error('error filtering indices', e);
                         return;
@@ -206,6 +209,7 @@ export function useScatterplotLayer() {
     const { point_shape } = config;
 
     const extensions = useMemo(() => {
+        if (point_shape === 'gaussian') return [new ScatterDensityExension()];
         if (point_shape === 'circle') return [];
         return [new ScatterDeckExtension()]
     }, []);
@@ -249,7 +253,7 @@ export function useScatterplotLayer() {
         onClick: ({index}) => {
             setHighlightedObjectIndex(index);
             //todo properly synchronise state with data store, allow deselection
-            chart.dataStore.dataHighlighted([data[index]]);
+            chart.dataStore.dataHighlighted([data[index]], chart);
         },
         transitions: {
             // this leads to weird behaviour when filter changes, looks ok when changing colorBy

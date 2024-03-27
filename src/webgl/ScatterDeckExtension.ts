@@ -26,3 +26,29 @@ export class ScatterDeckExtension extends LayerExtension {
         }
     }
 }
+
+export class ScatterDensityExension extends LayerExtension {
+    static get componentName(): string {
+        return 'ScatterDensityExension';
+    }
+    getShaders() {
+        return {
+            inject: {
+                'fs:#decl': `uniform float radiusScale; uniform float opacity;`,
+                'fs:#main-end': `
+                //---- ScatterDensityExension
+                const float e = 2.718281828459045;
+                // fragmentColor.a *= 1./pow(distToCenter, 0.75);
+                // fragmentColor.a *= 1./distToCenter;  //pow(e, )
+                float d = length(unitPosition);
+                // denom = 2*c^2 where c is the standard deviation - should be a uniform parameter
+                float _a = pow(e, -(d*d)/(0.05));
+                fragmentColor.rgb = vec3(1.);
+                fragmentColor.a = _a * opacity;
+                ////
+                
+                `,
+            }
+        }
+    }
+}
