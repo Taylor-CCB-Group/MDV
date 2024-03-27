@@ -311,9 +311,13 @@ export function positionChart(dataSource: DataSource, config: Config) {
     top = config.position[1];
   } 
   else {
-    const pos = findFreeSpace(dataSource)
-    left = pos.left;
-    top = pos.top;
+    try {
+      const pos = findFreeSpace(dataSource);
+      left = pos.left;
+      top = pos.top;
+    } catch (e) {
+      console.error(e);
+    }
   }
   //hack approx position of grid stack elements
 

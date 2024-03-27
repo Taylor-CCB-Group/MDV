@@ -58,10 +58,15 @@ class MLVPanel {
 		this.trackLabels={};
 		this.trackDialogs={};
 		for (let t_config of tracks){
-			let track=MLVTrack.getTrack(t_config);
-			this.tracks[track.config.track_id]=track;
-			this.track_order.push(track.config.track_id);
-			this._addTrackLabel(track.config)
+			try {
+				let track=MLVTrack.getTrack(t_config);
+				this.tracks[track.config.track_id]=track;
+				this.track_order.push(track.config.track_id);
+				this._addTrackLabel(track.config)
+			} catch (e) {
+				//todo show error message
+				console.error(e);
+			}
 		}
 		//check for linked scales
 		this._tracksChanged();
