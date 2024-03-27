@@ -45,6 +45,7 @@ import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { runInAction } from "mobx";
+import { addChartLink } from "../links/link_utils";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1869,42 +1870,11 @@ class ChartManager{
         switch(link.type){
             // some other types of link may be interpreted within chart code (e.g. react effect does "view_state")
             case "color_by_column":
-                const chart = this.charts[link.source_chart];
-                if (!chart){
-                    console.error(`broken link id:${link.id}`);
-                    return;
-                }
-                const ds = chart.dataSource.dataStore;
-                const srcCol = ds.columnIndex[link.column];
-                if (!srcCol) {
-                    console.log(`"color_by_column" link column "${link.column}" not found in dataStore "${ds.name}"`);
-                    // return;
-                }
-                
-                chart.chart.addListener(link.id, async (type, data) => {
-                    if (type === "cell_clicked") {
-                        // this is specific to HeatMap cells...
-                        for (let cid of link.target_charts) {
-                            this.getChart(cid).colorByColumn(data.row)
-                        }
-                    }
-                    if (type === "data_highlighted" && srcCol) {
-                        await this._getColumnsAsync(ds.name, [link.column]); //may not be necessary as `colorByColumn` is 'decorated' to load column
-                        const newValue = srcCol.values[srcCol.data[data.indexes[0]]];
-                        for (const cid of link.target_charts) {
-                            const chart = this.getChart(cid);
-                            chart.colorByColumn(newValue);
-                            if (link.set_title) chart.setTitle(newValue);
-                            if (link.set_tooltip) {
-                                if (chart.setToolTipColumn) chart.setToolTipColumn(link.column);
-                                else if (chart.config.tooltip) {
-                                    runInAction(()=>chart.config.tooltip.column = newValue);
-                                }
-                            }
-                        }
-                     }
-                });
-                break;
+                link.set_color = true;
+                console.warn('legacy color_by_column link type - use chart_columnval_link with set_color=true instead');
+            case "chart_columnval_link":
+                addChartLink(link, this);
+                break;       
         }
     }
 
@@ -1921,12 +1891,19 @@ class ChartManager{
             if (link.source_chart===cid){
                 linksToRemove.push(i);
             }
-            const index = link.target_charts.indexOf(cid)
-            if (index!==-1){
-                link.target_charts.splice(index,1);
-                if (link.target_charts.length===0){
-                    linksToRemove.push(i);
+            try {
+                // nb, for example viewState link doesn't have target_charts, it has linked_charts...
+                //pjt: slight hack, maybe ok, want to have some more typing on links
+                const targets = link.target_charts || link.linked_charts;
+                const index = targets.indexOf(cid);
+                if (index!==-1){
+                    targets.splice(index,1);
+                    if (targets.length===0){
+                        linksToRemove.push(i);
+                    }
                 }
+            } catch (error) {
+                console.error(`Error removing links for chart '${cid}'`, error, link);
             }
         }
         for (let i of linksToRemove){
@@ -1938,9 +1915,9 @@ class ChartManager{
         const link = this.viewData.links[linkIndex];
         switch(link.type){
             case "color_by_column":
+            case "chart_columnval_link":
                 const chart =  this.charts[link.source_chart].chart;
                 chart.removeListener(link.id)
-
         }
         this.viewData.links.splice(linkIndex,1)
     }
