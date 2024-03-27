@@ -38,13 +38,12 @@ export class ScatterDensityExension extends LayerExtension {
                 'fs:#main-end': `
                 //---- ScatterDensityExension
                 const float e = 2.718281828459045;
-                // fragmentColor.a *= 1./pow(distToCenter, 0.75);
-                // fragmentColor.a *= 1./distToCenter;  //pow(e, )
                 float d = length(unitPosition);
                 // denom = 2*c^2 where c is the standard deviation - should be a uniform parameter
-                float _a = pow(e, -(d*d)/(0.05));
-                fragmentColor.rgb = vec3(1.);
+                float _a = pow(e, -(d*d)/(0.02));
+                // fragmentColor.rgb = vec3(1.);
                 fragmentColor.a = _a * opacity;
+                //---- end ScatterDensityExension
                 ////
                 
                 `,

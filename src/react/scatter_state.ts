@@ -209,10 +209,10 @@ export function useScatterplotLayer() {
     const { point_shape } = config;
 
     const extensions = useMemo(() => {
-        if (point_shape === 'gaussian') return [new ScatterDensityExension()];
         if (point_shape === 'circle') return [];
+        if (point_shape === 'gaussian') return [new ScatterDensityExension()];
         return [new ScatterDeckExtension()]
-    }, []);
+    }, [point_shape]);
     const [currentLayerHasRendered, setCurrentLayerHasRendered] = useState(false);
     const scatterplotLayer = useMemo(() => {
         setCurrentLayerHasRendered(false);
@@ -262,7 +262,7 @@ export function useScatterplotLayer() {
             // },
         },
         extensions
-    })}, [id, data, opacity, radius, colorBy, cx, cy, highlightedObjectIndex, scale, modelMatrix]);
+    })}, [id, data, opacity, radius, colorBy, cx, cy, highlightedObjectIndex, scale, modelMatrix, extensions]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
         if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
         if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;

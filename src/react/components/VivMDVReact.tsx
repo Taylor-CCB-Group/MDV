@@ -184,6 +184,15 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 }
             },
             {
+                type: "dropdown",
+                label: "Shape",
+                current_value: c.point_shape,
+                values: [["circle", "square", "gaussian"]], //ugh
+                func: x => {
+                    c.point_shape = x;
+                }
+            },
+            {
                 type: "slider",
                 label: "radius",
                 current_value: c.radius || 10,
@@ -212,7 +221,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 func: x => {
                     c.zoom_on_filter = x;
                 }
-            }
+            },
             // no longer using PictureInPictureViewer - up for review as could be useful
             // {
             //     type: "check",

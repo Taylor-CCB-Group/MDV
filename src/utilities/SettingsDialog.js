@@ -210,10 +210,13 @@ class SettingsDialog extends BaseDialog{
             }
         }, wrapper);
         // createEl("br",{},d);
-        for (let item of s.values[0]){
+        for (let item of s.values[0]) {
+            // pass 1d array for simple list of strings, or [object[], text_field, value_field] for objects
+            const text = s.values.length > 1 ? item[s.values[1]] : item;
+            const value = s.values.length > 1 ? item[s.values[2]] : item;
             createEl("option",{
-                text:item[s.values[1]],
-                value:item[s.values[2]]
+                text,
+                value
             },dd)
         }
         dd.value=s.current_value;
