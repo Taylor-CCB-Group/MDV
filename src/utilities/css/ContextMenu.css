@@ -92,7 +92,7 @@
   position:absolute;
   border-radius:6px;
   padding:4px;
-  background:burlywood;
+  background:var(--background_color);
   z-index:5;
 
 }
