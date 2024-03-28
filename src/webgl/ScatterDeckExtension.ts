@@ -9,18 +9,39 @@ import { LayerExtension } from "deck.gl/typed";
  * May encorporate other rendering features in future, and the current implementation
  * is likely to change.
  */
-export class ScatterDeckExtension extends LayerExtension {
+export class ScatterSquareExtension extends LayerExtension {
     static get componentName(): string {
-        return 'ScatterDeckExtension';
+        return 'ScatterSquareExtension';
     }
     getShaders() {
         return {
             inject: {
+                'vs:#decl': `out float _lineWidthPixels;`,
                 'vs:#main-end': `
-                //---- ScatterDeckExtension
-                outerRadiusPixels = 0.;
+                //---- ScatterSquareExtension
+                // _outerRadiusPixels = outerRadiusPixels; // we might want this as an 'out', not used for now
+                outerRadiusPixels = 0.; // forces all fragments to be 'inCircle'
+                _lineWidthPixels = lineWidthPixels;
                 ////
                 
+                `,
+                'fs:#decl': `uniform float opacity;
+                in float _lineWidthPixels;
+                uniform float lineWidthScale;
+                `,
+                'fs:#main-end': `
+                //---- ScatterSquareExtension
+                // a bit wasteful to keep the original shader for circle rendering above
+                // we should arrange layers/extensions differently, but YOLO
+                if (stroked > 0.5) {
+                    vec2 uv = abs(unitPosition);
+                    float isLine = step(innerUnitRadius, max(uv.x, uv.y));
+                    if (_lineWidthPixels <= 0.01) isLine = 0.;
+                    fragmentColor = mix(vFillColor, vLineColor, isLine);
+                }
+                // make sure picking still works
+                DECKGL_FILTER_COLOR(fragmentColor, geometry);
+                //---- end ScatterSquareExtension
                 `,
             }
         }

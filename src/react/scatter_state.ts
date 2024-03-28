@@ -8,7 +8,7 @@ import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import { ViewState } from './components/VivScatterComponent';
 import { ScatterplotExLayer } from '../webgl/ImageArrayDeckExtension';
-import { ScatterDeckExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
+import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -199,7 +199,7 @@ export function useScatterplotLayer() {
         setViewState({
             target: [centerX, centerY, 0],
             zoom: zoom,
-            minZoom: -10,
+            // minZoom: -10,
             maxZoom,
             transitionDuration: 400, // Smooth transition
             transitionEasing: x => -(Math.cos(Math.PI * x) - 1) / 2, //https://easings.net/#easeInOutSine
@@ -211,7 +211,7 @@ export function useScatterplotLayer() {
     const extensions = useMemo(() => {
         if (point_shape === 'circle') return [];
         if (point_shape === 'gaussian') return [new ScatterDensityExension()];
-        return [new ScatterDeckExtension()]
+        return [new ScatterSquareExtension()]
     }, [point_shape]);
     const [currentLayerHasRendered, setCurrentLayerHasRendered] = useState(false);
     const scatterplotLayer = useMemo(() => {
@@ -244,10 +244,11 @@ export function useScatterplotLayer() {
         stroked: data.length < 1000, //todo make this configurable, and fix issue...
         // todo figure out why lineWidth 0 still shows up, particularly when zoomed out
         // can we make it have zero opacity? Seems like lineColor is rgb, not rgba...
-        // may need a layer extension to do this properly; may want that anyway for other reasons
+        // >>> may need a layer extension to do this properly; may want that anyway for other reasons <<<
         getLineWidth,
         //trying to set line color to same as fill, but it makes things very muddy when zoomed out
         //getLineColor: i => i === clickIndexRef.current ? [255, 255, 255] : colorBy ?? [200, 200, 200],
+        // lineColorBy...
         getLineColor: [255, 255, 255],
         // highlightedObjectIndex, // has some undesirable effects, but could be useful when better controlled
         onClick: ({index}) => {
