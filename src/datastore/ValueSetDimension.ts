@@ -30,29 +30,8 @@ class ValueSetDimension extends Dimension {
             });
             valueSet = newSet;
         }
-        const filter = parent.filterArray;
-        const localFilter = this.filterArray;
-        const len = this.parent.size;
-
-        for (let i=0; i<len; i++) {
-            // should be following similar logic to RangeDimension here... hopefully it's correct.
-            if (!valueSet.has(col.data[i])) {
-                if (localFilter[i] === 0) {
-                    if (++filter[i] === 1) {
-                        parent.filterSize--;
-                    }
-                }
-                localFilter[i] = 1;
-            } else {
-                if (localFilter[i] === 1) {
-                    if (--filter[i] === 0) {
-                        parent.filterSize++;
-                    }
-                }
-                localFilter[i] = 0;
-            }
-        }
-        this.parent._callListeners("filtered", this);
+        const predicate = i => valueSet.has(col.data[i]);
+        return this.filterPredicate({predicate}, columns);
     }
 }
 Dimension.types["valueset_dimension"] = ValueSetDimension;
