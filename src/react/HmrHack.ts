@@ -7,6 +7,8 @@ import xx from "./components/ColorChannelDialogReactWrapper";
 arr.push(xx);
 import wc from './components/WordCloudChart'
 arr.push(wc);
+import hfc from './components/HighlightedFeatureChart'
+arr.push(hfc);
 
 /**
  * Charts are registered with ChartManager by being added to a BaseChart.types object,

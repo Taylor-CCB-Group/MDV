@@ -9,6 +9,7 @@ import { useMetadata } from "./components/avivatorish/state";
 import { ViewState } from './components/VivScatterComponent';
 import { ScatterplotExLayer } from '../webgl/ImageArrayDeckExtension';
 import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
+import { useHighlightedIndex } from './selectionHooks';
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -107,10 +108,11 @@ export function useScatterplotLayer() {
     const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
     const hoverInfoRef = useRef<PickingInfo>(null);
-    const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
+    const highlightedIndex = useHighlightedIndex();
+    // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback((i: number) => {
-        return i === data[highlightedObjectIndex] ? 0.2*radius/scale : 0;
-    }, [radius, highlightedObjectIndex, data]);
+        return i === highlightedIndex ? 0.2*radius/scale : 0.0;
+    }, [radius, highlightedIndex, data]);
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
@@ -252,9 +254,13 @@ export function useScatterplotLayer() {
         getLineColor: [255, 255, 255],
         // highlightedObjectIndex, // has some undesirable effects, but could be useful when better controlled
         onClick: ({index}) => {
-            setHighlightedObjectIndex(index);
+            // setHighlightedObjectIndex(index);
             //todo properly synchronise state with data store, allow deselection
             chart.dataStore.dataHighlighted([data[index]], chart);
+            // timeout allowed us to highlight & redraw this chart before heavy blocking filter operations...
+            // but now we get highlight from useHighlightedIndex() we'd need more logic to short-circuit that.
+            // Really want to make the filtering async etc.
+            // setTimeout(()=> chart.dataStore.dataHighlighted([data[index]], chart), 5);
         },
         transitions: {
             // this leads to weird behaviour when filter changes, looks ok when changing colorBy
@@ -263,7 +269,7 @@ export function useScatterplotLayer() {
             // },
         },
         extensions
-    })}, [id, data, opacity, radius, colorBy, cx, cy, highlightedObjectIndex, scale, modelMatrix, extensions]);
+    })}, [id, data, opacity, radius, colorBy, cx, cy, highlightedIndex, scale, modelMatrix, extensions]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
         if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
         if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;
