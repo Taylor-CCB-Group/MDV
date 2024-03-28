@@ -65,6 +65,10 @@ class RowChart extends CategoryChart{
         const units = chartWidth/this.maxCount;
         const self = this;
         let  data = this.rowData;
+        if (!data) {
+            //seen this happen at least once when it shouldn't have, likely related to other data-loading issues
+            console.error(">>> No data for row chart - probably a bug, needs tracking...");
+        }
         let maxCount = this.maxCount;
   
         if (c.exclude_categories){
