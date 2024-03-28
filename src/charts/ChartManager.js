@@ -349,6 +349,8 @@ class ChartManager{
             this._getColumnsAsync(ods.name, [link.dest_column])
         ]).then(() => {
             ds.addListener(`${ds.name}-${ods.name}_valueset`, async (type, data) => {
+                // if the current view doesn't use the ods, don't bother filtering
+                if (!this.viewData.dataSources[ods.name]) return;
                 if (type === "filtered") {
                     //`data` may be a (Range)Dimension (which has a `filterArray` property),
                     //or 'undefined', or a string like "all_removed", or who knows what else...
