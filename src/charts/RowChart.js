@@ -127,8 +127,14 @@ class RowChart extends CategoryChart{
         .data(data,d=>d[1])
         .join("text")
         .on("click",(e,d)=>{
+            console.log(`${vals[d[1]]}: ${d[0]}`)
             self.filterCategories(vals[d[1]],e.shiftKey);
         })
+        .on("mouseover", (e, d) => {
+            console.log(`${vals[d[1]]}: ${d[0]}`)
+            self.showToolTip(e, `${vals[d[1]]}: ${d[0]}`);
+        })
+        .on("mouseout", () => self.hideToolTip())
         .attr("class","row-text")
         .transition(trans)
         .text((d)=>vals[d[1]]===""?"none":vals[d[1]])
@@ -138,7 +144,6 @@ class RowChart extends CategoryChart{
         .attr("y",(d,i)=>((i+1)*3)+(i*barHeight)+(barHeight/2))
         //.attr("text-anchor", "middle")
         .attr("dominant-baseline", "central") 
-
     }
 
     getSettings() {

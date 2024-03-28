@@ -419,6 +419,7 @@ class BaseChart{
     }
 
     showToolTip(e,msg){
+        if (!this._tooltip) this.addToolTip();
         this._tooltip.innerHTML=msg;
         this._tooltip.style.display= "inline-block";
         this._tooltip.style.left= (3+e.clientX)+"px";
@@ -426,6 +427,7 @@ class BaseChart{
     }
 
     hideToolTip(){
+        if (!this._tooltip) return;
         this._tooltip.style.display="none";
     }
 
