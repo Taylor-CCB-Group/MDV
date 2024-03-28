@@ -127,11 +127,10 @@ class RowChart extends CategoryChart{
         .data(data,d=>d[1])
         .join("text")
         .on("click",(e,d)=>{
-            console.log(`${vals[d[1]]}: ${d[0]}`)
             self.filterCategories(vals[d[1]],e.shiftKey);
         })
         .on("mouseover", (e, d) => {
-            console.log(`${vals[d[1]]}: ${d[0]}`)
+            if (!c.show_tooltip) return;
             self.showToolTip(e, `${vals[d[1]]}: ${d[0]}`);
         })
         .on("mouseout", () => self.hideToolTip())
@@ -193,6 +192,14 @@ class RowChart extends CategoryChart{
                 func: x => {
                     c.wordcloud = x;
                     this.drawChart();
+                }
+            },
+            {
+                type: "check",
+                label: "Show tooltip",
+                current_value: c.show_tooltip,
+                func: x => {
+                    c.show_tooltip = x;
                 }
             }
         ])
