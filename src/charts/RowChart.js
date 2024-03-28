@@ -104,6 +104,11 @@ class RowChart extends CategoryChart{
         .on("click",(e,d)=>{
             self.filterCategories(vals[d[1]],e.shiftKey);
         })
+        .on("mouseover", (e, d) => {
+            if (!c.show_tooltip) return;
+            self.showToolTip(e, `${vals[d[1]]}: ${d[0]}`);
+        })
+        .on("mouseout", () => self.hideToolTip())
         .transition(trans)
         .style("fill",(d)=>{
             const i = d[1];
