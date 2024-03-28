@@ -222,7 +222,7 @@ export function useScatterplotLayer() {
         data,
         opacity,
         radiusScale: radius,
-        getFillColor: colorBy ?? [0, 200, 200],
+        getFillColor: colorBy ?? [255, 255, 255],
         getRadius: 1/scale,
         getPosition: (i, { target }) => {
             target[0] = cx.data[i];
