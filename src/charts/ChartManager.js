@@ -2297,7 +2297,7 @@ class AddChartDialog extends BaseDialog{
         },this.columns[0]);
         this.chartDescription= createEl("textarea",{styles:{height:"100px"}},this.columns[0]);
       
-        createEl("div",{
+        this.columnsHeading = createEl("div",{
             text:"Columns",
             classes:["ciview-title-div"]
         },this.columns[1]);
@@ -2382,6 +2382,7 @@ class AddChartDialog extends BaseDialog{
         this.paramDiv.innerHTML="";
         const params = BaseChart.types[type].params;
         this.paramSelects=[];
+        this.columnsHeading.style.display = params?.length ? "" : "none";
         if (params){
             for (let p of params){
                 const d = createEl("div",{styles:{padding:"4px"}},this.paramDiv)
