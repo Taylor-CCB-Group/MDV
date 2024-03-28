@@ -5,7 +5,7 @@ import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
 import { StrictMode } from "react";
 import { createEl } from "../../utilities/ElementsTyped";
-import { Chart } from "../../charts/charts";
+import { Chart, DataSource } from "../../charts/charts";
 
 function Fallback() {
     return <>
@@ -44,6 +44,9 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  */
 export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     declare config: T & BaseConfig;
+    get dataSource(): DataSource {
+        return window.mdv.chartManager.charts[this.config.id].dataSource;
+    }
     useMobx = true;
     root: ReturnType<typeof createRoot>;
     reactEl: HTMLDivElement;
