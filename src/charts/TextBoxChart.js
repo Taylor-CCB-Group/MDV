@@ -15,7 +15,7 @@ class TextBoxChart extends BaseChart{
         //conditional import of function which uses the packages marked and sanitize
         //decreases size of entry module
         import('../utilities/MarkdownText').then(({ default:renderText })=>{
-            this.render= renderText;
+            this.render = renderText;
             this.para.innerHTML = this.render(c.text);
         })     
 	}
@@ -24,7 +24,7 @@ class TextBoxChart extends BaseChart{
         const settings = super.getSettings();
         const c= this.config;
         settings.push({
-            label:"Text",
+            label:"Markdown Text",
             type:"textbox",
             current_value:c.text,
             func: x => {
@@ -44,8 +44,9 @@ BaseChart.types["text_box_chart"]={
     params:[],
     extra_controls: ()=> [
         {
-            type:"textbox",
-            name:"text",
+            type: "textbox",
+            name: "text",
+            label: "Markdown Text:",
         }
     ],
     init:(config, dataSource, extraControls) => {
