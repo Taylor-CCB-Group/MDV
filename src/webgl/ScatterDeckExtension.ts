@@ -60,9 +60,13 @@ export class ScatterDensityExension extends LayerExtension {
                 //---- ScatterDensityExension
                 const float e = 2.718281828459045;
                 float d = length(unitPosition);
-                // denom = 2*c^2 where c is the standard deviation - should be a uniform parameter
-                float _a = pow(e, -(d*d)/(0.02));
-                // fragmentColor.rgb = vec3(1.);
+                // kernalSigma relates to dst in px in muspan, but denom uniform should be pre-computed
+                // kernel = np.exp(-( dst**2 / ( 2.0 * kernelSigma**2 ) ) )
+                // denom = 2*c^2 where c is the standard deviation / kernelSigma
+                // for muspan default kernelRadius=150, kernelSigma=50 => c = 1/3
+                // 2*(1/3)**2 => 0.222...
+                float _a = exp(-(d*d)/(0.222222222));
+                // should have an instance attribute for weight
                 fragmentColor.a = _a * opacity;
                 //---- end ScatterDensityExension
                 ////
