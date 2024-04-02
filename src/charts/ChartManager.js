@@ -610,6 +610,9 @@ class ChartManager{
         }
     }
 
+    /**
+     * Caution: doesn't return a 'DataSource', but a 'DataStore' (which is a property of a 'DataSource')
+     */
     getDataSource(name){
         return this.dsIndex[name].dataStore;
     }
