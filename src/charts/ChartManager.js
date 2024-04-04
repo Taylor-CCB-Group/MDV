@@ -10,6 +10,7 @@ import {csv,tsv,json} from "d3-fetch";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
+import FileUploadDialogReact from './dialogs/FileUploadDialog';
 
 //default charts 
 import "./HistogramChart.js";
@@ -260,6 +261,18 @@ class ChartManager{
 
         },this.rightMenuBar);
         themeButton.style.margin = "3px";
+
+        const uploadButton = createMenuIcon("fas fa-upload",{
+            tooltip:{
+                text:"Upload dataset",
+                position:"top-left"
+            },
+            func:(e)=>{
+                new FileUploadDialogReact().open();
+            }
+
+        },this.menuBar);
+        uploadButton.style.margin = "3px";
 
         this._setupThemeContextMenu();
       
