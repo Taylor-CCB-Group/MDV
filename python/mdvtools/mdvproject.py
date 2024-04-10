@@ -762,8 +762,10 @@ class MDVProject:
         page = open(template).read()
         #dummy popout page 
         copyfile(join(tdir,"popout.html"),join(outdir,"popout.html"))
-        #call init with no route, will be interpreted as static page (at /)
-        page = page.replace("_mdvInit('{{route}}')","_mdvInit()")
+        # make sure the static files are referenced correctly
+        page = page.replace('/static', 'static')
+        # call init with no route, will be interpreted as static page (at /)
+        page = page.replace("_mdvInit('{{route}}')","_mdvInit()") # not relevant for build-flask-vite build
         #correct config
         conf = self.state
         #can't edit static page
