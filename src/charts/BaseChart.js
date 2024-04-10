@@ -127,8 +127,12 @@ class BaseChart{
                 if (this.contentDiv !== document.fullscreenElement) console.error('unexpected fullscreen element');
                 const rect = this.contentDiv.getBoundingClientRect();
                 this.setSize(rect.width, rect.height);
+                if (this.settingsDialog) this.settingsDialog.setParent(this.contentDiv);
+                if (this.colorDialog) this.colorDialog.setParent(this.contentDiv);
             } else {
                 this.setSize(...oldSize);
+                if (this.settingsDialog) this.settingsDialog.setParent(null);
+                if (this.colorDialog) this.colorDialog.setParent(null);
             }
         });
         this.addMenuIcon("fas fa-expand","fullscreen", {
