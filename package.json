@@ -48,6 +48,7 @@
     "dotenv": "^16.0.3",
     "gl-matrix": "^3.4.3",
     "gridstack": "^7.1.1",
+    "h5wasm": "^0.7.2",
     "jquery": "^3.6.1",
     "lil-gui": "^0.18.1",
     "marked": "^4.2.4",
