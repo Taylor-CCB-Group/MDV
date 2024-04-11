@@ -103,17 +103,18 @@ const ChannelController = ({ index }: { index: number }) => {
     const colorString = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
     // not sure I want to be using material.ui... consider adding a widget abstration layer.
     // not jumping right in with using it for all layout etc because I don't want to be tied to it.
-    // consider adding tailwind soon...
+    // Starting to use tailwind here.
     return (
         <>
         <div
+        className="grid justify-start items-center p-1"
         style = {{
             // padding: '10px',
-            display: 'grid',
+            // display: 'grid',
             gridTemplateColumns: '0.4fr 0.1fr 0.1fr 1fr 0.1fr',
-            justifyItems: 'flex-start',
-            alignItems: 'center',
-            gap: '10px',
+            // justifyItems: 'flex-start',
+            // alignItems: 'center',
+            // gap: '10px',
         }}
         >
             <ChannelChooser index={index} />
