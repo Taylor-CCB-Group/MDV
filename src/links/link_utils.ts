@@ -1,6 +1,7 @@
 import { runInAction } from "mobx";
 import ChartManager from "../charts/ChartManager";
 import { ColumnName } from "../charts/charts";
+// zod?
 
 type ChartLink = {
     type: "chart_columnval_link",
@@ -15,6 +16,71 @@ type ChartLink = {
     /** if true, the parm at given parm_index will be set...*/
     set_param: boolean,
     param_index?: number,
+}
+
+type LinkTarget = {
+    target_chart: string,
+    //maybe we might want to allow for a different column in the source chart to be used to set the target chart's properties...
+    //not for now though...
+    // source_column: string,
+    set_color: boolean,
+    set_title: boolean,
+    set_tooltip: boolean,
+    set_legend: boolean,
+    set_param: boolean,
+    param_index?: number,
+}
+
+type HighlightColumnLink = {
+    type: "highlight_column_link",
+    id: string,
+    source_ds: string,
+    source_column: ColumnName,
+    targets: LinkTarget[],
+}
+
+export function addHighlightColumnLink(link: HighlightColumnLink, cm: ChartManager) {
+    /// this implementation filled in by copilot & not yet read / used...
+    const ds = cm.getDataSource(link.source_ds);
+    if (!ds) {
+        console.error(`DataStore ${link.source_ds} not found`);
+        return;
+    }
+    const srcCol = ds.columnIndex[link.source_column];
+    if (!srcCol) {
+        console.error(`Column ${link.source_column} not found in DataStore ${link.source_ds}`);
+        return;
+    }
+
+    async function updateValue(newValue: string) {
+        for (const target of link.targets) {
+            const targetChart = cm.getChart(target.target_chart);
+            if (!targetChart) {
+                console.error(`Chart ${target.target_chart} not found`);
+                continue;
+            }
+            if (target.set_color) targetChart.colorByColumn(newValue);
+            if (target.set_title) targetChart.setTitle(newValue);
+            if (target.set_tooltip) {
+                if (targetChart.setToolTipColumn) targetChart.setToolTipColumn(newValue);
+                else if (targetChart.config.tooltip) {
+                    runInAction(() => targetChart.config.tooltip.column = newValue);
+                }
+            }
+            if (target.set_param) {
+                runInAction(() => {
+                    targetChart.config.param[target.param_index] = newValue;
+                });
+            }
+        }
+    }
+
+    ds.addListener(link.id, async (type, data) => {
+        if (type === "data_highlighted") {
+            const newValue = srcCol.values[srcCol.data[data.indexes[0]]];
+            updateValue(newValue);
+        }
+    });
 }
 
 /**
