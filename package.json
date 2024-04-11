@@ -75,7 +75,7 @@
     "tailwindcss": "^3.4.3",
     "ts-loader": "^9.5.1",
     "typescript": "^5.3.3",
-    "vite": "^5.1.1",
+    "vite": "^5.2.8",
     "webpack": "^5.74.0",
     "webpack-bundle-analyzer": "^4.7.0",
     "webpack-cli": "^4.10.0",
