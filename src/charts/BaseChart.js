@@ -592,7 +592,7 @@ class BaseChart{
    
     _openSettingsDialog(e){
         if (!this.settingsDialog){
-          this.settingsDialog=  new SettingsDialog({
+          this.settingsDialog = new SettingsDialog({
                 maxHeight:400,
                 doc:this.__doc__ || document,
                 width:300,
@@ -600,11 +600,12 @@ class BaseChart{
                 position:[e.pageX,e.pageY],
                 useMobx: this.useMobx,
                 onclose:()=>this.settingsDialog=null
-
             },this.getSettings());
-
         }
-      
+        //experimenting with making the parent always be contentDiv (not only in fullscreen mode)
+        //doesn't work ATM because of stacking context - may want to review that more generally 
+        //(can be annoying with tooltips...)
+        //this.settingsDialog.setParent(this.contentDiv);
     }
 
   
