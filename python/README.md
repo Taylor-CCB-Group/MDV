@@ -33,9 +33,11 @@ To make an empty project, just create an MDVProject object specifying a path. Da
 
 ```python
 from mdvtools.mdvproject import MDVProject
-p=MDVProject("/path/to/myproject")
+
+p = MDVProject("/path/to/myproject")
 df = pd.read_csv("cells.tsv", sep="\t")
-p.add_datasource("cells", df)  #or p.add_datasource("cells", "cells.tsv")
+p.add_datasource("cells", df)  # or p.add_datasource("cells", "cells.tsv")
+
 ```
 
 Initially an empty default view is created. The easiest way to add content is interactively through the browser. To do this, make the project editable and then serve it:-
