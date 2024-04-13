@@ -180,16 +180,17 @@ def create_app(
     @project_bp.route("/get_row_data", methods=["POST"])
     def get_row_data():
         req = request.json
-        try:
-            with open(
-                safe_join(
-                    project.dir, "rowdata", req["datasource"], f"{req['index']}.json"
-                )
-            ) as f:  # type: ignore
-                data = f.read()
-        except Exception:
-            data = json.dumps({"data": None})
-        return data
+        if req is None:
+            return json.dumps({"data": None})
+        path = safe_join(
+            project.dir, "rowdata", req["datasource"], f"{req['index']}.json"
+        )
+        if path is None or not os.path.exists(path):
+            return json.dumps({"data": None})
+        with open(
+            path
+        ) as f:  # type: ignore
+            return f.read()
 
     # get arbitrary data
     @project_bp.route("/get_binary_data", methods=["POST"])
