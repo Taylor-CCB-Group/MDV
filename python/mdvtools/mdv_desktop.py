@@ -32,7 +32,7 @@ if os.path.exists(config_file):
         print(f"adding project '{d}' from config file")
         try:
             projects.append(MDVProject(d))
-        except:
+        except Exception:
             print(f"error adding project '{d}' from config file")
 else:
     with open(config_file, "w") as f:
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     for p in projects:
         try:
             p.serve(open_browser=False, app=app)
-        except:
+        except Exception:
             print(f"error serving {p.name}...")
 
     @app.route("/")

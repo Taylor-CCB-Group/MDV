@@ -7,7 +7,7 @@ Expecting to develop into something with a very different API quite soon - this 
 import copy
 import random
 import string
-
+from typing import Literal
 
 selection_chart_proto = {
     "filters": {"sampleID": {"category": ["21455"], "operand": None}},
@@ -245,8 +245,6 @@ chart_prototypes = {
     "violin": violin_proto,
     "multi_line": multi_line_proto,
 }
-
-from typing import Literal
 
 # for hinting, may not maintain this, probably use a different general approach later (more class-based etc)
 ChartKeys = Literal[

@@ -41,6 +41,7 @@ def setup_views():
     # this may not be the most efficient method, but we something in a familiar (and typed) format, so that's nice
     cell_df = p.get_datasource_as_dataframe("cells")
     # the rest is left as an exercise for the reader for now...
+    print(cell_df)
 
 
 p.serve(port=5052)  # port conflict locally as of writing...

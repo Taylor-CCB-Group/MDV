@@ -222,7 +222,6 @@ def create_regulamentary_project(
             "color_by": "RE",
             "color_legend": {"display": False, "pos": [5, 5]},
             "feature_label": "RE",
-            "view_margins": {"type": "fixed_length", "value": 4000},
         },
     }
     p.add_genome_browser(

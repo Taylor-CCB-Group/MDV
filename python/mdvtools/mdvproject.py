@@ -265,7 +265,7 @@ class MDVProject:
             mode = "a"
         try:
             return h5py.File(self.h5file, mode)
-        except:
+        except Exception:
             # certain environments seem to have issues with the handle not being closed instantly
             # if there is a better way to do this, please change it
             # if there are multiple processes trying to access the file, this may also help
@@ -333,7 +333,7 @@ class MDVProject:
             raw_data (list|array): Anything that can be converted into a pandas Series
             The data should be in the correct order
         """
-        if type(column) == str:
+        if isinstance(column, str):
             column = {"name": column}
         if not column.get("field"):
             column["field"] = column["name"]
@@ -397,7 +397,7 @@ class MDVProject:
             missing_value(str,optional): The value to put if the index value is missing in the input data.
                 Default is 'ND'
         """
-        if type(data) == str:
+        if isinstance(data, str):
             data = pandas.read_csv(data, sep=separator)
         ds = self.get_datasource_metadata(datasource)
         index_col = data.columns[0]
@@ -491,7 +491,7 @@ class MDVProject:
         """
         try:
             check_htslib()  # will raise an error if htslib is not installed
-        except:
+        except Exception:
             raise Exception(
                 "htslib not installed. This is not supported on Windows, other platforms will need to install e.g. via brew install htslib"
             )
@@ -626,14 +626,14 @@ class MDVProject:
             separator (str, optional): If a path to text file is supplied, then this should be the file's delimiter.
                 Defaults to a tab.
         """
-        if type(dataframe) == str:
+        if isinstance(dataframe, str):
             dataframe = pandas.read_csv(dataframe, sep=separator)
         # get the columns to add
         columns = get_column_info(columns, dataframe, supplied_columns_only)
         # does the datasource exist
         try:
             ds = self.get_datasource_metadata(name)
-        except:
+        except Exception:
             ds = None
         if ds:
             # delete the datasource
@@ -744,12 +744,12 @@ class MDVProject:
             )
             gr.create_dataset("p", (len(data.indptr),), data=data.indptr)
         else:
-            l = data.shape[0]
+            length = data.shape[0]
             total_len = data.shape[0] * data.shape[1]
             gr.create_dataset(
                 "x", (total_len,), data=data.flatten("F"), dtype=numpy.float32
             )
-            gr["length"] = [l]
+            gr["length"] = [length]
         ds = self.get_datasource_metadata(row_ds)
         ds["links"][col_ds]["rows_as_columns"]["subgroups"][stub] = {
             "name": name,
@@ -766,7 +766,7 @@ class MDVProject:
         if lnks:
             for lnkto in lnks:
                 lnk = lnks[lnkto]
-                if filter == None or lnk.get(filter):
+                if filter is None or lnk.get(filter):
                     links.append({"datasource": lnkto, "link": lnk})
         return links
 
@@ -831,7 +831,7 @@ class MDVProject:
                 # print("no images for", name)
                 continue
             image_metadata = ds["images"]
-            dsdir = join(outdir, "images", ds["name"])
+            dsdir = join(outdir, "images", name)
             if not os.path.exists(dsdir):
                 os.makedirs(dsdir)
             for image_set_name in image_metadata:
@@ -876,7 +876,7 @@ class MDVProject:
             folder (str): The path to the folder containing the images.
         """
         ds = self.get_datasource_metadata(datasource)
-        col = self.get_column_metadata(datasource, column)
+        # col = self.get_column_metadata(datasource, column)
 
         images = [x for x in os.listdir(folder) if x.endswith(type)]
         # create the image folder
@@ -1113,8 +1113,8 @@ class MDVProject:
     def add_viv_images(self, datasource, data, link_images=True):
         md = self.get_datasource_metadata(datasource)
         try:
-            a = md["regions"]["avivator"]
-        except:
+            md["regions"]["avivator"]
+        except Exception:
             raise AttributeError(
                 "Adding viv images when viv viewer has not been specified"
             )
@@ -1244,7 +1244,7 @@ def add_column_to_group(col: dict, data: pandas.Series, group: h5py.Group, lengt
         for v in data:
             try:
                 vs = v.split(delim)
-            except:
+            except Exception:
                 continue
             values.update([x.strip() for x in vs])
             maxv = max(maxv, len(vs))
@@ -1264,7 +1264,7 @@ def add_column_to_group(col: dict, data: pandas.Series, group: h5py.Group, lengt
                     continue
                 vs = v.split(delim)
                 vs = [x.strip() for x in vs]
-            except:
+            except Exception:
                 continue
             vs.sort()
             for n in range(0, len(vs)):
@@ -1316,7 +1316,7 @@ def get_column_info(columns, dataframe, supplied_columns_only):
 def check_htslib():
     try:
         subprocess.run(["tabix", "--version"])
-    except:
+    except Exception:
         raise AttributeError(
             "htslib not found, needed for preparing genome browser data"
         )

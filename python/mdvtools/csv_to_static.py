@@ -43,7 +43,7 @@ has_images = os.path.exists(os.path.join(indir, "images"))
 if has_images and not os.path.exists(os.path.join(outdir, "images")):
     try:
         shutil.copytree(os.path.join(indir, "images"), os.path.join(outdir, "images"))
-    except:
+    except Exception:
         pass
 
 print("reading csv...")

@@ -160,7 +160,7 @@ def create_app(
     def images(path):
         try:
             return _send_file(project.get_image(path))
-        except:
+        except Exception:
             return _send_file(safe_join(project.imagefolder, path))
 
     # All the project's metadata
