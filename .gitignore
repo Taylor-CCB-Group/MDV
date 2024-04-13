@@ -24,7 +24,6 @@ python/mdvtools/static/*
 python/mdvtools/template/page.html
 .ipynb_checkpoints
 
-python/requirements.txt
 python/dist/
 docs/jsdocs/build/
 docs/maindocs/_build/

@@ -3,6 +3,8 @@
 
 ## Installation
 
+### Make virtual environment
+
 It is recommended, but not essential to create a virtual environment so there are no conflicts with modules in the global python.
 
 To create and activate an environment in linux:-
@@ -16,13 +18,30 @@ python -m venv c:\path\to\myenv
 c:\path\to\myenv\Scripts\activate.bat
 ```
 
-Installing mdv (with -e if for development) will include dependencies:
+### Install poetry
+
+Install poetry if it is not already installed. This can be done with the official installer:
+
+```
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+Or with pipx:
+```
+pip install pipx
+pipx install poetry
+```
+
+See the [poetry installation instructions](https://python-poetry.org/docs/#installing-with-pipx) for more details and troubleshooting.
+
+### Install MDV
+
+To install MDV, run:
 
 ```
 cd MDV/python
-pip install -e .
+poetry install --with dev
 ```
-
 
 ## Quick Start
 
