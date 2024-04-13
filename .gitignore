@@ -31,3 +31,5 @@ docs/maindocs/autoapi/
 
 venv/
 data/
+
+.idea
