@@ -159,6 +159,24 @@ https://myserver.com/path/to/myapp
 * clone the repository
 * npm install
 
+### Git blame without formatting commits
+
+The `.git-blame-ignore-revs` file is used to ignore commits when running `git blame`. This is useful for ignoring formatting commits when trying to find the original author of a line of code. To use it, run:
+
+```bash
+git config -e
+```
+
+And add the following lines:
+
+```toml
+[blame]
+	ignoreRevsFile = ".git-blame-ignore-revs"
+	markIgnoredLines = true
+```
+
+Mark ignored lines will prepend a `?` to the blame commit hashes for indirectly blamed lines.
+
 ### note - this documentation is somewhat deprecated - [for dev-branch](#dev-branch)
 
 You can run a project in development mode, which allows you do debug the JavaScript code and make changes, which will be reflected in the browser.
