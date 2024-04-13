@@ -13,10 +13,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-[project.urls]
-"Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
-"Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
-
 
 [tool.poetry.dependencies]
 python = "^3.12,<3.13"
@@ -42,7 +38,6 @@ mudata = "^0.2.3"
 natsort = "^8.3.1"
 networkx = "^3.1"
 numpy = "^1.26.4"
-ome-types = "^0.5.0"
 packaging = "^23.2"
 pandas = "^2.1.1"
 patsy = "^0.5.3"
@@ -64,6 +59,18 @@ tqdm = "^4.65.0"
 tzdata = "^2023.3"
 umap-learn = "^0.5.3"
 Werkzeug = "^2.2.3"
+
+
+[tool.poetry.group.dev.dependencies]
+pyright = "^1.1.358"
+pytest = "^8.1.1"
+ruff = "^0.3.7"
+ome-types = "^0.5.0"
+
+
+[project.urls]
+"Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
+"Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
 
 
 [build-system]
