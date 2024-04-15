@@ -131,7 +131,12 @@ def create_app(
 
     @project_bp.route("/<file>.json")
     def get_json_file(file: str):
-        return send_file(safe_join(project.dir, file + ".json"))  # type: ignore - project.dir is a str, but pylance thinks it could be None
+        if project.dir is None:
+            return "Project directory not found", 404
+        path = safe_join(project.dir, file + ".json")
+        if path is None or not os.path.exists(path):
+            return "File not found", 404
+        return send_file(path)
 
     # empty page to put popout content
     @project_bp.route("/popout.html")
@@ -187,9 +192,9 @@ def create_app(
         )
         if path is None or not os.path.exists(path):
             return json.dumps({"data": None})
-        with open(
-            path
-        ) as f:  # type: ignore
+        with open(path) as f:
+            if f is None:
+                return json.dumps({"data": None})
             return f.read()
 
     # get arbitrary data

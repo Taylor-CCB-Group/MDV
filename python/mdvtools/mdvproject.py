@@ -257,7 +257,7 @@ class MDVProject:
         image_meta = ds_metadata["images"][p[1]]
         return join(image_meta["original_folder"], filename)
 
-    def _get_h5_handle(self, read_only=False, attempt=0):
+    def _get_h5_handle(self, read_only=False, attempt=0) -> h5py.File:
         mode = "r"
         if not exists(self.h5file):
             mode = "w"
@@ -278,7 +278,11 @@ class MDVProject:
     def get_column(self, datasource: str, column, raw=False):
         cm = self.get_column_metadata(datasource, column)
         h5 = self._get_h5_handle()
-        raw_data = numpy.array(h5[datasource][column])  # type: ignore
+        gr = h5[datasource]
+        if not isinstance(gr, h5py.Group):
+            h5.close()
+            raise AttributeError(f"cannot open datasource '{datasource}' in h5 file")
+        raw_data = numpy.array(gr[column])
         if raw:
             return raw_data
         dt = cm["datatype"]
