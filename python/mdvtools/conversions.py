@@ -193,8 +193,10 @@ def create_regulamentary_project(
         # trying to avoid unbound variables - but not convinced this is correct
         # what is supposed to happen if bigwig_folder is not a URL?
         # >> need tests for this function... <<
-        beds = bigwigs = ['' for _ in all_names]
-        print("bigwig_folder is not a URL - using empty URLs for tracks, may well be wrong.")
+        beds = bigwigs = ["" for _ in all_names]
+        print(
+            "bigwig_folder is not a URL - using empty URLs for tracks, may well be wrong."
+        )
         pass
     # get the reference
 

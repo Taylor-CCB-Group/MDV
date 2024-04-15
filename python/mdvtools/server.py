@@ -206,7 +206,9 @@ def create_app(
                 return "Request must contain JSON with 'datasource' and 'name'", 400
             if project.dir is None or not os.path.exists(project.dir):
                 return "Project directory not found", 404
-            path = safe_join(project.dir, "binarydata", req["datasource"], f"{req['name']}.gz")
+            path = safe_join(
+                project.dir, "binarydata", req["datasource"], f"{req['name']}.gz"
+            )
             if path is None or not os.path.exists(path):
                 return "Binary data not found", 404
             with open(path, "rb") as f:

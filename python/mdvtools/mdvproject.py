@@ -413,7 +413,7 @@ class MDVProject:
                 f"index column {index_col} not found in {datasource} datasource"
             )
         # py-right: dictionary key must be hashable
-        newdf = pandas.DataFrame({index_col: self.get_column(datasource, index_col)}) # type: ignore
+        newdf = pandas.DataFrame({index_col: self.get_column(datasource, index_col)})  # type: ignore
         h5 = self._get_h5_handle()
         gr = h5[datasource]
         assert isinstance(gr, h5py.Group)
@@ -1202,7 +1202,9 @@ def get_subgroup_bytes(grp, index, sparse=False):
         return numpy.array(grp["x"][offset : offset + _len], numpy.float32).tobytes()
 
 
-def add_column_to_group(col: dict, data: pandas.Series | pandas.DataFrame, group: h5py.Group, length: int):
+def add_column_to_group(
+    col: dict, data: pandas.Series | pandas.DataFrame, group: h5py.Group, length: int
+):
     """
     col (dict): The column metadata (may be modified e.g. to add values)
     data (pandas.Series): The data to add
@@ -1230,7 +1232,10 @@ def add_column_to_group(col: dict, data: pandas.Series | pandas.DataFrame, group
                 col["values"] = [x for x in values.index if values[x] != 0]
             vdict = {k: v for v, k in enumerate(col["values"])}
             group.create_dataset(
-                col["field"], length, dtype=dtype, data=data.map(vdict) # type: ignore
+                col["field"],
+                length,
+                dtype=dtype,
+                data=data.map(vdict),  # type: ignore
             )
             # convert to string
             col["values"] = [str(x) for x in col["values"]]
