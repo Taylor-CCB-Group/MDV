@@ -58,7 +58,7 @@ threadpoolctl = "^3.1.0"
 tqdm = "^4.65.0"
 tzdata = "^2023.3"
 umap-learn = "^0.5.3"
-Werkzeug = "^2.2.3"
+Werkzeug = "^3.0.2"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -67,6 +67,12 @@ pytest = "^8.1.1"
 ruff = "^0.3.7"
 ome-types = "^0.5.0"
 
+
+
+[tool.poetry.group.docs.dependencies]
+sphinx-rtd-theme = "^2.0.0"
+sphinx = "^7.2.6"
+sphinx-autoapi = "^3.0.0"
 
 [project.urls]
 "Homepage" = "https://github.com/Taylor-CCB-Group/MDV"

@@ -14,10 +14,11 @@
 #
 import os
 import sys
-import sphinx_rtd_theme # type: ignore
+## todo resolve dependency issues with sphinx in general
+# import sphinx_rtd_theme
 sys.path.insert(0, os.path.abspath('../'))
 
-
+# print(f'sphinx_rtd_theme: {sphinx_rtd_theme.__file__}')
 # -- Project information -----------------------------------------------------
 
 project = 'MDV'
