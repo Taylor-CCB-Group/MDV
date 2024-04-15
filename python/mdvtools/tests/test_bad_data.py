@@ -21,8 +21,10 @@ def test_bad_data():
     in this example we catch that and as of now, end up with a datasource with 0 columns.
     """
 
-    project_folder = os.path.expanduser("~/mdv/bad_data")
-    p = MDVProject(project_folder, delete_existing=True)
+    path = os.path.join(os.path.dirname(__file__), "temp", "test_bad_data")
+    if not os.path.exists(path):
+        os.makedirs(path)
+    p = MDVProject(path, delete_existing=True)
     df_good = pd.DataFrame({"a": [42]})
     df_mixed = pd.DataFrame({"a": [42, float("nan"), float("inf")]})
     # when explicitly setting a numeric column which we want to interpret as 'text' (so it can be a category, e.g. clusterID)
