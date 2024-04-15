@@ -1,9 +1,0 @@
-<component name="InspectionProjectProfileManager">
-  <profile version="1.0">
-    <option name="myName" value="Project Default" />
-    <inspection_tool class="UnnecessaryLocalVariableJS" enabled="true" level="WEAK WARNING" enabled_by_default="true" editorAttributes="INFO_ATTRIBUTES">
-      <option name="m_ignoreImmediatelyReturnedVariables" value="true" />
-      <option name="m_ignoreAnnotatedVariables" value="false" />
-    </inspection_tool>
-  </profile>
-</component>
