@@ -197,12 +197,14 @@ def create_app(
     def get_binary_data():
         req = request.json
         try:
-            with open(
-                safe_join(
-                    project.dir, "binarydata", req["datasource"], f"{req['name']}.gz"
-                ),
-                "rb",
-            ) as f:  # type: ignore
+            if req is None or "datasource" not in req or "name" not in req:
+                return "Request must contain JSON with 'datasource' and 'name'", 400
+            if project.dir is None or not os.path.exists(project.dir):
+                return "Project directory not found", 404
+            path = safe_join(project.dir, "binarydata", req["datasource"], f"{req['name']}.gz")
+            if path is None or not os.path.exists(path):
+                return "Binary data not found", 404
+            with open(path, "rb") as f:
                 data = f.read()
         except Exception:
             # data='' # satisfy type checker - was None, haven't tested if this is better or worse.
