@@ -2,7 +2,7 @@ import React, { useState, useCallback, useReducer, type PropsWithChildren } from
 import styled from "styled-components";
 import { useDropzone } from "react-dropzone";
 
-// Styled components (styles not currently changing with HMR)
+// Styled components (migrating to Tailwind CSS)
 // const Container = styled.div`
 //   display: flex;
 //   flex-direction: column;
@@ -13,13 +13,9 @@ import { useDropzone } from "react-dropzone";
 const Container = ({children}: PropsWithChildren) =>{
   return (
     <div 
-    style={{display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '10px'}}
-    // need to pull in my changes with tailwind
-    // className="flex flex-col justify-center justify-items-center p-10"
+    className="flex flex-col content-center items-center p-10"
     >
       {children}
-      <h1>Hello</h1>
-      <p>Is it me you're looking for?</p>
     </div>
   )
 }
@@ -77,7 +73,7 @@ const DropzoneContainer = styled.div<{ isDragOver: boolean }>`
   border: 2px dashed gray;
   padding: 10px;
   text-align: center;
-  background-color: ${(props) => (props.isDragOver ? "lightgray" : "white")};
+  /*todo: fix... background-color: ${(props) => (props.isDragOver ? "lightgray" : "white")};*/
   min-width: 90%;
   min-height: 90%;
   max-height: 90%;
@@ -446,8 +442,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
-          <Button onClick={handleUploadClick} disabled={!state.selectedFiles.length || state.isUploading} marginTop="20px">
-            {"Upload File"} ({(!state.selectedFiles.length || state.isUploading) ? "not disabled" : "disabled"})
+          <Button onClick={handleUploadClick} 
+          disabled={(state.selectedFiles.length===0 || state.isUploading)} 
+          marginTop="20px"
+          >
+            {"Upload File"}
           </Button>
         </>
       )}
