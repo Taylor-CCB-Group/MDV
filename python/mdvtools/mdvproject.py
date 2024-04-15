@@ -383,8 +383,8 @@ class MDVProject:
 
     def add_annotations(
         self,
-        datasource,
-        data,
+        datasource: str,
+        data: pandas.DataFrame | str,
         separator="\t",
         missing_value="ND",
         columns=[],
@@ -412,13 +412,15 @@ class MDVProject:
             raise AttributeError(
                 f"index column {index_col} not found in {datasource} datasource"
             )
-        newdf = pandas.DataFrame({index_col: self.get_column(datasource, index_col)})
+        # py-right: dictionary key must be hashable
+        newdf = pandas.DataFrame({index_col: self.get_column(datasource, index_col)}) # type: ignore
         h5 = self._get_h5_handle()
         gr = h5[datasource]
         assert isinstance(gr, h5py.Group)
         for c in columns:
             d = {k: v for k, v in zip(data.index, data[c["field"]])}
             # v slow - needs improving
+            # py-right: `Argument of type "Series | Unknown | DataFrame" cannot be assigned to parameter "data" of type "Series"`
             ncol = newdf.apply(lambda row: d.get(row[0], missing_value), axis=1)
             add_column_to_group(c, ncol, gr, len(ncol))
             ds["columns"].append(c)
@@ -600,7 +602,7 @@ class MDVProject:
     def add_datasource(
         self,
         name: str,
-        dataframe,
+        dataframe: pandas.DataFrame | str,
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
@@ -1200,7 +1202,7 @@ def get_subgroup_bytes(grp, index, sparse=False):
         return numpy.array(grp["x"][offset : offset + _len], numpy.float32).tobytes()
 
 
-def add_column_to_group(col: dict, data: pandas.Series, group: h5py.Group, length: int):
+def add_column_to_group(col: dict, data: pandas.Series | pandas.DataFrame, group: h5py.Group, length: int):
     """
     col (dict): The column metadata (may be modified e.g. to add values)
     data (pandas.Series): The data to add
@@ -1228,7 +1230,7 @@ def add_column_to_group(col: dict, data: pandas.Series, group: h5py.Group, lengt
                 col["values"] = [x for x in values.index if values[x] != 0]
             vdict = {k: v for v, k in enumerate(col["values"])}
             group.create_dataset(
-                col["field"], length, dtype=dtype, data=data.map(vdict)
+                col["field"], length, dtype=dtype, data=data.map(vdict) # type: ignore
             )
             # convert to string
             col["values"] = [str(x) for x in col["values"]]
@@ -1241,30 +1243,29 @@ def add_column_to_group(col: dict, data: pandas.Series, group: h5py.Group, lengt
             group.create_dataset(col["field"], length, data=data, dtype=utf8_type)
     elif col["datatype"] == "multitext":
         delim = col.get("delimiter", ",")
-        values = set()
+        value_set: set[str] = set()
         maxv = 0
         # first parse - get all possible values and max number
         # of values in a single field
         for v in data:
-            try:
-                vs = v.split(delim)
-            except Exception:
+            if not isinstance(v, str):
                 continue
-            values.update([x.strip() for x in vs])
+            vs = v.split(delim)
+            value_set.update([x.strip() for x in vs])
             maxv = max(maxv, len(vs))
 
-        if "" in values:
-            values.remove("")
-        ndata = numpy.empty(shape=(length * maxv,))
+        if "" in value_set:
+            value_set.remove("")
+        ndata = numpy.empty(shape=(length * maxv,), dtype=numpy.uint16)
         ndata.fill(65535)
-        values = list(values)
+        values = list(value_set)
         # dict more efficient than index list
         vmap = {k: v for v, k in enumerate(values)}
         for i in range(0, length):
             b = i * maxv
             try:
                 v = data[i]  # may raise KeyError if data is None at this index
-                if v == "":
+                if v == "" or not isinstance(v, str):
                     continue
                 vs = v.split(delim)
                 vs = [x.strip() for x in vs]

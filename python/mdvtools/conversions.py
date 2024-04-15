@@ -166,8 +166,8 @@ def convert_vcf_to_mdv(folder: str, vcf_filename: str) -> MDVProject:
 
 def create_regulamentary_project(
     folder,
-    output,
-    name,
+    output: str,
+    name: str,
     bigwig_folder="",
     bed_folder="",
     openchrome="DNase",
@@ -190,6 +190,11 @@ def create_regulamentary_project(
         bigwigs = [f"{bigwig_folder}/{name}_{x}_{genome}.bw" for x in all_names]
         beds = [f"{bed_folder}/{name}_{x}_{genome}.bb" for x in all_names]
     else:
+        # trying to avoid unbound variables - but not convinced this is correct
+        # what is supposed to happen if bigwig_folder is not a URL?
+        # >> need tests for this function... <<
+        beds = bigwigs = ['' for _ in all_names]
+        print("bigwig_folder is not a URL - using empty URLs for tracks, may well be wrong.")
         pass
     # get the reference
 
