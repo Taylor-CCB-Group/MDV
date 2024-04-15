@@ -33,3 +33,4 @@ venv/
 data/
 
 .idea
+xvenv/
