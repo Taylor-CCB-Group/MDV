@@ -9,6 +9,8 @@ import wc from './components/WordCloudChart'
 arr.push(wc);
 import hfc from './components/HighlightedFeatureChart'
 arr.push(hfc);
+import upload from '../charts/dialogs/FileUploadDialogWrapper';
+arr.push(upload);
 
 /**
  * Charts are registered with ChartManager by being added to a BaseChart.types object,

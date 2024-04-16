@@ -1,3 +1,4 @@
+import "../tailwind.css";
 import "microtip/microtip.min.css";
 import 'nouislider/dist/nouislider.min.css'
 import "../utilities/css/ContextMenu.css";

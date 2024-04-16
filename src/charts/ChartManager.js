@@ -10,7 +10,8 @@ import {csv,tsv,json} from "d3-fetch";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
-import FileUploadDialogReact from './dialogs/FileUploadDialog';
+// this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
+//import FileUploadDialogReact from './dialogs/FileUploadDialogWrapper';
 
 //default charts 
 import "./HistogramChart.js";
@@ -269,9 +270,11 @@ class ChartManager{
                     position:"top-left"
                 },
                 func:(e)=>{
-                    new FileUploadDialogReact().open();
-                }
-    
+                    //new FileUploadDialogReact().open();
+                    //this allows HMR to work, we could probably have a better design for that
+                    const dialog = new BaseDialog.experiment['FileUploadDialogReact']();
+                    // dialog.open();
+                }    
             },this.menuBar);
             uploadButton.style.margin = "3px";
         }
@@ -625,6 +628,9 @@ class ChartManager{
         }
     }
 
+    /**
+     * Caution: doesn't return a 'DataSource', but a 'DataStore' (which is a property of a 'DataSource')
+     */
     getDataSource(name){
         return this.dsIndex[name].dataStore;
     }

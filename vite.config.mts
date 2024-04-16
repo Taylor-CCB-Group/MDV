@@ -11,6 +11,13 @@ const flaskURL = "http://127.0.0.1:5051";
 let hasWarned1 = false;
 let hasWarned2 = false;
 
+/**
+ * shim for various different build configurations.
+ * 
+ * nb `dev_pt` which returns `{}` suffices for many things - vite devserver, netlify build.
+ * `desktop_pt` just has a little more config setting a .ts input & making sure other things will work with flask template.
+ * other methods are supposed to be for replacing other webpack configs.
+ */
 function getRollupOptions(): RollupOptions {
     const build = process.env.build as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {

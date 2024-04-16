@@ -9,7 +9,9 @@ class TextBoxChart extends BaseChart{
         c.text= c.text || "";
         this.para = createEl("div",{
             styles:{
-                padding:"5px"
+                padding:"5px",
+                overflowY:"auto",
+                maxHeight:"100%",
             }
         },this.contentDiv);
         //conditional import of function which uses the packages marked and sanitize

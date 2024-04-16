@@ -1,26 +1,40 @@
-import React, { useState, useCallback, useReducer } from "react";
+import React, { useState, useCallback, useReducer, type PropsWithChildren } from "react";
 import styled from "styled-components";
 import { useDropzone } from "react-dropzone";
-import { createRoot } from "react-dom/client";
-import { BaseDialog } from "../../utilities/Dialog.js";
 
-// Styled components
-const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 10px;
-`;
+// Styled components (migrating to Tailwind CSS)
+// const Container = styled.div`
+//   display: flex;
+//   flex-direction: column;
+//   justify-content: center;
+//   align-items: center;
+//   padding: 10px;
+// `;
+const Container = ({children}: PropsWithChildren) =>{
+  return (
+    <div 
+    className="flex flex-col content-center items-center p-10"
+    >
+      {children}
+    </div>
+  )
+}
 
-const StatusContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 150px;
-`;
+// const StatusContainer = styled.div`
+//   display: flex;
+//   flex-direction: column;
+//   justify-content: center;
+//   align-items: center;
+//   width: 100%;
+//   height: 150px;
+// `;
+const StatusContainer = ({children}: PropsWithChildren) => {
+  return (
+    <div className="flex flex-col justify-center items-center w-full h-150">
+      {children}
+    </div>
+  )
+}
 
 const SuccessContainer = styled.div`
   display: flex;
@@ -59,7 +73,7 @@ const DropzoneContainer = styled.div<{ isDragOver: boolean }>`
   border: 2px dashed gray;
   padding: 10px;
   text-align: center;
-  background-color: ${(props) => (props.isDragOver ? "lightgray" : "white")};
+  /*todo: fix... background-color: ${(props) => (props.isDragOver ? "lightgray" : "white")};*/
   min-width: 90%;
   min-height: 90%;
   max-height: 90%;
@@ -218,6 +232,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
   const handleUploadClick = async () => {
+    console.log("Uploading file...")
     if (!state.selectedFiles.length) {
       dispatch({ type: "SET_ERROR", payload: "noFilesSelected" });
       return;
@@ -427,7 +442,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
-          <Button onClick={handleUploadClick} disabled={!state.selectedFiles.length || state.isUploading} marginTop="20px">
+          <Button onClick={handleUploadClick} 
+          disabled={(state.selectedFiles.length===0 || state.isUploading)} 
+          marginTop="20px"
+          >
             {"Upload File"}
           </Button>
         </>
@@ -436,35 +454,4 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
   );
 };
 
-class FileUploadDialogReact extends BaseDialog {
-  root: ReturnType<typeof createRoot>;
-
-  constructor() {
-    super(
-      {
-        title: "File Upload",
-        width: 450,
-        height: 295,
-      },
-      null
-    );
-    this.outer.classList.add("fileUploadDialog");
-    if (this.dialog) {
-      this.root = createRoot(this.dialog);
-      this.root.render(<FileUploadDialogComponent onClose={() => this.close()} />);
-    } else {
-      console.error("Dialog element not found");
-    }
-  }
-
-  close(): void {
-    super.close();
-    if (this.root) {
-      this.root.unmount();
-    }
-  }
-}
-
-BaseDialog.experiment["FileUploadDialogReact"] = FileUploadDialogReact;
-
-export default FileUploadDialogReact;
+export default FileUploadDialogComponent;

@@ -1,0 +1,31 @@
+/* nb testing making a new thing vs using existing src/modules/all_css.js */
+/* todo include @tailwind base & check nothing is messed up... */
+/* @tailwind base; */
+@tailwind components;
+@tailwind utilities;
+/* 
+h1 {
+    @apply text-2xl font-bold
+}
+
+h2 {
+    @apply text-xl font-semibold
+}
+
+h3 {
+    @apply text-lg font-semibold
+}
+
+h1, h2, h3, h4, h5, p, ol, ul {
+    @apply mb-3
+}
+ul {
+    @apply list-disc list-inside;
+}
+ol {
+    @apply list-decimal list-inside;
+}
+
+textarea {
+    @apply p-1
+} */

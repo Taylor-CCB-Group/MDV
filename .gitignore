@@ -20,11 +20,11 @@ dist/_avocato
 *.spec
 python/build
 python/data
+python/mdvtools/tests/temp/*
 python/mdvtools/static/*
 python/mdvtools/template/page.html
 .ipynb_checkpoints
 
-python/requirements.txt
 python/dist/
 docs/jsdocs/build/
 docs/maindocs/_build/
@@ -32,3 +32,6 @@ docs/maindocs/autoapi/
 
 venv/
 data/
+
+.idea
+xvenv/

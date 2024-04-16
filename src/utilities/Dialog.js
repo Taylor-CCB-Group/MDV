@@ -125,6 +125,13 @@ constructor (config={},content) {
     
 
   }
+  setParent(parent) {
+    if (parent) {
+      parent.append(this.outer);
+    } else {
+      this.config.doc.body.append(this.outer);
+    }
+  }
 
   _addFooter(){
     this.footer= createEl("div",{
