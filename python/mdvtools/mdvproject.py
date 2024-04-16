@@ -606,7 +606,7 @@ class MDVProject:
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
-        add_to_view="default",
+        add_to_view: Optional[str]="default",
         separator="\t",
     ) -> list[dict[str, str]]:
         """Adds a pandas dataframe to the project. Each column's datatype, will be deduced by the

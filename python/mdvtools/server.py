@@ -251,11 +251,13 @@ def create_app(
             if not name:
                 return "Request must contain 'name'", 400
             cols = request.form['columns'].split(",") if "columns" in request.form else None
-            view = request.form["view"] if "view" in request.form else "default"
+            view = request.form["view"] if "view" in request.form else None
             replace = True if "replace" in request.form else False
+            if 'file' not in request.files:
+                return "No 'file' provided in request form data", 400
             file = request.files["file"]
             supplied_only = True if "supplied_only" in request.form else False
-            if file.mimetype != "text/csv":
+            if not file or file.mimetype != "text/csv":
                 return "File must be a CSV", 400
             file.seek(0)
             # will this work? can we return progress to the client?
