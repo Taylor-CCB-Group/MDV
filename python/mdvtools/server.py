@@ -243,17 +243,24 @@ def create_app(
 
     @project_bp.route("/add_datasource", methods=["POST"])
     def add_datasource():
-        if "permission" not in project.state or not project.state["permission"] == "edit":
+        if (
+            "permission" not in project.state
+            or not project.state["permission"] == "edit"
+        ):
             return "Project is read-only", 400
         success = True
         try:
             name = request.form["name"]
             if not name:
                 return "Request must contain 'name'", 400
-            cols = request.form['columns'].split(",") if "columns" in request.form else None
+            cols = (
+                request.form["columns"].split(",")
+                if "columns" in request.form
+                else None
+            )
             view = request.form["view"] if "view" in request.form else None
             replace = True if "replace" in request.form else False
-            if 'file' not in request.files:
+            if "file" not in request.files:
                 return "No 'file' provided in request form data", 400
             file = request.files["file"]
             supplied_only = True if "supplied_only" in request.form else False
@@ -262,7 +269,14 @@ def create_app(
             file.seek(0)
             # will this work? can we return progress to the client?
             df = pd.read_csv(file.stream)
-            project.add_datasource(name, df, cols, add_to_view=view, supplied_columns_only=supplied_only, replace_data=replace)
+            project.add_datasource(
+                name,
+                df,
+                cols,
+                add_to_view=view,
+                supplied_columns_only=supplied_only,
+                replace_data=replace,
+            )
         except Exception as e:
             # success = False
             return str(e), 400
