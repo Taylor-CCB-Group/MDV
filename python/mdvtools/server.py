@@ -253,11 +253,12 @@ def create_app(
             name = request.form["name"]
             if not name:
                 return "Request must contain 'name'", 400
-            cols = (
-                request.form["columns"].split(",")
-                if "columns" in request.form
-                else None
-            )
+            # xxx - not how column metadata should be passed, todo fix
+            # cols = (
+            #     request.form["columns"].split(",")
+            #     if "columns" in request.form
+            #     else None
+            # )
             view = request.form["view"] if "view" in request.form else None
             replace = True if "replace" in request.form else False
             if "file" not in request.files:
@@ -272,7 +273,7 @@ def create_app(
             project.add_datasource(
                 name,
                 df,
-                cols,
+                # cols,
                 add_to_view=view,
                 supplied_columns_only=supplied_only,
                 replace_data=replace,
