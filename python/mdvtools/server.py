@@ -17,6 +17,7 @@ from werkzeug.security import safe_join
 from .websocket import mdv_socketio
 from .mdvproject import MDVProject
 import os
+import pandas as pd
 from typing import Optional
 
 routes = set()
@@ -237,6 +238,32 @@ def create_app(
             project.save_state(state)
         except Exception:
             success = False
+
+        return jsonify({"success": success})
+
+    @project_bp.route("/add_datasource", methods=["POST"])
+    def add_datasource():
+        if "permission" not in project.state or not project.state["permission"] == "edit":
+            return "Project is read-only", 400
+        success = True
+        try:
+            name = request.form["name"]
+            if not name:
+                return "Request must contain 'name'", 400
+            cols = request.form['columns'].split(",") if "columns" in request.form else None
+            view = request.form["view"] if "view" in request.form else "default"
+            replace = True if "replace" in request.form else False
+            file = request.files["file"]
+            supplied_only = True if "supplied_only" in request.form else False
+            if file.mimetype != "text/csv":
+                return "File must be a CSV", 400
+            file.seek(0)
+            # will this work? can we return progress to the client?
+            df = pd.read_csv(file.stream)
+            project.add_datasource(name, df, cols, add_to_view=view, supplied_columns_only=supplied_only, replace_data=replace)
+        except Exception as e:
+            # success = False
+            return str(e), 400
 
         return jsonify({"success": success})
 
