@@ -1,15 +1,19 @@
-name: CI
+name: Python CI
 on:
   push:
     branches:
       # FIXME replace this with main after merge to main
       - pjt-dev
 #      - main
+    paths:
+      - 'python/**'
   pull_request:
     branches:
       # FIXME replace this with main after merge to main
       - pjt-dev
 #      - main
+    paths:
+      - 'python/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -77,15 +81,3 @@ jobs:
       - uses: chartboost/ruff-action@v1
         with:
           args: "format --check"
-
-  tsc:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm install
-      - run: npm run vite-build
-      # - uses: icrawl/action-tsc@v1
