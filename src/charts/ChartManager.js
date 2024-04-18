@@ -63,13 +63,13 @@ const column_orders={
 }
 
 const themes={
-    "Dark":{
+    "dark":{
         title_bar_color:"#222",
         main_panel_color:"black",
         text_color:"white",
         background_color:"#333"
     },
-    "Light":{
+    "light":{
         title_bar_color:"white",
         main_panel_color:"#f1f1f1",
         text_color:"black",
@@ -77,16 +77,17 @@ const themes={
 
     }
 }
+
 //https://stackoverflow.com/questions/56393880/how-do-i-detect-dark-mode-using-javascript
 function getPreferredColorScheme() {
     if (window.matchMedia) {
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            return "Dark";
+            return "dark";
         } else {
-            return "Light";
+            return "light";
         }
     } 
-    return "Light";
+    return "light";
 }
 function listenPreferredColorScheme(callback) {
     if (window.matchMedia) {
@@ -263,7 +264,6 @@ class ChartManager{
         },this.rightMenuBar);
         themeButton.style.margin = "3px";
 
-        if (config.permission === 'edit') {
             const uploadButton = createMenuIcon("fas fa-upload",{
                 tooltip:{
                     text:"Upload dataset",
@@ -277,7 +277,6 @@ class ChartManager{
                 }    
             },this.menuBar);
             uploadButton.style.margin = "3px";
-        }
 
         this._setupThemeContextMenu();
       
@@ -563,8 +562,6 @@ class ChartManager{
                 c.chart.themeChanged();
             }
         }
-      
-        
     }
 
 
