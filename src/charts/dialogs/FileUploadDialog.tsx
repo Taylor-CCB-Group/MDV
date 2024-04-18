@@ -1,163 +1,136 @@
 import React, { useState, useCallback, useReducer, type PropsWithChildren } from "react";
-import styled from "styled-components";
 import { useDropzone } from "react-dropzone";
 
-// Styled components (migrating to Tailwind CSS)
-// const Container = styled.div`
-//   display: flex;
-//   flex-direction: column;
-//   justify-content: center;
-//   align-items: center;
-//   padding: 10px;
-// `;
-const Container = ({children}: PropsWithChildren) =>{
+const Container = ({ children }: PropsWithChildren) => {
   return (
-    <div 
-    className="flex flex-col content-center items-center p-10"
+    <div className="flex flex-col content-center items-center h-max dark:bg-black-800 dark:text-white">
+      {children}
+    </div>
+  );
+};
+
+const StatusContainer = ({ children }: PropsWithChildren) => {
+  return (
+    <div className="flex flex-col justify-center items-center w-full h-150 dark:bg-#333">
+      {children}
+    </div>
+  );
+};
+
+const SuccessContainer = ({ children }) => (
+  <div className="flex flex-col items-center justify-center bg-[#f0f8ff] shadow-md border border-[#e0e0e0] m-4 dark:bg-black dark:border-gray-600">
+    {children}
+  </div>
+);
+
+const SuccessHeading = ({ children }) => (
+  <h1 className="text-[#333] mb-1 dark:text-white">{children}</h1>
+);
+
+const SuccessText = ({ children }) => (
+  <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">{children}</p>
+);
+
+const DropzoneContainer = ({ isDragOver, children, ...props }) => (
+  <div
+    {...props}
+    style={{ height: "90%" }}
+    className={`p-2.5 z-50 text-center border-2 border-dashed ${isDragOver ? 'bg-gray-300 dark:bg-slate-800' : 'bg-white dark:bg-black'
+      } min-w-[90%]`}
+  >
+    {children}
+  </div>
+);
+
+const FileInputLabel = ({ children, ...props }) => (
+  <label {...props} className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500">
+    {children}
+  </label>
+);
+
+const colorStyles = {
+  blue: {
+    bgColor: "bg-blue-600",
+    hoverColor: "hover:bg-blue-700",
+    darkBgColor: "dark:bg-blue-800",
+    darkHoverColor: "dark:bg-blue-900",
+  },
+  red: {
+    bgColor: "bg-red-600",
+    hoverColor: "hover:bg-red-700",
+    darkBgColor: "dark:bg-red-800",
+    darkHoverColor: "dark:bg-red-900",
+  },
+  green: {
+    bgColor: "bg-green-600",
+    hoverColor: "hover:bg-green-700",
+    darkBgColor: "dark:bg-green-800",
+    darkHoverColor: "dark:bg-green-900",
+  },
+};
+
+const Button = ({
+  onClick,
+  color = "blue",
+  disabled = false,
+  size = "px-5 py-2.5",
+  marginTop = "mt-2.5",
+  children
+}) => {
+  const { bgColor, hoverColor, darkBgColor, darkHoverColor } = colorStyles[color] || colorStyles.blue;
+
+  return (
+    <button
+      onClick={onClick}
+      className={`${size} ${marginTop} ${bgColor} ${hoverColor} ${darkBgColor} ${darkHoverColor} text-white rounded self-center cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-500 disabled:opacity-70`}
+      disabled={disabled}
     >
       {children}
-    </div>
-  )
-}
+    </button>
+  );
+};
 
-// const StatusContainer = styled.div`
-//   display: flex;
-//   flex-direction: column;
-//   justify-content: center;
-//   align-items: center;
-//   width: 100%;
-//   height: 150px;
-// `;
-const StatusContainer = ({children}: PropsWithChildren) => {
-  return (
-    <div className="flex flex-col justify-center items-center w-full h-150">
-      {children}
-    </div>
-  )
-}
+const ProgressBar = ({ value, max }) => (
+  <progress className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded" value={value} max={max}></progress>
+);
 
-const SuccessContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: #f0f8ff;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e0e0e0;
-`;
+const Message = ({ children }) => (
+  <p className="text-lg font-bold text-[#333] dark:text-white text-center">{children}</p>
+);
 
-const SuccessHeading = styled.h1`
-  color: #333;
-  margin-bottom: 15px;
-`;
+const FileSummary = ({ children }) => (
+  <div className="rounded-lg bg-[#f0f8ff] dark:bg-stone-800 shadow-md border border-[#e0e0e0] max-w-[400px] w-[90%] text-center">
+    {children}
+  </div>
+);
 
-const SuccessText = styled.p`
-  font-size: 20px;
-  color: #555;
-  margin-bottom: 20px;
-  text-align: center;
-`;
+const FileSummaryHeading = ({ children }) => (
+  <h2 className="text-gray-800 dark:text-white mb-3">{children}</h2>
+)
 
-const RefreshButton = styled.button`
-  padding: 10px 20px;
-  background-color: green;
-  color: white;
-  cursor: pointer;
-  border-radius: 5px;
-  margin-top: 20px;
-  margin-bottom: 20px;
-  align-self: center;
-`;
+const FileSummaryText = ({ children }) => (
+  <p className="text-base text-gray-700 dark:text-white my-1">{children}</p>
+);
 
-const DropzoneContainer = styled.div<{ isDragOver: boolean }>`
-  border: 2px dashed gray;
-  padding: 10px;
-  text-align: center;
-  /*todo: fix... background-color: ${(props) => (props.isDragOver ? "lightgray" : "white")};*/
-  min-width: 90%;
-  min-height: 90%;
-  max-height: 90%;
-`;
+const ErrorContainer = ({ children }) => (
+  <div className="bg-[#fff0f0] text-[#d8000c] border border-[#ffbaba] p-5 my-5 rounded shadow-sm text-left w-[90%] max-w-[600px]">
+    {children}
+  </div>
+);
 
-const FileInputLabel = styled.label`
-  padding: 10px 20px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  cursor: pointer;
-  background-color: #f0f0f0;
-  display: inline-block;
-  margin: 10px 0;
-`;
+const DynamicText = ({ text }) => (
+  <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
+    <p className="text-center m-0 font-bold text-sm sm:text-lg md:text-xl">
+      {text}
+    </p>
+  </div>
+);
 
-const Button = styled.button<{ color?: string; disabled?: boolean; size?: string; marginTop?: string; }>`
-  align-self: center;
-  padding: ${(props) => props.size || "10px 20px"};
-  background-color: ${(props) => props.color || "blue"};
-  color: white;
-  cursor: pointer;
-  margin-top: ${(props) => props.marginTop || "10px"};
-  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
-`;
-
-const ProgressBar = styled.progress`
-  width: 100%;
-  height: 30px;
-  margin-bottom: 20px;
-  background-color: #f3f3f3;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-`;
-
-const Message = styled.p`
-  font-size: 18px;
-  font-weight: bold;
-  color: #333;
-  font-family: Arial, sans-serif;
-  text-align: center;
-`;
-
-const FileSummary = styled.div`
-  border-radius: 8px;
-  background-color: #f0f8ff;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e0e0e0;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-`;
-
-const FileSummaryHeading = styled.h2`
-  color: #333;
-  margin: 0 0 20px 0;
-`;
-
-const FileSummaryText = styled.p`
-  font-size: 16px;
-  margin: 10px 0;
-  padding: 0;
-  color: #555;
-`;
-
-const ErrorContainer = styled.div`
-  background-color: #fff0f0; // Light red background for error visibility
-  color: #d8000c; // Dark red text color for contrast and readability
-  border: 1px solid #ffbaba; // Lighter red border color
-  padding: 20px;
-  margin: 20px 0;
-  border-radius: 5px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1); // Slight shadow for depth
-  font-family: Arial, sans-serif;
-  font-size: 14px;
-  text-align: left;
-  width: 90%; // Responsive width
-  max-width: 600px; // Max width to avoid too wide error messages
-`;
-
-const ErrorHeading = styled.h4`
-  margin-top: 0;
-  font-size: 16px;
-  font-weight: bold;
-`;
+const ErrorHeading = ({ children }) => (
+  <h4 className="mt-0 text-lg font-bold">
+    {children}
+  </h4>
+);
 
 // Reducer function
 const reducer = (state, action) => {
@@ -386,26 +359,17 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
               gap: '60px',
             }}
           >
-            <Button onClick={handleInsertClick}>{"Confirm"}</Button>
-            <Button color="red" size="10px 30px" onClick={onClose}>
+            <Button marginTop="mt-3" onClick={handleInsertClick}>{"Confirm"}</Button>
+            <Button color="red" size="px-6 py-2.5" marginTop="mt-3" onClick={onClose}>
               {"Cancel"}
             </Button>
           </div>
         </>
       ) : state.isInserting ? (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column', // Stack items vertically
-            justifyContent: 'center',
-            alignItems: 'center',
-            width: '100%', // Ensure the wrapper spans the entire width of its parent
-            height: '150px', // Adjust this height as needed to accommodate both the progress bar and the message
-          }}
-        >
+        <StatusContainer>
           <Message>{"Your file is being processed, please wait..."}</Message>
           <ProgressBar value={progress} max="100" />
-        </div>
+        </StatusContainer>
       ) : state.success ? (
         <>
           <SuccessContainer>
@@ -413,10 +377,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             <SuccessText>
               The file was uploaded successfully to the database.
             </SuccessText>
-            <RefreshButton onClick={() => window.location.reload()}>
-              Refresh Page
-            </RefreshButton>
           </SuccessContainer>
+          <Button color="green" onClick={() => window.location.reload()}>
+            Refresh Page
+          </Button>
         </>
 
       ) : state.error ? (
@@ -434,17 +398,16 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
           <DropzoneContainer {...getRootProps()} isDragOver={isDragActive} aria-label={"dropzoneLabel"}>
             <input {...getInputProps()} />
             {isDragActive ? (
-              <h2>{"dropFilesHere"}</h2>
+              <DynamicText text={"Drop files here..."}/>
             ) : (
-              <h2>
-                {state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : "Drag and drop files here or click the button below to upload"}
-              </h2>
+              <DynamicText text={state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : "Drag and drop files here or click the button below to upload"} />
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
-          <Button onClick={handleUploadClick} 
-          disabled={(state.selectedFiles.length===0 || state.isUploading)} 
-          marginTop="20px"
+          <Button onClick={handleUploadClick}
+            disabled={(state.selectedFiles.length === 0 || state.isUploading)}
+            marginTop="mt-5"
+            color="blue"
           >
             {"Upload File"}
           </Button>
