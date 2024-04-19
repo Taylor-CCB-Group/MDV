@@ -58,18 +58,24 @@ export type GuiValueTypes = {
     "dropdown": string;
     "check": boolean;
     "text": string;
-    "radiobuttons": any;
+    "radiobuttons": string;
     "slider": number;
-    "button": undefined; //never?
+    "spinner": number;
+    "button": undefined;
     "doubleslider": [number, number];
 }
-
-export type GuiSpec<T extends keyof GuiValueTypes> = {
+export type GuiSpecType = keyof GuiValueTypes;
+export type GuiSpec<GuiSpecType> = {
     type: T; 
     label: string;
     current_value?: GuiValueTypes[T];
     func?: (v: GuiValueTypes[T]) => void;
     values?: GuiValueTypes[T][];
+    // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
+    choices: T extends 'radiobuttons' ? [string, string][] : never;
+    min?: number;
+    max?: number;
+    step?: number;
     defaultVal?: GuiValueTypes[T];
 }
 interface DataStore {
@@ -86,7 +92,7 @@ export interface Chart {
     addMenuIcon: (classes: string, info: string) => HTMLElement;
     setSize: (x?: number, y?: number) => void;
     changeBaseDocument: (doc: Document) => void;
-    getSettings: () => GuiSpec<any>[];
+    getSettings: () => GuiSpec[];
     removeLayout?:()=> void;
     config:any;
     dataStore: DataStore;

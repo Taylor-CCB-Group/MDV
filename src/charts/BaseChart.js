@@ -3,6 +3,7 @@ import {ContextMenu} from "../utilities/ContextMenu.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog";
 import { chartTypes } from "./ChartTypes.ts";
+// import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
 
 
 class BaseChart{
@@ -591,8 +592,12 @@ class BaseChart{
 
    
     _openSettingsDialog(e){
-        if (!this.settingsDialog){
-          this.settingsDialog = new SettingsDialog({
+        if (!this.settingsDialog) {
+            if (import.meta.env.DEV) {
+                // this.settingsDialog = new SettingsDialogReactWrapper(this);
+                // return;
+            };
+            this.settingsDialog = new SettingsDialog({
                 maxHeight:400,
                 doc:this.__doc__ || document,
                 width:300,
@@ -645,6 +650,17 @@ class BaseChart{
         }
         if (this.addToContextMenu){
             menu=menu.concat(this.addToContextMenu());
+        }
+        if (import.meta.env.DEV) {
+            menu.push({
+                text: "experimental settings dialog",
+                icon: "fas fa-cog",
+                func: async () => {
+                    const m = await import("../react/components/SettingsDialogReactWrapper");
+                    const SettingsDialogReactWrapper = m.default;
+                    this.settingsDialog = new SettingsDialogReactWrapper(this);
+                }
+            });
         }
         return menu;
     }
