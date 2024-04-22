@@ -85,7 +85,14 @@ export type GuiSpec<T extends GuiSpecType> = {
     step?: number;
     defaultVal?: GuiValueTypes[T];
 }
-
+// todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
+export type ExtraControl<T extends GuiSpecType> = {
+    type: T;
+    name: string;
+    label: string;
+    values?: Array<{name: string, value: string}>;
+    defaultVal?: GuiValueTypes[T];
+}
 // const a: GuiSpec<'dropdown'> = {
 //     type: 'dropdown',
 //     label: 'label',
