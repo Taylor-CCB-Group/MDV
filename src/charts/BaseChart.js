@@ -128,12 +128,14 @@ class BaseChart{
                 if (this.contentDiv !== document.fullscreenElement) console.error('unexpected fullscreen element');
                 const rect = this.contentDiv.getBoundingClientRect();
                 this.setSize(rect.width, rect.height);
-                if (this.settingsDialog) this.settingsDialog.setParent(this.contentDiv);
-                if (this.colorDialog) this.colorDialog.setParent(this.contentDiv);
+                for (const d of this.dialogs) {
+                    d.setParent(this.contentDiv);
+                }
             } else {
                 this.setSize(...oldSize);
-                if (this.settingsDialog) this.settingsDialog.setParent(null);
-                if (this.colorDialog) this.colorDialog.setParent(null);
+                for (const d of this.dialogs) {
+                    d.setParent(null);
+                }
             }
         });
         this.addMenuIcon("fas fa-expand","fullscreen", {
@@ -150,7 +152,7 @@ class BaseChart{
         //work out width and height based on container
         this._setDimensions();
     }
-
+    dialogs = [];
     _getContentDimensions(){
         return{ //PJT to review re. gridstack.
             top:5,
@@ -446,8 +448,8 @@ class BaseChart{
         if (this._tooltip){
             this._tooltip.remove();
         }
-        if (this.settingsDialog){
-            this.settingsDialog.close();
+        for (const d of this.dialogs){
+            d.close();
         }
         // dynamic props?
     }
@@ -606,6 +608,7 @@ class BaseChart{
                 useMobx: this.useMobx,
                 onclose:()=>this.settingsDialog=null
             },this.getSettings());
+            this.dialogs.push(this.settingsDialog);
         }
         //experimenting with making the parent always be contentDiv (not only in fullscreen mode)
         //doesn't work ATM because of stacking context - may want to review that more generally 
@@ -658,7 +661,7 @@ class BaseChart{
                 func: async () => {
                     const m = await import("../react/components/SettingsDialogReactWrapper");
                     const SettingsDialogReactWrapper = m.default;
-                    this.settingsDialog = new SettingsDialogReactWrapper(this);
+                    this.dialogs.push(new SettingsDialogReactWrapper(this));
                 }
             });
         }
@@ -681,8 +684,8 @@ class BaseChart{
     changeBaseDocument(doc){
         this.contextMenu.__doc__=doc;
         this.__doc__=doc;
-        if (this.settingsDialog){
-            this.settingsDialog.close();
+        for (const d of this.dialogs){
+            d.close();
         }
         if (this.legend){
             this.legend.__doc__=doc;
