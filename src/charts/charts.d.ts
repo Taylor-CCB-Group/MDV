@@ -54,10 +54,16 @@ export type DataSource = {
     regions?: Record<string, any>;
 };
 
+export type DropdownMappedValues<T extends string, V extends string> = [
+    Array<{ [P in T]: string } & { [P in V]: string }>, T, V
+];
+export type DropDownValues = DropdownMappedValues<string, string> | [Array<string>];
 export type GuiValueTypes = {
     "dropdown": string;
+    "multidropdown": any;
     "check": boolean;
     "text": string;
+    "textbox": string;
     "radiobuttons": string;
     "slider": number;
     "spinner": number;
@@ -65,19 +71,34 @@ export type GuiValueTypes = {
     "doubleslider": [number, number];
 }
 export type GuiSpecType = keyof GuiValueTypes;
-export type GuiSpec<GuiSpecType> = {
+export type GuiSpec<T extends GuiSpecType> = {
     type: T; 
     label: string;
+    name: string;
     current_value?: GuiValueTypes[T];
     func?: (v: GuiValueTypes[T]) => void;
-    values?: GuiValueTypes[T][];
+    values?: T extends ('dropdown' | 'multidropdown') ? DropDownValues : never;
     // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
-    choices: T extends 'radiobuttons' ? [string, string][] : never;
+    choices?: T extends 'radiobuttons' ? [string, string][] : never;
     min?: number;
     max?: number;
     step?: number;
     defaultVal?: GuiValueTypes[T];
 }
+
+// const a: GuiSpec<'dropdown'> = {
+//     type: 'dropdown',
+//     label: 'label',
+//     name: 'name',
+//     current_value: 'current_value',
+//     func: (v) => {},
+//     values: [[
+//         {a: '0a', b: '0b'},
+//         {a: '1a', b: '1b'},
+//     ], 'a', 'b']
+// }
+// a.values[0].map(x => x.a);
+// ^^ still not well-typed... `x` is `any`.
 interface DataStore {
     getLoadedColumns: () => FieldName[];
     getColumnName: (col: FieldName) => ColumnName | null;

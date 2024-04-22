@@ -127,9 +127,11 @@ const ButtonComponent = function({props}: {props: GuiSpec<'button'>}) {
 };
 const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> = {
     'text': observer(TextComponent),
+    'textbox': observer(TextComponent),
     'slider': observer(SliderComponent),
     'spinner': observer(SpinnerComponent),
     'dropdown': observer(DropdownComponent),
+    'multidropdown': observer(DropdownComponent),
     'check': observer(CheckboxComponent),
     'radiobuttons': observer(RadioButtonComponent),
     'doubleslider': observer(DoubleSliderComponent),

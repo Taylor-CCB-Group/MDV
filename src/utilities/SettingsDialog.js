@@ -201,8 +201,6 @@ class SettingsDialog extends BaseDialog{
     
 
     dropdown(s, d){
-        //todo fuzzy search / filter / autocomplete
-        //(also for multidropdown)
         const wrapper = createEl("div");
         const dd = createEl("select",{
             styles:{

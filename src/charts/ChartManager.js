@@ -2451,7 +2451,7 @@ class AddChartDialog extends BaseDialog{
                     text:c.label,
                     classes:["ciview-title-div"]
                 },parentDiv);
-                // could this logic be shared with SettingsDialog?
+                // could this logic be shared with SettingsDialog? <<
                 if (c.type==="dropdown"){
                     const sel = createEl("select",{
                         styles:{
