@@ -51,6 +51,11 @@ export type TooltipConfig = {
         column?: ColumnName,
     }
 };
+type CategoryFilter = {
+    column: ColumnName,
+    category: string,
+    // consider properties like 'invert' or 'exclude', or 'color'...
+}
 //viewState should be persisted... maybe a way of saving different snapshots?
 //could we infer or something to avoid having to repeat this?
 export type ScatterPlotConfig = {
@@ -61,6 +66,7 @@ export type ScatterPlotConfig = {
         display: boolean,
         // todo: add more options here...
     },
+    category_filters: Array<CategoryFilter>,
     zoom_on_filter: boolean,
     point_shape: "circle" | "square" | "gaussian"
 } & TooltipConfig;
@@ -74,6 +80,7 @@ const scatterDefaults: ScatterPlotConfig = {
     tooltip: {
         show: false,
     },
+    category_filters: [],
     zoom_on_filter: false,
     point_shape: "circle",
 };
@@ -83,10 +90,7 @@ export type VivRoiConfig = {
     // ... except that we also need to check the other condition, because 'string' could also be that.
     // so it's not completely ideal.
     type: "VivMdvRegionReact" | "viv_scatter_plot",
-    background_filter: {
-        column: ColumnName,
-        category: string,
-    },
+    background_filter: CategoryFilter,
     roi: ROI,
     viv: VivConfig,
     //image_properties: ChannelsState,
@@ -165,6 +169,26 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const { tooltip } = c;
         const cols = this.dataStore.getColumnList() as DataColumn<any>[];
         const settings = super.getSettings();
+        // What I would like is ability to
+        // - change selected image at runtime.
+        // - choose multiple categories on which to filter.
+        const filters = c.category_filters.map(f => {
+            // what we really want is to have a type that is fairly specific to category filters...
+            // able to handle an array of them with controls for adding/removing...
+            const values = this.dataStore.columnIndex[f.column].values.slice();
+            values.unshift("all");
+            return {
+                type: "dropdown",
+                label: `'${f.column}' filter`,
+                current_value: f.category,
+                values: [values],
+                func: (v) => {
+                    f.category = v;
+                    c.category_filters = c.category_filters.slice();
+                }
+            }
+        });
+        //   ^^ kinda want a more react-y SettingsDialog for that...
         return settings.concat([
             {
                 type: "check",
@@ -222,6 +246,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.zoom_on_filter = x;
                 }
             },
+            ...filters,
             // no longer using PictureInPictureViewer - up for review as could be useful
             // {
             //     type: "check",
