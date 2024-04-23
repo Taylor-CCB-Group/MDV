@@ -184,7 +184,27 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             }
         });
         //   ^^ kinda want a more react-y SettingsDialog for that...
+        // todo switch image, <- more coherent region logic...
+        // const ds = this.dataStore;
+        // const images = [];
+        // for (const r in ds.regions.all_regions) {
+        //     const viv = ds.regions.all_regions[r].viv_image;
+        //     if (viv) {
+        //         const x = viv.url || viv.file;
+        //         images.push({name: x, value: x});
+        //     }
+        // }
         return settings.concat([
+            // {
+            //     type: "dropdown",
+            //     label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
+            //     current_value: c.viv.url,
+            //     values: [images, 'name', 'value'],
+            //     func: (v) => {
+            //         c.viv.url = v;
+            //         c.background_filter.category = v;
+            //     }
+            // },
             {
                 type: "check",
                 label: "Show Tooltip",
