@@ -54,7 +54,7 @@ export type TooltipConfig = {
 };
 type CategoryFilter = {
     column: ColumnName,
-    category: string,
+    category: string | string[],
     // consider properties like 'invert' or 'exclude', or 'color'...
 }
 //viewState should be persisted... maybe a way of saving different snapshots?
@@ -173,7 +173,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             const values = this.dataStore.columnIndex[f.column].values.slice();
             values.unshift("all");
             return {
-                type: "dropdown",
+                type: "multidropdown",
                 label: `'${f.column}' filter`,
                 current_value: f.category,
                 values: [values],

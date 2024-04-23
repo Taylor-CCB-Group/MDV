@@ -41,11 +41,16 @@ export function useFilteredIndices() {
                 const filterValue = config.background_filter?.category;
                 if (filterValue) {
                     //const filterIndex = col.values.indexOf(filterValue);
-                    const filterIndex = catFilters.map(f => dataStore.columnIndex[f.column].values.indexOf(f.category));
+                    const filterIndex = catFilters.map(f => {
+                        if (Array.isArray(f.category)) return f.category.map(c => dataStore.columnIndex[f.column].values.indexOf(c)) as number[];
+                        else return dataStore.columnIndex[f.column].values.indexOf(f.category) as number;
+                    });
                     try {
                         // const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
-                        const filteredIndices = indices.filter(i => catFilters.every((_, j) => {                            
-                            return filterIndex[j] === cols[j].data[i];
+                        const filteredIndices = indices.filter(i => catFilters.every((_, j) => {
+                            const f = filterIndex[j];
+                            if (typeof f === 'number') return f === cols[j].data[i];
+                            else return f.some(fi => cols[j].data[i] === fi);
                         }));
                         setFilteredIndices(filteredIndices);
                         // thinking about allowing gray-out of non-selected points... should be optional
