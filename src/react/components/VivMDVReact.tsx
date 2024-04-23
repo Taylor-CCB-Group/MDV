@@ -9,6 +9,7 @@ import type { ColumnName, DataColumn } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
+import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -136,17 +137,11 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             colorByDefault: action,
         });
         this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", (e) => {
-            // return;
             if (!this.colorDialog) {
-                //this.colorDialog = new ColorChannelDialog(this);
-                // 🙄 HMR hack
-                this.colorDialog = new BaseDialog.experiment['ColorDialogReact'](this);
+                this.colorDialog = new ColorChannelDialogReactWrapper(this);
+                this.dialogs.push(this.colorDialog);
             }
         });
-    }
-    remove() {
-        super.remove();
-        if (this.colorDialog) this.colorDialog.close();
     }
     colorBy?: (i: number) => [r: number, g: number, b: number];
     colorByColumn(col?: ColumnName) {

@@ -33,4 +33,4 @@ class FileUploadDialogReact extends BaseDialog {
 
 BaseDialog.experiment["FileUploadDialogReact"] = FileUploadDialogReact;
 
-export default 42;
+export default FileUploadDialogReact;

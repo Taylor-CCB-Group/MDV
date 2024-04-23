@@ -48,4 +48,4 @@ class ColorDialogReactWrapper extends BaseDialog {
 }
 
 BaseDialog.experiment['ColorDialogReact'] = ColorDialogReactWrapper;
-export default 'ColorDialogReact loaded';
+export default ColorDialogReactWrapper;
