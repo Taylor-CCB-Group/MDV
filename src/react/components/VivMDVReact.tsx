@@ -230,7 +230,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 max: 1,
                 continuous: true,
                 func: x => {
-                    c.opacity = x;
+                    c.opacity = x*x;
                 }
             },
             {
