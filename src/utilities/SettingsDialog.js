@@ -171,12 +171,14 @@ class SettingsDialog extends BaseDialog{
         }, wrapper);
         createEl("br",{},d);
         for (let item of s.values[0]){
-            const v =item[s.values[2]];
+            // pass 1d array for simple list of strings, or [object[], text_field, value_field] for objects
+            const text = s.values.length > 1 ? item[s.values[1]] : item;
+            const value = s.values.length > 1 ? item[s.values[2]] : item;
             const args = {
-                text:item[s.values[1]],
-                value:v
+                text,
+                value
             }
-            const sel = s.current_value.indexOf(v) !== -1;
+            const sel = s.current_value.indexOf(value) !== -1;
             if (sel){
                 args.selected=true;
             }
