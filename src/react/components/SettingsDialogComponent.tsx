@@ -127,6 +127,16 @@ const ButtonComponent = function({props}: {props: GuiSpec<'button'>}) {
         </>
     )
 };
+
+const FolderComponent = function({props}: {props: GuiSpec<'folder'>}) {
+    return (
+        <div className="col-span-2">
+            <h2>{props.label}</h2>
+            {props.current_value.map((setting, i) => <AbstractComponent key={i} props={setting} />)}
+        </div>
+    )
+}
+
 const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> = {
     'text': observer(TextComponent),
     'textbox': observer(TextComponent),
@@ -138,6 +148,7 @@ const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> =
     'radiobuttons': observer(RadioButtonComponent),
     'doubleslider': observer(DoubleSliderComponent),
     'button': observer(ButtonComponent),
+    'folder': observer(FolderComponent),
 } as const;
 
 const ErrorComponent = function({props}: {props: GuiSpec<GuiSpecType>}) {

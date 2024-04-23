@@ -261,7 +261,13 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.zoom_on_filter = x;
                 }
             },
-            ...filters,
+            {
+                type: 'folder',
+                label: 'Category Filters',
+                current_value: filters,
+                func: (x) => {},
+            },
+            // ...filters,
             // no longer using PictureInPictureViewer - up for review as could be useful
             // {
             //     type: "check",

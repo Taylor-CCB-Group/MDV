@@ -8,11 +8,11 @@ import { action } from "mobx";
 class SettingsDialog extends BaseDialog{
     constructor(config,content){
         super(config,content);
-        
     }
-
-    init(content){
-        this.controls=[]
+    
+    init(content, parent){
+        if (!this.controls) this.controls=[];
+        if (!parent) parent = this.dialog;
         //experimental lil-gui version...
         // this.initLilGui(content);
         // return;
@@ -21,7 +21,7 @@ class SettingsDialog extends BaseDialog{
                 styles:{
                     // padding:"5px"
                 }
-            },this.dialog);
+            },parent);
             if (s.type !== "button"){
                 createEl("label",{text:s.label},d);
             }
@@ -40,7 +40,7 @@ class SettingsDialog extends BaseDialog{
                 // we could check whether we'd already wrapped the function, but getSettings() returns a new object each time
                 s.func = action(`${s.label} <action>`, s.func);
             }
-            this.controls[s.label] = this[s.type](s,d);
+            this.controls[s.label] = this[s.type](s,d); //this is going to go wrong if the label isn't unique - like if we have multiple similar layers
         }
     }
     initLilGui(content){
@@ -77,7 +77,7 @@ class SettingsDialog extends BaseDialog{
             
     /** TODO */
     folder(s, d) {
-        const container = d;
+        this.init(s.current_value);
     }
     spinner(s,d){
          
