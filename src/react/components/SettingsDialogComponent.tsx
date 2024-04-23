@@ -49,12 +49,14 @@ const SpinnerComponent = function({props}: {props: GuiSpec<'spinner'>}) {
     )
 }
 
-const DropdownComponent = function({props}: {props: GuiSpec<'dropdown'>}) {
+const DropdownComponent = function({props}: {props: GuiSpec<'dropdown' | 'multidropdown'>}) {
     if (!props.values) return <>DropdownComponent: no values</>;
     return (
         <>
             <label>{props.label}</label>
-            <select onChange={action(e => {
+            <select 
+            multiple={props.type === 'multidropdown'}
+            onChange={action(e => {
                 props.current_value = e.target.value;
                 if (props.func) props.func(e.target.value);
             })}>
