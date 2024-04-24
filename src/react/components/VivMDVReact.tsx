@@ -245,7 +245,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             {
                 type: "slider",
                 label: "opacity",
-                current_value: c.opacity || scatterDefaults.opacity,
+                current_value: Math.sqrt(c.opacity || scatterDefaults.opacity),
                 min: 0,
                 max: 1,
                 continuous: true,
