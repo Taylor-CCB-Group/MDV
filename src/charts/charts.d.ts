@@ -54,8 +54,9 @@ export type DataSource = {
     regions?: Record<string, any>;
 };
 
+export type DropdownMappedValue<T extends string, V extends string> = { [P in T]: string } & { [P in V]: string };
 export type DropdownMappedValues<T extends string, V extends string> = [
-    Array<{ [P in T]: string } & { [P in V]: string }>, T, V
+    Array<DropdownMappedValue<T, V>>, T, V
 ];
 export type DropDownValues = DropdownMappedValues<string, string> | [Array<string>];
 export type GuiValueTypes = {

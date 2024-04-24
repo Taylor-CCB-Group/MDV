@@ -57,14 +57,24 @@ const SpinnerComponent = function({props}: {props: GuiSpec<'spinner'>}) {
 }
 
 const DropdownComponent = function({props}: {props: GuiSpec<'dropdown' | 'multidropdown'>}) {
+    const id = useId();
+    const [filter, setFilter] = useState('');
+    const filterArray = filter.toLowerCase().split(' ');
+    // const textFilter = (item: string | DropdownMappedValue<string, string>) => {
+    //     if (typeof item === 'string') return filter.some(f => !item.toLowerCase().includes(f));
+    //     const exclude = filter.some(f => !item.toString().toLowerCase().includes(f));
+    //     return true;
+    // }
     if (!props.values) return <>DropdownComponent: no values</>;
     const v = props.type === 'multidropdown' && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
     return (
         <>
-            <label>{props.label}</label>
+            <label htmlFor={id}>{props.label}</label>
             <select 
+            id={id}
             multiple={props.type === 'multidropdown'}
             value={v}
+            className="w-full"
             onChange={action(e => {
                 props.current_value = e.target.value;
                 if (props.func) props.func(e.target.value);
@@ -73,9 +83,15 @@ const DropdownComponent = function({props}: {props: GuiSpec<'dropdown' | 'multid
                     const s = props;
                     const text = s.values.length > 1 ? item[s.values[1]] : item;
                     const value = s.values.length > 1 ? item[s.values[2]] : item;
+                    if (filterArray.some(f => !text.toLowerCase().includes(f))) return null;
                     return <option key={i} value={value}>{text}</option>
                 })}
             </select>
+            <div></div>
+            <input type="text" value={filter} placeholder="Filter options..." 
+            onChange={(e => setFilter(e.target.value))} 
+            className="m-1 pl-1 justify-self-center"
+            />
         </>
     )
 };
@@ -120,10 +136,10 @@ const RadioButtonComponent = function({props}: {props: GuiSpec<'radiobuttons'>})
                     <>
                     <span 
                     className="m-1"
-                    key={i}>
+                    key={i + id}>
                         {v[0]}
                     </span>
-                        <input 
+                        <input key={i + id + 'input'}
                         type="radio" value={v[1]} checked={v[1] === props.current_value} onChange={action(e => {
                             props.current_value = e.currentTarget.value;
                             if (props.func) props.func(e.currentTarget.value);
@@ -217,7 +233,7 @@ export default observer(function({chart}: {chart: Chart}) {
         return wrap.settings;
     }, [chart]);
     return (
-        <div>
+        <div className="w-full">
             {settings.map((setting, i) => <AbstractComponent key={i} props={setting} />)}
         </div>
     )
