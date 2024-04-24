@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useId } from "react";
 import type { Chart, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -29,6 +29,7 @@ const SliderComponent = function({props}: {props: GuiSpec<'slider'>}) {
             <input type="range" value={props.current_value} 
             min={props.min || 0}
             max={props.max || 1}
+            step={props.step || 0.01}
             onChange={action(e => {
                 const value = parseFloat(e.target.value);
                 props.current_value = value;
@@ -90,18 +91,42 @@ const CheckboxComponent = function({props}: {props: GuiSpec<'check'>}) {
 };
 
 const RadioButtonComponent = function({props}: {props: GuiSpec<'radiobuttons'>}) {
+    const id = useId();
     return (
         <>
             <label>{props.label}</label>
+            {/* <RadioGroup << meh
+            className="ciview-radio-group"
+            defaultValue={props.current_value}
+                onValueChange={action(e => {
+                    props.current_value = e;
+                    if (props.func) props.func(e);
+                })}
+            >
+                {props.choices.map((v, i) => {
+                    const cid = `${id}-${v[0]}`;
+                    return (
+                        <span key={cid}>
+                            <RadioGroupItem id={cid} value={v[1]} />
+                            <Label htmlFor={cid}>{v[0]}</Label>
+                        </span>
+                    )
+                })}
+            </RadioGroup> */}
             <div className="ciview-radio-group">
                 {props.choices.map((v, i) => (
-                    <label key={i}>
+                    <>
+                    <span 
+                    className="m-1"
+                    key={i}>
                         {v[0]}
-                        <input type="radio" value={v[1]} checked={v[1] === props.current_value} onChange={action(e => {
+                    </span>
+                        <input 
+                        type="radio" value={v[1]} checked={v[1] === props.current_value} onChange={action(e => {
                             props.current_value = e.currentTarget.value;
                             if (props.func) props.func(e.currentTarget.value);
                         })}/>
-                    </label>
+                    </>
                 ))}
             </div>
         </>

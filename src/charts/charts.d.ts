@@ -69,6 +69,7 @@ export type GuiValueTypes = {
     "spinner": number;
     "button": undefined;
     "doubleslider": [number, number];
+    "folder": GuiSpec[];
 }
 export type GuiSpecType = keyof GuiValueTypes;
 export type GuiSpec<T extends GuiSpecType> = {
