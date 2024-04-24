@@ -67,16 +67,17 @@ function useCreateRange(chart: BaseReactChart<any>) {
 }
 
 
-export function ChartProvider({ chart, children }: { chart: BaseReactChart<any>, children: any }) {
+export function ChartProvider({ chart, children, materialui }: { chart: BaseReactChart<any>, materialui: boolean } & React.PropsWithChildren) {
     //DataStoreContext.Provider would be applied at a wider scope if we had a global root & portals.
     const rangeState = useCreateRange(chart);
     return (
     <ChartContext.Provider value={chart}>
         <DataStoreContext.Provider value={chart.dataStore}>
             <RangeContext.Provider value={rangeState}>
-                <MaterialWrapper>
+                {materialui && (<MaterialWrapper>
                     {children}
-                </MaterialWrapper>
+                </MaterialWrapper>)}
+                {!materialui && children}
             </RangeContext.Provider>
         </DataStoreContext.Provider>
     </ChartContext.Provider>)

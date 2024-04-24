@@ -81,7 +81,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         const ReactComponentFunction = this.ComponentFn;
         this.root.render((
             <StrictMode>
-                <ChartProvider chart={this}>
+                <ChartProvider chart={this} materialui>
                     <ReactComponentFunction />
                 </ChartProvider>
             </StrictMode>

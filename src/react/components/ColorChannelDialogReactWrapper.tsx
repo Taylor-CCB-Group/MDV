@@ -31,7 +31,7 @@ class ColorDialogReactWrapper extends BaseDialog {
         this.root = createRoot(div);
         // todo use a portal, share a root & chart context with the parent?
         this.root.render(
-            <ChartProvider chart={parent}>
+            <ChartProvider chart={parent} materialui>
                 <ColorChannelDialogReact />
             </ChartProvider>
         );
