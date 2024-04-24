@@ -58,11 +58,13 @@ const SpinnerComponent = function({props}: {props: GuiSpec<'spinner'>}) {
 
 const DropdownComponent = function({props}: {props: GuiSpec<'dropdown' | 'multidropdown'>}) {
     if (!props.values) return <>DropdownComponent: no values</>;
+    const v = props.type === 'multidropdown' && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
     return (
         <>
             <label>{props.label}</label>
             <select 
             multiple={props.type === 'multidropdown'}
+            value={v}
             onChange={action(e => {
                 props.current_value = e.target.value;
                 if (props.func) props.func(e.target.value);
