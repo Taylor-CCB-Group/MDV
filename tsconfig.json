@@ -15,6 +15,10 @@
         "sourceMap": true,
         "noEmit": false,
         "skipLibCheck": true,
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["./src/*"]
+        },
     },
     "exclude": [
         "venv",

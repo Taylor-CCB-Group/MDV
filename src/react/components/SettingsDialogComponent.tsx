@@ -3,6 +3,12 @@ import { useState, useMemo } from "react";
 import type { Chart, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion"
 
 const TextComponent = function({props}: {props: GuiSpec<'text'>}) {
     return (
@@ -130,10 +136,14 @@ const ButtonComponent = function({props}: {props: GuiSpec<'button'>}) {
 
 const FolderComponent = function({props}: {props: GuiSpec<'folder'>}) {
     return (
-        <div className="col-span-2">
-            <h2>{props.label}</h2>
-            {props.current_value.map((setting, i) => <AbstractComponent key={i} props={setting} />)}
-        </div>
+        <Accordion type='single' collapsible className="w-full col-span-2">
+            <AccordionItem value={props.label}>
+                <AccordionTrigger>{props.label}</AccordionTrigger>
+                <AccordionContent>
+                    {props.current_value.map((setting, i) => <AbstractComponent key={i} props={setting} />)}
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
     )
 }
 
