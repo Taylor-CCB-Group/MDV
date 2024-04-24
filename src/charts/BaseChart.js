@@ -654,17 +654,15 @@ class BaseChart{
         if (this.addToContextMenu){
             menu=menu.concat(this.addToContextMenu());
         }
-        if (import.meta.env.DEV) {
-            menu.push({
-                text: "experimental settings dialog",
-                icon: "fas fa-cog",
-                func: async () => {
-                    const m = await import("../react/components/SettingsDialogReactWrapper");
-                    const SettingsDialogReactWrapper = m.default;
-                    this.dialogs.push(new SettingsDialogReactWrapper(this));
-                }
-            });
-        }
+        menu.push({
+            text: "experimental settings dialog",
+            icon: "fas fa-cog",
+            func: async () => {
+                const m = await import("../react/components/SettingsDialogReactWrapper");
+                const SettingsDialogReactWrapper = m.default;
+                this.dialogs.push(new SettingsDialogReactWrapper(this));
+            }
+        });
         return menu;
     }
 
