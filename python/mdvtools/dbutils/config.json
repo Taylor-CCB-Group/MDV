@@ -1,0 +1,7 @@
+{
+    "database_uri": "postgresql://postgres@localhost/mydatabase",
+    "track_modifications": false,
+    "upload_folder": "/path/to/upload/folder",
+    "projects_base_dir": "/Users/jayesh/mdv"
+  }
+  
