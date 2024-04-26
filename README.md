@@ -94,7 +94,7 @@ poetry install --with dev
 npm run build-flask-vite
 ```
 
-On Windows systems, the `source venv/bin/activate` will not work - activating the environment is done by running `venv/bin/activate.bat`.
+On Windows systems, the `source venv/bin/activate` will not work - activating the environment is done by running `venv/Scripts/activate.bat`.
 
 If you don't want to use `poetry`, or wish to manage your own virtual environment, you can install `mdvtools` with `pip` (using `editable` flag for development):
 
