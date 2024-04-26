@@ -66,6 +66,7 @@ Clone the repository
 
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
+cd MDV
 git checkout pjt-dev
 ```
 
