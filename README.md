@@ -45,7 +45,8 @@ For development, or running the current version from the repository:
 
 * git
 * node.js
-
+* python (3.12)
+* poetry (for managing python dependencies - optional, but recommended especially for contributing to the Python code)
 
 ## Running On Local Machine
 
@@ -65,6 +66,7 @@ Clone the repository
 
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
+git checkout pjt-dev
 ```
 
 Then, from the MDV folder:
@@ -75,7 +77,7 @@ Install front-end dependencies
 npm i
 ```
 
-Setup Python virtual environment and build the front-end that it will use. On Unix-like systems, there is an npm script that will do this automatically:
+Setup Python virtual environment and build the front-end that it will use. On Unix-like systems, there is an npm script that will do this automatically, as long as you have Python 3.12 installed and [Poetry is available in your PATH](https://python-poetry.org/docs/#installation):
 
 ```
 npm run python-setup
@@ -86,16 +88,24 @@ This will be equivalent to the following:
 ```
 python -m venv venv
 source venv/bin/activate
-pip install -e python
+cd python
+poetry install --with dev
 npm run build-flask-vite
 ```
 
 On Windows systems, the `source venv/bin/activate` will not work - activating the environment is done by running `venv/bin/activate.bat`.
 
-If you wish to manage your own virtual environment, or use an existing one, instead of that you can install `mdvtools` (using `editable` flag for development):
+If you don't want to use `poetry`, or wish to manage your own virtual environment, you can install `mdvtools` with `pip` (using `editable` flag for development):
 
 ```
 pip install -e python
+```
+
+**or**, if you are happy with `poetry` but want to manage the virtual environment yourself:
+
+```
+cd python
+poetry install --with dev
 ```
 
 ### Running a test project
