@@ -20,7 +20,6 @@ import os
 import pandas as pd
 from typing import Optional
 from datetime import datetime
-from mdvtools.dbutils.dbmodels import db, Project, File, User
 
 routes = set()
 
@@ -304,6 +303,7 @@ def create_app(
         app.run(host="0.0.0.0", port=port, debug=True)
 
 def add_datasource_backend(project,view):
+    from mdvtools.dbutils.dbmodels import db, Project, File, User
     try:
         project_name = project.name
         if not project_name:
