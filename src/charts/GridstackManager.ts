@@ -77,7 +77,8 @@ export default class GridStackManager {
 
     destroy(ds: DataSource){
         if (!this.grids.has(ds)){
-            console.error(`destroying non-existent gridstack - ${ds.name}`)
+            console.error(`destroying non-existent gridstack - ${ds.name}`);
+            return;
         }
         const gi = this.grids.get(ds);
         const div = ds.contentDiv;

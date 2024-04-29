@@ -173,7 +173,9 @@ class VivScatterPlot extends DensityScatterPlot{
     // PJT *Channel methods moved to VivViewer.
 
     remove(){
-        this.viv.deck.finalize();
+        if (this.viv.deck){
+            this.viv.deck.finalize();
+        }
         super.remove();  
     }
 
@@ -222,7 +224,7 @@ class VivScatterPlot extends DensityScatterPlot{
             this.graphDiv.prepend(this.vivCanvas);
             
 
-            import ('../webgl/VivViewer.js').then(({default:VivViewer})=>{
+            import ('../webgl/VivViewer.js?v0.5').then(({default:VivViewer})=>{
                 //new config
                 const r  = this.dataStore.regions;
                 const vc  = Object.assign({},c.viv);
