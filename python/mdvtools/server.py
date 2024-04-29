@@ -75,7 +75,7 @@ def create_app(project,open_browser=True, port =5000):
             data = request.json
             bytes_ = project.get_byte_data(data["columns"],data["data_source"])
             response=make_response(bytes_)
-            response.headers.set('Content-Type', 'application/octet-stream')
+            response.headers['Content-Type']='application/octet-stream'
             return response
         except Exception as e:
             print(e) 
