@@ -49,24 +49,41 @@ class VivViewer {
     getTiff(config.url).then(loader=>{
       this.tiff = loader;
       this._setUp(loader,initialView);
-    });
+    }).catch(e=>{
+      console.log(e);
+      const ctx= this.canvas.getContext('2d');
+      ctx.font="20px Arial";
+      this.canvas.getContext('2d').fillText("Error loading data",10,20);
+    })
   }
+  
 
   setSize(x,y,conf){
     this.height=y;
     this.width=x;
-
+    
     const v =this.getViewState(conf.x_scale,conf.y_scale,conf.offset);
-    this.canvas.width = x;
-    this.canvas.height = y;
-    this.canvas.style.width = x;
-    this.canvas.style.height = y;
-    this.deck.setProps({
-      height:y,
-      width:x,
-      viewState:v
-    })
-  }
+    
+    this.detailView = new DetailView({
+        id: DETAIL_VIEW_ID,
+        height:y<this.native_y?this.native_y:y,
+        width:x<this.native_x?this.native_x:x
+      });
+  
+
+
+      const deckGLView =this.detailView.getDeckGlView();
+      this.canvas.width = x;
+      this.canvas.height = y;
+      this.canvas.style.width = x;
+      this.canvas.style.height = y;
+      this.deck.setProps({
+        height:y,
+        width:x,
+        viewState:v,
+        views:[deckGLView]
+      })
+    }
 
 
   setPanZoom(offset,x_scale,y_scale){  
@@ -81,13 +98,17 @@ class VivViewer {
     if (this.config.use3d) return undefined;
     const hzoom = Math.log2(y_scale);
     const wzoom = Math.log2(x_scale);
-    let xpos = ((1/x_scale)*(this.native_x))/2;
+    //need to make width and height th same as the canvas if they are smaller
+    //this is because the target is based on the width and height
+    const nx = this.width>this.native_x?this.width:this.native_x;
+    const ny = this.height>this.native_y?this.height:this.native_y;
+    let xpos = ((1/x_scale)*(nx))/2;
     xpos-= offset[0];
-    let ypos = ((1/y_scale)*(this.native_y))/2;
+    let ypos = ((1/y_scale)*(ny))/2;
     ypos+=this.native_y-offset[1];
     return {
-      height:this.native_y,
-      width:this.native_x,
+      height:nx,
+      width:ny,
       id:DETAIL_VIEW_ID,
       target:[xpos,ypos,0],
       zoom:[wzoom,hzoom]
@@ -307,10 +328,21 @@ class VivViewer {
             contrastLimits:[],
             domains:[]
         }
+        const def_colors=[[0,0,255],[0,255,0],[255,0,0],[255,255,0],[0,255,255],[255,0,255]];
+        let c_index=0;
         for (let item of conf){
-            nconf.selections.push({z:0,t:0,c:this.channels.findIndex(x=>x.Name===item.name)});
+            const chan = this.channels.findIndex(x=>x.Name===item.name);
+            if (chan===-1){
+              console.log('channel not found', item.name);
+              continue;
+            }
+            nconf.selections.push({z:0,t:0,c:chan});
             let c = item.color;
-            c = c?typeof item.color === "string"?hexToRGB(c):c:[255,0,0];
+            c = c?typeof item.color === "string"?hexToRGB(c):c:def_colors[c_index];
+            c_index++;
+            if (c_index>=def_colors.length){
+              c_index=0;
+            }  
             nconf.colors.push(c);
             nconf.channelsVisible.push(item.visible==undefined?true:item.visible);
             nconf.contrastLimits.push(item.contrastLimits || null);
@@ -360,8 +392,8 @@ class VivViewer {
     } else {
       this.detailView = new DetailView({
         id: DETAIL_VIEW_ID,
-        height:this.native_y,
-        width:this.native_x
+        height:this.native_y>this.height?this.native_y:this.height,
+        width:this.native_x>this.width?this.native_x:this.width
       });
     }
     const initialViewState = this.volViewState;
@@ -424,8 +456,6 @@ class VivViewer {
 
         //domains may not be the same as contrast limits -  again need way of calculating
         //temp default values
-        
-
         const layerConfig = {
             loader:this.loader,
             contrastLimits:info.contrastLimits.slice(0),
@@ -442,6 +472,8 @@ class VivViewer {
             viewStates,
             props:layerConfig
         });
+        //scale bar layer not formatted correctly
+        this.layers=[this.layers[0]]
         this.mainVivLayer = this.layers[0];
     }
 }
