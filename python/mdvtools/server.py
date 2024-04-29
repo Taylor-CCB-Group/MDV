@@ -244,6 +244,11 @@ def create_app(
 
     @project_bp.route("/add_datasource", methods=["POST"])
     def add_datasource():
+        backend = request.form["backend"]
+        if backend:
+                response = add_datasource_backend(project)
+                return response
+        
         if (
             "permission" not in project.state
             or not project.state["permission"] == "edit"
@@ -279,10 +284,8 @@ def create_app(
                 supplied_columns_only=supplied_only,
                 replace_data=replace,
             )
-            backend = request.form["backend"]
-            if backend:
-                response = add_datasource_backend(project,view)
-                return response
+            
+            
         except Exception as e:
             # success = False
             return str(e), 400
@@ -302,40 +305,106 @@ def create_app(
     else:
         app.run(host="0.0.0.0", port=port, debug=True)
 
-def add_datasource_backend(project,view):
-    from mdvtools.dbutils.dbmodels import db, Project, File, User
+def add_datasource_backend(project):
+    from mdvtools.dbutils.dbmodels import db, Project, File
+    from sqlalchemy.exc import SQLAlchemyError
+
     try:
-        project_name = project.name
-        if not project_name:
-            return jsonify({'error': 'Project name is missing.'}), 400
+    
+        if (
+            "permission" not in project.state
+            or not project.state["permission"] == "edit"
+        ):
+            return jsonify({'error': 'Project is read-only'}), 400
+       
+        name = request.form["name"]
+        if not name:
+            return jsonify({'error': 'Request must contain \'name\''}), 400
         
         # Check if project exists
-        project_db = Project.query.filter_by(name=project_name).first()
+        project_db = Project.query.filter_by(name=name).first()
         if not project_db:
             return jsonify({'project does not exist in database'}), 400
 
+        view = request.form["view"] if "view" in request.form else None
+        replace = True if "replace" in request.form else False
         
+        if "file" not in request.files:
+            return jsonify({'No \'file\' provided in request form data'}), 400
+        
+        file = request.files["file"]
+        supplied_only = True if "supplied_only" in request.form else False
+        
+        # Validate the file
+        is_valid, error_message = validate_file(file)
+        if not is_valid:
+            return jsonify({'error': error_message}), 400
+
+        # Read file and add the datasource 
+        file.seek(0)
+        # will this work? can we return progress to the client?
+        df = pd.read_csv(file.stream)
+        project.add_datasource(
+            name,
+            df,
+            # cols,
+            add_to_view=view,
+            supplied_columns_only=supplied_only,
+            replace_data=replace,
+        )
+        
+        #database operations
         file_set = [project.h5file, project.datasourcesfile]
         if view:
                 file_set.append(project.viewsfile)
 
         for file in file_set:
             existing_file = File.query.filter_by(name=os.path.basename(file), project_id=project_db.id).first()
+            
             if existing_file:
-               
                 # Update the database entry with new file path and update timestamp
-               
                 existing_file.update_timestamp = datetime.now()
 
-                
-
             else:
-                
                 # Create a new file entry
                 new_file = File(name=os.path.basename(file), file_path=None, project=project_db)
                 db.session.add(new_file)
                 
         db.session.commit()
-        return jsonify({'message': f'Files {file_set} have been modified under project "{project_name}  "'}), 200
+        return jsonify({'message': f'File Validation Status: Success. Successfully added csv as a new datasource and files {file_set} have been modified under project "{name}"'}), 200
+    
+    except SQLAlchemyError as e:
+        # Rollback transaction on database error
+        db.session.rollback()
+        return jsonify({'error': 'Database error occurred'}), 500
+    
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 400
+    
+
+def validate_file(file):
+    try:
+        if not file:
+            return False, 'File is missing'
+        
+        """Validate the CSV file."""
+        file_dir = os.path.dirname(os.path.abspath(__file__))
+        dbutils_dir = os.path.join(file_dir, 'dbutils')
+        validation_rules_path = os.path.join(dbutils_dir, 'validation_rules.json')
+
+        with open(validation_rules_path, 'r') as f:
+            validation_rules = json.load(f)
+        
+        # Check file type
+        if file.mimetype not in validation_rules['file_type']['allowed_types']:
+            return False, validation_rules['file_type']['error_message']
+
+        # Check file size
+        max_size = validation_rules['file_size']['max_size']
+        if file.content_length > max_size:
+            return False, validation_rules['file_size']['error_message']
+
+        return True, None
+    
+    except Exception as e:
+        return False, f'An error occurred during file validation: {str(e)}'
