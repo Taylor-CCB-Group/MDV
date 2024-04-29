@@ -12,7 +12,7 @@ class GenomeBrowser extends BaseChart{
         c.type="genome_browser";
         const add_ruler= c.tracks.find(x=>x["format"]==="ruler")?false:true;
 
-        import ('../browser/panel.js?v0.1').then(({default:MLVPanel})=>{
+        import ('../browser/panel.js?v0.2').then(({default:MLVPanel})=>{
             this.browser = new MLVPanel(this.contentDiv,{
                 allow_user_interactions:true,
                 show_scale:true,

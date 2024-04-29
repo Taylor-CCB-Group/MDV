@@ -596,7 +596,8 @@ class BWReader{
 
         return new Promise(function (fulfill, reject) {
             var rpTree = self.rpTreeCache[offset];
-            if (rpTree) {
+            //sometimes the rptree loads but has no root node if there was a network error
+            if (rpTree && rpTree.rootNode) {
                 fulfill(rpTree);
             }
             else {
@@ -794,7 +795,6 @@ class RPTree{
             console.log("null item");
             return false;
         }
-
         return ((chrIdx > item.startChrom) || (chrIdx == item.startChrom && endBase >= item.startBase)) &&
             ((chrIdx < item.endChrom) || (chrIdx == item.endChrom && startBase < item.endBase));
     }
