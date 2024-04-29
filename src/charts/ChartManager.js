@@ -46,7 +46,6 @@ import "./SingleSeriesChart";
 import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
-import { runInAction } from "mobx";
 import { addChartLink } from "../links/link_utils";
 
 //order of column data in an array buffer
