@@ -3,7 +3,7 @@ import {ContextMenu} from "../utilities/ContextMenu.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog";
 import { chartTypes } from "./ChartTypes.ts";
-// import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
+import DebugChartDialogReactWrapper from "../react/components/DebugChartDialogReactWrapper";
 
 
 class BaseChart{
@@ -99,7 +99,10 @@ class BaseChart{
                 menu.push({
                     text:"debug chart",
                     icon:"fas fa-bug",
-                    func:()=>window.mdv.debugChart = this
+                    func:()=>{
+                        window.mdv.debugChart = this;
+                        this.dialogs.push(new DebugChartDialogReactWrapper(this));
+                    }
                 });
                 menu.push({
                     text: "copy config JSON to clipboard",
