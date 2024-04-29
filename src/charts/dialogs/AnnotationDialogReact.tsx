@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import DataStore from "../../datastore/DataStore.js";
 import TagModel from "../../table/TagModel";
 import { BaseDialog } from "../../utilities/Dialog.js";
-import { createRoot } from "react-dom/client";
+import { createMdvPortal } from "@/react/react_utils";
 
 function AnnotationDialogComponent({tagModel}: {tagModel: TagModel}) {
     const [tagList, setTagList] = useState(tagModel.getTags());
@@ -39,7 +39,7 @@ class AnnotationDialogReact extends BaseDialog {
     // dataModel: DataModel;
     tagListElement: HTMLDivElement;
     tagInput: any;
-    root: ReturnType<typeof createRoot>;
+    root: ReturnType<typeof createMdvPortal>;
     constructor(dataStore: DataStore, tagModel: TagModel) {
         super({
             title: "Annotate selection",
@@ -49,8 +49,7 @@ class AnnotationDialogReact extends BaseDialog {
         this.outer.classList.add('annotationDialog');
         // this.tagModel = new TagModel(dataStore);
         this.tagModel = tagModel;
-        this.root = createRoot(this.dialog);
-        this.root.render(<AnnotationDialogComponent tagModel={this.tagModel} />);
+        this.root = createMdvPortal(<AnnotationDialogComponent tagModel={this.tagModel} />, this.dialog);
     }
     close(): void {
         super.close();

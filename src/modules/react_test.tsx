@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import BaseChart from "../charts/BaseChart";
-import { createRoot } from "react-dom/client";
+import { createMdvPortal } from "@/react/react_utils";
 
 let ID = 0;
 function ReactTest({dataStore, parent}) {
@@ -27,7 +27,7 @@ function ReactTest({dataStore, parent}) {
 class ReactChart extends BaseChart {
   constructor(dataStore, div, config) {
     super(dataStore, div, config);
-    createRoot(this.contentDiv).render(<ReactTest dataStore={dataStore} parent={this} />);
+    createMdvPortal(<ReactTest dataStore={dataStore} parent={this} />, this.contentDiv);
   }
 
   getSettings() {

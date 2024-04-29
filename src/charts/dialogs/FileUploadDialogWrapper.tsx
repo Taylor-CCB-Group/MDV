@@ -1,9 +1,9 @@
-import { createRoot } from "react-dom/client";
+import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "../../utilities/Dialog";
 import FileUploadDialogComponent from "./FileUploadDialog";
 
 class FileUploadDialogReact extends BaseDialog {
-    root: ReturnType<typeof createRoot>;
+    root: ReturnType<typeof createMdvPortal>;
 
     constructor() {
         super(
@@ -16,8 +16,7 @@ class FileUploadDialogReact extends BaseDialog {
         );
         this.outer.classList.add("fileUploadDialog");
         if (this.dialog) {
-            this.root = createRoot(this.dialog);
-            this.root.render(<FileUploadDialogComponent onClose={() => this.close()} />);
+            this.root = createMdvPortal(<FileUploadDialogComponent onClose={() => this.close()} />, this.dialog);
         } else {
             console.error("Dialog element not found");
         }

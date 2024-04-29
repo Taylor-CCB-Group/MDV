@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
-import { createRoot } from "react-dom/client";
+import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./SettingsDialogComponent";
 import BaseChart from "../../charts/BaseChart";
 
@@ -14,7 +14,7 @@ const SettingsDialog = observer(({chart}: {chart: BaseChart}) => {
 // don't necessarily want to inherit from BaseDialog, could consider different approach.
 // this will be more consistent / less work in short-term, and a basis for refactoring later.
 class SettingsDialogReactWrapper extends BaseDialog {
-    _root: ReturnType<typeof createRoot>;
+    _root: ReturnType<typeof createMdvPortal>;
     get root() { return this._root; }
     set root(v) {
         this._root = v;
@@ -31,12 +31,9 @@ class SettingsDialogReactWrapper extends BaseDialog {
     }
     init(parent: BaseChart) {
         const div = createEl('div', {}, this.dialog);
-        this.root = createRoot(div);
-        // todo use a portal, share a root & chart context with the parent?
-        // review ChartProvider... maybe do more passing of props vs context for everything...
-        this.root.render(
+        this.root = createMdvPortal((
             <SettingsDialog chart={parent} />
-        );
+        ), div);
     }
     close() {
         super.close();
