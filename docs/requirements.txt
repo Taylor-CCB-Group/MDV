@@ -1,0 +1,5 @@
+Sphinx==7.3.7
+sphinx_rtd_theme==2.0.0
+sphinx-autoapi==3.0.0
+sphinx-js==3.2.2
+esbonio==0.16.4

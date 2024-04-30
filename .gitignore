@@ -32,6 +32,7 @@ docs/maindocs/_build/
 docs/maindocs/autoapi/
 
 venv/
+docsenv/
 data/
 
 .idea
