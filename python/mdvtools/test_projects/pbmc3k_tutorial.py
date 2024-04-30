@@ -13,10 +13,7 @@
 
 import numpy as np
 import pandas as pd
-import scanpy as sc
-import anndata as ad
-import muon as mu
-import mudatasets as mds
+import scanpy as sc 
 import json
 from mdvtools.mdvproject import MDVProject
 import os
@@ -33,9 +30,9 @@ from mdvtools.charts.table_plot import TablePlot
 
 sc.settings.verbosity = 3  # verbosity: errors (0), warnings (1), info (2), hints (3)
 sc.logging.print_header()
-sc.settings.set_figure_params(dpi=80, facecolor="white")
 
-results_file = "write/pbmc3k.h5ad"  # the file that will store the analysis results
+dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(dir)
 
 adata = sc.read_10x_mtx(
     "data/filtered_gene_bc_matrices/hg19/",  # the directory with the `.mtx` file
@@ -43,7 +40,7 @@ adata = sc.read_10x_mtx(
     cache=True,  # write a cache file for faster subsequent reading
 )
 
-adata#.var_names_make_unique()  # this is unnecessary if using `var_names='gene_ids'` in `sc.read_10x_mtx`
+# adata.var_names_make_unique()  # this is unnecessary if using `var_names='gene_ids'` in `sc.read_10x_mtx`
 
 # annotate the group of mitochondrial genes as "mt"
 adata.var["mt"] = adata.var_names.str.startswith("MT-")
@@ -51,8 +48,8 @@ sc.pp.calculate_qc_metrics(
     adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True
 )
 
-adata = adata[adata.obs.n_genes_by_counts < 2500, :]
-adata = adata[adata.obs.pct_counts_mt < 5, :].copy()
+adata = adata[adata.obs.n_genes_by_counts < 2500, :] # type: ignore
+adata = adata[adata.obs.pct_counts_mt < 5, :].copy() # type: ignore
 
 sc.pp.normalize_total(adata, target_sum=1e4)
 sc.pp.log1p(adata)
@@ -60,7 +57,7 @@ sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
 
 adata.raw = adata
 
-adata = adata[:, adata.var.highly_variable]
+adata = adata[:, adata.var.highly_variable] # type: ignore
 
 sc.pp.regress_out(adata, ["total_counts", "pct_counts_mt"])
 
@@ -89,12 +86,14 @@ sc.tl.rank_genes_groups(adata, "leiden", method="logreg", max_iter=1000)
 
 cells_df = pd.DataFrame(adata.obs)
 
-cells_df["X_pca_1"] = adata.obsm["X_pca"][:, 0]
-cells_df["X_pca_2"] = adata.obsm["X_pca"][:, 1]
-cells_df["X_pca_3"] = adata.obsm["X_pca"][:, 2]
+pca_np = np.array(adata.obsm["X_pca"])
+cells_df["X_pca_1"] = pca_np[:, 0]
+cells_df["X_pca_2"] = pca_np[:, 1]
+cells_df["X_pca_3"] = pca_np[:, 2]
 
-cells_df["X_umap_1"] = adata.obsm["X_umap"][:, 0]
-cells_df["X_umap_2"] = adata.obsm["X_umap"][:, 1]
+umap_np = np.array(adata.obsm["X_umap"])
+cells_df["X_umap_1"] = umap_np[:, 0]
+cells_df["X_umap_2"] = umap_np[:, 1]
 
 cells_df["cell_id"] = adata.obs.index
 '''adata.layers['counts'] = adata.X.copy()
@@ -118,27 +117,31 @@ print(pd.DataFrame(
         for key in ["names", "scores"]
     }
 )) '''
-
+assert isinstance(adata.X, np.ndarray)
 adata.layers['counts'] = adata.X.copy()
 
-
-cells_df['ARVCF']=pd.Series(np.transpose(adata.layers['counts'])[adata.var.index.get_loc("ARVCF")]).values
-#cells_df['CTB-113I20.2']=pd.Series(np.transpose(adata.layers['counts'])[adata.var.index.get_loc("CTB-113I20.2")])
-cells_df['DOK3']=pd.Series(np.transpose(adata.layers['counts'])[adata.var.index.get_loc("DOK3")]).values
-cells_df['FAM210B']=pd.Series(np.transpose(adata.layers['counts'])[adata.var.index.get_loc("FAM210B")]).values
-cells_df['GBGT1']=pd.Series(np.transpose(adata.layers['counts'])[adata.var.index.get_loc("GBGT1")]).values
-cells_df['NFE2L2']=pd.Series(np.transpose(adata.layers['counts'])[adata.var.index.get_loc("NFE2L2")]).values
-#cells_df['PPBP']=pd.Series(np.transpose(adata.layers['counts'])[adata.var.index.get_loc("PPBP")])
-cells_df['UBE2D4']=pd.Series(np.transpose(adata.layers['counts'])[adata.var.index.get_loc("UBE2D4")]).values
-cells_df['YPEL2']=pd.Series(np.transpose(adata.layers['counts'])[adata.var.index.get_loc("YPEL2")]).values
+## these can be added dynamically with the 'Add Gene Expr' UI in the frontend
+assert isinstance(adata.layers['counts'], np.ndarray)
+counts = np.array(adata.layers['counts'])
+transpose_counts = np.transpose(counts)
+cells_df['ARVCF']=transpose_counts[adata.var.index.get_loc("ARVCF")]
+#cells_df['CTB-113I20.2']=transpose_counts[adata.var.index.get_loc("CTB-113I20.2")])
+cells_df['DOK3']=transpose_counts[adata.var.index.get_loc("DOK3")]
+cells_df['FAM210B']=transpose_counts[adata.var.index.get_loc("FAM210B")]
+cells_df['GBGT1']=transpose_counts[adata.var.index.get_loc("GBGT1")]
+cells_df['NFE2L2']=transpose_counts[adata.var.index.get_loc("NFE2L2")]
+#cells_df['PPBP']=transpose_counts[adata.var.index.get_loc("PPBP")])
+cells_df['UBE2D4']=transpose_counts[adata.var.index.get_loc("UBE2D4")]
+cells_df['YPEL2']=transpose_counts[adata.var.index.get_loc("YPEL2")]
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 #Αdd a second datasource 'genes'
 gene_table = adata.var
 gene_table["gene_ids"]=gene_table.index
 
-gene_table["PCs_1"] = adata.varm["PCs"][:, 0]
-gene_table["PCs_2"] = adata.varm["PCs"][:, 1]
+varm_np = np.array(adata.varm["PCs"])
+gene_table["PCs_1"] = varm_np[:, 0]
+gene_table["PCs_2"] = varm_np[:, 1]
 
 print(adata.var)
 #print(gene_table.columns.values.tolist())
@@ -176,6 +179,7 @@ dot_plot.set_axis_properties("ry", {"label": "", "textSize": 13, "tickfont": 10}
 dot_plot.set_color_scale(log_scale=False)
 dot_plot.set_color_legend(True, [40, 10])
 dot_plot.set_fraction_legend(True, [0, 0])
+
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 histogram_plot = HistogramPlot(
