@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { BaseDialog } from "../../utilities/Dialog";
 import FileUploadDialogComponent from "./FileUploadDialog";
-
+import { ProjectProvider} from "../../modules/ProjectContext";
 class FileUploadDialogReact extends BaseDialog {
     root: ReturnType<typeof createRoot>;
 
@@ -17,7 +17,11 @@ class FileUploadDialogReact extends BaseDialog {
         this.outer.classList.add("fileUploadDialog");
         if (this.dialog) {
             this.root = createRoot(this.dialog);
-            this.root.render(<FileUploadDialogComponent onClose={() => this.close()} />);
+            this.root.render(
+            <ProjectProvider>
+                <FileUploadDialogComponent onClose={() => this.close()} />
+            </ProjectProvider>
+        );
         } else {
             console.error("Dialog element not found");
         }
