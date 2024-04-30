@@ -1,0 +1,11 @@
+fasteners==0.18
+Flask==3.0.3
+Flask_SocketIO==5.3.6
+flask_sqlalchemy==3.1.1
+h5py==3.11.0
+mudata==0.2.3
+numpy==1.26.4
+pandas==2.2.2
+scanpy==1.10.1
+scipy==1.13.0
+Werkzeug==3.0.2
