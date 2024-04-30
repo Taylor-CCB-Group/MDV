@@ -16,7 +16,7 @@ class FileUploadDialogReact extends BaseDialog {
         );
         this.outer.classList.add("fileUploadDialog");
         if (this.dialog) {
-            this.root = createMdvPortal(<FileUploadDialogComponent onClose={() => this.close()} />, this.dialog);
+            this.root = createMdvPortal(<ProjectProvider><FileUploadDialogComponent onClose={() => this.close()} /></ProjectProvider>, this.dialog);
         } else {
             console.error("Dialog element not found");
         }
