@@ -27,6 +27,7 @@ class TestProjectLoader(unittest.TestCase):
 
         # Call the function
         projects = load_projects_from_config('/base/dir')
+        print(f"loaded {len(projects)} projects from mock config.")
 
         # Assert that MDVProject constructor was called twice
         self.assertEqual(mock_mdvproject.call_count, 2)
@@ -40,6 +41,7 @@ class TestProjectLoader(unittest.TestCase):
 
         # Call the function
         projects = create_projects_from_db('/base/dir')
+        print(f"created {len(projects)} projects from mock db.")
 
         # Assert that MDVProject constructor was called twice
         self.assertEqual(mock_mdvproject.call_count, 2)
