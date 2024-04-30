@@ -21,6 +21,7 @@ dist/_avocato
 python/build
 python/data
 python/mdvtools/tests/temp/*
+python/mdvtools/test_projects/cache/*
 python/mdvtools/static/*
 python/mdvtools/template/page.html
 .ipynb_checkpoints
