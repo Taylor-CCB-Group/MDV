@@ -75,6 +75,10 @@ sphinx-rtd-theme = "^2.0.0"
 sphinx = "^7.2.6"
 sphinx-autoapi = "^3.0.0"
 
+
+[tool.poetry.group.backend.dependencies]
+flask-sqlalchemy = "^3.1.1"
+
 [project.urls]
 "Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
 "Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
