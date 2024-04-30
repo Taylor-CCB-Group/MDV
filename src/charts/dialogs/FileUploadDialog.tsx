@@ -126,9 +126,9 @@ const ErrorContainer = ({ children }) => (
   </div>
 );
 
-const DynamicText = ({ text }) => (
+const DynamicText = ({ text, className = "" }) => (
   <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
-    <p className="text-center m-0 font-bold text-sm sm:text-lg md:text-xl">
+    <p className={`text-center m-0 font-bold text-sm sm:text-lg md:text-xl ${className}`}>
       {text}
     </p>
   </div>
@@ -212,7 +212,15 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     dispatch({ type: "SET_SELECTED_FILES", payload: acceptedFiles });
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
+    onDrop,
+    accept: {
+      'text/csv': ['.csv']
+    }
+  });
+  const rejectionMessage = fileRejections.length > 0 ? "Only CSV files can be selected" : "Drag and drop files here or click the button below to upload";
+  const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
+
 
   const handleUploadClick = async () => {
     console.log("Uploading file...");
@@ -385,7 +393,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             {isDragActive ? (
               <DynamicText text={"Drop files here..."}/>
             ) : (
-              <DynamicText text={state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : "Drag and drop files here or click the button below to upload"} />
+              <DynamicText text={state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : rejectionMessage} className={rejectionMessageStyle} />
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
