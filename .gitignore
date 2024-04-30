@@ -22,6 +22,7 @@ python/build
 python/data
 python/mdvtools/dbutils/__pycache__
 python/mdvtools/tests/temp/*
+python/mdvtools/test_projects/cache/*
 python/mdvtools/static/*
 python/mdvtools/template/page.html
 .ipynb_checkpoints
@@ -32,6 +33,7 @@ docs/maindocs/_build/
 docs/maindocs/autoapi/
 
 venv/
+docsenv/
 data/
 
 .idea
