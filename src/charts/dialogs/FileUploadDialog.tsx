@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useReducer, type PropsWithChildren } from "react";
 import { useDropzone } from "react-dropzone";
+import axios from 'axios';
+import { useProject } from "../../modules/ProjectContext";
 
 const Container = ({ children }: PropsWithChildren) => {
   return (
@@ -47,6 +49,12 @@ const FileInputLabel = ({ children, ...props }) => (
     {children}
   </label>
 );
+
+const Spinner = () => {
+  return <div className="w-16 h-16 border-8 mt-10 border-blue-500 border-dashed rounded-full animate-spin" style={{
+    borderColor: "blue transparent blue transparent"
+  }}></div>;
+};
 
 const colorStyles = {
   blue: {
@@ -183,10 +191,12 @@ const useFileUploadProgress = () => {
     setProgress(0);
   }, []);
 
-  return { progress, startProgress, resetProgress };
+  return { progress, setProgress, startProgress, resetProgress };
 };
 
 const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ onClose }) => {
+  const { projectName, flaskURL, isPopout } = useProject();
+
   const [state, dispatch] = useReducer(reducer, {
     selectedFiles: [],
     isUploading: false,
@@ -196,7 +206,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     error: null,
   });
 
-  const { progress, startProgress, resetProgress } = useFileUploadProgress();
+  const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     dispatch({ type: "SET_SELECTED_FILES", payload: acceptedFiles });
@@ -205,7 +215,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
   const handleUploadClick = async () => {
-    console.log("Uploading file...")
+    console.log("Uploading file...");
     if (!state.selectedFiles.length) {
       dispatch({ type: "SET_ERROR", payload: "noFilesSelected" });
       return;
@@ -213,63 +223,48 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
     dispatch({ type: "SET_IS_UPLOADING", payload: true });
     resetProgress();
-    dispatch({
-      type: "SET_ERROR",
-      payload: {
-        message: "Upload failed due to a network error.",
-        traceback: "Error: Network Error at uploadFileFunction"
-      }
-    });
 
-    startProgress();
+    const formData = new FormData();
+    formData.append("file", state.selectedFiles[0]);
+    formData.append("name", state.selectedFiles[0].name);
+    formData.append("view", "TRUE");
+    formData.append("backend", "TRUE");
+    formData.append("replace", "TRUE");
+    
+    
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: function(progressEvent) {
+        const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        setProgress(percentComplete); // Update the progress as the file uploads
+      }
+    };
 
     try {
-      // Simulating file upload
-
-      // const endpoint = 'https://example.com/upload';
-      // const formData = new FormData();
-
-      // Array.from(selectedFiles).forEach(file => {
-      //   formData.append('files', file);
-      // });
-
-      // try {
-      //   const response = await fetch(endpoint, {
-      //     method: 'POST',
-      //     body: formData,
-      //   });
-
-      //   if (response.ok) {
-      //     const result = await response.json();
-      //     console.log("Upload successful:", result);
-      //   } else {
-      //     console.error("Upload failed:", response.statusText);
-      //   }
-      // } catch (error) {
-      //   console.error("Error during upload:", error);
-      // } finally {
-      //   setIsUploading(false); // Finish uploading
-      // }
-
-      await new Promise((resolve) => setTimeout(resolve, UPLOAD_DURATION));
-
+      const response = await axios.post(`${flaskURL}${projectName}/add_datasource`, formData, config);
+      console.log('File uploaded successfully', response.data);
       dispatch({ type: "SET_IS_UPLOADING", payload: false });
+      
+      // Extracting rows, columns, and size from response.data
+      const { rows, columns, size } = response.data;
       dispatch({
         type: "SET_FILE_SUMMARY",
         payload: {
-          rows: 124,
-          columns: 12,
-          size: (10241024 / (1024 * 1024)).toFixed(2),
+          rows: rows,
+          columns: columns,
+          size: size,
         },
       });
     } catch (error) {
+      console.error('Error uploading file:', error);
       dispatch({ type: "SET_IS_UPLOADING", payload: false });
       dispatch({
         type: "SET_ERROR",
         payload: {
           message: "Upload failed due to a network error.",
-          traceback: "Error: Network Error at uploadFileFunction"
-          // The traceback here is just an example; it could be the actual error stack or details you get from your upload logic
+          traceback: error.message
         }
       });
     }
@@ -278,52 +273,44 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
   const handleInsertClick = async () => {
     dispatch({ type: "SET_FILE_SUMMARY", payload: null });
     dispatch({ type: "SET_IS_INSERTING", payload: true });
-    resetProgress();
-    dispatch({
-      type: "SET_ERROR",
-      payload: {
-        message: "Upload failed due to a network error.",
-        traceback: "Error: Network Error at uploadFileFunction"
-        // The traceback here is just an example; it could be the actual error stack or details you get from your upload logic
-      }
-    });
-
-    startProgress();
-
-    // const endpoint = 'https://example.com/upload';
-    // const formData = new FormData();
-
-    // Array.from(selectedFiles).forEach(file => {
-    //   formData.append('files', file);
-    // });
-
-    // try {
-    //   const response = await fetch(endpoint, {
-    //     method: 'POST',
-    //     body: formData,
-    //   });
-
-    //   if (response.ok) {
-    //     const result = await response.json();
-    //     console.log("Upload successful:", result);
-    //   } else {
-    //     console.error("Upload failed:", response.statusText);
-    //   }
-    // } catch (error) {
-    //   console.error("Error during upload:", error);
-    // } finally {
-    //   setIsUploading(false); // Finish uploading
-    // }
-
+  
     try {
-      // Simulating file insertion
-      await new Promise((resolve) => setTimeout(resolve, UPLOAD_DURATION));
-
-      dispatch({ type: "SET_IS_INSERTING", payload: false });
-      dispatch({ type: "SET_SUCCESS", payload: true });
+      const response = await axios.post(`${flaskURL}${projectName}/confirm_datasource`, { confirmed: true });
+      if (response.status === 200) {
+        console.log('Confirmation successful', response.data);
+        dispatch({ type: "SET_IS_INSERTING", payload: false });
+        dispatch({ type: "SET_SUCCESS", payload: true });
+      } else {
+        throw new Error('Failed to confirm');
+      }
     } catch (error) {
+      console.error('Error during confirmation:', error);
       dispatch({ type: "SET_IS_INSERTING", payload: false });
-      dispatch({ type: "SET_ERROR", payload: "insertError" });
+      dispatch({
+        type: "SET_ERROR", payload: {
+          message: "Confirmation failed due to a network or server error.",
+          traceback: error.message || "No additional error info"
+        }
+      });
+    }
+  };
+
+  const handleClose = async () => {
+    dispatch({ type: "SET_FILE_SUMMARY", payload: null });
+    dispatch({ type: "SET_IS_INSERTING", payload: true });
+  
+    try {
+      const response = await axios.post(`${flaskURL}${projectName}/confirm_datasource`, { confirmed: false });
+      if (response.status === 200) {
+        console.log('Cancellation successful');
+        onClose(); // Call onClose to handle any local cleanup or UI changes
+      } else {
+        throw new Error('Failed to cancel');
+      }
+    } catch (error) {
+      console.error('Error during cancellation:', error);
+    } finally {
+      dispatch({ type: "SET_IS_INSERTING", payload: false });
     }
   };
 
@@ -360,15 +347,13 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             }}
           >
             <Button marginTop="mt-3" onClick={handleInsertClick}>{"Confirm"}</Button>
-            <Button color="red" size="px-6 py-2.5" marginTop="mt-3" onClick={onClose}>
-              {"Cancel"}
-            </Button>
+            <Button color="red" size="px-6 py-2.5" marginTop="mt-3" onClick={handleClose}>{"Cancel"}</Button>
           </div>
         </>
       ) : state.isInserting ? (
         <StatusContainer>
           <Message>{"Your file is being processed, please wait..."}</Message>
-          <ProgressBar value={progress} max="100" />
+          <Spinner />
         </StatusContainer>
       ) : state.success ? (
         <>
@@ -389,7 +374,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             <ErrorHeading>An error occurred while uploading the file:</ErrorHeading>
             <p>{state.error.message}</p>
             {state.error.traceback && (
-              <pre>{state.error.traceback}</pre> // Use <pre> for preformatted text like tracebacks
+              <pre>{state.error.traceback}</pre>
             )}
           </ErrorContainer>
         </>
