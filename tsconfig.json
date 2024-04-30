@@ -15,9 +15,14 @@
         "sourceMap": true,
         "noEmit": false,
         "skipLibCheck": true,
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["./src/*"]
+        },
     },
     "exclude": [
         "venv",
+        "docsenv",
         "node_modules",
         "dist",
         "vite-dist",

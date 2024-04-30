@@ -14,7 +14,8 @@ import { useHighlightedIndex } from './selectionHooks';
 /**
  * Get a {Uint32Array} of the currently filtered indices.
  * When the selection changes, this will asynchronously update.
- * All users of the same data store share a reference to the same array.
+ * All users of the same data store (on a per-chart basis) share a reference to the same array.
+ * -- change properties/settings so that we can more dynamically select.
  */
 export function useFilteredIndices() {
     // in the case of region data, it should be filtered by that as well...
@@ -24,23 +25,33 @@ export function useFilteredIndices() {
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
     const [filteredOutIndices, setFilteredOutIndices] = useState(new Uint32Array());
-    // todo useQuery could be better?
     useEffect(() => {
         // return
         let cancelled = false;
         if (!filterColumn) return;
         const indexPromise = dataStore.getFilteredIndices();
-        const colPromise = window.mdv.chartManager?._getColumnsAsync(dataStore.name, [filterColumn]);
+        //todo maybe make more use of deck.gl category filters once we update to new version
+        const catFilters = [config.background_filter, ...config.category_filters.filter(f => f.category !== 'all')];
+        const catColumns = catFilters.map(f => f.column);
+        const colPromise = window.mdv.chartManager?._getColumnsAsync(dataStore.name, catColumns);
         Promise.all([indexPromise, colPromise]).then(([indices]) => {
-        // indexPromise.then((indices) => {
             if (cancelled) return;
             if (filterColumn) {
-                const col = dataStore.columnIndex[filterColumn];
+                const cols = catFilters.map(({column}) => dataStore.columnIndex[column]);
                 const filterValue = config.background_filter?.category;
                 if (filterValue) {
-                    const filterIndex = col.values.indexOf(filterValue);
+                    //const filterIndex = col.values.indexOf(filterValue);
+                    const filterIndex = catFilters.map(f => {
+                        if (Array.isArray(f.category)) return f.category.map(c => dataStore.columnIndex[f.column].values.indexOf(c)) as number[];
+                        else return dataStore.columnIndex[f.column].values.indexOf(f.category) as number;
+                    });
                     try {
-                        const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
+                        // const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
+                        const filteredIndices = indices.filter(i => catFilters.every((_, j) => {
+                            const f = filterIndex[j];
+                            if (typeof f === 'number') return f === cols[j].data[i];
+                            else return f.some(fi => cols[j].data[i] === fi);
+                        }));
                         setFilteredIndices(filteredIndices);
                         // thinking about allowing gray-out of non-selected points... should be optional
                         // const filteredOutIndices = indices.filter(i => col.data[i] !== filterIndex);
@@ -63,7 +74,7 @@ export function useFilteredIndices() {
 
         // using _filteredIndicesPromise as a dependency is working reasonably well,
         // but possibly needs a bit more thought.
-    }, [dataStore._filteredIndicesPromise, filterColumn, config.background_filter]);
+    }, [dataStore._filteredIndicesPromise, filterColumn, config.background_filter, config.category_filters]);
     return filteredIndices;
 }
 

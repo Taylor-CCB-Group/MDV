@@ -54,24 +54,60 @@ export type DataSource = {
     regions?: Record<string, any>;
 };
 
+export type DropdownMappedValue<T extends string, V extends string> = { [P in T]: string } & { [P in V]: string };
+export type DropdownMappedValues<T extends string, V extends string> = [
+    Array<DropdownMappedValue<T, V>>, T, V
+];
+export type DropDownValues = DropdownMappedValues<string, string> | [Array<string>];
 export type GuiValueTypes = {
     "dropdown": string;
+    "multidropdown": any;
     "check": boolean;
     "text": string;
-    "radiobuttons": any;
+    "textbox": string;
+    "radiobuttons": string;
     "slider": number;
-    "button": undefined; //never?
+    "spinner": number;
+    "button": undefined;
     "doubleslider": [number, number];
+    "folder": GuiSpec[];
 }
-
-export type GuiSpec<T extends keyof GuiValueTypes> = {
+export type GuiSpecType = keyof GuiValueTypes;
+export type GuiSpec<T extends GuiSpecType> = {
     type: T; 
     label: string;
+    name: string;
     current_value?: GuiValueTypes[T];
     func?: (v: GuiValueTypes[T]) => void;
-    values?: GuiValueTypes[T][];
+    values?: T extends ('dropdown' | 'multidropdown') ? DropDownValues : never;
+    // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
+    choices?: T extends 'radiobuttons' ? [string, string][] : never;
+    min?: number;
+    max?: number;
+    step?: number;
     defaultVal?: GuiValueTypes[T];
 }
+// todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
+export type ExtraControl<T extends GuiSpecType> = {
+    type: T;
+    name: string;
+    label: string;
+    values?: Array<{name: string, value: string}>;
+    defaultVal?: GuiValueTypes[T];
+}
+// const a: GuiSpec<'dropdown'> = {
+//     type: 'dropdown',
+//     label: 'label',
+//     name: 'name',
+//     current_value: 'current_value',
+//     func: (v) => {},
+//     values: [[
+//         {a: '0a', b: '0b'},
+//         {a: '1a', b: '1b'},
+//     ], 'a', 'b']
+// }
+// a.values[0].map(x => x.a);
+// ^^ still not well-typed... `x` is `any`.
 interface DataStore {
     getLoadedColumns: () => FieldName[];
     getColumnName: (col: FieldName) => ColumnName | null;
@@ -86,7 +122,7 @@ export interface Chart {
     addMenuIcon: (classes: string, info: string) => HTMLElement;
     setSize: (x?: number, y?: number) => void;
     changeBaseDocument: (doc: Document) => void;
-    getSettings: () => GuiSpec<any>[];
+    getSettings: () => GuiSpec[];
     removeLayout?:()=> void;
     config:any;
     dataStore: DataStore;

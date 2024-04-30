@@ -22,7 +22,7 @@ export const useViewStateLink = () => {
         // we want to do something like subscribe to our viewState and push changes to the linked charts
         // but make sure we don't create a circular loop of updates
         const unsubscribe = viewerStore.subscribe(({ viewState }) => {
-            thisChart.ignoreStateUpdate = true;
+            thisChart.ignoreStateUpdate = true; //<< add a setting for this, make sure we get the logic right
             const originalZoom = viewState.zoom as number;
             const ourPhysicalSize = metadata.Pixels.PhysicalSizeX;
             const ourUnits = metadata.Pixels.PhysicalSizeXUnit;

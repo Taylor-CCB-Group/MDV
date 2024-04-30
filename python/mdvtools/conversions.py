@@ -98,12 +98,10 @@ def compute_vcf_end(df: pd.DataFrame) -> pd.DataFrame:
     This is added as a column 'END' in the given DataFrame.
     """
 
-    def varlen(s: str) -> int:
-        return max([len(s) for s in s.split(",")])
+    def varlen(s) -> int:
+        return max([len(v) for v in str(s).split(",")])
 
-    # python/panda types aren't clever enough to easily deal with this (tbf fairly gnarly syntax)
-    # df[['REF', 'ALT']] resolves to `Series[Unknown]`
-    df["END"] = df["POS"] + df[["REF", "ALT"]].applymap(varlen).max(axis=1)  # type: ignore
+    df["END"] = df["POS"] + df[["REF", "ALT"]].map(varlen).max(axis=1)
     return df
 
 

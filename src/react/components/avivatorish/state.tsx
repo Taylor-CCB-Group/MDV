@@ -1,7 +1,6 @@
-import { PropsWithChildren, createContext, useContext, useMemo, useRef } from "react";
-import { useConfig } from "../../hooks";
-import { ColorPaletteExtension, loadOmeTiff } from "@hms-dbmi/viv";
-import { useChart, useOmeTiff } from "../../context";
+import { PropsWithChildren, createContext, useContext, useRef } from "react";
+import { loadOmeTiff } from "@hms-dbmi/viv";
+import { useChart } from "../../context";
 import { createStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { observer } from "mobx-react-lite";
@@ -323,26 +322,3 @@ export const useMetadata = () => {
   return Array.isArray(metadata) ? metadata[image] : metadata;
 };
 
-
-///---------
-
-/** @deprecated this one maybe shouldn't exist */
-export function useChannelsState() {
-  const config = useConfig<any>();
-  //todo something useful... some values...
-  return (config.image_properties || config.viv.image_properties) as ChannelsState;
-}
-
-/** @deprecated this one maybe shouldn't exist */
-export function useVivLayerConfig() {
-  const imageProps = useChannelsState();
-  const extensions = useMemo(() => [new ColorPaletteExtension()], []);
-
-  const ome = useOmeTiff();
-  if (!ome) return undefined;
-  return {
-    ...imageProps,
-    loader: ome.data,
-    extensions
-  }
-}

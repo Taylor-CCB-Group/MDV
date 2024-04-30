@@ -37,13 +37,13 @@ class ImageScatterChart extends BaseChart {
         this.dataModel.setColumns([...config.param, image_key, config.image_title]);
         this.dataModel.updateModel();
         //----------------
-
+        const s = parseInt(texture_size);
         this.imageArray = new ImageArray(dataStore, canvas, this.dataModel, {
             base_url,
             image_type: config.images.type,
             image_key,
-            width: texture_size,
-            height: texture_size,
+            width: s,
+            height: s,
         });
         this.imageArray.onProgress = (n) => {
             this.progress = n;
@@ -286,7 +286,7 @@ BaseChart.types["ImageScatterChart"] = {
         }
         console.log('imageSets', imageSets);
         const sortableColumns = dataStore.getLoadedColumns().map(c => ({ name: c, value: c }));
-        const imageSizes = [32, 64, 128, 256, 512, 1024].map(s => ({ name: s, value: s }));
+        const imageSizes = [32, 64, 128, 256, 512, 1024].map(s => `${s}`).map(s => ({ name: s, value: s }));
         return [
             //drop down of available image sets
             {
@@ -306,7 +306,7 @@ BaseChart.types["ImageScatterChart"] = {
                 name: "texture_size",
                 label: "Texture Size",
                 values: imageSizes,
-                defaultVal: 256
+                defaultVal: '256'
             },
         ];
     },

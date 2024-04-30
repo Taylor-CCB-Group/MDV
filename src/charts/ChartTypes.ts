@@ -1,6 +1,6 @@
 import DataStore from "../datastore/DataStore";
 import BaseChart from "./BaseChart";
-import type { DataSource, GuiSpec } from "./charts";
+import type { DataSource, ExtraControl, GuiSpecType } from "./charts";
 
 /**
  * Describes how a chart will be displayed in the 'add chart' dialog etc.
@@ -13,7 +13,7 @@ export type ChartType<T extends BaseChart> = {
     
     required?: string[] | ((ds: DataSource) => unknown); //TODO: better typing here (& there & everywhere)
     init?: (config: any, dataSource: any, extraControls: any) => void;
-    extra_controls?: (dataStore: DataStore) => GuiSpec<any>[];
+    extra_controls?: (dataStore: DataStore) => ExtraControl<GuiSpecType>[]; //not GuiSpec<GuiSpecType>[]; - AddChartDialog & SettingsDialog behave differently - would like to unify
     params?: { type: string | string[], name: string }[];
     configEntriesUsingColumns?: string[];
     methodsUsingColumns?: string[]; // (keyof T)[]; //would like better typing here

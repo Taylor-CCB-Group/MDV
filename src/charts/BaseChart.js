@@ -3,6 +3,7 @@ import {ContextMenu} from "../utilities/ContextMenu.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog";
 import { chartTypes } from "./ChartTypes.ts";
+import DebugChartDialogReactWrapper from "../react/components/DebugChartDialogReactWrapper";
 
 
 class BaseChart{
@@ -98,7 +99,10 @@ class BaseChart{
                 menu.push({
                     text:"debug chart",
                     icon:"fas fa-bug",
-                    func:()=>window.mdv.debugChart = this
+                    func:()=>{
+                        window.mdv.debugChart = this;
+                        this.dialogs.push(new DebugChartDialogReactWrapper(this));
+                    }
                 });
                 menu.push({
                     text: "copy config JSON to clipboard",
@@ -127,12 +131,14 @@ class BaseChart{
                 if (this.contentDiv !== document.fullscreenElement) console.error('unexpected fullscreen element');
                 const rect = this.contentDiv.getBoundingClientRect();
                 this.setSize(rect.width, rect.height);
-                if (this.settingsDialog) this.settingsDialog.setParent(this.contentDiv);
-                if (this.colorDialog) this.colorDialog.setParent(this.contentDiv);
+                for (const d of this.dialogs) {
+                    d.setParent(this.contentDiv);
+                }
             } else {
                 this.setSize(...oldSize);
-                if (this.settingsDialog) this.settingsDialog.setParent(null);
-                if (this.colorDialog) this.colorDialog.setParent(null);
+                for (const d of this.dialogs) {
+                    d.setParent(null);
+                }
             }
         });
         this.addMenuIcon("fas fa-expand","fullscreen", {
@@ -149,7 +155,7 @@ class BaseChart{
         //work out width and height based on container
         this._setDimensions();
     }
-
+    dialogs = [];
     _getContentDimensions(){
         return{ //PJT to review re. gridstack.
             top:5,
@@ -445,8 +451,8 @@ class BaseChart{
         if (this._tooltip){
             this._tooltip.remove();
         }
-        if (this.settingsDialog){
-            this.settingsDialog.close();
+        for (const d of this.dialogs){
+            d.close();
         }
         // dynamic props?
     }
@@ -591,8 +597,12 @@ class BaseChart{
 
    
     _openSettingsDialog(e){
-        if (!this.settingsDialog){
-          this.settingsDialog = new SettingsDialog({
+        if (!this.settingsDialog) {
+            if (import.meta.env.DEV) {
+                // this.settingsDialog = new SettingsDialogReactWrapper(this);
+                // return;
+            };
+            this.settingsDialog = new SettingsDialog({
                 maxHeight:400,
                 doc:this.__doc__ || document,
                 width:300,
@@ -601,6 +611,7 @@ class BaseChart{
                 useMobx: this.useMobx,
                 onclose:()=>this.settingsDialog=null
             },this.getSettings());
+            this.dialogs.push(this.settingsDialog);
         }
         //experimenting with making the parent always be contentDiv (not only in fullscreen mode)
         //doesn't work ATM because of stacking context - may want to review that more generally 
@@ -646,6 +657,15 @@ class BaseChart{
         if (this.addToContextMenu){
             menu=menu.concat(this.addToContextMenu());
         }
+        menu.push({
+            text: "experimental settings dialog",
+            icon: "fas fa-cog",
+            func: async () => {
+                const m = await import("../react/components/SettingsDialogReactWrapper");
+                const SettingsDialogReactWrapper = m.default;
+                this.dialogs.push(new SettingsDialogReactWrapper(this));
+            }
+        });
         return menu;
     }
 
@@ -665,8 +685,8 @@ class BaseChart{
     changeBaseDocument(doc){
         this.contextMenu.__doc__=doc;
         this.__doc__=doc;
-        if (this.settingsDialog){
-            this.settingsDialog.close();
+        for (const d of this.dialogs){
+            d.close();
         }
         if (this.legend){
             this.legend.__doc__=doc;

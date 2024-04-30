@@ -11,7 +11,7 @@ import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 // this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
-//import FileUploadDialogReact from './dialogs/FileUploadDialogWrapper';
+import FileUploadDialogReact from './dialogs/FileUploadDialogWrapper';
 
 //default charts 
 import "./HistogramChart.js";
@@ -46,7 +46,6 @@ import "./SingleSeriesChart";
 import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
-import { runInAction } from "mobx";
 import { addChartLink } from "../links/link_utils";
 
 //order of column data in an array buffer
@@ -270,10 +269,7 @@ class ChartManager{
                     position:"top-left"
                 },
                 func:(e)=>{
-                    //new FileUploadDialogReact().open();
-                    //this allows HMR to work, we could probably have a better design for that
-                    const dialog = new BaseDialog.experiment['FileUploadDialogReact']();
-                    // dialog.open();
+                    new FileUploadDialogReact().open();
                 }    
             },this.menuBar);
             uploadButton.style.margin = "3px";
@@ -2448,7 +2444,7 @@ class AddChartDialog extends BaseDialog{
                     text:c.label,
                     classes:["ciview-title-div"]
                 },parentDiv);
-                // could this logic be shared with SettingsDialog?
+                // could this logic be shared with SettingsDialog? <<
                 if (c.type==="dropdown"){
                     const sel = createEl("select",{
                         styles:{

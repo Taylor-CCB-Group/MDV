@@ -243,6 +243,8 @@ class MLVTrack{
 		if (!cl){
 			throw new Error("Track type "+ config.type+" not recognised")
 		}
+        // pjt: nb, simple bed FeatureSource is not used anywhere and we have no way of loading simple bed files
+        // config.type = "bed" is used for tabix indexed bed files
 		return new cl["class"](config);
 
 	}

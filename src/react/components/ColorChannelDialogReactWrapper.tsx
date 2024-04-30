@@ -2,7 +2,7 @@ import { observer } from "mobx-react-lite";
 import { BaseDialog } from "../../utilities/Dialog";
 import type { VivMDVReact } from "./VivMDVReact";
 import { createEl } from "../../utilities/ElementsTyped";
-import { createRoot } from "react-dom/client";
+import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./ColorChannelComponents";
 import { ChartProvider } from "../context";
 
@@ -14,7 +14,7 @@ const ColorChannelDialogReact = observer(function ColorChannelDialogReact() {
 // don't necessarily want to inherit from BaseDialog, could consider different approach.
 // this will be more consistent / less work in short-term, and a basis for refactoring later.
 class ColorDialogReactWrapper extends BaseDialog {
-    _root: ReturnType<typeof createRoot>;
+    _root: ReturnType<typeof createMdvPortal>;
     get root() { return this._root; }
     set root(v) { 
         this._root = v;
@@ -28,13 +28,11 @@ class ColorDialogReactWrapper extends BaseDialog {
     }
     init(parent: VivMDVReact) {
         const div = createEl('div', {}, this.dialog);
-        this.root = createRoot(div);
-        // todo use a portal, share a root & chart context with the parent?
-        this.root.render(
-            <ChartProvider chart={parent}>
+        this.root = createMdvPortal((
+            <ChartProvider chart={parent} materialui>
                 <ColorChannelDialogReact />
             </ChartProvider>
-        );
+        ), div);
     }
     close() {
         super.close();
@@ -48,4 +46,4 @@ class ColorDialogReactWrapper extends BaseDialog {
 }
 
 BaseDialog.experiment['ColorDialogReact'] = ColorDialogReactWrapper;
-export default 'ColorDialogReact loaded';
+export default ColorDialogReactWrapper;

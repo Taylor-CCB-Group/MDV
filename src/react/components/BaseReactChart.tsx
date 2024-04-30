@@ -1,6 +1,6 @@
 import { makeAutoObservable } from "mobx";
 import BaseChart from "../../charts/BaseChart";
-import { createRoot } from "react-dom/client";
+import { createMdvPortal } from "@/react/react_utils";
 import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
 import { StrictMode } from "react";
@@ -48,7 +48,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         return window.mdv.chartManager.charts[this.config.id].dataSource;
     }
     useMobx = true;
-    root: ReturnType<typeof createRoot>;
+    root: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
     ComponentFn: TComponent<T & BaseConfig>;
     protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: T & BaseConfig, ReactComponentFunction: TComponent<T & BaseConfig> = Fallback) {
@@ -77,15 +77,14 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         this.mountReact();
     }
     private mountReact() {
-        this.root = createRoot(this.reactEl);
         const ReactComponentFunction = this.ComponentFn;
-        this.root.render((
+        this.root = createMdvPortal((
             <StrictMode>
-                <ChartProvider chart={this}>
+                <ChartProvider chart={this} materialui>
                     <ReactComponentFunction />
                 </ChartProvider>
             </StrictMode>
-        ));
+        ), this.reactEl);
     }
 
     changeBaseDocument(doc: Document): void {

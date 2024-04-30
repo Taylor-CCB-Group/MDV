@@ -14,11 +14,12 @@ import json
 import sys
 import re
 from werkzeug.security import safe_join
-from .websocket import mdv_socketio
-from .mdvproject import MDVProject
+from mdvtools.websocket import mdv_socketio
+from mdvtools.mdvproject import MDVProject
 import os
 import pandas as pd
 from typing import Optional
+from datetime import datetime
 
 routes = set()
 
@@ -278,6 +279,10 @@ def create_app(
                 supplied_columns_only=supplied_only,
                 replace_data=replace,
             )
+            backend = request.form["backend"]
+            if backend:
+                response = add_datasource_backend(project,view)
+                return response
         except Exception as e:
             # success = False
             return str(e), 400
@@ -296,3 +301,41 @@ def create_app(
         app.register_blueprint(project_bp)
     else:
         app.run(host="0.0.0.0", port=port, debug=True)
+
+def add_datasource_backend(project,view):
+    from mdvtools.dbutils.dbmodels import db, Project, File, User
+    try:
+        project_name = project.name
+        if not project_name:
+            return jsonify({'error': 'Project name is missing.'}), 400
+        
+        # Check if project exists
+        project_db = Project.query.filter_by(name=project_name).first()
+        if not project_db:
+            return jsonify({'project does not exist in database'}), 400
+
+        
+        file_set = [project.h5file, project.datasourcesfile]
+        if view:
+                file_set.append(project.viewsfile)
+
+        for file in file_set:
+            existing_file = File.query.filter_by(name=os.path.basename(file), project_id=project_db.id).first()
+            if existing_file:
+               
+                # Update the database entry with new file path and update timestamp
+               
+                existing_file.update_timestamp = datetime.now()
+
+                
+
+            else:
+                
+                # Create a new file entry
+                new_file = File(name=os.path.basename(file), file_path=None, project=project_db)
+                db.session.add(new_file)
+                
+        db.session.commit()
+        return jsonify({'message': f'Files {file_set} have been modified under project "{project_name}  "'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

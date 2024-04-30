@@ -1,0 +1,29 @@
+name: TypeScript/JS CI
+on:
+  push:
+    branches:
+      # FIXME replace this with main after merge to main
+      - pjt-dev
+#      - main
+  pull_request:
+    branches:
+      # FIXME replace this with main after merge to main
+      - pjt-dev
+#      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tsc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install
+      - run: npm run vite-build
+      # - uses: icrawl/action-tsc@v1

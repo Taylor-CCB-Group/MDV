@@ -285,7 +285,9 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
     // add or remove from selection...
     // -> transform into Deck coordinates...
     // later: selection layers...
-    if (!scatterProps.currentLayerHasRendered) return null;
+    // glitches with settings changes are worse than the frame-behind overlay...
+    // but if we render the overlay as a deck layer, we can avoid this... need to make a store for that.
+    // if (!scatterProps.currentLayerHasRendered) return null;
     return (
         <>
         <ButtonGroup variant="contained" aria-label="choose tool for manipulating view or selection" style={{zIndex: 2, padding: '0.3em'}}>
@@ -299,16 +301,31 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
             zIndex: 1,
             pointerEvents: selectedTool === 'Pan' ? 'none' : 'auto'
             }}
+            tabIndex={0}
             onMouseUp={(e) => {
                 // setSelectedTool('Pan');
             }}
-            onKeyDown={(e) => {
-                //not working as of now... probably want to think more about keyboard shortcuts in general...
-                if (e.key === 'Escape') {
+            onMouseDown={(e) => {
+                if (selectedTool === 'Pan') {
+                    // allow the event to propagate to the deck canvas below
+                    return;
+                }
+                e.currentTarget.focus();
+            }}
+            onBlurCapture={(e) => {console.log('blur capture');}}
+            onBlur={(e) => {console.log('blur');}}
+            onKeyDownCapture={(e) => {
+                if (e.key === 'Escape' || e.key === ' ') {
                     setSelectedTool('Pan');
                 }
                 if (e.key === 'r') {
                     setSelectedTool('Rectangle');
+                }
+                if (e.key === 't') {
+                    setSelectedTool('Transform');
+                }
+                if (e.key === 'm') {
+                    setSelectedTool('Measure');
                 }
             }}
             >

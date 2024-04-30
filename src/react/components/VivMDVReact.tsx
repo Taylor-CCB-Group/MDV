@@ -9,6 +9,7 @@ import type { ColumnName, DataColumn } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
+import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -51,6 +52,11 @@ export type TooltipConfig = {
         column?: ColumnName,
     }
 };
+type CategoryFilter = {
+    column: ColumnName,
+    category: string | string[],
+    // consider properties like 'invert' or 'exclude', or 'color'...
+}
 //viewState should be persisted... maybe a way of saving different snapshots?
 //could we infer or something to avoid having to repeat this?
 export type ScatterPlotConfig = {
@@ -61,6 +67,7 @@ export type ScatterPlotConfig = {
         display: boolean,
         // todo: add more options here...
     },
+    category_filters: Array<CategoryFilter>,
     zoom_on_filter: boolean,
     point_shape: "circle" | "square" | "gaussian"
 } & TooltipConfig;
@@ -74,6 +81,7 @@ const scatterDefaults: ScatterPlotConfig = {
     tooltip: {
         show: false,
     },
+    category_filters: [],
     zoom_on_filter: false,
     point_shape: "circle",
 };
@@ -83,10 +91,7 @@ export type VivRoiConfig = {
     // ... except that we also need to check the other condition, because 'string' could also be that.
     // so it's not completely ideal.
     type: "VivMdvRegionReact" | "viv_scatter_plot",
-    background_filter: {
-        column: ColumnName,
-        category: string,
-    },
+    background_filter: CategoryFilter,
     roi: ROI,
     viv: VivConfig,
     //image_properties: ChannelsState,
@@ -132,17 +137,11 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             colorByDefault: action,
         });
         this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", (e) => {
-            // return;
             if (!this.colorDialog) {
-                //this.colorDialog = new ColorChannelDialog(this);
-                // 🙄 HMR hack
-                this.colorDialog = new BaseDialog.experiment['ColorDialogReact'](this);
+                this.colorDialog = new ColorChannelDialogReactWrapper(this);
+                this.dialogs.push(this.colorDialog);
             }
         });
-    }
-    remove() {
-        super.remove();
-        if (this.colorDialog) this.colorDialog.close();
     }
     colorBy?: (i: number) => [r: number, g: number, b: number];
     colorByColumn(col?: ColumnName) {
@@ -165,7 +164,47 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const { tooltip } = c;
         const cols = this.dataStore.getColumnList() as DataColumn<any>[];
         const settings = super.getSettings();
+        // What I would like is ability to
+        // - change selected image at runtime.
+        // - choose multiple categories on which to filter.
+        const filters = c.category_filters.map(f => {
+            // what we really want is to have a type that is fairly specific to category filters...
+            // able to handle an array of them with controls for adding/removing...
+            const values = this.dataStore.columnIndex[f.column].values.slice();
+            values.unshift("all");
+            return {
+                type: "multidropdown",
+                label: `'${f.column}' filter`,
+                current_value: f.category,
+                values: [values],
+                func: (v) => {
+                    f.category = v;
+                    c.category_filters = c.category_filters.slice();
+                }
+            }
+        });
+        //   ^^ kinda want a more react-y SettingsDialog for that...
+        // todo switch image, <- more coherent region logic...
+        // const ds = this.dataStore;
+        // const images = [];
+        // for (const r in ds.regions.all_regions) {
+        //     const viv = ds.regions.all_regions[r].viv_image;
+        //     if (viv) {
+        //         const x = viv.url || viv.file;
+        //         images.push({name: x, value: x});
+        //     }
+        // }
         return settings.concat([
+            // {
+            //     type: "dropdown",
+            //     label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
+            //     current_value: c.viv.url,
+            //     values: [images, 'name', 'value'],
+            //     func: (v) => {
+            //         c.viv.url = v;
+            //         c.background_filter.category = v;
+            //     }
+            // },
             {
                 type: "check",
                 label: "Show Tooltip",
@@ -206,12 +245,12 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             {
                 type: "slider",
                 label: "opacity",
-                current_value: c.opacity || scatterDefaults.opacity,
+                current_value: Math.sqrt(c.opacity || scatterDefaults.opacity),
                 min: 0,
                 max: 1,
                 continuous: true,
                 func: x => {
-                    c.opacity = x;
+                    c.opacity = x*x;
                 }
             },
             {
@@ -222,6 +261,13 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.zoom_on_filter = x;
                 }
             },
+            {
+                type: 'folder',
+                label: 'Category Filters',
+                current_value: filters,
+                func: (x) => {},
+            },
+            // ...filters,
             // no longer using PictureInPictureViewer - up for review as could be useful
             // {
             //     type: "check",

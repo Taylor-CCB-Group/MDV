@@ -154,4 +154,9 @@ export default defineConfig(env => { return {
             include: [/\.tsx?$/, /\.jsx?$/],
         })
     ],
+    resolve: {
+        alias: {
+            "@": path.resolve(__dirname, "./src"),
+        }
+    }
 }})

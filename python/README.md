@@ -48,6 +48,7 @@ poetry install --with dev
 ### Creating a Project
 
 To make an empty project, just create an MDVProject object specifying a path. Data can then be added using the `add_datasource` method and specifying a pandas dataframe or the path to a text file.
+
 ### Quick Start - to serve an HDF5 based project from a local python server
 
 ```python
@@ -95,7 +96,11 @@ If your server already adds these headers then the `convert_to_static_page` func
 
 ### To convert CSV data for a simple file server
 
-Given a CSV file associated folder of images, the `csv_to_static` script will create a folder (containing `datasources.json`, `state.json`, `views.json`, `{mydata.csv}.b`, `{mydata.csv}.json`, `images/`) that can be served by a simple file server. This script is 
+**This is somewhat deprecated in favour of the `convert_to_static_page` method and will likely be removed.**
+
+Given a CSV file associated folder of images, the `csv_to_static` script will create a folder (containing `datasources.json`, `state.json`, `views.json`, `{mydata.csv}.b`, `{mydata.csv}.json`, `images/`) that can be served by a simple file server. 
+
+```
 
 The script takes arguments for the CSV file and the output folder. If either of these is not present, or if the input file is not found, it will prompt for these interactively.
 
