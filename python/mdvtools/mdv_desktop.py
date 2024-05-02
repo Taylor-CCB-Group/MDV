@@ -3,6 +3,7 @@ from mdvtools.mdvproject import MDVProject
 from .server import add_safe_headers
 from flask import Flask, render_template, jsonify
 import json
+import threading
 
 """
 Make a Flask app, and open all folders in ~/mdv/ as projects that can be served by it.
@@ -38,6 +39,28 @@ else:
     with open(config_file, "w") as f:
         json.dump({"projects": []}, f)
 
+running = True
+def watch_folder(app: Flask):
+    '''watch the project folder for changes and update the projects list accordingly.'''
+    import time
+
+    while running:
+        time.sleep(2)
+        existing_project_dirs = [p.dir for p in projects]
+        new_projects = [
+            MDVProject(os.path.join(project_dir, d))
+            for d in os.listdir(project_dir)
+            if os.path.isdir(os.path.join(project_dir, d))
+            and os.path.join(project_dir, d) not in existing_project_dirs
+        ]
+        projects.extend(new_projects)
+        for p in new_projects:
+            print(f"watcher adding '{p.name}'")
+            try:
+                p.serve(open_browser=False, app=app)
+            except Exception:
+                print(f"error serving {p.name}...")
+    print("watcher exiting...")
 
 if __name__ == "__main__":
     app = Flask(__name__)
@@ -58,4 +81,7 @@ if __name__ == "__main__":
     def get_projects():
         return jsonify([p.name for p in projects])
 
+    watcher = threading.Thread(target=watch_folder, args=(app,))
+    watcher.start()
     app.run(debug=True, port=5051)
+    running = False
