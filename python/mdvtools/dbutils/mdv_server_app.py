@@ -55,6 +55,6 @@ if __name__ == '__main__':
             print(f'Error initializing app: {e}')
 
     try:
-        app.run(debug=True, port=5051)
+        app.run(debug=True, port=5055)
     except Exception as e:
         print(f'Error running app: {e}')

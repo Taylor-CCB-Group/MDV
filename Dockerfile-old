@@ -1,5 +1,5 @@
-# Stage 1: Install Node.js
-FROM node:16.13.1 AS frontend-builder
+# Stage 1: Build the frontend with npm
+FROM node:14 AS frontend-builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -14,8 +14,11 @@ RUN npm install
 # Copy the entire project to the working directory
 COPY . .
 
+# Run the npm build script for Flask and Vite
+RUN npm run build-flask-vite
+
 # Stage 2: Build the Python backend
-FROM python:3.12 AS python-builder
+FROM python:3.10.9 AS python-builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -23,13 +26,17 @@ WORKDIR /app
 # Copy everything from inside the frontend-builder /app to /app
 COPY --from=frontend-builder /app/python /app/python
 
+# Set the working directory to the Python directory
+WORKDIR /app/python
+
 # Install Python dependencies
-RUN npm run poetry-setup
-RUN npm run python-setup
+RUN pip install -e /app/python
+
+# Set the working directory back to /app
+WORKDIR /app
 
 # Expose the port that Flask will run on
-EXPOSE 5055
+EXPOSE 5052
 
 # Run your Python script
-CMD ["python", "-m", "mdvtools.dbutils.mdv_server_app"]
-
+CMD ["python", "-m", "mdvtools.test_projects.scanpy_pbmc3k"]
