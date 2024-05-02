@@ -29,6 +29,7 @@ python/mdvtools/template/page.html
 
 python/dist/
 docs/jsdocs/build/
+docs/typedoc/
 docs/maindocs/_build/
 docs/maindocs/autoapi/
 

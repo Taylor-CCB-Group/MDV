@@ -1,0 +1,16 @@
+{
+    "exclude": [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/docsenv/**",
+        "**/venv/**",
+    ],
+    // "includes": [
+    //     "src/**/*.tsx?$", "src/**/*.jsx?$"
+    // ],
+    "entryPoints": [
+        "src/modules/static_index.ts"
+    ],
+    "out": "docs/typedoc",
+}

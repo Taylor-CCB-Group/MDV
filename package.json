@@ -1,5 +1,5 @@
 {
-  "name": "ciview2",
+  "name": "mdv",
   "version": "0.0.2",
   "description": "Multi Dimensional Viewer (MDV) is tool for analyzing, annotating  and sharing multi dimensional data.  It is inspired by [dc charts](https://dc-js.github.io/dc.js/) and [crossfilter](https://square.github.io/crossfilter/), but is performant with over 10 million data items due to the use of web workers, shared array buffers and native arrays.   &nbsp; ![summary](images/summary.png)",
   "main": "index.js",
@@ -90,6 +90,7 @@
     "style-loader": "^3.3.1",
     "tailwindcss": "^3.4.3",
     "ts-loader": "^9.5.1",
+    "typedoc": "^0.25.13",
     "typescript": "^5.3.3",
     "vite": "^5.2.8",
     "webpack": "^5.74.0",
