@@ -1,8 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext } from "react";
 import { BaseReactChart } from "./components/BaseReactChart";
 import DataStore from "../datastore/DataStore";
 import { MaterialWrapper } from "./material";
-import { RangeProvider } from "./spatial_context";
 
 
 const ChartContext = createContext<BaseReactChart<any>>(undefined);
