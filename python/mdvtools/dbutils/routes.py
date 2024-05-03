@@ -30,7 +30,8 @@ def register_routes(projects):
             # Check if project exists
             project = Project.query.filter_by(name=project_name).first()
             if not project:
-                project = Project(name=project_name) # type: ignore
+                project = Project()
+                project.name = project_name
                 db.session.add(project)
 
             # Check if file with same name already exists in the project
@@ -54,7 +55,10 @@ def register_routes(projects):
                 file.save(file_path)
 
                 # Create a new file entry
-                new_file = File(name=file.filename, file_path=file_path, project=project) # type: ignore
+                new_file = File()
+                new_file.name = file.filename  # Assign value to the name attribute
+                new_file.file_path = file_path  # Assign value to the file_path attribute
+                new_file.project_id=project.id
                 db.session.add(new_file)
                 db.session.commit()
 

@@ -244,10 +244,9 @@ def create_app(
 
     @project_bp.route("/add_datasource", methods=["POST"])
     def add_datasource():
-        backend = request.form["backend"]
-        if backend:
-                response = add_datasource_backend(project)
-                return response
+        if "backend" in request.form:
+            response = add_datasource_backend(project)
+            return response
         
         if (
             "permission" not in project.state
@@ -330,10 +329,10 @@ def add_datasource_backend(project):
 
         view = request.form["view"] if "view" in request.form else None
         replace = True if "replace" in request.form else False
-        
+        if not replace and name in [ds['name'] for ds in project.datasources]:
+            return f"Datasource '{name}' already exists, and 'replace' was not set in request", 400
         if "file" not in request.files:
-            return jsonify({'No \'file\' provided in request form data'}), 400
-        
+            return "No 'file' provided in request form data", 400
         file = request.files["file"]
         supplied_only = True if "supplied_only" in request.form else False
         
@@ -347,12 +346,12 @@ def add_datasource_backend(project):
         # will this work? can we return progress to the client?
         df = pd.read_csv(file.stream)
         project.add_datasource(
-            name,
-            df,
-            # cols,
-            add_to_view=view,
-            supplied_columns_only=supplied_only,
-            replace_data=replace,
+                name,
+                df,
+                # cols,
+                add_to_view=view,
+                supplied_columns_only=supplied_only,
+                replace_data=replace,
         )
         
         #database operations
@@ -369,7 +368,10 @@ def add_datasource_backend(project):
 
             else:
                 # Create a new file entry
-                new_file = File(name=os.path.basename(file), file_path=None, project=project_db) # type: ignore
+                new_file = File()
+                new_file.name = os.path.basename(file)  # Assign value to the name attribute
+                new_file.file_path = None  # Assign value to the file_path attribute
+                new_file.project_id = project_db.id
                 db.session.add(new_file)
                 
         db.session.commit()
