@@ -7,11 +7,19 @@ import { useScatterplotLayer } from "../scatter_state";
 import SelectionOverlay from "./SelectionOverlay";
 import { useLoader, OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
 import { useViewStateLink } from "../chartLinkHooks";
+import { useChart } from "../context";
+import { RangeProvider } from "../spatial_context";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
 /** somewhat comparable to avivator `<Viewer />` */
-export const VivScatter = observer(() => {
+export const VivScatter = () => {
+    const chart = useChart();
+    return <RangeProvider chart={chart}><Main /></RangeProvider>
+}
+
+
+const Main = observer(() => {
     // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
     const ome = useLoader() as OME_TIFF['data'];// useOmeTiff();
 
