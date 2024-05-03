@@ -28,7 +28,7 @@
     "url": "git+https://github.com/Taylor-CCB-Group/MDV.git"
   },
   "author": "",
-  "license": "ISC",
+  "license": "GPL-3.0-only",
   "bugs": {
     "url": "https://github.com/Taylor-CCB-Group/MDV/issues"
   },
