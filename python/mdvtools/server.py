@@ -262,6 +262,8 @@ def create_app(
             # )
             view = request.form["view"] if "view" in request.form else None
             replace = True if "replace" in request.form else False
+            if not replace and name in [ds['name'] for ds in project.datasources]:
+                return f"Datasource '{name}' already exists, and 'replace' was not set in request", 400
             if "file" not in request.files:
                 return "No 'file' provided in request form data", 400
             file = request.files["file"]
@@ -279,8 +281,7 @@ def create_app(
                 supplied_columns_only=supplied_only,
                 replace_data=replace,
             )
-            backend = request.form["backend"]
-            if backend:
+            if "backend" in request.form:
                 response = add_datasource_backend(project,view)
                 return response
         except Exception as e:
@@ -332,7 +333,7 @@ def add_datasource_backend(project,view):
             else:
                 
                 # Create a new file entry
-                new_file = File(name=os.path.basename(file), file_path=None, project=project_db)
+                new_file = File(name=os.path.basename(file), file_path=None, project=project_db) # type: ignore
                 db.session.add(new_file)
                 
         db.session.commit()

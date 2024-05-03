@@ -55,9 +55,13 @@ sphinx-autoapi = "^3.0.0"
 [tool.poetry.group.backend.dependencies]
 flask-sqlalchemy = "^3.1.1"
 
-[project.urls]
-"Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
-"Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
+[tool.pyright]
+venvPath = "../venv/"
+typeCheckingMode = "standard"
+
+# [project.urls]
+# "Homepage" = "https://github.com/Taylor-CCB-Group/MDV"
+# "Bug Tracker" = "https://github.com/Taylor-CCB-Group/MDV/issues"
 
 
 [build-system]
