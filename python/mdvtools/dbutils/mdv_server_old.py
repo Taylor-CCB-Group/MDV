@@ -86,12 +86,12 @@ def upload():
         if not file:
             return jsonify({'error': 'No file selected.'}), 400
 
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename) # type: ignore
 
         # Check if project exists
         project = Project.query.filter_by(name=project_name).first()
         if not project:
-            project = Project(name=project_name)
+            project = Project(name=project_name) # type: ignore
             db.session.add(project)
 
         # Check if file with same name already exists in the project
@@ -115,7 +115,7 @@ def upload():
             file.save(file_path)
 
             # Create a new file entry
-            new_file = File(name=file.filename, file_path=file_path, project=project)
+            new_file = File(name=file.filename, file_path=file_path, project=project) # type: ignore
             db.session.add(new_file)
             db.session.commit()
 
