@@ -248,8 +248,9 @@ export function createVivStores(chart: VivMDVReact) {
         return { ...state, isChannelLoading: newIsChannelLoading };
       })
   })) satisfies VivContextType['viewerStore'];
-  // not sure why 'channelsStore' is misbehaving when other types are ok...
-  return { viewerStore, channelsStore, imageSettingsStore } as unknown as VivContextType;
+  // using `as` instead of `satisfies` because of a bug in the type-checking...
+  // not sure why 'channelsStore' is misbehaving when other types are ok.
+  return { viewerStore, channelsStore, imageSettingsStore } as VivContextType;
 }
 
 const VivContext = createContext<VivContextType>(null);
