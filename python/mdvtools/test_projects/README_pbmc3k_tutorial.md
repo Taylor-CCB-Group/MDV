@@ -3,9 +3,9 @@
 To setup running MDV locally please follow the instructions below:
 
 Clone the repository
-`git clone https://github.com/Taylor-CCB-Group/MDV.git
-cd MDV
-git checkout pjt-dev`
+`git clone https://github.com/Taylor-CCB-Group/MDV.git`
+`cd MDV`
+`git checkout pjt-dev`
 
 From the MDV folder:
 
@@ -17,11 +17,11 @@ From the MDV folder:
     `npm run python-setup`
 
 This is equvalent to running the following commands, so in case it doesn't work run these:
-    `python -m venv venv
-     source venv/bin/activate
-     cd python
-     poetry install --with dev
-     npm run build-flask-vite`
+    `python -m venv venv`
+    `source venv/bin/activate`
+    `cd python`
+    `poetry install --with dev`
+    `npm run build-flask-vite`
 
 NOTE:
 In case python does not run because the default is python3, try again the above commands replacing python with python3.
@@ -32,6 +32,6 @@ In case poetry does not work, or you do not want to use it, install mdvtools usi
 
 After the setup is done, please follow the instructions below:
 
-1. In the open terminal run. If you do not have jupyter notebook installed install it.
+1. In the open terminal run the command below. If you do not have jupyter notebook installed install it.
     `jupyter notebook`
 2. Open and run the notebook
