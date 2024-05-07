@@ -300,7 +300,8 @@ def create_app(
         print(f"Adding project {project.name} to existing app")
         app.register_blueprint(project_bp)
     else:
-        app.run(host="0.0.0.0", port=port, debug=True)
+        # user_reloader=False, allows the server to work within jupyter
+        app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
 
 def add_datasource_backend(project,view):
     from mdvtools.dbutils.dbmodels import db, Project, File, User

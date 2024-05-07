@@ -30,18 +30,8 @@ On Windows systems the `source venv/bin/activate` command will not work, instead
 In case poetry does not work, or you do not want to use it, install mdvtools using pip by:
 `pip install -e python`
 
-
 After the setup is done, please follow the instructions below:
 
-1. Open a terminal
-2. Switch to the python folder within the MDV folder
-    `cd MDV/python`
-3. Activate the previously created environment
-    `source venv/bin/activate` on Mac/Linux or `venv/Scripts/activate.bat` on Windows
-4. Run:
-    `python -m mdvtools.mdv_desktop` - leave this running in the background.
-5. Open a new terminal and follow steps 2 and 3 again
-6. If you do not have jupyter notebook installed install it, otherwise run:
+1. In the open terminal run. If you do not have jupyter notebook installed install it.
     `jupyter notebook`
-7. Open and run the notebook
-8. Open `http://localhost:5051/project/pbmc3k` in browser. The last part of the URL is the name of your project as it was named on the 
+2. Open and run the notebook
