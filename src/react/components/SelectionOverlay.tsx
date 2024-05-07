@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMetadata, useViewerStore } from "./avivatorish/state";
 import { useFilteredIndices, useRegionScale, useScatterplotLayer } from "../scatter_state";
 import { useChart } from "../context";
-import { useRange } from "../spatial_context";
+import { useMeasure, useRange } from "../spatial_context";
 import RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
 import type { VivMDVReact } from "./VivMDVReact";
@@ -155,8 +155,7 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
     // const physicalUnits = metadata?.Pixels?.PhysicalSizeXUnit || 'unknown units';
     const [w, h] = useChartSize();
     const [hasStarted, setHasStarted] = useState(false);
-    const [startPixels, setStart] = useState<P>([0, 0]);
-    const [endPixels, setEnd] = useState<P>([0, 0]);
+    const { startPixels, setStart, endPixels, setEnd } = useMeasure();
     const handleMouseMove = useCallback((e: MouseEvent) => {
         setEnd(unproject(e));
     }, [unproject]);

@@ -8,7 +8,7 @@ import SelectionOverlay from "./SelectionOverlay";
 import { useLoader, OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
-import { RangeProvider, useRange } from "../spatial_context";
+import { SpatialAnnotationProvider, useRange } from "../spatial_context";
 import { PolygonLayer } from "deck.gl/typed";
 import { getVivId } from "./avivatorish/MDVivViewer";
 
@@ -17,7 +17,7 @@ export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move
 /** somewhat comparable to avivator `<Viewer />` */
 export const VivScatter = () => {
     const chart = useChart();
-    return <RangeProvider chart={chart}><Main /></RangeProvider>
+    return <SpatialAnnotationProvider chart={chart}><Main /></SpatialAnnotationProvider>
 }
 
 const useRectLayer = () => {

@@ -3,21 +3,8 @@ import type RangeDimension from "../datastore/RangeDimension";
 import { BaseReactChart } from "./components/BaseReactChart";
 import { PolygonLayer } from '@deck.gl/layers';
 
-// const layer = new PolygonLayer({
-//     id: 'PolygonLayer',
-//     data: 'https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/sf-zipcodes.json',
-
-//     getPolygon: d => d.contour,
-//     getElevation: d => d.population / d.area / 10,
-//     getFillColor: d => [d.population / d.area / 60, 140, 0],
-//     getLineColor: [255, 255, 255],
-//     getLineWidth: 20,
-//     lineWidthMinPixels: 1,
-//     pickable: true
-// });
-
 /*****
- * Persisting some properties related to SelectionOverlay in "RangeProvider"... >>subject to change<<.
+ * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
  * Needs will also get more complex, and now we have a somewhat convoluted way of doing something simple.
  * Probably going to be a zustand store in not too long.
@@ -31,15 +18,20 @@ type RangeState = {
     start: P; setStart: (p: P) => void; startRef: RefP;
     end: P; setEnd: (p: P) => void; endRef: RefP;
 };
-
-
+type MeasureState = {
+    startPixels: P; setStart: (p: P) => void;
+    endPixels: P; setEnd: (p: P) => void;
+}
 type PolygonRegion = {
     coords: P[];
 }
-
+type SpatialAnnotationState = {
+    rectRange: RangeState;
+    measure: MeasureState;
+}
 
 // Could more usefully be thought of as SpatialContext?
-const RangeContext = createContext<RangeState>(undefined);
+const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined);
 
 function useCreateRange(chart: BaseReactChart<any>) {
     const ds = chart.dataStore;
@@ -95,20 +87,35 @@ function useCreateRange(chart: BaseReactChart<any>) {
     }, [ds]);
     return { polygonLayer, rangeDimension, start, setStart, startRef, end, setEnd, endRef };
 }
+function useCreateMeasure() {
+    const [startPixels, setStart] = useState<P>([0, 0]);
+    const [endPixels, setEnd] = useState<P>([0, 0]);
+    return { startPixels, setStart, endPixels, setEnd };
+}
+function useCreateSpatialAnnotationState(chart: BaseReactChart<any>) {
+    const rectRange = useCreateRange(chart);
+    const measure = useCreateMeasure();
+    return { rectRange, measure };
+}
 
 
-export function RangeProvider({ chart, children }: { chart: BaseReactChart<any> } & React.PropsWithChildren) {
-    const rangeState = useCreateRange(chart);
+export function SpatialAnnotationProvider({ chart, children }: { chart: BaseReactChart<any> } & React.PropsWithChildren) {
+    const annotationState = useCreateSpatialAnnotationState(chart);
     return (
-        <RangeContext.Provider value={rangeState}>
+        <SpatialAnnotationState.Provider value={annotationState}>
             {children}
-        </RangeContext.Provider>
+        </SpatialAnnotationState.Provider>
     );
 }
 
 export function useRange() {
-    const range = useContext(RangeContext);
+    const range = useContext(SpatialAnnotationState).rectRange;
     if (!range) throw new Error('no range context');
     return range;
 }
 
+export function useMeasure() {
+    const measure = useContext(SpatialAnnotationState).measure;
+    if (!measure) throw new Error('no measure context');
+    return measure;
+}
