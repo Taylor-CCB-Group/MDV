@@ -320,7 +320,7 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
                 <RectangleEditor toolActive={selectedTool==='Rectangle'} {...scatterProps}
                 rangeDimension={rangeDimension} />
                 {selectedTool === 'Transform'  && <TransformEditor {...scatterProps} rangeDimension={rangeDimension}/>}
-                <MeasureTool {...scatterProps} rangeDimension={rangeDimension} toolActive={selectedTool === 'Measure'} />
+                {scatterProps.currentLayerHasRendered && <MeasureTool {...scatterProps} rangeDimension={rangeDimension} toolActive={selectedTool === 'Measure'} />}
         </div>
         </>
     )
