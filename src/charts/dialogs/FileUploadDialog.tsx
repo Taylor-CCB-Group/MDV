@@ -256,7 +256,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
       dispatch({ type: "SET_IS_UPLOADING", payload: false });
       
       // Extracting rows, columns, and size from response.data
-      const { rows, columns, size } = response.data;
+      const { rows, columns, size, replaced } = response.data;
       dispatch({
         type: "SET_FILE_SUMMARY",
         payload: {
@@ -283,23 +283,59 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     dispatch({ type: "SET_IS_INSERTING", payload: true });
   
     try {
-      const response = await axios.post(`${flaskURL}${projectName}/confirm_datasource`, { confirmed: true });
+      const response = await axios.post(`${flaskURL}${projectName}/add_datasource`, { confirmed: true });
       if (response.status === 200) {
         console.log('Confirmation successful', response.data);
         dispatch({ type: "SET_IS_INSERTING", payload: false });
         dispatch({ type: "SET_SUCCESS", payload: true });
       } else {
-        throw new Error('Failed to confirm');
+        console.error(`Failed to confirm: Server responded with status ${response.status}`);
+        dispatch({ type: "SET_IS_INSERTING", payload: false });
+        dispatch({
+          type: "SET_ERROR",
+          payload: {
+            message: `Confirmation failed with status: ${response.status}`,
+            status: response.status,
+            traceback: "Server responded with non-200 status"
+          }
+        });
       }
     } catch (error) {
-      console.error('Error during confirmation:', error);
       dispatch({ type: "SET_IS_INSERTING", payload: false });
-      dispatch({
-        type: "SET_ERROR", payload: {
-          message: "Confirmation failed due to a network or server error.",
-          traceback: error.message || "No additional error info"
-        }
-      });
+  
+      if (error.response) {
+        // Error with response from server
+        const message = `Confirmation failed: ${error.response.data.message || "Unknown error from server"}`;
+        console.error('Error during confirmation:', message);
+        dispatch({
+          type: "SET_ERROR",
+          payload: {
+            message: message,
+            status: error.response.status,
+            traceback: error.stack
+          }
+        });
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('Error during confirmation:', error.message);
+        dispatch({
+          type: "SET_ERROR",
+          payload: {
+            message: "No response from server. Please check your network connection.",
+            traceback: error.message
+          }
+        });
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error during confirmation:', error.message);
+        dispatch({
+          type: "SET_ERROR",
+          payload: {
+            message: "Error setting up the confirmation request.",
+            traceback: error.message
+          }
+        });
+      }
     }
   };
 
@@ -308,7 +344,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     dispatch({ type: "SET_IS_INSERTING", payload: true });
   
     try {
-      const response = await axios.post(`${flaskURL}${projectName}/confirm_datasource`, { confirmed: false });
+      const response = await axios.post(`${flaskURL}${projectName}/add_datasource`, { confirmed: false });
       if (response.status === 200) {
         console.log('Cancellation successful');
         onClose(); // Call onClose to handle any local cleanup or UI changes
