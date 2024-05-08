@@ -5,7 +5,7 @@ import { createStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { observer } from "mobx-react-lite";
 import { VivMDVReact } from "../VivMDVReact";
-import type { ExtractState, ZustandStore } from "./zustandTypes";
+import type { EqFn, Selector, ZustandStore } from "./zustandTypes";
 
 // what about loadOmeZarr, loadBioformatsZarr...
 // ... not to mention HTJ2K?
@@ -265,16 +265,14 @@ const VivContext = createContext<VivContextType>(null);
 export const VivProvider = observer(({ children }: PropsWithChildren) => {
   const vivChart = useChart() as VivMDVReact; //may want to be less MDV-centric here
   if (!vivChart.vivStores) vivChart.vivStores = createVivStores(vivChart); //<< not very react-y: is this ok?
-  const vivStoresRef = useRef(vivChart.vivStores);
   return (
-    <VivContext.Provider value={vivStoresRef.current}>
+    <VivContext.Provider value={vivChart.vivStores}>
       {children}
     </VivContext.Provider>
   )
 });
 
 type StoreName = keyof VivContextType;
-type Selector<S, U> = (state: ExtractState<S>) => U;
 type ImageSettingsStore = VivContextType['imageSettingsStore'];
 type ViewerStore = VivContextType['viewerStore'];
 type ChannelsStore = VivContextType['channelsStore'];
@@ -289,8 +287,6 @@ function useStoreApi<S extends StoreName>(storeName: S): VivContextType[S] {
 export const useChannelsStoreApi = () => useStoreApi('channelsStore');
 export const useImageSettingsStoreApi = () => useStoreApi('imageSettingsStore');
 export const useViewerStoreApi = () => useStoreApi('viewerStore');
-
-type EqFn<U> = (a: U, b: U) => boolean;
 
 /** should be more-or-less equivalent to equivalent avivator hook - 
  * but there can be multiple viv viewers, so we have context for that.
