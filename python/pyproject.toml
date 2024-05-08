@@ -29,9 +29,6 @@ scipy = "^1.11.3"
 werkzeug = "^3.0.2"
 
 
-[tool.poetry.group.backend.dependencies]
-sqlalchemy = "^2.0.29"
-
 [tool.poetry.group.dev.dependencies]
 pyright = "^1.1.358"
 pytest = "^8.1.1"
