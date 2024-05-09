@@ -448,18 +448,28 @@ class MDVProject:
         shutil.copy(reft+".tbi",join(self.trackfolder,f"{genome}.bed.gz.tbi"))
         self.set_datasource_metadata(ds)
 
-    def add_genome_browser(self,datasource,parameters=["chr","start","end"],name=None,extra_params=None):
-        # get all the genome locations
-        loc = [self.get_column(datasource,x) for x in parameters]
-        #write to a bed file
-        bed = join(self.trackfolder,"t.bed")
-        o=open(bed,"w")
-        for c,(chr,start,end) in enumerate(zip(loc[0],loc[1],loc[2])):
-            o.write(f"{chr}\t{start}\t{end}\t{c}\n")
-        o.close()
-        indexed_bed= join(self.trackfolder,"loc.bed")
-        create_bed_gz_file(bed,indexed_bed)
-        os.remove(bed)
+    def add_genome_browser(self,datasource,parameters=["chr","start","end"],
+                           name=None,extra_params=None,custom_track=None):
+        
+        if not custom_track:
+            # get all the genome locations
+            loc = [self.get_column(datasource,x) for x in parameters]
+            #write to a bed file
+            bed = join(self.trackfolder,"t.bed")
+            o=open(bed,"w")
+            for c,(chr,start,end) in enumerate(zip(loc[0],loc[1],loc[2])):
+                o.write(f"{chr}\t{start}\t{end}\t{c}\n")
+            o.close()
+            indexed_bed= join(self.trackfolder,"loc.bed")
+            create_bed_gz_file(bed,indexed_bed)
+            os.remove(bed)
+        else:
+            custom_track["location"]
+            #copy the custom track to the tracks folder
+            shutil.copy(custom_track["location"],join(self.trackfolder,"loc.bed.gz"))
+            #copy index file
+            shutil.copy(custom_track["location"]+".tbi",join(self.trackfolder,"loc.bed.gz.tbi"))
+
         if not name:
             name = datasource
         gb={
@@ -469,6 +479,8 @@ class MDVProject:
                 "label":name
             }
         }
+        if custom_track:
+            gb["default_track"]["type"]=custom_track["type"]
         if extra_params:
             gb.update(extra_params)
         ds= self.get_datasource_metadata(datasource)
