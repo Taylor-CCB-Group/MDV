@@ -6,7 +6,7 @@ import 'react18-json-view/src/dark.css'
 
 export default function ({json, header}: {json: any, header?: string}) {
     return (
-        <div>
+        <div className='max-h-[90vh] overflow-auto'>
             {header && <h2>{header}</h2>}
             <JsonView src={json} />
         </div>

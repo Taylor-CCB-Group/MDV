@@ -120,6 +120,7 @@ async function loadData() {
 
     // add a button for debugging datasources & views metadata
     // this could be in ChartManager instead, this is convenient for now so we have `root` available.
+    // would be better if it appeared with other entry-points, and also having it here means HMR doesn't work.
     const tiptext = "View datasource metadata";
     const debugButton = cm.addMenuIcon('_main', "fas fa-bug", tiptext, async () => {
         const datasources = await fetchJsonConfig(`${root}/datasources.json`, root);
