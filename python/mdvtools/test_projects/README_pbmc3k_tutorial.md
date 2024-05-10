@@ -5,7 +5,7 @@ To setup running MDV locally please follow the instructions below:
 Clone the repository
 `git clone https://github.com/Taylor-CCB-Group/MDV.git`\
 `cd MDV`\
-`git checkout pjt-dev`
+`git checkout mk-API`
 
 From the MDV folder:
 
