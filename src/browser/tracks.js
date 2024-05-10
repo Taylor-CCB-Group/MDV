@@ -91,18 +91,47 @@ class MLVTrack{
 
 
     getSettings(panel){
-        return [{
-            type:"slider",
-            min:10,
-            max:1000,
-            label:"Height",
-            current_value:this.config.height,
-            func:x=>{
-                this.setConfigAttribute("height",x);
-                panel.update()
+        return [
+            {
+                type:"text",
+                label:"Label",
+                current_value:this.config.short_label,
+                func:x=>{
+                    this.setConfigAttribute("short_label",x);
+                    panel.update();
+                }
 
+            },
+            {
+                type:"slider",
+                min:10,
+                max:1000,
+                label:"Height",
+                current_value:this.config.height,
+                func:x=>{
+                    this.setConfigAttribute("height",x);
+                    panel.update();
+
+                }
+            },
+            {
+                type:"colorChooser",
+                label:"Color",
+                current_value:this.config.color,
+                func:x=>{
+                    this.setConfigAttribute("color",x);
+                    panel.update()
+    
+                }
+            },
+            {
+                type:"button",
+                label:"Delete",
+                func:()=>{
+                    panel.removeTrack(this.config.track_id);
+                }
             }
-        }]
+        ]
     }
 
 
@@ -816,6 +845,11 @@ class MLVWigTrack extends MLVTrack{
 	_setFeatureSource(){
 		this.feature_source=new BWSource(this.config);	
 	}
+    getSettings(panel){
+        const s= super.getSettings(panel);
+        return s;
+    }
+
 
 
 	drawScale(pixel_height,ctx,defaultColor){

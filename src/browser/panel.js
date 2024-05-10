@@ -33,7 +33,7 @@ import "./BamCoverageTrack.js";
 import "./extra/interaction_track.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog.js";
-import canvasToSvg from "canvas-to-svg"
+import canvasToSvg from "canvas-to-svg";
 
 class MLVPanel {
     /**
@@ -373,10 +373,11 @@ class MLVPanel {
         if (!not_repaint){
             this.repaint(true,true);
         }
-    
-        if (this.legend){
-            this.legend.removeTrack(track_id);
-        }
+        this.trackLabels[track_id].remove();
+        delete this.trackLabels[track_id];
+        this.trackDialogs[track_id] && this.trackDialogs[track_id].close();
+        delete this.trackDialogs[track_id];
+      
         let config =  this.tracks[track_id].config
         delete this.tracks[track_id];
         if (! not_propagate){
@@ -697,6 +698,8 @@ class MLVPanel {
                             
                             const l = self.trackLabels[track.config.track_id];
                             if (l){
+                                l.textContent=track.config.short_label;
+                                l.title = track.config.short_label;
                                 l.style.display="block";
                                 l.style.top=(top+self.yOffset)+"px";
 
