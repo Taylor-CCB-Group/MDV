@@ -1,5 +1,6 @@
 import json
-
+import random
+import string
 class BasePlot:
     def __init__(self, title, plot_type, params, size, position, id=None):
         self.plot_data = {
@@ -12,9 +13,8 @@ class BasePlot:
         }
 
     def generate_id(self):
-        # Generate a unique ID for the plot
-        return "unique_id"
-        # return str(uuid.uuid4()) ?
+        '''Generate a unique ID for the plot'''
+        return str(''.join(random.choices(string.ascii_letters, k=6)))
 
 
     def set_legend(self, legend):

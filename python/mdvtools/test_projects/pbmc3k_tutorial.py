@@ -263,7 +263,7 @@ histogram_plot_2.set_y_axis(size=45, label="frequency", textsize=13, tickfont=10
 
 # Set up and serve the MDV project
 base = os.path.expanduser('~/mdv')
-project_path = os.path.join(base, 'pbmc3k')
+project_path = os.path.join(base, 'pbmc3k_test')
 p = MDVProject(os.path.expanduser(project_path), delete_existing=True)
 
 # Add data to the project
