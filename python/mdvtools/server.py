@@ -288,7 +288,8 @@ def create_app(
             # success = False
             return str(e), 400
 
-        return jsonify({"success": success})
+        metadata = project.get_datasource_metadata(name)
+        return jsonify({"success": success, "metadata": metadata})
 
     if open_browser:
         webbrowser.open(f"http://localhost:{port}/{route}")
