@@ -18,7 +18,7 @@ def load_projects_from_config(base_dir):
                     except Exception as e:
                         print(f"Error adding project '{d}' from config file: {e}")
         else:
-            print("Config file doesn't exist.")
+            print("load_projects_from_config: Projects config file doesn't exist.")
             with open(config_file, 'w') as f:
                 json.dump({'projects': []}, f)
     except Exception as e:
@@ -39,7 +39,7 @@ def create_projects_from_db(base_dir):
                 if os.path.exists(project_path):
                     db_projects.append(MDVProject(project_path))
                 else:
-                    print(f"Error: Project path '{project_path}' does not exist.")
+                    print(f"Error in create_projects_from_db: Project path '{project_path}' does not exist.")
             except Exception as e:
                 print(f"Error creating project '{project_name}': {e}")
     except Exception as e:

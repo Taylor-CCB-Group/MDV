@@ -11,8 +11,9 @@ try:
         config = json.load(config_file)
         app.config['SQLALCHEMY_DATABASE_URI'] = config.get('database_uri', '')
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.get('track_modifications', False)
-        # app.config['UPLOAD_FOLDER'] = config.get('upload_folder', '')
-        print("Configuration loaded successfully!")
+        app.config['upload_folder'] = config.get('upload_folder', '')
+        app.config['projects_base_dir'] = config.get('projects_base_dir', '')
+        print("In app.py : Configuration loaded successfully!")
 except FileNotFoundError:
     print("Error: app.py script -> Configuration file not found.")
 except Exception as e:

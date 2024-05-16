@@ -5,15 +5,19 @@ from datetime import datetime
 import os
 
 def register_routes(projects):
+    
+    @app.route('/projects')
+    def get_projects():
+        return jsonify([p.name for p in projects])
+    
+
+def register_global_routes():
+    
     @app.route('/')
     def index():
         # todo: figure out what to do here / how to configure routes
         return render_template('index.html')
-
-    @app.route('/projects')
-    def get_projects():
-        return jsonify([p.name for p in projects])
-
+    
     @app.route('/upload', methods=['POST'])
     def upload():
         try:
@@ -25,7 +29,7 @@ def register_routes(projects):
             if not file:
                 return jsonify({'error': 'No file selected.'}), 400
 
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename) # type: ignore
+            file_path = os.path.join(app.config['projects_base_dir'], project_name, file.filename) # type: ignore
 
             # Check if project exists
             project = Project.query.filter_by(name=project_name).first()
@@ -64,28 +68,4 @@ def register_routes(projects):
 
                 return jsonify({'message': f'File uploaded successfully under project "{project_name}"'}), 200
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
-
-
-    @app.route('/delete_file', methods=['DELETE'])
-    def delete_file():
-        try:
-            file_id = request.args.get('file_id')
-            if not file_id:
-                return jsonify({'error': 'File ID is missing.'}), 400
-
-            # Check if the file exists
-            file = File.query.get(file_id)
-            if not file:
-                return jsonify({'error': 'File not found.'}), 404
-
-            # Delete the file from the uploads directory
-            if os.path.exists(file.file_path):
-                os.remove(file.file_path)
-            
-            # Delete the file entry from the database
-            db.session.delete(file)
-            db.session.commit()
-            return jsonify({'message': 'File deleted successfully.'}), 200
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({'error in /upload api': str(e)}), 500

@@ -3,7 +3,7 @@ import json
 from mdvtools.server import add_safe_headers
 from mdvtools.dbutils.app import app
 from mdvtools.dbutils.dbmodels import db
-from mdvtools.dbutils.routes import register_routes
+from mdvtools.dbutils.routes import register_routes, register_global_routes
 from mdvtools.dbutils.project_loader import create_all_projects
 
 
@@ -13,7 +13,7 @@ def serve_projects(projects):
 
         for p in projects:
             try:
-                print(p.name)
+                print(p.name, p.state)
                 p.serve(open_browser=False, app=app)
             except Exception as e:
                 print(f'Error serving {p.name}: {e}')
@@ -49,12 +49,14 @@ if __name__ == '__main__':
     with app.app_context():
         try:
             db.create_all()
+            register_global_routes()
             projects = create_all_projects(base_dir)
+            
             serve_projects(projects)
         except Exception as e:
             print(f'Error initializing app: {e}')
 
     try:
-        app.run(debug=True, port=5055)
+         app.run(host='0.0.0.0', debug=True, port=5055)
     except Exception as e:
         print(f'Error running app: {e}')
