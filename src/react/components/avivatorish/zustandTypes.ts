@@ -13,3 +13,5 @@ export type WithReact<S extends ReadonlyStoreApi<unknown>> = S & {
 
 // not copied from zustand source
 export type ZustandStore<T> = WithReact<StoreApi<T>>;
+export type Selector<S, U> = (state: ExtractState<S>) => U;
+export type EqFn<U> = (a: U, b: U) => boolean;

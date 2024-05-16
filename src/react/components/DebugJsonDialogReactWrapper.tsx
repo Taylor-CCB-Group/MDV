@@ -2,12 +2,11 @@ import { observer } from "mobx-react-lite";
 import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
-import Gui from "./DebugChartDialogComponent";
+import Gui from "./DebugJsonDialogComponent";
 import BaseChart from "../../charts/BaseChart";
 
-const DebugChart = observer(({chart}: {chart: BaseChart}) => {
-    // const config = chart.getConfig(); //instrument with mobx etc
-    return (<Gui chart={chart} />)
+const DebugChart = observer(({chart, header}: {chart: any, header?: string}) => {
+    return (<Gui json={chart} header={header} />)
 });
 
 
@@ -19,15 +18,15 @@ class DebugChartReactWrapper extends BaseDialog {
     set root(v) {
         this._root = v;
     }
-    constructor(chart: BaseChart) {
-        const name = chart.config.title || chart.config.type + ' ' + chart.config.id;
+    constructor(json: any, chart?: BaseChart) {
+        const name = chart ? (chart.config.title || chart.config.type + ' ' + chart.config.id) : '';
         const config = { //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
-            width: 500, title: `Debug (${name})`, doc: document,
-            onclose: () => { chart.dialogs.splice(chart.dialogs.indexOf(this), 1) }
+            width: 500, title: `Debug ${name}`, doc: document,
+            onclose: () => { chart?.dialogs.splice(chart.dialogs.indexOf(this), 1) }
         };
-        super(config, chart);
+        super(config, json);
     }
-    init(parent: BaseChart) {
+    init(parent: any) {
         const div = createEl('div', {}, this.dialog);
         this.root = createMdvPortal((
             <DebugChart chart={parent} />

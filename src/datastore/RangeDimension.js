@@ -30,6 +30,9 @@ class RangeDimension extends Dimension{
         return this.filterPredicate({predicate}, columns);
     }
 
+    /**
+     * @param {Array<[number, number]>} args
+     */
     filterPoly(args,columns){
         const points=args;
         let minX=Number.MAX_VALUE, minY= Number.MAX_VALUE;

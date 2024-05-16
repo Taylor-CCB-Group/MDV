@@ -11,6 +11,7 @@ import { BaseDialog } from "../utilities/Dialog";
 import { fetchJsonConfig, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
+import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
 declare global {
@@ -116,6 +117,19 @@ async function loadData() {
     }
     // this will assign itself to `window.mdv.chartManager` in constructor
     const cm = new ChartManager("holder", datasources, dataLoader, config, listener);
+
+    // add a button for debugging datasources & views metadata
+    // this could be in ChartManager instead, this is convenient for now so we have `root` available.
+    // would be better if it appeared with other entry-points, and also having it here means HMR doesn't work.
+    const tiptext = "View datasource metadata";
+    const debugButton = cm.addMenuIcon('_main', "fas fa-bug", tiptext, async () => {
+        const datasources = await fetchJsonConfig(`${root}/datasources.json`, root);
+        const views = await fetchJsonConfig(`${root}/views.json`, root);
+        
+        new DebugJsonReactWrapper({datasources, views});
+    });
+    debugButton.style.float = "right";
+    debugButton.setAttribute("data-microtip-position", "bottom-left");
 
     function extraFeatures(i: number) {
         const dsName = datasources[i].name;

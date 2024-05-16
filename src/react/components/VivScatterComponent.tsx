@@ -7,11 +7,46 @@ import { useScatterplotLayer } from "../scatter_state";
 import SelectionOverlay from "./SelectionOverlay";
 import { useLoader, OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
 import { useViewStateLink } from "../chartLinkHooks";
+import { useChart } from "../context";
+import { SpatialAnnotationProvider, useRange } from "../spatial_context";
+import { PolygonLayer } from "deck.gl/typed";
+import { getVivId } from "./avivatorish/MDVivViewer";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
 /** somewhat comparable to avivator `<Viewer />` */
-export const VivScatter = observer(() => {
+export const VivScatter = () => {
+    const chart = useChart();
+    return <SpatialAnnotationProvider chart={chart}><Main /></SpatialAnnotationProvider>
+}
+
+const useRectLayer = () => {
+    const id = useChartID();
+    const { start, end } = useRange();
+    // note: viv is very picky about layer ids
+    const layer_id = `rect_${getVivId(id + 'detail-react')}`;
+    const polygonLayer = useMemo(() => {
+        const data = [
+            [start, [end[0], start[1]], end, [start[0], end[1]]]
+        ];
+        return new PolygonLayer({
+            id: layer_id,
+            data,
+
+            getPolygon: d => d,
+            getFillColor: [140, 140, 140],
+            getLineColor: [255, 255, 255],
+            getLineWidth: 1,
+            lineWidthMinPixels: 1,
+            // fillOpacity: 0.1, //not working? why is there a prop for it if it doesn't work?
+            opacity: 0.2,
+            pickable: true
+        });
+    }, [start, end]);
+    return polygonLayer;
+}
+
+const Main = observer(() => {
     // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
     const ome = useLoader() as OME_TIFF['data'];// useOmeTiff();
 
@@ -20,6 +55,7 @@ export const VivScatter = observer(() => {
     const id = useChartID();
     const detailId = id + 'detail-react';
 
+    const rectLayer = useRectLayer();
     const scatterProps = useScatterplotLayer();
     const {scatterplotLayer, getTooltip} = scatterProps;
 
@@ -75,7 +111,7 @@ export const VivScatter = observer(() => {
             zIndex: '-1',
         },
         //todo multiple layers, figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
-        layers: [scatterplotLayer],
+        layers: [scatterplotLayer, rectLayer],
         id: id + 'deck',
         onAfterRender: () => {
             scatterProps.onAfterRender();

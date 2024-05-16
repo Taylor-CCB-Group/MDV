@@ -265,8 +265,8 @@ class ChartManager{
         if (config.permission === 'edit') {
             const uploadButton = createMenuIcon("fas fa-upload",{
                 tooltip:{
-                    text:"Upload dataset",
-                    position:"top-left"
+                    text:"Add datasource",
+                    position:"bottom-left"
                 },
                 func:(e)=>{
                     new FileUploadDialogReact().open();
@@ -274,6 +274,15 @@ class ChartManager{
             },this.menuBar);
             uploadButton.style.margin = "3px";
         }
+        // createMenuIcon("fas fa-question",{
+        //     tooltip:{
+        //         text:"Help",
+        //         position:"top-right"
+        //     },
+        //     func:()=>{
+        //         //todo
+        //     }
+        // },this.menuBar).style.margin = "3px";
 
         this._setupThemeContextMenu();
       
