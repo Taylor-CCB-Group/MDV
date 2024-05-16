@@ -2,8 +2,8 @@ import {getRandomString} from "../utilities/Utilities.js";
 import {ContextMenu} from "../utilities/ContextMenu.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog";
-import { chartTypes } from "./ChartTypes.ts";
-import DebugChartDialogReactWrapper from "../react/components/DebugChartDialogReactWrapper";
+import { chartTypes } from "./ChartTypes";
+import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 
 
 class BaseChart{
@@ -101,7 +101,7 @@ class BaseChart{
                     icon:"fas fa-bug",
                     func:()=>{
                         window.mdv.debugChart = this;
-                        this.dialogs.push(new DebugChartDialogReactWrapper(this));
+                        this.dialogs.push(new DebugJsonDialogReactWrapper(this.config, this));
                     }
                 });
                 menu.push({

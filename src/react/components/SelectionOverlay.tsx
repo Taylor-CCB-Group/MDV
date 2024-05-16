@@ -8,7 +8,8 @@ import StraightenIcon from '@mui/icons-material/Straighten';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMetadata, useViewerStore } from "./avivatorish/state";
 import { useFilteredIndices, useRegionScale, useScatterplotLayer } from "../scatter_state";
-import { useChart, useRange } from "../context";
+import { useChart } from "../context";
+import { useMeasure, useRange } from "../spatial_context";
 import RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
 import type { VivMDVReact } from "./VivMDVReact";
@@ -54,7 +55,10 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
     const cols = chart.config.param;
     // using both ref and state here so we can access the current value in the event handlers
     // (without needing to recreate them every time the state changes)
-    const { start, setStart, startRef, end, setEnd, endRef } = useRange();
+    const { setStart, startRef, setEnd, endRef } = useRange();
+    const { start, end } = useRange();
+    // this is glitchy - not clear whether it was actually working correctly prior to local changes or not
+    // ??? especially bad when measure tool is used first...
     const updateRange = useCallback(async () => {
         if (!rangeDimension) return;
         const s = startRef.current;
@@ -88,7 +92,6 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
         runInAction(() => {
           chart.config.zoom_on_filter = false;
         });
-        //chart.ignoreStateUpdate = true;
 
         rangeDimension.filter('filterPredicate', cols, args);
         //although the filter is sync, the event that checks zoom_on_filter will happen later...
@@ -102,43 +105,26 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
             });
         }, 500);
         chart.resetButton.style.display = 'inline';
-        (window as any).r = rangeDimension;
-    }, [rangeDimension, cols]);
+        // (window as any).r = rangeDimension;
+    }, [rangeDimension, cols, start, end]); //for some reason passing start & end here is improving the behaviour even though we use refs...
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!toolActive) return;
         const p = unproject(e);
         setEnd(p);
-    }, [toolActive]);
+    }, [toolActive, end]);
     const handleMouseUp = useCallback((e: MouseEvent) => {
         handleMouseMove(e);
         window.removeEventListener('mouseup', handleMouseUp);
         window.removeEventListener('mousemove', handleMouseMove);
         updateRange();
-    }, [toolActive]);
+    }, [toolActive, updateRange]);
 
-    const min = [Math.min(start[0], end[0]), Math.min(start[1], end[1])];
-    const max = [Math.max(start[0], end[0]), Math.max(start[1], end[1])];
     if (!currentLayerHasRendered) return null; //if we pass this, I thought it meant we have internalState, but it seems not...
     if (!scatterplotLayer.internalState) return null;
-    const screenStart = scatterplotLayer.project(min);
-    const screenEnd = scatterplotLayer.project(max);
 
     return (
     <>
-    <div style={{
-        // position: dragging ? 'fixed' : 'relative',
-        position: 'relative',
-        //consider using a ref to this element & updating the style directly...
-        //to avoid needing to re-render the whole thing and keep both state and refs in sync...
-        left: screenStart[0],
-        top: screenStart[1],
-        width: screenEnd[0] - screenStart[0],
-        height: screenEnd[1] - screenStart[1],
-        border: '1px solid white', //todo: make this a theme colour
-        backgroundColor: 'rgba(255,255,255,0.1)',
-    }}
-    />
     <div style={{
         position: 'absolute',
         width: '100%',
@@ -149,8 +135,9 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
     onMouseDown={(e) => {
         if (!toolActive) return;
         const p = unproject(e);
-        setStart(p);
-        setEnd(p);
+        console.log('mouse down', p);
+        setStart([p[0], p[1]]);
+        setEnd([p[0], p[1]]);
         // setDragging(true); //dragging state is determined by whether the listeners are attached...
         window.addEventListener('mouseup', handleMouseUp);
         window.addEventListener('mousemove', handleMouseMove);
@@ -168,10 +155,9 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
     // const physicalUnits = metadata?.Pixels?.PhysicalSizeXUnit || 'unknown units';
     const [w, h] = useChartSize();
     const [hasStarted, setHasStarted] = useState(false);
-    const [startPixels, setStart] = useState<P>([0, 0]);
-    const [endPixels, setEnd] = useState<P>([0, 0]);
+    const { startPixels, setStart, endPixels, setEnd } = useMeasure();
     const handleMouseMove = useCallback((e: MouseEvent) => {
-        setEnd(unproject([e.clientX, e.clientY]));
+        setEnd(unproject(e));
     }, [unproject]);
     const handleMouseUp = useCallback((e: MouseEvent) => {
         handleMouseMove(e);
@@ -182,6 +168,7 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
     // could we unproject into the image layer rather than scatterplotLayer?
     // const startPixels = unproject(start);
     // const endPixels = unproject(end);
+    // todo make this a layer in deck.gl & hopefully avoid exceptions...
     const start = scatterplotLayer.project(startPixels);
     const end = scatterplotLayer.project(endPixels);
     const length = physicalSize * Math.sqrt((endPixels[0] - startPixels[0])**2 + (endPixels[1] - startPixels[1])**2) / scale;
@@ -332,7 +319,7 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
                 <RectangleEditor toolActive={selectedTool==='Rectangle'} {...scatterProps}
                 rangeDimension={rangeDimension} />
                 {selectedTool === 'Transform'  && <TransformEditor {...scatterProps} rangeDimension={rangeDimension}/>}
-                <MeasureTool {...scatterProps} rangeDimension={rangeDimension} toolActive={selectedTool === 'Measure'} />
+                {scatterProps.currentLayerHasRendered && <MeasureTool {...scatterProps} rangeDimension={rangeDimension} toolActive={selectedTool === 'Measure'} />}
         </div>
         </>
     )

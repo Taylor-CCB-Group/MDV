@@ -5,12 +5,12 @@
         "**/build/**",
         "**/docsenv/**",
         "**/venv/**",
+        "**/docs/**",
     ],
-    // "includes": [
-    //     "src/**/*.tsx?$", "src/**/*.jsx?$"
-    // ],
     "entryPoints": [
-        "src/modules/static_index.ts"
+        "src/",
     ],
+    "entryPointStrategy": "expand",
+    "watch": true,
     "out": "docs/typedoc",
 }

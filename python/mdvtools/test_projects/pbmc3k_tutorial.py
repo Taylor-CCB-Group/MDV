@@ -48,6 +48,8 @@ sc.pp.calculate_qc_metrics(
     adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True
 )
 
+# pylance in vscode is giving type errors for the following lines - even though the code not only runs correctly,
+# but pyright when called from terminal or in CI action also doesn't give any errors.
 adata = adata[adata.obs.n_genes_by_counts < 2500, :] # type: ignore
 adata = adata[adata.obs.pct_counts_mt < 5, :].copy() # type: ignore
 

@@ -23,6 +23,7 @@
     "exclude": [
         "venv",
         "docsenv",
+        "docs",
         "node_modules",
         "dist",
         "vite-dist",
