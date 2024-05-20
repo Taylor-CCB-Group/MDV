@@ -1,0 +1,2 @@
+(function(){"use strict";const f=function(n){const l=n.data[2][1]==="int32"?Int32Array:Float32Array,o=new l(n.data[2][0]),t=n.data[3],d=(t.max-t.min)/t.bins,r=t.max,s=t.min,u=o.length,e=new Array(t.bins+1).fill(0),g=new Uint8Array(n.data[0]),c=new Uint8Array(n.data[1]);for(let a=0;a<u;a++){if(c[a]!==0&&c[a]!==g[a])continue;let i=o[a];i=i>r?r:i<s?s:i,e[Math.floor((i-s)/d)]++}return e};self.onmessage=function(n){n.data.length===void 0||typeof n.data=="string"||self.postMessage(f(n))}})();
+//# sourceMappingURL=binWorker-8ctBasS-.js.map

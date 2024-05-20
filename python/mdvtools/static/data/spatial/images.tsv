@@ -1,0 +1,6 @@
+sample	path	name
+COVID_OP_SAMPLE_ID_6_ROI_1	examples/data/spatial/COVID_OP_SAMPLE_ID_6_ROI_1.png	cellmask
+COVID_OP_SAMPLE_ID_6_ROI_2	examples/data/spatial/COVID_OP_SAMPLE_ID_6_ROI_2.png	cellmask
+COVID_OP_SAMPLE_ID_6_ROI_3	examples/data/spatial/COVID_OP_SAMPLE_ID_6_ROI_3.png	cellmask
+H_CON_SAMPLE_ID_1_ROI_1	examples/data/spatial/H_CON_SAMPLE_ID_1_ROI_1.png	cellmask
+H_CON_SAMPLE_ID_1_ROI_2	examples/data/spatial/H_CON_SAMPLE_ID_1_ROI_2.png	cellmask
