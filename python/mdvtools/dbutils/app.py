@@ -2,7 +2,7 @@ import os
 import json
 from flask import Flask
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='../templates', static_folder='../static')
 
 try:
     config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')

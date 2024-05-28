@@ -34,15 +34,14 @@ def register_global_routes():
             # Check if project exists
             project = Project.query.filter_by(name=project_name).first()
             if not project:
-                project = Project()
-                project.name = project_name
+                project = Project(name = project_name)
                 db.session.add(project)
 
             # Check if file with same name already exists in the project
             existing_file = File.query.filter_by(name=file.filename, project_id=project.id).first()
             if existing_file:
                 # Replace the existing file in the file system
-                os.remove(existing_file.file_path)
+                os.remove(file_path)
 
                 # Update the database entry with new file path and update timestamp
                 existing_file.file_path = file_path
@@ -59,10 +58,9 @@ def register_global_routes():
                 file.save(file_path)
 
                 # Create a new file entry
-                new_file = File()
-                new_file.name = file.filename  # Assign value to the name attribute
-                new_file.file_path = file_path  # Assign value to the file_path attribute
-                new_file.project_id=project.id
+                new_file = File(name = file.filename, file_path=file_path, project_id = project.id)
+                
+                
                 db.session.add(new_file)
                 db.session.commit()
 
