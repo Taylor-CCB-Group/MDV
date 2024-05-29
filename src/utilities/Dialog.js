@@ -210,7 +210,12 @@ constructor (config={},content) {
   * @param {integer} x the new width of the dialog
   * @param {integer} y the new height of the dialog
   */
-  onResize(x,y){}
+  onResize(x, y) {
+    if (this.outer) {
+        this.outer.style.width = x + "px";
+        this.outer.style.height = y + "px";
+    }
+}
 
 
 }
