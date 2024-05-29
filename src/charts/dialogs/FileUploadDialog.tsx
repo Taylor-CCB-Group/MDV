@@ -1,7 +1,11 @@
-import React, { useState, useCallback, useReducer, type PropsWithChildren } from "react";
+import React, { useState, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from 'axios';
 import { useProject } from "../../modules/ProjectContext";
+import { ColumnPreview } from "./ColumnPreview"
+
+// Use dynamic import for the worker
+const CsvWorker = new Worker(new URL('./csvWorker.ts', import.meta.url), { type: 'module' });
 
 const Container = ({ children }: PropsWithChildren) => {
   return (
@@ -33,16 +37,15 @@ const SuccessText = ({ children }) => (
   <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">{children}</p>
 );
 
-const DropzoneContainer = ({ isDragOver, children, ...props }) => (
+const DropzoneContainer = forwardRef(({ isDragOver, children, ...props }: any, ref) => (
   <div
     {...props}
-    style={{ height: "90%" }}
-    className={`p-2.5 z-50 text-center border-2 border-dashed ${isDragOver ? 'bg-gray-300 dark:bg-slate-800' : 'bg-white dark:bg-black'
-      } min-w-[90%]`}
+    ref={ref}
+    className={`p-4 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? 'bg-gray-300 dark:bg-slate-800' : 'bg-white dark:bg-black'} min-w-[90%]`}
   >
     {children}
   </div>
-);
+));
 
 const FileInputLabel = ({ children, ...props }) => (
   <label {...props} className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500">
@@ -107,17 +110,17 @@ const Message = ({ children }) => (
 );
 
 const FileSummary = ({ children }) => (
-  <div className="rounded-lg bg-[#f0f8ff] dark:bg-stone-800 shadow-md border border-[#e0e0e0] max-w-[400px] w-[90%] text-center">
+  <div className="max-w-[400px] w-[90%] text-center mb-5">
     {children}
   </div>
 );
 
 const FileSummaryHeading = ({ children }) => (
-  <h2 className="text-gray-800 dark:text-white mb-3">{children}</h2>
+  <h1 className="text-gray-800 dark:text-white mb-3">{children}</h1>
 )
 
 const FileSummaryText = ({ children }) => (
-  <p className="text-base text-gray-700 dark:text-white my-1">{children}</p>
+  <p className="text-lg text-gray-700 dark:text-white my-1">{children}</p>
 );
 
 const ErrorContainer = ({ children }) => (
@@ -147,14 +150,16 @@ const reducer = (state, action) => {
       return { ...state, selectedFiles: action.payload };
     case "SET_IS_UPLOADING":
       return { ...state, isUploading: action.payload };
-    case "SET_FILE_SUMMARY":
-      return { ...state, fileSummary: action.payload };
     case "SET_IS_INSERTING":
       return { ...state, isInserting: action.payload };
     case "SET_SUCCESS":
       return { ...state, success: action.payload };
     case "SET_ERROR":
       return { ...state, error: action.payload };
+    case "SET_IS_VALIDATING":
+      return { ...state, isValidating: action.payload };
+    case "SET_VALIDATION_RESULT":
+      return { ...state, validationResult: action.payload };
     default:
       return state;
   }
@@ -167,6 +172,7 @@ const UPLOAD_STEP = 100 / (UPLOAD_DURATION / UPLOAD_INTERVAL);
 
 interface FileUploadDialogComponentProps {
   onClose: () => void;
+  onResize: (width: number, height: number) => void; // Add this prop
 }
 
 // Custom hook for file upload progress
@@ -194,14 +200,26 @@ const useFileUploadProgress = () => {
   return { progress, setProgress, startProgress, resetProgress };
 };
 
-const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ onClose }) => {
-  const { projectName, flaskURL, isPopout } = useProject();
+const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ onClose, onResize }) => {
+  const { projectName, flaskURL } = useProject();
+
+  const [summary, setSummary] = useState({
+    fileName: "",
+    fileSize: "",
+    rowCount: 0,
+    columnCount: 0
+  });
+
+  const [columnNames, setColumnNames] = useState<string[]>([]);
+  const [columnTypes, setColumnTypes] = useState<string[]>([]);
+  const [secondRowValues, setSecondRowValues] = useState<string[]>([]);
 
   const [state, dispatch] = useReducer(reducer, {
     selectedFiles: [],
     isUploading: false,
-    fileSummary: null,
     isInserting: false,
+    isValidating: false,
+    validationResult: null,
     success: false,
     error: null,
   });
@@ -210,6 +228,14 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     dispatch({ type: "SET_SELECTED_FILES", payload: acceptedFiles });
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      setSummary({
+        ...summary,
+        fileName: file.name,
+        fileSize: (file.size / (1024 * 1024)).toFixed(2) // Convert to MB
+      });
+    }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
@@ -221,6 +247,38 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
   const rejectionMessage = fileRejections.length > 0 ? "Only CSV files can be selected" : "Drag and drop files here or click the button below to upload";
   const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
 
+  const handleValidateClick = () => {
+    const file = state.selectedFiles[0];
+    if (file) {
+      dispatch({ type: "SET_IS_VALIDATING", payload: true });
+      CsvWorker.postMessage(file);
+      CsvWorker.onmessage = (event: MessageEvent) => {
+        const { columnNames, columnTypes, secondRowValues, rowCount, columnCount, error } = event.data;
+        if (error) {
+          dispatch({
+            type: "SET_ERROR",
+            payload: {
+              message: "Validation failed.",
+              traceback: error
+            }
+          });
+          dispatch({ type: "SET_IS_VALIDATING", payload: false });
+        } else {
+          setColumnNames(columnNames);
+          setColumnTypes(columnTypes);
+          setSecondRowValues(secondRowValues);
+          setSummary((prevSummary) => ({
+            ...prevSummary,
+            rowCount,
+            columnCount
+          }));
+          onResize(600, 630);
+          dispatch({ type: "SET_IS_VALIDATING", payload: false });
+          dispatch({ type: "SET_VALIDATION_RESULT", payload: { columnNames, columnTypes } });
+        }
+      };
+    }
+  };
 
   const handleUploadClick = async () => {
     console.log("Uploading file...");
@@ -238,13 +296,13 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     formData.append("view", "TRUE");
     formData.append("backend", "TRUE");
     formData.append("replace", "TRUE");
-    
-    
+
+
     const config = {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
-      onUploadProgress: function(progressEvent) {
+      onUploadProgress: function (progressEvent) {
         const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         setProgress(percentComplete); // Update the progress as the file uploads
       }
@@ -253,18 +311,22 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     try {
       const response = await axios.post(`${flaskURL}${projectName}/add_datasource`, formData, config);
       console.log('File uploaded successfully', response.data);
-      dispatch({ type: "SET_IS_UPLOADING", payload: false });
-      
-      // Extracting rows, columns, and size from response.data
-      const { rows, columns, size, replaced } = response.data;
-      dispatch({
-        type: "SET_FILE_SUMMARY",
-        payload: {
-          rows: rows,
-          columns: columns,
-          size: size,
-        },
-      });
+
+      if (response.status === 200) {
+        dispatch({ type: "SET_IS_UPLOADING", payload: false });
+        dispatch({ type: "SET_SUCCESS", payload: true });
+      } else {
+        console.error(`Failed to confirm: Server responded with status ${response.status}`);
+        dispatch({ type: "SET_IS_UPLOADING", payload: false });
+        dispatch({
+          type: "SET_ERROR",
+          payload: {
+            message: `Confirmation failed with status: ${response.status}`,
+            status: response.status,
+            traceback: "Server responded with non-200 status"
+          }
+        });
+      }
     } catch (error) {
       console.error('Error uploading file:', error);
       dispatch({ type: "SET_IS_UPLOADING", payload: false });
@@ -278,84 +340,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     }
   };
 
-  const handleInsertClick = async () => {
-    dispatch({ type: "SET_FILE_SUMMARY", payload: null });
-    dispatch({ type: "SET_IS_INSERTING", payload: true });
-  
-    try {
-      const response = await axios.post(`${flaskURL}${projectName}/add_datasource`, { confirmed: true });
-      if (response.status === 200) {
-        console.log('Confirmation successful', response.data);
-        dispatch({ type: "SET_IS_INSERTING", payload: false });
-        dispatch({ type: "SET_SUCCESS", payload: true });
-      } else {
-        console.error(`Failed to confirm: Server responded with status ${response.status}`);
-        dispatch({ type: "SET_IS_INSERTING", payload: false });
-        dispatch({
-          type: "SET_ERROR",
-          payload: {
-            message: `Confirmation failed with status: ${response.status}`,
-            status: response.status,
-            traceback: "Server responded with non-200 status"
-          }
-        });
-      }
-    } catch (error) {
-      dispatch({ type: "SET_IS_INSERTING", payload: false });
-  
-      if (error.response) {
-        // Error with response from server
-        const message = `Confirmation failed: ${error.response.data.message || "Unknown error from server"}`;
-        console.error('Error during confirmation:', message);
-        dispatch({
-          type: "SET_ERROR",
-          payload: {
-            message: message,
-            status: error.response.status,
-            traceback: error.stack
-          }
-        });
-      } else if (error.request) {
-        // The request was made but no response was received
-        console.error('Error during confirmation:', error.message);
-        dispatch({
-          type: "SET_ERROR",
-          payload: {
-            message: "No response from server. Please check your network connection.",
-            traceback: error.message
-          }
-        });
-      } else {
-        // Something happened in setting up the request that triggered an Error
-        console.error('Error during confirmation:', error.message);
-        dispatch({
-          type: "SET_ERROR",
-          payload: {
-            message: "Error setting up the confirmation request.",
-            traceback: error.message
-          }
-        });
-      }
-    }
-  };
-
   const handleClose = async () => {
     dispatch({ type: "SET_FILE_SUMMARY", payload: null });
-    dispatch({ type: "SET_IS_INSERTING", payload: true });
-  
-    try {
-      const response = await axios.post(`${flaskURL}${projectName}/add_datasource`, { confirmed: false });
-      if (response.status === 200) {
-        console.log('Cancellation successful');
-        onClose(); // Call onClose to handle any local cleanup or UI changes
-      } else {
-        throw new Error('Failed to cancel');
-      }
-    } catch (error) {
-      console.error('Error during cancellation:', error);
-    } finally {
-      dispatch({ type: "SET_IS_INSERTING", payload: false });
-    }
+    onResize(450, 295);
+    onClose();
   };
 
   return (
@@ -365,35 +353,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
           <Message>{"Your file is being uploaded, please wait..."}</Message>
           <ProgressBar value={progress} max="100" />
         </StatusContainer>
-      ) : state.fileSummary ? (
-        <>
-          <FileSummary>
-            <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
-            <FileSummaryText>
-              <strong>{"File name"}</strong> {state.selectedFiles[0].name}
-            </FileSummaryText>
-            <FileSummaryText>
-              <strong>{"Number of rows"}</strong> {state.fileSummary.rows}
-            </FileSummaryText>
-            <FileSummaryText>
-              <strong>{"Number of columns"}</strong> {state.fileSummary.columns}
-            </FileSummaryText>
-            <FileSummaryText>
-              <strong>{"File size"}</strong> {state.fileSummary.size} MB
-            </FileSummaryText>
-          </FileSummary>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '60px',
-            }}
-          >
-            <Button marginTop="mt-3" onClick={handleInsertClick}>{"Confirm"}</Button>
-            <Button color="red" size="px-6 py-2.5" marginTop="mt-3" onClick={handleClose}>{"Cancel"}</Button>
-          </div>
-        </>
       ) : state.isInserting ? (
         <StatusContainer>
           <Message>{"Your file is being processed, please wait..."}</Message>
@@ -422,23 +381,53 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             )}
           </ErrorContainer>
         </>
+      ) : state.isValidating ? (
+        <StatusContainer>
+          <Message>{"Validating the CSV file, please wait..."}</Message>
+          <Spinner />
+        </StatusContainer>
+      ) : state.validationResult ? (
+        <>
+          <FileSummary>
+            <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
+            <FileSummaryText>
+              <strong>{"File name"}</strong> {summary.fileName}
+            </FileSummaryText>
+            <FileSummaryText>
+              <strong>{"Number of rows"}</strong> {summary.rowCount}
+            </FileSummaryText>
+            <FileSummaryText>
+              <strong>{"Number of columns"}</strong> {summary.columnCount}
+            </FileSummaryText>
+            <FileSummaryText>
+              <strong>{"File size"}</strong> {summary.fileSize} MB
+            </FileSummaryText>
+          </FileSummary>
+
+
+          <ColumnPreview columnNames={columnNames} columnTypes={columnTypes} secondRowValues={secondRowValues} />
+          <div className="flex justify-center items-center gap-6 mt-4">
+            <Button marginTop="mt-1" onClick={handleUploadClick}>{"Upload"}</Button>
+            <Button color="red" size="px-6 py-2.5" marginTop="mt-1" onClick={handleClose}>{"Cancel"}</Button>
+          </div>
+        </>
       ) : (
         <>
           <DropzoneContainer {...getRootProps()} isDragOver={isDragActive} aria-label={"dropzoneLabel"}>
             <input {...getInputProps()} />
             {isDragActive ? (
-              <DynamicText text={"Drop files here..."}/>
+              <DynamicText text={"Drop files here..."} />
             ) : (
               <DynamicText text={state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : rejectionMessage} className={rejectionMessageStyle} />
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
-          <Button onClick={handleUploadClick}
+          <Button onClick={handleValidateClick}
             disabled={(state.selectedFiles.length === 0 || state.isUploading)}
             marginTop="mt-5"
             color="blue"
           >
-            {"Upload File"}
+            {"Validate File"}
           </Button>
         </>
       )}
@@ -446,4 +435,4 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
   );
 };
 
-export default FileUploadDialogComponent;
+export default FileUploadDialogComponent; 
