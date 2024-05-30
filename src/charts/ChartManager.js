@@ -262,7 +262,7 @@ class ChartManager{
 
         },this.rightMenuBar);
         themeButton.style.margin = "3px";
-
+        if (config.permission === 'edit') {
             const uploadButton = createMenuIcon("fas fa-upload",{
                 tooltip:{
                     text:"Add datasource",
@@ -2124,7 +2124,6 @@ class ChartManager{
         })
     }
 }
-
 
 /**
 * Creates a dialog for the user to choose multiple columns
