@@ -45,7 +45,7 @@ For development, or running the current version from the repository:
 
 * git
 * node.js
-* python (3.12)
+* python (>=3.10, 3.12 is most tested/supported)
 * poetry (for managing python dependencies - optional, but recommended especially for contributing to the Python code)
 
 ## Running On Local Machine

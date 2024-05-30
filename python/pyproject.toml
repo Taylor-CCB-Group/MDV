@@ -15,7 +15,7 @@ classifiers = [
 
 
 [tool.poetry.dependencies]
-python = "^3.12,<3.13"
+python = ">=3.10,<3.13"
 anndata = "^0.9.1"
 fasteners = "^0.18"
 Flask = "^2.2.5"
