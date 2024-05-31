@@ -201,7 +201,7 @@ const useFileUploadProgress = () => {
 };
 
 const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ onClose, onResize }) => {
-  const { projectName, flaskURL } = useProject();
+  const { root } = useProject();
 
   const [summary, setSummary] = useState({
     fileName: "",
@@ -293,9 +293,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     const formData = new FormData();
     formData.append("file", state.selectedFiles[0]);
     formData.append("name", state.selectedFiles[0].name);
-    formData.append("view", "TRUE");
-    formData.append("backend", "TRUE");
-    formData.append("replace", "TRUE");
+    // formData.append("view", "TRUE");
+    // formData.append("backend", "TRUE");
+    formData.append("replace", '');
 
 
     const config = {
@@ -309,7 +309,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     };
 
     try {
-      const response = await axios.post(`${flaskURL}${projectName}/add_datasource`, formData, config);
+      const response = await axios.post(`${root}/add_datasource`, formData, config);
       console.log('File uploaded successfully', response.data);
 
       if (response.status === 200) {
