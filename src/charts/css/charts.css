@@ -23,7 +23,7 @@
     }
 }
 
-.Dark {
+.dark {
     --title_bar_color: #222;
     --main_panel_color: black;
     --text_color: white;
@@ -34,7 +34,7 @@
     --menu-gradient: linear-gradient(#444, #222);
 }
 
-.Light {
+.light {
     --title_bar_color: white;
     --main_panel_color: #f1f1f1;
     --text_color: black;
@@ -48,7 +48,7 @@
     font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
     --button_color: #1266f1;
 }
-.Dark a {
+.dark a {
     color: #1266f1;
 }
 select, input, textarea {
@@ -137,10 +137,10 @@ select, input, textarea {
     overflow-x: hidden !important;
 }
 
-.Dark .gridLock {
+.dark .gridLock {
     border-color: #101010;
 }
-.Light .gridLock {
+.light .gridLock {
     border-color: #888;
 }
 
@@ -224,10 +224,10 @@ select, input, textarea {
 .legend-container:hover {
     backdrop-filter: blur(20px);
 }
-.Dark .legend-container {
+.dark .legend-container {
     background-color: rgba(51, 51, 51, 0.3);
 }
-.Light .legend-container {
+.light .legend-container {
     background-color: rgba(186, 186, 186, 0.3);
 }
 

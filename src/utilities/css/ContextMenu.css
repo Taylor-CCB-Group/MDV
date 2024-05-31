@@ -6,45 +6,45 @@
   background: #888;
 }
 
-.Dark .slick-row.odd{
+.dark .slick-row.odd{
   background:#303030;
 }
 
-.Dark .ui-widget-content{
+.dark .ui-widget-content{
   color:white;
 }
 
-.Dark .even{
+.dark .even{
   background:#404040
 }
 
-.Dark .slick-header-column{
+.dark .slick-header-column{
   background:black;
   color:white;
 }
-.Dark .slick-header-column:hover {
+.dark .slick-header-column:hover {
   background: var(--menu-gradient);
 }
-.Dark .slick-header-columns{
+.dark .slick-header-columns{
   background:black
 }
-.Dark .slick-header{
+.dark .slick-header{
   background:black
 }
 
-.Dark .slick-viewport::-webkit-scrollbar-track {
+.dark .slick-viewport::-webkit-scrollbar-track {
   background: #585858;        /* color of the tracking area */
 }
 
-.Dark .slick-viewport::-webkit-scrollbar {
+.dark .slick-viewport::-webkit-scrollbar {
   width: 12px;
 }
-.Dark .slick-viewport::-webkit-scrollbar-thumb {
+.dark .slick-viewport::-webkit-scrollbar-thumb {
   background-color:	black ;
 
 }
 
-.Dark .slick-cell.selected{
+.dark .slick-cell.selected{
   background:	#5c3434
 }
 

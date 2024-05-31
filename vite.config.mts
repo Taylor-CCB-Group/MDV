@@ -154,6 +154,9 @@ export default defineConfig(env => { return {
             include: [/\.tsx?$/, /\.jsx?$/],
         })
     ],
+    worker: {
+        format: 'iife',
+    },
     resolve: {
         alias: {
             "@": path.resolve(__dirname, "./src"),

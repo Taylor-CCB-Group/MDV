@@ -17,6 +17,15 @@ module.exports = {
       },
     },
     extend: {
+      keyframes: {
+        spin: {
+          from: { transform: 'rotate(0deg)' },
+          to: { transform: 'rotate(360deg)' },
+        },
+      },
+      animation: {
+        spin: 'spin 1s linear infinite',
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
