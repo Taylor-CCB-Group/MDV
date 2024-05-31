@@ -32,6 +32,8 @@ def create_projects_from_db(base_dir):
     try:
         # Assuming Project.query.all() returns a list of project names
         project_names = [project.name for project in Project.query.all()]
+        # todo: pass the project id to the MDVProject constructor so that it is used for flask routing
+        # project_tuples = [(project.id, project.name) for project in Project.query.all()]
 
         for project_name in project_names:
             project_path = os.path.join(base_dir, project_name)
