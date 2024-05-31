@@ -269,7 +269,7 @@ class ChartManager{
                     position:"bottom-left"
                 },
                 func:(e)=>{
-                    new FileUploadDialogReact().open();
+                    new FileUploadDialogReact();//.open();
                 }    
             },this.menuBar);
             uploadButton.style.margin = "3px";
