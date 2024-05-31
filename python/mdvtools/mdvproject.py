@@ -44,9 +44,9 @@ numpy_dtypes = {
 
 
 class MDVProject:
-    def __init__(self, dir: str, delete_existing=False):
+    def __init__(self, dir: str, id: Optional[str]=None, delete_existing=False):
         self.dir = dir
-        self.name = dir.split("/")[-1]
+        self.id = id if id else dir.split("/")[-1]
         if delete_existing and exists(dir):
             shutil.rmtree(dir)
         self.h5file = join(dir, "datafile.h5")

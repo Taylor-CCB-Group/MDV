@@ -101,12 +101,12 @@ def create_app(
         # set the route prefix to the project name, derived from the dir name.
         # this is to allow multiple projects to be served from the same server.
         multi_project = True
-        route = "/project/" + project.name + "/"
-        project_bp = Blueprint(project.name, __name__, url_prefix=route)
-    if route in routes:
-        raise Exception(
-            "Route already exists - can't have two projects with the same name"
-        )
+        route = "/project/" + project.id + "/"
+        project_bp = Blueprint(project.id, __name__, url_prefix=route)        
+    # if route in routes:
+    #     raise Exception(
+    #         "Route already exists - can't have two projects with the same name"
+    #     )
     routes.add(route)
 
     @project_bp.route("/")
@@ -299,7 +299,9 @@ def create_app(
             raise Exception(
                 "assert: project_bp must be a Flask instance when multi_project is True"
             )
-        print(f"Adding project {project.name} to existing app")
+        if route in app.blueprints:
+            print(f"there is already a blueprint at {route}")
+        print(f"Adding project {project.id} to existing app")
         app.register_blueprint(project_bp)
     else:
         # user_reloader=False, allows the server to work within jupyter

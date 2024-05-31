@@ -41,7 +41,7 @@ else:
 
 running = True
 def watch_folder(app: Flask):
-    '''watch the project folder for changes and update the projects list accordingly.'''
+    """watch the project folder for changes and update the projects list accordingly."""
     import time
 
     while running:
@@ -55,11 +55,11 @@ def watch_folder(app: Flask):
         ]
         projects.extend(new_projects)
         for p in new_projects:
-            print(f"watcher adding '{p.name}'")
+            print(f"watcher adding '{p.id}'")
             try:
                 p.serve(open_browser=False, app=app)
             except Exception:
-                print(f"error serving {p.name}...")
+                print(f"error serving {p.id}...")
     print("watcher exiting...")
 
 if __name__ == "__main__":
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         try:
             p.serve(open_browser=False, app=app)
         except Exception:
-            print(f"error serving {p.name}...")
+            print(f"error serving {p.id}...")
 
     @app.route("/")
     def index():
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 
     @app.route("/projects")
     def get_projects():
-        return jsonify([p.name for p in projects])
+        return jsonify([p.id for p in projects])
 
     watcher = threading.Thread(target=watch_folder, args=(app,))
     # print("Oh frabjous day! Callooh! Callay!")
