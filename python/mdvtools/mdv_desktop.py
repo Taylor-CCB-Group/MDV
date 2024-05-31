@@ -82,6 +82,11 @@ if __name__ == "__main__":
         return jsonify([p.name for p in projects])
 
     watcher = threading.Thread(target=watch_folder, args=(app,))
+    # print("Oh frabjous day! Callooh! Callay!")
+    watcher.daemon = True
     watcher.start()
-    app.run(debug=True, port=5051)
+    try:
+        app.run(debug=True, port=5051)
+    except Exception as e:
+        print(e)
     running = False
