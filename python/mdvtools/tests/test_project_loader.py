@@ -44,6 +44,7 @@ class TestProjectLoader(unittest.TestCase):
         print(f"created {len(projects)} projects from mock db.")
 
         # Assert that MDVProject constructor was called twice
+        ## pjt - currently failing because we're executing in a context without db etc?
         self.assertEqual(mock_mdvproject.call_count, 2)
 
 

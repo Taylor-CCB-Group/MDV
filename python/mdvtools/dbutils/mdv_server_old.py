@@ -73,7 +73,7 @@ def index():
 
 @app.route('/projects')
 def get_projects():
-    return jsonify([p.name for p in projects])
+    return jsonify([p.id for p in projects])
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -167,6 +167,6 @@ if __name__ == '__main__':
         try:
             p.serve(open_browser=False, app=app)
         except Exception as e:
-            print(f"error '{e}' serving {p.name}...")
+            print(f"error '{e}' serving {p.id}...")
 
     app.run(debug=True, port=5051)
