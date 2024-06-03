@@ -28,6 +28,25 @@
                 container.appendChild(link);
             }
         })();
-    </script>    
+        const button = document.createElement('button');
+        button.innerText = 'Create Project';
+        button.onclick = async () => {
+            const response = await fetch('/create_project', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: prompt('Enter project name')
+                })
+            });
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Failed to create project');
+            }
+        };
+        document.body.appendChild(button);
+    </script>
 </body>
 </html>

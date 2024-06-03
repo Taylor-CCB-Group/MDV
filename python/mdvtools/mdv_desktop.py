@@ -1,9 +1,12 @@
 import os
 from mdvtools.mdvproject import MDVProject
+from mdvtools.project_router import ProjectBlueprint
 from .server import add_safe_headers
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import json
 import threading
+import random
+import string
 
 """
 Make a Flask app, and open all folders in ~/mdv/ as projects that can be served by it.
@@ -65,6 +68,7 @@ def watch_folder(app: Flask):
 if __name__ == "__main__":
     app = Flask(__name__)
     app.after_request(add_safe_headers)
+    ProjectBlueprint.register_app(app)
 
     for p in projects:
         try:
@@ -81,6 +85,27 @@ if __name__ == "__main__":
     def get_projects():
         return jsonify([p.id for p in projects])
 
+    @app.route("/create_project", methods=["POST"])
+    def create_project():
+        try:
+            project_id = (
+                request.json["id"]
+                if request.json and "id" in request.json
+                else str("".join(random.choices(string.ascii_letters, k=6)))
+            )
+            print(f"creating project '{project_id}'")
+            p = MDVProject(os.path.join(project_dir, project_id), delete_existing=True)
+            p.set_editable(True)
+            """
+            why do we get an error from Flask when we add projects via this route, when the watcher seems somewhat ok...
+            The setup method 'register_blueprint' can no longer be called on the application. It has already handled its first request, any changes will not be applied consistently.
+            """
+            # projects.append(p) - will be added by the watcher
+            # p.serve(app=app, id=project_id, open_browser=False)
+            return jsonify({"status": "success"})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    
     watcher = threading.Thread(target=watch_folder, args=(app,))
     # print("Oh frabjous day! Callooh! Callay!")
     watcher.daemon = True

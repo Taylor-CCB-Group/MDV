@@ -1,6 +1,6 @@
 from flask import (
     Flask,
-    Blueprint,
+    # Blueprint,
     render_template,
     request,
     make_response,
@@ -16,6 +16,7 @@ import re
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
 from mdvtools.mdvproject import MDVProject
+from mdvtools.project_router import ProjectBlueprint as Blueprint
 import os
 import pandas as pd
 from typing import Optional
@@ -97,6 +98,9 @@ def create_app(
         if websocket:
             mdv_socketio(app)
     else:
+        ## nb - previous use of flask.Blueprint was not allowing new projects at runtime
+        ## we substitute this with our own ProjectBlueprint class, which is a drop-in replacement
+        ## but we should add more tests to ensure it behaves as expected...
         # add routes for this project to existing app
         # set the route prefix to the project name, derived from the dir name.
         # this is to allow multiple projects to be served from the same server.
@@ -302,7 +306,8 @@ def create_app(
         if route in app.blueprints:
             print(f"there is already a blueprint at {route}")
         print(f"Adding project {project.id} to existing app")
-        app.register_blueprint(project_bp)
+        ## nb - uncomment this if not using ProjectBlueprint refactor...
+        # app.register_blueprint(project_bp)
     else:
         # user_reloader=False, allows the server to work within jupyter
         app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
