@@ -50,10 +50,9 @@ class ProjectBlueprint:
     
     def dispatch_request(self, subpath: str) -> Response:
         """We need to parse `subpath` so that we can route in a compatible way:
-        If we have a route like `/tracks/<path:path>`, we'll receive `path` as a single string.
-        We need to store the method in blueprint.routes so that we can find it when user requests
-        `/project/<project_id>/tracks/mytrack`... right now, we'll try to look for '/tracks/mytrack'
-        We need to split it into a list of strings to pass to the method.
+        Currently, we have regex patterns as keys in self.routes that match the subpath, with groups for
+        any dynamic parts, so '/tracks/<path:path>' becomes '/tracks/(.*)'. If we get a request for '/tracks/mytrack',
+        it will match the rule and call the method with 'mytrack' as the argument.
         """
         # find the method in self.routes that matches the subpath
         # e.g. '/tracks/mytrack' -> self.routes['/tracks/<path:path>']('mytrack')
