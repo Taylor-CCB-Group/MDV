@@ -11,8 +11,6 @@ class ProjectBlueprint:
     blueprints: Dict[str, "ProjectBlueprint"] = {}
     @staticmethod
     def register_app(app: Flask) -> None:
-        # return
-        print("registering app")
         @app.route("/project/<project_id>/", defaults={'subpath': ''}, methods=["GET", "POST"])
         @app.route("/project/<project_id>/<subpath>/", methods=["GET", "POST"])
         def project_route(project_id: str, subpath: str):
@@ -21,10 +19,8 @@ class ProjectBlueprint:
             It will look up the project_id in ProjectBlueprint.blueprints and call the method with the given subpath.
             The ProjectBlueprint instance is responsible for routing the request to the correct method etc.
             """
-            print(f'project_route: {project_id}, {subpath}')
             if project_id in ProjectBlueprint.blueprints:
                 try:
-                    print(f'found project {project_id}, dispatching request to {subpath}...')
                     return ProjectBlueprint.blueprints[project_id].dispatch_request(subpath)
                 except Exception as e:
                     return {"status": "error", "message": str(e)}
@@ -73,6 +69,5 @@ class ProjectBlueprint:
         for rule, method in self.routes.items():
             match = rule.match(subpath)
             if match:
-                print(f'matching route {rule.pattern} to {subpath}...')
                 return method(*match.groups())
         raise ValueError(f"no matching route for {subpath}")
