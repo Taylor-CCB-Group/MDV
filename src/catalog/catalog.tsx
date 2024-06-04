@@ -1,9 +1,18 @@
 import { useEffect, useState } from 'react';
 import './catalog_index.css';
 
-const ProjectTile = ({ name }: { name: string }) => {
+/**
+ * We should have better ways of documenting & specifying the types of the data we're working with.
+ * We might use zod or similar to validate the data we're working with in front-end.
+ */
+type ProjectMetadata = {
+    id: string;
+    name: string;
+}
+
+const ProjectTile = ({ name, id }: ProjectMetadata) => {
     return (
-        <a href={`/project/${name}`} className="project-tile">
+        <a href={`/project/${id}`} className="project-tile">
             {name}
         </a>
     );
@@ -11,7 +20,7 @@ const ProjectTile = ({ name }: { name: string }) => {
 
 
 export default function App() {
-    const [projects, setProjects] = useState<string[]>([]);
+    const [projects, setProjects] = useState<ProjectMetadata[]>([]);
     const [error, setError] = useState<string | null>(null);
     useEffect(() => {
         (async function () {
@@ -40,7 +49,7 @@ export default function App() {
                         setError(response.statusText);
                     }
                 } }>Create Project</button>
-                {projects.map((p, i) => <ProjectTile key={i} name={p} />)}
+                {projects.map((p, i) => <ProjectTile key={i} name={p.name} id={p.id} />)}
                 {error && <div className='bg-red-500'>{error}</div>}
             </div>
         </div>

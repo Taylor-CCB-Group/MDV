@@ -83,7 +83,8 @@ if __name__ == "__main__":
 
     @app.route("/projects")
     def get_projects():
-        return jsonify([p.id for p in projects])
+        # todo formalise relation between this, db-version of backend, frontend etc.
+        return jsonify([{'id': p.id, 'name': p.id} for p in projects])
 
     @app.route("/create_project", methods=["POST"])
     def create_project():
