@@ -28,7 +28,7 @@ export default function App() {
             const data = await response.json();
             setProjects(data);
         })();
-    });
+    }, []);
     return (
         <div>
             <h1 className="bg-red-600">App TBD</h1>
