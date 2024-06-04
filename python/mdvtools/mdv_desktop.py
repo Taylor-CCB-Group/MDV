@@ -96,12 +96,8 @@ if __name__ == "__main__":
             print(f"creating project '{project_id}'")
             p = MDVProject(os.path.join(project_dir, project_id), delete_existing=True)
             p.set_editable(True)
-            """
-            why do we get an error from Flask when we add projects via this route, when the watcher seems somewhat ok...
-            The setup method 'register_blueprint' can no longer be called on the application. It has already handled its first request, any changes will not be applied consistently.
-            """
-            # projects.append(p) - will be added by the watcher
-            # p.serve(app=app, id=project_id, open_browser=False)
+            projects.append(p)
+            p.serve(app=app, open_browser=False)
             return jsonify({"status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
