@@ -34,12 +34,17 @@ function getRollupOptions(): RollupOptions {
         }
     } else if (build === 'desktop_pt') {
         // currently there are different versions of entrypoint, this is the one with react etc.
+        // used for Flask...
         return {
-            input: 'src/modules/static_index.ts',
+            input: {
+                'mdv': 'src/modules/static_index.ts',
+                'catalog': 'src/catalog_index.tsx',
+            },
             output: {
-                entryFileNames: 'js/mdv.js',
+                entryFileNames: 'js/[name].js',
                 assetFileNames: (assetInfo) => {
                     if (assetInfo.name === 'static_index.css') return 'assets/mdv.css';
+                    if (assetInfo.name === 'catalog_index.css') return 'assets/catalog.css';
                     //not including hash, may impact caching, but more similar to previous webpack behavior
                     return 'img/[name][extname]';
                 },
