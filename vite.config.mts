@@ -44,8 +44,9 @@ function getRollupOptions(): RollupOptions {
             output: {
                 entryFileNames: 'js/[name].js',
                 assetFileNames: (assetInfo) => {
-                    if (assetInfo.name === 'static_index.css') return 'assets/mdv.css';
-                    if (assetInfo.name === 'catalog_index.css') return 'assets/catalog.css';
+                    if (assetInfo.name === 'mdv.css') return 'assets/mdv.css';
+                    if (assetInfo.name === 'catalog.css') return 'assets/catalog.css';
+                    
                     //not including hash, may impact caching, but more similar to previous webpack behavior
                     return 'img/[name][extname]';
                 },
