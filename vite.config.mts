@@ -21,6 +21,7 @@ let hasWarned2 = false;
 function getRollupOptions(): RollupOptions {
     const build = process.env.build as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
+        // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
@@ -38,7 +39,7 @@ function getRollupOptions(): RollupOptions {
         return {
             input: {
                 'mdv': 'src/modules/static_index.ts',
-                'catalog': 'src/catalog_index.tsx',
+                'catalog': 'src/catalog/catalog_index.tsx',
             },
             output: {
                 entryFileNames: 'js/[name].js',
@@ -53,6 +54,7 @@ function getRollupOptions(): RollupOptions {
     } else if (build === 'dev_pt') {
         // version of vite build used for netlify deploy preview & devserver, using default 'index.html' entrypoint
         // (which as of writing refers to same static_index.ts as desktop_pt)
+        // nb, localhost:5170/catalog_dev.html works on devserver without needing to change this.
         return {}
     } else if (build === 'desktop') {
         return {
