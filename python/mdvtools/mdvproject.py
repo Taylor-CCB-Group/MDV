@@ -222,7 +222,8 @@ class MDVProject:
         name="Images",
         image_type="png",
     ):
-        """Adds images to a datasource.
+        """This function should be deprecated, it has a similar functionality as add_image_set but does not copy the images like add_image_set does
+        Adds images to a datasource.
         These will be copied as static assets with `convert_to_static_page()`,
         and served from their original location by `serve()`.
         Args:
