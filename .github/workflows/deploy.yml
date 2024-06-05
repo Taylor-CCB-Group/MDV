@@ -39,11 +39,11 @@ jobs:
 
       - name: Build and push frontend image
         run: |
-          docker build -t MDV-frontend:${{ env.NEW_VERSION }} -f Dockerfile .
-          docker tag MDV-frontend:${{ env.NEW_VERSION }} ${{ secrets.DOCKER_HUB_USERNAME }}/MDV-frontend:${{ env.NEW_VERSION }}
-          docker tag MDV-frontend:${{ env.NEW_VERSION }} ${{ secrets.DOCKER_HUB_USERNAME }}/MDV-frontend:latest
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/MDV-frontend:${{ env.NEW_VERSION }}
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/MDV-frontend:latest
+          docker build -t mdv-frontend:${{ env.NEW_VERSION }} -f Dockerfile .
+          docker tag mdv-frontend:${{ env.NEW_VERSION }} ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }}
+          docker tag mdv-frontend:${{ env.NEW_VERSION }} ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }}
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest
 
       - name: Commit and push new version
         run: |
