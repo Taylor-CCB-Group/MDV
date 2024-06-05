@@ -3,8 +3,8 @@
 from mdvtools.charts.base_plot import BasePlot
 
 class HeatmapPlot(BasePlot):
-    def __init__(self, title, params, size, position, id=None, **kwargs):
-        super().__init__(title, "heat_map", params, size, position, id, **kwargs)
+    def __init__(self, title, params, size, position, id=None):
+        super().__init__(title, "heat_map", params, size, position, id)
 
     def set_method(self, method):
         self.plot_data["method"] = method

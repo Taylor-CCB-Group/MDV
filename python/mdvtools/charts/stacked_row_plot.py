@@ -14,4 +14,7 @@ class StackedRowChart(BasePlot):
             "display": display
         }
 
+    def set_position(self, position):
+        self.position = position
+
     # Additional methods for customization can be added here

@@ -24,4 +24,7 @@ class DotPlot(BasePlot):
             "pos": position
         }
 
+    def set_position(self, position):
+        self.position = position
+
     # Additional methods for customization (e.g., tooltip visibility) can be added here
