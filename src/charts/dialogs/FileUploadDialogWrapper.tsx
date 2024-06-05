@@ -11,7 +11,7 @@ class FileUploadDialogReact extends BaseDialog {
             {
                 title: "File Upload",
                 width: 450,
-                height: 295,
+                height: 320,
             },
             null
         );
