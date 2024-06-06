@@ -849,6 +849,20 @@ files = [
 ]
 
 [[package]]
+name = "generate-tiff-offsets"
+version = "0.1.7"
+description = "A cli tool for generating IFD offsets within a tiff file, useful for optimizing load times of remote tiff files in viewers like viv."
+optional = false
+python-versions = ">=3.5"
+files = [
+    {file = "generate_tiff_offsets-0.1.7-py2.py3-none-any.whl", hash = "sha256:ba1c90983bc20aed28a02bf1e3fc4e2acbd118c06103ad2d4506c155fbf44ff6"},
+    {file = "generate_tiff_offsets-0.1.7.tar.gz", hash = "sha256:f0ad4b002ffdbfd3b218b4f1792fb4ed5c72f3354224328287ad0d01de22d801"},
+]
+
+[package.dependencies]
+tifffile = "2020.10.1"
+
+[[package]]
 name = "greenlet"
 version = "3.0.3"
 description = "Lightweight in-process concurrent programming"
@@ -3843,6 +3857,23 @@ files = [
 ]
 
 [[package]]
+name = "tifffile"
+version = "2020.10.1"
+description = "Read and write TIFF(r) files"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "tifffile-2020.10.1-py3-none-any.whl", hash = "sha256:9611ac348b4db6844b6555db2b5f8f2be1715728a0011352acb55e0171ee2949"},
+    {file = "tifffile-2020.10.1.tar.gz", hash = "sha256:799feeccc91965b69e1288c51a1d1118faec7f40b2eb89ad2979591b85324830"},
+]
+
+[package.dependencies]
+numpy = ">=1.15.1"
+
+[package.extras]
+all = ["imagecodecs (>=2020.5.30)", "lxml", "matplotlib (>=3.2)"]
+
+[[package]]
 name = "tinycss2"
 version = "1.3.0"
 description = "A tiny CSS parser"
@@ -4122,4 +4153,4 @@ test = ["pre-commit", "pytest", "pytest-benchmark", "pytest-cov"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "f5923c702b21b482a585c3aa6465e05b117a8932627225e2c17df803bb9896e0"
+content-hash = "fc3b12219c4a97605c2e77466cbb1085a816d0380fdd95f916d92215355a5c69"
