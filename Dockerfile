@@ -1,42 +1,24 @@
-# Stage 1: Build the frontend with npm
-FROM node:14 AS frontend-builder
+# Build the frontend with npm
+FROM nikolaik/python-nodejs:python3.12-nodejs22 as frontend-builder
 
 # Set the working directory inside the container
 WORKDIR /app
-
-# Copy package.json and package-lock.json to the working directory
-COPY package.json .
-COPY package-lock.json .
-
-# Install npm dependencies
-RUN npm install
 
 # Copy the entire project to the working directory
 COPY . .
 
+# Install npm dependencies
+RUN npm install
+
 # Run the npm build script for Flask and Vite
 RUN npm run build-flask-vite
 
-
-# Stage 2: Build the Python backend
-FROM python:3.12 AS python-builder
-
-# Set the working directory inside the container
-WORKDIR /app
-
+# bootstrap project folder - this won't be necessary in future
 RUN mkdir -p /app/mdv/pbmc3k /app/mdv/pbmc3k_project2
 
-# Install HDF5 library
+# Install HDF5 library, for some reason poetry can't install it in this context as of now
+# see https://github.com/h5py/h5py/issues/2146 for similar-ish issue
 RUN apt-get update && apt-get install -y libhdf5-dev
-
-# Copy the Python backend source code
-COPY --from=frontend-builder /app/python /app/python
-
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 -
-
-# Set up the PATH environment variable to include Poetry's bin directory
-ENV PATH="${PATH}:/root/.local/bin"
 
 # Install Python dependencies using Poetry
 WORKDIR /app/python
@@ -44,9 +26,6 @@ RUN poetry install --with dev,backend
 
 # Expose the port that Flask will run on
 EXPOSE 5055 
-
-# Set the working directory to the Python directory
-WORKDIR /app/python
 
 # Run your Python script
 CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
