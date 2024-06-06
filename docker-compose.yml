@@ -3,10 +3,11 @@ version: '3.8'
 services:
   
   frontend:
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
-    image: jayeshire/mdv-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # todo: configure dev vs dockerhub etc
+    # image: jayeshire/mdv-frontend:latest
     ports:
       - "5055:5055"
     depends_on:
