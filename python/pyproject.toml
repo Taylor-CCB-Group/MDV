@@ -63,6 +63,7 @@ optional = true
 
 [tool.poetry.group.backend.dependencies]
 flask-sqlalchemy = "^3.1.1"
+psycopg2 = "^2.9.9"
 
 [tool.pyright]
 venvPath = "../venv/"
