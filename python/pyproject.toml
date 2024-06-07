@@ -19,7 +19,7 @@ python = ">=3.10,<3.13"
 anndata = "^0.9.1"
 fasteners = "^0.18"
 Flask = "^2.2.5"
-Flask-SocketIO = "^5.3.4"
+Flask-SocketIO = "^5.3.6"
 h5py = "^3.10.0"
 mudata = "^0.2.3"
 numpy = "^1.26.4"
@@ -28,6 +28,8 @@ scanpy = "^1.9.8"
 scipy = "^1.11.3"
 werkzeug = "^3.0.2"
 
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
 pyright = "^1.1.358"
@@ -47,11 +49,17 @@ generate-tiff-offsets = "^0.1.7"
 
 
 
+[tool.poetry.group.docs]
+optional = true
+
 [tool.poetry.group.docs.dependencies]
 sphinx-rtd-theme = "^2.0.0"
 sphinx = "^7.3.7"
 sphinx-autoapi = "^3.0.0"
 
+
+[tool.poetry.group.backend]
+optional = true
 
 [tool.poetry.group.backend.dependencies]
 flask-sqlalchemy = "^3.1.1"
