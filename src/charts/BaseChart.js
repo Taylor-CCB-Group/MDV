@@ -765,7 +765,7 @@ class BaseChart{
 
     /**
      * Downloads an image of the chart
-     * @param {string} im_type - either svg or png 
+     * @param {"svg" | "png"} im_type - either svg or png 
      */
     downloadImage(im_type){ 
         const originalColor =this.contentDiv.style.color;
@@ -808,20 +808,20 @@ class BaseChart{
   }
 
   getImageFromSVG(svg,callback) {
-    var copy = svg.cloneNode(true);
+    const copy = svg.cloneNode(true);
     copyStylesInline(copy, svg);
-    var canvas = document.createElement("canvas");
-    //var bbox = svg.getBBox();
+    const canvas = document.createElement("canvas");
+    //const bbox = svg.getBBox();
     copy.style.top = "0px";
     canvas.width = svg.width.baseVal.value
     canvas.height =svg.height.baseVal.value
-    var ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    var data = (new XMLSerializer()).serializeToString(copy);
-    var DOMURL = window.URL || window.webkitURL || window;
-    var img = new Image();
-    var svgBlob = new Blob([data], {type: "image/svg+xml;charset=utf-8"});
-    var url = DOMURL.createObjectURL(svgBlob);
+    const data = (new XMLSerializer()).serializeToString(copy);
+    const DOMURL = window.URL || window.webkitURL || window;
+    const img = new Image();
+    const svgBlob = new Blob([data], {type: "image/svg+xml;charset=utf-8"});
+    const url = DOMURL.createObjectURL(svgBlob);
     img.src = url;
           img.onload = function () {
           ctx.drawImage(img, 0, 0);
