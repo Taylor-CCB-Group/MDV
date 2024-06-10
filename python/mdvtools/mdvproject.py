@@ -15,8 +15,10 @@ import string
 from os.path import join, split, exists
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
-from typing import Optional, NewType, List, Union
+from typing import Optional, NewType, List, Union, Any
+from .charts.view import View
 import time
+import copy
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -80,7 +82,7 @@ class MDVProject:
         save_json(self.datasourcesfile, value)
 
     @property
-    def views(self):
+    def views(self) -> dict[str, View]:
         return get_json(self.viewsfile)
 
     @views.setter
@@ -138,8 +140,8 @@ class MDVProject:
 
     def set_interactions(
         self,
-        interaction_ds,
-        parent_ds,
+        interaction_ds: str,
+        parent_ds: str,
         pivot_column="sample_id",
         parent_column="annotation",
         is_single_region=True,
@@ -912,15 +914,28 @@ class MDVProject:
 
         self.set_datasource_metadata(ds)
 
-    def get_view(self, view):
+    def get_view(self, view: str):
         views = self.views
         return views.get(view)
 
-    def set_view(self, name, view, make_default=False):
+    def set_view(self, name: str, view: Optional[View | Any], make_default=False):
+        """Sets the view with the given name to the supplied view data.
+        If the view is None, then the view will be deleted.
+        """
         views = self.views
         # update or add the view
         if view:
-            views[name] = view
+            # clone, in case a calling script might get confused by the view being changed
+            view2 = copy.deepcopy(view)
+            # generate ids for the views if not present
+            # may consider more robust id generation & other checks here
+            initialCharts = view2["initialCharts"]
+            for ds in initialCharts:
+                # todo check that there is a ds with that name
+                for c in initialCharts[ds]:
+                    if "id" not in c:
+                        c["id"] = str("".join(random.choices(string.ascii_letters, k=6)))
+            views[name] = view2
         # remove the view
         else:
             if views.get(name):
