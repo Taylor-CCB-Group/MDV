@@ -18,7 +18,9 @@ export default function ProjectTemplates() {
                 });
                 if (response.ok) {
                     // go to the new project from response link...
-                    location.reload();
+                    // location.reload();
+                    const data = await response.json();
+                    window.location.href = `/project/${data.id}`;
                 } else {
                     alert(response.statusText);
                 }

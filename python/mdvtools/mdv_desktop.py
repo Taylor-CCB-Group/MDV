@@ -99,7 +99,7 @@ if __name__ == "__main__":
             p.set_editable(True)
             projects.append(p)
             p.serve(app=app, open_browser=False)
-            return jsonify({"status": "success"})
+            return jsonify({"id": p.id, "name": p.id, "status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
     
