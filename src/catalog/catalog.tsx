@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import './catalog_index.css';
 import ProjectTemplates from './CreateProject';
+import { BugPlay } from 'lucide-react';
 
 /**
  * We should have better ways of documenting & specifying the types of the data we're working with.
@@ -13,9 +14,15 @@ type ProjectMetadata = {
 
 const ProjectTile = ({ name, id }: ProjectMetadata) => {
     return (
-        <a href={`/project/${id}`} className="container p-5 outline rounded-xl">
-            {name}
-        </a>
+        <div className="container w-32 h-32 p-5 outline rounded-xl">
+            <a href={`/project/${id}`}>
+                {name}
+            </a>
+            {import.meta.env.DEV && (<a href={`http://localhost:5170?dir=/project/${id}`}>
+            <BugPlay />
+            </a>)}
+            {/* <a className='text-red-500' href={`/delete_project/${id}`}>Delete</a> */}
+        </div>
     );
 }
 
@@ -37,7 +44,7 @@ const Projects = () => {
             <input type='text' placeholder='Search projects...' 
             className='p-2 m-8 bg-slate-100 rounded-xl'
             onChange={e => setFilter(e.target.value)} value={filter}></input>
-            <div className='grid grid-flow-row grid-cols-4 w-full items-center gap-4'>
+            <div className='grid grid-flow-row grid-cols-8 w-full items-center gap-4'>
                 {filteredProjects.map(p => <ProjectTile key={p.id} name={p.name} id={p.id} />)}
                 {error && <div className='bg-red-500'>{error}</div>}
             </div>
