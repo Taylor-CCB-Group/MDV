@@ -2481,7 +2481,7 @@ class AddChartDialog extends BaseDialog{
                             maxWidth:"200px"
                         }
                     },parentDiv);
-                    
+                    createFilterElement(sel, parentDiv);
                     for (let item of c.values){
                         const option = createEl("option",{text:item.name,value:item.value},sel);
                         if (item.value===c.defaultVal){
