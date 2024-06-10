@@ -1,4 +1,4 @@
-from base_plot import BasePlot
+from mdvtools.charts.base_plot import BasePlot
 
 class ImageTableChart(BasePlot):
 
