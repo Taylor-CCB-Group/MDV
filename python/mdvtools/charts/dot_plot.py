@@ -17,6 +17,9 @@ class DotPlot(BasePlot):
         self.plot_data["color_legend"] = {"display": display, "pos": position}
 
     def set_fraction_legend(self, display, position):
-        self.plot_data["fraction_legend"] = {"display": display, "pos": position}
+        self.plot_data["fraction_legend"] = {
+            "display": display,
+            "pos": position
+        }
 
     # Additional methods for customization (e.g., tooltip visibility) can be added here

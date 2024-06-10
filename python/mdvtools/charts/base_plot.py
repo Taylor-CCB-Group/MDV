@@ -31,6 +31,6 @@ class BasePlot:
 
     def set_position(self, position):
         self.position = position
-
+    
     def to_json(self):
         return json.dumps(self.plot_data, indent=2)

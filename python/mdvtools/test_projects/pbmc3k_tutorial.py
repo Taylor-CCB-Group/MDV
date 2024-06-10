@@ -6,7 +6,7 @@ import pandas as pd
 import scanpy as sc
 import json
 from mdvtools.mdvproject import MDVProject
-
+import os
 # Import the chart classes
 from mdvtools.charts.row_chart import RowChart
 from mdvtools.charts.dot_plot import DotPlot
@@ -14,22 +14,6 @@ from mdvtools.charts.histogram_plot import HistogramPlot
 from mdvtools.charts.scatter_plot_3D import ScatterPlot3D
 from mdvtools.charts.scatter_plot import ScatterPlot
 from mdvtools.charts.table_plot import TablePlot
-
-try:
-    os.mkdir("data")
-    os.mkdir("write")
-except FileExistsError:
-    pass
-url = "http://cf.10xgenomics.com/samples/cell-exp/1.1.0/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz"
-r = requests.get(url)
-with open("data/pbmc3k_filtered_gene_bc_matrices.tar.gz", "wb") as f:
-    f.write(r.content)
-tar = tarfile.open("data/pbmc3k_filtered_gene_bc_matrices.tar.gz")
-tar.extractall("data")
-tar.close()
-print("Downloaded and extracted data")
-
-# https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html
 
 
 # * * * Data Analysis section * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -57,10 +41,8 @@ sc.pp.calculate_qc_metrics(
 sc.pp.filter_cells(adata, min_genes=200)
 sc.pp.filter_genes(adata, min_cells=3)
 
-# pylance in vscode is giving type errors for the following lines - even though the code not only runs correctly,
-# but pyright when called from terminal or in CI action also doesn't give any errors.
-adata = adata[adata.obs.n_genes_by_counts < 2500, :]  # type: ignore
-adata = adata[adata.obs.pct_counts_mt < 5, :].copy()  # type: ignore
+adata = adata[adata.obs.n_genes_by_counts < 2500, :] # type: ignore
+adata = adata[adata.obs.pct_counts_mt < 5, :].copy() # type: ignore
 
 sc.pp.normalize_total(adata, target_sum=1e4)
 sc.pp.log1p(adata)

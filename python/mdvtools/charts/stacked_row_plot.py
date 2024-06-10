@@ -11,6 +11,8 @@ class StackedRowChart(BasePlot):
         self.plot_data["axis"][axis] = properties
 
     def set_color_legend(self, display):
-        self.plot_data["color_legend"] = {"display": display}
+        self.plot_data["color_legend"] = {
+            "display": display
+        }
 
     # Additional methods for customization can be added here
