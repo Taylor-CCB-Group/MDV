@@ -1,9 +1,12 @@
 import os
 from mdvtools.mdvproject import MDVProject
+from mdvtools.project_router import ProjectBlueprint
 from .server import add_safe_headers
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import json
 import threading
+import random
+import string
 
 """
 Make a Flask app, and open all folders in ~/mdv/ as projects that can be served by it.
@@ -41,7 +44,7 @@ else:
 
 running = True
 def watch_folder(app: Flask):
-    '''watch the project folder for changes and update the projects list accordingly.'''
+    """watch the project folder for changes and update the projects list accordingly."""
     import time
 
     while running:
@@ -55,22 +58,23 @@ def watch_folder(app: Flask):
         ]
         projects.extend(new_projects)
         for p in new_projects:
-            print(f"watcher adding '{p.name}'")
+            print(f"watcher adding '{p.id}'")
             try:
                 p.serve(open_browser=False, app=app)
             except Exception:
-                print(f"error serving {p.name}...")
+                print(f"error serving {p.id}...")
     print("watcher exiting...")
 
 if __name__ == "__main__":
     app = Flask(__name__)
     app.after_request(add_safe_headers)
+    ProjectBlueprint.register_app(app)
 
     for p in projects:
         try:
             p.serve(open_browser=False, app=app)
         except Exception:
-            print(f"error serving {p.name}...")
+            print(f"error serving {p.id}...")
 
     @app.route("/")
     def index():
@@ -79,9 +83,32 @@ if __name__ == "__main__":
 
     @app.route("/projects")
     def get_projects():
-        return jsonify([p.name for p in projects])
+        # todo formalise relation between this, db-version of backend, frontend etc.
+        return jsonify([{'id': p.id, 'name': p.id} for p in projects])
 
+    @app.route("/create_project", methods=["POST"])
+    def create_project():
+        try:
+            project_id = (
+                request.json["id"]
+                if request.json and "id" in request.json
+                else str("".join(random.choices(string.ascii_letters, k=6)))
+            )
+            print(f"creating project '{project_id}'")
+            p = MDVProject(os.path.join(project_dir, project_id), delete_existing=True)
+            p.set_editable(True)
+            projects.append(p)
+            p.serve(app=app, open_browser=False)
+            return jsonify({"id": p.id, "name": p.id, "status": "success"})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    
     watcher = threading.Thread(target=watch_folder, args=(app,))
+    # print("Oh frabjous day! Callooh! Callay!")
+    watcher.daemon = True
     watcher.start()
-    app.run(debug=True, port=5051)
+    try:
+        app.run(debug=True, port=5051)
+    except Exception as e:
+        print(e)
     running = False

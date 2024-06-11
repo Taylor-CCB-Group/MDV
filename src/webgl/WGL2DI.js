@@ -220,7 +220,8 @@ class WGL2DI{
 			},
 			canvas:self.canvas,
 			attributes:{
-				antialias:false,
+				antialias: false,
+				preserveDrawingBuffer: true //allows us to screenshot entire page without app.refresh() logic.
 			}
 		});
 

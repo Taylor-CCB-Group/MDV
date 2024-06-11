@@ -115,6 +115,9 @@ const Main = observer(() => {
         id: id + 'deck',
         onAfterRender: () => {
             scatterProps.onAfterRender();
+        },
+        glOptions: {
+            preserveDrawingBuffer: true,
         }
     }
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...

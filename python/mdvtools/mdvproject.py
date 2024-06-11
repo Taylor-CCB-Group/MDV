@@ -15,8 +15,10 @@ import string
 from os.path import join, split, exists
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
-from typing import Optional, NewType, List, Union
+from typing import Optional, NewType, List, Union, Any
+from .charts.view import View
 import time
+import copy
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -44,9 +46,9 @@ numpy_dtypes = {
 
 
 class MDVProject:
-    def __init__(self, dir: str, delete_existing=False):
+    def __init__(self, dir: str, id: Optional[str]=None, delete_existing=False):
         self.dir = dir
-        self.name = dir.split("/")[-1]
+        self.id = id if id else dir.split("/")[-1]
         if delete_existing and exists(dir):
             shutil.rmtree(dir)
         self.h5file = join(dir, "datafile.h5")
@@ -80,7 +82,7 @@ class MDVProject:
         save_json(self.datasourcesfile, value)
 
     @property
-    def views(self):
+    def views(self) -> dict[str, View]:
         return get_json(self.viewsfile)
 
     @views.setter
@@ -138,8 +140,8 @@ class MDVProject:
 
     def set_interactions(
         self,
-        interaction_ds,
-        parent_ds,
+        interaction_ds: str,
+        parent_ds: str,
         pivot_column="sample_id",
         parent_column="annotation",
         is_single_region=True,
@@ -708,7 +710,7 @@ class MDVProject:
         llink[linktype] = data
         self.set_datasource_metadata(ds)
 
-    def add_rows_as_columns_link(self, ds_row, ds_col, column_name, name):
+    def add_rows_as_columns_link(self, ds_row: str, ds_col: str, column_name: str, name: str):
         """
         Adds a link between two datasources, such that columns may be added to the `ds_row` datasource
         based on the values in the `ds_col` datasource dynamically at runtime. The values in the `column_name` column of the
@@ -719,7 +721,7 @@ class MDVProject:
             ds_col (string): The name of the datasource containing the columns
             column_name (string): The name of a column in the `ds_col` datasource, the row-value of which will be used
                 as the column name for columns dynamically added to the `ds_row` datasource
-            name (string): The name of the link
+            name (string): The name of the link that will appear in the interface to describe the nature of the data being added, e.g. `'Gene Expr'`
         """
         to_ds = self.get_datasource_metadata(ds_col)
         if not to_ds:
@@ -732,15 +734,21 @@ class MDVProject:
         self.insert_link(ds_row, ds_col, "rows_as_columns", data)
 
     def add_rows_as_columns_subgroup(
-        self, row_ds, col_ds, stub, data, name=None, label=None, sparse=False
+        self, row_ds: str, col_ds: str, stub: str, data, name:Optional[str]=None, label:Optional[str]=None, sparse=False
     ):
+        '''
+        '''
         name = name if name else stub
         label = label if label else name
         h5 = self._get_h5_handle()
         ds = h5[row_ds]
         if not isinstance(ds, h5py.Group):
             raise AttributeError(f"{row_ds} is not a group")
-        gr = ds.create_group(name)
+        if name in ds:
+            raise 
+        gr = ds.create_group(name) # we could check for existing name first...
+        # sparse is passed as an argument - maybe we should infer it automatically from the data
+        # (isinstance of spmatrix)
         if sparse:
             gr.create_dataset(
                 "x", (len(data.data),), data=data.data, dtype=numpy.float32
@@ -751,6 +759,7 @@ class MDVProject:
             gr.create_dataset("p", (len(data.indptr),), data=data.indptr)
         else:
             length = data.shape[0]
+            # we should assert and test that the shape dimensions correspond to number of rows in row_ds & col_ds
             total_len = data.shape[0] * data.shape[1]
             gr.create_dataset(
                 "x", (total_len,), data=data.flatten("F"), dtype=numpy.float32
@@ -904,15 +913,28 @@ class MDVProject:
 
         self.set_datasource_metadata(ds)
 
-    def get_view(self, view):
+    def get_view(self, view: str):
         views = self.views
         return views.get(view)
 
-    def set_view(self, name, view, make_default=False):
+    def set_view(self, name: str, view: Optional[View | Any], make_default=False):
+        """Sets the view with the given name to the supplied view data.
+        If the view is None, then the view will be deleted.
+        """
         views = self.views
         # update or add the view
         if view:
-            views[name] = view
+            # clone, in case a calling script might get confused by the view being changed
+            view2 = copy.deepcopy(view)
+            # generate ids for the views if not present
+            # may consider more robust id generation & other checks here
+            initialCharts = view2["initialCharts"]
+            for ds in initialCharts:
+                # todo check that there is a ds with that name
+                for c in initialCharts[ds]:
+                    if "id" not in c:
+                        c["id"] = str("".join(random.choices(string.ascii_letters, k=6)))
+            views[name] = view2
         # remove the view
         else:
             if views.get(name):

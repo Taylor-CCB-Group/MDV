@@ -17,7 +17,24 @@ const TextComponent = function({props}: {props: GuiSpec<'text'>}) {
             <input type="text" value={props.current_value} onChange={action(e => {
                 props.current_value = e.target.value;
                 if (props.func) props.func(e.target.value);
-            })} />
+            })} 
+            className="w-full"
+            />
+        </>
+    )
+};
+
+const TextBoxComponent = function({props}: {props: GuiSpec<'text'>}) {
+    return (
+        <>
+            <label>{props.label}</label>
+            <div />
+            <textarea value={props.current_value} onChange={action(e => {
+                props.current_value = e.target.value;
+                if (props.func) props.func(e.target.value);
+            })} 
+            className="w-full col-span-2"
+            />
         </>
     )
 };
@@ -134,11 +151,12 @@ const RadioButtonComponent = function({props}: {props: GuiSpec<'radiobuttons'>})
             <div className="ciview-radio-group">
                 {props.choices.map((v, i) => (
                     <>
-                    <span 
-                    className="m-1"
-                    key={i + id}>
-                        {v[0]}
-                    </span>
+                        <span 
+                        className="m-1"
+                        key={i + id}
+                        >
+                            {v[0]}
+                        </span>
                         <input key={i + id + 'input'}
                         type="radio" value={v[1]} checked={v[1] === props.current_value} onChange={action(e => {
                             props.current_value = e.currentTarget.value;
@@ -192,7 +210,7 @@ const FolderComponent = function({props}: {props: GuiSpec<'folder'>}) {
 
 const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> = {
     'text': observer(TextComponent),
-    'textbox': observer(TextComponent),
+    'textbox': observer(TextBoxComponent),
     'slider': observer(SliderComponent),
     'spinner': observer(SpinnerComponent),
     'dropdown': observer(DropdownComponent),

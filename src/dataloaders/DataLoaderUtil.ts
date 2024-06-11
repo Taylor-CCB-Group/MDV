@@ -1,3 +1,4 @@
+import { createEl } from "@/utilities/ElementsTyped";
 import type { Datasource } from "../modules/static_index";
 import { getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./DataLoaders";
 
@@ -80,7 +81,19 @@ async function loadRowData(datasource: string, index: string) {
 }
 //load view from API
 async function getView(view: string) {
-    return await getPostData(projectRoot+"/get_view", { view })
+    try {
+        return await getPostData(projectRoot+"/get_view", { view })
+    } catch (e) {
+        //todo nicer dialog
+        const dialog = createEl("dialog", { title: "Error loading view"});
+        dialog.innerText = e.message;
+        dialog.addEventListener("click", () => dialog.close());
+        document.body.appendChild(dialog);
+        dialog.showModal();
+        console.error(e);
+        // return {initialCharts: {}};
+        return undefined;
+    }
 }
 
 async function loadBinaryData(datasource: string, name: string) {
@@ -96,6 +109,9 @@ export async function getPostData(url: string, args, return_type = "json") {
             "Content-Type": "application/json"
         }
     });
+    if (!resp.ok) {
+        throw new Error(`Error fetching '${url}': ${resp.statusText}`);
+    }
     if (return_type === "json") {
         return await resp.json();
     }

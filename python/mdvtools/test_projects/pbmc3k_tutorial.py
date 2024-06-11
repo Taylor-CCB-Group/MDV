@@ -1,22 +1,11 @@
-## Before running this script:
-# Run the following code to create the necessary folders and download the data
-# Firstly cd into the folder containing the script
-# Then uncomment and run the following from your terminal
-# !mkdir data
-# !wget http://cf.10xgenomics.com/samples/cell-exp/1.1.0/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz -O data/pbmc3k_filtered_gene_bc_matrices.tar.gz
-# !cd data; tar -xzf pbmc3k_filtered_gene_bc_matrices.tar.gz
-# !mkdir write
-
-
-
-# https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html
-
+import os
+import requests
+import tarfile
 import numpy as np
 import pandas as pd
 import scanpy as sc 
 import json
 from mdvtools.mdvproject import MDVProject
-import os
 # Import the chart classes
 from mdvtools.charts.row_chart import RowChart
 from mdvtools.charts.dot_plot import DotPlot
@@ -24,6 +13,23 @@ from mdvtools.charts.histogram_plot import HistogramPlot
 from mdvtools.charts.scatter_plot_3D import ScatterPlot3D
 from mdvtools.charts.scatter_plot import ScatterPlot
 from mdvtools.charts.table_plot import TablePlot
+
+try:
+    os.mkdir("data")
+    os.mkdir("write")
+except FileExistsError:
+    pass
+url = "http://cf.10xgenomics.com/samples/cell-exp/1.1.0/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz"
+r = requests.get(url)
+with open("data/pbmc3k_filtered_gene_bc_matrices.tar.gz", "wb") as f:
+    f.write(r.content)
+tar = tarfile.open("data/pbmc3k_filtered_gene_bc_matrices.tar.gz")
+tar.extractall("data")
+tar.close()
+print("Downloaded and extracted data")
+
+# https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html
+
 
 
 # * * * Data Analysis section * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -47,6 +53,9 @@ adata.var["mt"] = adata.var_names.str.startswith("MT-")
 sc.pp.calculate_qc_metrics(
     adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True
 )
+
+sc.pp.filter_cells(adata, min_genes=200)
+sc.pp.filter_genes(adata, min_cells=3)
 
 # pylance in vscode is giving type errors for the following lines - even though the code not only runs correctly,
 # but pyright when called from terminal or in CI action also doesn't give any errors.
@@ -98,6 +107,8 @@ cells_df["X_umap_1"] = umap_np[:, 0]
 cells_df["X_umap_2"] = umap_np[:, 1]
 
 cells_df["cell_id"] = adata.obs.index
+
+#cells_df["n_cells"] = adata.obs[["Sample", "leiden"]].value_counts().reset_index()
 '''adata.layers['counts'] = adata.X.copy()
 
 marker_genes = [
@@ -145,7 +156,7 @@ varm_np = np.array(adata.varm["PCs"])
 gene_table["PCs_1"] = varm_np[:, 0]
 gene_table["PCs_2"] = varm_np[:, 1]
 
-print(adata.var)
+#print(adata.var)
 #print(gene_table.columns.values.tolist())
 
 #gene_table["PCs_1"] = rna.varm["PCs"][:, 0]
@@ -243,24 +254,24 @@ table_plot = TablePlot(
     position=[10, 10]
 )
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-'''histogram_plot = HistogramPlot(
-    title="n_genes_by_counts",
-    param="n_genes_by_counts",
+histogram_plot_2 = HistogramPlot(
+    title="n_cells",
+    param="n_cells",
     bin_number=17,
     display_min=0,
     display_max=2500,
-    size=[360, 250],
-    position=[10, 280]
+    size=[240, 240],
+    position=[270, 270]
 )
 
-histogram_plot.set_x_axis(size=30, label="n_genes_by_counts", textsize=13, tickfont=10)
-histogram_plot.set_y_axis(size=45, label="frequency", textsize=13, tickfont=10, rotate_labels=False) '''
+histogram_plot_2.set_x_axis(size=30, label="n_cells", textsize=13, tickfont=10)
+histogram_plot_2.set_y_axis(size=45, label="frequency", textsize=13, tickfont=10, rotate_labels=False)
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 
 # Set up and serve the MDV project
 base = os.path.expanduser('~/mdv')
-project_path = os.path.join(base, 'pbmc3k')
+project_path = os.path.join(base, 'pbmc3k_test')
 p = MDVProject(os.path.expanduser(project_path), delete_existing=True)
 
 # Add data to the project
@@ -281,6 +292,7 @@ scatter_chart = json.loads(json.dumps(scatter_plot.plot_data, indent=2).replace(
 
 table_chart = json.loads(json.dumps(table_plot.plot_data, indent=2).replace("\\", ""))
 scatter2D_chart = json.loads(json.dumps(scatter2D_plot.plot_data, indent=2).replace("\\", ""))
+histogram_chart_data_2 = json.loads(json.dumps(histogram_plot_2.plot_data, indent=2).replace("\\", ""))
 
 list_charts_cells.append(row_chart_data)
 list_charts_cells.append(dot_chart_data)
@@ -289,6 +301,7 @@ list_charts_cells.append(scatter_chart)
 
 list_charts_genes.append(table_chart)
 list_charts_genes.append(scatter2D_chart)
+list_charts_genes.append(histogram_chart_data_2)
 
 view_config = {'initialCharts': {"cells": list_charts_cells, "genes":list_charts_genes}}
 

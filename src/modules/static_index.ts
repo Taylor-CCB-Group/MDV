@@ -125,8 +125,9 @@ async function loadData() {
     const debugButton = cm.addMenuIcon('_main', "fas fa-bug", tiptext, async () => {
         const datasources = await fetchJsonConfig(`${root}/datasources.json`, root);
         const views = await fetchJsonConfig(`${root}/views.json`, root);
+        const state = await fetchJsonConfig(`${root}/state.json`, root);
         
-        new DebugJsonReactWrapper({datasources, views});
+        new DebugJsonReactWrapper({datasources, views, state});
     });
     debugButton.style.float = "right";
     debugButton.setAttribute("data-microtip-position", "bottom-left");

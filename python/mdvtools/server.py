@@ -1,6 +1,6 @@
 from flask import (
     Flask,
-    Blueprint,
+    # Blueprint,
     render_template,
     request,
     make_response,
@@ -16,6 +16,7 @@ import re
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
 from mdvtools.mdvproject import MDVProject
+from mdvtools.project_router import ProjectBlueprint as Blueprint
 import os
 import pandas as pd
 from typing import Optional
@@ -97,16 +98,19 @@ def create_app(
         if websocket:
             mdv_socketio(app)
     else:
+        ## nb - previous use of flask.Blueprint was not allowing new projects at runtime
+        ## we substitute this with our own ProjectBlueprint class, which is a drop-in replacement
+        ## but we should add more tests to ensure it behaves as expected...
         # add routes for this project to existing app
         # set the route prefix to the project name, derived from the dir name.
         # this is to allow multiple projects to be served from the same server.
         multi_project = True
-        route = "/project/" + project.name + "/"
-        project_bp = Blueprint(project.name, __name__, url_prefix=route)
-    if route in routes:
-        raise Exception(
-            "Route already exists - can't have two projects with the same name"
-        )
+        route = "/project/" + project.id + "/"
+        project_bp = Blueprint(project.id, __name__, url_prefix=route)        
+    # if route in routes:
+    #     raise Exception(
+    #         "Route already exists - can't have two projects with the same name"
+    #     )
     routes.add(route)
 
     @project_bp.route("/")
@@ -302,10 +306,14 @@ def create_app(
             raise Exception(
                 "assert: project_bp must be a Flask instance when multi_project is True"
             )
-        print(f"Adding project {project.name} to existing app")
-        app.register_blueprint(project_bp)
+        if route in app.blueprints:
+            print(f"there is already a blueprint at {route}")
+        print(f"Adding project {project.id} to existing app")
+        ## nb - uncomment this if not using ProjectBlueprint refactor...
+        # app.register_blueprint(project_bp)
     else:
-        app.run(host="0.0.0.0", port=port, debug=True)
+        # user_reloader=False, allows the server to work within jupyter
+        app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
 
 def add_datasource_backend(project):
     from mdvtools.dbutils.dbmodels import db, Project, File

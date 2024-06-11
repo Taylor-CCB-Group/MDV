@@ -47,6 +47,7 @@ import "./GenomeBrowser";
 import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
+import { toPng } from "html-to-image";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -62,13 +63,13 @@ const column_orders={
 }
 
 const themes={
-    "Dark":{
+    "dark":{
         title_bar_color:"#222",
         main_panel_color:"black",
         text_color:"white",
         background_color:"#333"
     },
-    "Light":{
+    "light":{
         title_bar_color:"white",
         main_panel_color:"#f1f1f1",
         text_color:"black",
@@ -76,16 +77,17 @@ const themes={
 
     }
 }
+
 //https://stackoverflow.com/questions/56393880/how-do-i-detect-dark-mode-using-javascript
 function getPreferredColorScheme() {
     if (window.matchMedia) {
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            return "Dark";
+            return "dark";
         } else {
-            return "Light";
+            return "light";
         }
     } 
-    return "Light";
+    return "light";
 }
 function listenPreferredColorScheme(callback) {
     if (window.matchMedia) {
@@ -261,7 +263,6 @@ class ChartManager{
 
         },this.rightMenuBar);
         themeButton.style.margin = "3px";
-
         if (config.permission === 'edit') {
             const uploadButton = createMenuIcon("fas fa-upload",{
                 tooltip:{
@@ -269,10 +270,30 @@ class ChartManager{
                     position:"bottom-left"
                 },
                 func:(e)=>{
-                    new FileUploadDialogReact().open();
+                    new FileUploadDialogReact();//.open();
                 }    
             },this.menuBar);
             uploadButton.style.margin = "3px";
+        }
+
+        if (import.meta.env.DEV) {
+            // add a button to take a screenshot of the current view
+            // we don't actually want a button like this - I think we probably want to take a screenshot
+            // inside 'getState()' and add it to view... but that's a bit of a destructive change.
+            createMenuIcon("fas fa-camera", {
+                tooltip:{
+                    text:"Take Screenshot",
+                    position:"bottom-left"
+                },
+                func: async () => {
+                    const bounds = this.containerDiv.getBoundingClientRect();
+                    const aspect = bounds.width / bounds.height;
+                    const dataUrl = await toPng(this.containerDiv, {canvasWidth: 400, canvasHeight: 400/aspect});
+                    const img = document.createElement('img');
+                    img.src = dataUrl;
+                    document.body.appendChild(img);
+                }
+            }, this.menuBar);
         }
         // createMenuIcon("fas fa-question",{
         //     tooltip:{
@@ -568,8 +589,6 @@ class ChartManager{
                 c.chart.themeChanged();
             }
         }
-      
-        
     }
 
 
@@ -2126,7 +2145,6 @@ class ChartManager{
         })
     }
 }
-
 
 /**
 * Creates a dialog for the user to choose multiple columns

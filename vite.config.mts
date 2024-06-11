@@ -21,6 +21,7 @@ let hasWarned2 = false;
 function getRollupOptions(): RollupOptions {
     const build = process.env.build as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
+        // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
@@ -34,12 +35,18 @@ function getRollupOptions(): RollupOptions {
         }
     } else if (build === 'desktop_pt') {
         // currently there are different versions of entrypoint, this is the one with react etc.
+        // used for Flask...
         return {
-            input: 'src/modules/static_index.ts',
+            input: {
+                'mdv': 'src/modules/static_index.ts',
+                'catalog': 'src/catalog/catalog_index.tsx',
+            },
             output: {
-                entryFileNames: 'js/mdv.js',
+                entryFileNames: 'js/[name].js',
                 assetFileNames: (assetInfo) => {
-                    if (assetInfo.name === 'static_index.css') return 'assets/mdv.css';
+                    if (assetInfo.name === 'mdv.css') return 'assets/mdv.css';
+                    if (assetInfo.name === 'catalog.css') return 'assets/catalog.css';
+                    
                     //not including hash, may impact caching, but more similar to previous webpack behavior
                     return 'img/[name][extname]';
                 },
@@ -48,6 +55,7 @@ function getRollupOptions(): RollupOptions {
     } else if (build === 'dev_pt') {
         // version of vite build used for netlify deploy preview & devserver, using default 'index.html' entrypoint
         // (which as of writing refers to same static_index.ts as desktop_pt)
+        // nb, localhost:5170/catalog_dev.html works on devserver without needing to change this.
         return {}
     } else if (build === 'desktop') {
         return {
@@ -112,6 +120,14 @@ export default defineConfig(env => { return {
                 target: flaskURL,
                 changeOrigin: true,
             },
+            '/projects': {
+                target: flaskURL,
+                changeOrigin: true,
+            },
+            '/create_project': {
+                target: flaskURL,
+                changeOrigin: true,
+            },
         }
     },
     publicDir: 'examples', //used for netlify.toml??... the rest is noise.
@@ -154,6 +170,9 @@ export default defineConfig(env => { return {
             include: [/\.tsx?$/, /\.jsx?$/],
         })
     ],
+    worker: {
+        format: 'iife',
+    },
     resolve: {
         alias: {
             "@": path.resolve(__dirname, "./src"),

@@ -1,163 +1,147 @@
-import React, { useState, useCallback, useReducer, type PropsWithChildren } from "react";
-import styled from "styled-components";
+import React, { useState, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
 import { useDropzone } from "react-dropzone";
+import axios from 'axios';
+import { useProject } from "../../modules/ProjectContext";
+import { ColumnPreview } from "./ColumnPreview"
 
-// Styled components (migrating to Tailwind CSS)
-// const Container = styled.div`
-//   display: flex;
-//   flex-direction: column;
-//   justify-content: center;
-//   align-items: center;
-//   padding: 10px;
-// `;
-const Container = ({children}: PropsWithChildren) =>{
+// Use dynamic import for the worker
+const CsvWorker = new Worker(new URL('./csvWorker.ts', import.meta.url), { type: 'module' });
+
+const Container = ({ children }: PropsWithChildren) => {
   return (
-    <div 
-    className="flex flex-col content-center items-center p-10"
+    <div className="flex flex-col content-center items-center h-max dark:bg-black-800 dark:text-white">
+      {children}
+    </div>
+  );
+};
+
+const StatusContainer = ({ children }: PropsWithChildren) => {
+  return (
+    <div className="flex flex-col justify-center items-center w-full h-150 dark:bg-#333">
+      {children}
+    </div>
+  );
+};
+
+const SuccessContainer = ({ children }) => (
+  <div className="flex flex-col items-center justify-center bg-[#f0f8ff] shadow-md border border-[#e0e0e0] m-4 dark:bg-black dark:border-gray-600">
+    {children}
+  </div>
+);
+
+const SuccessHeading = ({ children }) => (
+  <h1 className="text-[#333] mb-1 dark:text-white">{children}</h1>
+);
+
+const SuccessText = ({ children }) => (
+  <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">{children}</p>
+);
+
+const DropzoneContainer = forwardRef(({ isDragOver, children, ...props }: any, ref) => (
+  <div
+    {...props}
+    ref={ref}
+    className={`p-4 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? 'bg-gray-300 dark:bg-slate-800' : 'bg-white dark:bg-black'} min-w-[90%]`}
+  >
+    {children}
+  </div>
+));
+
+const FileInputLabel = ({ children, ...props }) => (
+  <label {...props} className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500">
+    {children}
+  </label>
+);
+
+const Spinner = () => {
+  return <div className="w-16 h-16 border-8 mt-10 border-blue-500 border-dashed rounded-full animate-spin" style={{
+    borderColor: "blue transparent blue transparent"
+  }}></div>;
+};
+
+const colorStyles = {
+  blue: {
+    bgColor: "bg-blue-600",
+    hoverColor: "hover:bg-blue-700",
+    darkBgColor: "dark:bg-blue-800",
+    darkHoverColor: "dark:bg-blue-900",
+  },
+  red: {
+    bgColor: "bg-red-600",
+    hoverColor: "hover:bg-red-700",
+    darkBgColor: "dark:bg-red-800",
+    darkHoverColor: "dark:bg-red-900",
+  },
+  green: {
+    bgColor: "bg-green-600",
+    hoverColor: "hover:bg-green-700",
+    darkBgColor: "dark:bg-green-800",
+    darkHoverColor: "dark:bg-green-900",
+  },
+};
+
+const Button = ({
+  onClick,
+  color = "blue",
+  disabled = false,
+  size = "px-5 py-2.5",
+  marginTop = "mt-2.5",
+  children
+}) => {
+  const { bgColor, hoverColor, darkBgColor, darkHoverColor } = colorStyles[color] || colorStyles.blue;
+
+  return (
+    <button
+      onClick={onClick}
+      className={`${size} ${marginTop} ${bgColor} ${hoverColor} ${darkBgColor} ${darkHoverColor} text-white rounded self-center cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-500 disabled:opacity-70`}
+      disabled={disabled}
     >
       {children}
-    </div>
-  )
-}
+    </button>
+  );
+};
 
-// const StatusContainer = styled.div`
-//   display: flex;
-//   flex-direction: column;
-//   justify-content: center;
-//   align-items: center;
-//   width: 100%;
-//   height: 150px;
-// `;
-const StatusContainer = ({children}: PropsWithChildren) => {
-  return (
-    <div className="flex flex-col justify-center items-center w-full h-150">
-      {children}
-    </div>
-  )
-}
+const ProgressBar = ({ value, max }) => (
+  <progress className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded" value={value} max={max}></progress>
+);
 
-const SuccessContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: #f0f8ff;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e0e0e0;
-`;
+const Message = ({ children }) => (
+  <p className="text-lg font-bold text-[#333] dark:text-white text-center">{children}</p>
+);
 
-const SuccessHeading = styled.h1`
-  color: #333;
-  margin-bottom: 15px;
-`;
+const FileSummary = ({ children }) => (
+  <div className="max-w-[400px] w-[90%] text-center mb-5">
+    {children}
+  </div>
+);
 
-const SuccessText = styled.p`
-  font-size: 20px;
-  color: #555;
-  margin-bottom: 20px;
-  text-align: center;
-`;
+const FileSummaryHeading = ({ children }) => (
+  <h1 className="text-gray-800 dark:text-white mb-3">{children}</h1>
+)
 
-const RefreshButton = styled.button`
-  padding: 10px 20px;
-  background-color: green;
-  color: white;
-  cursor: pointer;
-  border-radius: 5px;
-  margin-top: 20px;
-  margin-bottom: 20px;
-  align-self: center;
-`;
+const FileSummaryText = ({ children }) => (
+  <p className="text-lg text-gray-700 dark:text-white my-1">{children}</p>
+);
 
-const DropzoneContainer = styled.div<{ isDragOver: boolean }>`
-  border: 2px dashed gray;
-  padding: 10px;
-  text-align: center;
-  /*todo: fix... background-color: ${(props) => (props.isDragOver ? "lightgray" : "white")};*/
-  min-width: 90%;
-  min-height: 90%;
-  max-height: 90%;
-`;
+const ErrorContainer = ({ children }) => (
+  <div className="bg-[#fff0f0] text-[#d8000c] border border-[#ffbaba] p-5 my-5 rounded shadow-sm text-left w-[90%] max-w-[600px]">
+    {children}
+  </div>
+);
 
-const FileInputLabel = styled.label`
-  padding: 10px 20px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  cursor: pointer;
-  background-color: #f0f0f0;
-  display: inline-block;
-  margin: 10px 0;
-`;
+const DynamicText = ({ text, className = "" }) => (
+  <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
+    <p className={`text-center m-0 font-bold text-sm sm:text-lg md:text-xl ${className}`}>
+      {text}
+    </p>
+  </div>
+);
 
-const Button = styled.button<{ color?: string; disabled?: boolean; size?: string; marginTop?: string; }>`
-  align-self: center;
-  padding: ${(props) => props.size || "10px 20px"};
-  background-color: ${(props) => props.color || "blue"};
-  color: white;
-  cursor: pointer;
-  margin-top: ${(props) => props.marginTop || "10px"};
-  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
-`;
-
-const ProgressBar = styled.progress`
-  width: 100%;
-  height: 30px;
-  margin-bottom: 20px;
-  background-color: #f3f3f3;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-`;
-
-const Message = styled.p`
-  font-size: 18px;
-  font-weight: bold;
-  color: #333;
-  font-family: Arial, sans-serif;
-  text-align: center;
-`;
-
-const FileSummary = styled.div`
-  border-radius: 8px;
-  background-color: #f0f8ff;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e0e0e0;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-`;
-
-const FileSummaryHeading = styled.h2`
-  color: #333;
-  margin: 0 0 20px 0;
-`;
-
-const FileSummaryText = styled.p`
-  font-size: 16px;
-  margin: 10px 0;
-  padding: 0;
-  color: #555;
-`;
-
-const ErrorContainer = styled.div`
-  background-color: #fff0f0; // Light red background for error visibility
-  color: #d8000c; // Dark red text color for contrast and readability
-  border: 1px solid #ffbaba; // Lighter red border color
-  padding: 20px;
-  margin: 20px 0;
-  border-radius: 5px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1); // Slight shadow for depth
-  font-family: Arial, sans-serif;
-  font-size: 14px;
-  text-align: left;
-  width: 90%; // Responsive width
-  max-width: 600px; // Max width to avoid too wide error messages
-`;
-
-const ErrorHeading = styled.h4`
-  margin-top: 0;
-  font-size: 16px;
-  font-weight: bold;
-`;
+const ErrorHeading = ({ children }) => (
+  <h4 className="mt-0 text-lg font-bold">
+    {children}
+  </h4>
+);
 
 // Reducer function
 const reducer = (state, action) => {
@@ -166,14 +150,16 @@ const reducer = (state, action) => {
       return { ...state, selectedFiles: action.payload };
     case "SET_IS_UPLOADING":
       return { ...state, isUploading: action.payload };
-    case "SET_FILE_SUMMARY":
-      return { ...state, fileSummary: action.payload };
     case "SET_IS_INSERTING":
       return { ...state, isInserting: action.payload };
     case "SET_SUCCESS":
       return { ...state, success: action.payload };
     case "SET_ERROR":
       return { ...state, error: action.payload };
+    case "SET_IS_VALIDATING":
+      return { ...state, isValidating: action.payload };
+    case "SET_VALIDATION_RESULT":
+      return { ...state, validationResult: action.payload };
     default:
       return state;
   }
@@ -186,6 +172,7 @@ const UPLOAD_STEP = 100 / (UPLOAD_DURATION / UPLOAD_INTERVAL);
 
 interface FileUploadDialogComponentProps {
   onClose: () => void;
+  onResize: (width: number, height: number) => void; // Add this prop
 }
 
 // Custom hook for file upload progress
@@ -210,29 +197,91 @@ const useFileUploadProgress = () => {
     setProgress(0);
   }, []);
 
-  return { progress, startProgress, resetProgress };
+  return { progress, setProgress, startProgress, resetProgress };
 };
 
-const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ onClose }) => {
+const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ onClose, onResize }) => {
+  const { root } = useProject();
+
+  const [summary, setSummary] = useState({
+    fileName: "",
+    fileSize: "",
+    rowCount: 0,
+    columnCount: 0
+  });
+
+  const [columnNames, setColumnNames] = useState<string[]>([]);
+  const [columnTypes, setColumnTypes] = useState<string[]>([]);
+  const [secondRowValues, setSecondRowValues] = useState<string[]>([]);
+
   const [state, dispatch] = useReducer(reducer, {
     selectedFiles: [],
     isUploading: false,
-    fileSummary: null,
     isInserting: false,
+    isValidating: false,
+    validationResult: null,
     success: false,
     error: null,
   });
 
-  const { progress, startProgress, resetProgress } = useFileUploadProgress();
+  const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     dispatch({ type: "SET_SELECTED_FILES", payload: acceptedFiles });
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      setSummary({
+        ...summary,
+        fileName: file.name,
+        fileSize: (file.size / (1024 * 1024)).toFixed(2) // Convert to MB
+      });
+    }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
+    onDrop,
+    accept: {
+      'text/csv': ['.csv']
+    }
+  });
+  const rejectionMessage = fileRejections.length > 0 ? "Only CSV files can be selected" : "Drag and drop files here or click the button below to upload";
+  const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
+
+  const handleValidateClick = () => {
+    const file = state.selectedFiles[0];
+    if (file) {
+      dispatch({ type: "SET_IS_VALIDATING", payload: true });
+      CsvWorker.postMessage(file);
+      CsvWorker.onmessage = (event: MessageEvent) => {
+        const { columnNames, columnTypes, secondRowValues, rowCount, columnCount, error } = event.data;
+        if (error) {
+          dispatch({
+            type: "SET_ERROR",
+            payload: {
+              message: "Validation failed.",
+              traceback: error
+            }
+          });
+          dispatch({ type: "SET_IS_VALIDATING", payload: false });
+        } else {
+          setColumnNames(columnNames);
+          setColumnTypes(columnTypes);
+          setSecondRowValues(secondRowValues);
+          setSummary((prevSummary) => ({
+            ...prevSummary,
+            rowCount,
+            columnCount
+          }));
+          onResize(600, 630);
+          dispatch({ type: "SET_IS_VALIDATING", payload: false });
+          dispatch({ type: "SET_VALIDATION_RESULT", payload: { columnNames, columnTypes } });
+        }
+      };
+    }
+  };
 
   const handleUploadClick = async () => {
-    console.log("Uploading file...")
+    console.log("Uploading file...");
     if (!state.selectedFiles.length) {
       dispatch({ type: "SET_ERROR", payload: "noFilesSelected" });
       return;
@@ -240,118 +289,61 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
     dispatch({ type: "SET_IS_UPLOADING", payload: true });
     resetProgress();
-    dispatch({
-      type: "SET_ERROR",
-      payload: {
-        message: "Upload failed due to a network error.",
-        traceback: "Error: Network Error at uploadFileFunction"
-      }
-    });
 
-    startProgress();
+    const formData = new FormData();
+    formData.append("file", state.selectedFiles[0]);
+    formData.append("name", state.selectedFiles[0].name);
+    // formData.append("view", "TRUE");
+    // formData.append("backend", "TRUE");
+    formData.append("replace", '');
+
+
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: function (progressEvent) {
+        const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        setProgress(percentComplete); // Update the progress as the file uploads
+      }
+    };
 
     try {
-      // Simulating file upload
+      const response = await axios.post(`${root}/add_datasource`, formData, config);
+      console.log('File uploaded successfully', response.data);
 
-      // const endpoint = 'https://example.com/upload';
-      // const formData = new FormData();
-
-      // Array.from(selectedFiles).forEach(file => {
-      //   formData.append('files', file);
-      // });
-
-      // try {
-      //   const response = await fetch(endpoint, {
-      //     method: 'POST',
-      //     body: formData,
-      //   });
-
-      //   if (response.ok) {
-      //     const result = await response.json();
-      //     console.log("Upload successful:", result);
-      //   } else {
-      //     console.error("Upload failed:", response.statusText);
-      //   }
-      // } catch (error) {
-      //   console.error("Error during upload:", error);
-      // } finally {
-      //   setIsUploading(false); // Finish uploading
-      // }
-
-      await new Promise((resolve) => setTimeout(resolve, UPLOAD_DURATION));
-
-      dispatch({ type: "SET_IS_UPLOADING", payload: false });
-      dispatch({
-        type: "SET_FILE_SUMMARY",
-        payload: {
-          rows: 124,
-          columns: 12,
-          size: (10241024 / (1024 * 1024)).toFixed(2),
-        },
-      });
+      if (response.status === 200) {
+        dispatch({ type: "SET_IS_UPLOADING", payload: false });
+        dispatch({ type: "SET_SUCCESS", payload: true });
+      } else {
+        console.error(`Failed to confirm: Server responded with status ${response.status}`);
+        dispatch({ type: "SET_IS_UPLOADING", payload: false });
+        dispatch({
+          type: "SET_ERROR",
+          payload: {
+            message: `Confirmation failed with status: ${response.status}`,
+            status: response.status,
+            traceback: "Server responded with non-200 status"
+          }
+        });
+      }
     } catch (error) {
+      console.error('Error uploading file:', error);
       dispatch({ type: "SET_IS_UPLOADING", payload: false });
       dispatch({
         type: "SET_ERROR",
         payload: {
           message: "Upload failed due to a network error.",
-          traceback: "Error: Network Error at uploadFileFunction"
-          // The traceback here is just an example; it could be the actual error stack or details you get from your upload logic
+          traceback: error.message
         }
       });
     }
   };
 
-  const handleInsertClick = async () => {
+  const handleClose = async () => {
     dispatch({ type: "SET_FILE_SUMMARY", payload: null });
-    dispatch({ type: "SET_IS_INSERTING", payload: true });
-    resetProgress();
-    dispatch({
-      type: "SET_ERROR",
-      payload: {
-        message: "Upload failed due to a network error.",
-        traceback: "Error: Network Error at uploadFileFunction"
-        // The traceback here is just an example; it could be the actual error stack or details you get from your upload logic
-      }
-    });
-
-    startProgress();
-
-    // const endpoint = 'https://example.com/upload';
-    // const formData = new FormData();
-
-    // Array.from(selectedFiles).forEach(file => {
-    //   formData.append('files', file);
-    // });
-
-    // try {
-    //   const response = await fetch(endpoint, {
-    //     method: 'POST',
-    //     body: formData,
-    //   });
-
-    //   if (response.ok) {
-    //     const result = await response.json();
-    //     console.log("Upload successful:", result);
-    //   } else {
-    //     console.error("Upload failed:", response.statusText);
-    //   }
-    // } catch (error) {
-    //   console.error("Error during upload:", error);
-    // } finally {
-    //   setIsUploading(false); // Finish uploading
-    // }
-
-    try {
-      // Simulating file insertion
-      await new Promise((resolve) => setTimeout(resolve, UPLOAD_DURATION));
-
-      dispatch({ type: "SET_IS_INSERTING", payload: false });
-      dispatch({ type: "SET_SUCCESS", payload: true });
-    } catch (error) {
-      dispatch({ type: "SET_IS_INSERTING", payload: false });
-      dispatch({ type: "SET_ERROR", payload: "insertError" });
-    }
+    onResize(450, 295);
+    onClose();
   };
 
   return (
@@ -361,51 +353,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
           <Message>{"Your file is being uploaded, please wait..."}</Message>
           <ProgressBar value={progress} max="100" />
         </StatusContainer>
-      ) : state.fileSummary ? (
-        <>
-          <FileSummary>
-            <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
-            <FileSummaryText>
-              <strong>{"File name"}</strong> {state.selectedFiles[0].name}
-            </FileSummaryText>
-            <FileSummaryText>
-              <strong>{"Number of rows"}</strong> {state.fileSummary.rows}
-            </FileSummaryText>
-            <FileSummaryText>
-              <strong>{"Number of columns"}</strong> {state.fileSummary.columns}
-            </FileSummaryText>
-            <FileSummaryText>
-              <strong>{"File size"}</strong> {state.fileSummary.size} MB
-            </FileSummaryText>
-          </FileSummary>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '60px',
-            }}
-          >
-            <Button onClick={handleInsertClick}>{"Confirm"}</Button>
-            <Button color="red" size="10px 30px" onClick={onClose}>
-              {"Cancel"}
-            </Button>
-          </div>
-        </>
       ) : state.isInserting ? (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column', // Stack items vertically
-            justifyContent: 'center',
-            alignItems: 'center',
-            width: '100%', // Ensure the wrapper spans the entire width of its parent
-            height: '150px', // Adjust this height as needed to accommodate both the progress bar and the message
-          }}
-        >
+        <StatusContainer>
           <Message>{"Your file is being processed, please wait..."}</Message>
-          <ProgressBar value={progress} max="100" />
-        </div>
+          <Spinner />
+        </StatusContainer>
       ) : state.success ? (
         <>
           <SuccessContainer>
@@ -413,10 +365,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             <SuccessText>
               The file was uploaded successfully to the database.
             </SuccessText>
-            <RefreshButton onClick={() => window.location.reload()}>
-              Refresh Page
-            </RefreshButton>
           </SuccessContainer>
+          <Button color="green" onClick={() => window.location.reload()}>
+            Refresh Page
+          </Button>
         </>
 
       ) : state.error ? (
@@ -425,28 +377,57 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             <ErrorHeading>An error occurred while uploading the file:</ErrorHeading>
             <p>{state.error.message}</p>
             {state.error.traceback && (
-              <pre>{state.error.traceback}</pre> // Use <pre> for preformatted text like tracebacks
+              <pre>{state.error.traceback}</pre>
             )}
           </ErrorContainer>
+        </>
+      ) : state.isValidating ? (
+        <StatusContainer>
+          <Message>{"Validating the CSV file, please wait..."}</Message>
+          <Spinner />
+        </StatusContainer>
+      ) : state.validationResult ? (
+        <>
+          <FileSummary>
+            <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
+            <FileSummaryText>
+              <strong>{"File name"}</strong> {summary.fileName}
+            </FileSummaryText>
+            <FileSummaryText>
+              <strong>{"Number of rows"}</strong> {summary.rowCount}
+            </FileSummaryText>
+            <FileSummaryText>
+              <strong>{"Number of columns"}</strong> {summary.columnCount}
+            </FileSummaryText>
+            <FileSummaryText>
+              <strong>{"File size"}</strong> {summary.fileSize} MB
+            </FileSummaryText>
+          </FileSummary>
+
+
+          <ColumnPreview columnNames={columnNames} columnTypes={columnTypes} secondRowValues={secondRowValues} />
+          <div className="flex justify-center items-center gap-6 mt-4">
+            <Button marginTop="mt-1" onClick={handleUploadClick}>{"Upload"}</Button>
+            <Button color="red" size="px-6 py-2.5" marginTop="mt-1" onClick={handleClose}>{"Cancel"}</Button>
+          </div>
         </>
       ) : (
         <>
           <DropzoneContainer {...getRootProps()} isDragOver={isDragActive} aria-label={"dropzoneLabel"}>
             <input {...getInputProps()} />
             {isDragActive ? (
-              <h2>{"dropFilesHere"}</h2>
+              <DynamicText text={"Drop files here..."} />
             ) : (
-              <h2>
-                {state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : "Drag and drop files here or click the button below to upload"}
-              </h2>
+              <DynamicText text={state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : rejectionMessage} className={rejectionMessageStyle} />
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
-          <Button onClick={handleUploadClick} 
-          disabled={(state.selectedFiles.length===0 || state.isUploading)} 
-          marginTop="20px"
+          <Button onClick={handleValidateClick}
+            disabled={(state.selectedFiles.length === 0 || state.isUploading)}
+            marginTop="mt-5"
+            color="blue"
           >
-            {"Upload File"}
+            {"Validate File"}
           </Button>
         </>
       )}
@@ -454,4 +435,4 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
   );
 };
 
-export default FileUploadDialogComponent;
+export default FileUploadDialogComponent; 
