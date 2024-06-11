@@ -15,10 +15,8 @@ import string
 from os.path import join, split, exists
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
-from typing import Optional, NewType, List, Union, Any
-from .charts.view import View
+from typing import Optional, NewType, List, Union
 import time
-import copy
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -82,7 +80,7 @@ class MDVProject:
         save_json(self.datasourcesfile, value)
 
     @property
-    def views(self) -> dict[str, View]:
+    def views(self):
         return get_json(self.viewsfile)
 
     @views.setter
@@ -140,8 +138,8 @@ class MDVProject:
 
     def set_interactions(
         self,
-        interaction_ds: str,
-        parent_ds: str,
+        interaction_ds,
+        parent_ds,
         pivot_column="sample_id",
         parent_column="annotation",
         is_single_region=True,
@@ -224,8 +222,7 @@ class MDVProject:
         name="Images",
         image_type="png",
     ):
-        """This function should be deprecated, it has a similar functionality as add_image_set but does not copy the images like add_image_set does
-        Adds images to a datasource.
+        """Adds images to a datasource.
         These will be copied as static assets with `convert_to_static_page()`,
         and served from their original location by `serve()`.
         Args:
@@ -914,28 +911,15 @@ class MDVProject:
 
         self.set_datasource_metadata(ds)
 
-    def get_view(self, view: str):
+    def get_view(self, view):
         views = self.views
         return views.get(view)
 
-    def set_view(self, name: str, view: Optional[View | Any], make_default=False):
-        """Sets the view with the given name to the supplied view data.
-        If the view is None, then the view will be deleted.
-        """
+    def set_view(self, name, view, make_default=False):
         views = self.views
         # update or add the view
         if view:
-            # clone, in case a calling script might get confused by the view being changed
-            view2 = copy.deepcopy(view)
-            # generate ids for the views if not present
-            # may consider more robust id generation & other checks here
-            initialCharts = view2["initialCharts"]
-            for ds in initialCharts:
-                # todo check that there is a ds with that name
-                for c in initialCharts[ds]:
-                    if "id" not in c:
-                        c["id"] = str("".join(random.choices(string.ascii_letters, k=6)))
-            views[name] = view2
+            views[name] = view
         # remove the view
         else:
             if views.get(name):
