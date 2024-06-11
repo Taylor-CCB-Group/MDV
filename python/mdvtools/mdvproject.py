@@ -17,6 +17,7 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union
+from typing import Optional, NewType, List, Union
 import time
 
 DataSourceName = str  # NewType("DataSourceName", str)
@@ -150,6 +151,8 @@ class MDVProject:
         self,
         interaction_ds,
         parent_ds,
+        interaction_ds,
+        parent_ds,
         pivot_column="sample_id",
         parent_column="annotation",
         is_single_region=True,
@@ -232,8 +235,7 @@ class MDVProject:
         name="Images",
         image_type="png",
     ):
-        """This function should be deprecated, it has a similar functionality as add_image_set but does not copy the images like add_image_set does
-        Adds images to a datasource.
+        """Adds images to a datasource.
         These will be copied as static assets with `convert_to_static_page()`,
         and served from their original location by `serve()`.
         Args:
