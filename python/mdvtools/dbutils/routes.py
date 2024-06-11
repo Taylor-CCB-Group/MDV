@@ -14,10 +14,9 @@ def register_routes(projects):
 def register_global_routes():
     @app.route("/")
     def index():
-        # todo: figure out what to do here / how to configure routes
-        return render_template("index.html")
-
-    @app.route("/upload", methods=["POST"])
+        return render_template('index.html')
+    
+    @app.route('/upload', methods=['POST'])
     def upload():
         try:
             project_name = request.form.get("project_name")
@@ -28,23 +27,21 @@ def register_global_routes():
             if not file:
                 return jsonify({"error": "No file selected."}), 400
 
-            file_path = os.path.join(
-                app.config["projects_base_dir"], project_name, file.filename
-            )  # type: ignore
+            file_path = os.path.join(app.config['projects_base_dir'], project_name, file.filename)  # type: ignore
 
             # Check if project exists
             project = Project.query.filter_by(name=project_name).first()
             if not project:
-                project = Project(name=project_name)
+                project = Project(name=project_name)  # type: ignore
                 db.session.add(project)
+                db.session.commit()  # Commit to get the project.id
 
-            # Check if file with same name already exists in the project
-            existing_file = File.query.filter_by(
-                name=file.filename, project_id=project.id
-            ).first()
+            # Check if file with the same name already exists in the project
+            existing_file = File.query.filter_by(name=file.filename, project_id=project.id).first()
             if existing_file:
                 # Replace the existing file in the file system
-                os.remove(file_path)
+                if os.path.exists(existing_file.file_path):
+                    os.remove(existing_file.file_path)
 
                 # Update the database entry with new file path and update timestamp
                 existing_file.file_path = file_path
@@ -65,10 +62,8 @@ def register_global_routes():
                 file.save(file_path)
 
                 # Create a new file entry
-                new_file = File(
-                    name=file.filename, file_path=file_path, project_id=project.id
-                )
-
+                new_file = File(name=file.filename, file_path=file_path, project_id=project.id)  # type: ignore
+                
                 db.session.add(new_file)
                 db.session.commit()
 
@@ -78,4 +73,4 @@ def register_global_routes():
                     }
                 ), 200
         except Exception as e:
-            return jsonify({"error in /upload api": str(e)}), 500
+            return jsonify({'error in /upload api': str(e)}), 500
