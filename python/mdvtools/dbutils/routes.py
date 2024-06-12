@@ -8,8 +8,10 @@ def register_routes(projects):
     
     @app.route('/projects')
     def get_projects():
-        return jsonify([p.name for p in projects])
-    
+        # todo formalise relation between this, db-version of backend, frontend etc.
+        # the project metadata we want to return will change...
+        return jsonify([{"id": p.id, "name": p.id} for p in projects])
+
 
 def register_global_routes():
     
