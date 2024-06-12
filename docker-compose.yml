@@ -11,7 +11,7 @@ services:
     ports:
       - "5055:5055"
     volumes:
-      - /Users/jayesh/code/MDV:/app 
+      - .:/app 
     depends_on:
       - database
 
