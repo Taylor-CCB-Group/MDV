@@ -1,38 +1,54 @@
 from flask import request, jsonify, render_template
+from mdvtools.mdvproject import MDVProject
 from mdvtools.dbutils.app import app
 from mdvtools.dbutils.dbmodels import db, Project, File
 from datetime import datetime
 import os
 
-def register_routes(projects):
-    
-    @app.route('/projects')
-    def get_projects():
-        # todo formalise relation between this, db-version of backend, frontend etc.
-        # the project metadata we want to return will change...
-        return jsonify([{"id": p.id, "name": p.id} for p in projects])
 
-
-def register_global_routes():
+def register_global_routes(project_dir):
     
     @app.route('/')
     def index():
         return render_template('index.html')
     
-    @app.route('/create_project', methods=['POST'])
+    @app.route('/projects')
+    def get_projects():
+        try:
+            # Query the database to get all projects
+            projects = Project.query.all()
+            
+            # Return the list of projects with their IDs and names
+            return jsonify([{"id": p.id, "name": p.name} for p in projects])
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    
+    @app.route("/create_project", methods=["POST"])
     def create_project():
-        return jsonify({'status': '/create_project not implemented yet...'}), 501
-        # check if user is authenticated
-        # if not, return 401
-        # if authenticated, create project
-        # id = str("".join(random.choices(string.ascii_letters, k=8))) # should be based on db
-        # dir = os.path.join(project_dir, id) # not this...
-        # ... something based on db ...
-        # project = MDVProject(dir)
-        # project.set_editable(True)
-        # projects.append(project)
-        # project.serve(app=app, open_browser=False)
-        # return jsonify({'id': project.id, 'name': project.id, 'status': 'success'})
+        try:
+            print(f"creating project")
+            
+            # Get the next ID from the database
+            next_id = db.session.query(db.func.max(Project.id)).scalar()
+            if next_id is None:
+                next_id = 1
+            else:
+                next_id += 1
+
+            p = MDVProject(os.path.join(project_dir, str(next_id)))
+            p.set_editable(True)
+            
+            p.serve(app=app, open_browser=False)
+
+            # Create a new Project record in the database with the default name
+            new_project = Project()
+            db.session.add(new_project)
+            db.session.commit()
+            
+            return jsonify({"id": p.id, "name": p.id, "status": "success"})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    
     
     @app.route('/upload', methods=['POST'])
     def upload():
