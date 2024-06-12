@@ -18,6 +18,21 @@ def register_global_routes():
     def index():
         return render_template('index.html')
     
+    @app.route('/create_project', methods=['POST'])
+    def create_project():
+        return jsonify({'status': '/create_project not implemented yet...'}), 501
+        # check if user is authenticated
+        # if not, return 401
+        # if authenticated, create project
+        # id = str("".join(random.choices(string.ascii_letters, k=8))) # should be based on db
+        # dir = os.path.join(project_dir, id) # not this...
+        # ... something based on db ...
+        # project = MDVProject(dir)
+        # project.set_editable(True)
+        # projects.append(project)
+        # project.serve(app=app, open_browser=False)
+        # return jsonify({'id': project.id, 'name': project.id, 'status': 'success'})
+    
     @app.route('/upload', methods=['POST'])
     def upload():
         try:
