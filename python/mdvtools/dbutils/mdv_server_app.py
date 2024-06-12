@@ -1,24 +1,74 @@
 import os
 import json
+#import threading
+#import random
+#import string
+#from flask import Flask, render_template, jsonify, request
 from mdvtools.server import add_safe_headers
+from mdvtools.mdvproject import MDVProject
+from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.app import app
-from mdvtools.dbutils.dbmodels import db
-from mdvtools.dbutils.routes import register_routes, register_global_routes
-from mdvtools.dbutils.project_loader import create_all_projects
+from mdvtools.dbutils.dbmodels import db, Project
+from mdvtools.dbutils.routes import register_global_routes
 
 
-def serve_projects(projects):
+
+def create_projects_from_filesystem(base_dir):
+
     try:
-        register_routes(projects)
+        # Get all project IDs from the database
+        project_ids_in_db = {project.id for project in Project.query.with_entities(Project.id).all()}
 
-        for p in projects:
-            try:
-                print(p.name, p.state)
-                p.serve(open_browser=False, app=app)
-            except Exception as e:
-                print(f"Error serving {p.name}: {e}")
+        # Get all project directories in the filesystem (assumed to be digits only)
+        project_ids_in_fs = {int(d) for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d)) and d.isdigit()}
+
+        missing_project_ids = project_ids_in_fs - project_ids_in_db
+
+        for project_id in missing_project_ids:
+            project_path = os.path.join(base_dir, str(project_id))
+            if os.path.exists(project_path):
+                try:
+                    p = MDVProject(project_path)
+                    p.set_editable(True)
+                    p.serve(app=app, open_browser=False)
+                    
+                    # Create a new Project record in the database with the default name
+                    new_project = Project()
+                    db.session.add(new_project)
+                    db.session.commit()
+                except Exception as e:
+                    print(f"In create_projects_from_filesystem: Error creating project with ID '{project_id}': {e}")
+            else:
+                print(f"In create_projects_from_filesystem:  Error- Project path '{project_path}' does not exist.")
+                
+
     except Exception as e:
-        print(f"Error registering routes: {e}")
+        print(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
+
+
+
+# running = True
+# def watch_folder(app: Flask):
+#     """watch the project folder for changes and update the projects list accordingly."""
+#     import time
+
+#     while running:
+#         time.sleep(2)
+#         existing_project_dirs = [p.dir for p in projects]
+#         new_projects = [
+#             MDVProject(os.path.join(project_dir, d))
+#             for d in os.listdir(project_dir)
+#             if os.path.isdir(os.path.join(project_dir, d))
+#             and os.path.join(project_dir, d) not in existing_project_dirs
+#         ]
+#         projects.extend(new_projects)
+#         for p in new_projects:
+#             print(f"watcher adding '{p.id}'")
+#             try:
+#                 p.serve(open_browser=False, app=app)
+#             except Exception:
+#                 print(f"error serving {p.id}...")
+#     print("watcher exiting...")
 
 
 if __name__ == "__main__":
@@ -50,13 +100,21 @@ if __name__ == "__main__":
     with app.app_context():
         try:
             db.create_all()
-            register_global_routes()
-            projects = create_all_projects(base_dir)
+            register_global_routes(base_dir)
+            ProjectBlueprint.register_app(app)
+            
+            create_projects_from_filesystem(base_dir)
 
-            serve_projects(projects)
+            
+            
         except Exception as e:
-            print(f"Error initializing app: {e}")
+            print(f'Error initializing app: {e}')
 
+    # watcher = threading.Thread(target=watch_folder, args=(app,))
+    # # print("Oh frabjous day! Callooh! Callay!")
+    # watcher.daemon = True
+    # watcher.start()
+    
     try:
         app.run(host="0.0.0.0", debug=True, port=5055)
     except Exception as e:
