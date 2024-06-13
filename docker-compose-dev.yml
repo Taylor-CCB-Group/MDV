@@ -8,6 +8,8 @@ services:
     # image: jayeshire/mdv-frontend:latest
     ports:
       - "5055:5055"
+    volumes:
+      - ./python:/app/python
     depends_on:
       - database
 

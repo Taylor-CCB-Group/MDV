@@ -26,37 +26,37 @@ from mdvtools.dbutils.dbmodels import Project
 
 #     return config_projects
 
-def create_projects_from_db(base_dir):
-    db_projects = []
+# def create_projects_from_db(base_dir):
+#     db_projects = []
 
-    try:
-        # Assuming Project.query.all() returns a list of project names
-        project_names = [project.name for project in Project.query.all()]
-        # todo: pass the project id to the MDVProject constructor so that it is used for flask routing
-        # project_tuples = [(project.id, project.name) for project in Project.query.all()]
+#     try:
+#         # Assuming Project.query.all() returns a list of project names
+#         project_names = [project.name for project in Project.query.all()]
+#         # todo: pass the project id to the MDVProject constructor so that it is used for flask routing
+#         # project_tuples = [(project.id, project.name) for project in Project.query.all()]
 
-        for project_name in project_names:
-            project_path = os.path.join(base_dir, project_name)
-            try:
-                if os.path.exists(project_path):
-                    db_projects.append(MDVProject(project_path))
-                else:
-                    print(f"Error in create_projects_from_db: Project path '{project_path}' does not exist.")
-            except Exception as e:
-                print(f"Error creating project '{project_name}': {e}")
-    except Exception as e:
-        print(f"Error retrieving projects from database: {e}")
+#         for project_name in project_names:
+#             project_path = os.path.join(base_dir, project_name)
+#             try:
+#                 if os.path.exists(project_path):
+#                     db_projects.append(MDVProject(project_path))
+#                 else:
+#                     print(f"Error in create_projects_from_db: Project path '{project_path}' does not exist.")
+#             except Exception as e:
+#                 print(f"Error creating project '{project_name}': {e}")
+#     except Exception as e:
+#         print(f"Error retrieving projects from database: {e}")
 
-    return db_projects
+#     return db_projects
 
 
-def create_all_projects(base_dir):
-    try:
-        db_projects = create_projects_from_db(base_dir)
-        #config_projects = load_projects_from_config(base_dir)
-        #return db_projects + config_projects
-        return db_projects
-    except Exception as e:
-        print(f"Error creating all projects: {e}")
-        return []
+# def create_all_projects(base_dir):
+#     try:
+#         db_projects = create_projects_from_db(base_dir)
+#         #config_projects = load_projects_from_config(base_dir)
+#         #return db_projects + config_projects
+#         return db_projects
+#     except Exception as e:
+#         print(f"Error creating all projects: {e}")
+#         return []
 
