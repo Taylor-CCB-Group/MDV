@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Function - Check if Docker is installed
+check_docker_installed() {
+  if ! command -v docker &> /dev/null; then
+    echo "Error: Docker is not installed. Please install Docker before running this script."
+    exit 1
+  fi
+}
+
 # Function to check if Docker daemon is running
 check_docker_daemon() {
   if ! docker info &> /dev/null; then
@@ -21,13 +29,10 @@ run_docker_compose() {
 }
 
 # Main execution starts here
-echo "Welcome to the MDV (Market Data Validation) application deployment script!"
+echo "Welcome to the MDV application deployment script!"
 
 # Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-  echo "Error: Docker is not installed. Please install Docker before running this script."
-  exit 1
-fi
+check_docker_installed
 
 # Check if Docker daemon is running
 check_docker_daemon
