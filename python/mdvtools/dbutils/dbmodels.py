@@ -8,6 +8,7 @@ db = SQLAlchemy(app)
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(255), nullable=False, unique=False, default='unnamed_project')
+    path = db.Column(db.String(1024), nullable=False, unique=True)
 
 class File(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

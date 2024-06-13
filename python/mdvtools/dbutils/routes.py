@@ -27,7 +27,7 @@ def register_global_routes(project_dir):
     @app.route("/create_project", methods=["POST"])
     def create_project():
         try:
-            print(f"creating project")
+            print("Creating project")
             
             # Get the next ID from the database
             next_id = db.session.query(db.func.max(Project.id)).scalar()
@@ -35,20 +35,27 @@ def register_global_routes(project_dir):
                 next_id = 1
             else:
                 next_id += 1
-
-            p = MDVProject(os.path.join(project_dir, str(next_id)))
-            p.set_editable(True)
             
-            p.serve(app=app, open_browser=False)
+            # Create the project directory path
+            project_path = os.path.join(project_dir, str(next_id))
+            
+            # Create and serve the MDVProject
+            print("Creating and serving the new project")
 
-            # Create a new Project record in the database with the default name
-            new_project = Project()
+            p = MDVProject(project_path)
+            p.set_editable(True)
+            p.serve(app=app, open_browser=False)
+            
+            # Create a new Project record in the database with the path
+            print("Added new project to the database")
+            new_project = Project(path=project_path)
             db.session.add(new_project)
             db.session.commit()
             
-            return jsonify({"id": p.id, "name": p.id, "status": "success"})
+            return jsonify({"id": new_project.id, "name": new_project.id, "status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
+
     
     
     @app.route('/upload', methods=['POST'])
