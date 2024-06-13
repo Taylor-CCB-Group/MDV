@@ -7,7 +7,7 @@ db = SQLAlchemy(app)
 
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(255), nullable=False, unique=True, default='unnamed_project')
+    name = db.Column(db.String(255), nullable=False, unique=False, default='unnamed_project')
 
 class File(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -33,25 +33,24 @@ class UserProject(db.Model):
 
 
 # Function to create default entries
-def create_default_projects():
-    default_projects = ["pbmc3k", "pbmc3k_project2"]
-    with app.app_context():
-        # Create tables if they don't exist
-        db.create_all()
+# def create_default_projects():
+#     default_projects = ['pbmc3k', 'pbmc3k_project2']
+#     with app.app_context():
+#         # Create tables if they don't exist
+#         db.create_all()
 
-        # Iterate through default projects
-        for project_name in default_projects:
-            # Check if the project already exists
-            existing_project = Project.query.filter_by(name=project_name).first()
+#         # Iterate through default projects
+#         for project_name in default_projects:
+#             # Check if the project already exists
+#             existing_project = Project.query.filter_by(name=project_name).first()
 
-            # If the project doesn't exist, add it
-            if not existing_project:
-                project = Project(name=project_name)  # type: ignore
-                db.session.add(project)
+#             # If the project doesn't exist, add it
+#             if not existing_project:
+#                 project = Project(name=project_name)  # type: ignore
+#                 db.session.add(project)
 
-        # Commit the changes
-        db.session.commit()
+#         # Commit the changes
+#         db.session.commit()
 
-
-# Call the function to create default entries when the application starts
-create_default_projects()
+# # Call the function to create default entries when the application starts
+# create_default_projects()
