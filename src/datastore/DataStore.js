@@ -448,10 +448,15 @@ class DataStore{
     * been added and is not permanently stored in the backend
     */
     addColumn(column,data=null,dirty=false){
-        let c  = {
+        const c  = {
             name:column.name,
             field:column.field,
             datatype:column.datatype,
+            getValue: i => {
+                //this could be more efficient if the logic was inverted;
+                //i.e. getRowAsObject would call this method on all columns...
+                return this.getRowAsObject(i,[column.field])[column.field];
+            }
         }
         if (!c.field){
             c.field=column.name;
@@ -721,6 +726,7 @@ class DataStore{
         }
         const obj={} // pjt consider using Map if this is a bottleneck
         for (let c of columns){
+            //todo invert this to use col.getValue(index)
             const col = this.columnIndex[c];
             let v= col.data[index];
             if (col.datatype === "text" || col.datatype === "text16") {
