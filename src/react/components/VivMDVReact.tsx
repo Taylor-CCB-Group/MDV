@@ -94,6 +94,7 @@ export type VivRoiConfig = {
     background_filter: CategoryFilter,
     roi: ROI,
     viv: VivConfig,
+    json?: string, //for extra e.g. cell segmentation data - but we might want more than just a string...
     //image_properties: ChannelsState,
 } & ScatterPlotConfig;
 
