@@ -35,7 +35,14 @@ def create_projects_from_filesystem(base_dir):
                 try:
                     project_name = os.path.basename(project_path)
 
-                    p = MDVProject(project_path)
+                    # Get the next ID from the database
+                    next_id = db.session.query(db.func.max(Project.id)).scalar()
+                    if next_id is None:
+                        next_id = 1
+                    else:
+                        next_id += 1
+
+                    p = MDVProject(dir=project_path,id= str(next_id))
                     p.set_editable(True)
                     p.serve(app=app, open_browser=False)
                     print(f"Serving project: {project_path}")
