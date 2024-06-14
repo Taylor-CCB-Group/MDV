@@ -1332,7 +1332,7 @@ def add_column_to_group(
 
     else:
         dt = numpy.int32 if col["datatype"] == "int32" else numpy.float32
-        clean = data # data.apply(pandas.to_numeric, errors="coerce") # this is slooooow?
+        clean = data.apply(pandas.to_numeric, errors="coerce") # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
