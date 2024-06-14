@@ -50,7 +50,7 @@ const useRectLayer = () => {
 const useJsonLayer = () => {
     const id = useChartID();
     const { root } = useProject();
-    const { json } = useConfig<VivRoiConfig>();
+    const { json, showJson } = useConfig<VivRoiConfig>();
     const layer_id = `json_${getVivId(id + 'detail-react')}`;
     const layer = useMemo(() => {
         return json ? new GeoJsonLayer({
@@ -68,9 +68,9 @@ const useJsonLayer = () => {
             getTextColor: [255, 255, 255, 255],
             getTextSize: 12,
             textBackground: true,
-            // visible: false,
+            visible: showJson,
         }) : null;
-    }, [json]);
+    }, [json, showJson]);
     return layer;
 }
 
