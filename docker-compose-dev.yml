@@ -9,7 +9,8 @@ services:
     ports:
       - "5055:5055"
     volumes:
-      - ./python:/app/python
+      - ./python:/app/
+      - mdv-data:/app/mdv 
     depends_on:
       - database
 
@@ -26,3 +27,4 @@ services:
 
 volumes:
   postgres-data:
+  mdv-data:
