@@ -11,8 +11,30 @@ from mdvtools.dbutils.app import app
 from mdvtools.dbutils.dbmodels import db, Project
 from mdvtools.dbutils.routes import register_global_routes
 
-def create_projects_from_filesystem(base_dir):
+
+def serve_projects_from_db():
     try:
+        # Get all projects from the database
+        print("Serving the projects present in both database and filesystem. Displaying the error if the path doesn't exist for a project")
+        projects = Project.query.all()
+
+        for project in projects:
+            if os.path.exists(project.path):
+                try:
+                    p = MDVProject(dir=project.path, id=str(project.id))
+                    p.set_editable(True)
+                    p.serve(app=app, open_browser=False)
+                    print(f"Serving project: {project.path}")
+                except Exception as e:
+                    print(f"Error serving project '{project.path}': {e}")
+            else:
+                print(f"Error: Project path '{project.path}' does not exist.")
+    except Exception as e:
+        print(f"Error serving projects from database: {e}")
+
+def serve_projects_from_filesystem(base_dir):
+    try:
+        print("Serving the projects present in filesystem but missing in database")
         print(f"Scanning base directory: {base_dir}")
 
         # Get all project paths from the database
@@ -99,8 +121,11 @@ if __name__ == '__main__':
             print("Registering the blueprint(register_app)")
             ProjectBlueprint.register_app(app)
             
+            print("Serve projects from database")
+            serve_projects_from_db()
+
             print("Start- create_projects_from_filesystem")
-            create_projects_from_filesystem(base_dir)
+            serve_projects_from_filesystem(base_dir)
 
         except Exception as e:
             print(f'Error initializing app: {e}')
