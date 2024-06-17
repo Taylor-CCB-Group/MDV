@@ -13,6 +13,7 @@ import shutil
 import random
 import string
 from os.path import join, split, exists
+from pathlib import Path
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
@@ -790,6 +791,10 @@ class MDVProject:
 
         create_app(self, **kwargs)
 
+    def delete(self):
+        # todo - remove from project routes, set a flag indicating it's been deleted
+        shutil.rmtree(self.dir)
+
     def get_configs(self):
         config = {
             "datasources": self.datasources,
@@ -1071,14 +1076,32 @@ class MDVProject:
                     "max_y": v["height"] + y,
                     "max_x": v["width"] + x,
                 },
+                # "images": v.get("images", {}),
                 "images": {},
             }
+            if "json" in v:
+                f = v["json"]
+                assert isinstance(f, str) # in future we may allow dict or list
+                if exists(f):
+                    # copy the json file to the project
+                    # f = os.path.relpath(f, os.getcwd())
+                    Path(join(self.dir, f)).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(f, join(self.dir, f))
+                    all_regions[k]["json"] = v["json"]
+                else:
+                    raise FileNotFoundError(f"json file '{f}' not found")
         # maybe warn if replacing existing regions
         # or add to existing regions
         md["regions"]["all_regions"] = all_regions
         self.set_datasource_metadata(md)
 
-    def add_region_images(self, datasource, data):
+    def add_region_images(self, datasource: DataSourceName, data):
+        """Adds images to regions in a datasource.
+        
+        Args:
+            datasource (str): The name of the datasource.
+            data (dict|str): A dictionary containing data about which images should be associated with 
+        """
         imdir = join(self.dir, "images", "regions")
         if not exists(imdir):
             os.makedirs(imdir)
@@ -1309,7 +1332,7 @@ def add_column_to_group(
 
     else:
         dt = numpy.int32 if col["datatype"] == "int32" else numpy.float32
-        clean = data.apply(pandas.to_numeric, errors="coerce")
+        clean = data.apply(pandas.to_numeric, errors="coerce") # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)

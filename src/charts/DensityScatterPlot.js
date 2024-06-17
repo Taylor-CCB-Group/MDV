@@ -355,6 +355,7 @@ BaseChart.types["image_scatter_plot"]={
         config.color_legend = { display: false };
         config.region = ec.region;
         config.roi = sr.roi;
+        config.json = sr.json;
         config.background_image = sr.images[sr.default_image];
         config.title = ec.region + (sr.default_image ? `-${sr.default_image}` : "");
     }

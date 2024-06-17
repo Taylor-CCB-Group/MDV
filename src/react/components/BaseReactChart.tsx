@@ -7,6 +7,7 @@ import { StrictMode } from "react";
 import { createEl } from "../../utilities/ElementsTyped";
 import { Chart, DataSource } from "../../charts/charts";
 import { toPng, toSvg } from "html-to-image";
+import { ProjectProvider } from "@/modules/ProjectContext";
 
 function Fallback() {
     return <>
@@ -81,9 +82,11 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         const ReactComponentFunction = this.ComponentFn;
         this.root = createMdvPortal((
             <StrictMode>
-                <ChartProvider chart={this} materialui>
-                    <ReactComponentFunction />
-                </ChartProvider>
+                <ProjectProvider>
+                    <ChartProvider chart={this} materialui>
+                        <ReactComponentFunction />
+                    </ChartProvider>                    
+                </ProjectProvider>
             </StrictMode>
         ), this.reactEl);
     }

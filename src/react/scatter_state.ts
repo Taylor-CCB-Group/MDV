@@ -130,16 +130,16 @@ export function useScatterplotLayer() {
         return chart.dataStore.columnIndex[config.tooltip.column]
     }, [config.tooltip.column]);
     const getTooltipVal = useCallback((i: number) => {
-        if (!tooltipCol) return '';
-        // careful now...
-        const valueIndex = tooltipCol.data[data[i]];
-        if (!tooltipCol.values) return valueIndex;
-        return tooltipCol.values[valueIndex];
-    }, [tooltipCol, tooltipCol?.data, tooltipCol?.values, data]);
+        // if (!tooltipCol?.data) return '#'+i;
+        return tooltipCol.getValue(data[i]);
+    }, [tooltipCol, data]);
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
-        () => {
+        ({object}) => {
             if (!config.tooltip.show) return;
+            // testing reading object properties --- pending further development
+            // (not hardcoding DN property etc)
+            // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
             const hoverInfo = hoverInfoRef.current;
             return hoverInfo && hoverInfo.index !== -1 && `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`;
         },

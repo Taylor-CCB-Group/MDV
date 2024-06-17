@@ -2,15 +2,17 @@ import { getDefaultInitialViewState, ColorPaletteExtension, DetailView, VivViewe
 import { observer } from "mobx-react-lite";
 import { useState, useLayoutEffect, useMemo, useEffect, useRef } from "react";
 import { shallow } from "zustand/shallow";
-import { useChartSize, useChartID } from "../hooks";
+import { useChartSize, useChartID, useConfig } from "../hooks";
 import { useScatterplotLayer } from "../scatter_state";
 import SelectionOverlay from "./SelectionOverlay";
 import { useLoader, OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
 import { SpatialAnnotationProvider, useRange } from "../spatial_context";
-import { PolygonLayer } from "deck.gl/typed";
+import { GeoJsonLayer, PolygonLayer } from "deck.gl/typed";
 import { getVivId } from "./avivatorish/MDVivViewer";
+import { VivRoiConfig } from "./VivMDVReact";
+import { useProject } from "@/modules/ProjectContext";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -34,17 +36,44 @@ const useRectLayer = () => {
             data,
 
             getPolygon: d => d,
-            getFillColor: [140, 140, 140],
-            getLineColor: [255, 255, 255],
+            getFillColor: [140, 140, 140, 50],
+            getLineColor: [255, 255, 255, 200],
             getLineWidth: 1,
             lineWidthMinPixels: 1,
             // fillOpacity: 0.1, //not working? why is there a prop for it if it doesn't work?
-            opacity: 0.2,
-            pickable: true
+            // opacity: 0.2,
         });
     }, [start, end]);
     return polygonLayer;
 }
+
+const useJsonLayer = () => {
+    const id = useChartID();
+    const { root } = useProject();
+    const { json, showJson } = useConfig<VivRoiConfig>();
+    const layer_id = `json_${getVivId(id + 'detail-react')}`;
+    const layer = useMemo(() => {
+        return json ? new GeoJsonLayer({
+            id: layer_id,
+            data: `${root}/${json}`,
+            opacity: 0.25,
+            filled: true,
+            getFillColor: f => [255, 255, 255, 150],
+            getLineColor: f => [f.properties.DN, 255, 255, 150],
+            getLineWidth: 2,
+            lineWidthMinPixels: 1,
+            pickable: true,
+            autoHighlight: true,
+            getText: f => f.properties.DN,
+            getTextColor: [255, 255, 255, 255],
+            getTextSize: 12,
+            textBackground: true,
+            visible: showJson,
+        }) : null;
+    }, [json, showJson]);
+    return layer;
+}
+
 
 const Main = observer(() => {
     // type of this to be sorted - before we accessed ome.data, but maybe this is the 'data'...
@@ -55,9 +84,11 @@ const Main = observer(() => {
     const id = useChartID();
     const detailId = id + 'detail-react';
 
+    //useSpatialLayers()
     const rectLayer = useRectLayer();
     const scatterProps = useScatterplotLayer();
     const {scatterplotLayer, getTooltip} = scatterProps;
+    const jsonLayer = useJsonLayer();
 
     const [colors, contrastLimits, channelsVisible, selections] = useChannelsStore(
         store => [
@@ -111,7 +142,10 @@ const Main = observer(() => {
             zIndex: '-1',
         },
         //todo multiple layers, figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
-        layers: [scatterplotLayer, rectLayer],
+        layers: [
+            jsonLayer,
+            scatterplotLayer, rectLayer, 
+        ],
         id: id + 'deck',
         onAfterRender: () => {
             scatterProps.onAfterRender();

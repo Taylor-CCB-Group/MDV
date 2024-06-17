@@ -128,6 +128,10 @@ export default defineConfig(env => { return {
                 target: flaskURL,
                 changeOrigin: true,
             },
+            '/delete_project': {
+                target: flaskURL,
+                changeOrigin: true,
+            },
         }
     },
     publicDir: 'examples', //used for netlify.toml??... the rest is noise.

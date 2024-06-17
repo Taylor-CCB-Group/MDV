@@ -94,6 +94,8 @@ export type VivRoiConfig = {
     background_filter: CategoryFilter,
     roi: ROI,
     viv: VivConfig,
+    showJson: boolean,
+    json?: string, //for extra e.g. cell segmentation data - but we might want more than just a string...
     //image_properties: ChannelsState,
 } & ScatterPlotConfig;
 
@@ -259,6 +261,14 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 current_value: c.zoom_on_filter || false,
                 func: x => {
                     c.zoom_on_filter = x;
+                }
+            },
+            {
+                type: "check",
+                label: "show json layer",
+                current_value: c.showJson || false,
+                func: x => {
+                    c.showJson = x;
                 }
             },
             {

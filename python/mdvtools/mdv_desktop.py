@@ -103,6 +103,19 @@ if __name__ == "__main__":
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
     
+    @app.route("/delete_project/<project_id>", methods=["DELETE"])
+    def delete_project(project_id: str):
+        """perhaps this should be routed by the project itself..."""
+        try:
+            # project_id = request.json["id"]
+            print(f"deleting project '{project_id}'")
+            p = next(p for p in projects if p.id == project_id)
+            p.delete()
+            projects.remove(p)
+            return jsonify({"status": "success"})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    
     watcher = threading.Thread(target=watch_folder, args=(app,))
     # print("Oh frabjous day! Callooh! Callay!")
     watcher.daemon = True

@@ -1,8 +1,14 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { PropsWithChildren, createContext, useContext, useState } from 'react';
 
-const ProjectContext = createContext(null);
+type ProjectInfo = {
+    root: string;
+    isPopout: boolean;
+    staticFolder: boolean;
+}
 
-export const ProjectProvider = ({ children }) => {
+const ProjectContext = createContext<ProjectInfo>(null);
+
+export const ProjectProvider = ({ children }: PropsWithChildren) => {
     // Derive initial state from window.location and URL parameters
     const { origin, pathname } = window.location;
     const flaskURL = origin + pathname;
@@ -10,7 +16,7 @@ export const ProjectProvider = ({ children }) => {
     const isPopout = urlParams.get('popout') === "true";
     const dir = urlParams.get('dir') || (isPopout ? '' : flaskURL);
 
-    const getRoot = (dir) => {
+    const getRoot = (dir: string) => {
         return dir.endsWith("/") ? dir.substring(0, dir.length - 1) : dir;
     };
     const root = getRoot(dir);
@@ -27,7 +33,7 @@ export const ProjectProvider = ({ children }) => {
     });
 
     return (
-        <ProjectContext.Provider value={{ ...projectConfig, setProjectConfig }}>
+        <ProjectContext.Provider value={{ ...projectConfig }}>
             {children}
         </ProjectContext.Provider>
     );
