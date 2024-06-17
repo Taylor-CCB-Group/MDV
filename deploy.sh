@@ -44,3 +44,7 @@ PROD_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/jh-dev/
 run_docker_compose $PROD_COMPOSE_URL
 
 echo "MDV application deployment completed successfully!"
+
+echo
+echo "******  Open your web browser and go to https://localhost:5055 to access the MDV application  ******"
+echo
