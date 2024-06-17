@@ -14,7 +14,7 @@ RUN npm install
 RUN npm run build-flask-vite
 
 # bootstrap project folder - this won't be necessary in future
-RUN mkdir -p /app/mdv/pbmc3k /app/mdv/pbmc3k_project2
+#RUN mkdir -p /app/mdv/pbmc3k /app/mdv/pbmc3k_project2
 
 # Install HDF5 library, for some reason poetry can't install it in this context as of now
 # see https://github.com/h5py/h5py/issues/2146 for similar-ish issue

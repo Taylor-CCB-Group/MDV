@@ -10,6 +10,7 @@ services:
       - "5055:5055"
     volumes:
       - ./python:/app/python
+      - ./mdv:/app/mdv
       - mdv-data:/app/mdv 
     depends_on:
       - database
