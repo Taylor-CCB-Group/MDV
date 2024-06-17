@@ -19,6 +19,11 @@ def serve_projects_from_db():
         projects = Project.query.all()
 
         for project in projects:
+            
+            if project.is_deleted:
+                print(f"Project with ID {project.id} is soft deleted.")
+                continue
+
             if os.path.exists(project.path):
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id))
@@ -29,6 +34,7 @@ def serve_projects_from_db():
                     print(f"Error serving project '{project.path}': {e}")
             else:
                 print(f"Error: Project path '{project.path}' does not exist.")
+                
     except Exception as e:
         print(f"Error serving projects from database: {e}")
 
