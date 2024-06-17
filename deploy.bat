@@ -20,7 +20,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-
 REM Function to download and run docker-compose
 :run_docker_compose
 echo Setting PROD_COMPOSE_URL environment variable...
@@ -40,4 +39,9 @@ if errorlevel 1 (
 )
 
 echo MDV application deployment completed successfully!
+
+echo.
+echo ******  Open your web browser and go to https://localhost:5055 to access the MDV application  ******
+echo.
+
 exit /b 0
