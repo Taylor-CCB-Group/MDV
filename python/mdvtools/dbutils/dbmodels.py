@@ -9,6 +9,16 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(255), nullable=False, unique=False, default='unnamed_project')
     path = db.Column(db.String(1024), nullable=False, unique=True)
+    created_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
+    deleted_timestamp = db.Column(db.DateTime, nullable=True, default=None)
+    update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    accessed_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    
+    def soft_delete(self):
+        self.deleted = True
+        self.deleted_timestamp = datetime.now()
+        db.session.commit()
 
 class File(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

@@ -2,6 +2,7 @@ from flask import request, jsonify, render_template
 from mdvtools.mdvproject import MDVProject
 from mdvtools.dbutils.app import app
 from mdvtools.dbutils.dbmodels import db, Project, File
+from mdvtools.project_router import ProjectBlueprint
 from datetime import datetime
 import os
 
@@ -54,6 +55,35 @@ def register_global_routes(project_dir):
             return jsonify({"id": new_project.id, "name": new_project.id, "status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
+        
+    
+    @app.route("/delete_project/<project_id>", methods=["DELETE"])
+    def delete_project(project_id: int):
+        """Soft delete a project by setting the deleted flag."""
+        try:
+            print(f"Deleting project '{project_id}'")
+            
+            # Check if the project exists in the ProjectBlueprint.blueprints dictionary
+            if project_id not in ProjectBlueprint.blueprints:
+                return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in ProjectBlueprint.blueprints"}), 404
+            else:
+                # Find the project by ID and mark it as deleted
+                project = Project.query.filter_by(id=project_id).first()
+                if project is None:
+                    return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
+                
+                # Remove the project from the ProjectBlueprint.blueprints dictionary
+                del ProjectBlueprint.blueprints[project_id]
+                print(f"Removed project '{project_id}' from ProjectBlueprint.blueprints")
+                
+                
+                # Soft delete the project
+                project.soft_delete()
+                
+                return jsonify({"status": "success"})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+
 
     
     
