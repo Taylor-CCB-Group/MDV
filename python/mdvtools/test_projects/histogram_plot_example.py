@@ -8,7 +8,7 @@ def create_histogram_plot(title, param, bin_number, display_min, display_max, si
     """Create and configure a HistogramPlot instance with the given parameters."""
     plot = HistogramPlot(
         title=title,
-        param=param,
+        param=param, # When the variable is named as "param", it can only take one data field. If it was "params" it would take more than one.
         bin_number=bin_number,
         display_min=display_min,
         display_max=display_max,
@@ -47,7 +47,7 @@ def main():
     
     # HistogramPlot parameters
     title = "Number of cells"
-    param = "n_cells"
+    param = "n_cells" # When the variable is named as "param", it can only take one data field. If it was "params" it would take more than one.
     bin_number = 50
     display_min = 0
     display_max = 3000.035
