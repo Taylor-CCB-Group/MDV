@@ -1,5 +1,7 @@
 @echo off
 
+echo Welcome to the MDV application deployment script!
+
 REM Function to check if Docker is installed
 :check_docker_installed
 echo Checking if Docker is installed...
@@ -36,17 +38,6 @@ if errorlevel 1 (
     echo Error: Failed to run docker-compose. Check the configuration and try again.
     exit /b 1
 )
-
-echo Welcome to the MDV application deployment script!
-
-REM Call function to check if Docker is installed
-@REM call :check_docker_installed
-
-REM Call function to check Docker daemon
-@REM call :check_docker_daemon
-
-REM Call function to download and run docker-compose
-@REM call :run_docker_compose
 
 echo MDV application deployment completed successfully!
 exit /b 0
