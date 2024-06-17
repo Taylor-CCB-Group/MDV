@@ -1,0 +1,321 @@
+{
+  "default": {
+    "initialCharts": {
+      "cells": [
+        {
+          "axis": {
+            "x": {
+              "label": "",
+              "textSize": 13,
+              "tickfont": 10,
+              "size": 25
+            }
+          },
+          "id": "CmTARR",
+          "param": "leiden",
+          "position": [
+            380,
+            270
+          ],
+          "size": [
+            260,
+            260
+          ],
+          "title": "leiden",
+          "type": "row_chart"
+        },
+        {
+          "axis": {
+            "ry": {
+              "label": "",
+              "textSize": 13,
+              "tickfont": 10,
+              "size": 25
+            },
+            "x": {
+              "label": "",
+              "textSize": 13,
+              "tickfont": 10,
+              "size": 25
+            },
+            "y": {
+              "label": "",
+              "textSize": 13,
+              "tickfont": 10,
+              "size": 40
+            }
+          },
+          "color_legend": {
+            "display": true,
+            "pos": [
+              40,
+              10
+            ]
+          },
+          "color_scale": {
+            "log": false
+          },
+          "fraction_legend": {
+            "display": true,
+            "pos": [
+              0,
+              0
+            ]
+          },
+          "id": "qRpMlx",
+          "param": [
+            "leiden",
+            "ARVCF",
+            "DOK3",
+            "FAM210B",
+            "GBGT1",
+            "NFE2L2",
+            "UBE2D4",
+            "YPEL2"
+          ],
+          "position": [
+            10,
+            10
+          ],
+          "size": [
+            400,
+            250
+          ],
+          "title": "leiden",
+          "type": "dot_plot"
+        },
+        {
+          "bin_number": 17,
+          "display_max": 2500,
+          "display_min": 0,
+          "id": "CcgngW",
+          "param": "n_genes_by_counts",
+          "position": [
+            10,
+            280
+          ],
+          "size": [
+            360,
+            250
+          ],
+          "title": "n_genes_by_counts",
+          "type": "bar_chart",
+          "x_axis": {
+            "label": "n_genes_by_counts",
+            "size": 30,
+            "textSize": 13,
+            "tickfont": 10
+          },
+          "y_axis": {
+            "label": "frequency",
+            "rotate_labels": false,
+            "size": 45,
+            "textSize": 13,
+            "tickfont": 10
+          },
+          "axis": {
+            "x": {
+              "size": 30,
+              "label": "n_genes_by_counts",
+              "textsize": 13,
+              "textSize": 13,
+              "tickfont": 10
+            },
+            "y": {
+              "size": 45,
+              "label": "frequency",
+              "textsize": 13,
+              "textSize": 13,
+              "tickfont": 10
+            }
+          }
+        },
+        {
+          "axis_scales": [
+            220,
+            220,
+            220
+          ],
+          "brush": "default",
+          "camera": {
+            "distance": 37543.999999999956,
+            "theta": -1.038,
+            "phi": 0.261
+          },
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "color_by": "leiden",
+          "default_color": "#377eb8",
+          "id": "ADWdNI",
+          "on_filter": "hide",
+          "opacity": 0.8,
+          "param": [
+            "X_pca_1",
+            "X_pca_2",
+            "X_pca_3"
+          ],
+          "position": [
+            420,
+            10
+          ],
+          "radius": 5,
+          "size": [
+            250,
+            250
+          ],
+          "title": "X_pca_1 x X_pca_2 x X_pca_3",
+          "type": "wgl_3d_scatter_plot",
+          "axis": {},
+          "tooltip": {
+            "show": false
+          },
+          "color_legend": {
+            "display": true,
+            "pos": [
+              10,
+              10
+            ]
+          }
+        }
+      ],
+      "genes": [
+        {
+          "id": "kDJSRJ",
+          "include_index": false,
+          "param": [
+            "gene_ids",
+            "mt",
+            "n_cells_by_counts",
+            "mean_counts",
+            "pct_dropout_by_counts",
+            "total_counts",
+            "n_cells",
+            "highly_variable",
+            "means",
+            "dispersions",
+            "dispersions_norm",
+            "mean",
+            "std",
+            "PCs_1",
+            "PCs_2"
+          ],
+          "position": [
+            10,
+            10
+          ],
+          "size": [
+            250,
+            500
+          ],
+          "title": "Data table",
+          "type": "table_chart",
+          "column_widths": {}
+        },
+        {
+          "axis": {
+            "x": {
+              "label": "PCs_1",
+              "textSize": 13,
+              "tickfont": 10,
+              "size": 25
+            },
+            "y": {
+              "label": "PCs_2",
+              "textSize": 13,
+              "tickfont": 10,
+              "size": 40
+            }
+          },
+          "brush": "poly",
+          "color_by": "dispersions",
+          "color_legend": {
+            "display": true,
+            "pos": [
+              20,
+              1
+            ]
+          },
+          "default_color": "#377eb8",
+          "id": "QnxtHw",
+          "opacity": 0.8,
+          "param": [
+            "PCs_1",
+            "PCs_2"
+          ],
+          "position": [
+            270,
+            10
+          ],
+          "radius": 2,
+          "size": [
+            250,
+            250
+          ],
+          "title": "PCs_1 x PCs_2",
+          "type": "wgl_scatter_plot",
+          "tooltip": {
+            "show": false
+          },
+          "on_filter": "hide"
+        },
+        {
+          "bin_number": 17,
+          "display_max": 2500,
+          "display_min": 0,
+          "id": "xearRt",
+          "param": "n_cells",
+          "position": [
+            270,
+            280
+          ],
+          "size": [
+            240,
+            240
+          ],
+          "title": "n_cells",
+          "type": "bar_chart",
+          "x_axis": {
+            "label": "n_cells",
+            "size": 30,
+            "textSize": 13,
+            "tickfont": 10
+          },
+          "y_axis": {
+            "label": "frequency",
+            "rotate_labels": false,
+            "size": 45,
+            "textSize": 13,
+            "tickfont": 10
+          },
+          "axis": {
+            "x": {
+              "size": 30,
+              "label": "n_cells",
+              "textsize": 13,
+              "textSize": 13,
+              "tickfont": 10
+            },
+            "y": {
+              "size": 45,
+              "label": "frequency",
+              "textsize": 13,
+              "textSize": 13,
+              "tickfont": 10
+            }
+          }
+        }
+      ]
+    },
+    "dataSources": {
+      "cells": {
+        "panelWidth": 50
+      },
+      "genes": {
+        "panelWidth": 50
+      }
+    }
+  }
+}
