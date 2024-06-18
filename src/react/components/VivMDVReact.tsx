@@ -213,6 +213,10 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 current_value: tooltip.show,
                 func: (x: boolean) => {
                     tooltip.show = x;
+                    if (!tooltip.column) {
+                        console.warn("No tooltip column set, using first column... but we need to make sure it actually loads.");
+                        tooltip.column = cols[0].field;
+                    }
                 }
             },
             {
