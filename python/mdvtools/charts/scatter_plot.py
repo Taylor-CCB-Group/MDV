@@ -3,8 +3,8 @@
 from mdvtools.charts.base_plot import BasePlot
 
 class ScatterPlot(BasePlot):
-    def __init__(self, title, params, size, position, id=None):
-        super().__init__(title, "wgl_scatter_plot", params, size, position, id)
+    def __init__(self, title, params, size, position, id=None, **kwargs):
+        super().__init__(title, "wgl_scatter_plot", params, size, position, id, kwargs=kwargs)
 
     def set_default_color(self, color):
         self.plot_data["default_color"] = color
