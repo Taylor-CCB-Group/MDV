@@ -1,5 +1,6 @@
 /**
 * A popout window
+@deprecated
 */
 class PopOutWindow {
     /**

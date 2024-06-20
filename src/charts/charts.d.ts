@@ -126,6 +126,7 @@ export interface Chart {
     removeLayout?:()=> void;
     config:any;
     dataStore: DataStore;
+    popoutIcon: HTMLElement;
 };    
 
 export type ChartState = {
