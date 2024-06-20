@@ -129,7 +129,7 @@ class BaseChart{
             //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
             if (document.fullscreenElement) {
                 if (this.contentDiv !== document.fullscreenElement) console.error('unexpected fullscreen element');
-                const rect = this.contentDiv.getBoundingClientRect();
+                const rect = window.screen;
                 this.setSize(rect.width, rect.height);
                 for (const d of this.dialogs) {
                     d.setParent(this.contentDiv);
