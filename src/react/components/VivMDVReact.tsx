@@ -60,6 +60,7 @@ type CategoryFilter = {
 //viewState should be persisted... maybe a way of saving different snapshots?
 //could we infer or something to avoid having to repeat this?
 export type ScatterPlotConfig = {
+    course_radius: number,
     radius: number,
     opacity: number,
     color_by: ColumnName,
@@ -72,6 +73,7 @@ export type ScatterPlotConfig = {
     point_shape: "circle" | "square" | "gaussian"
 } & TooltipConfig;
 const scatterDefaults: ScatterPlotConfig = {
+    course_radius: 1,
     radius: 10,
     opacity: 1,
     color_by: null,
@@ -238,11 +240,20 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 }
             },
             {
+                type: "radiobuttons",
+                label: "course radius",
+                current_value: c.course_radius || 1,
+                choices: [[0.1, 0.1], [1, 1], [10, 10], [100, 100]],
+                func: x => {
+                    c.course_radius = x;
+                }
+            },
+            {
                 type: "slider",
                 label: "radius",
-                current_value: c.radius || 10,
+                current_value: c.radius || 5,
                 min: 0,
-                max: 500,
+                max: 20,
                 continuous: true,
                 func: x => {
                     c.radius = x;

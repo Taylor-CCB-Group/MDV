@@ -114,7 +114,8 @@ export function useScatterplotLayer() {
     const colorBy = (chart as any).colorBy;
     const config = useConfig<ScatterPlotConfig>();
 
-    const { opacity, radius } = config;
+    const { opacity, radius, course_radius } = config;
+    const radiusScale = radius * course_radius;
 
     const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
@@ -122,8 +123,8 @@ export function useScatterplotLayer() {
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback((i: number) => {
-        return i === highlightedIndex ? 0.2*radius/scale : 0.0;
-    }, [radius, highlightedIndex, data]);
+        return i === highlightedIndex ? 0.2*radiusScale/scale : 0.0;
+    }, [radiusScale, highlightedIndex, data]);
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
@@ -234,7 +235,7 @@ export function useScatterplotLayer() {
         id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
         data,
         opacity,
-        radiusScale: radius,
+        radiusScale,
         getFillColor: colorBy ?? [255, 255, 255],
         getRadius: 1/scale,
         getPosition: (i, { target }) => {
@@ -280,7 +281,7 @@ export function useScatterplotLayer() {
             // },
         },
         extensions
-    })}, [id, data, opacity, radius, colorBy, cx, cy, highlightedIndex, scale, modelMatrix, extensions]);
+    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, highlightedIndex, scale, modelMatrix, extensions]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
         if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
         if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;
