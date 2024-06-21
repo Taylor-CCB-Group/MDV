@@ -24,15 +24,15 @@ class SettingsDialogReactWrapper extends BaseDialog {
         // it isn't only used by 'charts', but e.g. tracks.
         const name = chart.config.title || chart.config.type + ' ' + chart.config.id;
         const config = { //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
-            width: 500, title: `Settings (${name})`, doc: document,
+            width: 500, title: `Settings (${name})`, doc: chart.__doc__ || document,
             onclose: () => { chart.dialogs.splice(chart.dialogs.indexOf(this), 1) }
         };
         super(config, chart);
     }
-    init(parent: Chart) {
+    init(chart: Chart) {
         const div = createEl('div', {}, this.dialog);
         this.root = createMdvPortal((
-            <SettingsDialog chart={parent} />
+            <SettingsDialog chart={chart} />
         ), div);
     }
     close() {
