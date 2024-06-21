@@ -609,7 +609,10 @@ class BaseChart{
                 title:"Settings",
                 position:[e.pageX,e.pageY],
                 useMobx: this.useMobx,
-                onclose:()=>this.settingsDialog=null
+                onclose:() => {
+                    this.settingsDialog = null;
+                    this.dialogs.splice(this.dialogs.indexOf(this.settingsDialog), 1);
+                }
             },this.getSettings());
             this.dialogs.push(this.settingsDialog);
         }

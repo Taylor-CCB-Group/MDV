@@ -7,6 +7,11 @@ import { action } from "mobx";
 
 class SettingsDialog extends BaseDialog{
     constructor(config,content){
+        const originalOnClose = config.onclose;
+        config.onclose = () => {
+            if (originalOnClose) originalOnClose();
+            if (config.chart) config.chart.dialogs.splice(config.chart.dialogs.indexOf(this), 1);
+        };
         super(config,content);
     }
     

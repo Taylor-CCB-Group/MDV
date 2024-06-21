@@ -22,7 +22,10 @@ class ColorDialogReactWrapper extends BaseDialog {
     constructor(parent: VivMDVReact) {
         const config = {
             width: 500, title: `Color Channels (${parent.config.title})`, doc: parent.__doc__ || document,
-            onclose: () => { (parent as any).colorDialog = null} //todo fix types
+            onclose: () => { 
+                parent.colorDialog = null;
+                parent.dialogs.splice(parent.dialogs.indexOf(this), 1);
+            }
         };
         super(config, parent)
     }
