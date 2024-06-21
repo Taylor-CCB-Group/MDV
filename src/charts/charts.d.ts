@@ -4,7 +4,7 @@
 //   partly just using them as a form of documentation / notes-to-self.
 
 import DataStore from "../datastore/DataStore";
-
+import type BaseChart from "./BaseChart";
 export type DataType = 'integer' | 'double' | 'text' | 'unique' | 'multitext' | 'int32';
 
 type DataStructureTypes = {
@@ -116,7 +116,7 @@ interface DataStore {
 }
 
 
-export interface Chart {
+export type Chart = {
     getDiv: () => HTMLElement;
     remove: () => void;
     addMenuIcon: (classes: string, info: string) => HTMLElement;
@@ -127,7 +127,7 @@ export interface Chart {
     config:any;
     dataStore: DataStore;
     popoutIcon: HTMLElement;
-};    
+} & BaseChart;
 
 export type ChartState = {
     chart: Chart;

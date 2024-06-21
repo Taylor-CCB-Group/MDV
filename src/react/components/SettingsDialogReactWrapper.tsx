@@ -3,9 +3,9 @@ import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./SettingsDialogComponent";
-import BaseChart from "../../charts/BaseChart";
+import { Chart } from "@/charts/charts";
 
-const SettingsDialog = observer(({chart}: {chart: BaseChart}) => {
+const SettingsDialog = observer(({chart}: {chart: Chart}) => {
     // const config = chart.getConfig(); //instrument with mobx etc
     return (<Gui chart={chart} />)
 });
@@ -19,7 +19,7 @@ class SettingsDialogReactWrapper extends BaseDialog {
     set root(v) {
         this._root = v;
     }
-    constructor(chart: BaseChart) {
+    constructor(chart: Chart) {
         // if this is intended to be a drop-in replacement for existing SettingsDialog,
         // it isn't only used by 'charts', but e.g. tracks.
         const name = chart.config.title || chart.config.type + ' ' + chart.config.id;
@@ -29,7 +29,7 @@ class SettingsDialogReactWrapper extends BaseDialog {
         };
         super(config, chart);
     }
-    init(parent: BaseChart) {
+    init(parent: Chart) {
         const div = createEl('div', {}, this.dialog);
         this.root = createMdvPortal((
             <SettingsDialog chart={parent} />
