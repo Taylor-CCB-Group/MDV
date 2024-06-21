@@ -2,6 +2,8 @@ import { Chart } from "@/charts/charts";
 import { removeDraggable, removeResizable } from "./Elements";
 
 export default function popoutChart(chart: Chart) {
+    const { chartManager } = window.mdv;
+    const mainWindow = window;
     const div = chart.getDiv();
     const originalParent = div.parentElement;
     if (div.gridstackPopoutCallback) div.gridstackPopoutCallback();
@@ -32,12 +34,17 @@ export default function popoutChart(chart: Chart) {
     }); 
     resizeObserver.observe(popoutWindow.document.documentElement);
 
+    // I don't think we use this win property much, but it's here for consistency
+    // with previous implementation & comments
+    chartManager.charts[chart.config.id].win = popoutWindow;
     popoutWindow.addEventListener('beforeunload', () => {
         popStyles();
         originalParent.appendChild(div);
-        window.mdv.chartManager!._makeChartRD(chart);
+        chartManager._makeChartRD(chart);
+        chartManager.charts[chart.config.id].win = mainWindow;
         chart.changeBaseDocument(document);
     });
+    return popoutWindow;
 }
 
 /** apply the styles for popped-out version of chart & return a function that will restore them later */

@@ -72,7 +72,7 @@ class MDVProject:
                 o.close()
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
-                o.write(json.dumps({"all_views": [], "popouturl": "popout.html"}))
+                o.write(json.dumps({"all_views": []}))
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
 
     @property
@@ -823,8 +823,6 @@ class MDVProject:
         page = "page.html"
         template = join(tdir, page)
         page = open(template).read()
-        # dummy popout page
-        copyfile(join(tdir, "popout.html"), join(outdir, "popout.html"))
         # make sure the static files are referenced correctly
         page = page.replace("/static", "static")
         # call init with no route, will be interpreted as static page (at /)

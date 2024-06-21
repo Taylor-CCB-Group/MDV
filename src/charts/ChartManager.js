@@ -1,6 +1,5 @@
 import { createEl, makeDraggable, makeResizable,MDVProgress,removeDraggable,removeResizable,createMenuIcon,splitPane, createFilterElement} from "../utilities/Elements";
 import  BaseChart from "./BaseChart.js";
-import { PopOutWindow } from "../utilities/PopOutWindow";
 import  DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";
@@ -320,7 +319,7 @@ class ChartManager{
 
         //each entry in charts will contain
         //  chart - the actual chart
-        //  win - the popout wimdow it is in (or null)
+        //  win - the popout window it is in (or null)
         //  dataSource - the data source associated with it 
         this.charts={};
 

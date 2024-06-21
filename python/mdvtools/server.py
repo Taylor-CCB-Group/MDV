@@ -144,11 +144,6 @@ def create_app(
             return "File not found", 404
         return send_file(path)
 
-    # empty page to put popout content
-    @project_bp.route("/popout.html")
-    def popout():
-        return "<!DOCTYPE html><html><head></head><body></body></html>"
-
     # gets the raw byte data and packages it in the correct response
     @project_bp.route("/get_data", methods=["POST"])
     def get_data():
