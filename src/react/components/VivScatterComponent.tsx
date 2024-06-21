@@ -126,8 +126,7 @@ const Main = observer(() => {
             vsRef.current = scatterProps.viewState;
         }
     }, [scatterProps.viewState])
-    // TODO get viv working in popouts (not a react thing - happens elsewhere
-    // - probably need to handle lost gl context)
+    // TODO get viv working in popouts (seems to be some spurious feature-detection, should be fixed with new version of viv)
     const layerConfigX = {
         loader: ome,
         selections,

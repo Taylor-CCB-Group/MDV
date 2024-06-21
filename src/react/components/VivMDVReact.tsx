@@ -110,7 +110,7 @@ export type VivMdvReactConfig = ScatterPlotConfig & (
 ) & { channel: number };
 export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
-    colorDialog: any;
+    colorDialog: ColorChannelDialogReactWrapper;
 
     vivStores?: VivContextType;
     get viewerStore() {
@@ -301,12 +301,15 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             const channels = channelsStore.getState();
             const viewer = viewerStore.getState();
             const imageSettings = imageSettingsStore.getState();
+            // omit some things like width, height...
+            // for 3D we'd want rotation etc, but if we keep entire viewState it causes problems (stuck zoom)
+            const viewState = {target: viewer.viewState.target, zoom: viewer.viewState.zoom};
             const viv = {
                 viewerStore: {
                     // could be that we want this to be where `'source'` comes from...
                     // we could be interested in use3d, useLens, useLinkedView... those would come from imageSettingsStore
                     // we might want an expanded version of 'pixelValues'...
-                    viewState: viewer.viewState,
+                    viewState, 
                 },
                 // we could call this `image_properties` and make it compatible with the 'legacy format' from VivScatterPlot
                 // or we could parse it into a nicer viv.channels[] array-of-objects format, and parse back when we load.
