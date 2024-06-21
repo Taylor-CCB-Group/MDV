@@ -10,9 +10,9 @@ class SettingsDialog extends BaseDialog{
         super(config,content);
     }
     
-    init(content, parent){
+    init(content){
         if (!this.controls) this.controls=[];
-        if (!parent) parent = this.dialog;
+        const parent = this.dialog;
         //experimental lil-gui version...
         // this.initLilGui(content);
         // return;
