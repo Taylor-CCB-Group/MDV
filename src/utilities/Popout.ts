@@ -9,7 +9,8 @@ export default function popoutChart(chart: Chart) {
     if (div.gridstackPopoutCallback) div.gridstackPopoutCallback();
     removeResizable(div);
     removeDraggable(div);
-    const popoutWindow = window.open('', chart.config.id, 'width=800,height=600');
+    const popoutWindow = window.open('', chart.config.title, 'width=800,height=600');
+    popoutWindow.document.body.style.overflow = 'hidden';
     Array.from(document.styleSheets).forEach(styleSheet => {
         if (styleSheet.href) {
             const newLink = popoutWindow.document.createElement('link');
