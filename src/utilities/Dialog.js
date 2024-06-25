@@ -1,4 +1,4 @@
-import {createEl,makeResizable,makeDraggable} from "./Elements.js";
+import {createEl,makeResizable,makeDraggable, removeResizable, removeDraggable} from "./Elements.js";
 
 class BaseDialog{
   /**
@@ -59,6 +59,8 @@ constructor (config={},content) {
       classes:["ciview-dlg-content"]
     },this.outer);
 
+    //... needs fixing in popout / when doc changes
+    //(if this was more react-y it should just work)
     makeResizable(this.outer,{
       doc:config.doc,
       onresizeend:(x,y)=>{
@@ -126,10 +128,31 @@ constructor (config={},content) {
 
   }
   setParent(parent) {
+    // need to makeResizable and makeDraggable work with this
+    removeResizable(this.outer);
+    removeDraggable(this.outer);
     if (parent) {
       parent.append(this.outer);
+      makeResizable(this.outer, {
+        doc: parent.ownerDocument,
+        onresizeend:(x,y) => {
+        this.onResize(x,y)
+      }});
+      makeDraggable(this.outer, {
+        doc: parent.ownerDocument,
+        handle:".ciview-dlg-header"    
+      });
     } else {
       this.config.doc.body.append(this.outer);
+      makeResizable(this.outer, {
+        doc: this.config.doc,
+        onresizeend:(x,y) => {
+        this.onResize(x,y)
+      }});
+      makeDraggable(this.outer, {
+        doc: this.config.doc,
+        handle:".ciview-dlg-header"    
+      });
     }
   }
 

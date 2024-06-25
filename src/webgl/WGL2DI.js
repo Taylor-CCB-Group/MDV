@@ -1276,8 +1276,8 @@ class WGL2DI{
 		})
 
 		const mouseup = (evt) => {
-			window.removeEventListener("mousemove",mousemoveDragging);
-			window.removeEventListener("mouseup",mouseup);
+			this.__doc__.removeEventListener("mousemove",mousemoveDragging);
+			this.__doc__.removeEventListener("mouseup",mouseup);
 
             this._finish(evt);
             if (!this.dragging && !(this.brush || this.poly_brush) && evt.button===0){
@@ -1426,9 +1426,9 @@ class WGL2DI{
 			}, 350);
 
 		});
-		this.div_container.addEventListener("mousedown",function (evt){
-			window.addEventListener("mousemove",mousemoveDragging);
-			window.addEventListener("mouseup",mouseup);
+		this.div_container.addEventListener("mousedown", (evt) => {
+			this.__doc__.addEventListener("mousemove",mousemoveDragging);
+			this.__doc__.addEventListener("mouseup",mouseup);
 
 			if (evt.which===3){
 				//add right click behaviour

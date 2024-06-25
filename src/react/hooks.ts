@@ -54,6 +54,13 @@ export function useChartID(): string {
     return chart.config.id;
 }
 
+/** Get the document the chart is currently assigned to, which changes when popped-out.
+ * Used for mouse events etc that were previously on `window` to allow dragging out of the chart itself.
+ */
+export function useChartDoc() {
+    const chart = useChart();
+    return chart.__doc__;
+}
 
 export function useParamColumns(): DataColumn<any>[] {
     const chart = useChart();

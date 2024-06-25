@@ -22,7 +22,6 @@ class BaseChart{
         }
         //**********
 
-
         //copy the config
         this.config=JSON.parse(JSON.stringify(config))
         //give it a random id if one isn't supplied
@@ -129,7 +128,7 @@ class BaseChart{
             //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
             if (document.fullscreenElement) {
                 if (this.contentDiv !== document.fullscreenElement) console.error('unexpected fullscreen element');
-                const rect = this.contentDiv.getBoundingClientRect();
+                const rect = window.screen;
                 this.setSize(rect.width, rect.height);
                 for (const d of this.dialogs) {
                     d.setParent(this.contentDiv);
@@ -609,7 +608,10 @@ class BaseChart{
                 title:"Settings",
                 position:[e.pageX,e.pageY],
                 useMobx: this.useMobx,
-                onclose:()=>this.settingsDialog=null
+                onclose:() => {
+                    this.settingsDialog = null;
+                    this.dialogs.splice(this.dialogs.indexOf(this.settingsDialog), 1);
+                }
             },this.getSettings());
             this.dialogs.push(this.settingsDialog);
         }
@@ -683,10 +685,16 @@ class BaseChart{
     * @param {document} doc - the document that the chart will use 
     */
     changeBaseDocument(doc){
+        //this needs to be reviewed for popout windows
+        // - mouse events need to be on the right window ✅
+        // - dialogs need to be on the right window ✅ / transferred
         this.contextMenu.__doc__=doc;
         this.__doc__=doc;
         for (const d of this.dialogs){
-            d.close();
+            // d.close();
+            // how about changing the parent of the dialog?
+            // like we do with fullscreen (make sure drag works after this)
+            d.setParent(doc.body);
         }
         if (this.legend){
             this.legend.__doc__=doc;

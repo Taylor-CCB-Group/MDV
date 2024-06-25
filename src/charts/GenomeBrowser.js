@@ -462,7 +462,7 @@ class GenomeBrowser extends BaseChart{
     changeBaseDocument(doc){
         this.browser.closeAllDialogs();
         super.changeBaseDocument(doc);
-        this.browser.__doc__=doc;   
+        this.browser.changeBaseDocument(doc);
     }
 
 

@@ -20,8 +20,9 @@ class DebugChartReactWrapper extends BaseDialog {
     }
     constructor(json: any, chart?: BaseChart) {
         const name = chart ? (chart.config.title || chart.config.type + ' ' + chart.config.id) : '';
+        const doc = chart ? chart.__doc__ : document;
         const config = { //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
-            width: 500, title: `Debug ${name}`, doc: document,
+            width: 500, title: `Debug ${name}`, doc,
             onclose: () => { chart?.dialogs.splice(chart.dialogs.indexOf(this), 1) }
         };
         super(config, json);

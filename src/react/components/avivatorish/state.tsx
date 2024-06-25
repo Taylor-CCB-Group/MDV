@@ -98,7 +98,7 @@ const DEFAULT_VIEWER_STATE = {
   isVolumeRenderingWarningOn: false,
   useLinkedView: false,
   isControllerOn: true,
-  use3d: false,
+  use3d: false, //not used at the moment, but should be
   useLens: false,
   useColormap: false,
   globalSelection: { z: 0, t: 0 },
@@ -109,21 +109,22 @@ const DEFAULT_VIEWER_STATE = {
   pyramidResolution: 0
 };
 
-// --- following how VivViewerMDV _parseChannels() works ---
-export type MdvVivChannelConfig = {
-  name: string,
-  selections?: { c: number, z: number, t: number }[],
-  color?: `#${string}` | [r: number, g: number, b: number],
-  visible?: boolean,
-  contrastLimits?: [min: number, max: number],
-  domains?: [min: number, max: number],
-}
+// --- following how VivViewerMDV _parseChannels() works: (not used) ---
+// export type MdvVivChannelConfig = {
+//   name: string,
+//   selections?: { c: number, z: number, t: number }[],
+//   color?: `#${string}` | [r: number, g: number, b: number],
+//   visible?: boolean,
+//   contrastLimits?: [min: number, max: number],
+//   domains?: [min: number, max: number],
+// }
 
 export type VivConfig = {
-  // todo establish how we actually want this to be...
-  channels: MdvVivChannelConfig[],
+  // settling on using the same structure as Avivator for now...
+  // todo more specification of which bits we want to exclude / include
+  // channels: MdvVivChannelConfig[],
   // vs...
-  image_properties: ChannelsState,
+  // image_properties: ChannelsState,
   // vs...
   viewerStore?: Partial<ViewerStore>,
   channelsStore?: Partial<ChannelsStore>,

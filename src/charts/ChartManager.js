@@ -1,6 +1,5 @@
 import { createEl, makeDraggable, makeResizable,MDVProgress,removeDraggable,removeResizable,createMenuIcon,splitPane, createFilterElement} from "../utilities/Elements";
 import  BaseChart from "./BaseChart.js";
-import { PopOutWindow } from "../utilities/PopOutWindow";
 import  DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";
@@ -48,6 +47,7 @@ import "./DeepToolsHeatMap";
 import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import { toPng } from "html-to-image";
+import popoutChart from "@/utilities/Popout";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -319,7 +319,7 @@ class ChartManager{
 
         //each entry in charts will contain
         //  chart - the actual chart
-        //  win - the popout wimdow it is in (or null)
+        //  win - the popout window it is in (or null)
         //  dataSource - the data source associated with it 
         this.charts={};
 
@@ -2068,47 +2068,7 @@ class ChartManager{
     }
 
     _popOutChart(chart){
-        const div= chart.getDiv();
-        const chInfo= this.charts[chart.config.id];
-        const details={dim:[chart.config.size[0],chart.config.size[1]],pos:[div.style.left,div.style.top]};
-        if (div.gridstackPopoutCallback) div.gridstackPopoutCallback();
-        removeResizable(div);
-        removeDraggable(div);
-        const win = new PopOutWindow(
-            //new window opens
-            (doc,box)=>{
-           
-              chart.setSize(box.width,box.height);
-              div.style.top="5px";
-              div.style.left="5px";
-              doc.body.append(div)
-              chart.changeBaseDocument(doc)
-              doc.body.style.overflow="hidden";
-              chart.popoutIcon.style.display="none";
-        
-            },
-            //new window closes
-            (doc,box)=>{
-              chInfo.dataSource.contentDiv.append(div)
-              chart.changeBaseDocument(document);
-              div.style.left = details.pos[0];
-              div.style.top= details.pos[1];
-              chart.setSize(details.dim[0],details.dim[1]);
-              this._makeChartRD(chart, chInfo.dataSource);
-              chart.popoutIcon.style.display="inline";
-              delete chInfo.window
-              //... 'popin' IPC event?
-            },
-            //config
-            { 
-                onresize:(doc,box)=>{
-                    chart.setSize(box.width,box.height)
-                },
-                url:this.config.popouturl || "/?popout=true",
-        
-            }
-        );
-        chInfo.window=win;
+        popoutChart(chart);
     }
 
     _sendAllChartsToBack(ds){

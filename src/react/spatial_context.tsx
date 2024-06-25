@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type RangeDimension from "../datastore/RangeDimension";
 import { BaseReactChart } from "./components/BaseReactChart";
 import { PolygonLayer } from '@deck.gl/layers';
+import { useScatterplotLayer } from "./scatter_state";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -118,4 +119,13 @@ export function useMeasure() {
     const measure = useContext(SpatialAnnotationState).measure;
     if (!measure) throw new Error('no measure context');
     return measure;
+}
+
+/** work in progress... */
+export function useSpatialLayers() {
+    const { rectRange } = useContext(SpatialAnnotationState);
+    const scatterProps = useScatterplotLayer();
+    const { scatterplotLayer, getTooltip } = scatterProps;
+    const layers = [ rectRange.polygonLayer, scatterplotLayer ];
+    return { layers, getTooltip, scatterProps };
 }

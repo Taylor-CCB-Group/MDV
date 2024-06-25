@@ -46,6 +46,7 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  */
 export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     declare config: T & BaseConfig;
+    declare popoutIcon: HTMLElement;
     get dataSource(): DataSource {
         return window.mdv.chartManager.charts[this.config.id].dataSource;
     }
