@@ -16,9 +16,12 @@ def register_global_routes(project_dir):
     
     @app.route('/projects')
     def get_projects():
+        
         try:
-            # Query the database to get all projects
-            projects = Project.query.all()
+            # Query the database to get all projects that aren't deleted
+            print('/projects queried...')
+            
+            projects = Project.query.filter_by(is_deleted=False).all()
             
             # Return the list of projects with their IDs and names
             return jsonify([{"id": p.id, "name": p.name} for p in projects])
@@ -48,10 +51,8 @@ def register_global_routes(project_dir):
             p.serve(app=app, open_browser=False)
             
             # Create a new Project record in the database with the path
-            print("Added new project to the database")
-            new_project = Project(path=project_path)
-            db.session.add(new_project)
-            db.session.commit()
+            print("Adding new project to the database")
+            new_project = Project.create_project(path=project_path)
             
             return jsonify({"id": new_project.id, "name": new_project.id, "status": "success"})
         except Exception as e:
