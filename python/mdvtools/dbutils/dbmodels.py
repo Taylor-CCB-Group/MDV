@@ -19,6 +19,18 @@ class Project(db.Model):
         self.deleted = True
         self.deleted_timestamp = datetime.now()
         db.session.commit()
+    
+    @classmethod
+    def create_project(cls, path):
+        new_project = cls(
+            path=path,
+            created_timestamp=datetime.now(),
+            update_timestamp=datetime.now(),
+            accessed_timestamp=datetime.now()
+        )
+        db.session.add(new_project)
+        db.session.commit()
+        return new_project
 
 class File(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
