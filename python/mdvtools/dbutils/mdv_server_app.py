@@ -1,5 +1,7 @@
 import os
 import json
+from flask import Flask, render_template, jsonify
+from flask_sqlalchemy import SQLAlchemy
 # import threading
 # import random
 # import string
@@ -7,7 +9,6 @@ import json
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
-from mdvtools.dbutils.app import app
 from mdvtools.dbutils.dbmodels import db, Project
 from mdvtools.dbutils.routes import register_global_routes
 
@@ -88,55 +89,209 @@ def serve_projects_from_filesystem(base_dir):
     except Exception as e:
         print(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
 
-if __name__ == '__main__':
+# Function to create base directory if it doesn't exist
+def create_base_directory():
+    base_dir = app.config.get('projects_base_dir', 'mdv')
     try:
-        config_file_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "config.json"
-        )
-        with open(config_file_path) as config_file:
-            config = json.load(config_file)
-            base_dir = config.get('projects_base_dir', 'mdv')
-            print(f"Loaded config: {config}")
-    except FileNotFoundError:
-        print("Error: mdv_server_app.py -> Configuration file not found.")
-        exit(1)
-    except Exception as e:
-        print(f"An unexpected error occurred while loading configuration: {e}")
-        exit(1)
-
-    if not os.path.exists(base_dir):
-        try:
+        if not os.path.exists(base_dir):
             os.makedirs(base_dir)
             print(f"Created base directory: {base_dir}")
-        except Exception as e:
-            print(f"Error creating base directory: {e}")
-            exit(1)
-
-    app.after_request(add_safe_headers)
-
-    with app.app_context():
-        try:
-            print("Initialized app context")
-            
-            db.create_all()
-            print("Created the database tables")
-
-            print("Registering the global routes")
-            register_global_routes(base_dir)
-            
-            print("Registering the blueprint(register_app)")
-            ProjectBlueprint.register_app(app)
-            
-            print("Serve projects from database")
-            serve_projects_from_db()
-
-            print("Start- create_projects_from_filesystem")
-            serve_projects_from_filesystem(base_dir)
-
-        except Exception as e:
-            print(f'Error initializing app: {e}')
-
-    try:
-        app.run(host='0.0.0.0', debug=True, port=5055)
+        else:
+            print(f"Base directory already exists: {base_dir}")
     except Exception as e:
-        print(f"Error running app: {e}")
+        print(f'Error creating base directory: {e}')
+        exit(1)
+
+
+
+print("script starts..")
+
+app = Flask(__name__, template_folder='../templates', static_folder='../static')
+app.after_request(add_safe_headers)
+
+
+    
+print("creating base directory")
+create_base_directory()
+    
+
+
+
+
+# Configuration and initialization of the Flask app and database
+print("adding database URI to app config")
+#app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI', '')
+print("adding config.json details to app config")
+try:
+    config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+    print(config_file_path)
+    with open(config_file_path) as config_file:
+        config = json.load(config_file)
+        app.config['SQLALCHEMY_DATABASE_URI'] = config.get('database_uri', '')
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.get('track_modifications', False)
+        app.config['upload_folder'] = config.get('upload_folder', '')
+        app.config['projects_base_dir'] = config.get('projects_base_dir', '')
+        print("Configuration loaded successfully!")
+except FileNotFoundError:
+    print("Error: Configuration file not found.")
+except Exception as e:
+    print(f"An unexpected error occurred: {e}")
+
+
+
+
+
+print("Initializing app with db")
+
+db.init_app(app)
+
+
+print("creating tables")
+    
+def tables_exist():
+        inspector = db.inspect(db.engine)
+        print("printing table names")
+        print(inspector.get_table_names())
+        return inspector.get_table_names()
+
+with app.app_context():
+    if not tables_exist():
+        print("Creating database tables")
+        db.create_all()
+        print("Created database tables")
+
+    else:
+        print("Database tables already exist")
+
+
+
+# Routes registration and application setup
+
+
+
+print("Registering the blueprint(register_app)")
+ProjectBlueprint.register_app(app)
+
+
+print("Routes....")
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+
+print("Routes..../projects")
+@app.route('/projects')
+def get_projects():
+    print('/projects queried...')    
+    try:
+        # Query the database to get all projects that aren't deleted
+        print('/projects queried...')
+        
+        projects = Project.query.filter_by(is_deleted=False).all()
+        
+        # Return the list of projects with their IDs and names
+        return jsonify([{"id": p.id, "name": p.name} for p in projects])
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
+    
+print("Routes..../create_project")
+@app.route("/create_project", methods=["POST"])
+def create_project():
+    try:
+        print("Creating project")
+        
+        # Get the next ID from the database
+        next_id = db.session.query(db.func.max(Project.id)).scalar()
+        if next_id is None:
+            next_id = 1
+        else:
+            next_id += 1
+        
+        # Create the project directory path
+        project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
+        
+        # Create and serve the MDVProject
+        print("Creating and serving the new project")
+
+        p = MDVProject(project_path)
+        p.set_editable(True)
+        p.serve(app=app, open_browser=False)
+        
+        # Create a new Project record in the database with the path
+        print("Adding new project to the database")
+        new_project = Project.create_project(path=project_path)
+        
+        return jsonify({"id": new_project.id, "name": new_project.id, "status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
+
+print("Routes..../delete_project")
+@app.route("/delete_project/<project_id>", methods=["DELETE"])
+def delete_project(project_id: int):
+    #Soft delete a project by setting the deleted flag.
+    try:
+        print(f"Deleting project '{project_id}'")
+        
+        # Check if the project exists in the ProjectBlueprint.blueprints dictionary
+        if project_id not in ProjectBlueprint.blueprints:
+            return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in ProjectBlueprint.blueprints"}), 404
+        else:
+            # Find the project by ID and mark it as deleted
+            project = Project.query.filter_by(id=project_id).first()
+            if project is None:
+                return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
+            
+            # Remove the project from the ProjectBlueprint.blueprints dictionary
+            del ProjectBlueprint.blueprints[project_id]
+            print(f"Removed project '{project_id}' from ProjectBlueprint.blueprints")
+            
+            
+            # Soft delete the project
+            project.soft_delete()
+            
+            return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+with app.app_context():
+
+    
+    print("Serve projects from database")
+    serve_projects_from_db()
+
+    print("Start- create_projects_from_filesystem")
+    serve_projects_from_filesystem(app.config['projects_base_dir'])
+    
+
+""" with app.app_context():
+    
+    print("Initialized app context")
+
+        
+    #db.create_all()
+    #print("Created the database tables")
+
+    #print("Registering the global routes")
+    #register_global_routes(app, db, app.config['projects_base_dir'])
+        
+    print("Registering the blueprint(register_app)")
+    ProjectBlueprint.register_app(app)
+        
+    print("Serve projects from database")
+    serve_projects_from_db()
+
+    print("Start- create_projects_from_filesystem")
+    serve_projects_from_filesystem(app.config['projects_base_dir']) """
+
+if __name__ == '__main__':
+    print("In main..")
+
+    
+    
+    app.run(host='0.0.0.0', debug=True, port=5055)
+    
+    

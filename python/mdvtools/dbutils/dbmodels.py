@@ -1,9 +1,9 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-from mdvtools.dbutils.app import app
+#from mdvtools.dbutils.mdv_server_app import db
 from sqlalchemy.orm import relationship
 
-db = SQLAlchemy(app)
+db = SQLAlchemy()
 
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -16,7 +16,7 @@ class Project(db.Model):
     accessed_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     
     def soft_delete(self):
-        self.deleted = True
+        self.is_deleted = True
         self.deleted_timestamp = datetime.now()
         db.session.commit()
     

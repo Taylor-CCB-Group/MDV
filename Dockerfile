@@ -20,6 +20,7 @@ RUN npm run build-flask-dockerjs
 # see https://github.com/h5py/h5py/issues/2146 for similar-ish issue
 RUN apt-get update && apt-get install -y libhdf5-dev
 
+#RUN pip install gunicorn
 # Install Python dependencies using Poetry
 WORKDIR /app/python
 RUN poetry install --with dev,backend 
@@ -27,5 +28,8 @@ RUN poetry install --with dev,backend
 # Expose the port that Flask will run on
 EXPOSE 5055 
 
-# Run your Python script
-CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
+# Command to run Gunicorn
+CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "mdvtools.dbutils.mdv_server_app:app"]
+#CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
+
+

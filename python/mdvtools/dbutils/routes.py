@@ -1,14 +1,14 @@
 from flask import request, jsonify, render_template
 from mdvtools.mdvproject import MDVProject
-from mdvtools.dbutils.app import app
-from mdvtools.dbutils.dbmodels import db, Project, File
+#from mdvtools.dbutils.app import app
+#from mdvtools.dbutils.mdv_server_app import app, db
+from mdvtools.dbutils.dbmodels import Project, File
 from mdvtools.project_router import ProjectBlueprint
 from datetime import datetime
 import os
 
 
-
-def register_global_routes(project_dir):
+def register_global_routes(app, db, project_dir):
     
     @app.route('/')
     def index():

@@ -38,10 +38,10 @@ check_docker_installed
 check_docker_daemon
 
 # URL of your production docker-compose file
-PROD_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/jh-dev/docker-compose.yml"
+DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/jh-dev/docker-compose.yml"
 
 # Download and run docker-compose for production
-run_docker_compose $PROD_COMPOSE_URL
+run_docker_compose $DOCKER_COMPOSE_URL
 
 echo "MDV application deployment completed successfully!"
 
