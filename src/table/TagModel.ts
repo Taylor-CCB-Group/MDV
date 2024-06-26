@@ -47,11 +47,8 @@ export default class TagModel {
         if (i != -1) this.listeners.splice(i, 1);
     }
     setTag(tag: string, tagValue = true) {
-        // updateModel appears to be unnecessary, and interacts badly with react triggers
-        // as it calls the listeners before the data is actually updated (and for some reason,
-        // the later call doesn't have desired result)
-        // this.dataModel.updateModel();
         setTag({tag, ...this}, tagValue);
+        this.dataModel.updateModel(); //seems necessary after-all
     }
     getTags() {
         return getTags(this.tagColumn);
@@ -92,6 +89,7 @@ function setTagOnAllSelectedValues(tagToChange: string, col: TagColumn, dataMode
     sanitizeTags(col);
     if (tagToChange.match(SEP)) {
         tagToChange.split(SEP).forEach(t => setTagOnAllSelectedValues(t, col, dataModel, false, tagValue));
+        //todo check if this is the right way to handle notify
         if (notify) dataModel.dataStore.dataChanged([col.name]);
         return;
     }
