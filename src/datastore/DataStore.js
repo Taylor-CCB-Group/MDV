@@ -420,6 +420,7 @@ class DataStore{
     *   <li> double - any floating point data </li>
     *   <li> integer - any integer data </li>
     *   <li> text - data containing strings but with no more than 256 categories </li>
+    *   <li> text16 - data containing strings with up to 65536 categories </li>
     *   <li> unique - data contianing strings but with many categories </li>
     *   <li> multitext - 
     * </ul>
@@ -1183,7 +1184,7 @@ class DataStore{
         else {
           c.data= new Uint8Array(buffer);
         }
-        this.columnsWithData.push(column);      
+        this.columnsWithData.push(column);
     }
 
     //experimental
