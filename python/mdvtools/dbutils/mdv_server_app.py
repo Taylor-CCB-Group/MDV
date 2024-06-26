@@ -166,9 +166,6 @@ with app.app_context():
 
 
 # Routes registration and application setup
-
-
-
 print("Registering the blueprint(register_app)")
 ProjectBlueprint.register_app(app)
 
