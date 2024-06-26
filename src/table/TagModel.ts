@@ -2,7 +2,8 @@ import { DataColumn } from "../charts/charts";
 import DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
 
-type TagColumn = DataColumn<'multitext'>; //multitext...?
+//multitext is buggy (empty data buffer after loading project), so we're using text for now.
+type TagColumn = DataColumn<'text'>;
 
 const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
 const JOIN = '; '; //join with semi-colon and space.
@@ -31,7 +32,7 @@ export default class TagModel {
         })
         if (!dataStore.columnIndex[columnName]) {
             // subgroup - user annotations?
-            const columnSpec = {name: columnName, datatype: 'multitext', editable: true, delimeter: ';', field: columnName};
+            const columnSpec = {name: columnName, datatype: 'text', editable: true, separator: ';', field: columnName};
             const data = new SharedArrayBuffer(dataStore.size * 2);
             dataStore.addColumn(columnSpec, data);
         }
