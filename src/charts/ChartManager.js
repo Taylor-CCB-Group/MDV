@@ -11,6 +11,7 @@ import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 // this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from './dialogs/FileUploadDialogWrapper';
+import TagModel from '../table/TagModel';
 
 //default charts 
 import "./HistogramChart.js";
@@ -219,6 +220,7 @@ class ChartManager{
                     position:"bottom-right"
                 },
                 func:()=>{
+                    //not saving tag data? did it ever?
                     const state = this.getState();
                     this._callListeners("state_saved",state)
                 }
@@ -1453,6 +1455,15 @@ class ChartManager{
                 this.layoutMenus[ds.name].show(e);
             }
         },ds.menuBar);
+        let tagModel;
+        function getTagModel() {
+            if (!tagModel) tagModel = new TagModel(ds.dataStore);
+            return tagModel;
+        }
+        this.addMenuIcon(ds.name,"fas fa-tags", "Tag Annotation", ()=> {
+            //todo - check whether we have a reason for hacky import here
+            new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, getTagModel());
+        });
 
         if (dataStore.links){
             for (let ods in dataStore.links){
