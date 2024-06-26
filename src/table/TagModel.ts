@@ -15,7 +15,7 @@ const splitTags = (value: string) => value.split(SEP).filter(v=>v);
  * find all the indices that include 'tag' as one of those tags.
  */
 function getTagValueIndices(tag: string, col: TagColumn) {
-    if (tag.split(SEP).length > 1) console.error('todo: process multiple tags in tag input');
+    if (tag.match(SEP)) throw new Error('getTagValueIndices: tag must not contain separator (should be handled before calling this function)');
     return col.values.map((v, i) => v.split(SEP).includes(tag) ? i : -1).filter(i => i != -1);
 }
 
@@ -47,7 +47,10 @@ export default class TagModel {
         if (i != -1) this.listeners.splice(i, 1);
     }
     setTag(tag: string, tagValue = true) {
-        this.dataModel.updateModel();
+        // updateModel appears to be unnecessary, and interacts badly with react triggers
+        // as it calls the listeners before the data is actually updated (and for some reason,
+        // the later call doesn't have desired result)
+        // this.dataModel.updateModel();
         setTag({tag, ...this}, tagValue);
     }
     getTags() {
@@ -55,6 +58,7 @@ export default class TagModel {
     }
     entireSelectionHasTag(tag: string) {
         const col = this.tagColumn;
+        if (tag.match(SEP)) return tag.split(SEP).every(t => this.entireSelectionHasTag(t));
         const tagIndices = getTagValueIndices(tag, col);
         return !this.dataModel.data.some(v => !tagIndices.includes(col.data[v]));
     }
@@ -86,6 +90,11 @@ function setTagOnAllSelectedValues(tagToChange: string, col: TagColumn, dataMode
     //     return;
     // }
     sanitizeTags(col);
+    if (tagToChange.match(SEP)) {
+        tagToChange.split(SEP).forEach(t => setTagOnAllSelectedValues(t, col, dataModel, false, tagValue));
+        if (notify) dataModel.dataStore.dataChanged([col.name]);
+        return;
+    }
     const indicesWithTag = getTagValueIndices(tagToChange, col); //refers to values that already contain 'tag'
 
     //If tagValue is true, map from the index of the value without the tag, to the index of the value with the tag.
@@ -153,6 +162,7 @@ function sanitizeTags(col: TagColumn, notify = false) {
     if (alreadySorted.length === vals.length) return;
     console.log('sanitizing tags...'); //not expected to happen unless other non-tag operations are performed on col?
     const values = alreadySorted.map(v => v.sorted);
+    if (values.length > 256) throw new Error(`text column '${col.name}' exceeded 256 values when sanitizing tags`);
     col.values = values;
     
     const mapToSorted = new Map<number, number>();
