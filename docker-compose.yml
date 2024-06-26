@@ -11,13 +11,15 @@ services:
      - mdv-data:/app/mdv 
     depends_on:
       - database
+    #environment:
+    #  DATABASE_URI: postgresql://admin:password@database:5432/mdvdatabase
 
   database:
     image: postgres:latest
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: mydatabase
+      POSTGRES_DB: mdvdatabase
     ports:
       - "5432:5432"
     volumes:
