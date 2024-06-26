@@ -49,6 +49,7 @@ export default class TagModel {
     setTag(tag: string, tagValue = true) {
         setTag({tag, ...this}, tagValue);
         this.dataModel.updateModel(); //seems necessary after-all
+        //^^ not exactly intended design, should test more...
     }
     getTags() {
         return getTags(this.tagColumn);
@@ -88,9 +89,11 @@ function setTagOnAllSelectedValues(tagToChange: string, col: TagColumn, dataMode
     // }
     sanitizeTags(col);
     if (tagToChange.match(SEP)) {
-        tagToChange.split(SEP).forEach(t => setTagOnAllSelectedValues(t, col, dataModel, false, tagValue));
+        const changed = tagToChange.split(SEP)
+        .map(t => setTagOnAllSelectedValues(t, col, dataModel, false, tagValue))
+        .reduce((a, b) => a || b, false);
         //todo check if this is the right way to handle notify
-        if (notify) dataModel.dataStore.dataChanged([col.name]);
+        if (notify && changed) dataModel.dataStore.dataChanged([col.name]);
         return;
     }
     const indicesWithTag = getTagValueIndices(tagToChange, col); //refers to values that already contain 'tag'
@@ -145,6 +148,7 @@ function setTagOnAllSelectedValues(tagToChange: string, col: TagColumn, dataMode
     }
     // console.log(`updated ${count}/${data.length} selected rows`);
     if (notify && count) dataModel.dataStore.dataChanged([col.name]);
+    return count !== 0; //return whether any changes were made
 }
 
 /** processes a given column so that tags appear in sorted order and without repitition.
