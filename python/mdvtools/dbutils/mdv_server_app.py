@@ -110,7 +110,6 @@ app = Flask(__name__, template_folder='../templates', static_folder='../static')
 app.after_request(add_safe_headers)
 
 
-    
 print("creating base directory")
 create_base_directory()
     
