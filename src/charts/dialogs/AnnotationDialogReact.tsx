@@ -53,10 +53,10 @@ function AnnotationDialogComponent({tagModel}: {tagModel: TagModel}) {
             <div className="flex flex-row">
                 {[...tagsInSelection].map(tag => <MTag key={'a'+tag} tagModel={tagModel} tag={tag}/>)}
             </div>
-            <h2>All tags:</h2>
+            {/* <h2>All tags:</h2>
             <div className="flex flex-row">
                 {[...tagList].map(tag => <MTag key={'b'+tag} tagModel={tagModel} tag={tag}/>)}
-            </div>
+            </div> */}
         </div>
         </>
     )
