@@ -217,7 +217,6 @@ def create_project():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
     
-
 print("Routes..../delete_project")
 @app.route("/delete_project/<project_id>", methods=["DELETE"])
 def delete_project(project_id: int):
