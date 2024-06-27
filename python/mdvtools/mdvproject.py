@@ -50,7 +50,7 @@ class MDVProject:
     def __init__(self, dir: str, id: Optional[str]=None, delete_existing=False, skip_column_clean=False):
         self.skip_column_clean = skip_column_clean # signficant speedup for large datasets
         self.dir = dir
-        self.id = id if id else dir.split("/")[-1]
+        self.id = id if id else os.path.basename(dir)
         if delete_existing and exists(dir):
             shutil.rmtree(dir)
         self.h5file = join(dir, "datafile.h5")
