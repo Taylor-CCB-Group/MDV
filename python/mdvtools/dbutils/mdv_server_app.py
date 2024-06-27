@@ -114,9 +114,6 @@ print("creating base directory")
 create_base_directory()
     
 
-
-
-
 # Configuration and initialization of the Flask app and database
 print("adding database URI to app config")
 #app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI', '')
@@ -138,12 +135,9 @@ except Exception as e:
 
 
 
-
-
 print("Initializing app with db")
 
 db.init_app(app)
-
 
 print("creating tables")
     
