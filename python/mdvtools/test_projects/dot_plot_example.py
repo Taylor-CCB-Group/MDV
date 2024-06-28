@@ -4,7 +4,7 @@ import pandas as pd
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.dot_plot import DotPlot
 
-def create_dot_plot(title, params, size, position, colorscale):#, x_axis_settings, y_axis_settings):
+def create_dot_plot(title, params, size, position, colorscale):
     """Create and configure a DotPlot instance with the given parameters."""
     plot = DotPlot(
         title=title,
@@ -14,8 +14,6 @@ def create_dot_plot(title, params, size, position, colorscale):#, x_axis_setting
     )
 
     plot.set_color_scale(colorscale)
-    #plot.set_x_axis(**x_axis_settings)  # x-axis settings
-    #plot.set_y_axis(**y_axis_settings)  # y-axis settings
     
     return plot
 
@@ -55,24 +53,9 @@ def main():
     colorscale = {
         'log': False
     }
-
-    #x_axis_settings = {
-    #    'size': 30,
-    #    'label': "X-Axis Label",
-    #    'textsize': 13,
-    #    'tickfont': 10
-    #}
-    
-    #y_axis_settings = {
-    #    'size': 45,
-    #    'label': "Y-Axis Label",
-    #    'textsize': 13,
-    #    'tickfont': 10,
-    #    'rotate_labels': 45
-    #}
     
     # Create plot
-    dot_plot = create_dot_plot(title, params, size, position, colorscale)#, x_axis_settings, y_axis_settings)
+    dot_plot = create_dot_plot(title, params, size, position, colorscale)
     
     # Convert plot to JSON and set view
     dot_plot_json = convert_plot_to_json(dot_plot)
