@@ -59,6 +59,7 @@ function pushSetStyles(chart: Chart) {
         iconDisplay: chart.popoutIcon.style.display,
     };
     div.style.height = '100vh';
+    div.style.width = '100vw';
     div.style.top = '0';
     div.style.left = '0';
     chart.popoutIcon.style.display = 'none';
