@@ -15,6 +15,6 @@
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "space",
-		"indentWidth": 4
+		"indentWidth": 4 // considering changing to 2, but most of the codebase uses 4
 	}
 }
