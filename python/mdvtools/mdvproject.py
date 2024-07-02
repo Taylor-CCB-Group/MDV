@@ -1085,10 +1085,14 @@ class MDVProject:
                 assert isinstance(f, str) # in future we may allow dict or list
                 if exists(f):
                     # copy the json file to the project
-                    # f = os.path.relpath(f, os.getcwd())
-                    Path(join(self.dir, f)).parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(f, join(self.dir, f))
-                    all_regions[k]["json"] = v["json"]
+                    name = os.path.basename(f)
+                    rel = join(self.dir, "json", name)
+                    Path(rel).parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        shutil.copyfile(f, rel)
+                        all_regions[k]["json"] = rel
+                    except Exception as e:
+                        print(f"Skipping json for region {k} because of error copying {f} to {rel}\n{repr(e)}")
                 else:
                     raise FileNotFoundError(f"json file '{f}' not found")
         # maybe warn if replacing existing regions
