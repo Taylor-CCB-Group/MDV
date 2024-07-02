@@ -1090,7 +1090,7 @@ class MDVProject:
                     Path(rel).parent.mkdir(parents=True, exist_ok=True)
                     try:
                         shutil.copyfile(f, rel)
-                        all_regions[k]["json"] = rel
+                        all_regions[k]["json"] = join("json", name)
                     except Exception as e:
                         print(f"Skipping json for region {k} because of error copying {f} to {rel}\n{repr(e)}")
                 else:
