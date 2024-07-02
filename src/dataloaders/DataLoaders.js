@@ -41,7 +41,7 @@ function processArrayBuffer(data,columns,size){
 		}
         else if (column.datatype==="multitext"){
             arrayType=Uint16Array;
-            bytes=column.stringLength*2;
+            bytes=column.stringLength*2; //stringLength is 'undefined' when text16 version of multitext is saved by client. there is no 'values' key at all.
             arr_len=size*column.stringLength;
         }
         else if (column.datatype==="text16"){
