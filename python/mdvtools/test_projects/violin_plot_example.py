@@ -40,7 +40,7 @@ def main():
     project.add_datasource(data_path, data_frame)
     
     # ViolinPlot parameters
-    title = "Violin Plot Example"
+    title = "Box Plot Example"
     params = ["highly_variable", "mean"]
     size = [792, 472]
     position = [10, 10]
