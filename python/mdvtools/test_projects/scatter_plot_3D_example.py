@@ -4,7 +4,7 @@ import pandas as pd
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.scatter_plot_3D import ScatterPlot3D
 
-def create_scatter_plot(title, params, size, position, color, brush, opacity, radius, camera, center, category_color):
+def create_scatter_plot(title, params, size, position, color, brush, opacity, radius, camera, center):
     """Create and configure a ScatterPlot3D instance with the given parameters."""
     plot = ScatterPlot3D(
         title=title,
@@ -19,7 +19,6 @@ def create_scatter_plot(title, params, size, position, color, brush, opacity, ra
     plot.set_radius(radius)
     plot.set_camera(camera)
     plot.set_center(center)
-    plot.set_color_by(category_color)
     
     return plot
 
@@ -61,13 +60,12 @@ def main():
     brush = "default"
     radius = 0.9
     opacity = 0.8
-    category_color = "leiden"
     
     camera={"distance": 37, "theta": -1.038, "phi": 0.261}
 
 
     # Create plot
-    scatter_plot = create_scatter_plot(title, params, size, position, color, brush, opacity, radius, camera, center, category_color)
+    scatter_plot = create_scatter_plot(title, params, size, position, color, brush, opacity, radius, camera, center)
     
     # Convert plot to JSON and set view
     scatter_plot_json = convert_plot_to_json(scatter_plot)
