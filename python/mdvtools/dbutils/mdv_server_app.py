@@ -12,7 +12,6 @@ from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 from mdvtools.dbutils.routes import register_global_routes
 
-
 def serve_projects_from_db():
     try:
         # Get all projects from the database
@@ -29,7 +28,8 @@ def serve_projects_from_db():
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id))
                     p.set_editable(True)
-                    p.serve(app=app, open_browser=False)
+                    # todo: look up how **kwargs works and maybe have a shared app config we can pass around
+                    p.serve(app=app, open_browser=False, backend=True)
                     print(f"Serving project: {project.path}")
                 except Exception as e:
                     print(f"Error serving project '{project.path}': {e}")
@@ -73,7 +73,7 @@ def serve_projects_from_filesystem(base_dir):
 
                     p = MDVProject(dir=project_path,id= str(next_id))
                     p.set_editable(True)
-                    p.serve(app=app, open_browser=False)
+                    p.serve(app=app, open_browser=False, backend=True)
                     print(f"Serving project: {project_path}")
 
                     # Create a new Project record in the database with the default name
@@ -207,7 +207,7 @@ def create_project():
 
         p = MDVProject(project_path)
         p.set_editable(True)
-        p.serve(app=app, open_browser=False)
+        p.serve(app=app, open_browser=False, backend=True)
         
         # Create a new Project record in the database with the path
         print("Adding new project to the database")
