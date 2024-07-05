@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
-    <head>
+    <head>        
+        {% if backend %}
+        <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+        {% endif %}
         <meta charset="utf-8">
         <style>
             html,body,#holder{

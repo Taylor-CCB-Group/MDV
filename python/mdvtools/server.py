@@ -82,6 +82,7 @@ def create_app(
     port=5050,
     websocket=False,
     app: Optional[Flask] = None,
+    backend=False,
 ):
     if app is None:
         route = ""
@@ -116,8 +117,11 @@ def create_app(
     @project_bp.route("/")
     def project_index():
         print("recieved request to project_index")
-        # `_mdvInit('{{route}}')` in template...
-        return render_template("page.html", route=route)
+        # the backend page currently needs to be different to workaround a server config issue
+        # some requests were being downgraded to http, which caused problems with the backend
+        # but if we always add the header it messes up localhost development.
+        # todo if necessary, apply equivalent change to index.html / any other pages we might have
+        return render_template("page.html", route=route, backend=backend)
 
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
@@ -243,7 +247,8 @@ def create_app(
 
     @project_bp.route("/add_datasource", methods=["POST"])
     def add_datasource():
-        if "backend" in request.form:
+        # we shouldn't be passing "backend" in request.form, the logic should only be on server
+        if backend:
             response = add_datasource_backend(project)
             return response
 
