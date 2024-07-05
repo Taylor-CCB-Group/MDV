@@ -1,21 +1,21 @@
 import { hierarchy as d3_hierarchy}  from "d3-hierarchy";
 
 const distances ={
-	euclidean: function(v1, v2) {
+	euclidean: (v1, v2) => {
       var total = 0;
       for (var i = 0; i < v1.length; i++) {
          total += Math.pow(isNaN(v2[i])?0:v2[i] -v1[i], 2);      
       }
       return Math.sqrt(total);
    },
-   manhattan: function(v1, v2) {
+   manhattan: (v1, v2) => {
      var total = 0;
      for (var i = 0; i < v1.length ; i++) {
         total += Math.abs(v2[i] - v1[i]);      
      }
      return total;
    },
-   max: function(v1, v2) {
+   max: (v1, v2) => {
      var max = 0;
      for (var i = 0; i < v1.length; i++) {
         max = Math.max(max , Math.abs(v2[i] - v1[i]));      
@@ -31,7 +31,7 @@ class HierarchicalClustering{
    			this.distance=distances["euclidean"];
    		}
    		this.linkage = linkage?linkage:"average";
-		this.threshold = threshold == undefined ? Infinity : threshold;
+		this.threshold = threshold == undefined ? Number.POSITIVE_INFINITY : threshold;
 	}
 
    cluster(items, snapshotPeriod, snapshotCb) {
@@ -57,7 +57,7 @@ class HierarchicalClustering{
 
       for (var i = 0; i < this.clusters.length; i++) {
          for (var j = 0; j <= i; j++) {
-            var dist = (i == j) ? Infinity : 
+            var dist = (i == j) ? Number.POSITIVE_INFINITY : 
                this.distance(this.clusters[i].value, this.clusters[j].value);
             this.dists[i][j] = dist;
             this.dists[j][i] = dist;
@@ -77,7 +77,7 @@ class HierarchicalClustering{
         merged = this.mergeClosest();
       }
     
-      this.clusters.forEach(function(cluster) {
+      this.clusters.forEach((cluster) => {
         // clean up metadata used for clustering
         delete cluster.key;
         delete cluster.index;
@@ -90,7 +90,7 @@ class HierarchicalClustering{
 
    mergeClosest() {
       // find two closest clusters from cached mins
-      var minKey = 0, min = Infinity;
+      var minKey = 0, min = Number.POSITIVE_INFINITY;
       for (var i = 0; i < this.clusters.length; i++) {
          var key = this.clusters[i].key,
              dist = this.dists[key][this.mins[key]];
@@ -122,7 +122,7 @@ class HierarchicalClustering{
          var ci = this.clusters[i];
          var dist;
          if (c1.key == ci.key) {
-            dist = Infinity;            
+            dist = Number.POSITIVE_INFINITY;            
          }
          else if (this.linkage == "single") {
             dist = this.dists[c1.key][ci.key];
@@ -171,7 +171,7 @@ class HierarchicalClustering{
    }
 
    orderClusters(obj){
-   	    for (let item in obj){
+   	    for (const item in obj){
    	    	if (item ==="children"){
    	    		this.orderClusters(obj[item][0]);
                 this.orderClusters(obj[item][1])
@@ -189,8 +189,8 @@ function getHierarchicalNodes(data,config={}){
     hc.cluster(data);
     try {
        const nodes = d3_hierarchy(hc.clusters[0]);
-       for (let node of nodes.descendants()){
-           let d = node.data;
+       for (const node of nodes.descendants()){
+           const d = node.data;
            delete d.size;
            if (d.value){
                d.id= d.value._id;
@@ -210,12 +210,12 @@ function getHierarchicalNodes(data,config={}){
 function parseNewick(tree){
     let r={};
     for(let e=[],s=tree.split(/\s*(;|\(|\)|,|:)\s*/),t=0;t<s.length;t++){
-        let n=s[t];
+        const n=s[t];
         switch(n){
             case"(":var c={};r.children=[c],e.push(r),r=c;break;
             case",":var c={};e[e.length-1].children.push(c),r=c;break;
             case")":r=e.pop();break;case":":break;
-            default:var h=s[t-1];")"===h||"("===h||","===h?r.name=n:":"===h&&(r.length=parseFloat(n));
+            default:var h=s[t-1];")"===h||"("===h||","===h?r.name=n:":"===h&&(r.length=Number.parseFloat(n));
         }
     }
     return d3_hierarchy(r);    

@@ -19,7 +19,6 @@ class ImageTable {
         this.row_last=139;
         this.tile_height=205;
         this.tile_width=205;
-        let self =this;
         this.__doc__=document;
         this.display_columns=[];
         this.selection_mode=true;
@@ -86,17 +85,17 @@ class ImageTable {
             this.setColumns(config.columns);
         }
         //load first image to get the orignal dimensions 
-        let im = new Image();
+        const im = new Image();
         im.crossOrigin="anonymous";
-        im.onload=function(e){
-            self.originalDimensions=[im.width,im.height];
-            self.preferred_width=self.img_width=im.width;
-            self.preferred_height =self.img_height=im.height;
+        im.onload=(e)=> {
+            this.originalDimensions=[im.width,im.height];
+            this.preferred_width=this.img_width=im.width;
+            this.preferred_height =this.img_height=im.height;
             if (config.initial_image_width){
-                self.preferred_width=config.initial_image_width;
-                self.preferred_height=Math.round((self.preferred_width/self.img_width)*self.img_height)
+                this.preferred_width=config.initial_image_width;
+                this.preferred_height=Math.round((this.preferred_width/this.img_width)*this.img_height)
             }
-            self._resize();
+            this._resize();
         }
 
         const burl = getProjectURL(this.config.base_url);
@@ -108,9 +107,9 @@ class ImageTable {
 
     mouseOver(e,img){
         if (img.id){
-            let arr= img.id.split("-");
-            let index =parseInt(arr[1]);
-            let item = this.data_view.getItem(index);
+            const arr= img.id.split("-");
+            const index =Number.parseInt(arr[1]);
+            const item = this.data_view.getItem(index);
             if (!item){
                 return;
             }
@@ -142,17 +141,17 @@ class ImageTable {
         if (!id){
             return;
         }
-        let arr =id.split("-");
+        const arr =id.split("-");
         if (arr[0]==="mlvtile"){
             let ids =null;
             
-            let index = parseInt(arr[2]);
+            const index = Number.parseInt(arr[2]);
             if (e.shiftKey && self.last_img_clicked != null) {
                 const l_index = this.last_img_clicked.index;
                 
                 range=[];
                 ids=[];
-                let diff = index-l_index<0?-1:1;
+                const diff = index-l_index<0?-1:1;
                 let st= l_index+1;
                 let en =index+1;
                 if (diff===-1){
@@ -160,7 +159,7 @@ class ImageTable {
                     en=l_index;
                 }
                 for (let i=st;i<en;i++){
-                    let id = this.data_view.getId(i)
+                    const id = this.data_view.getId(i)
                     
                     ids.push(id);
                 }
@@ -209,7 +208,7 @@ class ImageTable {
     }
 
     addListener(type,func,id){
-    	let listener = this.listeners[type];
+    	const listener = this.listeners[type];
     	if (!listener){
     		return null;
     	}
@@ -221,7 +220,7 @@ class ImageTable {
     }
 
     removeListener(type,id){
-    	let listener = this.listeners[type];
+    	const listener = this.listeners[type];
     	if (!listener){
     		return false;
     	}
@@ -247,7 +246,7 @@ class ImageTable {
     setImageDimensions(dim,redraw){
         this.lrm = this.config.margins.left_right;
         this.tbm = this.config.margins.top_bottom;
-        let ft = this.getFirstTileInView();
+        const ft = this.getFirstTileInView();
         if (!dim){
             dim=[this.preferred_width,this.preferred_height];
         }
@@ -275,11 +274,11 @@ class ImageTable {
         }
 
 
-    	this.tile_width=parseInt(dim[0])+this.lrm;
-        this.tile_height=parseInt(dim[1])+this.tbm;
-        this.t_width = parseInt(dim[0]);
-        this.t_height = parseInt(dim[1]);
-        let end_row = Math.floor((this.height+(this.cache_size*this.tile_height))/this.tile_height);
+    	this.tile_width=Number.parseInt(dim[0])+this.lrm;
+        this.tile_height=Number.parseInt(dim[1])+this.tbm;
+        this.t_width = Number.parseInt(dim[0]);
+        this.t_height = Number.parseInt(dim[1]);
+        const end_row = Math.floor((this.height+(this.cache_size*this.tile_height))/this.tile_height);
         this.max_difference= end_row+this.cache_size;
         if (redraw){
             this.show(ft);
@@ -292,20 +291,19 @@ class ImageTable {
  
 
     resize(){
-    	let self=this;
     	clearTimeout(this.resize_timeout);
-    	 self.resize_timeout=setTimeout(()=>{	     
-    		 self._resize();
-         },self.resize_timeout_length);
+    	 this.resize_timeout=setTimeout(()=>{	     
+    		 this._resize();
+         },this.resize_timeout_length);
     }
 
     getFirstTileInView(){
-        let top = this.view_port.scrollTop;
+        const top = this.view_port.scrollTop;
         return Math.floor(top/this.tile_height)*this.num_per_row;
     }
 
     getLastTileInView(){
-        let bottom= this.view_port.scrollTop+this.view_port.height();
+        const bottom= this.view_port.scrollTop+this.view_port.height();
         return Math.floor(bottom/this.tile_height)*this.num_per_row;
     }
 
@@ -319,15 +317,15 @@ class ImageTable {
     }
 
     _setCanvasHeight(){
-        let h = ((Math.ceil(this.data_view.getLength()/this.num_per_row))*this.tile_height)+this.tbm;
+        const h = ((Math.ceil(this.data_view.getLength()/this.num_per_row))*this.tile_height)+this.tbm;
         this.canvas.style.height=h+"px";
     }
 
     _hasScrolled(){
         clearTimeout(this.scroll_timeout);
-        let s_top = this.view_port.scrollTop;
+        const s_top = this.view_port.scrollTop;
         let begin_row = Math.floor((s_top-(this.cache_size*this.tile_height))/this.tile_height);
-        let end_row = Math.floor((s_top+this.height+(this.cache_size*this.tile_height))/this.tile_height);
+        const end_row = Math.floor((s_top+this.height+(this.cache_size*this.tile_height))/this.tile_height);
         if (begin_row<0){
             begin_row=0;
         }
@@ -413,9 +411,9 @@ class ImageTable {
             s_top = this.view_port.scrollTop;
         }
         const bb = this.view_port.getBoundingClientRect();
-        let height = bb.height;
+        const height = bb.height;
         let begin_row = Math.floor((s_top-(this.cache_size*this.tile_height))/this.tile_height);
-        let end_row = Math.floor((s_top+height+(this.cache_size*this.tile_height))/this.tile_height);
+        const end_row = Math.floor((s_top+height+(this.cache_size*this.tile_height))/this.tile_height);
         if (begin_row<0){
                 begin_row=0;
         }
@@ -427,8 +425,8 @@ class ImageTable {
 
     setSelectedTiles(ids,append,propagate){
         if (!append){
-            for (let id in this.selected_tiles){
-                let t  =  this.__doc__.getElementById(`mlvtile-${this.domId}-${id}`);
+            for (const id in this.selected_tiles){
+                const t  =  this.__doc__.getElementById(`mlvtile-${this.domId}-${id}`);
                 if (t){
                     t.style.border= this.selected_tiles[id];
                 }
@@ -436,8 +434,8 @@ class ImageTable {
             }
             this.selected_tiles={};
         }
-        for (let id of ids){
-            let tile = this.__doc__.getElementById(`mlvtile-${this.domId}-${id}`);
+        for (const id of ids){
+            const tile = this.__doc__.getElementById(`mlvtile-${this.domId}-${id}`);
             if (tile){
                 this.selected_tiles[id]=tile.style.border;
                 tile.style.border="4px solid goldenrod";
@@ -453,7 +451,7 @@ class ImageTable {
 
     scrollToTile(index,select){
         const pos = this.data_view.data.indexOf(index);
-        let obj = this._calculateTopBottomRow(pos);
+        const obj = this._calculateTopBottomRow(pos);
         if (Math.abs(obj.top-this.row_displayed_first)>this.max_difference){
             this.render(obj.top,obj.bottom,true);
         }
@@ -472,7 +470,7 @@ class ImageTable {
 		}
     	an = an&&an.toLowerCase();
     	let str="", i=0, min=an=="a"?10:0, max=an=="n"?10:62;
-   	 	for(;i++<len;){
+   	 	while(i++<len){
       		let r = Math.random()*(max-min)+min <<0;
       		str += String.fromCharCode(r+=r>9?r<36?55:61:48);
     	}
@@ -484,16 +482,16 @@ class ImageTable {
             first_tile_index=this.getFirstTileInView();
         }
         this._setCanvasHeight();  
-        let obj=this._calculateTopBottomRow(first_tile_index);
+        const obj=this._calculateTopBottomRow(first_tile_index);
         this.render(obj.top,obj.bottom,true);
         this.view_port.scrollTop=obj.scroll_top;
     }
 
     _addRow(row){
         const label = this.config.image_label;
-        let st = row*this.num_per_row;
-        let en = st+this.num_per_row;
-        let top = row * this.tile_height+this.tbm;
+        const st = row*this.num_per_row;
+        const en = st+this.num_per_row;
+        const top = row * this.tile_height+this.tbm;
         let x=0;
         const w = this.t_width+"px";
         const h = this.t_height+"px";
@@ -510,11 +508,11 @@ class ImageTable {
             const image= this.data_view.getItemField(i,this.config.image_key);
             const text = hasTitleColumn ? `${titleColumn} '${this.data_view.getItemField(i, titleColumn)}'` : image;
             const missing = image === "missing";
-            let left=x*this.tile_width+this.lrm;
+            const left=x*this.tile_width+this.lrm;
             x++;
             let border=""
             if (this.color_by){
-                let color = this.color_by(id);
+                const color = this.color_by(id);
                 border= "4px solid "+color;
                 if (this.color_overlay) {
                     createEl("div",{
@@ -534,7 +532,7 @@ class ImageTable {
                     },this.canvas);
                 }
             }
-            let extra_classes=[];
+            const extra_classes=[];
             if (this.selected_tiles[id]){
                border="4px solid goldenrod"
             }

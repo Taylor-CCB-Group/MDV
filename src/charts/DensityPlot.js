@@ -175,7 +175,7 @@ class DensityPlot extends SVGChart{
         .join("path")
         .attr("class","dp-polygon")
       .attr("d", geoPath())
-      .attr("fill", function(d) { return color(d.value); })
+      .attr("fill", (d) => color(d.value))
 
     }
 

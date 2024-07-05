@@ -26,7 +26,7 @@ export function VennDiagram() {
         // I'm hackily redefining below. TODO: remove this and change to d3.schemeCategory10
         colourScheme = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"],
         colourIndex = 0,
-        colours = function(key) {
+        colours = (key) => {
             if (key in colourMap) {
                 return colourMap[key];
             }
@@ -46,14 +46,12 @@ export function VennDiagram() {
 
         // handle 0-sized sets by removing from input
         var toremove = {};
-        data.forEach(function(datum) {
+        data.forEach((datum) => {
             if ((datum.size == 0) && datum.sets.length == 1) {
                 toremove[datum.sets[0]] = 1;
             }
         });
-        data = data.filter(function(datum) {
-            return !datum.sets.some(function(set) { return set in toremove; });
-        });
+        data = data.filter((datum) => !datum.sets.some((set) => set in toremove));
 
         var circles = {};
         var textCentres = {};
@@ -74,7 +72,7 @@ export function VennDiagram() {
         // Figure out the current label for each set. These can change
         // and D3 won't necessarily update (fixes https://github.com/benfred/venn.js/issues/103)
         var labels = {};
-        data.forEach(function(datum) {
+        data.forEach((datum) => {
             if (datum.label) {
                 labels[datum.sets] = datum.label;
             }
@@ -109,9 +107,8 @@ export function VennDiagram() {
 
         // interpolate intersection area paths between previous and
         // current paths
-        var pathTween = function(d) {
-            return function(t) {
-                var c = d.sets.map(function(set) {
+        var pathTween = (d) => (t) => {
+                var c = d.sets.map((set) => {
                     var start = previous[set], end = circles[set];
                     if (!start) {
                         start = {x : width/2, y : height/2, radius : 1};
@@ -125,27 +122,22 @@ export function VennDiagram() {
                 });
                 return intersectionAreaPath(c);
             };
-        };
 
         // update data, joining on the set ids
         var nodes = svg.selectAll(".venn-area")
-            .data(data, function(d) { return d.sets; });
+            .data(data, (d) => d.sets);
 
         // create new nodes
         var enter = nodes.enter()
             .append('g')
-            .attr("class", function(d) {
-                return "venn-area venn-" +
-                    (d.sets.length == 1 ? "circle" : "intersection");
-            })
-            .attr("data-venn-sets", function(d) {
-                return d.sets.join("_");
-            });
+            .attr("class", (d) => "venn-area venn-" +
+                    (d.sets.length == 1 ? "circle" : "intersection"))
+            .attr("data-venn-sets", (d) => d.sets.join("_"));
 
         var enterPath = enter.append("path"),
             enterText = enter.append("text")
             .attr("class", "label")
-            .text(function (d) { return label(d); } )
+            .text((d) => label(d) )
             .attr("text-anchor", "middle")
             .attr("dy", ".35em")
             .attr("x", width/2)
@@ -155,12 +147,12 @@ export function VennDiagram() {
         // apply minimal style if wanted
         if (styled) {
             enterPath.style("fill-opacity", "0")
-                .filter(function (d) { return d.sets.length == 1; } )
-                .style("fill", function(d) { return colours(d.sets); })
+                .filter((d) => d.sets.length == 1 )
+                .style("fill", (d) => colours(d.sets))
                 .style("fill-opacity", ".25");
 
             enterText
-                .style("fill", function(d) { return d.sets.length == 1 ? colours(d.sets) : "#444"; });
+                .style("fill", (d) => d.sets.length == 1 ? colours(d.sets) : "#444");
         }
 
         // update existing, using pathTween if necessary
@@ -171,16 +163,14 @@ export function VennDiagram() {
                 .attrTween("d", pathTween);
         } else {
             update.selectAll("path")
-                .attr("d", function(d) {
-                    return intersectionAreaPath(d.sets.map(function (set) { return circles[set]; }));
-                });
+                .attr("d", (d) => intersectionAreaPath(d.sets.map((set) => circles[set])));
         }
 
         var updateText = update.selectAll("text")
-            .filter(function (d) { return d.sets in textCentres; })
-            .text(function (d) { return label(d); } )
-            .attr("x", function(d) { return Math.floor(textCentres[d.sets].x);})
-            .attr("y", function(d) { return Math.floor(textCentres[d.sets].y);});
+            .filter((d) => d.sets in textCentres)
+            .text((d) => label(d) )
+            .attr("x", (d) => Math.floor(textCentres[d.sets].x))
+            .attr("y", (d) => Math.floor(textCentres[d.sets].y));
 
         if (wrap) {
             if (hasPrevious) {
@@ -222,79 +212,79 @@ export function VennDiagram() {
                 'exit': exit};
     }
 
-    chart.wrap = function(_) {
+    chart.wrap = (_) => {
         if (!arguments.length) return wrap;
         wrap = _;
         return chart;
     };
 
-    chart.width = function(_) {
+    chart.width = (_) => {
         if (!arguments.length) return width;
         width = _;
         return chart;
     };
 
-    chart.height = function(_) {
+    chart.height = (_) => {
         if (!arguments.length) return height;
         height = _;
         return chart;
     };
 
-    chart.padding = function(_) {
+    chart.padding = (_) => {
         if (!arguments.length) return padding;
         padding = _;
         return chart;
     };
 
-    chart.colours = function(_) {
+    chart.colours = (_) => {
         if (!arguments.length) return colours;
         colours = _;
         return chart;
     };
 
-    chart.fontSize = function(_) {
+    chart.fontSize = (_) => {
         if (!arguments.length) return fontSize;
         fontSize = _;
         return chart;
     };
 
-    chart.duration = function(_) {
+    chart.duration = (_) => {
         if (!arguments.length) return duration;
         duration = _;
         return chart;
     };
 
-    chart.layoutFunction = function(_) {
+    chart.layoutFunction = (_) => {
         if (!arguments.length) return layoutFunction;
         layoutFunction = _;
         return chart;
     };
 
-    chart.normalize = function(_) {
+    chart.normalize = (_) => {
         if (!arguments.length) return normalize;
         normalize = _;
         return chart;
     };
 
-    chart.styled = function(_) {
+    chart.styled = (_) => {
         if (!arguments.length) return styled;
         styled = _;
         return chart;
     };
 
-    chart.orientation = function(_) {
+    chart.orientation = (_) => {
         if (!arguments.length) return orientation;
         orientation = _;
         return chart;
     };
 
-    chart.orientationOrder = function(_) {
+    chart.orientationOrder = (_) => {
         if (!arguments.length) return orientationOrder;
         orientationOrder = _;
         return chart;
     };
 
-    chart.lossFunction = function(_) {
+    chart.lossFunction = (_) => {
       if (!arguments.length) return loss;
       loss = _;
       return chart;
@@ -348,9 +338,7 @@ export function wrapText(circles, labeller) {
         text.selectAll("tspan")
             .attr("x", x)
             .attr("y", y)
-            .attr("dy", function(d, i) {
-                 return (initial + i * lineHeight) + "em";
-            });
+            .attr("dy", (d, i) => (initial + i * lineHeight) + "em");
     };
 }
 
@@ -398,7 +386,7 @@ export function computeTextCentre(interior, exterior) {
 
     // maximize the margin numerically
     var solution = nelderMead(
-                function(p) { return -1 * circleMargin({x: p[0], y: p[1]}, interior, exterior); },
+                (p) => -1 * circleMargin({x: p[0], y: p[1]}, interior, exterior),
                 [initial.x, initial.y],
                 {maxIterations:500, minErrorDelta:1e-10}).x;
     var ret = {x: solution[0], y: solution[1]};
@@ -443,7 +431,7 @@ export function computeTextCentre(interior, exterior) {
                 // polygon. this should basically never happen
                 // and has some issues:
                 // https://github.com/benfred/venn.js/issues/48#issuecomment-146069777
-                ret = getCenter(areaStats.arcs.map(function (a) { return a.p1; }));
+                ret = getCenter(areaStats.arcs.map((a) => a.p1));
             }
         }
     }
@@ -540,7 +528,7 @@ export function sortAreas(div, relativeTo) {
     }
 
     // need to sort div's so that Z order is correct
-    div.selectAll("g").sort(function (a, b) {
+    div.selectAll("g").sort((a, b) => {
         // highest order set intersections first
         if (a.sets.length != b.sets.length) {
             return a.sets.length - b.sets.length;
@@ -570,9 +558,9 @@ export function circlePath(x, y, r) {
 // inverse of the circlePath function, returns a circle object from an svg path
 export function circleFromPath(path) {
     var tokens = path.split(' ');
-    return {'x' : parseFloat(tokens[1]),
-            'y' : parseFloat(tokens[2]),
-            'radius' : -parseFloat(tokens[4])
+    return {'x' : Number.parseFloat(tokens[1]),
+            'y' : Number.parseFloat(tokens[2]),
+            'radius' : -Number.parseFloat(tokens[4])
             };
 }
 

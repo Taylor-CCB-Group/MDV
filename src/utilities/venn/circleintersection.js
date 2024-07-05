@@ -7,9 +7,7 @@ function intersectionArea(circles, stats) {
     var intersectionPoints = getIntersectionPoints(circles);
 
     // filter out points that aren't included in all the circles
-    var innerPoints = intersectionPoints.filter(function (p) {
-        return containedInCircles(p, circles);
-    });
+    var innerPoints = intersectionPoints.filter((p) => containedInCircles(p, circles));
 
     var arcArea = 0, polygonArea = 0, arcs = [], i;
 
@@ -23,7 +21,7 @@ function intersectionArea(circles, stats) {
             var p = innerPoints[i];
             p.angle = Math.atan2(p.x - center.x, p.y - center.y);
         }
-        innerPoints.sort(function(a,b) { return b.angle - a.angle;});
+        innerPoints.sort((a,b) => b.angle - a.angle);
 
         // iterate over all points, get arc between the points
         // and update the areas

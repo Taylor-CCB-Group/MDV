@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import BaseChart from "../../charts/BaseChart";
-import { BaseConfig, BaseReactChart } from "./BaseReactChart";
+import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { useChart } from "../context";
 import { useChartID } from "../hooks";
 

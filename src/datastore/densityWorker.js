@@ -3,7 +3,7 @@ import {scaleLinear} from "d3-scale";
 
 
 
-onmessage= function(e){
+onmessage= (e)=> {
     const config = e.data[5];
     const cat = new Uint8Array(e.data[4]);
     const y =e.data[3][1]=="int32"? new Int32Array(e.data[3][0]):new Float32Array(e.data[3][0]);
@@ -15,8 +15,8 @@ onmessage= function(e){
     const xscale = scaleLinear().domain(config.xscale[0]).range(config.xscale[1]);
     function calcDensity(category){
         return contourDensity()
-        .x(function(d,i) { return xscale(x[i]); })
-        .y(function(d,i) { return yscale(y[i]); })
+        .x((d,i) => xscale(x[i]))
+        .y((d,i) => yscale(y[i]))
         .weight((d,i)=>{
             if (lFilter[i]==2){
                 return 0;
@@ -38,7 +38,7 @@ onmessage= function(e){
 
     }
     const data=[];
-    for (let i of config.categories){
+    for (const i of config.categories){
         if (i===-1){
             data.push(null)
         }

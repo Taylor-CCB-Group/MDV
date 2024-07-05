@@ -82,7 +82,7 @@ constructor (config={},content) {
       if (!this.footer){
         this._addFooter();
       }
-      for (let but of config.buttons){
+      for (const but of config.buttons){
         this._addButton(but);
       }
     }
@@ -113,12 +113,12 @@ constructor (config={},content) {
 
    
     if (pos[0]+dbox.width > bbox.width){
-      let w= bbox.width-dbox.width;
+      const w= bbox.width-dbox.width;
       pos[0]=w<0?0:w;
       
     }
     if (pos[1]+dbox.height > bbox.height){
-      let h= bbox.height-dbox.height;
+      const h= bbox.height-dbox.height;
       pos[1]=h<0?0:h;
       
     }

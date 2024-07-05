@@ -2,9 +2,9 @@
 
 
 
-onmessage= function(e){  
+onmessage= (e)=> {  
     const data= [];
-    for (let item of e.data[3]){
+    for (const item of e.data[3]){
         data.push(item[1]==="int32"?new Int32Array(item[0]):new Float32Array(item[0]))
     }
     const dLen= data.length
@@ -22,7 +22,7 @@ onmessage= function(e){
         return;
 
     }
-    let result = new Array(dLen);
+    const result = new Array(dLen);
     for (let n=0;n<dLen;n++){
         const arr =  new Array(valLen);
         for (let i=0;i<valLen;i++){
@@ -75,7 +75,7 @@ onmessage= function(e){
 
 function addMedians(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,scaleVals){
     
-    let t= performance.now();
+    const t= performance.now();
     for (let i=0;i<len;i++){
         //if filtered out in global but not in local
         if (gFilter[i]!==0){
@@ -83,7 +83,7 @@ function addMedians(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,sc
             continue;
             }           
         }
-        let c= cat[i];
+        const c= cat[i];
         catTotals[c]++;
         for (let n=0;n<dLen;n++){
             if (isNaN(data[n][i])){
@@ -112,7 +112,7 @@ function addMedians(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,sc
             continue;
             }           
         }
-        let c= cat[i];
+        const c= cat[i];
         for (let n=0;n<dLen;n++){
             if (isNaN(data[n][i])){
                 continue;
@@ -129,10 +129,10 @@ function addMedians(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,sc
         const den = scaleVals[n][1]-scaleVals[n][0]; 
         for(let i=0;i<valLen;i++){   
               
-            let a =result[n][i];
+            const a =result[n][i];
             const li =a[1];
             if (!li){
-                result[n][i]=NaN;
+                result[n][i]=Number.NaN;
                 continue;
             } 
             li.sort();
@@ -148,7 +148,7 @@ function addMedians(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,sc
 
 function addMedianst(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,scaleVals){
     
-    let t= performance.now();
+    const t= performance.now();
     for (let i=0;i<len;i++){
         //if filtered out in global but not in local
         if (gFilter[i]!==0){
@@ -156,7 +156,7 @@ function addMedianst(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,s
             continue;
             }           
         }
-        let c= cat[i];
+        const c= cat[i];
         catTotals[c]++;
         for (let n=0;n<dLen;n++){
             if (isNaN(data[n][i])){
@@ -172,9 +172,9 @@ function addMedianst(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,s
         const den = scaleVals[n][1]-scaleVals[n][0]; 
         for(let i=0;i<valLen;i++){   
               
-            let li =result[n][i];
+            const li =result[n][i];
             if (li.length===0){
-                result[n][i]=NaN;
+                result[n][i]=Number.NaN;
                 continue;
             } 
             li.sort();
@@ -196,7 +196,7 @@ function addAverages(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,s
             continue;
             }           
         }
-        let c= cat[i];
+        const c= cat[i];
         catTotals[c]++;
         for (let n=0;n<dLen;n++){
             if (isNaN(data[n][i])){
@@ -218,7 +218,7 @@ function addAverages(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,s
        
         for(let i=0;i<valLen;i++){  
 
-            let val =result[n][i];
+            const val =result[n][i];
             let r = val[0]/val[1];
             r=(r-scaleVals[n][0])/den;
             result[n][i]= r<0?0:r>1?1:r
@@ -251,7 +251,7 @@ function addSimpleMean(data,gFilter,lFilter,catData,conf){
             a[n].count++;
         }
     }
-    let it = r[0].values[0]
+    const it = r[0].values[0]
     let amax= it.count==0?0:it.total/it.count;
     let amin =amax;
     for (let i=0;i<dlen;i++){

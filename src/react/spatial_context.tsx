@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type RangeDimension from "../datastore/RangeDimension";
-import { BaseReactChart } from "./components/BaseReactChart";
+import type { BaseReactChart } from "./components/BaseReactChart";
 import { PolygonLayer } from '@deck.gl/layers';
 import { useScatterplotLayer } from "./scatter_state";
 

@@ -10,8 +10,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 
-const TextComponent = function({props}: {props: GuiSpec<'text'>}) {
-    return (
+const TextComponent = ({props}: {props: GuiSpec<'text'>}) => (
         <>
             <label>{props.label}</label>
             <input type="text" value={props.current_value} onChange={action(e => {
@@ -21,11 +20,9 @@ const TextComponent = function({props}: {props: GuiSpec<'text'>}) {
             className="w-full"
             />
         </>
-    )
-};
+    );
 
-const TextBoxComponent = function({props}: {props: GuiSpec<'text'>}) {
-    return (
+const TextBoxComponent = ({props}: {props: GuiSpec<'text'>}) => (
         <>
             <label>{props.label}</label>
             <div />
@@ -36,11 +33,9 @@ const TextBoxComponent = function({props}: {props: GuiSpec<'text'>}) {
             className="w-full col-span-2"
             />
         </>
-    )
-};
+    );
 
-const SliderComponent = function({props}: {props: GuiSpec<'slider'>}) {
-    return (
+const SliderComponent = ({props}: {props: GuiSpec<'slider'>}) => (
         <>
             <label>{props.label}</label>
             <input type="range" value={props.current_value} 
@@ -48,16 +43,14 @@ const SliderComponent = function({props}: {props: GuiSpec<'slider'>}) {
             max={props.max || 1}
             step={props.step || 0.01}
             onChange={action(e => {
-                const value = parseFloat(e.target.value);
+                const value = Number.parseFloat(e.target.value);
                 props.current_value = value;
                 if (props.func) props.func(value);
             })} />
         </>
-    )
-};
+    );
 
-const SpinnerComponent = function({props}: {props: GuiSpec<'spinner'>}) {
-    return (
+const SpinnerComponent = ({props}: {props: GuiSpec<'spinner'>}) => (
         <>
             <label>{props.label}</label>
             <input type="number"
@@ -66,14 +59,13 @@ const SpinnerComponent = function({props}: {props: GuiSpec<'spinner'>}) {
             max={props.max || null}
             step={props.step || 1}
             onChange={action(e => {
-                const value = props.current_value = parseInt(e.target.value);
+                const value = props.current_value = Number.parseInt(e.target.value);
                 if (props.func) props.func(value);
             })} />
         </>
     )
-}
 
-const DropdownComponent = function({props}: {props: GuiSpec<'dropdown' | 'multidropdown'>}) {
+const DropdownComponent = ({props}: {props: GuiSpec<'dropdown' | 'multidropdown'>}) => {
     const id = useId();
     const [filter, setFilter] = useState('');
     const filterArray = filter.toLowerCase().split(' ');
@@ -113,8 +105,7 @@ const DropdownComponent = function({props}: {props: GuiSpec<'dropdown' | 'multid
     )
 };
 
-const CheckboxComponent = function({props}: {props: GuiSpec<'check'>}) {
-    return (
+const CheckboxComponent = ({props}: {props: GuiSpec<'check'>}) => (
         <>
             <label>{props.label}</label>
             <input type="checkbox" checked={props.current_value} onChange={action(e => {
@@ -122,10 +113,9 @@ const CheckboxComponent = function({props}: {props: GuiSpec<'check'>}) {
                 if (props.func) props.func(e.target.checked);
             })}/>
         </>
-    )
-};
+    );
 
-const RadioButtonComponent = function({props}: {props: GuiSpec<'radiobuttons'>}) {
+const RadioButtonComponent = ({props}: {props: GuiSpec<'radiobuttons'>}) => {
     const id = useId();
     return (
         <>
@@ -169,34 +159,29 @@ const RadioButtonComponent = function({props}: {props: GuiSpec<'radiobuttons'>})
     )
 };
 
-const DoubleSliderComponent = function({props}: {props: GuiSpec<'doubleslider'>}) {
-    return (
+const DoubleSliderComponent = ({props}: {props: GuiSpec<'doubleslider'>}) => (
         <>
             <label>{props.label}</label>
             <input type="range" value={props.current_value[0]} onChange={action(e => {
-                const v = props.current_value[0] = parseFloat(e.target.value);
+                const v = props.current_value[0] = Number.parseFloat(e.target.value);
                 if (props.func) props.func([v, props.current_value[1]]);
             })} />
             <input type="range" value={props.current_value[1]} onChange={action(e => {
-                const v = props.current_value[1] = parseFloat(e.target.value);
+                const v = props.current_value[1] = Number.parseFloat(e.target.value);
                 if (props.func) props.func([props.current_value[0], v]);
             })} />
         </>
-    )
-};
+    );
 
-const ButtonComponent = function({props}: {props: GuiSpec<'button'>}) {
-    return (
+const ButtonComponent = ({props}: {props: GuiSpec<'button'>}) => (
         <>
             <button onClick={action(e => {
                 if (props.func) props.func(undefined);
             })}>{props.label}</button>
         </>
-    )
-};
+    );
 
-const FolderComponent = function({props}: {props: GuiSpec<'folder'>}) {
-    return (
+const FolderComponent = ({props}: {props: GuiSpec<'folder'>}) => (
         <Accordion type='single' collapsible className="w-full col-span-2">
             <AccordionItem value={props.label}>
                 <AccordionTrigger>{props.label}</AccordionTrigger>
@@ -206,7 +191,6 @@ const FolderComponent = function({props}: {props: GuiSpec<'folder'>}) {
             </AccordionItem>
         </Accordion>
     )
-}
 
 const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> = {
     'text': observer(TextComponent),
@@ -222,7 +206,7 @@ const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> =
     'folder': observer(FolderComponent),
 } as const;
 
-const ErrorComponent = function({props}: {props: GuiSpec<GuiSpecType>}) {
+const ErrorComponent = ({props}: {props: GuiSpec<GuiSpecType>}) => {
     const [expanded, setExpanded] = useState(false);
     return (
         <div className="border-red-500 border-2 border-solid" onClick={e => setExpanded(!expanded)}>
@@ -232,7 +216,7 @@ const ErrorComponent = function({props}: {props: GuiSpec<GuiSpecType>}) {
     )
 }
 
-const AbstractComponent = observer(function({props}: {props: GuiSpec<GuiSpecType>}) {
+const AbstractComponent = observer(({props}: {props: GuiSpec<GuiSpecType>}) => {
     const Component = Components[props.type];
     return (
         <div className="grid grid-cols-2 p-1 justify-items-start">
@@ -243,7 +227,7 @@ const AbstractComponent = observer(function({props}: {props: GuiSpec<GuiSpecType
     )
 })
 
-export default observer(function({chart}: {chart: Chart}) {
+export default observer(({chart}: {chart: Chart}) => {
     const settings = useMemo(() => {
         const settings = chart.getSettings();
         const wrap = {settings};

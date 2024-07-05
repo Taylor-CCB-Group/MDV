@@ -97,9 +97,7 @@ import {Slick} from "./Slick.js";
         && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey 
         && (e.which == Slick.keyCode.UP || e.which == Slick.keyCode.DOWN)) {
           var selectedRows = getSelectedRows();
-          selectedRows.sort(function (x, y) {
-            return x - y;
-          });
+          selectedRows.sort((x, y) => x - y);
   
           if (!selectedRows.length) {
             selectedRows = [activeRow.row];
@@ -144,9 +142,7 @@ import {Slick} from "./Slick.js";
           selection.push(cell.row);
           _grid.setActiveCell(cell.row, cell.cell);
         } else if (idx !== -1 && (e.ctrlKey || e.metaKey)) {
-          selection = selection.filter(function (o, i) {
-            return (o !== cell.row);
-          });
+          selection = selection.filter((o, i) => (o !== cell.row));
           _grid.setActiveCell(cell.row, cell.cell);
         } else if (selection.length && e.shiftKey) {
           var last = selection.pop();

@@ -48,7 +48,7 @@ class ImagePanZoom{
     zoom(amount,event){
         amount = amount>0?1.1:.9;
         const cbox = this.container.getBoundingClientRect();
-        let ibox =  this.img.getBoundingClientRect();
+        const ibox =  this.img.getBoundingClientRect();
         const  dx = ((event.clientX-cbox.left)  - this.img.offsetLeft) * (amount-1);
         const dy = ((event.clientY-cbox.top) - this.img.offsetTop) * (amount-1);
       

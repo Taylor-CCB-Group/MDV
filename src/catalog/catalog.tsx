@@ -34,7 +34,7 @@ const Projects = () => {
     const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<string | null>(null);
     useEffect(() => {
-        (async function () {
+        (async () => {
             const response = await fetch('/projects');
             const data = await response.json();
             setProjects(data);

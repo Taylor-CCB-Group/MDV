@@ -17,7 +17,7 @@ class TableChart extends BaseChart{
         //add the index column (unless told not to)
         if (config.include_index !== false) cols = [{field:"__index__",id:"__index__",name:"index",datatype:"integer",sortable:true,width:100}];
         const cw = config.column_widths || {};
-        for (let c of this.config.param){
+        for (const c of this.config.param){
             const column = dataStore.columnIndex[c];
             const col = {
                 id:column.field,
@@ -158,7 +158,7 @@ class TableChart extends BaseChart{
 
         config.param = cols.filter(x=>x.field!=="__index__").map(x=>x.field);
         config.column_widths= {};
-        for (let c of cols){
+        for (const c of cols){
             if (c.width!==100){
                 config.column_widths[c.field]=c.width;
             }
@@ -281,7 +281,7 @@ class TableChart extends BaseChart{
     }
     _rowsSelected(args){
         const indexes=[];
-        for (let i of args.rows){
+        for (const i of args.rows){
             indexes.push(this.dataModel.data[i]);
         }
         
@@ -440,7 +440,7 @@ class AddColumnDialog extends BaseDialog{
         createEl("div",{text:"Copy Existing Column"},dc);
         const cols = table.getColumnInfo()
         this.cloneCol =createEl("select",{},d2);
-        for (let c of cols){
+        for (const c of cols){
             createEl("option",{text:c.name,value:c.field},this.cloneCol);
         }
         const d3 = createEl("div",{style:dstyle},this.dialog);
@@ -455,8 +455,8 @@ class AddColumnDialog extends BaseDialog{
             this.name.focus();
             return;
         }
-        let clone = this.cloneCheck.checked?this.cloneCol.value:null;
-        let pos = parseInt(this.position.value);
+        const clone = this.cloneCheck.checked?this.cloneCol.value:null;
+        let pos = Number.parseInt(this.position.value);
         pos = isNaN(pos)?null:pos
         this.table.createColumn(this.name.value,clone,pos);
         this.close();

@@ -20,7 +20,7 @@ class CustomDialog extends BaseDialog{
         this.controlValues={};
         this.controls={};
         if (config._buttons){
-            for (let b of config._buttons){
+            for (const b of config._buttons){
                 this.addButton(b);
             }
         }
@@ -30,11 +30,11 @@ class CustomDialog extends BaseDialog{
         }
      
         if (config.controls){
-            for (let s of config.controls){
+            for (const s of config.controls){
                 if (!s.id){
                     s.id=s.label;
                 }
-                let d = createEl("div",{
+                const d = createEl("div",{
                     styles:{
                         padding:"5px"
                     }
@@ -55,7 +55,7 @@ class CustomDialog extends BaseDialog{
     radiobuttons(s,d){
         const d1 =createEl("div",{},d);
         this.controlValues[s.id]=s.current_value;
-        for (let c of s.choices){
+        for (const c of s.choices){
             createEl("span",{   
                 text:c[0]
             },d1);
@@ -94,7 +94,7 @@ class CustomDialog extends BaseDialog{
         });
         this.controlValues[s.id]=s.current_value;
         sl.noUiSlider.on("end",(values)=>{
-            const v= parseFloat(values[0]);
+            const v= Number.parseFloat(values[0]);
             this.controlValues[s.id]=v;
             if (s.func){
                 s.func(v);
@@ -107,7 +107,7 @@ class CustomDialog extends BaseDialog{
         while(dd.length!==0){
             dd.remove(0);
         }
-        for (let item of items){
+        for (const item of items){
             createEl("option",{
                 text:item.text,
                 value:item.value
@@ -123,7 +123,7 @@ class CustomDialog extends BaseDialog{
                 maxWidth:"200px"
             }
         });
-        for (let item of s.items){
+        for (const item of s.items){
             createEl("option",{
                 text:item.text,
                 value:item.value
@@ -153,7 +153,7 @@ class CustomDialog extends BaseDialog{
                 classes:["ciview-button-sm"]
             },menu);
             sall.addEventListener("click",()=>{
-                for (let ch of s.checkboxes){
+                for (const ch of s.checkboxes){
                     self.controls[ch.id].checked=check;
                     self.controlValues[ch.id]=check;
                 }
@@ -165,7 +165,7 @@ class CustomDialog extends BaseDialog{
        
        
         const cbHolder = createEl("div",{},d);
-        for (let cb of s.checkboxes){
+        for (const cb of s.checkboxes){
             const cbd =  createEl("div",{styles:{
                 display:"inline-block",
                 padding:"3px"

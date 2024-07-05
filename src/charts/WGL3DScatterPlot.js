@@ -40,9 +40,9 @@ class WGL3DScatterPlot extends WGLChart{
 		});
        
         const colorFunc = this.afterAppCreation();
-        let cx = this.dataStore.columnIndex[p[0]];
-		let cy = this.dataStore.columnIndex[p[1]];
-        let cz = this.dataStore.columnIndex[p[2]];
+        const cx = this.dataStore.columnIndex[p[0]];
+		const cy = this.dataStore.columnIndex[p[1]];
+        const cz = this.dataStore.columnIndex[p[2]];
 
 
         this.app.addCircles({
@@ -167,7 +167,7 @@ class WGL3DScatterPlot extends WGLChart{
         const c = this.config.center;
         const s  = this.config.axis_scales;
         for (let index=0;index<3;index++){
-            let mm = this.dataStore.getMinMaxForColumn(this.config.param[index]);
+            const mm = this.dataStore.getMinMaxForColumn(this.config.param[index]);
             const color = [0,0,0];
             color[index]=255;
             const from = c.map((x,i)=>i==index?mm[0]:x/s[i]);

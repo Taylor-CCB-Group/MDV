@@ -75,7 +75,7 @@ class FileUploadDialog extends BaseDialog{
             files = resp.files;
             this.infoDiv.textContent=resp.msg
         }
-        for (let file of files){
+        for (const file of files){
             this.addFile(file);
         }
 
@@ -88,11 +88,11 @@ class FileUploadDialog extends BaseDialog{
             if (this.onupload){
                 data = this.onupload(this.files);
             }
-            let xhr = new XMLHttpRequest();
-    		let fd = new FormData();
+            const xhr = new XMLHttpRequest();
+    		const fd = new FormData();
     		xhr.responseType="json";
     		xhr.open("POST", this.url, true);
-            for (let index in  this.files){
+            for (const index in  this.files){
 				fd.append("file"+index, this.files[index]);
 			}
     		fd.append("data",JSON.stringify(data));

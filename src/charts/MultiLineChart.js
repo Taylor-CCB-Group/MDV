@@ -33,9 +33,9 @@ class MultiLineChart extends SVGChart{
             c.color_legend={display:c.stacked?false:true}
         }
         //set default band width
-        let mm = this.dataStore.getMinMaxForColumn(c.param[0]);
+        const mm = this.dataStore.getMinMaxForColumn(c.param[0]);
         let xx= mm.slice(0);
-        let yy= [1,0];
+        const yy= [1,0];
         if (config.scaletrim){
             xx = [0,1];
         }
@@ -151,7 +151,6 @@ class MultiLineChart extends SVGChart{
         this.y_scale.domain(axisd);
         this.updateAxis();
         const xpos= this.ticks.map(x=>this.x_scale(x));
-        const self = this;
         const colors = this.dataStore.getColumnColors(this.config.param[1]);
         const ga =this.graph_area.selectAll(".chart-line")
         .data(display_data);
@@ -159,10 +158,10 @@ class MultiLineChart extends SVGChart{
         .attr("class","chart-line")
         .on("mouseover pointermove",(e,d)=>{          
             const label = vals[d.id];
-            self.showToolTip(e,label);
+            this.showToolTip(e,label);
         }).
         on("mouseout",()=>{
-            self.hideToolTip();
+            this.hideToolTip();
         })
         .transition(trans)
         .attr("fill", "none")
@@ -189,8 +188,8 @@ class MultiLineChart extends SVGChart{
 
       if (c.fill){
             const a= area()
-            .x(function(d,i) { return xpos[i]; })
-            .y0(function(d,i) { return d; })
+            .x((d,i) => xpos[i])
+            .y0((d,i) => d)
             .y1((d,i)=>{
                 c.stacked?(rowHeight*d.id)+rowHeight:cdim.height
             });
@@ -202,14 +201,12 @@ class MultiLineChart extends SVGChart{
         .transition(trans)
         .attr("fill", d=>colors[d.id])
         .style("opacity", 0.5)
-        .attr("d", function(d,i){
-            return area()
-            .x(function(dd,ii) { return xpos[ii]; })
-            .y0(function(dd) { return dd; })
+        .attr("d", (d,i)=> area()
+            .x((dd,ii) => xpos[ii])
+            .y0((dd) => dd)
             .y1(d=>{
                 return c.stacked?(rowHeight*i)+rowHeight:cdim.height;
-            })(d);
-        });
+            })(d));
     
     }else{
         this.graph_area.selectAll(".chart-area").remove();

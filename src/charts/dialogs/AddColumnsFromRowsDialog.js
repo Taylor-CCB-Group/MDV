@@ -38,7 +38,7 @@ class AddColumnsFromRowsDialog extends BaseDialog{
             
             //add the radio buttons for type
             this.rn = getRandomString();
-            for (let sg in this.link.subgroups){
+            for (const sg in this.link.subgroups){
                 createEl("label",{
                     text:this.link.subgroups[sg].label
                 },this.footer);
@@ -169,7 +169,7 @@ class AddColumnsFromRowsDialog extends BaseDialog{
         createEl("br",{},this.colorDiv);
         this.colorChartSelect = createEl("select",{styles:{maxWidth:"150px"}},this.colorDiv);
       
-        for (let cid in this.cm.charts){
+        for (const cid in this.cm.charts){
             this._addColorChartOption(this.cm.charts[cid].chart);
            
         }
@@ -216,7 +216,7 @@ class AddColumnsFromRowsDialog extends BaseDialog{
         const multi = Array.isArray(col)
         const arr = multi?col:[col];
         const fs= [];
-        for (let c of arr){
+        for (const c of arr){
             const f = `${sg}|${c.value}(${sg})|${c.index}`
             this.ds.dataStore.addColumnFromField(f);
             fs.push(f);

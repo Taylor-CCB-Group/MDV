@@ -32,12 +32,12 @@ class CategoryDimension extends Dimension{
         } //end typeof category === "string"
         else { //category is an array
             const cats = new Set();
-            for (let cat of category){
+            for (const cat of category){
                 cats.add(vals.indexOf(cat));
             }
             if (col.datatype==="multitext"){
                 const int = col.stringLength;
-                let ao = category.operand === "and";
+                const ao = category.operand === "and";
                 const catsArr = category.map(c => vals.indexOf(c));
                 const singleCat = cats.size === 1;
 
@@ -46,7 +46,7 @@ class CategoryDimension extends Dimension{
                     //nb, this is based on the premise that we want "and" of ['a', 'a'] to require two 'a's, so using array rather than Set
                     //in any case, we need to remove found categories for a given row as we go,
                     //otherwise we end up with a false positive if the same category is used twice
-                    let catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
+                    const catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
                     for (let n=st; n < st+int; n++) {
                         if (data[n]===65535) {
                             //... if this row only has one item, we can't possibly have two of the same item,
@@ -168,12 +168,12 @@ class CategoryDimension extends Dimension{
             }     
         }
         else {
-            for (let cat of category){
+            for (const cat of category){
                 cats.add(vals.indexOf(cat));
             }
             if (col.datatype==="multitext"){
                 const int = col.stringLength;
-                let ao = category.operand === "and";
+                const ao = category.operand === "and";
                 const catsArr = category.map(c => vals.indexOf(c));
                 const singleCat = cats.size === 1;
                 for (let i=0;i<len;i++){

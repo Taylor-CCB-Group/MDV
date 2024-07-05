@@ -34,9 +34,6 @@ class RingChart extends CategoryChart{
         
         //only get categories with >1 count
         const data = this.pie(this.rowData.filter(x=>x[0]!==0));
-      
-        //update the pie chart
-        const self = this;
         this.graph_area.selectAll(".pie-arc")
         .data(data,(d,i)=>{
             d.data[1];
@@ -44,12 +41,12 @@ class RingChart extends CategoryChart{
         .join("path")
         
         .on("click",(e,d)=>{
-            self.filterCategories(vals[d.data[1]],e.shiftKey);
+            this.filterCategories(vals[d.data[1]],e.shiftKey);
         })
       
         .style("fill",(d,i)=>{
-            if (self.filter.length>0){
-                if (self.filter.indexOf(vals[d.data[1]])===-1){
+            if (this.filter.length>0){
+                if (this.filter.indexOf(vals[d.data[1]])===-1){
                     return "lightgray"
                 }
             }
@@ -68,7 +65,7 @@ class RingChart extends CategoryChart{
             d.data[1]})
         .join("text")
         .on("click",(e,d)=>{
-            self.filterCategories(vals[d.data[1]],e.shiftKey);
+            this.filterCategories(vals[d.data[1]],e.shiftKey);
         })
         .attr("class","pie-text")
         .text((d,i)=>{
@@ -77,10 +74,10 @@ class RingChart extends CategoryChart{
             return angle > 0.4?vals[d.data[1]]:"";
         })
         .attr("x",(d)=>{    
-           return  self.arc.centroid(d)[0]
+           return  this.arc.centroid(d)[0]
         })
         .attr("font-size",fontSize+"px")
-        .attr("y",(d)=>self.arc.centroid(d)[1])
+        .attr("y",(d)=>this.arc.centroid(d)[1])
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "central") 
     }     

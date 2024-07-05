@@ -24,7 +24,7 @@ onmessage=function(e){
         return meth;
     })
     ord.sort((a,b)=>{
-        for (let m of methods){
+        for (const m of methods){
             const r = m(a,b);
             if (r!==0){
                 return r;

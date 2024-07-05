@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
+import type React from "react";
+import { useState, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from 'axios';
 import { useProject } from "../../modules/ProjectContext";
@@ -302,7 +303,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
       headers: {
         'Content-Type': 'multipart/form-data'
       },
-      onUploadProgress: function (progressEvent) {
+      onUploadProgress: (progressEvent) => {
         const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         setProgress(percentComplete); // Update the progress as the file uploads
       }

@@ -28,7 +28,7 @@ class SVGChart extends BaseChart{
         }
         
         //add default values for axis if not specified in config
-        for (let at of [["x",25],["y",40],["ry",25],["tx",25]]){
+        for (const at of [["x",25],["y",40],["ry",25],["tx",25]]){
             const ati = axisTypes[at[0]]
             if (ati) {
                 cax[at[0]] = cax[at[0]] || {}//textsize:13,label:"",size:ati.size||at[1]};
@@ -242,12 +242,12 @@ class SVGChart extends BaseChart{
         const nodes= treeMap(nodeData);
         const desc=  nodes.descendants();
         const interval= b.width/number;
-        for (let n of desc){
+        for (const n of desc){
             if (!n.children){                     		
                 n.x =(interval/2)+(interval*n.data.order);
             }
         }
-        for (let n of desc){
+        for (const n of desc){
             if (!n.children){
                 let i=n.parent;            
                 while(i){
@@ -287,12 +287,12 @@ class SVGChart extends BaseChart{
         const nodes= treeMap(nodeData);
         const desc=  nodes.descendants();
         const interval= b.height/number;
-        for (let n of desc){
+        for (const n of desc){
             if (!n.children){                     		
                 n.x =(interval/2)+(interval*n.data.order);
             }
         }
-        for (let n of desc){
+        for (const n of desc){
             if (!n.children){
                 let i=n.parent;            
                 while(i){

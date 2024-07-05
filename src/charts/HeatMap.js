@@ -106,7 +106,7 @@ class HeatMap extends SVGChart{
         }
         const config={method:this.config.method,scaleVals:[]};
         const p =this.config.param;
-        let q = this.config.color_scale.trim=="none"?null:this.config.color_scale.trim;
+        const q = this.config.color_scale.trim=="none"?null:this.config.color_scale.trim;
         for (let x=1;x<p.length;x++){
             const col = this.dataStore.columnIndex[p[x]];
             config.scaleVals.push([q?col.quantiles[q][0]:col.minMax[0],q?col.quantiles[q][1]:col.minMax[1]]);
@@ -174,8 +174,6 @@ class HeatMap extends SVGChart{
         this.cat_scale.domain([cMax,0]);
         const cUnits = cMax===0?0:40/cMax;
         const cTotals = this.data.transpose.map(x=>[this.data.catTotals[x._id],x._id])
-       
-        const self = this;
         const recHeight = dim.height/(this.config.param.length-1);
         this.graph_area.selectAll(".heatmap-row")
         .data(this.data.averages)
@@ -185,8 +183,8 @@ class HeatMap extends SVGChart{
         .selectAll(".heatmap-rect")
         .data(d=>d.map((x,i)=>{
             const row_id= d._id;
-            const col_id= self.data.transpose[i]._id;
-           return {av:self.data.transpose[i][row_id],row_id:row_id,col_id:col_id,miss:false}
+            const col_id= this.data.transpose[i]._id;
+           return {av:this.data.transpose[i][row_id],row_id:row_id,col_id:col_id,miss:false}
         }))
         .join("rect")
         .attr("class","heatmap-rect")
@@ -194,7 +192,7 @@ class HeatMap extends SVGChart{
         .attr("height",recHeight)
         .attr("width",recWidth)
         .on("click",(e,d)=>{
-            const row = self.config.param[d.row_id+1];
+            const row = this.config.param[d.row_id+1];
             this._callListeners("cell_clicked",{
                 row:row,
                 col:vals[d.col_id],
@@ -202,19 +200,19 @@ class HeatMap extends SVGChart{
             });
         })
         .on("mouseover pointermove",(e,d)=>{ 
-            const row = self.dataStore.columnIndex[self.config.param[d.row_id+1]].name;
+            const row = this.dataStore.columnIndex[this.config.param[d.row_id+1]].name;
 
-            self.showToolTip(e,`${vals[d.col_id]}<br>${row}<br>${d.av.toPrecision(2)}`);
+            this.showToolTip(e,`${vals[d.col_id]}<br>${row}<br>${d.av.toPrecision(2)}`);
         }).
         on("mouseleave",()=>{
-            self.hideToolTip();
+            this.hideToolTip();
         })   
         .transition(trans)
         .attr("fill",(d,i)=>{
             if (d.miss){
                 return "#DCDCDC";
             }
-           return self.colorFunction(d.av);
+           return this.colorFunction(d.av);
         });
 
         const trans2 =  select(this.contentDiv).transition()

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import DataStore from "../../datastore/DataStore.js";
-import TagModel from "../../table/TagModel";
+import type DataStore from "../../datastore/DataStore.js";
+import type TagModel from "../../table/TagModel";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createMdvPortal } from "@/react/react_utils";
 import { X } from "lucide-react";

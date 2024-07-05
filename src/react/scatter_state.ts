@@ -1,12 +1,12 @@
 import { Matrix4 } from '@math.gl/core';
-import { PickingInfo } from "deck.gl/typed";
-import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
+import type { PickingInfo } from "deck.gl/typed";
+import type { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
 import { useChart, useDataStore } from "./context";
 import { useChartID, useChartSize, useConfig, useParamColumns } from "./hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
-import { ViewState } from './components/VivScatterComponent';
+import type { ViewState } from './components/VivScatterComponent';
 import { ScatterplotExLayer } from '../webgl/ImageArrayDeckExtension';
 import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 import { useHighlightedIndex } from './selectionHooks';

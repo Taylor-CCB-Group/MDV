@@ -197,7 +197,7 @@ class BaseChart{
     }
 
     _callListeners(type,data){
-        for (let id in this.listeners){
+        for (const id in this.listeners){
             this.listeners[id](type,data);
         }
     }
@@ -263,7 +263,7 @@ class BaseChart{
             if (typeof this.config.param === "string" ){
                 cols=[this.config.param];
             }
-            for (let p of cols){
+            for (const p of cols){
                 if (columns.indexOf(p)!==-1){
                     isDirty=true;
                     break;
@@ -391,7 +391,7 @@ class BaseChart{
         if (typeof this.config.param === "string" ){
             cols=[this.config.param];
         }
-        for (let p of cols){
+        for (const p of cols){
             if (column===p){
                 isDirty=true;
                 break;
@@ -479,7 +479,7 @@ class BaseChart{
     */
     getSettings(){
         const c= this.config;
-        let settings = [
+        const settings = [
             {
                 type:"text",
                 label:"Chart Name",
@@ -704,7 +704,7 @@ class BaseChart{
             this.addToolTip();
         }
         if (this.extra_legends){
-            for (let l of this.extra_legends){
+            for (const l of this.extra_legends){
                 if (this[l]){
                     this[l].__doc__=doc;
                 }
@@ -779,8 +779,8 @@ class BaseChart{
         const originalColor =this.contentDiv.style.color;
         this.contentDiv.style.color = "black";
         this.getImage(resp=>{
-            let link =document.createElement("a");
-            let name = this.config.title || "image"
+            const link =document.createElement("a");
+            const name = this.config.title || "image"
             link.download=name+"."+im_type;
             if (im_type==="svg"){
                 link.href="data:image/svg+xml," + encodeURIComponent(resp);
@@ -831,7 +831,7 @@ class BaseChart{
     const svgBlob = new Blob([data], {type: "image/svg+xml;charset=utf-8"});
     const url = DOMURL.createObjectURL(svgBlob);
     img.src = url;
-          img.onload = function () {
+          img.onload = () => {
           ctx.drawImage(img, 0, 0);
           callback(canvas,ctx)
     }

@@ -6,7 +6,7 @@ import { ImageArray } from "../webgl/ImageArray";
 //import { ScatterplotLayer } from 'deck.gl/typed'; // -no, using ScatterplotExLayer
 import { ScatterplotExLayer, ImageArrayDeckExtension } from '../webgl/ImageArrayDeckExtension';
 import { OrthographicView } from "deck.gl/typed";
-import Dimension from "../datastore/Dimension.js";
+import type Dimension from "../datastore/Dimension.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
 type Column = { data: Float32Array, minMax: [number, number] }
@@ -37,7 +37,7 @@ class ImageScatterChart extends BaseChart {
         this.dataModel.setColumns([...config.param, image_key, config.image_title]);
         this.dataModel.updateModel();
         //----------------
-        const s = parseInt(texture_size);
+        const s = Number.parseInt(texture_size);
         this.imageArray = new ImageArray(dataStore, canvas, this.dataModel, {
             base_url,
             image_type: config.images.type,
@@ -281,7 +281,7 @@ BaseChart.types["ImageScatterChart"] = {
     },
     extra_controls: (dataStore) => {
         const imageSets = [];
-        for (let iname in dataStore.images) {
+        for (const iname in dataStore.images) {
             imageSets.push({ name: iname, value: iname })
         }
         console.log('imageSets', imageSets);

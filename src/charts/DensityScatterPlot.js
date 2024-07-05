@@ -119,14 +119,14 @@ class DensityScatterPlot extends WGLScatterPlot{
 
     drawChart(tTime=400){
         const c = this.config;
-        for (let i in this.catKeys){
-            let ck=this.catKeys[i];
+        for (const i in this.catKeys){
+            const ck=this.catKeys[i];
             if (ck===-1){
                 this.graph_area.selectAll(`.dp-poly-${i}`).remove();
             }
             else{
-                let color = this.dataStore.getColumnColors(c.param[2])[ck]
-                let  colorScale = scaleLinear([0,1-c.contour_intensity],["white",color]);
+                const color = this.dataStore.getColumnColors(c.param[2])[ck]
+                const  colorScale = scaleLinear([0,1-c.contour_intensity],["white",color]);
                 this._drawContours(color,colorScale,i);
         
             }
@@ -134,7 +134,7 @@ class DensityScatterPlot extends WGLScatterPlot{
     }
 
     getContextMenu(){
-        let cm = super.getContextMenu();
+        const cm = super.getContextMenu();
         if (this.dataStore.regions && !this.config.viv){
             cm.push({
                 text:"Set as Default Image",
@@ -193,12 +193,12 @@ class DensityScatterPlot extends WGLScatterPlot{
                    
                 },
                 onchange:(controls,x)=>{
-                    let cats = this.dataStore.getColumnValues(x);
+                    const cats = this.dataStore.getColumnValues(x);
                     const cs = cats.slice(0);
                     cs.push("None");
-                    for (let n of ["Contour Category 1","Contour Category 2"]){
+                    for (const n of ["Contour Category 1","Contour Category 2"]){
                         controls[n].innerHTML="";
-                        for (let c of cs){
+                        for (const c of cs){
                             createEl("option",{
                                 text:c,
                                 value:c
@@ -331,7 +331,7 @@ BaseChart.types["image_scatter_plot"]={
     required:["regions"],
     extra_controls:(ds)=>{
         const vals=[];
-        for(let x in ds.regions.all_regions){
+        for(const x in ds.regions.all_regions){
             vals.push({name:x,value:x})
         }
         return [

@@ -23,7 +23,7 @@
 function processArrayBuffer(data,columns,size){
     const dataList= [];
 	let offset=0;
-	for (let column of columns){
+	for (const column of columns){
         //default values for numbers
 		let arrayType= column.datatype==="int32"?Int32Array:Float32Array;
         //the length of the typed array
@@ -67,7 +67,7 @@ function processArrayBuffer(data,columns,size){
 			const sab = new SharedArrayBuffer(size*4);
 			const new_arr= new Float32Array(sab);
             //fill array with missing values
-			new_arr.fill(NaN);
+			new_arr.fill(Number.NaN);
             //add the sparse data
 			for (let i=0;i<indexes.length;i++){
 				new_arr[indexes[i]]=values[i];	
@@ -78,7 +78,7 @@ function processArrayBuffer(data,columns,size){
 			const len  = size*bytes;
             //get the data from the arraybuffer into a SharedArrayBuffer
             //unfortunately cannot be copied directly-  have to via a typed Array
-			let arr = new arrayType(data,offset,arr_len);
+			const arr = new arrayType(data,offset,arr_len);
 			const sab = new SharedArrayBuffer(len);
 			const new_arr =  new arrayType(sab)
 			new_arr.set(arr,0);
@@ -134,7 +134,7 @@ function getArrayBufferDataLoader(url){
 
 function getLocalCompressedBinaryDataLoader(dataSources,folder){
     const loaders = {}
-    for (let ds of dataSources) {
+    for (const ds of dataSources) {
         loaders[ds.name] = new CompressedBinaryDataLoader(`${folder}/${ds.name}.gz`, ds.size);
     }
     return async (columns, dataSource, size) => {
@@ -197,7 +197,7 @@ class CompressedBinaryDataLoader {
                     const sb = new SharedArrayBuffer(size*4)
                     const new_arr= new Float32Array(sb);
                     //fill array with missing values
-                    new_arr.fill(NaN);
+                    new_arr.fill(Number.NaN);
                     for (let i=0;i<indexes.length;i++){
                         new_arr[indexes[i]]=values[i];	
                     }

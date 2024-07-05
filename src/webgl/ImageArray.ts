@@ -1,6 +1,6 @@
 import { getProjectURL } from '../dataloaders/DataLoaderUtil';
-import DataStore from '../datastore/DataStore';
-import { DataModel } from '../table/DataModel';
+import type DataStore from '../datastore/DataStore';
+import type { DataModel } from '../table/DataModel';
 import { createEl } from '../utilities/Elements';
 
 export type ImageArrayConfig = {

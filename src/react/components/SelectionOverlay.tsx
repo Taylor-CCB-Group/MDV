@@ -7,10 +7,10 @@ import ControlCameraOutlinedIcon from '@mui/icons-material/ControlCameraOutlined
 import StraightenIcon from '@mui/icons-material/Straighten';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMetadata, useViewerStore } from "./avivatorish/state";
-import { useFilteredIndices, useRegionScale, useScatterplotLayer } from "../scatter_state";
+import { useFilteredIndices, useRegionScale, type useScatterplotLayer } from "../scatter_state";
 import { useChart } from "../context";
 import { useMeasure, useRange } from "../spatial_context";
-import RangeDimension from "../../datastore/RangeDimension";
+import type RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
 import type { VivMDVReact } from "./VivMDVReact";
 import { runInAction } from "mobx";
@@ -212,7 +212,7 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
 }
 
 function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProps) {
-    const pLastRef = useRef([NaN, NaN]);
+    const pLastRef = useRef([Number.NaN, Number.NaN]);
     const handleMouseMove = useCallback((e: MouseEvent) => {
         const p = unproject(e);
         const pLast = pLastRef.current;

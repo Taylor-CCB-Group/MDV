@@ -34,7 +34,7 @@ class BoxPlot extends ViolinPlot{
         const catLen= this.data.length;
         const yscale = this.y_scale;
         const values=[]
-        for (let i of this.data){
+        for (const i of this.data){
             values.push(this.values[i.id]);
         }
         this.x_scale.domain(values);

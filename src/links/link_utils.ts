@@ -1,6 +1,6 @@
 import { runInAction } from "mobx";
-import ChartManager from "../charts/ChartManager";
-import { ColumnName } from "../charts/charts";
+import type ChartManager from "../charts/ChartManager";
+import type { ColumnName } from "../charts/charts";
 // zod?
 
 type ChartLink = {

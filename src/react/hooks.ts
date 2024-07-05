@@ -5,7 +5,7 @@ import type { OME_TIFF } from "./components/avivatorish/state";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import { DataColumn } from "../charts/charts";
+import type { DataColumn } from "../charts/charts";
 
 /**
  * Get the chart's config.

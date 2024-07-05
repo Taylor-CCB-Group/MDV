@@ -112,7 +112,7 @@ export function createFilterElement(selectEl, parent) {
     }, parent);
     filter.oninput = (e) => {
         const val = e.target.value.toLowerCase().split(" ");
-        for (let o of selectEl.options) {
+        for (const o of selectEl.options) {
             const filter = val.some((v) => o.text.toLowerCase().indexOf(v) === -1);
             if (filter) {
                 o.style.display = "none";
@@ -185,7 +185,7 @@ function makeSortable(list,config={}){
 
     //add dummy element, allows items to be dragged to the beginning
     //of the list i.e. after the dummy element
-    let firstDummyEl= createEl("div",  {styles:{height:"5px"}});
+    const firstDummyEl= createEl("div",  {styles:{height:"5px"}});
     list.prepend(firstDummyEl);
     firstDummyEl.addEventListener("dragover",handleDragOver);
     //add drag events to all child elements
@@ -230,8 +230,8 @@ function makeResizable(el,config={}){
     function initDrag(e) {
         ri.startX = e.clientX;
         ri.startY = e.clientY;
-        ri.startWidth = parseInt(document.defaultView.getComputedStyle(el).width, 10);
-        ri.startHeight = parseInt(document.defaultView.getComputedStyle(el).height, 10);
+        ri.startWidth = Number.parseInt(document.defaultView.getComputedStyle(el).width, 10);
+        ri.startHeight = Number.parseInt(document.defaultView.getComputedStyle(el).height, 10);
         el.__doc__.documentElement.addEventListener("mousemove", doDrag, false);
         el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
     }
@@ -305,9 +305,9 @@ function makeDraggable(el,config={}){
     }
 
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    let  handle= config.handle?el.querySelector(config.handle):el;
+    const  handle= config.handle?el.querySelector(config.handle):el;
     let cont = null;
-    let is_moving=false;
+    const is_moving=false;
     if (config.contain){
         cont={
             dir:config.contain
@@ -357,8 +357,8 @@ function makeDraggable(el,config={}){
         pos3 = e.clientX;
         pos4 = e.clientY;
         // set the element's new position:
-        let nt  = el.offsetTop -pos2;
-        let nl = el.offsetLeft - pos1;
+        const nt  = el.offsetTop -pos2;
+        const nl = el.offsetLeft - pos1;
         if (cont){
             if (nt<0 || (nt+cont.c_bb.height>cont.p_bb.height && cont.dir !=="topleft")){
                 return;
@@ -384,11 +384,11 @@ function makeDraggable(el,config={}){
 }
 
 function addResizeListener(element, endCallback, startCallback){
-    let box = element.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
     let width = box.width;
     let height = box.height;
     const list = (e)=>{
-        let box = element.getBoundingClientRect();
+        const box = element.getBoundingClientRect();
         if (box.width!==width || box.height!==height){
             endCallback(box.width,box.height);
         }

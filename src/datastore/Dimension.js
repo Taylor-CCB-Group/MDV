@@ -181,7 +181,7 @@ class Dimension{
     */
     reFilterOnDataChanged(columns){
         if (this.filterMethod && this.filterColumns){
-            for (let c of this.filterColumns){
+            for (const c of this.filterColumns){
                 if (typeof c === "string" && columns.indexOf(c)!==-1){
                     this.filter(this.filterMethod,this.filterColumns,this.filterArguments,false);
                     return true;
@@ -196,8 +196,8 @@ class Dimension{
     * Will increase size of local filters 
     */
     updateSize(){
-        let newBuff =  new SharedArrayBuffer(this.parent.size);
-        let newArr = new Uint8Array(newBuff);
+        const newBuff =  new SharedArrayBuffer(this.parent.size);
+        const newArr = new Uint8Array(newBuff);
         newArr.set(this.filterArray);
         this.filterBuffer =newBuff;  
         this.filterArray= newArr;

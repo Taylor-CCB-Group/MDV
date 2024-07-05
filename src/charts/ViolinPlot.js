@@ -26,7 +26,7 @@ class ViolinPlot extends WGLChart{
         const c = this.config;
 		c.brush = c.brush || "poly";
 
-        let appConf= {brush:c.brush};
+        const appConf= {brush:c.brush};
 
         this.app = new WGL2DI(this.graphDiv,appConf);
         const colorFunc = this.afterAppCreation();
@@ -86,10 +86,10 @@ class ViolinPlot extends WGLChart{
             this.dim.removeFilter();
         }
         else{
-        	let y_max=range.y_max;
-        	let y_min=range.y_min;
-        	let x_max=range.x_max;
-        	let x_min=range.x_min;
+        	const y_max=range.y_max;
+        	const y_min=range.y_min;
+        	const x_max=range.x_max;
+        	const x_min=range.x_min;
 			this.filter= [[x_min,x_max],[y_min,y_max]]
             this.dim("filterSquare",[this.xPos,this.config.param[1]],{range1:this.filter[0],range2:this.filter[1]},[this.xPos,1]);
             this.app.refresh();
@@ -205,10 +205,8 @@ class ViolinPlot extends WGLChart{
         .attr("stroke-linejoin", "round")
         .attr("d",line()
         .curve(curveBasis)
-          .x(function(d,i) {
-             
-               return d[1]+d[2]} )
-          .y(function(d,i) { return d[0] })
+          .x((d,i) => d[1]+d[2] )
+          .y((d,i) => d[0])
       );
       this.graph_area.selectAll(".violin-curve1")
       .data(display_data,d=>"B"+d.id).join("path")     
@@ -222,10 +220,8 @@ class ViolinPlot extends WGLChart{
       .attr("stroke-linejoin", "round")
       .attr("d",line()
       .curve(curveBasis)
-        .x(function(d,i) {
-           
-             return d[1]-d[2]} )
-        .y(function(d,i) { return d[0] })
+        .x((d,i) => d[1]-d[2] )
+        .y((d,i) => d[0])
     );
     //this.centerGraph();
     this.app.refresh();
@@ -243,7 +239,7 @@ class ViolinPlot extends WGLChart{
     onDataAdded(newSize){
         const p = this.config.param;
 		const config = this.getSetupConfig();
-        let newX= new Float32Array(newSize);
+        const newX= new Float32Array(newSize);
         newX.set(this.xPos);
         this.values = this.dataStore.getColumnValues(p[0]);
         const cats =this.dataStore.getRawColumn(p[0])
@@ -271,15 +267,15 @@ class ViolinPlot extends WGLChart{
 
     centerGraph(){
         const mm = this.dataStore.getMinMaxForColumn(this.config.param[1])
-        let max_x=this.data.length*50;
-    	let max_y=mm[1]
-    	let min_x=0
-    	let min_y=mm[0];
+        const max_x=this.data.length*50;
+    	const max_y=mm[1]
+    	const min_x=0
+    	const min_y=mm[0];
     
 
-        let y_margin=((max_y-min_y)/20);
-        let x_range = (max_x-min_x);
-        let y_range= (max_y-min_y)+2*y_margin;
+        const y_margin=((max_y-min_y)/20);
+        const x_range = (max_x-min_x);
+        const y_range= (max_y-min_y)+2*y_margin;
 
         const dim = this._getContentDimensions();
 
@@ -342,7 +338,7 @@ class ViolinPlot extends WGLChart{
 
     _createPolyFilter(vs){
     	this.range=true;
-    	for (let pt of vs){
+    	for (const pt of vs){
     		pt[1]=-pt[1];
     		if (this.config.axis.x_log_scale){
     			pt[0]=this._getInverseLogValue(pt[0]);

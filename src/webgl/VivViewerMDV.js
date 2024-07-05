@@ -308,7 +308,7 @@ class VivViewerMDV {
             contrastLimits:[],
             domains:[]
         }
-        for (let item of conf){
+        for (const item of conf){
             const name = item.name || item.Name;
             const c = this.channels.findIndex(x => x.Name===name);
             if (c === -1) {
@@ -382,7 +382,7 @@ class VivViewerMDV {
     if (this.config.channels){
       image_properties = this._parseChannels(this.config.channels)
     }
-    if (image_properties?.selections) for (let s of image_properties.selections){
+    if (image_properties?.selections) for (const s of image_properties.selections){
       s.id=getRandomString();
     }
     //check if there are any channels without contrast limits and get default values
@@ -395,7 +395,7 @@ class VivViewerMDV {
     }
     //get the default values and continue the set up
     this.getDefaultChannelValues(contrastLimitsToGet).then(data=>{
-        for (let d of data){
+        for (const d of data){
             image_properties.contrastLimits[d.index]=d.stats.contrastLimits;
             image_properties.domains[d.index]=d.stats.domain;
         }

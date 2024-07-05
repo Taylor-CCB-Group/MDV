@@ -63,7 +63,7 @@ function getRandomDataStore(size,config={}){
         a4[n]=Math.floor((Math.random()*4));
     
         if (Math.random()>0.95){
-            a1[n]=NaN;
+            a1[n]=Number.NaN;
         }
         //a1[200]= 420;
     
@@ -117,7 +117,7 @@ function mockDataLoader(){
         function: (columns, dataSource, size) => {
             return new Promise((resolve,reject)=>{
                 const dataList=[];
-                for (let column of columns){        
+                for (const column of columns){        
                   dataList.push({data:getRandomData(column,size),field:column.field});
                 }       
                 resolve(dataList);

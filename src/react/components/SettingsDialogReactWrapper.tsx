@@ -3,7 +3,7 @@ import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./SettingsDialogComponent";
-import { Chart } from "@/charts/charts";
+import type { Chart } from "@/charts/charts";
 
 const SettingsDialog = observer(({chart}: {chart: Chart}) => {
     // const config = chart.getConfig(); //instrument with mobx etc

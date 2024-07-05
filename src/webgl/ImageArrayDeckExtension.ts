@@ -1,5 +1,5 @@
-import { Layer, LayerContext, LayerExtension, UpdateParameters } from 'deck.gl/typed';
-import { ImageArray } from './ImageArray';
+import { type Layer, type LayerContext, LayerExtension, type UpdateParameters } from 'deck.gl/typed';
+import type { ImageArray } from './ImageArray';
 import { ScatterplotLayer } from 'deck.gl/typed';
 
 /** don't think we can prepend '#version 300 es' in LayerExtension, 

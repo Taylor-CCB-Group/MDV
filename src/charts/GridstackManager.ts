@@ -1,7 +1,7 @@
 import 'gridstack/dist/gridstack.min.css';
 import { GridStack } from 'gridstack';
 import { debounce } from '../utilities/Utilities';
-import { DataSource, Chart, ChartManager } from './charts';
+import type { DataSource, Chart, ChartManager } from './charts';
 import AnnotationDialog from './dialogs/AnnotationDialog';
 
 function clearPosition(div) {
@@ -84,7 +84,7 @@ export default class GridStackManager {
         const div = ds.contentDiv;
          //store sizes/positions of div elements
         const sizes = new Map();
-        for (let chart of gi.charts){
+        for (const chart of gi.charts){
             const d = chart.getDiv();
             sizes.set(d,[d.offsetWidth,d.offsetHeight,d.offsetLeft,d.offsetTop]);
             chart.removeLayout();
@@ -95,7 +95,7 @@ export default class GridStackManager {
         gi.grid.destroy(false);
 
         //convert back to absolute positioning plus other clean up on the div
-        for (let chart of gi.charts){
+        for (const chart of gi.charts){
             const  d= chart.getDiv();
             const s = sizes.get(d);
             d.style.position="absolute";

@@ -3,7 +3,7 @@
 // - general shape of data structures NB - in many cases this can be inferred from JS, so I may remove these again...
 //   partly just using them as a form of documentation / notes-to-self.
 
-import DataStore from "../datastore/DataStore";
+import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
 export type DataType = 'integer' | 'double' | 'text' | 'unique' | 'multitext' | 'int32';
 

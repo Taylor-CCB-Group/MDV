@@ -324,7 +324,7 @@ function zip(a, b) {
  * @param {{ labels: string[], shape: number[] }} pixelSource
  */
 export function buildDefaultSelection({ labels, shape }) {
-    let selection = [];
+    const selection = [];
 
     const dimensions = zip(labels, shape).map(([name, size]) => ({ name, size }));
 
@@ -361,7 +361,7 @@ export function buildDefaultSelection({ labels, shape }) {
 export function hexToRgb(hex) {
     // https://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result.map(d => parseInt(d, 16)).slice(1);
+    return result.map(d => Number.parseInt(d, 16)).slice(1);
 }
 
 export function range(length) {
@@ -461,7 +461,7 @@ export const getMultiSelectionStats = async ({ loader, selections, use3d }) => {
 export function isMobileOrTablet() {
     let check = false;
     // eslint-disable-next-line func-names
-    (function (a) {
+    ((a) => {
         if (
             /(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino|android|ipad|playbook|silk/i.test(
                 a

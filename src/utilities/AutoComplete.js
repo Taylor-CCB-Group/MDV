@@ -84,7 +84,7 @@ class AutoComplete{
    
         for (let i = 0; i < this.list.length; i++) {
             const label = this.list[i].value;
-            let b = createEl("div",{text:label},this.listHolder);
+            const b = createEl("div",{text:label},this.listHolder);
             this.addItemEventListener(b,this.list[i])  
           }
     }

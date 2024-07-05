@@ -5,7 +5,7 @@ import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
 import { StrictMode } from "react";
 import { createEl } from "../../utilities/ElementsTyped";
-import { Chart, DataSource } from "../../charts/charts";
+import type { Chart, DataSource } from "../../charts/charts";
 import { toPng, toSvg } from "html-to-image";
 import { ProjectProvider } from "@/modules/ProjectContext";
 

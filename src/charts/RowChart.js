@@ -63,7 +63,6 @@ class RowChart extends CategoryChart{
         
        
         const units = chartWidth/this.maxCount;
-        const self = this;
         let  data = this.rowData;
         if (!data) {
             //seen this happen at least once when it shouldn't have, likely related to other data-loading issues
@@ -73,7 +72,7 @@ class RowChart extends CategoryChart{
   
         if (c.exclude_categories){
             const ex = new Set()
-            for (let n of c.exclude_categories){
+            for (const n of c.exclude_categories){
                 ex.add(vals.indexOf(n))
             }
             data= this.rowData.filter((x,i)=>!ex.has(i));
@@ -102,18 +101,18 @@ class RowChart extends CategoryChart{
         .join("rect")
         .attr("class","row-bar")
         .on("click",(e,d)=>{
-            self.filterCategories(vals[d[1]],e.shiftKey);
+            this.filterCategories(vals[d[1]],e.shiftKey);
         })
         .on("mouseover", (e, d) => {
             if (!c.show_tooltip) return;
-            self.showToolTip(e, `${vals[d[1]]}: ${d[0]}`);
+            this.showToolTip(e, `${vals[d[1]]}: ${d[0]}`);
         })
-        .on("mouseout", () => self.hideToolTip())
+        .on("mouseout", () => this.hideToolTip())
         .transition(trans)
         .style("fill",(d)=>{
             const i = d[1];
-            if (self.filter.length>0){
-                if (self.filter.indexOf(vals[i])===-1){
+            if (this.filter.length>0){
+                if (this.filter.indexOf(vals[i])===-1){
                     return "lightgray"
                 }
             }
@@ -132,13 +131,13 @@ class RowChart extends CategoryChart{
         .data(data,d=>d[1])
         .join("text")
         .on("click",(e,d)=>{
-            self.filterCategories(vals[d[1]],e.shiftKey);
+            this.filterCategories(vals[d[1]],e.shiftKey);
         })
         .on("mouseover", (e, d) => {
             if (!c.show_tooltip) return;
-            self.showToolTip(e, `${vals[d[1]]}: ${d[0]}`);
+            this.showToolTip(e, `${vals[d[1]]}: ${d[0]}`);
         })
-        .on("mouseout", () => self.hideToolTip())
+        .on("mouseout", () => this.hideToolTip())
         .attr("class","row-text")
         .transition(trans)
         .text((d)=>vals[d[1]]===""?"none":vals[d[1]])

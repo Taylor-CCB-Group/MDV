@@ -3,7 +3,7 @@ import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./DebugJsonDialogComponent";
-import BaseChart from "../../charts/BaseChart";
+import type BaseChart from "../../charts/BaseChart";
 
 const DebugChart = observer(({chart, header}: {chart: any, header?: string}) => {
     return (<Gui json={chart} header={header} />)

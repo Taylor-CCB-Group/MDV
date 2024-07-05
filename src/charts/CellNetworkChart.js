@@ -56,7 +56,7 @@ class CellNetworkChart extends SVGChart{
 
         //length
         this.linkLengthScale= scaleLinear();
-        this.forceLink = forceLink().id(function(d) { return d.id; });
+        this.forceLink = forceLink().id((d) => d.id);
         if (!c.link_length){
             c.link_length={};
             const tq= this.dataStore.getColumnQuantile(c.param[3],0.01);
@@ -113,7 +113,6 @@ class CellNetworkChart extends SVGChart{
     }
 
     drawChart(){
-        const self = this;
         const c = this.config;
         this.svg.selectAll("*").remove();
         
@@ -132,17 +131,17 @@ class CellNetworkChart extends SVGChart{
             .enter();
         this.link = lnks.append("line")
             .attr("stroke-width", d=>{
-                return self.linkThicknessScale(thick[d.d_index]);
+                return this.linkThicknessScale(thick[d.d_index]);
             })
             .style("stroke",d=>{
-                if (self.linkColorScale && drawColors){
-                    return self.linkColorScale(d.d_index)
+                if (this.linkColorScale && drawColors){
+                    return this.linkColorScale(d.d_index)
                 }
                 return "currentcolor"
             })
             .style("opacity",drawColors?0.6:1.0)
             .on("click",(e,d)=>{
-                self.dataStore.dataHighlighted([d.d_index],self);
+                this.dataStore.dataHighlighted([d.d_index],this);
             })
 
         this.arrows = lnks.append("path")
@@ -150,8 +149,8 @@ class CellNetworkChart extends SVGChart{
         .attr("fill","none")
         .style("opacity",c.show_directionality?1.0:0.0)
           .attr("stroke",d=>{
-            if (self.linkColorScale && drawColors){
-                return self.linkColorScale(d.d_index);
+            if (this.linkColorScale && drawColors){
+                return this.linkColorScale(d.d_index);
             }
             return "currentcolor"
         });
@@ -165,11 +164,11 @@ class CellNetworkChart extends SVGChart{
     
         this.circles = this.node.append("circle")
             .attr("r", d=>{
-                return self.nodeScale(d.node_size)
+                return this.nodeScale(d.node_size)
             })
             .style("stroke", "currentColor")
             .style("stroke-width", 2)
-            .attr("fill", function(d) {
+            .attr("fill", (d) => {
                 if (tcolors){
                     return tcolors[d.type];
                 }
@@ -183,11 +182,9 @@ class CellNetworkChart extends SVGChart{
             .call(this.setUpDrag());
 
         this.lables = this.node.append("text")
-            .text(function(d) {
-                return d.id;
-            })
+            .text((d) => d.id)
             .style("fill","currentcolor")
-            .style("font-size",`${self.config.label_size}px`)
+            .style("font-size",`${this.config.label_size}px`)
             .attr('x', 6)
             .attr('y', 3);
           
@@ -195,7 +192,7 @@ class CellNetworkChart extends SVGChart{
 
         this.simulation
             .nodes(this.nodeData)
-            .on("tick", ()=>self.ticked());
+            .on("tick", ()=>this.ticked());
 
             this.simulation.force("link")
             .links(this.linkData);
@@ -216,7 +213,6 @@ class CellNetworkChart extends SVGChart{
         if (domain){
             c.node_size.domain=domain;
         }   
-        const self = this;
         this.nodeScale= scaleSqrt().domain(c.node_size.domain)
                     .range(c.node_size.range).
                     clamp(true);
@@ -234,14 +230,14 @@ class CellNetworkChart extends SVGChart{
             return;
         }
         const name = this.dataStore.columnIndex[c.param[6]].name
-        let pos = c.node_size.legend_position;
+        const pos = c.node_size.legend_position;
         this.nodeColorLegend=getColorLegendCustom(this.nodeScale,{label:name,type:"circle"});
         this.contentDiv.append(this.nodeColorLegend);
         this.nodeColorLegend.style.top= pos[1]+"px";
         this.nodeColorLegend.style.left= pos[0]+"px";
         if (update){
             this.circles.attr("r", d=>{
-                return self.nodeScale(d.node_size);
+                return this.nodeScale(d.node_size);
             })
         }
     }
@@ -273,10 +269,9 @@ class CellNetworkChart extends SVGChart{
                             .clamp(true);
         
         if (update){
-            const self = this;
             const thick = this.dataStore.getRawColumn(c.param[4]);
             this.link.attr("stroke-width", d=>{
-                return self.linkThicknessScale(thick[d.d_index]);
+                return this.linkThicknessScale(thick[d.d_index]);
             })
         }
         const l = this.linkThicknessLegend;
@@ -290,7 +285,7 @@ class CellNetworkChart extends SVGChart{
             delete this.linkThicknessLegend;
             return;
         }
-        let pos = c.link_thickness.legend_position;
+        const pos = c.link_thickness.legend_position;
         const name = this.dataStore.columnIndex[c.param[4]].name
 
         this.linkThicknessLegend=getColorLegendCustom(this.linkThicknessScale,{label:name,type:"line"});
@@ -301,8 +296,6 @@ class CellNetworkChart extends SVGChart{
 
     _changeLinkLengthScale(domain,range,update){
         const c = this.config;
-      
-        const self = this;
         if (range){
             c.link_length.range=range;
         }
@@ -321,7 +314,7 @@ class CellNetworkChart extends SVGChart{
                 if (isNaN(l)){
                     return maxLen;
                 }
-                return self.linkLengthScale(l);
+                return this.linkLengthScale(l);
              
         });
         if (update){
@@ -340,10 +333,10 @@ class CellNetworkChart extends SVGChart{
        
         const colors  = this.dataStore.getColumnColors(c.param[1]);
         const ncolor = this.dataStore.getColorForCategory(c.param[0],c.category);
-        let tcolors = v==="type" ? this.dataStore.getColumnColors(c.param[7]):null
+        const tcolors = v==="type" ? this.dataStore.getColumnColors(c.param[7]):null
      
         this.circles 
-        .attr("fill", function(d) {
+        .attr("fill", (d) => {
             if (tcolors){
                 return tcolors[d.type];
             }
@@ -386,19 +379,18 @@ class CellNetworkChart extends SVGChart{
                 }
             });
         }
-        const self = this;
         if (update){
             this.link.style("stroke",d=>{
-                if (colors!=="none" && self.linkColorScale){
-                    return self.linkColorScale(d.d_index)
+                if (colors!=="none" && this.linkColorScale){
+                    return this.linkColorScale(d.d_index)
                 }
                     return "currentColor"
                 }).style("opacity",colors!=="none"?0.6:1.0);
                 this.setColorLegend();
             this.arrows
                 .attr("stroke",d=>{
-                  if (self.linkColorScale && colors!=="none"){
-                      return self.linkColorScale(d.d_index);
+                  if (this.linkColorScale && colors!=="none"){
+                      return this.linkColorScale(d.d_index);
                   }
                   return "currentColor"
               });
@@ -435,7 +427,6 @@ class CellNetworkChart extends SVGChart{
    
 
     ticked(){
-        const self = this;
 
         this.lables.attr("text-anchor",d=>{
             return d.x>this.width*2/3?"end":"start";
@@ -445,20 +436,20 @@ class CellNetworkChart extends SVGChart{
        
 
         this.node
-        .attr("transform", function(d) {
-            d.x = Math.min(d.x,self.width-20);       
+        .attr("transform", (d) => {
+            d.x = Math.min(d.x,this.width-20);       
             d.x = Math.max(d.x,15);
-            d.y = Math.min(d.y,self.height-20);       
+            d.y = Math.min(d.y,this.height-20);       
             d.y = Math.max(d.y,15);
         
       
           return "translate(" + d.x + "," + d.y + ")";
         })
         this.link
-        .attr("x1", function(d) { return d.source.x; })
-        .attr("y1", function(d) { return d.source.y; })
-        .attr("x2", function(d) { return d.target.x; })
-        .attr("y2", function(d) { return d.target.y; });
+        .attr("x1", (d) => d.source.x)
+        .attr("y1", (d) => d.source.y)
+        .attr("x2", (d) => d.target.x)
+        .attr("y2", (d) => d.target.y);
 
         this.arrows.attr("d",d=>{
       
@@ -547,7 +538,7 @@ class CellNetworkChart extends SVGChart{
         const ns = index[p[6]].data;
      
         this.nodeData=[];
-        let firstRound=new Set();
+        const firstRound=new Set();
         
         const bc =cells.indexOf(this.config.base_cell);
         firstRound.add(bc);
@@ -574,7 +565,7 @@ class CellNetworkChart extends SVGChart{
                     firstRound.add(c2[n]);          
             }
         }
-        let needed = new Set(firstRound);
+        const needed = new Set(firstRound);
         if (this.config.levels==2){
             for (let n=0;n<this.dataStore.size;n++){
                 if (f[n]>0){
@@ -758,7 +749,7 @@ class CellNetworkChart extends SVGChart{
             current_value:c.levels,
             choices:[["1",1],["2",2]],             
             func:(v)=>{
-                c.levels=parseInt(v);
+                c.levels=Number.parseInt(v);
                 if (c.base_cell){
                     this.reCalculate();
                 }
@@ -792,7 +783,7 @@ class CellNetworkChart extends SVGChart{
             }
         });
         const colors=[]
-        for (let c in color_schemes){
+        for (const c in color_schemes){
             colors.push([c,c]);
         };
         colors.push(["none","none"])

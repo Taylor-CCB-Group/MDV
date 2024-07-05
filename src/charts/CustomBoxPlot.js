@@ -98,7 +98,6 @@ class CustomBoxPlot extends SVGChart{
         const vals2 =  this.dataStore.getColumnValues(p[1]); 
         const dim  = this._getContentDimensions();
         const recWidth= dim.width/vals.length;
-        const self = this;
         const xpos = recWidth/5;
         const margin = recWidth/10;
         const radius = 5;
@@ -118,14 +117,14 @@ class CustomBoxPlot extends SVGChart{
         .attr("class","cbp-circle")
         .on("mouseover pointermove",(e,d)=>{    
             const h= `${vals[d[1]]}<br>${vals2[d[2]]}`;             
-            self.showToolTip(e,h)
+            this.showToolTip(e,h)
         }).
         on("mouseleave",()=>{
-            self.hideToolTip();
+            this.hideToolTip();
         })   
         .transition(trans)
         .attr("cy",(d,i)=>{
-            return self.y_scale(d[0]);
+            return this.y_scale(d[0]);
         })
         .attr("fill",(d,i)=>colors[d[1]])
         .attr("r",radius)
@@ -137,11 +136,11 @@ class CustomBoxPlot extends SVGChart{
         .attr("d",(d,i)=>{
             const x  = (i*recWidth) + (recWidth/2);
            
-            const av  = self.y_scale(d.av);
+            const av  = this.y_scale(d.av);
             let sd1 = d.av+d.std;
-            sd1= self.y_scale(sd1>d.max?d.max:sd1);
+            sd1= this.y_scale(sd1>d.max?d.max:sd1);
             let sd2 = d.av-d.std;
-            sd2= self.y_scale(sd2<d.min?d.min:sd2)
+            sd2= this.y_scale(sd2<d.min?d.min:sd2)
             return `M${x} ${sd1} L${x} ${sd2}
                     M${x-g} ${av} L${x+g} ${av} 
                     M${x-g1} ${sd1} L${x+g1} ${sd1}     
@@ -193,7 +192,7 @@ BaseChart.types["density_box_plot"]={
         config.denom_unit= ds.regions.scale_unit+"²"; //should be power 2
         config.param=[ec.group,ds.regions.region_field,ec.cat];
         //work out area of each region
-        for (let reg_name in ds.regions.all_regions){
+        for (const reg_name in ds.regions.all_regions){
             const reg = ds.regions.all_regions[reg_name];
             const area = (reg.roi.max_x - reg.roi.min_x) * (reg.roi.max_x - reg.roi.min_x);
             config.denominators[reg_name]=area*(ds.regions.scale*ds.regions.scale);

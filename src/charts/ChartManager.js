@@ -199,7 +199,7 @@ class ChartManager{
         if (config.all_views){
        
             this.viewSelect = createEl("select",{},this.menuBar);
-            for (let v of config.all_views){
+            for (const v of config.all_views){
                 createEl("option",{text:v,value:v},this.viewSelect)
             }
             createFilterElement(this.viewSelect, this.menuBar);
@@ -339,7 +339,7 @@ class ChartManager{
 
         if (dataLoader.files){     
             this.filesToLoad=dataLoader.files.length;
-            for (let item of dataLoader.files){
+            for (const item of dataLoader.files){
                 this.loadFile(item,()=>{
                    this.filesToLoad--;
                    if (this.filesToLoad===0){
@@ -353,10 +353,10 @@ class ChartManager{
         }
 
         //add links
-        for (let ds of this.dataSources){
+        for (const ds of this.dataSources){
             const links = ds.dataStore.links;
             if (links){
-                for (let ods in links){
+                for (const ods in links){
                     const _ods = this.dsIndex[ods].dataStore;
                     if (!_ods){
                         console.warn(`datasource ${ds.name} has link to non-existent datasource ${ods}`);
@@ -556,7 +556,7 @@ class ChartManager{
 
         this.themeMenu = new ContextMenu(()=>{
             const mItems=[];
-           for (let t in themes){
+           for (const t in themes){
                 mItems.push(this.__getMenuItem(t))
 
            }
@@ -585,7 +585,7 @@ class ChartManager{
         if (!this.charts){
             return;
         }
-        for (let ch in this.charts){
+        for (const ch in this.charts){
             const c= this.charts[ch];
             if (c.chart.themeChanged){
                 c.chart.themeChanged();
@@ -596,7 +596,7 @@ class ChartManager{
 
     //sync color columns
     _sync_colors(columns,from,to){ 
-        for (let item of columns){
+        for (const item of columns){
             
             const from_col=from.columnIndex[item.link_to];
             const to_col = to.columnIndex[item.col];
@@ -668,7 +668,7 @@ class ChartManager{
         //DataSources but no charts
         if (!view){
             const dts={}   
-            for (let ds in this.dsIndex){
+            for (const ds in this.dsIndex){
                 dts[ds]={layout:"gridstack"}
             }
             this.viewData={dataSources:dts,initialCharts:{}};
@@ -679,7 +679,7 @@ class ChartManager{
             //need to add which DataSources to display
             if (!view.dataSources){
                 view.dataSources={};
-                for (let ds in view.initialCharts){
+                for (const ds in view.initialCharts){
                     view.dataSources[ds]={};
                 }
             }
@@ -688,15 +688,15 @@ class ChartManager{
         }
 
 
-        for (let ds of this.dataSources){
+        for (const ds of this.dataSources){
             delete ds.contentDiv;
             delete ds.menuBar;   
         }
         const dsToView= Object.keys(this.viewData.dataSources);
 
         let widths= [];
-        for (let ds of dsToView){
-            let w = this.viewData.dataSources[ds].panelWidth;
+        for (const ds of dsToView){
+            const w = this.viewData.dataSources[ds].panelWidth;
             if (!w){
                 widths=null;
                 break;
@@ -748,7 +748,7 @@ class ChartManager{
      
         //any first time initiation
         if (firstTime){        
-            for (let d of this.dataSources){
+            for (const d of this.dataSources){
                 const ds = d.dataStore;
                 //initiate offsets if any
                 if (ds.offsets){
@@ -761,7 +761,7 @@ class ChartManager{
                 if (d.column_link_to){
                     this._sync_colors(d.column_link_to.columns,this.dsIndex[d.column_link_to.dataSource].dataStore,ds);
                 }
-                for (let scc of ds.syncColumnColors){
+                for (const scc of ds.syncColumnColors){
                     try {
                         this._sync_colors(scc.columns,this.dsIndex[scc.dataSource].dataStore,ds);
                     } catch (error) {
@@ -775,8 +775,8 @@ class ChartManager{
         //charts loaded
         const charts= view?view.initialCharts || {}: {}
         this._toLoadCharts = new Set();
-        for (let ds in charts){         
-            for (let ch of charts[ds]){
+        for (const ds in charts){         
+            for (const ch of charts[ds]){
                 this._toLoadCharts.add(ch);
             }
         }
@@ -788,8 +788,8 @@ class ChartManager{
         //add charts - any columns will be added dynamically
         this._inInit = true;
         const chartPromises = [];
-        for (let ds in charts){  
-            for (let ch of charts[ds]){
+        for (const ds in charts){  
+            for (const ch of charts[ds]){
                 chartPromises.push(this.addChart(ds,ch));
             }
         }
@@ -836,7 +836,7 @@ class ChartManager{
 
         ];
         if (this.dataSources.length>1){
-            for (let ds of this.dataSources){
+            for (const ds of this.dataSources){
                 controls.push({
                     type:"checkbox",
                     id:ds.name,
@@ -859,7 +859,7 @@ class ChartManager{
                     this.currentView=vals["name"];
                     if (!vals["clone-view"]){
                         //remove all charts and links
-                        for (let ds in this.viewData.dataSources){
+                        for (const ds in this.viewData.dataSources){
                             if (this.viewData.dataSources[ds].layout==="gridstack"){
                                 this.gridStack.destroy(this.dsIndex[ds])
                             }
@@ -875,7 +875,7 @@ class ChartManager{
                             state.view.dataSources[this.dataSources[0].name]={};
                         }
                         else{
-                            for (let ds in this.dsIndex){
+                            for (const ds in this.dsIndex){
                                 if (vals[ds]){
                                     state.view.initialCharts[ds]=[];
                                     state.view.dataSources[ds]={};
@@ -942,7 +942,7 @@ class ChartManager{
 
 
     changeView(view){
-        for (let ds in this.viewData.dataSources){
+        for (const ds in this.viewData.dataSources){
             if (this.viewData.dataSources[ds].layout==="gridstack"){
                 this.gridStack.destroy(this.dsIndex[ds])
             }
@@ -970,7 +970,7 @@ class ChartManager{
 
     _columnRemoved(ds,col){      
         const ids_to_delete=[];
-        for (let id in this.charts){
+        for (const id in this.charts){
             const info = this.charts[id];
             if (info.dataSource===ds){
                 const ch=info.chart;
@@ -990,7 +990,7 @@ class ChartManager{
         if (ids_to_delete.length>0){
             ds.dataStore._callListeners("filtered"); 
         }
-        for (let id of ids_to_delete){
+        for (const id of ids_to_delete){
             delete this.charts[id];
         }
     }
@@ -1006,7 +1006,7 @@ class ChartManager{
         } else if (typeof p === "string"){
             set.add(p);
         } else{
-            for (let i of p ){
+            for (const i of p ){
                 set.add(i);
             }
         }
@@ -1035,7 +1035,7 @@ class ChartManager{
                 let e = config[x];
                 if(e){
                     e= Array.isArray(e)?e:[e];
-                    for (let i of e){
+                    for (const i of e){
                         set.add(i)
                     }
                 }
@@ -1062,7 +1062,7 @@ class ChartManager{
             const ds =this.dsIndex[dataSource].dataStore;
             const all_cols =  ds.getAllColumns();
             //which columns are present in the datastore
-            for (let c of data.columns){
+            for (const c of data.columns){
                 if (ds.columnIndex[c]){
                     cols[c]=[];
                 }
@@ -1072,12 +1072,12 @@ class ChartManager{
                 if (i+1%100===0){
                     this.updateInfoAlert(iid,`processed ${i}/${data.length} rows`);
                 }
-                for (let col in cols){
+                for (const col in cols){
                     cols[col].push(row[col]);
                 }
             }
             let proc=0;
-            for  (let col in cols){
+            for  (const col in cols){
                 ds.setColumnData(col,cols[col]);
                 proc++;
                 this.updateInfoAlert(iid,`processed ${proc}/${all_cols.length} columns`);       
@@ -1098,23 +1098,23 @@ class ChartManager{
             removed:[],
             colors_changed:[]
         }
-        for (let c in dc.added){
+        for (const c in dc.added){
             const td = getMd(c);
             rv.columns.push(td);
             rv.added.push(c)
         }
-        for (let r in dc.removed){
+        for (const r in dc.removed){
             rv.removed.push(r)
         }
 
-        for (let c in dc.data_changed){
+        for (const c in dc.data_changed){
             if (!rv.columns[c]){
                 const td = getMd(c);
                 rv.columns.push(td);
             }
         }
 
-        for (let cc in dc.colors_changed){
+        for (const cc in dc.colors_changed){
             rv.colors_changed.push({
                 column:cc,
                 colors:dataStore.columnIndex[cc].colors
@@ -1151,9 +1151,9 @@ class ChartManager{
         for (const ds of this.dataSources){
             if (ds.contentDiv){
                 initialCharts[ds.name]=[];
-                let w = this.dsPanes[ds.name].style.width;
+                const w = this.dsPanes[ds.name].style.width;
                 const re2 = /calc\((.+)\%.+/;
-                this.viewData.dataSources[ds.name].panelWidth=parseFloat(w.match(re2)[1]);
+                this.viewData.dataSources[ds.name].panelWidth=Number.parseFloat(w.match(re2)[1]);
             }
             
             
@@ -1162,12 +1162,12 @@ class ChartManager{
             
             if (dstore.dirtyMetadata.size !==0){
                 metadata[ds.name]={};
-                for (let param of dstore.dirtyMetadata){
+                for (const param of dstore.dirtyMetadata){
                     metadata[ds.name][param]=dstore[param];
                 }
             }
         }
-        for (let chid in this.charts){
+        for (const chid in this.charts){
             const chInfo = this.charts[chid];
            
             const chart = chInfo.chart;
@@ -1175,8 +1175,8 @@ class ChartManager{
             const div =  chart.getDiv();
             const d = this.viewData.dataSources[chInfo.dataSource.name];
             if (d.layout==="gridstack"){
-                config.gsposition= [parseInt(div.getAttribute("gs-x")),parseInt(div.getAttribute("gs-y"))];
-                config.gssize= [parseInt(div.getAttribute("gs-w")),parseInt(div.getAttribute("gs-h"))];
+                config.gsposition= [Number.parseInt(div.getAttribute("gs-x")),Number.parseInt(div.getAttribute("gs-y"))];
+                config.gssize= [Number.parseInt(div.getAttribute("gs-w")),Number.parseInt(div.getAttribute("gs-h"))];
 
             }
             else{
@@ -1201,7 +1201,7 @@ class ChartManager{
     }
 
     setAllColumnsClean(){
-        for (let ds of this.dataSources){
+        for (const ds of this.dataSources){
             ds.dataStore.setAllColumnsClean();
         }
     }
@@ -1235,7 +1235,7 @@ class ChartManager{
     }
 
     createInfoAlert(msg,config={}){
-        let id = getRandomString();
+        const id = getRandomString();
         const len = Object.keys(this.infoAlerts).length;
         config.type= config.type || "info"
         const div = createEl("div",{
@@ -1288,7 +1288,7 @@ class ChartManager{
             this.infoAlerts[id].div.remove();
             delete this.infoAlerts[id];
             let top =50;
-            for (let i in this.infoAlerts){
+            for (const i in this.infoAlerts){
                 this.infoAlerts[i].div.style.top = top+"px";
                 top+=40;
             }
@@ -1327,7 +1327,7 @@ class ChartManager{
         }
         let col_list = [];
         const t  = this.transactions[id]; 
-        for (let col of columns){
+        for (const col of columns){
             this.columnsLoading[dataSource][col]=true;
             col_list.push(col);
             if (col_list.length===split){
@@ -1353,7 +1353,7 @@ class ChartManager{
        
         const col_list = trans.columns[trans.nextColumn++];
         const columns = [];
-        for (let col of col_list){
+        for (const col of col_list){
            columns.push(dataStore.getColumnInfo(col));
         }
         //float32 columns need to be at the beginning of the byte stream
@@ -1365,7 +1365,7 @@ class ChartManager{
        
         //"this.dataLoader is not a function" with e.g. "cell_types"
         this.dataLoader(columns,dataSource,dataStore.size).then(resp=>{
-            for (let col of resp){
+            for (const col of resp){
                 dataStore.setColumnData(col.field,col.data);
             }
             trans.columnsLoaded++;
@@ -1378,7 +1378,7 @@ class ChartManager{
             const total = trans.columns.length;
             const loaded = trans.columnsLoaded;
             let all_loaded= loaded*col_list.length;
-            for (let col of col_list){
+            for (const col of col_list){
                 delete this.columnsLoading[dataSource][col];
              }
             all_loaded = all_loaded>trans.totalColumns?trans.totalColumns:all_loaded;
@@ -1466,7 +1466,7 @@ class ChartManager{
         });
 
         if (dataStore.links){
-            for (let ods in dataStore.links){
+            for (const ods in dataStore.links){
                 const link= dataStore.links[ods];
                 if (link.rows_as_columns){
                     this._addLinkIcon(ds,this.dsIndex[ods],link.rows_as_columns)
@@ -1548,7 +1548,7 @@ class ChartManager{
         delete this.listeners[id];
     }
     _callListeners(type,data){
-        for (let id in this.listeners){
+        for (const id in this.listeners){
             this.listeners[id](type,this,data);
         }
     }
@@ -1674,12 +1674,12 @@ class ChartManager{
             });
             for (let n=0;n<ds.size;n++){
                 const i = index[ic.data[n]];
-                for (let c of colInfo){
+                for (const c of colInfo){
                     c.arr[n]=c.odata[i]
                 }
             }
 
-            for (let c of colInfo){
+            for (const c of colInfo){
                 ds.setColumnData(c.col,c.data)
             }
             func();
@@ -1699,12 +1699,12 @@ class ChartManager{
         const dStore = ds.dataStore;
         //check if need to load column data from linked data set
         if (dStore.links){
-            for (let ods in dStore.links){
+            for (const ods in dStore.links){
                 const link = dStore.links[ods];
                 if (link.columns){
                     const otherCols = [];
                     const thisCols=[];
-                    for (let c of columns){
+                    for (const c of columns){
                        
                         if(link.columns.indexOf(c)===-1){
                             thisCols.push(c)
@@ -1784,17 +1784,14 @@ class ChartManager{
     __decorateColumnMethod(method,chart,dataSource){
         const newMethod = "_"+method;
         chart[newMethod]= chart[method];
-        //if original method is called check whether column has data
-        //first argument must be column(s) needed
-        const self=this;
-        chart[method]=function(){
+        chart[method]=()=> {
             //column not needed
             if (arguments[0] == null){
                 chart[newMethod](...arguments);
             }
             else{
                 const cols = Array.isArray(arguments[0])?arguments[0]:[arguments[0]];
-                self._getColumnsThen(dataSource,cols,()=>chart[newMethod](...arguments));
+                this._getColumnsThen(dataSource,cols,()=>chart[newMethod](...arguments));
             }
            
         }
@@ -1803,7 +1800,7 @@ class ChartManager{
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
     _haveColumnsLoaded(neededCols,dataSource,func){
-        for (let col of neededCols){
+        for (const col of neededCols){
             if (this.columnsLoading[dataSource][col]){
                 setTimeout(()=>{
                     this._haveColumnsLoaded(neededCols,dataSource,func);
@@ -1864,7 +1861,7 @@ class ChartManager{
 
          //new preferred way to decorate column methods 
         if (chartType.methodsUsingColumns){
-            for (let meth of chartType.methodsUsingColumns ){
+            for (const meth of chartType.methodsUsingColumns ){
                 this.__decorateColumnMethod(meth,chart,dataSource);
             }
         }
@@ -1875,7 +1872,7 @@ class ChartManager{
             if (ds.index_link_to){
                 this._giveChartAccess(chart,this.dsIndex[ds.index_link_to.dataSource].dataStore,ds.index_link_to.index);
             }
-            for (let lnk of ds.dataStore.accessOtherDataStore){
+            for (const lnk of ds.dataStore.accessOtherDataStore){
                 this._giveChartAccess(chart,this.dsIndex[lnk.dataSource].dataStore,lnk.index);
             }            
         }
@@ -1899,7 +1896,7 @@ class ChartManager{
             if (this._toLoadCharts.size===0){
                 delete this._toLoadCharts;
                 if (this.viewData.links){
-                    for (let l of this.viewData.links){
+                    for (const l of this.viewData.links){
                         this._setUpLink(l);
                     }
                 }
@@ -1964,7 +1961,7 @@ class ChartManager{
                 console.error(`Error removing links for chart '${cid}'`, error, link);
             }
         }
-        for (let i of linksToRemove){
+        for (const i of linksToRemove){
             this.removeLink(i);
         }
     }
@@ -1984,14 +1981,14 @@ class ChartManager{
 
     removeAllCharts(dataSources){
         const allCharts=[];
-        for (let cn in this.charts){
+        for (const cn in this.charts){
             const ch = this.charts[cn];
             if (dataSources && dataSources.indexOf(ch.dataSource.name) ===-1){
                 continue;
             }
             allCharts.push([ch.chart,ch.window]);
         }
-        for (let ci of allCharts){
+        for (const ci of allCharts){
             if (ci[1]){
                 ci[1].close();
 
@@ -2006,7 +2003,7 @@ class ChartManager{
     getAllFilters(dataSorce){
         const charts = this.getAllCharts(dataSorce);
         const fs= [];
-        for (let c of charts){
+        for (const c of charts){
             const filter = c.getFilter();
             if (filter){
                 fs.push(filter)
@@ -2032,7 +2029,7 @@ class ChartManager{
      */
     getAllCharts(dataSource){
         const charts= []
-        for (let id in this.charts){
+        for (const id in this.charts){
             const ch = this.charts[id];
             if (ch.dataSource.name ===dataSource){
                 charts.push(ch.chart)
@@ -2045,7 +2042,7 @@ class ChartManager{
         let top=margin;
         let left =margin;
         let rowSize=0;
-        for (let id in this.charts){
+        for (const id in this.charts){
             const info = this.charts[id];
             const d= info.chart.getDiv();
             d.style.left=left+"px";
@@ -2083,7 +2080,7 @@ class ChartManager{
     }
 
     _sendAllChartsToBack(ds){
-        for (let id in this.charts){  
+        for (const id in this.charts){  
             const c = this.charts[id]
             if (ds === c.dataSource ){
                 c.chart.div.style.zIndex="";
@@ -2144,7 +2141,7 @@ class ChooseColumnDialog extends BaseDialog{
         
         const cgs = Object.keys(this.ds.columnGroups);
         cgs.unshift("All")
-        for (let group of cgs){
+        for (const group of cgs){
             const d= createEl("span",{styles:{display:"inline-block",whiteSpace:"nowrap",marginRight:"5px"}},gd);
             createEl("span",{text:group},d)
             createEl("input",{
@@ -2169,12 +2166,12 @@ class ChooseColumnDialog extends BaseDialog{
         }, cd);
         filter.addEventListener('input', (e) => {
             const val = e.target.value.toLowerCase().split(" ");
-            for (let check of this.checks) {
+            for (const check of this.checks) {
                 const f = val.some(v => !check[1].toLowerCase().includes(v));
                 check[0].parentElement.style.display = f ? 'none' : '';
             }
         });
-        for (let col of cols){
+        for (const col of cols){
             const d= createEl("div",{
                 styles:{//display:"inline-block",
                         whiteSpace:"nowrap",
@@ -2192,13 +2189,13 @@ class ChooseColumnDialog extends BaseDialog{
     }
     checkAllInGroup(group){
         if (group==="All"){
-            for (let check of this.checks){ 
+            for (const check of this.checks){ 
                 check[0].checked=true;
             }
         }
         else{
             const cols = this.ds.columnGroups[group].columns;
-            for (let check of this.checks){                  
+            for (const check of this.checks){                  
                     check[0].checked=cols.indexOf(check[1])===-1?false:true
             }
 
@@ -2208,7 +2205,7 @@ class ChooseColumnDialog extends BaseDialog{
 
     getColumns(){
         const cols=[];
-        for (let check of this.checks){
+        for (const check of this.checks){
             if (check[0].checked){
                 cols.push(check[1]);
             }
@@ -2244,7 +2241,7 @@ class AddChartDialog extends BaseDialog{
         const types=[];
         this.dataSource=content.dataSource;
         this.dataStore= content.dataSource.dataStore;
-        for (let type in BaseChart.types){
+        for (const type in BaseChart.types){
             const t = BaseChart.types[type];
             //check to see if chart has any requirements
             
@@ -2257,7 +2254,7 @@ class AddChartDialog extends BaseDialog{
                 //is an array of parameters required in the datasource
                 else{
                     let allow =true;
-                    for (let r of t.required){
+                    for (const r of t.required){
                         if (!this.dataStore[r]){
                             allow=false
                         }
@@ -2289,7 +2286,7 @@ class AddChartDialog extends BaseDialog{
                 maxWidth:"200px"
             }
         }, this.columns[0]);
-        for (let item of types){
+        for (const item of types){
             createEl("option",{
                 text:item.name,
                 value:item.type
@@ -2336,7 +2333,7 @@ class AddChartDialog extends BaseDialog{
             // options: this.options ? Object.fromEntries(this.options) : undefined,
         }
         const ed={};
-        for (let name in this.extraControls){
+        for (const name in this.extraControls){
             const c = this.extraControls[name];
             ed[name] = c.type === 'checkbox' ? c.checked : c.value;
             //mjs: sometimes its not as simple as this and more complex alterations
@@ -2401,7 +2398,7 @@ class AddChartDialog extends BaseDialog{
         this.paramSelects=[];
         this.columnsHeading.style.display = params?.length ? "" : "none";
         if (params){
-            for (let p of params){
+            for (const p of params){
                 const d = createEl("div",{styles:{padding:"4px"}},this.paramDiv)
                 const sp =createEl("div",{text:p.name+":"},d);
                 const holder =createEl("div",{},this.paramDiv);
@@ -2417,17 +2414,17 @@ class AddChartDialog extends BaseDialog{
                     },holder);
                     const ps = this.dataStore.getColumnList(p.type);
                     const sgs = {}
-                    for (let ds of this.dataStore.subgroupDataSources){
+                    for (const ds of this.dataStore.subgroupDataSources){
                         sgs[ds] = createEl("optgroup",{label:ds});
                     }
-                    for (let item of ps){
+                    for (const item of ps){
                         let ele = dd;
                         if (item.subgroup){
                             ele = sgs[item.subgroup.dataSource];
                         }
                         createEl("option",{text:item.name,value:item.field}, ele);
                     }
-                    for (let ds of this.dataStore.subgroupDataSources){
+                    for (const ds of this.dataStore.subgroupDataSources){
                         dd.append(sgs[ds]);
                     }
                     createFilterElement(dd, holder);
@@ -2440,7 +2437,7 @@ class AddChartDialog extends BaseDialog{
         if (t.extra_controls){
             const controls = t.extra_controls(this.dataSource.dataStore);
             const parentDiv = this.paramDiv;
-            for (let c of controls){
+            for (const c of controls){
                 createEl("div",{
                     text:c.label,
                     classes:["ciview-title-div"]
@@ -2453,7 +2450,7 @@ class AddChartDialog extends BaseDialog{
                         }
                     },parentDiv);
                     createFilterElement(sel, parentDiv);
-                    for (let item of c.values){
+                    for (const item of c.values){
                         const option = createEl("option",{text:item.name,value:item.value},sel);
                         if (item.value===c.defaultVal){
                             option.selected=true;

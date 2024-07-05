@@ -41,15 +41,14 @@ class WGLChart extends SVGChart{
     }
     
     afterAppCreation(){
-        const self = this;
         const c= this.config;
-        this.app.addHandler("object_over",function(e,index){
+        this.app.addHandler("object_over",(e,index)=> {
 			if (c.tooltip.show){
-				self.showTooltip(e,index)
+				this.showTooltip(e,index)
 			}       
         });
-		this.app.addHandler("object_out",function(e,index){
-            self.tooltip.style.display="none"        
+		this.app.addHandler("object_out",(e,index)=> {
+            this.tooltip.style.display="none"        
         });
 
         c.default_color= c.default_color || "#377eb8";
@@ -285,7 +284,7 @@ class WGLChart extends SVGChart{
                 current_value:c.tooltip.show,
                 func:(x)=>{
                     c.tooltip.show=x;
-                    let cl= c.tooltip.column || cols[0].field
+                    const cl= c.tooltip.column || cols[0].field
                     this.setToolTipColumn(cl) 
                 }
             },

@@ -132,7 +132,7 @@ function median(l,r){
 function stKernelDensityEstimator(V,X,Qs,k=2){
 
     const den = Qs[1]-Qs[0];
-    return X.map(function(x) {
+    return X.map((x) => {
         let sum=0;
         let count=0;
         for (let i=0;i<V.length;i++){
@@ -153,11 +153,11 @@ function stKernelDensityEstimator(V,X,Qs,k=2){
 }
 
 function kernelDensityEstimator(V,X,k=2) {   
-    return X.map(function(x) {
+    return X.map((x) => {
         let sum=0;
         let count=0;
         for (let i=0;i<V.length;i++){
-            let val = V[i];
+            const val = V[i];
             if (!isNaN(val)){
               let v= x-val;
               sum+=Math.abs(v /= k) <= 1 ? 0.75 * (1 - v * v) / k : 0;
@@ -173,14 +173,14 @@ function kernelDensityEstimator(V,X,k=2) {
 function multiBoxPlot(e){
 
     const data= [];
-    for (let item of e.data[2]){
+    for (const item of e.data[2]){
         data.push(item[1]==="int32"?new Int32Array(item[0]):new Float32Array(item[0]))
     }
     const dLen= data.length;
     const config = e.data[4];
    
     const scaleVals = config.scaleVals;
-    for (let sv of scaleVals){
+    for (const sv of scaleVals){
         sv.push(sv[1]-sv[0])
     }
   
@@ -205,7 +205,7 @@ function multiBoxPlot(e){
     for (let i=0;i<tLen;i++){
         if (cats[i] === cat && gFilter[i]===0){     
             for (let n=0;n<dLen;n++){
-                let v= (data[n][i]-scaleVals[n][0])/scaleVals[n][2];
+                const v= (data[n][i]-scaleVals[n][0])/scaleVals[n][2];
                 results[n][count]=v<0?0:v>1?1:v;   
             }
             count++;

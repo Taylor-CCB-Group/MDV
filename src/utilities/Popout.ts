@@ -1,4 +1,4 @@
-import { Chart } from "@/charts/charts";
+import type { Chart } from "@/charts/charts";
 import { removeDraggable, removeResizable } from "./Elements";
 
 export default function popoutChart(chart: Chart) {

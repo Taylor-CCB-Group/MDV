@@ -4,7 +4,7 @@ import { getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./
 
 let projectRoot = "";
 export async function fetchJsonConfig(url: string, root: string) {
-    let resp = await fetch(url);
+    const resp = await fetch(url);
     const config = await resp.json();
     //rewriteBaseUrlRecursive(config, root); //removed.
     return config;
