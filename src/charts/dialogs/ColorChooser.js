@@ -7,7 +7,7 @@ class ColorChooser extends BaseDialog{
             footer:true,
             width:500,
             maxHeight:500,
-            title:"Field Colors For "+ds.name,
+            title:`Field Colors For ${ds.name}`,
             columns:2,
             buttons:[{
                 text:"Apply",

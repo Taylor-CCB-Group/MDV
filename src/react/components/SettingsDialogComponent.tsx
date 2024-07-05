@@ -96,7 +96,7 @@ const DropdownComponent = ({props}: {props: GuiSpec<'dropdown' | 'multidropdown'
                     return <option key={i} value={value}>{text}</option>
                 })}
             </select>
-            <div></div>
+            <div />
             <input type="text" value={filter} placeholder="Filter options..." 
             onChange={(e => setFilter(e.target.value))} 
             className="m-1 pl-1 justify-self-center"
@@ -147,7 +147,7 @@ const RadioButtonComponent = ({props}: {props: GuiSpec<'radiobuttons'>}) => {
                         >
                             {v[0]}
                         </span>
-                        <input key={i + id + 'input'}
+                        <input key={`${i + id}input`}
                         type="radio" value={v[1]} checked={v[1] === props.current_value} onChange={action(e => {
                             props.current_value = e.currentTarget.value;
                             if (props.func) props.func(e.currentTarget.value);

@@ -57,7 +57,7 @@ const FileInputLabel = ({ children, ...props }) => (
 const Spinner = () => {
   return <div className="w-16 h-16 border-8 mt-10 border-blue-500 border-dashed rounded-full animate-spin" style={{
     borderColor: "blue transparent blue transparent"
-  }}></div>;
+  }} />;
 };
 
 const colorStyles = {
@@ -103,7 +103,7 @@ const Button = ({
 };
 
 const ProgressBar = ({ value, max }) => (
-  <progress className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded" value={value} max={max}></progress>
+  <progress className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded" value={value} max={max} />
 );
 
 const Message = ({ children }) => (
@@ -419,7 +419,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             {isDragActive ? (
               <DynamicText text={"Drop files here..."} />
             ) : (
-              <DynamicText text={state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : rejectionMessage} className={rejectionMessageStyle} />
+              <DynamicText text={state.selectedFiles.length > 0 ? `Selected file: ${state.selectedFiles[0].name}` : rejectionMessage} className={rejectionMessageStyle} />
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>

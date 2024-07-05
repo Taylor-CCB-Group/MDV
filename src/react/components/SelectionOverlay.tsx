@@ -84,7 +84,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
             // if (!indexSet.has(i)) return true;
             const v1 = data1[i];
             const v2 = data2[i];
-            return !(v1 < range1[0] || v1 > range1[1] || v2 < range2[0] || v2 > range2[1] || isNaN(v1) || isNaN(v2))
+            return !(v1 < range1[0] || v1 > range1[1] || v2 < range2[0] || v2 > range2[1] || Number.isNaN(v1) || Number.isNaN(v2))
         }
         const args = { range1, range2, predicate };
 
@@ -291,7 +291,6 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
             zIndex: 1,
             pointerEvents: selectedTool === 'Pan' ? 'none' : 'auto'
             }}
-            tabIndex={0}
             onMouseUp={(e) => {
                 // setSelectedTool('Pan');
             }}

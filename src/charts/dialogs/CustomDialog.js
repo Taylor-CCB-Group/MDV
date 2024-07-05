@@ -8,7 +8,7 @@ class CustomDialog extends BaseDialog{
         if (config.buttons){
             config.footer=true;
             config._buttons= config.buttons;
-            delete config.buttons
+            config.buttons = undefined
         }
         config.width= config.width || 300;
         

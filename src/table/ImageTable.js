@@ -9,7 +9,7 @@ class ImageTable {
      */
     constructor(parent_div,data_view,config){
         if (typeof parent_div === "string"){
-            parent_div =document.getElementById("#"+parent_div);
+            parent_div =document.getElementById(`#${parent_div}`);
         }
         if (!config){
             config={};
@@ -36,8 +36,8 @@ class ImageTable {
         const bg = config.background_color;
         this.view_port = createEl("div",{
             styles:{
-                height:bb.height+"px",
-                width:bb.width+"px",
+                height:`${bb.height}px`,
+                width:`${bb.width}px`,
                 overflow:"auto"
                // backgroundColor:bg
 
@@ -318,7 +318,7 @@ class ImageTable {
 
     _setCanvasHeight(){
         const h = ((Math.ceil(this.data_view.getLength()/this.num_per_row))*this.tile_height)+this.tbm;
-        this.canvas.style.height=h+"px";
+        this.canvas.style.height=`${h}px`;
     }
 
     _hasScrolled(){
@@ -376,7 +376,7 @@ class ImageTable {
                     this._removeByClass(`.mlv-tile-${this.domId}-${n}`);
                 }
             }
-            if (begin_row==0){
+            if (begin_row===0){
                 for (let n=end_row;n<this.row_displayed_last;n++){
                     this._removeByClass(`.mlv-tile-${this.domId}-${n}`);
                 }
@@ -393,8 +393,8 @@ class ImageTable {
         const bb =this.parent.getBoundingClientRect() 
         this.width = Math.round(bb.width);
         this.height = Math.round(bb.height);
-        this.view_port.style.height= this.height+"px";
-        this.view_port.style.width = this.width+"px";
+        this.view_port.style.height= `${this.height}px`;
+        this.view_port.style.width = `${this.width}px`;
         this.setImageDimensions();
         this.show(fti)     
     }
@@ -468,8 +468,11 @@ class ImageTable {
 		if (!len){
 			len=6;
 		}
-    	an = an&&an.toLowerCase();
-    	let str="", i=0, min=an=="a"?10:0, max=an=="n"?10:62;
+    	an = an?.toLowerCase();
+    	let str="";
+    	let i=0;
+    	const min=an==="a"?10:0;
+    	const max=an==="n"?10:62;
    	 	while(i++<len){
       		let r = Math.random()*(max-min)+min <<0;
       		str += String.fromCharCode(r+=r>9?r<36?55:61:48);
@@ -493,8 +496,8 @@ class ImageTable {
         const en = st+this.num_per_row;
         const top = row * this.tile_height+this.tbm;
         let x=0;
-        const w = this.t_width+"px";
-        const h = this.t_height+"px";
+        const w = `${this.t_width}px`;
+        const h = `${this.t_height}px`;
         const burl = getProjectURL(this.config.base_url);
         const type = this.config.image_type;
         // looking for something to provide a default name; "Gene" is ok for ytrap...
@@ -513,14 +516,14 @@ class ImageTable {
             let border=""
             if (this.color_by){
                 const color = this.color_by(id);
-                border= "4px solid "+color;
+                border= `4px solid ${color}`;
                 if (this.color_overlay) {
                     createEl("div",{
                         styles:{
                             height:h,
                             width:w,
-                            left:left+"px",
-                            top:top+"px",
+                            left:`${left}px`,
+                            top:`${top}px`,
                             zIndex: 1,
                             pointerEvents: "none",
                             backgroundColor: color,
@@ -546,8 +549,8 @@ class ImageTable {
                     border:border,
                     height:h,
                     width:w,
-                    left:left+"px",
-                    top:top+"px"
+                    left:`${left}px`,
+                    top:`${top}px`
                 },
                 alt: text,
                 title: text,
@@ -564,8 +567,8 @@ class ImageTable {
                     styles:{
                         width:w,
                         fontSize: `${this.label_size}px`,
-                        top:(top-this.label_size)+"px",
-                        left:left+"px"
+                        top:`${top-this.label_size}px`,
+                        left:`${left}px`
                     }
                 },this.canvas);
             }

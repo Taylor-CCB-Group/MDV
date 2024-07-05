@@ -171,7 +171,7 @@ class SingleHeatMap extends SVGChart{
         let v2 =null;
         //two extra columns describing the groups each cell is in
         //get the group interactions
-        if ( p.length==6){
+        if ( p.length===6){
             //get the raw columns and create matrix to hold the data 
             const gv1=this.dataStore.getColumnValues(p[4]);
             const gv2= this.dataStore.getColumnValues(p[5]);
@@ -215,7 +215,7 @@ class SingleHeatMap extends SVGChart{
             if (!d){
                 return mcol;
             }
-            if (isNaN(d[2])){
+            if (Number.isNaN(d[2])){
                 return mcol;
             }
             if (f[d[3]]>0){

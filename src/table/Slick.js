@@ -12,8 +12,8 @@
      * @constructor
      */
     function EventData() {
-      var isPropagationStopped = false;
-      var isImmediatePropagationStopped = false;
+      let isPropagationStopped = false;
+      let isImmediatePropagationStopped = false;
   
       /***
        * Stops event from propagating up the DOM tree.
@@ -52,7 +52,7 @@
      * @constructor
      */
     function Event() {
-      var handlers = [];
+      const handlers = [];
   
       /***
        * Adds an event handler to be called when the event is fired.
@@ -71,7 +71,7 @@
        * @param fn {Function} Event handler to be removed.
        */
       this.unsubscribe = (fn) => {
-        for (var i = handlers.length - 1; i >= 0; i--) {
+        for (let i = handlers.length - 1; i >= 0; i--) {
           if (handlers[i] === fn) {
             handlers.splice(i, 1);
           }
@@ -95,8 +95,8 @@
         e = e || new EventData();
         scope = scope || this;
   
-        var returnValue;
-        for (var i = 0; i < handlers.length && !(e.isPropagationStopped() || e.isImmediatePropagationStopped()); i++) {
+        let returnValue;
+        for (let i = 0; i < handlers.length && !(e.isPropagationStopped() || e.isImmediatePropagationStopped()); i++) {
           returnValue = handlers[i].call(scope, e, args);
         }
   
@@ -105,7 +105,7 @@
     }
   
     function EventHandler() {
-      var handlers = [];
+      let handlers = [];
   
       this.subscribe = function (event, handler) {
         handlers.push({
@@ -118,7 +118,7 @@
       };
   
       this.unsubscribe = function (event, handler) {
-        var i = handlers.length;
+        let i = handlers.length;
         while (i--) {
           if (handlers[i].event === event &&
               handlers[i].handler === handler) {
@@ -132,7 +132,7 @@
       };
   
       this.unsubscribeAll = function () {
-        var i = handlers.length;
+        let i = handlers.length;
         while (i--) {
           handlers[i].event.unsubscribe(handlers[i].handler);
         }
@@ -187,7 +187,7 @@
        * @return {Boolean}
        */
       this.isSingleRow = function () {
-        return this.fromRow == this.toRow;
+        return this.fromRow === this.toRow;
       };
   
       /***
@@ -196,7 +196,7 @@
        * @return {Boolean}
        */
       this.isSingleCell = function () {
-        return this.fromRow == this.toRow && this.fromCell == this.toCell;
+        return this.fromRow === this.toRow && this.fromCell === this.toCell;
       };
   
       /***
@@ -218,11 +218,10 @@
        */
       this.toString = function () {
         if (this.isSingleCell()) {
-          return "(" + this.fromRow + ":" + this.fromCell + ")";
+          return `(${this.fromRow}:${this.fromCell})`;
         }
-        else {
-          return "(" + this.fromRow + ":" + this.fromCell + " - " + this.toRow + ":" + this.toCell + ")";
-        }
+        
+          return `(${this.fromRow}:${this.fromCell} - ${this.toRow}:${this.toCell})`;
       };
     }
   
@@ -372,7 +371,7 @@
      * @constructor
      */
     function EditorLock() {
-      var activeEditController = null;
+      let activeEditController = null;
   
       /***
        * Returns true if a specified edit controller is active (has the edit lock).
@@ -451,7 +450,7 @@
      */
     function TreeColumns(treeColumns) {
   
-      var columnsById = {};
+      const columnsById = {};
   
       function init() {
         mapToId(treeColumns);
@@ -471,7 +470,7 @@
   
         return node.filter((column) => {
   
-          var valid = condition.call(column);
+          const valid = condition.call(column);
   
           if (valid && column.columns)
             column.columns = filter(column.columns, condition);
@@ -484,8 +483,8 @@
       function sort(columns, grid) {
         columns
           .sort((a, b) => {
-            var indexA = getOrDefault(grid.getColumnIndex(a.id)),
-              indexB = getOrDefault(grid.getColumnIndex(b.id));
+            const indexA = getOrDefault(grid.getColumnIndex(a.id));
+            const indexB = getOrDefault(grid.getColumnIndex(b.id));
   
             return indexA - indexB;
           })
@@ -501,7 +500,7 @@
   
       function getDepth(node) {
         if (node.length)
-          for (var i in node)
+          for (const i in node)
             return getDepth(node[i]);
         else if (node.columns)
           return 1 + getDepth(node.columns);
@@ -510,10 +509,10 @@
       }
   
       function getColumnsInDepth(node, depth, current) {
-        var columns = [];
+        let columns = [];
         current = current || 0;
   
-        if (depth == current) {
+        if (depth === current) {
   
           if (node.length)
             node.forEach((n) => {
@@ -522,8 +521,8 @@
             });
   
           return node;
-        } else
-          for (var i in node)
+        }
+          for (const i in node)
             if (node[i].columns) {
               columns = columns.concat(getColumnsInDepth(node[i].columns, depth, current + 1));
             }
@@ -532,11 +531,11 @@
       }
   
       function extractColumns(node) {
-        var result = [];
+        let result = [];
   
         if (node.hasOwnProperty('length')) {
   
-          for (var i = 0; i < node.length; i++)
+          for (let i = 0; i < node.length; i++)
             result = result.concat(extractColumns(node[i]));
   
         } else {
@@ -563,7 +562,7 @@
   
       this.hasDepth = () => {
   
-        for (var i in treeColumns)
+        for (const i in treeColumns)
           if (treeColumns[i].hasOwnProperty('columns'))
             return true;
   
@@ -601,8 +600,8 @@
      * @class Map
      * @constructor
      */
-    var Map = 'Map' in window ? window.Map : function Map() {
-      var data = {};
+    const Map = 'Map' in window ? window.Map : function Map() {
+      const data = {};
       
       /***
        * Gets the item with the given key from the map or undefined if

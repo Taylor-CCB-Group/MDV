@@ -27,7 +27,7 @@ function useColumnData(columnName: ColumnName, maxItems = 100) {
             for (let j = 0; j < indices.length; j++) {
                 const i = indices[j];
                 const v = newColumnData[j] = column.data[i];
-                if (isNaN(v)) {
+                if (Number.isNaN(v)) {
                     newColumnData[j] = Number.NEGATIVE_INFINITY;
                 }
             }

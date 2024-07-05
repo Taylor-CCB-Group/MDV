@@ -61,8 +61,8 @@ class DataModel {
                 this.data.sort((a,b)=>{
                     let va= col[a];
                     let vb = col[b];
-                    va= isNaN(va)?Number.MAX_VALUE:va;
-                    vb= isNaN(vb)?Number.MAX_VALUE:vb;
+                    va= Number.isNaN(va)?Number.MAX_VALUE:va;
+                    vb= Number.isNaN(vb)?Number.MAX_VALUE:vb;
                     return va-vb;
                 });
             }
@@ -70,8 +70,8 @@ class DataModel {
                 this.data.sort((a,b)=>{
                     let va= col[a];
                     let vb = col[b];
-                    va= isNaN(va)?Number.MIN_VALUE:va;
-                    vb= isNaN(vb)?Number.MIN_VALUE:vb;
+                    va= Number.isNaN(va)?Number.MIN_VALUE:va;
+                    vb= Number.isNaN(vb)?Number.MIN_VALUE:vb;
                     return vb-va;
                 });
             }
@@ -175,7 +175,7 @@ class DataModel {
                 }
             }
         }
-        else if (replace=="_delete_"){
+        else if (replace==="_delete_"){
             this.dataStore.cleanColumnData(column);
             return;
 

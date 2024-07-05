@@ -10,7 +10,7 @@ class GenomeBrowser extends BaseChart{
         this.contentDiv.style.width="100%";
         this.contentDiv.style.height="100%";
         c.type="genome_browser";
-        const add_ruler= c.tracks.find(x=>x["format"]==="ruler")?false:true;
+        const add_ruler= !c.tracks.find(x=>x["format"]==="ruler");
 
         import ('../browser/panel.js?v0.1').then(({default:MLVPanel})=>{
             this.browser = new MLVPanel(this.contentDiv,{
@@ -117,7 +117,7 @@ class GenomeBrowser extends BaseChart{
         }
         const cat = this.config.cluster_reads;
       
-        dataStore.addListener("gb_"+this.config.id, (type,data) => {
+        dataStore.addListener(`gb_${this.config.id}`, (type,data) => {
             if (type==="filtered") {
                 this.filterReads(data);
             }
@@ -184,7 +184,7 @@ class GenomeBrowser extends BaseChart{
                 type:"checkbox",
                 id:c.track_id,
                 label:c.short_label,
-                current_value:c.hide?false:true
+                current_value:!c.hide
             }
         });
         new CustomDialog({
@@ -278,7 +278,7 @@ class GenomeBrowser extends BaseChart{
         //this should be done elsewhere
         const phased= []
         const not_phased=[]
-        if (rowData && rowData.phase_data){
+        if (rowData?.phase_data){
             this.browser.removeAllHighlightedRegions();
             this._setPhasedSNPs(rowData.more_peak_haplotype,"blue");
             this._setPhasedSNPs(rowData.less_peak_haplotype,"red"); 
@@ -288,7 +288,7 @@ class GenomeBrowser extends BaseChart{
                     continue;
                 }          
                 if (pd){
-                    if (pd.ratio[0]==0 && pd.ratio[1]==0){
+                    if (pd.ratio[0]===0 && pd.ratio[1]===0){
                         this.browser.setTrackAttribute(id,"phase_data",null)
                     } 
                     else{       
@@ -369,7 +369,7 @@ class GenomeBrowser extends BaseChart{
     }
 
     getImage(callback,type){
-        if (type=="svg"){
+        if (type==="svg"){
             this.browser.repaint(true,false,callback)
         }
         else{
@@ -423,7 +423,7 @@ class GenomeBrowser extends BaseChart{
     setLabelFunction(column){
         if (!column){
             this.browser.setTrackLabelFunction("_base_track",null);
-            delete this.config.feature_label;
+            this.config.feature_label = undefined;
         }
         else{
             this.config.feature_label=column;
@@ -475,7 +475,7 @@ class GenomeBrowser extends BaseChart{
     remove(notify=true){
         if (this.cellDim){
             this.cellDim.destroy(notify);
-            this.dataLink.dataStore.removeListener("gb_"+this.config.id);
+            this.dataLink.dataStore.removeListener(`gb_${this.config.id}`);
         }
         super.remove();
     }
@@ -532,7 +532,7 @@ class GenomeBrowser extends BaseChart{
             only_update_on_enter:true,
             func:(x)=>{
                 x= Number.parseInt(x);
-                x= isNaN(x)?c.view_margins.type==="percentage"?20:1000:x;
+                x= Number.isNaN(x)?c.view_margins.type==="percentage"?20:1000:x;
                 c.view_margins.value=x;
                 const d = this.dataStore.getHighlightedData();
                 if (d){

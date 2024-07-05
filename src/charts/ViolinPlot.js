@@ -18,7 +18,7 @@ class ViolinPlot extends WGLChart{
             }
         }
 		if (!config.title){
-			config.title= x_name+" x "+y_name;	
+			config.title= `${x_name} x ${y_name}`;	
 		}
     	super(dataStore,div,config,{x:{type:"band"},y:{}});
         this.config.type="violin_plot";
@@ -101,7 +101,7 @@ class ViolinPlot extends WGLChart{
             return;
         }
        
-        else if (dim !== this.dim){
+        if (dim !== this.dim){
             if (dim === "all_removed"){
                 this.app.clearBrush();
                 this.app.setFilter(false);
@@ -151,14 +151,13 @@ class ViolinPlot extends WGLChart{
             let start= true;
             for (let n =0;n<this.data[i].length;n++){
                 const v= this.data[i][n];
-                if (v===0 || isNaN(v)){
+                if (v===0 || Number.isNaN(v)){
                    if (!start){
-                       if (arr[arr.length-1][2]==0){
+                       if (arr[arr.length-1][2]===0){
                            continue;
                        }
-                       else{
+                       
                         arr.push([ypos[n],pos,0])
-                       }
                    }
 
                     continue;
@@ -168,9 +167,8 @@ class ViolinPlot extends WGLChart{
                         arr.push([0,pos,0]);
                         continue;
                     }
-                    else{
+                    
                         arr.push([ypos[n-1],pos,0])
-                    }
                     start=false;
                 }
     
@@ -193,7 +191,7 @@ class ViolinPlot extends WGLChart{
 
         const colors = this.dataStore.getColumnColors(this.config.param[0]);
         const ga =this.graph_area.selectAll(".violin-curve")
-        .data(display_data,d=>'A'+d.id);
+        .data(display_data,d=>`A${d.id}`);
         ga.join("path")     
         .attr("class","violin-curve")
         .transition(trans)
@@ -209,7 +207,7 @@ class ViolinPlot extends WGLChart{
           .y((d,i) => d[0])
       );
       this.graph_area.selectAll(".violin-curve1")
-      .data(display_data,d=>"B"+d.id).join("path")     
+      .data(display_data,d=>`B${d.id}`).join("path")     
       .attr("class","violin-curve1")
       .transition(trans)
       .attr("fill", "none")

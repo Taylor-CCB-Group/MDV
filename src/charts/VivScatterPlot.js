@@ -244,7 +244,7 @@ class VivScatterPlot extends DensityScatterPlot{
                                 if (base.startsWith("./")){
                                     base=base.substring(2)
                                 }
-                                base= window.location.href.split("?")[0]+"/"+base;
+                                base= `${window.location.href.split("?")[0]}/${base}`;
                             }
                         }
                         url = base + i.file;          
@@ -254,7 +254,7 @@ class VivScatterPlot extends DensityScatterPlot{
                 this.viv = new VivViewerMDV(this.vivCanvas,vc,this.app);
                 this.app.addHandler("pan_or_zoom",(offset,x_scale,y_scale)=>{
                     this.viv.setPanZoom(offset,x_scale,y_scale)
-                },c.id+"_viv")
+                },`${c.id}_viv`)
             });
         }
         return super.afterAppCreation();
@@ -285,7 +285,7 @@ BaseChart.types["viv_scatter_plot"]={
     },
     init:(config, ds, ec)=>{
         BaseChart.types["image_scatter_plot"].init(config,ds,ec);
-        delete config.background_image;
+        config.background_image = undefined;
         config.radius=0.5;
         config.viv={
             channels:ds.regions.avivator.default_channels,

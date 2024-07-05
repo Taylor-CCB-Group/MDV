@@ -1,7 +1,7 @@
 import * as glMatrix from "gl-matrix"
 
 function damp (x) {
-    var xd = x * 0.9
+    const xd = x * 0.9
     if (Math.abs(xd) < 0.1) {
       return 0
     }
@@ -42,7 +42,7 @@ class Camera{
     mouseChange(dx,dy){
         
            
-        var w = Math.max(this.cameraState.distance, 0.5);
+        const w = Math.max(this.cameraState.distance, 0.5);
         
         this.dtheta += w *dx;
         this.dphi += w * dy;     
@@ -69,9 +69,9 @@ class Camera{
 
 
     updateCamera () {
-        var center = this.cameraState.center;
-        var eye = this.cameraState.eye;
-        var up = this.cameraState.up;
+        const center = this.cameraState.center;
+        const eye = this.cameraState.eye;
+        const up = this.cameraState.up;
     
         this.cameraState.theta += this.dtheta;
         this.cameraState.phi = clamp(
@@ -87,16 +87,16 @@ class Camera{
         this.dphi = damp(this.dphi);
         this.ddistance = damp(this.ddistance);
     
-        var theta = this.cameraState.theta;
-        var phi = this.cameraState.phi;
+        const theta = this.cameraState.theta;
+        const phi = this.cameraState.phi;
         //console.log(phi+":"+theta)
-        var r = Math.exp(this.cameraState.distance);
+        const r = Math.exp(this.cameraState.distance);
     
-        var vf = r * Math.sin(theta) * Math.cos(phi);
-        var vr = r * Math.cos(theta) * Math.cos(phi);
-        var vu = r * Math.sin(phi);
+        const vf = r * Math.sin(theta) * Math.cos(phi);
+        const vr = r * Math.cos(theta) * Math.cos(phi);
+        const vu = r * Math.sin(phi);
     
-        for (var i = 0; i < 3; ++i) {
+        for (let i = 0; i < 3; ++i) {
           eye[i] = center[i] + vf * this.front[i] + vr * this.right[i] + vu * up[i]
         }
 

@@ -93,11 +93,11 @@ class FileUploadDialog extends BaseDialog{
     		xhr.responseType="json";
     		xhr.open("POST", this.url, true);
             for (const index in  this.files){
-				fd.append("file"+index, this.files[index]);
+				fd.append(`file${index}`, this.files[index]);
 			}
     		fd.append("data",JSON.stringify(data));
     		xhr.onreadystatechange = ()=> {
-        	    if (xhr.readyState == 4 && xhr.status == 200) {
+        	    if (xhr.readyState === 4 && xhr.status === 200) {
                     let msg = null;
                     if (this.onfinished){
                         msg = this.onfinished(xhr.response);

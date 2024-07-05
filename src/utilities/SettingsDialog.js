@@ -72,8 +72,6 @@ class SettingsDialog extends BaseDialog{
                 case "radiobuttons":
                     gui.add(s, 'current_value', s.choices).name(s.label).onChange(s.func);
                     break;
-                case "text":
-                case "textbox":
                 default:
                     gui.add(s, 'current_value').name(s.label).onChange(s.func);
             }

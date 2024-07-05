@@ -86,14 +86,14 @@ class DotPlot extends SVGChart{
             l.remove();  
         }
         if (!c.fraction_legend.display){
-            delete this.nodeFractionLegend;
+            this.nodeFractionLegend = undefined;
             return;
         }
         const pos = c.fraction_legend.position || [0,0];
         this.fractionLegend=getColorLegendCustom(this.fractionScale,{label:"fraction",type:"circle"});
         this.contentDiv.append(this.fractionLegend);
-        this.fractionLegend.style.top= pos[1]+"px";
-        this.fractionLegend.style.left= pos[0]+"px";
+        this.fractionLegend.style.top= `${pos[1]}px`;
+        this.fractionLegend.style.left= `${pos[0]}px`;
     }
 
     getConfig(){

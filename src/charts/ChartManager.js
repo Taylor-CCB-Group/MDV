@@ -84,9 +84,8 @@ function getPreferredColorScheme() {
     if (window.matchMedia) {
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
             return "dark";
-        } else {
-            return "light";
         }
+            return "light";
     } 
     return "light";
 }
@@ -689,8 +688,8 @@ class ChartManager{
 
 
         for (const ds of this.dataSources){
-            delete ds.contentDiv;
-            delete ds.menuBar;   
+            ds.contentDiv = undefined;
+            ds.menuBar = undefined;   
         }
         const dsToView= Object.keys(this.viewData.dataSources);
 
@@ -781,8 +780,8 @@ class ChartManager{
             }
         }
         //nothing to load - call any listeners
-        if (this._toLoadCharts.size==0){
-            delete this._toLoadCharts;
+        if (this._toLoadCharts.size===0){
+            this._toLoadCharts = undefined;
             this._callListeners("view_loaded",this.currentView)
         }
         //add charts - any columns will be added dynamically
@@ -1239,10 +1238,10 @@ class ChartManager{
         const len = Object.keys(this.infoAlerts).length;
         config.type= config.type || "info"
         const div = createEl("div",{
-            classes:["ciview-info-alert","ciview-alert-"+config.type],
+            classes:["ciview-info-alert",`ciview-alert-${config.type}`],
             styles:{
                 right:"10px",
-                top:50+(len*40)+"px",
+                top:`${50+(len*40)}px`,
             },
           
         },this.containerDiv);
@@ -1268,8 +1267,8 @@ class ChartManager{
     updateInfoAlert(id,msg,config={}){
         const al =this.infoAlerts[id];
         if (config.type && al.type !==config.type){
-            al.div.classList.remove("ciview-alert-"+al.type);
-            al.div.classList.add("ciview-alert-"+config.type);
+            al.div.classList.remove(`ciview-alert-${al.type}`);
+            al.div.classList.add(`ciview-alert-${config.type}`);
             al.type=config.type;
         }
         al.text.textContent=msg;
@@ -1289,7 +1288,7 @@ class ChartManager{
             delete this.infoAlerts[id];
             let top =50;
             for (const i in this.infoAlerts){
-                this.infoAlerts[i].div.style.top = top+"px";
+                this.infoAlerts[i].div.style.top = `${top}px`;
                 top+=40;
             }
         },delay);
@@ -1587,10 +1586,10 @@ class ChartManager{
         const div= createEl("div",{
             styles:{
                 position:"absolute",
-                width:width+"px",
-                height:height+"px",
-                left:left+"px",
-                top:top+"px",
+                width:`${width}px`,
+                height:`${height}px`,
+                left:`${left}px`,
+                top:`${top}px`,
                 background:t.main_panel_color,
                 zIndex:2,
                 display:"flex",
@@ -1770,7 +1769,7 @@ class ChartManager{
     
     //need to ensure that column data is loaded before calling method
     _decorateColumnMethod(method,chart,dataSource){
-        const newMethod = "_"+method;
+        const newMethod = `_${method}`;
         chart[newMethod]= chart[method];
         //if original method is called check whether column has data
         chart[method]=(column)=>{
@@ -1782,7 +1781,7 @@ class ChartManager{
     //supercedes previous method - more genric
     //method must be specified in the method UsingColumns in types of dictionary
     __decorateColumnMethod(method,chart,dataSource){
-        const newMethod = "_"+method;
+        const newMethod = `_${method}`;
         chart[newMethod]= chart[method];
         chart[method]=()=> {
             //column not needed
@@ -1894,7 +1893,7 @@ class ChartManager{
         if (this._toLoadCharts){
             this._toLoadCharts.delete(config);
             if (this._toLoadCharts.size===0){
-                delete this._toLoadCharts;
+                this._toLoadCharts = undefined;
                 if (this.viewData.links){
                     for (const l of this.viewData.links){
                         this._setUpLink(l);
@@ -1970,9 +1969,10 @@ class ChartManager{
         const link = this.viewData.links[linkIndex];
         switch(link.type){
             case "color_by_column":
-            case "chart_columnval_link":
+            case "chart_columnval_link": {
                 const chart =  this.charts[link.source_chart].chart;
                 chart.removeListener(link.id)
+            }
         }
         this.viewData.links.splice(linkIndex,1)
     }
@@ -2045,8 +2045,8 @@ class ChartManager{
         for (const id in this.charts){
             const info = this.charts[id];
             const d= info.chart.getDiv();
-            d.style.left=left+"px";
-            d.style.top=top+"px";
+            d.style.left=`${left}px`;
+            d.style.top=`${top}px`;
             //info.chart.setSize(size[0],size[1]);
             left+=size[0]+margin;
             rowSize++;
@@ -2196,7 +2196,7 @@ class ChooseColumnDialog extends BaseDialog{
         else{
             const cols = this.ds.columnGroups[group].columns;
             for (const check of this.checks){                  
-                    check[0].checked=cols.indexOf(check[1])===-1?false:true
+                    check[0].checked=cols.indexOf(check[1])!==-1
             }
 
         }
@@ -2400,7 +2400,7 @@ class AddChartDialog extends BaseDialog{
         if (params){
             for (const p of params){
                 const d = createEl("div",{styles:{padding:"4px"}},this.paramDiv)
-                const sp =createEl("div",{text:p.name+":"},d);
+                const sp =createEl("div",{text:`${p.name}:`},d);
                 const holder =createEl("div",{},this.paramDiv);
                 if (!(Array.isArray(p.type)) && p.type.startsWith("_multi")){
                     this._addMultiColumnSelect(holder,p.type.split(":")[1])

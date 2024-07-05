@@ -35,7 +35,7 @@ class CategoryChart extends SVGChart{
             if (this.filter.indexOf(cat)!==-1){
                 this.filter= this.filter.filter(x=>x!==cat)
             }
-            else if (this.filter.length==0){
+            else if (this.filter.length===0){
                 const vs = this.dataStore.getColumnValues(this.config.param);
                 this.filter= vs.filter(x=>x!==cat);
             }

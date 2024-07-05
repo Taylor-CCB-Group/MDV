@@ -141,7 +141,7 @@ class RowChart extends CategoryChart{
         .attr("class","row-text")
         .transition(trans)
         .text((d)=>vals[d[1]]===""?"none":vals[d[1]])
-        .attr("font-size",fontSize+"px")
+        .attr("font-size",`${fontSize}px`)
         .attr("x",5)
         .style("fill","currentColor")
         .attr("y",(d,i)=>((i+1)*3)+(i*barHeight)+(barHeight/2))

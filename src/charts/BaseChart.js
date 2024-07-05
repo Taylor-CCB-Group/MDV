@@ -318,7 +318,7 @@ class BaseChart{
             if (this.legend){
                 this.config.color_legend.pos=[this.legend.offsetLeft,this.legend.offsetTop];
                 this.legend.remove();
-                delete this.legend;
+                this.legend = undefined;
             }
             return;
         }
@@ -335,8 +335,8 @@ class BaseChart{
             if (!cl.pos){
                 cl.pos=[box.left,box.top]
             }
-            ll= cl.pos[0]+"px";
-            lt= cl.pos[1]+"px";
+            ll= `${cl.pos[0]}px`;
+            lt= `${cl.pos[1]}px`;
         }
         this.legend = this.getColorLegend();
         if (!this.legend) {
@@ -403,7 +403,7 @@ class BaseChart{
         }
         if (this.colorByColumn){
             if (this.config.color_by===column){
-                delete this.config.color_by;
+                this.config.color_by = undefined;
                 this.colorByDefault();
             }
         }
@@ -431,8 +431,8 @@ class BaseChart{
         if (!this._tooltip) this.addToolTip();
         this._tooltip.innerHTML=msg;
         this._tooltip.style.display= "inline-block";
-        this._tooltip.style.left= (3+e.clientX)+"px";
-        this._tooltip.style.top=(3+e.clientY)+"px"
+        this._tooltip.style.left= `${3+e.clientX}px`;
+        this._tooltip.style.top=`${3+e.clientY}px`
     }
 
     hideToolTip(){
@@ -503,7 +503,7 @@ class BaseChart{
                 current_value:c.color_by || "_none",
                 func:(x)=>{
                     if (x==="_none"){
-                        delete c.color_by
+                        c.color_by = undefined
                         this.colorByDefault();
                     }
                     else{
@@ -753,8 +753,8 @@ class BaseChart{
     setSize(x,y){
         //if supplied change the div dimensions
         if (x){
-            this.div.style.height=y+"px";
-            this.div.style.width=x+"px";
+            this.div.style.height=`${y}px`;
+            this.div.style.width=`${x}px`;
         }
         //calculate width and height based on outer div
         this._setDimensions();
@@ -781,9 +781,9 @@ class BaseChart{
         this.getImage(resp=>{
             const link =document.createElement("a");
             const name = this.config.title || "image"
-            link.download=name+"."+im_type;
+            link.download=`${name}.${im_type}`;
             if (im_type==="svg"){
-                link.href="data:image/svg+xml," + encodeURIComponent(resp);
+                link.href=`data:image/svg+xml,${encodeURIComponent(resp)}`;
             }
             else{
                 let url =resp.toDataURL('image/png');
@@ -850,16 +850,16 @@ class BaseChart{
 BaseChart.types = chartTypes;
 
 function copyStylesInline(destinationNode, sourceNode) {
-    var containerElements = ["svg","g"];
-    for (var cd = 0; cd < destinationNode.childNodes.length; cd++) {
-        var child = destinationNode.childNodes[cd];
-        if (containerElements.indexOf(child.tagName) != -1) {
+    const containerElements = ["svg","g"];
+    for (let cd = 0; cd < destinationNode.childNodes.length; cd++) {
+        const child = destinationNode.childNodes[cd];
+        if (containerElements.indexOf(child.tagName) !== -1) {
              copyStylesInline(child, sourceNode.childNodes[cd]);
              continue;
         }
-        var style = sourceNode.childNodes[cd].currentStyle || window.getComputedStyle(sourceNode.childNodes[cd]);
-        if (style == "undefined" || style == null) continue;
-        for (var st = 0; st < style.length; st++){
+        const style = sourceNode.childNodes[cd].currentStyle || window.getComputedStyle(sourceNode.childNodes[cd]);
+        if (style === "undefined" || style == null) continue;
+        for (let st = 0; st < style.length; st++){
              child.style.setProperty(style[st], style.getPropertyValue(style[st]));
         }
     }

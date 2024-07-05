@@ -31,10 +31,10 @@ function processArrayBuffer(data,columns,size){
         //the number of bytes for each item in the column's data
  		let bytes=4;
         //set the correct values for other datatypes
-		if (column.datatype=="unique" || column.datatype=="text"){
+		if (column.datatype==="unique" || column.datatype==="text"){
 			arrayType=Uint8Array;
  			bytes=1;
-			if(column.datatype=="unique"){
+			if(column.datatype==="unique"){
 				bytes=column.stringLength;
 				arr_len=size*bytes;
 			}
@@ -54,7 +54,7 @@ function processArrayBuffer(data,columns,size){
         //the first 4 bytes specifies the number of values (n)
         //The next n*4 bytes are the indexes of these values (Uint32)
         //the next n*4 bytes are the actual values (Float32) 
-		if (column.sgtype=="sparse"){
+		if (column.sgtype==="sparse"){
 			//first byte is length of data
 			const l = new Uint32Array(data,offset,1)[0];
 			offset+=4;
@@ -203,12 +203,11 @@ class CompressedBinaryDataLoader {
                     }
                     return { data: sb, field: c.field };
                 }
-                else{
+                
                     const sb = new SharedArrayBuffer(output.length)
                     const f = new Uint8Array(sb);
                     f.set(output, 0);
                     return { data: sb, field: c.field };
-                }
             } catch (e) {
                 console.warn(`Error inflating ${c.field}: ${e}`);
             }

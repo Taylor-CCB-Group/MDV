@@ -71,7 +71,7 @@ class OffsetDialog extends BaseDialog{
 		let x =0;
 		let y=0;
 		const am = Number.parseFloat(this.offsetAm.value);
-		if (isNaN(am)){
+		if (Number.isNaN(am)){
 			return;
 		}
 		x+=dir==="right"?am:0;
@@ -133,14 +133,14 @@ class OffsetDialog extends BaseDialog{
 		let xy=[0,0];
 		let angle=0;
 		const vs =  this.ds.offsets.values[this.filter || "all"];
-		if (vs && vs[group]){
+		if (vs?.[group]){
 			xy = vs[group].offsets;
 			angle =vs[group].rotation;
 		}
 
-		this.xoffset.textContent="x:"+xy[0].toFixed(1);
-		this.yoffset.textContent="y:"+xy[1].toFixed(1);
-		this.angle.textContent="angle:"+angle.toFixed(1);
+		this.xoffset.textContent=`x:${xy[0].toFixed(1)}`;
+		this.yoffset.textContent=`y:${xy[1].toFixed(1)}`;
+		this.angle.textContent=`angle:${angle.toFixed(1)}`;
 	}
 	
 
@@ -175,7 +175,7 @@ class OffsetDialog extends BaseDialog{
 		},this.rDiv);
 		j.addEventListener("click",e=>{
 			const am = Number.parseFloat(this.offsetAn.value);
-			if (isNaN(am)){
+			if (Number.isNaN(am)){
 				return;
 			}
 			const angle = dir==="left"?-am:am;
@@ -200,7 +200,7 @@ class WGLScatterPlot extends WGLChart{
             }
         }
 		if (!config.title){
-			config.title= x_name+" x "+y_name;	
+			config.title= `${x_name} x ${y_name}`;	
 		}
     	super(dataStore,div,config,{x:{},y:{}});
 	
@@ -342,7 +342,7 @@ class WGLScatterPlot extends WGLChart{
 			this.app.refresh();
 		}
         im.onerror=()=>{
-            delete this.config.background_image;
+            this.config.background_image = undefined;
         }
 	}
 
@@ -381,15 +381,15 @@ class WGLScatterPlot extends WGLChart{
 
     _calculateRadius(){
     	const width = this.width?this.width:1;
-		let max_x=this.config.max_x || this.config.max_x==0?this.config.max_x:this.minMaxX[1]; 	
-    	let min_x=this.config.min_x || this.config.min_x==0?this.config.min_x:this.minMaxX[0];
+		let max_x=this.config.max_x || this.config.max_x===0?this.config.max_x:this.minMaxX[1]; 	
+    	let min_x=this.config.min_x || this.config.min_x===0?this.config.min_x:this.minMaxX[0];
     	if (this.config.axis.x_log_scale){
     		max_x= this._getLogValue(max_x);
     		min_x= this._getLogValue(min_x);
     	}
 		
 		const range = max_x-min_x
-		const pt_px = Math.pow(range,1.50)/(Math.pow(this.dataStore.size,0.8)+range);
+		const pt_px = range ** 1.50/(this.dataStore.size ** 0.8+range);
 		//pt_px = pt_px<0.001?0.001:pt_px;
 		return (pt_px)*5;
 		
@@ -546,7 +546,7 @@ class WGLScatterPlot extends WGLChart{
 				label:"Change Image",
 				func:x=>{
 					if (x==="__none__"){
-						delete c.background_image;
+						c.background_image = undefined;
 						this.app.removeImages();
 						this.app.refresh();
 						return;
@@ -566,7 +566,7 @@ class WGLScatterPlot extends WGLChart{
 						c.background_image.height=f[3];
 						c.background_image.position=[f[4],f[5]];
 					}
-					this.setTitle(t+"-"+f[0])
+					this.setTitle(`${t}-${f[0]}`)
 					this.addBackgroundImage(c.background_image,replace);
 				}
 			})
@@ -586,14 +586,14 @@ class WGLScatterPlot extends WGLChart{
 				label:"Change Image",
 				func:x=>{
 					if (x==="__none__"){
-						delete c.background_image;
+						c.background_image = undefined;
 						this.app.removeImages();
 						this.app.refresh();
 						return;
 					}
-					const replace = c.background_image?true:false;
+					const replace = !!c.background_image;
 					c.background_image=ic[x];	
-					this.setTitle(c.region+"-"+x)
+					this.setTitle(`${c.region}-${x}`)
 					this.addBackgroundImage(c.background_image,replace);
 				}
 			})
@@ -625,7 +625,7 @@ class WGLScatterPlot extends WGLChart{
 			current_value:c.background_color || "none",
 			func:(x)=>{
 				if (x==="none"){
-					delete c.background_color
+					c.background_color = undefined
 				}
 				else{
 					c.background_color=x

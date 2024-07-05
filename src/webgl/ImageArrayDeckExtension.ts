@@ -5,14 +5,10 @@ import { ScatterplotLayer } from 'deck.gl/typed';
 /** don't think we can prepend '#version 300 es' in LayerExtension, 
  * so we use this as a hack */
 export class ScatterplotExLayer extends ScatterplotLayer<any> {
-    // ts suddenly complains if we don't have this constructor
-    constructor(props: any) {
-        super(props);
-    }
     getShaders() {
         const shaders = super.getShaders();
-        shaders.vs = '#version 300 es\n' + shaders.vs;
-        shaders.fs = '#version 300 es\n' + shaders.fs;
+        shaders.vs = `#version 300 es\n${shaders.vs}`;
+        shaders.fs = `#version 300 es\n${shaders.fs}`;
         return shaders;
     }
 }

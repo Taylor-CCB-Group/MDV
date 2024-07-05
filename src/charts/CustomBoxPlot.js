@@ -189,7 +189,7 @@ BaseChart.types["density_box_plot"]={
     },
     init:(config,ds,ec)=>{   
         config.denominators={};
-        config.denom_unit= ds.regions.scale_unit+"²"; //should be power 2
+        config.denom_unit= `${ds.regions.scale_unit}²`; //should be power 2
         config.param=[ec.group,ds.regions.region_field,ec.cat];
         //work out area of each region
         for (const reg_name in ds.regions.all_regions){

@@ -199,7 +199,7 @@ class VivViewerMDV {
     //most of this can move into createLayers()
     const {SizeX, SizeY, SizeZ, Channels: channels} = tiff.metadata.Pixels;
     const target = [SizeX/2, SizeY/2, SizeZ/2];
-    const id = '3d_' + DETAIL_VIEW_ID;
+    const id = `3d_${DETAIL_VIEW_ID}`;
     const loader = tiff.data;
     const n = channels.length;
     // this is wrong in cases where non-default set of channels is used.
@@ -322,7 +322,7 @@ class VivViewerMDV {
             // todo nicer default colors
             color = color ? typeof item.color === "string" ? hexToRGB(color) : color : [255,0,0];
             nconf.colors.push(color);
-            nconf.channelsVisible.push(item.visible==undefined?true:item.visible);
+            nconf.channelsVisible.push(item.visible===undefined?true:item.visible);
             nconf.contrastLimits.push(item.contrastLimits || null);
             nconf.domains.push(item.domains || null);
         }

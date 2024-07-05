@@ -198,7 +198,7 @@ class SingleHeatMapGroup extends SVGChart{
             if (!d){
                 return "#f4f0ec";
             }
-            if (isNaN(d[2])){
+            if (Number.isNaN(d[2])){
                 return "#f4f0ec";
             }
             return this.colorFunction(d[2]);

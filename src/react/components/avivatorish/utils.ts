@@ -38,11 +38,10 @@ function isOmeTiff(urlOrFile) {
 function getMultiTiffFilenames(urlOrFiles) {
     if (Array.isArray(urlOrFiles)) {
         return urlOrFiles.map(f => f.name);
-    } else if (urlOrFiles instanceof File) {
+    }if (urlOrFiles instanceof File) {
         return [urlOrFiles.name];
-    } else {
-        return urlOrFiles.split(',');
     }
+        return urlOrFiles.split(',');
 }
 
 /**
@@ -66,11 +65,10 @@ function isMultiTiff(urlOrFiles) {
 async function generateMultiTiffFileArray(urlOrFiles) {
     if (Array.isArray(urlOrFiles)) {
         return urlOrFiles;
-    } else if (urlOrFiles instanceof File) {
+    }if (urlOrFiles instanceof File) {
         return [urlOrFiles];
-    } else {
-        return urlOrFiles.split(',');
     }
+        return urlOrFiles.split(',');
 }
 
 /**

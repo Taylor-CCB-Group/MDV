@@ -76,7 +76,7 @@ class RingChart extends CategoryChart{
         .attr("x",(d)=>{    
            return  this.arc.centroid(d)[0]
         })
-        .attr("font-size",fontSize+"px")
+        .attr("font-size",`${fontSize}px`)
         .attr("y",(d)=>this.arc.centroid(d)[1])
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "central") 

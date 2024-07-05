@@ -74,9 +74,9 @@ class AutoComplete{
         this.listHolder = createEl("div",{
             classes:["autocomplete-items"],
             styles:{
-                top:(dim.top+dim.height)+"px",
-                left:dim.left+"px",
-                width:dim.width +"px",
+                top:`${dim.top+dim.height}px`,
+                left:`${dim.left}px`,
+                width:`${dim.width}px`,
                 zIndex:1200
             }
         },this.__doc__.body);

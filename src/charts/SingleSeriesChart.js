@@ -73,7 +73,7 @@ class SingleSeriesChart extends SVGChart{
         let max=  null;
         for (let i =0;i<len;i++){
             if (c1[i]===cat1 && c2[i]===cat2){
-                if (isNaN(values[i])){
+                if (Number.isNaN(values[i])){
                     continue
                 }
                 max = max===null?values[i]:Math.max(values[i],max);
@@ -89,9 +89,9 @@ class SingleSeriesChart extends SVGChart{
             eb.mean = eb.totals/eb.values.length;
             let n = eb.values.length-1;
             n= n===0?1:n;
-            eb.std= eb.values.reduce((prev,cur)=>prev+(Math.pow(cur-eb.mean,2)),0);
+            eb.std= eb.values.reduce((prev,cur)=>prev+((cur-eb.mean) ** 2),0);
             eb.std= Math.sqrt(eb.std/n);
-            delete eb.values
+            eb.values = undefined
         }
         this.errorBars=errorBars;
         const margin = (max-min)/10;

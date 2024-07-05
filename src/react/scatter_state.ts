@@ -43,14 +43,14 @@ export function useFilteredIndices() {
                     //const filterIndex = col.values.indexOf(filterValue);
                     const filterIndex = catFilters.map(f => {
                         if (Array.isArray(f.category)) return f.category.map(c => dataStore.columnIndex[f.column].values.indexOf(c)) as number[];
-                        else return dataStore.columnIndex[f.column].values.indexOf(f.category) as number;
+                        return dataStore.columnIndex[f.column].values.indexOf(f.category) as number;
                     });
                     try {
                         // const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
                         const filteredIndices = indices.filter(i => catFilters.every((_, j) => {
                             const f = filterIndex[j];
                             if (typeof f === 'number') return f === cols[j].data[i];
-                            else return f.some(fi => cols[j].data[i] === fi);
+                            return f.some(fi => cols[j].data[i] === fi);
                         }));
                         setFilteredIndices(filteredIndices);
                         // thinking about allowing gray-out of non-selected points... should be optional
@@ -232,7 +232,7 @@ export function useScatterplotLayer() {
         setCurrentLayerHasRendered(false);
         return new ScatterplotExLayer({
         // loaders //<< this will be interesting to learn about
-        id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
+        id: `scatter_${getVivId(`${id}detail-react`)}`, // should satisfy VivViewer, could make this tidier
         data,
         opacity,
         radiusScale,

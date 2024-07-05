@@ -107,8 +107,8 @@ class CellRadialChart extends SVGChart{
         }
         this.state_legend = getColorLegend(colors,names,{label:col.name});
         this.contentDiv.append(this.state_legend);
-        this.state_legend.style.top= sl.position[1]+"px";
-        this.state_legend.style.left= sl.position[0]+"px";
+        this.state_legend.style.top= `${sl.position[1]}px`;
+        this.state_legend.style.left= `${sl.position[0]}px`;
 
 
     }
@@ -140,7 +140,7 @@ class CellRadialChart extends SVGChart{
                             .range(c.link_thickness.range)
                             .clamp(true);
         const cwidth = c.link_thickness.type==="constant"
-        const width = c.link_thickness.width+"px"
+        const width = `${c.link_thickness.width}px`
         if (update){    
             this.links.attr("stroke-width", d=>{
                 if (d.depth===3){
@@ -341,13 +341,13 @@ class CellRadialChart extends SVGChart{
         const c2Colors = this.dataStore.getColumnColors(c.param[2]);
         const stData=  this.dataStore.getRawColumn(c.param[0])
        
-        var tree = d3Tree()
+        const tree = d3Tree()
        
         .size([360, radius])
-        .separation((a, b) => (a.parent == b.parent ? 1 : 2) / a.depth);
+        .separation((a, b) => (a.parent === b.parent ? 1 : 2) / a.depth);
        
       
-        var root = tree(this.root);
+        const root = tree(this.root);
 
         this.graph_area.selectAll(".link").remove();
         this.graph_area.selectAll(".node").remove();
@@ -440,24 +440,17 @@ class CellRadialChart extends SVGChart{
             .attr("d", (d) => {
                 level_radii[d.depth]=d.y;
                 if (d.depth>1){
-                return "M" + project(d.x, d.y)
-                    + "C" + project(d.x, (d.y + d.parent.y) / 2)
-                    + " " + project(d.parent.x, (d.y + d.parent.y) / 2)
-                    + " " + project(d.parent.x, d.parent.y);
+                return `M${project(d.x, d.y)}C${project(d.x, (d.y + d.parent.y) / 2)} ${project(d.parent.x, (d.y + d.parent.y) / 2)} ${project(d.parent.x, d.parent.y)}`;
                 }
-                else{
-                    return "M" + project(d.x, d.y)
-                    + "L" + project(d.parent.x,d.parent.y);
                 
-                
-                }
+                    return `M${project(d.x, d.y)}L${project(d.parent.x,d.parent.y)}`;
             });
 
         const node = this.graph_area.selectAll(".node")
             .data(data)
             .enter().append("g")
-              .attr("class", (d) => "node" + (d.children ? " node--internal" : " node--leaf"))
-              .attr("transform", (d) => "translate(" + project(d.x, d.y) + ")").on("click",(d)=> {
+              .attr("class", (d) => `node${d.children ? " node--internal" : " node--leaf"}`)
+              .attr("transform", (d) => `translate(${project(d.x, d.y)})`).on("click",(d)=> {
                   this.nodeClicked(d);
               });
     
@@ -481,14 +474,14 @@ class CellRadialChart extends SVGChart{
                 }
              });
 
-        const fs = this.config.label_size+"px";
+        const fs = `${this.config.label_size}px`;
         node.append("text")
               .attr("dy", ".31em")
               .attr("font-size",fs)
               .style("fill","currentColor")
               .attr("font-family","Helvetica")
               .attr("x", d=> {
-                const x_off= d.depth==1?c.node_size.inner+1:c.node_size.outer+1;
+                const x_off= d.depth===1?c.node_size.inner+1:c.node_size.outer+1;
                 return d.x < 180 === !d.children ? x_off : -x_off; 
             })
               .attr("alignment-baseline",d=>d.depth===1 && c.central_links?"hanging":"baseline")
@@ -496,18 +489,17 @@ class CellRadialChart extends SVGChart{
                   if (! d.children ){
                       return d.x < 180?"start" : "end"; 
                   }
-                  else {
+                  
                       return d.x > 180?"start" : "end"; 
-                  }
                   
               })
               .attr("transform", (d) => {
                     if ( d.depth ===1 && !(c.central_links)){
                         return ("rotate(0)");
                     }
-                  return "rotate(" + (d.x < 180 ? d.x - 90 : d.x + 90) + ")"; 
+                  return `rotate(${d.x < 180 ? d.x - 90 : d.x + 90})`; 
               })
-              .text((d) => d.depth==2?"":d.data[2]);
+              .text((d) => d.depth===2?"":d.data[2]);
     }
 
     setSize(x,y){
@@ -594,7 +586,8 @@ class CellRadialChart extends SVGChart{
 
 
 function  project(x, y) {
-    const angle = (x - 90) / 180 * Math.PI, radius = y;
+    const angle = (x - 90) / 180 * Math.PI;
+    const radius = y;
     return [radius * Math.cos(angle), radius * Math.sin(angle)];
 }
 

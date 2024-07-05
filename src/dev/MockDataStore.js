@@ -84,10 +84,10 @@ function getRandomDataStore(size,config={}){
 function getRandomData(column,size){
     let arrayType=Float32Array;
     let bytes=4;
-    if (column.datatype=="unique" || column.datatype=="text"){
+    if (column.datatype==="unique" || column.datatype==="text"){
         arrayType=Uint8Array;
         bytes=1;
-        if(column.datatype=="unique"){
+        if(column.datatype==="unique"){
           bytes=column.stringLength;
           arr_len=size*column.stringLength;
         }

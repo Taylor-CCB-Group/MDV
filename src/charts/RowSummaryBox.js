@@ -11,7 +11,7 @@ class RowSummaryBox extends BaseChart{
         if (config.image){
             const d = createEl("div",{
                 classes:["mdv-image-holder"],
-                style:{height:Number.parseInt(this.width*0.7)+"px"}
+                style:{height:`${Number.parseInt(this.width*0.7)}px`}
             },this.contentDiv);       
             this.imViewer=new ImagePanZoom(d,this._getImage(0));
         }
@@ -70,7 +70,7 @@ class RowSummaryBox extends BaseChart{
     setSize(x,y){
         super.setSize(x,y);
         if (this.imViewer){
-            this.imViewer.container.style.height= Math.round(this.width*0.7)+"px";
+            this.imViewer.container.style.height= `${Math.round(this.width*0.7)}px`;
             this.imViewer.fit();
         }
     }

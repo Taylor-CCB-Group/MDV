@@ -60,7 +60,7 @@ class MultiPieChart extends SVGChart{
             }
             let sum =0;
             for (const p of d){
-                if (isNaN(p[2])){
+                if (Number.isNaN(p[2])){
                     p[2]=0;
                 }
                 else{
@@ -162,7 +162,7 @@ class MultiPieChart extends SVGChart{
          .attr("text-anchor", "middle")
          .attr("class","pie-text-header")
          .attr("y",-(ph/2)+(ph/10))
-         .attr("font-size",fontSize+"px")
+         .attr("font-size",`${fontSize}px`)
          .attr("dominant-baseline", "bottom") 
         .text(d=>d);
 

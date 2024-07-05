@@ -101,8 +101,7 @@ class VivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivVie
         const { views, onViewStateChange } = this.props;
         // eslint-disable-next-line no-param-reassign
         viewState =
-            (onViewStateChange &&
-                onViewStateChange({
+            (onViewStateChange?.({
                     viewId,
                     viewState,
                     interactionState,

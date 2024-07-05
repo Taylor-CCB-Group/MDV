@@ -83,7 +83,7 @@ class DensityScatterPlot extends WGLScatterPlot{
     _drawContours(color,colorScale,i){
         const dpc= `dp-poly-${i}`;
         const c =this.config;
-        this.graph_area.selectAll("."+dpc)
+        this.graph_area.selectAll(`.${dpc}`)
         .data(this.data[i])
         .join("path")
         .attr("class",dpc)
@@ -101,7 +101,7 @@ class DensityScatterPlot extends WGLScatterPlot{
     }
 
     removeCategory(c){
-        delete this.config["category"+c];
+        delete this.config[`category${c}`];
         this.data[c-1]=null;
         this.catKeys[c-1]=-1;
         this.graph_area.selectAll(`.dp-poly-${c-1}`).remove();

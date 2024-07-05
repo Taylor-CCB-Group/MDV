@@ -2,22 +2,22 @@ import { hierarchy as d3_hierarchy}  from "d3-hierarchy";
 
 const distances ={
 	euclidean: (v1, v2) => {
-      var total = 0;
-      for (var i = 0; i < v1.length; i++) {
-         total += Math.pow(isNaN(v2[i])?0:v2[i] -v1[i], 2);      
+      let total = 0;
+      for (let i = 0; i < v1.length; i++) {
+         total += (Number.isNaN(v2[i])?0:v2[i] -v1[i]) ** 2;      
       }
       return Math.sqrt(total);
    },
    manhattan: (v1, v2) => {
-     var total = 0;
-     for (var i = 0; i < v1.length ; i++) {
+     let total = 0;
+     for (let i = 0; i < v1.length ; i++) {
         total += Math.abs(v2[i] - v1[i]);      
      }
      return total;
    },
    max: (v1, v2) => {
-     var max = 0;
-     for (var i = 0; i < v1.length; i++) {
+     let max = 0;
+     for (let i = 0; i < v1.length; i++) {
         max = Math.max(max , Math.abs(v2[i] - v1[i]));      
      }
      return max;
@@ -31,7 +31,7 @@ class HierarchicalClustering{
    			this.distance=distances["euclidean"];
    		}
    		this.linkage = linkage?linkage:"average";
-		this.threshold = threshold == undefined ? Number.POSITIVE_INFINITY : threshold;
+		this.threshold = threshold === undefined ? Number.POSITIVE_INFINITY : threshold;
 	}
 
    cluster(items, snapshotPeriod, snapshotCb) {
@@ -41,8 +41,8 @@ class HierarchicalClustering{
       this.index = []; // keep a hash of all clusters by key
  
       
-		  for (var i = 0; i < items.length; i++) {
-			 var cluster = {
+		  for (let i = 0; i < items.length; i++) {
+			 const cluster = {
 				value: items[i],
 				key: i,
 				index: i,
@@ -55,9 +55,9 @@ class HierarchicalClustering{
 		  }
       
 
-      for (var i = 0; i < this.clusters.length; i++) {
-         for (var j = 0; j <= i; j++) {
-            var dist = (i == j) ? Number.POSITIVE_INFINITY : 
+      for (let i = 0; i < this.clusters.length; i++) {
+         for (let j = 0; j <= i; j++) {
+            const dist = (i === j) ? Number.POSITIVE_INFINITY : 
                this.distance(this.clusters[i].value, this.clusters[j].value);
             this.dists[i][j] = dist;
             this.dists[j][i] = dist;
@@ -68,10 +68,10 @@ class HierarchicalClustering{
          }
       }
 
-      var merged = this.mergeClosest();
-      var i = 0;
+      let merged = this.mergeClosest();
+      let i = 0;
       while (merged) {
-        if (snapshotCb && (i++ % snapshotPeriod) == 0) {
+        if (snapshotCb && (i++ % snapshotPeriod) === 0) {
            snapshotCb(this.clusters);           
         }
         merged = this.mergeClosest();
@@ -79,8 +79,8 @@ class HierarchicalClustering{
     
       this.clusters.forEach((cluster) => {
         // clean up metadata used for clustering
-        delete cluster.key;
-        delete cluster.index;
+        cluster.key = undefined;
+        cluster.index = undefined;
       });
       this.node_order=[];
       this.order=0;
@@ -90,10 +90,11 @@ class HierarchicalClustering{
 
    mergeClosest() {
       // find two closest clusters from cached mins
-      var minKey = 0, min = Number.POSITIVE_INFINITY;
-      for (var i = 0; i < this.clusters.length; i++) {
-         var key = this.clusters[i].key,
-             dist = this.dists[key][this.mins[key]];
+      let minKey = 0;
+      let min = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < this.clusters.length; i++) {
+         const key = this.clusters[i].key;
+         const dist = this.dists[key][this.mins[key]];
          if (dist < min) {
             minKey = key;
             min = dist;
@@ -103,11 +104,11 @@ class HierarchicalClustering{
          return false;         
       }
 
-      var c1 = this.index[minKey],
-          c2 = this.index[this.mins[minKey]];
+      const c1 = this.index[minKey];
+      const c2 = this.index[this.mins[minKey]];
 
       // merge two closest clusters
-      var merged = {
+      const merged = {
          children: [c1, c2],
          key: c1.key,
          size: c1.size + c2.size
@@ -118,25 +119,25 @@ class HierarchicalClustering{
       this.index[c1.key] = merged;
 
       // update distances with new merged cluster
-      for (var i = 0; i < this.clusters.length; i++) {
-         var ci = this.clusters[i];
-         var dist;
-         if (c1.key == ci.key) {
+      for (let i = 0; i < this.clusters.length; i++) {
+         const ci = this.clusters[i];
+         let dist;
+         if (c1.key === ci.key) {
             dist = Number.POSITIVE_INFINITY;            
          }
-         else if (this.linkage == "single") {
+         else if (this.linkage === "single") {
             dist = this.dists[c1.key][ci.key];
             if (this.dists[c1.key][ci.key] > this.dists[c2.key][ci.key]) {
                dist = this.dists[c2.key][ci.key];
             }
          }
-         else if (this.linkage == "complete") {
+         else if (this.linkage === "complete") {
             dist = this.dists[c1.key][ci.key];
             if (this.dists[c1.key][ci.key] < this.dists[c2.key][ci.key]) {
                dist = this.dists[c2.key][ci.key];              
             }
          }
-         else if (this.linkage == "average") {
+         else if (this.linkage === "average") {
             dist = (this.dists[c1.key][ci.key] * c1.size
                    + this.dists[c2.key][ci.key] * c2.size) / (c1.size + c2.size);
          }
@@ -149,12 +150,12 @@ class HierarchicalClustering{
 
     
       // update cached mins
-      for (var i = 0; i < this.clusters.length; i++) {
-         var key1 = this.clusters[i].key;        
-         if (this.mins[key1] == c1.key || this.mins[key1] == c2.key) {
-            var min = key1;
-            for (var j = 0; j < this.clusters.length; j++) {
-               var key2 = this.clusters[j].key;
+      for (let i = 0; i < this.clusters.length; i++) {
+         const key1 = this.clusters[i].key;        
+         if (this.mins[key1] === c1.key || this.mins[key1] === c2.key) {
+            let min = key1;
+            for (let j = 0; j < this.clusters.length; j++) {
+               const key2 = this.clusters[j].key;
                if (this.dists[key1][key2] < this.dists[key1][min]) {
                   min = key2;                  
                }
@@ -164,8 +165,8 @@ class HierarchicalClustering{
          this.clusters[i].index = i;
       }
       // clean up metadata used for clustering
-      delete c1.key; delete c2.key;
-      delete c1.index; delete c2.index;
+      c1.key = undefined; c2.key = undefined;
+      c1.index = undefined; c2.index = undefined;
 
       return true;
    }
@@ -191,11 +192,11 @@ function getHierarchicalNodes(data,config={}){
        const nodes = d3_hierarchy(hc.clusters[0]);
        for (const node of nodes.descendants()){
            const d = node.data;
-           delete d.size;
+           d.size = undefined;
            if (d.value){
                d.id= d.value._id;
                d.order = d.value._order;
-               delete d.value;
+               d.value = undefined;
            }
        }
        return {nodes:nodes,order:hc.node_order}
@@ -212,10 +213,13 @@ function parseNewick(tree){
     for(let e=[],s=tree.split(/\s*(;|\(|\)|,|:)\s*/),t=0;t<s.length;t++){
         const n=s[t];
         switch(n){
-            case"(":var c={};r.children=[c],e.push(r),r=c;break;
-            case",":var c={};e[e.length-1].children.push(c),r=c;break;
+            case"(": {const c={};r.children=[c],e.push(r),r=c;break;
+            }
+            case",": {const c={};e[e.length-1].children.push(c),r=c;break;
+            }
             case")":r=e.pop();break;case":":break;
-            default:var h=s[t-1];")"===h||"("===h||","===h?r.name=n:":"===h&&(r.length=Number.parseFloat(n));
+            default: {const h=s[t-1];")"===h||"("===h||","===h?r.name=n:":"===h&&(r.length=Number.parseFloat(n));
+            }
         }
     }
     return d3_hierarchy(r);    

@@ -243,7 +243,7 @@ class TableChart extends BaseChart{
             const cols = this.grid.getColumns();
             position-=1;
             if (position<0){
-                position==0;
+                position===0;
             }
             else if (position>=cols.length){
                 position = cols.length-1;
@@ -268,7 +268,7 @@ class TableChart extends BaseChart{
     }
 
     _updateOverlay(args){
-        var column = this.grid.getColumns()[args.range.fromCell];
+        const column = this.grid.getColumns()[args.range.fromCell];
 
         // Ensure the column is editable
         if (!column.editor) {
@@ -351,7 +351,7 @@ class EditColumnDialog extends BaseDialog{
             columns:2,
             width:380,
             maxHeight:500,
-            title:"Bulk Edit "+ columnName
+            title:`Bulk Edit ${columnName}`
         }
         super(config, { table, column });
     }
@@ -457,7 +457,7 @@ class AddColumnDialog extends BaseDialog{
         }
         const clone = this.cloneCheck.checked?this.cloneCol.value:null;
         let pos = Number.parseInt(this.position.value);
-        pos = isNaN(pos)?null:pos
+        pos = Number.isNaN(pos)?null:pos
         this.table.createColumn(this.name.value,clone,pos);
         this.close();
     }

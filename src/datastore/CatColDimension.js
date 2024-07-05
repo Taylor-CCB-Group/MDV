@@ -20,7 +20,7 @@ class CatColDimension extends Dimension{
         for (let i=0;i<len;i++){
             //repetitive code - ideally have inline function
             const d= colData[i];
-            if (catData[i]===cat && !(isNaN(d)) && d>thr){
+            if (catData[i]===cat && !(Number.isNaN(d)) && d>thr){
                 //is filtered locally
                 if (localFilter[i]===1){
                     //remove from global filter

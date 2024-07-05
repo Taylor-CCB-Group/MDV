@@ -83,7 +83,7 @@ export function useImgUrl(): string {
     const { regions } = useDataStore();
     if (!regions) {
         //throw `No image URL provided and no regions found in data store`; // plenty of other ways this could go wrong}
-        console.warn(`No image URL provided and no regions found in data store`); // plenty of other ways this could go wrong}
+        console.warn("No image URL provided and no regions found in data store"); // plenty of other ways this could go wrong}
         return '';
     }
     const i = regions.all_regions[config.region].viv_image;

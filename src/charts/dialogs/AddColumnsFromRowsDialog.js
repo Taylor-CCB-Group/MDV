@@ -102,7 +102,7 @@ class AddColumnsFromRowsDialog extends BaseDialog{
                 
                 if (type==="data_highlighted"){
                     const l = data.indexes.length;
-                    if (l==1){
+                    if (l===1){
                         const index = data.indexes[0];
                         const value= tds.getRowText(index,this.link.name_column);
                         this.ac.setSelectedItem({value,index})
@@ -195,7 +195,7 @@ class AddColumnsFromRowsDialog extends BaseDialog{
             
             else{
                 errors=true;
-                names[n]=names[n]+"??"
+                names[n]=`${names[n]}??`
             }  
         }
 

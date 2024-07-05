@@ -1,13 +1,13 @@
 import {Slick} from "./Slick.js";
     // register namespace
     function RowSelectionModel(options) {
-      var _grid;
-      var _ranges = [];
-      var _self = this;
-      var _handler = new Slick.EventHandler();
-      var _inHandler;
-      var _options;
-      var _defaults = {
+      let _grid;
+      let _ranges = [];
+      const _self = this;
+      const _handler = new Slick.EventHandler();
+      let _inHandler;
+      let _options;
+      const _defaults = {
         selectActiveRow: true
       };
   
@@ -37,9 +37,9 @@ import {Slick} from "./Slick.js";
       }
   
       function rangesToRows(ranges) {
-        var rows = [];
-        for (var i = 0; i < ranges.length; i++) {
-          for (var j = ranges[i].fromRow; j <= ranges[i].toRow; j++) {
+        const rows = [];
+        for (let i = 0; i < ranges.length; i++) {
+          for (let j = ranges[i].fromRow; j <= ranges[i].toRow; j++) {
             rows.push(j);
           }
         }
@@ -47,16 +47,17 @@ import {Slick} from "./Slick.js";
       }
   
       function rowsToRanges(rows) {
-        var ranges = [];
-        var lastCell = _grid.getColumns().length - 1;
-        for (var i = 0; i < rows.length; i++) {
+        const ranges = [];
+        const lastCell = _grid.getColumns().length - 1;
+        for (let i = 0; i < rows.length; i++) {
           ranges.push(new Slick.Range(rows[i], 0, rows[i], lastCell));
         }
         return ranges;
       }
   
       function getRowsRange(from, to) {
-        var i, rows = [];
+        let i;
+        const rows = [];
         for (i = from; i <= to; i++) {
           rows.push(i);
         }
@@ -92,30 +93,30 @@ import {Slick} from "./Slick.js";
       }
   
       function handleKeyDown(e) {
-        var activeRow = _grid.getActiveCell();
+        const activeRow = _grid.getActiveCell();
         if (_grid.getOptions().multiSelect && activeRow 
         && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey 
-        && (e.which == Slick.keyCode.UP || e.which == Slick.keyCode.DOWN)) {
-          var selectedRows = getSelectedRows();
+        && (e.which === Slick.keyCode.UP || e.which === Slick.keyCode.DOWN)) {
+          let selectedRows = getSelectedRows();
           selectedRows.sort((x, y) => x - y);
   
           if (!selectedRows.length) {
             selectedRows = [activeRow.row];
           }
   
-          var top = selectedRows[0];
-          var bottom = selectedRows[selectedRows.length - 1];
-          var active;
+          let top = selectedRows[0];
+          let bottom = selectedRows[selectedRows.length - 1];
+          let active;
   
-          if (e.which == Slick.keyCode.DOWN) {
-            active = activeRow.row < bottom || top == bottom ? ++bottom : ++top;
+          if (e.which === Slick.keyCode.DOWN) {
+            active = activeRow.row < bottom || top === bottom ? ++bottom : ++top;
           } else {
             active = activeRow.row < bottom ? --bottom : --top;
           }
   
           if (active >= 0 && active < _grid.getDataLength()) {
             _grid.scrollRowIntoView(active);
-            var tempRanges = rowsToRanges(getRowsRange(top, bottom));
+            const tempRanges = rowsToRanges(getRowsRange(top, bottom));
             setSelectedRanges(tempRanges);
           }
   
@@ -125,7 +126,7 @@ import {Slick} from "./Slick.js";
       }
   
       function handleClick(e) {
-        var cell = _grid.getCellFromEvent(e);
+        const cell = _grid.getCellFromEvent(e);
         if (!cell || !_grid.canCellBeActive(cell.row, cell.cell)) {
           return false;
         }
@@ -135,8 +136,8 @@ import {Slick} from "./Slick.js";
           return false;
         }
   
-        var selection = rangesToRows(_ranges);
-        var idx =  selection.indexOf(cell.row);
+        let selection = rangesToRows(_ranges);
+        const idx =  selection.indexOf(cell.row);
   
         if (idx === -1 && (e.ctrlKey || e.metaKey)) {
           selection.push(cell.row);
@@ -145,11 +146,11 @@ import {Slick} from "./Slick.js";
           selection = selection.filter((o, i) => (o !== cell.row));
           _grid.setActiveCell(cell.row, cell.cell);
         } else if (selection.length && e.shiftKey) {
-          var last = selection.pop();
-          var from = Math.min(cell.row, last);
-          var to = Math.max(cell.row, last);
+          const last = selection.pop();
+          const from = Math.min(cell.row, last);
+          const to = Math.max(cell.row, last);
           selection = [];
-          for (var i = from; i <= to; i++) {
+          for (let i = from; i <= to; i++) {
             if (i !== last) {
               selection.push(i);
             }
@@ -158,7 +159,7 @@ import {Slick} from "./Slick.js";
           _grid.setActiveCell(cell.row, cell.cell);
         }
   
-        var tempRanges = rowsToRanges(selection);
+        const tempRanges = rowsToRanges(selection);
         setSelectedRanges(tempRanges);
         e.stopImmediatePropagation();
   

@@ -16,7 +16,7 @@ export class ScatterSquareExtension extends LayerExtension {
     getShaders() {
         return {
             inject: {
-                'vs:#decl': `out float _lineWidthPixels;`,
+                'vs:#decl': "out float _lineWidthPixels;",
                 'vs:#main-end': `
                 //---- ScatterSquareExtension
                 // _outerRadiusPixels = outerRadiusPixels; // we might want this as an 'out', not used for now
@@ -58,7 +58,7 @@ export class ScatterDensityExension extends LayerExtension {
             inject: {
                 // todo - add a uniform for ~kernelSigma
                 // todo - change picking behavior
-                'fs:#decl': `uniform float radiusScale; uniform float opacity;`,
+                'fs:#decl': "uniform float radiusScale; uniform float opacity;",
                 'fs:#main-end': `
                 //---- ScatterDensityExension
                 const float e = 2.718281828459045;

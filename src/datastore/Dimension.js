@@ -58,12 +58,12 @@ class Dimension{
         const localFilter= this.filterArray;
         const parent = this.parent;
         const len = this.parent.size;
-        delete this.filterArguments;
-        delete this.filterColumns;
-        delete this.filterMethod;
+        this.filterArguments = undefined;
+        this.filterColumns = undefined;
+        this.filterMethod = undefined;
         for (let i=0;i<len;i++){
             if (localFilter[i]===1){
-                if(--filter[i]==0){
+                if(--filter[i]===0){
                     parent.filterSize++;
                 }
                 localFilter[i]=0;           

@@ -58,7 +58,7 @@ class MultiBoxPlot extends SVGChart{
             choices:[["No Trim","none"],["0.001","0.001"],["0.01","0.01"],["0.05","0.05"]],             
             func:(v)=>{
                 if (v==="none"){
-                    delete c.percentile_trim;
+                    c.percentile_trim = undefined;
                 }
                 else{
                     c.percentile_trim=v;
@@ -96,7 +96,7 @@ class MultiBoxPlot extends SVGChart{
         .attr("width",(vWidth-6)>1?vWidth-6:1)
         .attr("height",d=>{
             const w = yscale(d.Q1)-yscale(d.Q3);
-            return isNaN(w)?0:w;
+            return Number.isNaN(w)?0:w;
         })
         .attr("fill","none")
         .attr("stroke", (d,i)=>colors[i])
@@ -112,7 +112,7 @@ class MultiBoxPlot extends SVGChart{
         .attr("stroke-width", 3)
         
         .attr("d",(d,i)=>{
-            if (isNaN(d.med)){
+            if (Number.isNaN(d.med)){
                 return "";
             }
              const es=i*(vWidth-6)+((i+1)*6);

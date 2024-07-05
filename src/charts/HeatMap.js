@@ -106,7 +106,7 @@ class HeatMap extends SVGChart{
         }
         const config={method:this.config.method,scaleVals:[]};
         const p =this.config.param;
-        const q = this.config.color_scale.trim=="none"?null:this.config.color_scale.trim;
+        const q = this.config.color_scale.trim==="none"?null:this.config.color_scale.trim;
         for (let x=1;x<p.length;x++){
             const col = this.dataStore.columnIndex[p[x]];
             config.scaleVals.push([q?col.quantiles[q][0]:col.minMax[0],q?col.quantiles[q][1]:col.minMax[1]]);
@@ -132,7 +132,7 @@ class HeatMap extends SVGChart{
             this.y_scale.domain(this.rowClusterNodes.order.map(x=>this.dataStore.getColumnName(this.config.param[x+1])));
        }
        else{
-           delete this.rowClusterNodes;
+           this.rowClusterNodes = undefined;
            this.y_scale.domain(this.config.param.slice(1).map(x=>this.dataStore.getColumnName(x)));
            this.margins.right=10;
            this.data.averages.sort((x,y)=>x._id-y._id);
@@ -151,7 +151,7 @@ class HeatMap extends SVGChart{
             this.setAxisSize("tx", 85);
         }
         else {
-            delete this.columnClusterNodes;
+            this.columnClusterNodes = undefined;
             this.x_scale.domain(this.data.transpose.map(x => vals[x._id]));
             this.setAxisSize("tx", 45);
             this.data.transpose.sort((x, y) => x._id - y._id);

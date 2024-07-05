@@ -5,7 +5,7 @@
 
 onmessage= (e)=> {
     const config = e.data[3];
-    const dtype = config.datatype=="text16" || config.datatype=="multitext"?Uint16Array:Uint8Array
+    const dtype = config.datatype==="text16" || config.datatype==="multitext"?Uint16Array:Uint8Array
     const data=new dtype(e.data[2]);
     const lFilter=new  Uint8Array(e.data[0]);
     const gFilter = new  Uint8Array(e.data[1]);
@@ -251,10 +251,10 @@ function getSankeyData(lFilter,gFilter,data,data2,config){
     const len = data.length;
     const matrix = new Array(len1);
     const nodes1= config.values.map((x,i)=>{
-        return "A"+i;
+        return `A${i}`;
     });
     const nodes2= config.values2.map((x,i)=>{
-        return"B"+i;
+        return`B${i}`;
     });
 
 
@@ -308,7 +308,7 @@ function getSankeyData(lFilter,gFilter,data,data2,config){
 function std(arr,av){
     let n=arr.length-1;
     n=n===0?1:n;
-    const std = arr.reduce((prev,cur)=>prev+(Math.pow(cur-av,2)),0);
+    const std = arr.reduce((prev,cur)=>prev+((cur-av) ** 2),0);
     return Math.sqrt(std/n);
 
 }

@@ -66,7 +66,7 @@ onmessage= (e)=> {
         transpose[i] = new Array(dLen);
         transpose[i]._id=indexR[i];
         for (let n=0;n<dLen;n++){
-            transpose[i][n]=isNaN(result[n][i])?0:result[n][i];
+            transpose[i][n]=Number.isNaN(result[n][i])?0:result[n][i];
         }
     }   
     postMessage({averages:result,transpose:transpose,catTotals:catTotals});
@@ -86,7 +86,7 @@ function addMedians(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,sc
         const c= cat[i];
         catTotals[c]++;
         for (let n=0;n<dLen;n++){
-            if (isNaN(data[n][i])){
+            if (Number.isNaN(data[n][i])){
                 continue;
             }
             result[n][c][0]++;
@@ -114,7 +114,7 @@ function addMedians(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,sc
         }
         const c= cat[i];
         for (let n=0;n<dLen;n++){
-            if (isNaN(data[n][i])){
+            if (Number.isNaN(data[n][i])){
                 continue;
             }
             const a = result[n][c];
@@ -159,7 +159,7 @@ function addMedianst(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,s
         const c= cat[i];
         catTotals[c]++;
         for (let n=0;n<dLen;n++){
-            if (isNaN(data[n][i])){
+            if (Number.isNaN(data[n][i])){
                 continue;
             }
             result[n][c].push(data[n][i]);
@@ -199,7 +199,7 @@ function addAverages(result,data,len,dLen,gFilter,lFilter,cat,catTotals,valLen,s
         const c= cat[i];
         catTotals[c]++;
         for (let n=0;n<dLen;n++){
-            if (isNaN(data[n][i])){
+            if (Number.isNaN(data[n][i])){
                 continue;
             }
             const a= result[n][c];
@@ -244,7 +244,7 @@ function addSimpleMean(data,gFilter,lFilter,catData,conf){
         r[c].count++;
         for (let n=0;n<dlen;n++){  
             const v= data[n][i];
-            if (isNaN(v) || !(v>thr) ){
+            if (Number.isNaN(v) || !(v>thr) ){
                 continue;
             }
             a[n].total+=v;
@@ -252,13 +252,13 @@ function addSimpleMean(data,gFilter,lFilter,catData,conf){
         }
     }
     const it = r[0].values[0]
-    let amax= it.count==0?0:it.total/it.count;
+    let amax= it.count===0?0:it.total/it.count;
     let amin =amax;
     for (let i=0;i<dlen;i++){
         for (let n=0;n<conf.values.length;n++){
             const item= r[n].values[i];
-            const av= item.count==0?0:item.total/item.count;
-            item.frac = r[n].count==0?0:(item.count/r[n].count)*100;
+            const av= item.count===0?0:item.total/item.count;
+            item.frac = r[n].count===0?0:(item.count/r[n].count)*100;
             amax=av>amax?av:amax;
             amin=av<amin?av:amin;
             item.mean=av;

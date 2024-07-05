@@ -105,7 +105,7 @@ class WGL2DI{
 		this.circle_properties={x_pos:1,y_pos:1,color:1,pick_color:1,localFilter:1,globalFilter:1};
 	
 		this.circles={};
-		for (var prop in this.circle_properties){
+		for (const prop in this.circle_properties){
 			this.circles[prop]=[];
 		}
 		this.circles.count=0;
@@ -120,7 +120,7 @@ class WGL2DI{
 		this.line_properties={position:2,color:2,opacity:2};
 	
 		this.lines={};
-		for (var prop in this.line_properties){
+		for (const prop in this.line_properties){
 			this.lines[prop]=[];   ;
 		}
 		this.lines.count=0;
@@ -133,7 +133,7 @@ class WGL2DI{
 		//images
 		this.image_properties={'position':2,"color":2,"opacity":2};
 		this.images={};
-		for (var prop in this.image_properties){     
+		for (const prop in this.image_properties){     
 			this.images[prop]=[];   
 		
 		}	
@@ -165,7 +165,7 @@ class WGL2DI{
 		this.square_properties={x_pos:1,y_pos:1,color:1,pick_color:1,localFilter:1,globalFilter:1};
 
 		this.squares={};
-		for (var prop in this.square_properties){
+		for (const prop in this.square_properties){
 			this.squares[prop]=[];
 		}
 		this.squares.count=0;
@@ -178,7 +178,7 @@ class WGL2DI{
         this.rectangle_properties={position:6,color:6,opacity:6};
 	
 		this.rects={};
-		for (var prop in this.rectangle_properties){
+		for (const prop in this.rectangle_properties){
 			this.rects[prop]=[];   ;
 		}
 		this.rects.count=0;
@@ -249,8 +249,8 @@ class WGL2DI{
 
 			this.height=height;
 			this.width=width;
-			this.div_container.style.height=height+"px";
-			this.div_container.style.width = width+"px";
+			this.div_container.style.height=`${height}px`;
+			this.div_container.style.width = `${width}px`;
 		}
 
         const attr = {
@@ -328,8 +328,8 @@ class WGL2DI{
 
 		this.height=height;
 		this.width=width;
-		this.div_container.style.height=height+"px";
-		this.div_container.style.width =width+"px"
+		this.div_container.style.height=`${height}px`;
+		this.div_container.style.width =`${width}px`
 		this.canvas.setAttribute("height",height);
 		this.canvas.setAttribute("width",width);
 		this.label_canvas.setAttribute("height",height);
@@ -353,13 +353,13 @@ class WGL2DI{
 	}
 
 	_getMousePosition(e){
-    	var rect = this.canvas.getBoundingClientRect();
+    	const rect = this.canvas.getBoundingClientRect();
     	return [e.clientX-rect.left,e.clientY-rect.top];
 	}
 
 	_getActualPosition(position){
-    	var x = (position[0]/this.x_scale) - this.offset[0];
-    	var y = (position[1]/this.y_scale) - this.offset[1];
+    	const x = (position[0]/this.x_scale) - this.offset[0];
+    	const y = (position[1]/this.y_scale) - this.offset[1];
     	return [x,y];
 	}
 
@@ -414,7 +414,7 @@ class WGL2DI{
 
 
 	setPointRadius(value){
-		if (!value || isNaN(value)){
+		if (!value || Number.isNaN(value)){
 			value=0;
 		}
 		this.pointRadius=value;
@@ -543,7 +543,8 @@ class WGL2DI{
 		const st = index*6;
 	    const wh = this.images.props.w_h[index];
 		const xy =this.images.props.x_y[index];
-		let width,height = null;
+		let width;
+		let height = null;
 		if (Array.isArray(factor)){
 			width = factor[0];
 			height= factor[1];
@@ -571,7 +572,7 @@ class WGL2DI{
 		const height=c.height;
 		const width =c.width;
 		y=y-height;
-		var image_index=this.images.position.length;
+		const image_index=this.images.position.length;
 		this.images.position.push([x,y]);
 		this.images.position.push([x,y+height]);
 		this.images.position.push([x+width,y+height]),
@@ -581,7 +582,7 @@ class WGL2DI{
 		this.image_position=[[-1,1],[-1,0],[0,0],[0,0],[0,1],[-1.0]];
 		
 		const opacity=c.opacity==null?1:c.opacity;
-		for (var a=0;a<6;a++){
+		for (let a=0;a<6;a++){
 			 this.images.color.push([1,1,1]);
 			 this.images.opacity.push(opacity);
 		}
@@ -679,10 +680,10 @@ class WGL2DI{
 
 	_getRGBFromIndex(index){
 	
-		var b = Math.floor(index/65536);
-		var temp = index%65536;
-		var g= Math.floor(temp/256);
-		var r = temp%256;
+		const b = Math.floor(index/65536);
+		const temp = index%65536;
+		const g= Math.floor(temp/256);
+		const r = temp%256;
 		return [r,g,b];
             
 	}
@@ -732,7 +733,7 @@ class WGL2DI{
 		}
 		const s = this.camera.cameraState;
 		return{
-			distance:Math.pow(Math.E,s.distance),
+			distance:Math.E ** s.distance,
 			theta:s.theta,
 			phi:s.phi
 
@@ -789,7 +790,7 @@ class WGL2DI{
 	
 				
 		for (const i of this.draw_order){
-			var type =this.object_types[i];
+			const type =this.object_types[i];
 			//no objects of this type
 	
 			if (!type.data.count){
@@ -850,7 +851,7 @@ class WGL2DI{
 			}
 				
 			
-			for (var prop in type.properties){
+			for (const prop in type.properties){
 
 				if (buffer){
 					//swap color for pock buffer
@@ -963,7 +964,7 @@ class WGL2DI{
 	}
 
 	addHandler(handler_type,handler,name){
-		var handler_dict = this.handlers[handler_type];
+		const handler_dict = this.handlers[handler_type];
 		if (!handler_dict){
 			throw "Handler Not Supported";
 		}
@@ -975,11 +976,11 @@ class WGL2DI{
 	}
 
 	removeHandler(handler_type,name){
-		var handler_dict = this.handlers[handler_type];
+		const handler_dict = this.handlers[handler_type];
 		if (!handler_dict){
 			throw "Handler Not Supported";
 		}
-		delete handler_dict['name'];
+		handler_dict['name'] = undefined;
 
 
 	}
@@ -988,8 +989,8 @@ class WGL2DI{
 		const div =createEl("div",{
 			classes:["wgl2di-brush"],
 			styles:{
-				top:origin[1]+"px",
-				left:origin[0]+"px"
+				top:`${origin[1]}px`,
+				left:`${origin[0]}px`
 			}
 		},this.div_container);
 
@@ -1055,7 +1056,7 @@ class WGL2DI{
 		for (const pt of this.poly_brush.points){
 			poly.push(this._getActualPosition(pt));
 		}
-		for (var i in this.handlers.brush_stopped){
+		for (const i in this.handlers.brush_stopped){
 			setTimeout(()=>this.handlers.brush_stopped[i](poly,true), 0);
 		}
 	}
@@ -1090,7 +1091,7 @@ class WGL2DI{
 		if (this.mode==="3d"){
 			const s = this.getObjectsInRange(x,y,w,h);
 			
-			for (var i in this.handlers.brush_stopped){
+			for (const i in this.handlers.brush_stopped){
 				this.handlers.brush_stopped[i](s);
 			}
 
@@ -1100,7 +1101,7 @@ class WGL2DI{
 			const lt =this._getActualPosition([x,y]);
 			const br = this._getActualPosition([x+w,y+h]);
 			const info = {x_min:lt[0],x_max:br[0],y_max:-lt[1],y_min:-br[1]};
-			for (var i in this.handlers.brush_stopped){
+			for (const i in this.handlers.brush_stopped){
 				this.handlers.brush_stopped[i](info);
 			}
 
@@ -1119,11 +1120,11 @@ class WGL2DI{
         if (this.config.brush){
             this.div_container.style.cursor="crosshair";
         }
-        if (this.brush && this.brush.resizing){
+        if (this.brush?.resizing){
             this._brushingStopped();
             //return;
         }
-        if (this.poly_brush && this.poly_brush.active){
+        if (this.poly_brush?.active){
             this._finishPolyBrush();
         }
         
@@ -1147,7 +1148,7 @@ class WGL2DI{
                 //this.refresh();
                 ret.imageMoved= this.imageMoved;
                 this.imageMoved=null;
-                for (var i in this.handlers.panning_stopped){
+                for (const i in this.handlers.panning_stopped){
                         this.handlers.panning_stopped[i](ret);
                 }
             }
@@ -1167,10 +1168,10 @@ class WGL2DI{
 				if (this.brush.resizing){
 					const origin =this.brush.origin;
 					const now = this._getMousePosition(e);
-					const left = Math.round((origin[0]<now[0]?origin[0]:now[0]))+"px";
-					const top =Math.round((origin[1]<now[1]?origin[1]:now[1]))+"px";
-					const width = (Math.abs(origin[0]-now[0]))+"px";
-					const height= (Math.abs(origin[1]-now[1]))+"px";
+					const left = `${Math.round((origin[0]<now[0]?origin[0]:now[0]))}px`;
+					const top =`${Math.round((origin[1]<now[1]?origin[1]:now[1]))}px`;
+					const width = `${Math.abs(origin[0]-now[0])}px`;
+					const height= `${Math.abs(origin[1]-now[1])}px`;
 					this.brush.div.style.top=top;
 					this.brush.div.style.left=left;
 					this.brush.div.style.width=width;
@@ -1178,21 +1179,21 @@ class WGL2DI{
 					
 					return;
 				}
-				else if (this.brush.moving){
+				if (this.brush.moving){
 					this.dragging=false;
 					return;
 
 				}
 				
 			}
-			if (this.poly_brush && this.poly_brush.active){
+			if (this.poly_brush?.active){
 				const pt =this._getMousePosition(e);
 				this._extendPolyBrush(pt);
 			}
 			//is this a drag or just a click without the mouse moving
 			if (this.mouse_position &&  ! this.dragging){
-				var x_amount= (e.pageX-this.mouse_position[0]);
-				var y_amount = (e.pageY-this.mouse_position[1]);
+				const x_amount= (e.pageX-this.mouse_position[0]);
+				const y_amount = (e.pageY-this.mouse_position[1]);
 				if (Math.abs(x_amount) > 3 || Math.abs(y_amount)>3){
 					this.dragging = true;
 				}
@@ -1212,7 +1213,7 @@ class WGL2DI{
 						this.moveImage(x_amount,y_amount);
 						this.imageMoved=this.getImageDetails(this.movingImage);
 					}
-					else if(this.offsets && e.which ==3 		){
+					else if(this.offsets && e.which ===3 		){
 						this.alterOffsets(x_amount,y_amount);
 					
 					}
@@ -1221,7 +1222,7 @@ class WGL2DI{
 							this.offset[0]+=x_amount;
 						}		
 						this.offset[1]+=y_amount;
-						for (var i in this.handlers.pan_or_zoom){
+						for (const i in this.handlers.pan_or_zoom){
 							this.handlers.pan_or_zoom[i](this.offset,this.x_scale,this.y_scale);
 						}
 
@@ -1275,11 +1276,11 @@ class WGL2DI{
 
             this._finish(evt);
             if (!this.dragging && !(this.brush || this.poly_brush) && evt.button===0){
-                    var position =this._getMousePosition(evt);
-                    var obj = this._getObjectAtPosition(position);
+                    const position =this._getMousePosition(evt);
+                    const obj = this._getObjectAtPosition(position);
 					const apos= this._getActualPosition(position);
                     if (obj){
-                        for (var i in this.handlers.object_clicked){
+                        for (const i in this.handlers.object_clicked){
                             this.handlers.object_clicked[i](obj,apos);
                         }  
                     }
@@ -1346,7 +1347,7 @@ class WGL2DI{
 
 		this.div_container.addEventListener('wheel', (event)=> {
 			event.preventDefault();
-			var position =this._getActualPosition(this._getMousePosition(event));
+			const position =this._getActualPosition(this._getMousePosition(event));
 			let wdelta=0;
 			if (event.wheelDelta > 0 || event.detail < 0) {
 					this.zoom_amount+=0.01;
@@ -1379,7 +1380,7 @@ class WGL2DI{
 					const new_position=this._getActualPosition(this._getMousePosition(event));
 					this.offset[0]+=new_position[0]-position[0];
 					this.offset[1]+=new_position[1]-position[1];
-					for (var i in this.handlers.pan_or_zoom){
+					for (const i in this.handlers.pan_or_zoom){
 						this.handlers.pan_or_zoom[i](this.offset,this.x_scale,this.y_scale);					
 					}
 				}
@@ -1427,11 +1428,11 @@ class WGL2DI{
 			if (evt.which===3){
 				//add right click behaviour
 			}
-			const otherKey = evt.shiftKey || evt.ctrlKey || evt.which==2 || evt.which==3;
+			const otherKey = evt.shiftKey || evt.ctrlKey || evt.which===2 || evt.which===3;
 			//create brush
 			if ((this.config.brush && !(otherKey)) || (!(this.config.brush)&&otherKey)){
 				const origin = this._getMousePosition(evt);
-				if (this.config.brush=="default"){
+				if (this.config.brush==="default"){
 					const t = evt.target;
 					if(t.classList.contains("wgl2di-brush")){
 						return;
@@ -1443,7 +1444,7 @@ class WGL2DI{
 					this._setUpBrush(origin);
 					return;
 				}
-				else if (this.config.brush==="poly"){
+				if (this.config.brush==="poly"){
 				    if(this.poly_brush){
 			    	    this.clearBrush();
 			        }
@@ -1456,7 +1457,7 @@ class WGL2DI{
 				this.div_container.style.cursor="move";
 			}
 			
-			var position =this._getMousePosition(evt);
+			const position =this._getMousePosition(evt);
 			this.mouse_position= [evt.pageX, evt.pageY];
 			this.clearBrush();
 			evt.preventDefault();
@@ -1599,8 +1600,6 @@ class WGL2DI{
 		});
 
 		this.__drawHighlights = this.regl({
-			depth:this.draw_options.depth,
-	        blend:this.draw_options.blend,
 			depth:this.draw_options.depth,
 	        blend:this.draw_options.blend,
 	

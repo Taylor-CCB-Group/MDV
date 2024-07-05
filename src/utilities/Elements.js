@@ -11,13 +11,13 @@ function createSVGEl(type,attrs,parent){
     const el = document.createElementNS("http://www.w3.org/2000/svg", type);
 
     if (attrs){
-        for (var idx in attrs) {
+        for (const idx in attrs) {
             if ((idx === 'styles' || idx === 'style') && typeof attrs[idx] === 'object') {
-                for (var prop in attrs[idx]){el.style[prop] = attrs[idx][prop];}
+                for (const prop in attrs[idx]){el.style[prop] = attrs[idx][prop];}
             } else if (idx === 'text') {
                 el.textContent = attrs[idx];
             } else if (idx==="classes"){
-                for (var cl of attrs[idx]){el.classList.add(cl)}
+                for (const cl of attrs[idx]){el.classList.add(cl)}
                  
             } else {
                 el.setAttributeNS(null,idx, attrs[idx]);
@@ -80,13 +80,13 @@ function createMenuIcon(icon,config,parent){
 
 }
 function addElProps(el,attrs){
-    for (var idx in attrs) {
+    for (const idx in attrs) {
         if ((idx === 'styles' || idx === 'style') && typeof attrs[idx] === 'object') {
-            for (var prop in attrs[idx]){el.style[prop] = attrs[idx][prop];}
+            for (const prop in attrs[idx]){el.style[prop] = attrs[idx][prop];}
         } else if (idx === 'text') {
             el.textContent = attrs[idx];
         } else if (idx==="classes"){
-            for (var cl of attrs[idx]){el.classList.add(cl)}
+            for (const cl of attrs[idx]){el.classList.add(cl)}
              
         } else {
             el.setAttribute(idx, attrs[idx]);
@@ -236,8 +236,8 @@ function makeResizable(el,config={}){
         el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
     }
     function doDrag(e) {
-        el.style.width = (ri.startWidth + e.clientX - ri.startX) + "px";
-        el.style.height = (ri.startHeight + e.clientY - ri.startY) + "px";
+        el.style.width = `${ri.startWidth + e.clientX - ri.startX}px`;
+        el.style.height = `${ri.startHeight + e.clientY - ri.startY}px`;
     }
     function stopDrag(e) {
         el.__doc__.documentElement.removeEventListener("mousemove", doDrag, false);
@@ -256,7 +256,7 @@ function removeResizable(el){
     if (ri.onresize){
         el.removeEventListener("mouseup",ri.onresize)
     }
-    delete el.__resizeinfo__;
+    el.__resizeinfo__ = undefined;
 
 
 }
@@ -269,7 +269,7 @@ function removeDraggable(el){
      d.handle.style.cursor=d.cursor;
      el.style.position=d.position;
      d.handle.onmousedown=null;
-     delete el.__draginfo__;
+     el.__draginfo__ = undefined;
 }
 
 
@@ -304,7 +304,10 @@ function makeDraggable(el,config={}){
         config.doc=document;
     }
 
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    let pos1 = 0;
+    let pos2 = 0;
+    let pos3 = 0;
+    let pos4 = 0;
     const  handle= config.handle?el.querySelector(config.handle):el;
     let cont = null;
     const is_moving=false;
@@ -368,9 +371,9 @@ function makeDraggable(el,config={}){
             }
         }
         if (!config.y_axis){
-            el.style.top = (nt) + "px";
+            el.style.top = `${nt}px`;
         }
-        el.style.left = (nl) + "px";
+        el.style.left = `${nl}px`;
     }
   
     function closeDragElement() {
@@ -401,9 +404,9 @@ function addResizeListener(element, endCallback, startCallback){
 }
 
 function getElDim(el){
-    var rect = el.getBoundingClientRect(),
-    scrollLeft = window.pageXOffset || document.documentElement.scrollLeft,
-    scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const rect = el.getBoundingClientRect();
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     return { top: rect.top + scrollTop, left: rect.left + scrollLeft ,height:rect.height,width:rect.width}
 
 }

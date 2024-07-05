@@ -65,8 +65,8 @@ class ContextMenu{
         if (left+rect.width>doc.body.clientWidth){
             left = doc.body.clientWidth-rect.width-3;
         }
-        menu.style.left=left+"px";
-        menu.style.top=top+"px";
+        menu.style.left=`${left}px`;
+        menu.style.top=`${top}px`;
         this.menus.push(menu)
     }
     _getDocument(){

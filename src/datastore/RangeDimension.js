@@ -25,7 +25,7 @@ class RangeDimension extends Dimension{
         const predicate = i => {
             const v1 = data1[i];
             const v2 = data2[i];
-            return v1>=range1[0] && v1<=range1[1] && v2>=range2[0] && v2<=range2[1] && !isNaN(v1) && !isNaN(v2);
+            return v1>=range1[0] && v1<=range1[1] && v2>=range2[0] && v2<=range2[1] && !Number.isNaN(v1) && !Number.isNaN(v2);
         }
         return this.filterPredicate({predicate}, columns);
     }
@@ -35,8 +35,10 @@ class RangeDimension extends Dimension{
      */
     filterPoly(args,columns){
         const points=args;
-        let minX=Number.MAX_VALUE, minY= Number.MAX_VALUE;
-        let maxX=Number.MIN_VALUE, maxY= Number.MIN_VALUE;
+        let minX=Number.MAX_VALUE;
+        let minY= Number.MAX_VALUE;
+        let maxX=Number.MIN_VALUE;
+        let maxY= Number.MIN_VALUE;
         for (const pt of points){
             minX=Math.min(minX,pt[0]);
             maxX= Math.max(maxX,pt[0]);
@@ -54,16 +56,19 @@ class RangeDimension extends Dimension{
         const vs = points;
 
         const predicate = i => {
-            const x = data1[i], y = data2[i];
+            const x = data1[i];
+            const y = data2[i];
             let inside = false;
-            if (x<minX || x>maxX || y<minY || y>maxY || isNaN(x) || isNaN(y)){
+            if (x<minX || x>maxX || y<minY || y>maxY || Number.isNaN(x) || Number.isNaN(y)){
                 return false;
             }
             for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-                const xi = vs[i][0], yi = vs[i][1];
-                const xj = vs[j][0], yj = vs[j][1];
+                const xi = vs[i][0];
+                const yi = vs[i][1];
+                const xj = vs[j][0];
+                const yj = vs[j][1];
 
-                const intersect = ((yi > y) != (yj > y))
+                const intersect = ((yi > y) !== (yj > y))
                     && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
                 if (intersect) inside = !inside;
             }
@@ -80,7 +85,7 @@ class RangeDimension extends Dimension{
         // performance seems similar to non-predicate version
         const predicate = i => {
             const v = arr[i];
-            return v >= min && v <= max && !isNaN(v);
+            return v >= min && v <= max && !Number.isNaN(v);
         }
         return this.filterPredicate({predicate}, columns);
     }

@@ -30,7 +30,7 @@ class MultiLineChart extends SVGChart{
 
         const c = this.config;
         if (!c.color_legend ){ 
-            c.color_legend={display:c.stacked?false:true}
+            c.color_legend={display:!c.stacked}
         }
         //set default band width
         const mm = this.dataStore.getMinMaxForColumn(c.param[0]);
@@ -82,12 +82,12 @@ class MultiLineChart extends SVGChart{
     scaleTrim(val){
         const c = this.config;
         if (!(val) || val==="none"){
-            delete c.scaletrim;
+            c.scaletrim = undefined;
             const mm = this.dataStore.getMinMaxForColumn(c.param[0]);
             this.x_scale.domain(mm)
         }
         else{
-            c.scaletrim=val+"";
+            c.scaletrim=`${val}`;
             this.x_scale.domain([0,1])
             c.band_width=0.1;
         }
@@ -102,8 +102,8 @@ class MultiLineChart extends SVGChart{
     onDataFiltered(dim){
         if (this.isPinned){
             return;
-        }     
-        else if (dim !== this.dim){
+        }
+        if (dim !== this.dim){
             if (dim === "all_removed"){
           
                 this.resetButton.style.display="none";  

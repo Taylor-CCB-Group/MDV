@@ -22,7 +22,7 @@ class SettingsDialogReactWrapper extends BaseDialog {
     constructor(chart: Chart) {
         // if this is intended to be a drop-in replacement for existing SettingsDialog,
         // it isn't only used by 'charts', but e.g. tracks.
-        const name = chart.config.title || chart.config.type + ' ' + chart.config.id;
+        const name = chart.config.title || `${chart.config.type} ${chart.config.id}`;
         const config = { //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
             width: 500, title: `Settings (${name})`, doc: chart.__doc__ || document,
             onclose: () => { chart.dialogs.splice(chart.dialogs.indexOf(this), 1) }

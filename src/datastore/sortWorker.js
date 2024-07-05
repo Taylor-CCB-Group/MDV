@@ -42,8 +42,8 @@ function getNumberSort({data,desc}){
     return (a,b)=>{
         let va= data[a];
         let vb = data[b];
-        va= isNaN(va)?Number.MAX_VALUE:va;
-        vb= isNaN(vb)?Number.MAX_VALUE:vb;
+        va= Number.isNaN(va)?Number.MAX_VALUE:va;
+        vb= Number.isNaN(vb)?Number.MAX_VALUE:vb;
         return (va>vb?1:va<vb?-1:0)*mu
     }
 }

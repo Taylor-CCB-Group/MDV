@@ -141,7 +141,7 @@ class SelectionDialog extends BaseChart{
                 let n = Number.parseFloat(greaterThan.value);
                
                 const cvi = sl.noUiSlider.get();
-                if (isNaN(n) || n > cvi[1]){
+                if (Number.isNaN(n) || n > cvi[1]){
                     return;
                 }
                 n  = n < mm[0]?mm[0]:n;
@@ -158,7 +158,7 @@ class SelectionDialog extends BaseChart{
                 let n = Number.parseFloat(lessThan.value);
                
                 const cvi = sl.noUiSlider.get();
-                if (isNaN(n) || n < cvi[0]){
+                if (Number.isNaN(n) || n < cvi[0]){
                     return;
                 }
                 n= n>mm[1]?mm[1]:n;

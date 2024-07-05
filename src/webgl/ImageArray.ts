@@ -59,7 +59,7 @@ export class ImageArray {
     }
     drawProgress(n = 0) {
         // this.logEl.textContent = `Loading images: ${Math.round(n * 100)}%`;
-        this.onProgress && this.onProgress(n);
+        this.onProgress?.(n);
     }
     loadImageColumn(ds: DataStore, gl: WebGL2RenderingContext, config: ImageArrayConfig) {
         // how about also passing a cancellation token or something?

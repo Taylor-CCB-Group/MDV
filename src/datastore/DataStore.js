@@ -532,7 +532,7 @@ class DataStore{
             for (let i = 0;i<d.length-len;i++){
                 let match=true;
                 for (let a=0;a<len;a++){
-                    if (bupper[a]!=d[i+a] && blower[a]!=d[i+a]){
+                    if (bupper[a]!==d[i+a] && blower[a]!==d[i+a]){
                         match=false;
                         break;
                     }
@@ -562,16 +562,14 @@ class DataStore{
                             match =false;
                             break;
                         }
-                        else{
+                        
                             console.log("match")
-                        }
                     }
                     if (match){
                         break;
                     }
-                    else{
+                    
                         console.log(n);
-                    }
                 }
                 if (match){
                     matches.push({
@@ -734,15 +732,15 @@ class DataStore{
                 v= col.values[v];
             }
             else if (col.datatype==="double" || col.datatype==="integer" || col.datatype==="int32"){
-                if (isNaN(v)){
+                if (Number.isNaN(v)){
                     v="missing";
                 }
             }
             //multitext displayed as comma delimited values
-            else if (col.datatype=="multitext"){
+            else if (col.datatype==="multitext"){
                 const delim = ", ";
                 const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
-                v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(delim);
+                v= Array.from(d.filter(x=>x!==65535)).map(x=>col.values[x]).join(delim);
 
             }
             else{
@@ -1156,13 +1154,14 @@ class DataStore{
             buffer=data;
         }
         c.buffer=buffer;      
-        if (c.datatype === "integer" || c.datatype=="double" || c.datatype==="int32"){
+        if (c.datatype === "integer" || c.datatype==="double" || c.datatype==="int32"){
             const dataArray = c.data=  c.datatype==="int32"?new Int32Array(buffer):new Float32Array(buffer);
             if (!c.minMax){
-                let min =Number.MAX_VALUE, max = Number.MIN_VALUE;
+                let min =Number.MAX_VALUE;
+                let max = Number.MIN_VALUE;
                 for (let i=0;i<dataArray.length;i++){
                     const value = dataArray[i];
-                    if (isNaN(value)){
+                    if (Number.isNaN(value)){
                         continue;
                     }
                     min = (value<min) ? value:min
@@ -1171,7 +1170,7 @@ class DataStore{
                 c.minMax=[min,max];
             }
             if (!c.quantiles){
-                const a  = c.data.filter(x=>!isNaN(x)).sort();
+                const a  = c.data.filter(x=>!Number.isNaN(x)).sort();
                 c.quantiles={};
                 for (const q of [0.05,0.01,0.001]){
                     c.quantiles[q]=[quantileSorted(a,q),quantileSorted(a,1-q)];           
@@ -1304,7 +1303,7 @@ class DataStore{
             }
             return buff;
         }
-        else if (col.datatype === "integer" || col.datatype === "double" || col.datatype==="int32"){
+        if (col.datatype === "integer" || col.datatype === "double" || col.datatype==="int32"){
             const buff =new  SharedArrayBuffer(this.size*4);
             const a=  col.datatype==="int32"?new Int32Array(buff):new Float32Array(buff);
            
@@ -1314,7 +1313,7 @@ class DataStore{
             return buff
 
         }
-        else if (col.datatype=== "multitext"){
+        if (col.datatype=== "multitext"){
             const delim = col.delimiter || ",";
             const vals = new Set();
             let max=0;
@@ -1358,7 +1357,7 @@ class DataStore{
             return buff;
 
         }
-        else{
+        
            
             
             let max = 0
@@ -1375,7 +1374,6 @@ class DataStore{
             }
            
             return buff;
-        }
 
     }
 
@@ -1422,13 +1420,13 @@ class DataStore{
         const ov = config.overideValues|| {}
         const  colors  =  this.getColumnColors(column,config);
         function isFallback(v){
-            return isNaN(v) || (ov.fallbackOnZero && v===0);
+            return Number.isNaN(v) || (ov.fallbackOnZero && v===0);
         }
         //simply return the color associated with the value
         if (c.datatype==="text" || c.datatype==="text16" || c.datatype==="multitext"){                   
             return x=>colors[data[x]];
         }
-        else if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
+        if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
             const min = ov.min==null?c.minMax[0]:ov.min;
             const max = ov.max == null?c.minMax[1]:ov.max;
             const bins = config.bins || 100;
@@ -1450,7 +1448,7 @@ class DataStore{
                     return colors[bin];
                 }
 
-            }else{
+            }
                 return x=>{
                     const v= data[x];
                     //missing data
@@ -1466,7 +1464,6 @@ class DataStore{
                     }
                     return colors[bin];
                 }
-            }    
         }
     }
 
@@ -1583,8 +1580,8 @@ class DataStore{
         if (c.datatype==="double" || c.datatype==="integer" || c.datatype==="int32"){
             const ov = config.overideValues || {};
             const c_colors = ov.colors || (c.colors || defaultIPalette);
-            const min = ov.min == undefined ? c.minMax[0]:ov.min;
-            const max =  ov.max == undefined ? c.minMax[1]:ov.max;
+            const min = ov.min === undefined ? c.minMax[0]:ov.min;
+            const max =  ov.max === undefined ? c.minMax[1]:ov.max;
             //calculate the color of each bin
             const ls= linspace(min,max,c_colors.length);
             const scale =scaleLinear().domain(ls).range(c_colors).clamp(true);
@@ -1613,7 +1610,7 @@ class DataStore{
             }
             return colors
         }
-        else if (c.datatype==="text" || c.datatype==="multitext" || c.datatype==="text16"){
+        if (c.datatype==="text" || c.datatype==="multitext" || c.datatype==="text16"){
 
             let colors=  c.colors;
             if (! colors){
@@ -1674,7 +1671,7 @@ class DataStore{
     getColumnRange(column){
         const c = this.columnIndex[column];
         if (!c.minMax) {
-            console.error('unknown minMax for column ' + column);
+            console.error(`unknown minMax for column ${column}`);
             return [0, 50];
         }
         return c.minMax[1]-c.minMax[0];
@@ -1751,10 +1748,10 @@ class DataStore{
 }
 
 function linspace(start,end,n){
-    var out = [];
-    var delta = (end - start) / (n - 1);
+    const out = [];
+    const delta = (end - start) / (n - 1);
 
-    var i = 0;
+    let i = 0;
     while(i < (n - 1)) {
         out.push(start + (i * delta));
         i++;
@@ -1766,18 +1763,18 @@ function linspace(start,end,n){
 
 function hexToRGB(hex){
     hex=hex.replace("#","")
-    var bigint = Number.parseInt(hex, 16);
-    var r = (bigint >> 16) & 255;
-    var g = (bigint >> 8) & 255;
-    var b = bigint & 255;
+    const bigint = Number.parseInt(hex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
     return [r,g,b];
 }
 
 function RGBToHex(rgb){
-     return "#"+rgb.map(x => {
+     return `#${rgb.map(x => {
         const hex = x.toString(16)
-        return hex.length === 1 ? '0' + hex : hex
-      }).join('');
+        return hex.length === 1 ? `0${hex}` : hex
+      }).join('')}`;
 }
 function rgbToRGB(rgb){
     if (!rgb){

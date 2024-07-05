@@ -19,7 +19,7 @@ class DensityPlot extends SVGChart{
             }
         }
 		if (!config.title){
-			config.title= x_name+" x "+y_name;	
+			config.title= `${x_name} x ${y_name}`;	
 		}
 
     	super(dataStore,div,config,{x:{},y:{}});
@@ -63,7 +63,7 @@ class DensityPlot extends SVGChart{
     }
 
     zoom(e){
-        var rect = this.contentDiv.getBoundingClientRect();
+        const rect = this.contentDiv.getBoundingClientRect();
         const box =this._getContentDimensions()
     	const x= e.clientX-rect.left-box.left;
         const y = e.clientY-rect.top-box.top;
@@ -165,7 +165,7 @@ class DensityPlot extends SVGChart{
 
     drawChart(tTime=400){
 
-        var color = scaleSequential(interpolateYlGnBu)
+        const color = scaleSequential(interpolateYlGnBu)
     .domain([0, 0.5]); 
         const trans =  select(this.contentDiv).transition()
         .duration(tTime).ease(easeLinear);

@@ -88,8 +88,8 @@ export default class GridStackManager {
             const d = chart.getDiv();
             sizes.set(d,[d.offsetWidth,d.offsetHeight,d.offsetLeft,d.offsetTop]);
             chart.removeLayout();
-            delete chart.config.gssize;
-            delete chart.config.gsposition;
+            chart.config.gssize = undefined;
+            chart.config.gsposition = undefined;
         }
                  
         gi.grid.destroy(false);
@@ -99,10 +99,10 @@ export default class GridStackManager {
             const  d= chart.getDiv();
             const s = sizes.get(d);
             d.style.position="absolute";
-            d.style.width=(s[0]-5)+"px";
-            d.style.height=(s[1]-5)+"px";
-            d.style.left=s[2]+"px";
-            d.style.top=s[3]+"px";
+            d.style.width=`${s[0]-5}px`;
+            d.style.height=`${s[1]-5}px`;
+            d.style.left=`${s[2]}px`;
+            d.style.top=`${s[3]}px`;
             chart.config.size=[s[0]-5,s[1]-5];
             chart.config.position=[s[2],s[3]];
             d.classList.remove("grid-stack-item")
@@ -219,7 +219,7 @@ export default class GridStackManager {
         chart.removeLayout=()=>{
             grid.removeWidget(div,false); //doesn't remove listeners from handle...
             lockButton.remove();
-            delete div.gridstackPopoutCallback;
+            div.gridstackPopoutCallback = undefined;
             chart.remove = oldRemove;
             chart.changeBaseDocument = oldChangeBase;
             ro.disconnect();
@@ -299,8 +299,10 @@ function findFreeSpace(dataSource: DataSource) {
 
 export function positionChart(dataSource: DataSource, config: Config) {
   // some legacy code extracted to here and may be reviewed at some point.
-  let width = 300, height = 300; //consider having a preferred-size...
-  let left = 10, top = 10;
+  let width = 300;
+  let height = 300; //consider having a preferred-size...
+  let left = 10;
+  let top = 10;
   if (config.size) {
     width = config.size[0];
     height = config.size[1];
