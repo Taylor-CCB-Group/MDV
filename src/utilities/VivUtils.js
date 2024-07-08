@@ -61,8 +61,8 @@ export function getDefaultSelectionStats(n) {
 }
 
 export function getDefaultChannelColors(n) {
-    if (n == 1) return [[255, 255, 255]];
-    else return new Array(n).fill([0, 0, 0]).map((_, i) => {
+    if (n === 1) return [[255, 255, 255]];
+    return new Array(n).fill([0, 0, 0]).map((_, i) => {
         //TODO: non-shit algorithm / use a nice palette.
         const a = i / (n);
         return [Math.floor(a * 255), Math.floor((1 - a) * 255), 0];

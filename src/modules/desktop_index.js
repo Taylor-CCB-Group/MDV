@@ -34,7 +34,7 @@ function _mdvInit(routeFromTemplate) {
         //data loaders depend on whether data is static or retrieved via API
         const dataLoader={
             function:staticFolder?getLocalCompressedBinaryDataLoader(resp.datasources,".")
-                                    :getArrayBufferDataLoader(route + "/get_data"),
+                                    :getArrayBufferDataLoader(`${route}/get_data`),
             viewLoader:staticFolder?async (view)=> resp.views[view]
                                     :getView,
             rowDataLoader:staticFolder?loadRowDataStatic
@@ -47,7 +47,7 @@ function _mdvInit(routeFromTemplate) {
             switch(type){
                 case "state_saved":
                     //maybe consider rewriting the base URL here...
-                    getData(route + "/save_state",data).then(resp=>{
+                    getData(`${route}/save_state`,data).then(resp=>{
                         if (resp.success){
                             cm.createInfoAlert("Data Saved",{duration:2000});
                             cm.setAllColumnsClean();
@@ -72,18 +72,18 @@ window._mdvInit=_mdvInit;
 
 //loads unstructured data for each row
 async function loadRowData(datasource,index){
-    return await getData(route + "/get_row_data",{datasource,index})
+    return await getData(`${route}/get_row_data`,{datasource,index})
 }
 async function loadRowDataStatic(datasource,index){
     const resp = await fetch(`${route}/rowdata/${datasource}/${index}.json`);
-    if (resp.status !=200){
+    if (resp.status !==200){
         return null
     }
     return await resp.json()
 }
 //load view from API
 async function getView(view){
-    return await getData(route + "/get_view",{view:view})
+    return await getData(`${route}/get_view`,{view:view})
 }
 
 //load arbitrary data
@@ -93,7 +93,7 @@ async function loadBinaryDataStatic(datasource,name){
     return await decompressData(b);
 }
 async function loadBinaryData(datasource,name){
-    const b = await getData(route + "/get_binary_data",{datasource,name},"arraybuffer");
+    const b = await getData(`${route}/get_binary_data`,{datasource,name},"arraybuffer");
     return await decompressData(b);
 }
 
@@ -114,7 +114,7 @@ async function getConfigs(isStaticFolder){
         configs.views =  await resp.json();  
     }
     else{
-        configs = await getData(route + "/get_configs")
+        configs = await getData(`${route}/get_configs`)
     }
     return configs;
 }
@@ -135,9 +135,8 @@ async function getData(url, args, return_type="json"){
         console.log('original', original);
         return original; //rewriteBaseUrlRecursive(original, route);
     }
-    else{
+    
         return await resp.arrayBuffer();
-    }
 }
 
 //changes or adds a param to the browser address bar

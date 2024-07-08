@@ -1,18 +1,19 @@
-import { Layer, LayerContext, LayerExtension, UpdateParameters } from 'deck.gl/typed';
-import { ImageArray } from './ImageArray';
+import { type Layer, type LayerContext, LayerExtension, type UpdateParameters } from 'deck.gl/typed';
+import type { ImageArray } from './ImageArray';
 import { ScatterplotLayer } from 'deck.gl/typed';
 
 /** don't think we can prepend '#version 300 es' in LayerExtension, 
  * so we use this as a hack */
-export class ScatterplotExLayer extends ScatterplotLayer<any> {
+export class ScatterplotExLayer extends ScatterplotLayer<any, any> {
     // ts suddenly complains if we don't have this constructor
+    // todo review types after viv/deck.gl update
     constructor(props: any) {
         super(props);
     }
     getShaders() {
         const shaders = super.getShaders();
-        shaders.vs = '#version 300 es\n' + shaders.vs;
-        shaders.fs = '#version 300 es\n' + shaders.fs;
+        shaders.vs = `#version 300 es\n${shaders.vs}`;
+        shaders.fs = `#version 300 es\n${shaders.fs}`;
         return shaders;
     }
 }

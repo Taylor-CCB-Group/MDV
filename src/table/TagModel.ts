@@ -2,7 +2,8 @@ import type { DataColumn } from "../charts/charts";
 import type DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
 
-//multitext is buggy (empty data buffer after loading project), so we're using text for now.
+//multitext was buggy (empty data buffer after loading project)
+//at least one multitext bug has been fixed, but we're still using text for now.
 type TagColumn = DataColumn<'text'>;
 
 const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed

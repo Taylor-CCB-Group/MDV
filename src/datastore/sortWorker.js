@@ -1,6 +1,7 @@
 import datatypes from "./datatypes.js";
 
-onmessage=function(e){
+// biome-ignore lint/suspicious/noGlobalAssign: <explanation>
+onmessage = (e) => {
     const {orderBuffer,columns}=e.data;
     //get access to the order buffer
     const ord = new Uint32Array(orderBuffer);
@@ -24,7 +25,7 @@ onmessage=function(e){
         return meth;
     })
     ord.sort((a,b)=>{
-        for (let m of methods){
+        for (const m of methods){
             const r = m(a,b);
             if (r!==0){
                 return r;
@@ -42,8 +43,8 @@ function getNumberSort({data,desc}){
     return (a,b)=>{
         let va= data[a];
         let vb = data[b];
-        va= isNaN(va)?Number.MAX_VALUE:va;
-        vb= isNaN(vb)?Number.MAX_VALUE:vb;
+        va= Number.isNaN(va)?Number.MAX_VALUE:va;
+        vb= Number.isNaN(vb)?Number.MAX_VALUE:vb;
         return (va>vb?1:va<vb?-1:0)*mu
     }
 }

@@ -18,10 +18,10 @@ class WGLChart extends SVGChart{
 		this.graphDiv = createEl("div",{
             styles:{
                 position:"absolute",
-				left:box.left+"px",
-				top:box.top+"px",
-				width:box.width+"px",
-				height:box.height+"px"
+				left:`${box.left}px`,
+				top:`${box.top}px`,
+				width:`${box.width}px`,
+				height:`${box.height}px`
             }
         },this.contentDiv);
         this.tooltip = createEl("div",{
@@ -41,15 +41,14 @@ class WGLChart extends SVGChart{
     }
     
     afterAppCreation(){
-        const self = this;
         const c= this.config;
-        this.app.addHandler("object_over",function(e,index){
+        this.app.addHandler("object_over",(e,index)=> {
 			if (c.tooltip.show){
-				self.showTooltip(e,index)
+				this.showTooltip(e,index)
 			}       
         });
-		this.app.addHandler("object_out",function(e,index){
-            self.tooltip.style.display="none"        
+		this.app.addHandler("object_out",(e,index)=> {
+            this.tooltip.style.display="none"        
         });
 
         c.default_color= c.default_color || "#377eb8";
@@ -94,13 +93,13 @@ class WGLChart extends SVGChart{
  
 
     showTooltip(e,index){
-		var rect = this.graphDiv.getBoundingClientRect();
+		const rect = this.graphDiv.getBoundingClientRect();
 		const row =  this.dataStore.getRowAsObject(index);
     	const x = e.clientX-rect.left;
 		const y =e.clientY-rect.top;
 		this.tooltip.style.display="block";
-		this.tooltip.style.left = x+"px";
-		this.tooltip.style.top = y+"px";
+		this.tooltip.style.left = `${x}px`;
+		this.tooltip.style.top = `${y}px`;
 		this.tooltip.textContent=row[this.config.tooltip.column];
 
 	}
@@ -132,8 +131,8 @@ class WGLChart extends SVGChart{
             console.error("WGLChart: bad _getContentDimensions()");
         }
 		this.app.setSize(dim.width,dim.height);
-        this.graphDiv.style.left = dim.left+"px";
-        this.graphDiv.style.top = dim.top+"px";
+        this.graphDiv.style.left = `${dim.left}px`;
+        this.graphDiv.style.top = `${dim.top}px`;
 		this.updateAxis();
 	}
 
@@ -175,7 +174,7 @@ class WGLChart extends SVGChart{
         
 		const t = performance.now();
 		this.app.colorPoints(colorFunc);
-		console.log("color time:"+(performance.now()-t))
+		console.log(`color time:${performance.now()-t}`)
         setTimeout(()=>{
             this.app.refresh();
         },50);  
@@ -285,7 +284,7 @@ class WGLChart extends SVGChart{
                 current_value:c.tooltip.show,
                 func:(x)=>{
                     c.tooltip.show=x;
-                    let cl= c.tooltip.column || cols[0].field
+                    const cl= c.tooltip.column || cols[0].field
                     this.setToolTipColumn(cl) 
                 }
             },

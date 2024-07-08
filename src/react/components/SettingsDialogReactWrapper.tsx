@@ -3,7 +3,7 @@ import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./SettingsDialogComponent";
-import { Chart } from "@/charts/charts";
+import type { Chart } from "@/charts/charts";
 
 const SettingsDialog = observer(({chart}: {chart: Chart}) => {
     // const config = chart.getConfig(); //instrument with mobx etc
@@ -22,7 +22,7 @@ class SettingsDialogReactWrapper extends BaseDialog {
     constructor(chart: Chart) {
         // if this is intended to be a drop-in replacement for existing SettingsDialog,
         // it isn't only used by 'charts', but e.g. tracks.
-        const name = chart.config.title || chart.config.type + ' ' + chart.config.id;
+        const name = chart.config.title || `${chart.config.type} ${chart.config.id}`;
         const config = { //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
             width: 500, title: `Settings (${name})`, doc: chart.__doc__ || document,
             onclose: () => { chart.dialogs.splice(chart.dialogs.indexOf(this), 1) }

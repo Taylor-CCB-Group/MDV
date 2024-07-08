@@ -1,5 +1,5 @@
 import { io } from "socket.io-client";
-import ChartManager from "../charts/ChartManager";
+import type ChartManager from "../charts/ChartManager";
 import { DataModel } from "../table/DataModel";
 
 type VuplexCallback = (event: { data: MDVMessage }) => void;

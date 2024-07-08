@@ -14,7 +14,7 @@ class BoxPlot extends ViolinPlot{
             return;
         }
       
-        else if (dim !== this.dim){
+        if (dim !== this.dim){
             if (dim === "all_removed"){
                 this.app.clearBrush();
                 this.app.setFilter(false);
@@ -34,7 +34,7 @@ class BoxPlot extends ViolinPlot{
         const catLen= this.data.length;
         const yscale = this.y_scale;
         const values=[]
-        for (let i of this.data){
+        for (const i of this.data){
             values.push(this.values[i.id]);
         }
         this.x_scale.domain(values);
@@ -52,7 +52,7 @@ class BoxPlot extends ViolinPlot{
         .attr("width",vWidth-6)
         .attr("height",d=>{
             const w = yscale(d.Q1)-yscale(d.Q3);
-            return isNaN(w)?0:w;
+            return Number.isNaN(w)?0:w;
         })
         .attr("fill","none")
         .attr("stroke", (d,i)=>colors[d.id])
@@ -68,7 +68,7 @@ class BoxPlot extends ViolinPlot{
         .attr("stroke-width", 3)
         
         .attr("d",(d,i)=>{
-            if (isNaN(d.med)){
+            if (Number.isNaN(d.med)){
                 return "";
             }
              const es=i*(vWidth-6)+((i+1)*6);

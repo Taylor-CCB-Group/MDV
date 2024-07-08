@@ -123,13 +123,13 @@ class DataStore{
         this.tree_diagram=config.tree_diagram;
        
         if (config.columns){
-            for (let c of config.columns){
+            for (const c of config.columns){
                 this.addColumn(c,c.data);
             }
         }
 
         if (config.columnGroups){
-            for (let item of config.columnGroups){
+            for (const item of config.columnGroups){
                 this.addColumnGroup(item);
             }
         }
@@ -138,12 +138,12 @@ class DataStore{
         }
         if (config.links){
             this.links= config.links;
-            for (let ds in config.links){
+            for (const ds in config.links){
                 const link = config.links[ds];
                 if (link.rows_as_columns){
                     const sg= link.rows_as_columns.subgroups;
                     this.subgroupDataSources.add(ds);
-                    for (let t in sg){
+                    for (const t in sg){
                             this.subgroups[t]={
                                 subgroup:sg[t],
                                 dataSource:ds,
@@ -213,7 +213,7 @@ class DataStore{
     }
 
     _callListeners(type,data){
-        for (let id in this.listeners){
+        for (const id in this.listeners){
             try {
                 this.listeners[id](type,data);
             } catch (e) {
@@ -230,8 +230,8 @@ class DataStore{
      */
     removeAllFilters(){
         this.filterArray.fill(0);
-        let noclear=[];
-        for (let dim of this.dimensions){     
+        const noclear=[];
+        for (const dim of this.dimensions){     
             if (dim.noclear){
                 noclear.push(dim);
                 continue
@@ -248,7 +248,7 @@ class DataStore{
         }  
         this.filterSize=this.size;
         //need to re-add the noclear filters (if any)
-        for (let dim of noclear){
+        for (const dim of noclear){
             const f= dim.filterArray;
             for (let n=0;n<f.length;n++){
                 if (f[n] === 1){
@@ -276,14 +276,14 @@ class DataStore{
     */
     dataChanged(columns,is_dirty=true){
         let hasFiltered=false;
-        for (let d of this.dimensions){
+        for (const d of this.dimensions){
             //this method will not call any listeners- wait until all done
            if (d.reFilterOnDataChanged(columns)){
                 hasFiltered=true;
            }
         }
         if (is_dirty){
-            for (let c of columns){
+            for (const c of columns){
                 this.setColumnIsDirty(c);
             }
         }
@@ -397,14 +397,14 @@ class DataStore{
  
     //delete
     _calculateCategories(column){
-        let vs = column.values;
-        let d= column.data;
-        let ci = {};
-        for (let n of vs){
+        const vs = column.values;
+        const d= column.data;
+        const ci = {};
+        for (const n of vs){
             ci[n]=0;
         }
         for (let i=0;i<d.length;i++){
-            let v= vs[d[i]];
+            const v= vs[d[i]];
             ci[v]++;      
         }
     }
@@ -532,7 +532,7 @@ class DataStore{
             for (let i = 0;i<d.length-len;i++){
                 let match=true;
                 for (let a=0;a<len;a++){
-                    if (bupper[a]!=d[i+a] && blower[a]!=d[i+a]){
+                    if (bupper[a]!==d[i+a] && blower[a]!==d[i+a]){
                         match=false;
                         break;
                     }
@@ -562,16 +562,14 @@ class DataStore{
                             match =false;
                             break;
                         }
-                        else{
+                        
                             console.log("match")
-                        }
                     }
                     if (match){
                         break;
                     }
-                    else{
+                    
                         console.log(n);
-                    }
                 }
                 if (match){
                     matches.push({
@@ -638,7 +636,7 @@ class DataStore{
         });
         const f_array = Array.isArray(filter);  
         const has_sgs= sgs.length !== 0;
-        for (let f in this.columnIndex){
+        for (const f in this.columnIndex){
             const c= this.columnIndex[f];
             if (filter){
                 if (f_array){
@@ -663,7 +661,7 @@ class DataStore{
             //subgroup columns separate
             if (has_sgs){
                 let has = false;
-                for (let s of sgs){
+                for (const s of sgs){
                     if (c.field.startsWith(`${s}|`)){
                         const sg = this.subgroups[s];
                         sgDataSources[s].push({name:c.name,field:c.field,datatype:c.datatype,
@@ -684,7 +682,7 @@ class DataStore{
         }
         let cols =  columns.sort((a,b)=> a.name.localeCompare(b.name));
         if (has_sgs){
-            for (let ds in sgDataSources){
+            for (const ds in sgDataSources){
                 sgDataSources[ds].sort((a,b)=> a.name.localeCompare(b.name));
                 cols=cols.concat(sgDataSources[ds]);
             }
@@ -726,7 +724,7 @@ class DataStore{
             columns= this.columnsWithData;
         }
         const obj={} // pjt consider using Map if this is a bottleneck
-        for (let c of columns){
+        for (const c of columns){
             //todo invert this to use col.getValue(index)
             const col = this.columnIndex[c];
             let v= col.data[index];
@@ -734,15 +732,15 @@ class DataStore{
                 v= col.values[v];
             }
             else if (col.datatype==="double" || col.datatype==="integer" || col.datatype==="int32"){
-                if (isNaN(v)){
+                if (Number.isNaN(v)){
                     v="missing";
                 }
             }
             //multitext displayed as comma delimited values
-            else if (col.datatype=="multitext"){
+            else if (col.datatype==="multitext"){
                 const delim = ", ";
                 const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
-                v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(delim);
+                v= Array.from(d.filter(x=>x!==65535)).map(x=>col.values[x]).join(delim);
 
             }
             else{
@@ -875,8 +873,8 @@ class DataStore{
             fv = fc.values.indexOf(filter)
         }
     
-        let mmx=[Number.MAX_VALUE,Number.MIN_VALUE];
-        let mmy=[Number.MAX_VALUE,Number.MIN_VALUE];
+        const mmx=[Number.MAX_VALUE,Number.MIN_VALUE];
+        const mmy=[Number.MAX_VALUE,Number.MIN_VALUE];
 
         for (let n=0;n<this.size;n++){
             if (fc && fc.data[n] !== fv){
@@ -921,17 +919,17 @@ class DataStore{
         const gc= this.columnIndex[o.groups];
         const values=[];
       
-        for (let fv in o.values){
+        for (const fv in o.values){
             if (single &&  fv!==single.filter){
                 continue;
             }
 
         
-            for (let i in o.values[fv]){
+            for (const i in o.values[fv]){
                 if (single && i !==single.group){
                     continue;
                 }
-                let v= o.values[fv][i];
+                const v= o.values[fv][i];
             
                 const val={
                     index:gc.values.indexOf(i)
@@ -1034,16 +1032,16 @@ class DataStore{
      
         for (let n=0;n<this.size;n++){
          
-            for (let v of values){
+            for (const v of values){
                 if (v.filterData && v.filterData[n] !== v.filterValue){
                     continue;
                 }
                 if (groupData[n]===v.index){
                     if (rotation){
-                        let cx= v.rotation_center[0];
-                        let cy = v.rotation_center[1];
-                        let nx = (v.cos * (x.data[n] - cx)) + (v.sin * (y.data[n] - cy)) + cx;
-                        let ny = (v.cos * (y.data[n] - cy)) - (v.sin * (x.data[n] - cx)) + cy;
+                        const cx= v.rotation_center[0];
+                        const cy = v.rotation_center[1];
+                        const nx = (v.cos * (x.data[n] - cx)) + (v.sin * (y.data[n] - cy)) + cx;
+                        const ny = (v.cos * (y.data[n] - cy)) - (v.sin * (x.data[n] - cx)) + cy;
                         x.data[n]=nx;
                         y.data[n]=ny;
                     }else{
@@ -1144,7 +1142,7 @@ class DataStore{
     * @param {SharedArrayBuffer|Array} data  either a javascript array or shared array buffer 
     */
     setColumnData(column,data){
-        let c= this.columnIndex[column];
+        const c= this.columnIndex[column];
         if (!c){
             throw `column ${column} is not present in data store`
         }
@@ -1156,13 +1154,14 @@ class DataStore{
             buffer=data;
         }
         c.buffer=buffer;      
-        if (c.datatype === "integer" || c.datatype=="double" || c.datatype==="int32"){
+        if (c.datatype === "integer" || c.datatype==="double" || c.datatype==="int32"){
             const dataArray = c.data=  c.datatype==="int32"?new Int32Array(buffer):new Float32Array(buffer);
             if (!c.minMax){
-                let min =Number.MAX_VALUE, max = Number.MIN_VALUE;
+                let min =Number.MAX_VALUE;
+                let max = Number.MIN_VALUE;
                 for (let i=0;i<dataArray.length;i++){
-                    let value = dataArray[i];
-                    if (isNaN(value)){
+                    const value = dataArray[i];
+                    if (Number.isNaN(value)){
                         continue;
                     }
                     min = (value<min) ? value:min
@@ -1171,9 +1170,9 @@ class DataStore{
                 c.minMax=[min,max];
             }
             if (!c.quantiles){
-                const a  = c.data.filter(x=>!isNaN(x)).sort();
+                const a  = c.data.filter(x=>!Number.isNaN(x)).sort();
                 c.quantiles={};
-                for (let q of [0.05,0.01,0.001]){
+                for (const q of [0.05,0.01,0.001]){
                     c.quantiles[q]=[quantileSorted(a,q),quantileSorted(a,1-q)];           
                 }
             }         
@@ -1189,7 +1188,7 @@ class DataStore{
 
     //experimental
     appendColumnData(column,data,newSize){
-        let c= this.columnIndex[column];
+        const c= this.columnIndex[column];
         let arrType= Uint8Array;
         let size = newSize;
         if (c.datatype === "integer" || c.datatype==="double"){
@@ -1205,8 +1204,8 @@ class DataStore{
             size=size*c.stringLength;
         }
         
-        let newBuffer = new SharedArrayBuffer(size);
-        let newArr= new arrType(newBuffer);
+        const newBuffer = new SharedArrayBuffer(size);
+        const newArr= new arrType(newBuffer);
         newArr.set(c.data);
         newArr.set(new arrType(data),c.data.length);
         c.data= newArr;
@@ -1217,11 +1216,11 @@ class DataStore{
     //experimental
     addDataToStore(columnData,size){
         const newSize=size+this.size;
-        for (let c of columnData){
+        for (const c of columnData){
             this.appendColumnData(c.column,c.data,newSize)
         }
-        let newBuffer = new SharedArrayBuffer(newSize);
-        let newArr = new Uint8Array(newBuffer);
+        const newBuffer = new SharedArrayBuffer(newSize);
+        const newArr = new Uint8Array(newBuffer);
         newArr.set(this.filterArray);
 
 
@@ -1230,7 +1229,7 @@ class DataStore{
         this.size = newSize;
         this.filterSize+=size;
         //update dimensions and redo any filters
-        for (let d of this.dimensions){
+        for (const d of this.dimensions){
             d.updateSize();
         }
         this._callListeners("data_added",this.size)
@@ -1240,7 +1239,7 @@ class DataStore{
     cleanColumnData(column){
         const index= {};
         const col = this.columnIndex[column];
-        for (let v in col.values){
+        for (const v in col.values){
             index[v]=0;
         }
         for (let i=0;i<this.size;i++){
@@ -1270,7 +1269,10 @@ class DataStore{
     _convertColumn(col,arr){
        
         const len =arr.length;
-        if (col.datatype==="text" || "text16"){
+        //pjt: note - looked like a bug here with `if (col.datatype==="text" || "text16")` - always truthy
+        //also, should this handle "multitext" as well? No - that has a separate case below.
+        //this was the source of bug with saving multitext columns for __tags
+        if (col.datatype === "text" || col.datatype === "text16"){
             const t8 = col.datatype==="text";
             const buff =new SharedArrayBuffer(t8?this.size:this.size*2);
             //work out number or rows with each value
@@ -1286,7 +1288,7 @@ class DataStore{
             }
             //sort values by number of rows
             const li=[];
-            for (let v in v_to_n){
+            for (const v in v_to_n){
                 li.push([v,v_to_n[v]])
             }
             col.values=[];
@@ -1304,7 +1306,7 @@ class DataStore{
             }
             return buff;
         }
-        else if (col.datatype === "integer" || col.datatype === "double" || col.datatype==="int32"){
+        if (col.datatype === "integer" || col.datatype === "double" || col.datatype==="int32"){
             const buff =new  SharedArrayBuffer(this.size*4);
             const a=  col.datatype==="int32"?new Int32Array(buff):new Float32Array(buff);
            
@@ -1314,9 +1316,9 @@ class DataStore{
             return buff
 
         }
-        else if (col.datatype=== "multitext"){
+        if (col.datatype=== "multitext"){
             const delim = col.delimiter || ",";
-            let vals = new Set();
+            const vals = new Set();
             let max=0;
             //first parse - get all possible values and max number
             //of values in a single field
@@ -1334,7 +1336,7 @@ class DataStore{
             //more efficent than using indexOf in array
             const map = {};
             let  index=0;
-            for (let v of  vals){
+            for (const v of  vals){
                 map[v]=index;
                 values[index]=v;
                 index++;
@@ -1358,7 +1360,7 @@ class DataStore{
             return buff;
 
         }
-        else{
+        
            
             
             let max = 0
@@ -1375,7 +1377,6 @@ class DataStore{
             }
            
             return buff;
-        }
 
     }
 
@@ -1420,15 +1421,15 @@ class DataStore{
 
         const data= c.data;
         const ov = config.overideValues|| {}
-        let  colors  =  this.getColumnColors(column,config);
+        const  colors  =  this.getColumnColors(column,config);
         function isFallback(v){
-            return isNaN(v) || (ov.fallbackOnZero && v===0);
+            return Number.isNaN(v) || (ov.fallbackOnZero && v===0);
         }
         //simply return the color associated with the value
         if (c.datatype==="text" || c.datatype==="text16" || c.datatype==="multitext"){                   
             return x=>colors[data[x]];
         }
-        else if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
+        if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
             const min = ov.min==null?c.minMax[0]:ov.min;
             const max = ov.max == null?c.minMax[1]:ov.max;
             const bins = config.bins || 100;
@@ -1450,7 +1451,7 @@ class DataStore{
                     return colors[bin];
                 }
 
-            }else{
+            }
                 return x=>{
                     const v= data[x];
                     //missing data
@@ -1466,7 +1467,6 @@ class DataStore{
                     }
                     return colors[bin];
                 }
-            }    
         }
     }
 
@@ -1583,8 +1583,8 @@ class DataStore{
         if (c.datatype==="double" || c.datatype==="integer" || c.datatype==="int32"){
             const ov = config.overideValues || {};
             const c_colors = ov.colors || (c.colors || defaultIPalette);
-            const min = ov.min == undefined ? c.minMax[0]:ov.min;
-            const max =  ov.max == undefined ? c.minMax[1]:ov.max;
+            const min = ov.min === undefined ? c.minMax[0]:ov.min;
+            const max =  ov.max === undefined ? c.minMax[1]:ov.max;
             //calculate the color of each bin
             const ls= linspace(min,max,c_colors.length);
             const scale =scaleLinear().domain(ls).range(c_colors).clamp(true);
@@ -1613,7 +1613,7 @@ class DataStore{
             }
             return colors
         }
-        else if (c.datatype==="text" || c.datatype==="multitext" || c.datatype==="text16"){
+        if (c.datatype==="text" || c.datatype==="multitext" || c.datatype==="text16"){
 
             let colors=  c.colors;
             if (! colors){
@@ -1674,7 +1674,7 @@ class DataStore{
     getColumnRange(column){
         const c = this.columnIndex[column];
         if (!c.minMax) {
-            console.error('unknown minMax for column ' + column);
+            console.error(`unknown minMax for column ${column}`);
             return [0, 50];
         }
         return c.minMax[1]-c.minMax[0];
@@ -1751,10 +1751,10 @@ class DataStore{
 }
 
 function linspace(start,end,n){
-    var out = [];
-    var delta = (end - start) / (n - 1);
+    const out = [];
+    const delta = (end - start) / (n - 1);
 
-    var i = 0;
+    let i = 0;
     while(i < (n - 1)) {
         out.push(start + (i * delta));
         i++;
@@ -1766,25 +1766,25 @@ function linspace(start,end,n){
 
 function hexToRGB(hex){
     hex=hex.replace("#","")
-    var bigint = parseInt(hex, 16);
-    var r = (bigint >> 16) & 255;
-    var g = (bigint >> 8) & 255;
-    var b = bigint & 255;
+    const bigint = Number.parseInt(hex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
     return [r,g,b];
 }
 
 function RGBToHex(rgb){
-     return "#"+rgb.map(x => {
+     return `#${rgb.map(x => {
         const hex = x.toString(16)
-        return hex.length === 1 ? '0' + hex : hex
-      }).join('');
+        return hex.length === 1 ? `0${hex}` : hex
+      }).join('')}`;
 }
 function rgbToRGB(rgb){
     if (!rgb){
         return [255,255,255];
     }
     rgb= rgb.substring(4,rgb.length-1).split(", ");
-    return rgb.map(x=>parseInt(x));
+    return rgb.map(x=>Number.parseInt(x));
 }
 
 const defaultPalette=[

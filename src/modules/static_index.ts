@@ -99,7 +99,7 @@ async function loadData() {
 
     const listener = async (type: string, cm: ChartManager, data: any) => {
         if (type === "state_saved" && !staticFolder) {
-            const resp = await getPostData(root+'/save_state', data);
+            const resp = await getPostData(`${root}/save_state`, data);
             if (resp.success) {
                 cm.createInfoAlert("State saved", {duration: 2000});
                 cm.setAllColumnsClean();

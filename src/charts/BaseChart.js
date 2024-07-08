@@ -197,7 +197,7 @@ class BaseChart{
     }
 
     _callListeners(type,data){
-        for (let id in this.listeners){
+        for (const id in this.listeners){
             this.listeners[id](type,data);
         }
     }
@@ -263,7 +263,7 @@ class BaseChart{
             if (typeof this.config.param === "string" ){
                 cols=[this.config.param];
             }
-            for (let p of cols){
+            for (const p of cols){
                 if (columns.indexOf(p)!==-1){
                     isDirty=true;
                     break;
@@ -318,7 +318,7 @@ class BaseChart{
             if (this.legend){
                 this.config.color_legend.pos=[this.legend.offsetLeft,this.legend.offsetTop];
                 this.legend.remove();
-                delete this.legend;
+                this.legend = undefined;
             }
             return;
         }
@@ -335,8 +335,8 @@ class BaseChart{
             if (!cl.pos){
                 cl.pos=[box.left,box.top]
             }
-            ll= cl.pos[0]+"px";
-            lt= cl.pos[1]+"px";
+            ll= `${cl.pos[0]}px`;
+            lt= `${cl.pos[1]}px`;
         }
         this.legend = this.getColorLegend();
         if (!this.legend) {
@@ -391,7 +391,7 @@ class BaseChart{
         if (typeof this.config.param === "string" ){
             cols=[this.config.param];
         }
-        for (let p of cols){
+        for (const p of cols){
             if (column===p){
                 isDirty=true;
                 break;
@@ -403,7 +403,7 @@ class BaseChart{
         }
         if (this.colorByColumn){
             if (this.config.color_by===column){
-                delete this.config.color_by;
+                this.config.color_by = undefined;
                 this.colorByDefault();
             }
         }
@@ -431,8 +431,8 @@ class BaseChart{
         if (!this._tooltip) this.addToolTip();
         this._tooltip.innerHTML=msg;
         this._tooltip.style.display= "inline-block";
-        this._tooltip.style.left= (3+e.clientX)+"px";
-        this._tooltip.style.top=(3+e.clientY)+"px"
+        this._tooltip.style.left= `${3+e.clientX}px`;
+        this._tooltip.style.top=`${3+e.clientY}px`
     }
 
     hideToolTip(){
@@ -479,7 +479,7 @@ class BaseChart{
     */
     getSettings(){
         const c= this.config;
-        let settings = [
+        const settings = [
             {
                 type:"text",
                 label:"Chart Name",
@@ -503,7 +503,7 @@ class BaseChart{
                 current_value:c.color_by || "_none",
                 func:(x)=>{
                     if (x==="_none"){
-                        delete c.color_by
+                        c.color_by = undefined
                         this.colorByDefault();
                     }
                     else{
@@ -704,7 +704,7 @@ class BaseChart{
             this.addToolTip();
         }
         if (this.extra_legends){
-            for (let l of this.extra_legends){
+            for (const l of this.extra_legends){
                 if (this[l]){
                     this[l].__doc__=doc;
                 }
@@ -753,8 +753,8 @@ class BaseChart{
     setSize(x,y){
         //if supplied change the div dimensions
         if (x){
-            this.div.style.height=y+"px";
-            this.div.style.width=x+"px";
+            this.div.style.height=`${y}px`;
+            this.div.style.width=`${x}px`;
         }
         //calculate width and height based on outer div
         this._setDimensions();
@@ -779,11 +779,11 @@ class BaseChart{
         const originalColor =this.contentDiv.style.color;
         this.contentDiv.style.color = "black";
         this.getImage(resp=>{
-            let link =document.createElement("a");
-            let name = this.config.title || "image"
-            link.download=name+"."+im_type;
+            const link =document.createElement("a");
+            const name = this.config.title || "image"
+            link.download=`${name}.${im_type}`;
             if (im_type==="svg"){
-                link.href="data:image/svg+xml," + encodeURIComponent(resp);
+                link.href=`data:image/svg+xml,${encodeURIComponent(resp)}`;
             }
             else{
                 let url =resp.toDataURL('image/png');
@@ -831,7 +831,7 @@ class BaseChart{
     const svgBlob = new Blob([data], {type: "image/svg+xml;charset=utf-8"});
     const url = DOMURL.createObjectURL(svgBlob);
     img.src = url;
-          img.onload = function () {
+          img.onload = () => {
           ctx.drawImage(img, 0, 0);
           callback(canvas,ctx)
     }
@@ -850,16 +850,16 @@ class BaseChart{
 BaseChart.types = chartTypes;
 
 function copyStylesInline(destinationNode, sourceNode) {
-    var containerElements = ["svg","g"];
-    for (var cd = 0; cd < destinationNode.childNodes.length; cd++) {
-        var child = destinationNode.childNodes[cd];
-        if (containerElements.indexOf(child.tagName) != -1) {
+    const containerElements = ["svg","g"];
+    for (let cd = 0; cd < destinationNode.childNodes.length; cd++) {
+        const child = destinationNode.childNodes[cd];
+        if (containerElements.indexOf(child.tagName) !== -1) {
              copyStylesInline(child, sourceNode.childNodes[cd]);
              continue;
         }
-        var style = sourceNode.childNodes[cd].currentStyle || window.getComputedStyle(sourceNode.childNodes[cd]);
-        if (style == "undefined" || style == null) continue;
-        for (var st = 0; st < style.length; st++){
+        const style = sourceNode.childNodes[cd].currentStyle || window.getComputedStyle(sourceNode.childNodes[cd]);
+        if (style === "undefined" || style == null) continue;
+        for (let st = 0; st < style.length; st++){
              child.style.setProperty(style[st], style.getPropertyValue(style[st]));
         }
     }

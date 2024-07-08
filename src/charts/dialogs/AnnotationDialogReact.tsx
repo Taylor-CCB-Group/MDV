@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import DataStore from "../../datastore/DataStore.js";
-import TagModel from "../../table/TagModel";
+import type DataStore from "../../datastore/DataStore.js";
+import type TagModel from "../../table/TagModel";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createMdvPortal } from "@/react/react_utils";
 import { X } from "lucide-react";
@@ -21,12 +21,12 @@ function TagInput({tagModel}: {tagModel: TagModel}) {
 
     return (
         <input className="p-2" placeholder="annotation..." onKeyDown={e => {
-            if (e.key == "Enter") {
-                if (e.currentTarget.value == '') return;
+            if (e.key === "Enter") {
+                if (e.currentTarget.value === '') return;
                 tagModel.setTag(e.currentTarget.value, true);
                 e.currentTarget.value = '';
             }
-        }}></input>
+        }} />
     )
 }
 
@@ -51,7 +51,7 @@ function AnnotationDialogComponent({tagModel}: {tagModel: TagModel}) {
             <TagInput tagModel={tagModel} />
             <h2>Tags in selection:</h2>
             <div className="flex flex-row">
-                {[...tagsInSelection].map(tag => <MTag key={'a'+tag} tagModel={tagModel} tag={tag}/>)}
+                {[...tagsInSelection].map(tag => <MTag key={`a${tag}`} tagModel={tagModel} tag={tag}/>)}
             </div>
             {/* <h2>All tags:</h2>
             <div className="flex flex-row">

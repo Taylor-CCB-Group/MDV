@@ -66,7 +66,7 @@ class MultiSelectDropdown{
     setSelected(selected){
         selected.forEach(x=>{
             const o = this.options.get(x);
-            o.selected= o.value===selected?true:false
+            o.selected= o.value === selected
         });
         this.refresh();
     }
@@ -78,10 +78,10 @@ class MultiSelectDropdown{
         if( nex< this.config.maxShow && nex !==0 && this.options.size>this.config.maxShow){
             const ex = Array.from(this.options.values()).filter(x=>!x.selected);
             const msg = ex.map(x=>x.text).join(",")
-            this.div.appendChild(createEl('span',{class:['optext'],text:msg+" excluded"}));  
+            this.div.appendChild(createEl('span',{class:['optext'],text:`${msg} excluded`}));  
         }
         else if(sels.length>(this.config.maxShow)){
-            this.div.appendChild(createEl('span',{class:['optext'],text:sels.length+' '+this.config.txtSelected}));          
+            this.div.appendChild(createEl('span',{class:['optext'],text:`${sels.length} ${this.config.txtSelected}`}));          
           }
         else{
           sels.forEach(x=>{
@@ -91,7 +91,7 @@ class MultiSelectDropdown{
             this.div.appendChild(c);
           });
         }
-        if(0==sels.length) this.div.appendChild(createEl('span',{class:'placeholder',text:this.config.placeholder}));
+        if(0===sels.length) this.div.appendChild(createEl('span',{class:'placeholder',text:this.config.placeholder}));
         this.div.querySelectorAll('span.optext, span.placeholder');
         if (this.listWrap){
             Array.from(this.list.childNodes).forEach(x=>{
@@ -115,7 +115,7 @@ class MultiSelectDropdown{
         this.list.querySelectorAll(":scope div:not(.multiselect-dropdown-all-selector)").forEach(d=>{
             const txt=d.querySelector("label").innerText.toUpperCase();
             const v = this.search.value.toUpperCase();
-            const does = txt.includes(v) || v =="";
+            const does = txt.includes(v) || v ==="";
             if (does){
                 console.log(txt);
             }
@@ -174,9 +174,9 @@ class MultiSelectDropdown{
             {
                 classes:['multiselect-dropdown-list-wrapper'],
                 style:{
-                    top:(dim.top+dim.height)+"px",
-                    left:dim.left+"px",
-                    width:dim.width +"px",
+                    top:`${dim.top+dim.height}px`,
+                    left:`${dim.left}px`,
+                    width:`${dim.width}px`,
                 }
             },
             this.config.doc.body);
@@ -209,11 +209,11 @@ class MultiSelectDropdown{
         if ( b_space>ddim.height){
             //do nothing
         }else if (t_space>ddim.height){
-            this.listWrap.style.top=(dim.top-ddim.height)+"px";
+            this.listWrap.style.top=`${dim.top-ddim.height}px`;
         }
         else{
             const m = Math.max(b_space,t_space)-60;
-            this.list.style.height= m+"px";
+            this.list.style.height= `${m}px`;
             if (t_space>b_space){
                 this.listWrap.style.top="10px";
             }

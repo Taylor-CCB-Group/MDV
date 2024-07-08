@@ -16,7 +16,7 @@ export default class DeepToolsDimension extends SortableDimension {
 
     updateData(colorScale,colorOnly=false){
         return new Promise((resolve,reject)=>{
-            this.deepToolsWorker.onmessage = function(e) {
+            this.deepToolsWorker.onmessage = (e) => {
                 resolve(e.data);
             }
             this.deepToolsWorker.postMessage({
