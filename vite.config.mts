@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
-import * as path from 'path';
+import * as path from 'node:path';
 
 const flaskURL = "http://127.0.0.1:5051";
 
@@ -33,7 +33,7 @@ function getRollupOptions(): RollupOptions {
                 },
             }
         }
-    } else if (build === 'desktop_pt') {
+    } if (build === 'desktop_pt') {
         // currently there are different versions of entrypoint, this is the one with react etc.
         // used for Flask...
         return {
@@ -52,12 +52,12 @@ function getRollupOptions(): RollupOptions {
                 },
             }
         }
-    } else if (build === 'dev_pt') {
+    } if (build === 'dev_pt') {
         // version of vite build used for netlify deploy preview & devserver, using default 'index.html' entrypoint
         // (which as of writing refers to same static_index.ts as desktop_pt)
         // nb, localhost:5170/catalog_dev.html works on devserver without needing to change this.
         return {}
-    } else if (build === 'desktop') {
+    } if (build === 'desktop') {
         return {
             input: 'src/modules/desktop_index.js',
             output: {
@@ -69,27 +69,26 @@ function getRollupOptions(): RollupOptions {
                 },
             }
         }
-    } else {
-        if (process.env.VITE_ENTRYPOINT) {
-            // If you want a custom entrypoint - in particular, in order to have a custom DataLoader for interfacing
-            // with another backend, you can specify it with VITE_ENTRYPOINT environment variable, e.g.
-            // `VITE_ENTRYPOINT=path/to/my_index.js npx vite build --outDir path/to/output`
-            // (nb, we may change the logic in this config...)
-            const {name} = path.parse(process.env.VITE_ENTRYPOINT);
-            return {
-                input: process.env.VITE_ENTRYPOINT,
-                output: {
-                    entryFileNames: 'js/mdv.js',
-                    assetFileNames: (assetInfo) => {
-                        if (assetInfo.name === name + '.css') return 'assets/mdv.css';
-                        //not including hash, may impact caching, but more similar to previous webpack behavior
-                        return 'img/[name][extname]';
-                    },
-                }
+    }
+    if (process.env.VITE_ENTRYPOINT) {
+        // If you want a custom entrypoint - in particular, in order to have a custom DataLoader for interfacing
+        // with another backend, you can specify it with VITE_ENTRYPOINT environment variable, e.g.
+        // `VITE_ENTRYPOINT=path/to/my_index.js npx vite build --outDir path/to/output`
+        // (nb, we may change the logic in this config...)
+        const {name} = path.parse(process.env.VITE_ENTRYPOINT);
+        return {
+            input: process.env.VITE_ENTRYPOINT,
+            output: {
+                entryFileNames: 'js/mdv.js',
+                assetFileNames: (assetInfo) => {
+                    if (assetInfo.name === `${name}.css`) return 'assets/mdv.css';
+                    //not including hash, may impact caching, but more similar to previous webpack behavior
+                    return 'img/[name][extname]';
+                },
             }
         }
-        throw new Error(`Unknown build type '${build}' and no VITE_ENTRYPOINT specified.`);
     }
+    throw new Error(`Unknown build type '${build}' and no VITE_ENTRYPOINT specified.`);
 }
 
 export default defineConfig(env => { return {
