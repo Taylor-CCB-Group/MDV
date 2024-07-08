@@ -112,13 +112,18 @@ export default defineConfig(env => { return {
                 changeOrigin: true,
             },
             '^/project/.*/\?': { //this works with ?dir=/project/project_name
-                target: flaskURL_, //todo review before merging
+                target: flaskURL,
                 changeOrigin: true,
             },
             //will fail if url has search params <-- ?
             //will cause problems if we have json files that don't want to be proxied
             '^/.*\\.(json|b|gz)$': {
                 target: flaskURL_, //todo review before merging
+                changeOrigin: true,
+            },
+            '^/socket\\.io.*': {
+                target: flaskURL_,
+                ws: true,
                 changeOrigin: true,
             },
             '/projects': {
