@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "cross-env build=dev_pt vite --host",
     "vite-build": "tsc && cross-env build=dev_pt vite build --outDir ./vite-dist",
-    "build": "webpack --env build=desktop",
+    "build": "cross-env build=desktop vite build --outDir ./dist",
     "build-nofont": "cross-env build=production nofont=true vite build --outDir ./dist/basic",
     "build-flask-vite": "cross-env build=desktop_pt vite build --outDir ./python/mdvtools/static",
     "docs-env-setup": "python -m venv docsenv && source docsenv/bin/activate && cd docs && pip install -r requirements.txt && npm run build-docs-nix",
