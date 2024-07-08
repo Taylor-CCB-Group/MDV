@@ -21,7 +21,7 @@ const ProjectTile = ({ name, id }: ProjectMetadata) => {
             {import.meta.env.DEV && (<a href={`http://localhost:5170?dir=/project/${id}`}>
             <BugPlay />
             </a>)}
-            <button className='text-red-500' onClick={async () => {
+            <button type="button" className='text-red-500' onClick={async () => {
                 await fetch(`/delete_project/${id}`, { method: 'DELETE' });
                 window.location.reload(); //probably should use react-router-dom or generally consider flow here.
             }}>Delete</button>
