@@ -172,8 +172,10 @@ class ChartManager{
         if (listener){
             this.addListener("_default",listener)
         }
-        //we may want to move this, for now I don't think it's doing any harm and avoids changes to multiple index files:
-        connectIPC(this);
+        if (config.websocket) {
+            // previously, we were always calling this - but it was only relevant to earlier experiment with Unity
+            connectIPC(this);
+        }
         this.transactions={};
 
 

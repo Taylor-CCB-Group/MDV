@@ -11,6 +11,7 @@ def log(msg: str):
 
 def mdv_socketio(app: Flask):
     socketio = SocketIO(app, cors_allowed_origins="*")
+    print("socketio initialized")
 
     @socketio.on("connect")
     def test_connect():
@@ -20,5 +21,9 @@ def mdv_socketio(app: Flask):
     @socketio.on("message")
     def message(data):
         # 'hello world'... if we have need for more logic here, we'll probably use a dictionay of functions for each message type.
-        if data.type == "popout":
+        if data['type'] == "popout":
             log(f"popout: {data}")
+        if data['type'] == "ping":
+            log(f"ping: {data}")
+            socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"})
+

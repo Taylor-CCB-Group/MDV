@@ -1,5 +1,5 @@
 import { io } from "socket.io-client";
-import ChartManager from "../charts/ChartManager";
+import type ChartManager from "../charts/ChartManager";
 import { DataModel } from "../table/DataModel";
 
 type VuplexCallback = (event: { data: MDVMessage }) => void;
@@ -26,6 +26,10 @@ type ErrorMessage = {
     type: "error";
     message: string;
 }
+type PingMessage = {
+    type: "ping";
+    message?: string;
+}
 type ChartEventNames = "state_saved" | "chart_added" | "chart_removed" | "view_loaded";
 type Chart = unknown; //todo
 type ViewId = string;
@@ -36,7 +40,7 @@ type ChartMsgValue<T extends ChartEventNames> =
     : T extends "state_saved" ? { state: ChartState }
     : never;
 
-type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage;
+type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage | PingMessage;
 
 /** initial experimental IPC support. As of this writing, will attempt to 
  * - connect a 'vuplex' PostMessage interface for embedding in a VR environment in Unity
@@ -57,11 +61,10 @@ export default async function connectIPC(cm: ChartManager) {
             }
         }
     });
-    //temporarily disable websocket connection
-    const socket = {on: (s, f)=>{}};//io(url);
+    const socket = io(url);
 
     function sendMessage(msg: MDVMessage) {
-        // socket.emit("message", msg);
+        socket.emit("message", msg);
         if (window.vuplex) window.vuplex.postMessage(msg);
     }
 
@@ -71,7 +74,11 @@ export default async function connectIPC(cm: ChartManager) {
         sendMessage({ type: "popout", chartID: chart.config.id });
     }
 
-    // socket.connect();
+    socket.connect();
+    socket.on("connect", () => {
+        console.log("socket connected");
+        sendMessage({type: 'ping'})
+    });
     function popout(chartID: string) {
         const chart = cm.charts[chartID];
         if (!chart) {
@@ -85,12 +92,14 @@ export default async function connectIPC(cm: ChartManager) {
             cm._popOutChart(chart.chart);
         }
     }
-    // should msg be a string? or a JSON object?
-    socket.on("message", async (msg: string) => {
-        const data = JSON.parse(msg) as MDVMessage;
+    socket.on("message", async (data: MDVMessage) => {
         if (data.type === "popout") {
             const { chartID } = data;
             popout(chartID);
+        }
+        if (data.type === "ping") {
+            console.log("ping received");
+            console.log(data);
         }
     });
     // DataModel: register with all datastore changes & send appropriate updates.
