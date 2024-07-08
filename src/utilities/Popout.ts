@@ -30,10 +30,9 @@ export default function popoutChart(chart: Chart) {
     const popStyles = pushSetStyles(chart);
 
     const body = popoutWindow.document.body;
-    const resizeObserver = new ResizeObserver(() => {
+    popoutWindow.addEventListener('resize', () => {
         chart.setSize(body.clientWidth, body.clientHeight);
-    }); 
-    resizeObserver.observe(popoutWindow.document.documentElement);
+    });
 
     // I don't think we use this win property much, but it's here for consistency
     // with previous implementation & comments
