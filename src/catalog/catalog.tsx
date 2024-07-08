@@ -52,6 +52,16 @@ const Projects = () => {
     )
 }
 
+const ChatExperiment = () => {
+    return (
+        <div className='p-10'>
+            <a href='/'>
+                <h1 className="text-6xl text-center m-10">Chat Experiment</h1>
+            </a>
+        </div>
+    );
+}
+
 
 export default function App() {
     return (
@@ -59,6 +69,7 @@ export default function App() {
             <h1 className="text-6xl text-center m-10">MDV</h1>
             <ProjectTemplates />
             <Projects />
+            <ChatExperiment />
         </div>
     );
 }

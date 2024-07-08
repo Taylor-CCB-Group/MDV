@@ -4,6 +4,7 @@ import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'path';
 
 const flaskURL = "http://127.0.0.1:5051";
+const flaskURL_ = "http://127.0.0.1:5050"; // hack for single project mode / chat experiment
 
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
@@ -107,17 +108,17 @@ export default defineConfig(env => { return {
         proxy: {
             // these routes are proxied to flask server in 'single project' mode
             '^/(get_|images|tracks|save).*': {
-                target: flaskURL,
+                target: flaskURL_, //todo review before merging
                 changeOrigin: true,
             },
             '^/project/.*/\?': { //this works with ?dir=/project/project_name
-                target: flaskURL,
+                target: flaskURL_, //todo review before merging
                 changeOrigin: true,
             },
             //will fail if url has search params <-- ?
             //will cause problems if we have json files that don't want to be proxied
             '^/.*\\.(json|b|gz)$': {
-                target: flaskURL,
+                target: flaskURL_, //todo review before merging
                 changeOrigin: true,
             },
             '/projects': {
