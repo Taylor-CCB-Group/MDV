@@ -81,6 +81,7 @@ def create_app(
     open_browser=True,
     port=5050,
     websocket=False,
+    use_reloader=False,
     app: Optional[Flask] = None,
 ):
     if app is None:
@@ -92,7 +93,6 @@ def create_app(
         app.after_request(add_safe_headers)
         project_bp = app
         multi_project = False
-        # nb, may make this default to False again soon.
         ### 'MEW' in Unity is using IWeb PostMessage, not WebSockets.
         ### but this will be used for local testing in short-term, and potentially other things later.
         if websocket:
@@ -106,11 +106,9 @@ def create_app(
         # this is to allow multiple projects to be served from the same server.
         multi_project = True
         route = "/project/" + project.id + "/"
-        project_bp = Blueprint(project.id, __name__, url_prefix=route)        
-    # if route in routes:
-    #     raise Exception(
-    #         "Route already exists - can't have two projects with the same name"
-    #     )
+        project_bp = Blueprint(project.id, __name__, url_prefix=route)
+        if websocket:
+            print('todo: websocket for multi-project')
     routes.add(route)
 
     @project_bp.route("/")
@@ -142,6 +140,12 @@ def create_app(
         path = safe_join(project.dir, file + ".json")
         if path is None or not os.path.exists(path):
             return "File not found", 404
+        if file == "state":
+            with open(path) as f:
+                print("processing state response.")
+                state = json.load(f)
+                state["websocket"] = websocket
+                return state
         return send_file(path)
 
     # empty page to put popout content
@@ -313,7 +317,7 @@ def create_app(
         # app.register_blueprint(project_bp)
     else:
         # user_reloader=False, allows the server to work within jupyter
-        app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
+        app.run(host="0.0.0.0", port=port, debug=True, use_reloader=use_reloader)
 
 def add_datasource_backend(project):
     from mdvtools.dbutils.dbmodels import db, Project, File
