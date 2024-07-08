@@ -7,6 +7,7 @@ import { ScatterplotLayer } from 'deck.gl/typed';
 export class ScatterplotExLayer extends ScatterplotLayer<any, any> {
     // ts suddenly complains if we don't have this constructor
     // todo review types after viv/deck.gl update
+    // biome-ignore lint/complexity/noUselessConstructor: we get a tsc error if we remove this - hope to fix after viv/deck.gl update
     constructor(props: any) {
         super(props);
     }
@@ -100,12 +101,14 @@ export class ImageArrayDeckExtension<T extends ImageArrayExtensionProps = ImageA
             }
         };
     }
+    // biome-ignore lint/complexity/noBannedTypes: hope to fix, not before viv/deck.gl update
     initializeState(this: Layer<{}>, context: LayerContext, extension: this): void {
         this.getAttributeManager()?.addInstanced({
             imageIndex: { size: 1, accessor: 'getImageIndex', defaultValue: 0 },
             imageAspect: { size: 1, accessor: 'getImageAspect', defaultValue: 1 }
         });
     }
+    // biome-ignore lint/complexity/noBannedTypes: hope to fix, not before viv/deck.gl update
     updateState(this: Layer<{}>, params: UpdateParameters<Layer<ImageArrayExtensionProps>>) {
         const { texture } = params.props.imageArray;
         const { saturation } = params.props;
