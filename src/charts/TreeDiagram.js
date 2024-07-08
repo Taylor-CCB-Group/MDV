@@ -8,6 +8,7 @@ import {select} from "d3-selection";
 import {max} from "d3"
 
 
+/** this is somewhat bespoke / subject to review etc. */
 class TreeDiagram extends SVGChart{
     constructor(dataStore,div,config){
 		super(dataStore,div,config,{});
@@ -38,7 +39,11 @@ class TreeDiagram extends SVGChart{
             return d.data.length + (d.children ? max(d.children, maxLength) : 0);
         }
     
-        this.setBranchLength(this.treeData, this.treeData.data.length = 0,(b.width-50)/maxLength(this.treeData));
+        // todo !!! fix this !!! need a test, and to understand what it's supposed to do
+        // this.setBranchLength(this.treeData, this.treeData.data.length = 0,(b.width-50)/maxLength(this.treeData));
+        // at least the following must be less wrong...
+        console.warn("setBranchLength needs to be reviewed / tested");
+        this.setBranchLength(this.treeData, 0,(b.width-50)/maxLength(this.treeData));
         
         const desc=  nodes.descendants();
         const nml = max(desc,d=>d.data.length);
