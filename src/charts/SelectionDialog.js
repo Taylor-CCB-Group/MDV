@@ -186,7 +186,6 @@ class SelectionDialog extends BaseChart{
                 this.dims[col].removeFilter();
             }
             else{
-                const vs= f.category;
                 this.resetButton.style.display = "inline";
                 this.dims[col].filter("filterCategories",[col],f.category,notify)
             }    

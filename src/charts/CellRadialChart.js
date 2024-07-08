@@ -440,7 +440,11 @@ class CellRadialChart extends SVGChart{
             .attr("d", (d) => {
                 level_radii[d.depth]=d.y;
                 if (d.depth>1){
-                return `M${project(d.x, d.y)}C${project(d.x, (d.y + d.parent.y) / 2)} ${project(d.parent.x, (d.y + d.parent.y) / 2)} ${project(d.parent.x, d.parent.y)}`;
+                    // biome-ignore lint/style/useTemplate: clearer to have this on several lines
+                    return "M" + project(d.x, d.y)
+                        + "C" + project(d.x, (d.y + d.parent.y) / 2)
+                        + " " + project(d.parent.x, (d.y + d.parent.y) / 2)
+                        + " " + project(d.parent.x, d.parent.y);
                 }
                 
                     return `M${project(d.x, d.y)}L${project(d.parent.x,d.parent.y)}`;

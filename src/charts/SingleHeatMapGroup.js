@@ -81,8 +81,9 @@ class SingleHeatMapGroup extends SVGChart{
         let oset2 = null;
         let y_len = y_col.values.length;
         let x_len = x_col.values.length;
-        const z_len = z_col.values.length;
-        
+        // biome-ignore lint/style/useConst: this is very sus - why is there not similar logic for z_len?
+        let z_len = z_col.values.length;
+
 
         const so = c.specific_only;
         if (so){

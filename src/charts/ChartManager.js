@@ -1783,7 +1783,9 @@ class ChartManager{
     __decorateColumnMethod(method,chart,dataSource){
         const newMethod = `_${method}`;
         chart[newMethod]= chart[method];
-        chart[method]=()=> {
+        //if original method is called check whether column has data
+        //first argument must be column(s) needed
+        chart[method]= ()=> {
             //column not needed
             if (arguments[0] == null){
                 chart[newMethod](...arguments);
@@ -1926,6 +1928,8 @@ class ChartManager{
             case "color_by_column":
                 link.set_color = true;
                 console.warn('legacy color_by_column link type - use chart_columnval_link with set_color=true instead');
+                addChartLink(link, this);
+                break;
             case "chart_columnval_link":
                 addChartLink(link, this);
                 break;       
@@ -2418,10 +2422,7 @@ class AddChartDialog extends BaseDialog{
                         sgs[ds] = createEl("optgroup",{label:ds});
                     }
                     for (const item of ps){
-                        let ele = dd;
-                        if (item.subgroup){
-                            ele = sgs[item.subgroup.dataSource];
-                        }
+                        const ele = item.subgroup ? sgs[item.subgroup.dataSource] : dd;
                         createEl("option",{text:item.name,value:item.field}, ele);
                     }
                     for (const ds of this.dataStore.subgroupDataSources){

@@ -472,20 +472,19 @@ class CellNetworkChart extends SVGChart{
     }
 
     setUpDrag(){
-            const self = this;
-            function dragstarted(event) {
-              if (!event.active) self.simulation.alphaTarget(0.3).restart();
+            const dragstarted = (event) => {
+              if (!event.active) this.simulation.alphaTarget(0.3).restart();
               event.subject.fx = event.subject.x;
               event.subject.fy = event.subject.y;
             }
-            
-            function dragged(event) {
+
+            const dragged = (event) => {
               event.subject.fx = event.x;
               event.subject.fy = event.y;
             }
-            
-            function dragended(event) {
-              if (!event.active) self.simulation.alphaTarget(0);
+
+            const dragended = (event) => {
+              if (!event.active) this.simulation.alphaTarget(0);
               event.subject.fx = null;
               event.subject.fy = null;
             }

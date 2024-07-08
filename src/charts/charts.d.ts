@@ -108,6 +108,7 @@ export type ExtraControl<T extends GuiSpecType> = {
 // }
 // a.values[0].map(x => x.a);
 // ^^ still not well-typed... `x` is `any`.
+// biome-ignore lint/suspicious/noRedeclare: I should probably fix this...
 interface DataStore {
     getLoadedColumns: () => FieldName[];
     getColumnName: (col: FieldName) => ColumnName | null;

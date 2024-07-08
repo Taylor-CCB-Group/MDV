@@ -1,8 +1,7 @@
 import 'gridstack/dist/gridstack.min.css';
 import { GridStack } from 'gridstack';
 import { debounce } from '../utilities/Utilities';
-import type { DataSource, Chart, ChartManager } from './charts';
-import AnnotationDialog from './dialogs/AnnotationDialog';
+import type { Chart, ChartManager, DataSource } from './charts';
 
 function clearPosition(div) {
     div.style.position = '';
@@ -68,11 +67,10 @@ export default class GridStackManager {
             });
          
             const i = this.chartManager.addMenuIcon(ds.name, "fas fa-compress-arrows-alt", "compact layout", ()=>grid.compact());
-            //this.chartManager.addMenuIcon(ds.name, "fas fa-tags", "Tag annotation", () => {new AnnotationDialog(ds.dataStore)})
             this.grids.set(ds, {grid:grid,charts:new Set(),icon:i});
         }
-        
-        return this.grids.get(ds)!;
+
+        return this.grids.get(ds);
     }
 
     destroy(ds: DataSource){

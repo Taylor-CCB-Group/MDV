@@ -1,6 +1,7 @@
 import datatypes from "./datatypes.js";
 
-onmessage=function(e){
+// biome-ignore lint/suspicious/noGlobalAssign: <explanation>
+onmessage = (e) => {
     const {orderBuffer,columns}=e.data;
     //get access to the order buffer
     const ord = new Uint32Array(orderBuffer);

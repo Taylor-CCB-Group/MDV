@@ -380,16 +380,16 @@ class WGLScatterPlot extends WGLChart{
     }
 
     _calculateRadius(){
-    	const width = this.width?this.width:1;
-		let max_x=this.config.max_x || this.config.max_x===0?this.config.max_x:this.minMaxX[1]; 	
-    	let min_x=this.config.min_x || this.config.min_x===0?this.config.min_x:this.minMaxX[0];
+    	// const width = this.width?this.width:1;
+		let max_x=this.config.max_x || this.config.max_x === 0 ? this.config.max_x : this.minMaxX[1]; 	
+    	let min_x=this.config.min_x || this.config.min_x === 0 ? this.config.min_x : this.minMaxX[0];
     	if (this.config.axis.x_log_scale){
     		max_x= this._getLogValue(max_x);
     		min_x= this._getLogValue(min_x);
     	}
 		
 		const range = max_x-min_x
-		const pt_px = range ** 1.50/(this.dataStore.size ** 0.8+range);
+		const pt_px = range ** 1.50/((this.dataStore.size ** 0.8)+range);
 		//pt_px = pt_px<0.001?0.001:pt_px;
 		return (pt_px)*5;
 		

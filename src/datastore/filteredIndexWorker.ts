@@ -1,4 +1,5 @@
 
+// biome-ignore lint/suspicious/noGlobalAssign: <explanation>
 onmessage = (e: MessageEvent<{ filterBuffer: SharedArrayBuffer, outputBuffer: SharedArrayBuffer }>) => {
     //todo atomics.
     const filterArray = new Uint8Array(e.data.filterBuffer);
