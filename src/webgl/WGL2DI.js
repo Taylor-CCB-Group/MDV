@@ -575,7 +575,7 @@ class WGL2DI{
 		const image_index=this.images.position.length;
 		this.images.position.push([x,y]);
 		this.images.position.push([x,y+height]);
-		this.images.position.push([x+width,y+height]),
+		this.images.position.push([x+width,y+height]);
 		this.images.position.push([x+width,y+height]);
 		this.images.position.push([x+width,y]);
 		this.images.position.push([x,y]);
