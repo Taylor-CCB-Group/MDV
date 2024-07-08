@@ -126,14 +126,14 @@ class ImageScatterChart extends BaseChart {
                 target[0] = n(cx, i, this.spaceX);
                 target[1] = n(cy, i, this.spaceY);
                 target[2] = 0;//n(cz, i);
-                return target;
+                return target as unknown as Float32Array; // deck.gl types are wrong AFAICT;
             },
             getRadius: 1,
             radiusScale: this.size,
             // getFillColor: this.colorBy ? (i: K)=>[...this.colorBy(i), this.opacity] : [255, 255, 255, this.opacity],
             opacity: this.opacity/255,
             saturation: this.saturation,
-            getFillColor: this.colorBy ? (i: K)=>this.colorBy(i) : [255, 255, 255],
+            getFillColor: (this.colorBy ? (i: K)=>this.colorBy(i) : [255, 255, 255]) as unknown as any,
             imageArray,
             updateTriggers: {
                 // what is this actually for?
