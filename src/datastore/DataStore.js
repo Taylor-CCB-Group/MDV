@@ -1269,7 +1269,10 @@ class DataStore{
     _convertColumn(col,arr){
        
         const len =arr.length;
-        if (col.datatype==="text" || "text16"){
+        //pjt: note - looked like a bug here with `if (col.datatype==="text" || "text16")` - always truthy
+        //also, should this handle "multitext" as well? No - that has a separate case below.
+        //this was the source of bug with saving multitext columns for __tags
+        if (col.datatype === "text" || col.datatype === "text16"){
             const t8 = col.datatype==="text";
             const buff =new SharedArrayBuffer(t8?this.size:this.size*2);
             //work out number or rows with each value
