@@ -1,45 +1,17 @@
 import { BotMessageSquare } from 'lucide-react';
 import { MessageCircleQuestion } from 'lucide-react';
-
-
-import { sendMessage } from './ChatAPI';
+import useChat from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
-
-type Message = {
-    text: string;
-    sender: 'user' | 'bot';
-    id: string;
-};
-
-function generateId() {
-    return Math.random().toString(36).substring(7);
-}
-
 
 
 const Chatbot = () => {
-    const [messages, setMessages] = useState<Message[]>([]);
+    const { messages, isSending, sendAPI } = useChat();
     const [input, setInput] = useState<string>('');
-    const [isSending, setIsSending] = useState<boolean>(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const handleSend = async () => {
         if (!input.trim()) return;
-
-        const userMessage: Message = { text: input, sender: 'user', id: generateId() };
-        setMessages((prevMessages) => [...prevMessages, userMessage]);
-
-        try {
-            setIsSending(true);
-            const response = await sendMessage(input);
-            const botMessage: Message = { text: response.message, sender: 'bot', id: generateId() };
-            setMessages((prevMessages) => [...prevMessages, botMessage]);
-        } catch (error) {
-            const errorMessage: Message = { text: `Error: ${error}`, sender: 'bot', id: generateId() };
-            setMessages((prevMessages) => [...prevMessages, errorMessage]);
-        }
-        setIsSending(false);
-
+        await sendAPI(input);
         setInput('');
     };
 
@@ -56,7 +28,7 @@ const Chatbot = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, []);
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies: messages is 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: messages is needed for the effect to run
     useEffect(() => {
         scrollToBottom();
     }, [messages, scrollToBottom]);
