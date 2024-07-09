@@ -50,7 +50,7 @@ class MDVProject:
     def __init__(self, dir: str, id: Optional[str]=None, delete_existing=False, skip_column_clean=False):
         self.skip_column_clean = skip_column_clean # signficant speedup for large datasets
         self.dir = dir
-        self.id = id if id else dir.split("/")[-1]
+        self.id = id if id else os.path.basename(dir)
         if delete_existing and exists(dir):
             shutil.rmtree(dir)
         self.h5file = join(dir, "datafile.h5")
@@ -1085,10 +1085,14 @@ class MDVProject:
                 assert isinstance(f, str) # in future we may allow dict or list
                 if exists(f):
                     # copy the json file to the project
-                    # f = os.path.relpath(f, os.getcwd())
-                    Path(join(self.dir, f)).parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(f, join(self.dir, f))
-                    all_regions[k]["json"] = v["json"]
+                    name = os.path.basename(f)
+                    rel = join(self.dir, "json", name)
+                    Path(rel).parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        shutil.copyfile(f, rel)
+                        all_regions[k]["json"] = join("json", name)
+                    except Exception as e:
+                        print(f"Skipping json for region {k} because of error copying {f} to {rel}\n{repr(e)}")
                 else:
                     raise FileNotFoundError(f"json file '{f}' not found")
         # maybe warn if replacing existing regions

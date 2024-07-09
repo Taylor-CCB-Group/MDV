@@ -1,4 +1,4 @@
-import React, { PropsWithChildren, createContext, useContext, useState } from 'react';
+import React, { type PropsWithChildren, createContext, useContext, useState } from 'react';
 
 type ProjectInfo = {
     root: string;

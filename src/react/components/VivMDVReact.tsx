@@ -2,7 +2,7 @@ import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivContextType, VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
+import { DEFAUlT_CHANNEL_STATE, type ROI, type VivConfig, type VivContextType, VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
 import type { ColumnName, DataColumn } from "../../charts/charts";

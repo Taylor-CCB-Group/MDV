@@ -5,13 +5,13 @@ import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID, useConfig } from "../hooks";
 import { useScatterplotLayer } from "../scatter_state";
 import SelectionOverlay from "./SelectionOverlay";
-import { useLoader, OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
+import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
 import { SpatialAnnotationProvider, useRange } from "../spatial_context";
 import { GeoJsonLayer, PolygonLayer } from "deck.gl/typed";
 import { getVivId } from "./avivatorish/MDVivViewer";
-import { VivRoiConfig } from "./VivMDVReact";
+import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
@@ -26,7 +26,7 @@ const useRectLayer = () => {
     const id = useChartID();
     const { start, end } = useRange();
     // note: viv is very picky about layer ids
-    const layer_id = `rect_${getVivId(id + 'detail-react')}`;
+    const layer_id = `rect_${getVivId(`${id}detail-react`)}`;
     const polygonLayer = useMemo(() => {
         const data = [
             [start, [end[0], start[1]], end, [start[0], end[1]]]
@@ -51,7 +51,7 @@ const useJsonLayer = () => {
     const id = useChartID();
     const { root } = useProject();
     const { json, showJson } = useConfig<VivRoiConfig>();
-    const layer_id = `json_${getVivId(id + 'detail-react')}`;
+    const layer_id = `json_${getVivId(`${id}detail-react`)}`;
     const layer = useMemo(() => {
         return json ? new GeoJsonLayer({
             id: layer_id,
@@ -82,7 +82,7 @@ const Main = observer(() => {
     const viewerStore = useViewerStoreApi();
     const [width, height] = useChartSize();
     const id = useChartID();
-    const detailId = id + 'detail-react';
+    const detailId = `${id}detail-react`;
 
     //useSpatialLayers()
     const rectLayer = useRectLayer();
@@ -145,7 +145,7 @@ const Main = observer(() => {
             jsonLayer,
             scatterplotLayer, rectLayer, 
         ],
-        id: id + 'deck',
+        id: `${id}deck`,
         onAfterRender: () => {
             scatterProps.onAfterRender();
         },

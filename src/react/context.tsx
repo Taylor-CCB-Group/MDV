@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
-import { BaseReactChart } from "./components/BaseReactChart";
-import DataStore from "../datastore/DataStore";
+import type { BaseReactChart } from "./components/BaseReactChart";
+import type DataStore from "../datastore/DataStore";
 import { MaterialWrapper } from "./material";
 
 

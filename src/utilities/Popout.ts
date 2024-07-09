@@ -1,4 +1,4 @@
-import { Chart } from "@/charts/charts";
+import type { Chart } from "@/charts/charts";
 import { removeDraggable, removeResizable } from "./Elements";
 
 export default function popoutChart(chart: Chart) {
@@ -30,10 +30,9 @@ export default function popoutChart(chart: Chart) {
     const popStyles = pushSetStyles(chart);
 
     const body = popoutWindow.document.body;
-    const resizeObserver = new ResizeObserver(() => {
+    popoutWindow.addEventListener('resize', () => {
         chart.setSize(body.clientWidth, body.clientHeight);
-    }); 
-    resizeObserver.observe(popoutWindow.document.documentElement);
+    });
 
     // I don't think we use this win property much, but it's here for consistency
     // with previous implementation & comments
@@ -59,6 +58,7 @@ function pushSetStyles(chart: Chart) {
         iconDisplay: chart.popoutIcon.style.display,
     };
     div.style.height = '100vh';
+    div.style.width = '100vw';
     div.style.top = '0';
     div.style.left = '0';
     chart.popoutIcon.style.display = 'none';

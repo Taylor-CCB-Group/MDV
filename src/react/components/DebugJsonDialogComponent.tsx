@@ -24,7 +24,7 @@ function filterJSON(obj: JSONObject, filter: string): JSONObject {
     function recursiveFilter(current: JSONObject, path: string[]): JSONObject | null {
         if (typeof current === 'string') {
             return matchesFilter(current, path) ? current : null;
-        } else if (typeof current === 'object' && current !== null) {
+        }if (typeof current === 'object' && current !== null) {
             const filteredObj: JSONObject = {};
             let childMatch = false;
 
@@ -52,7 +52,7 @@ export default function ({json, header}: {json: any, header?: string}) {
     return (
         <div className='max-h-[90vh] overflow-auto'>
             {header && <h2>{header}</h2>}
-            <input type='text' value={filter} onChange={e => setFilter(e.target.value)} placeholder='Filter...'></input>
+            <input type='text' value={filter} onChange={e => setFilter(e.target.value)} placeholder='Filter...' />
             <JsonView src={filteredJson} />
         </div>
     );

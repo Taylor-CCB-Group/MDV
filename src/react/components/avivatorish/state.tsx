@@ -1,10 +1,10 @@
-import { PropsWithChildren, createContext, useContext, useRef } from "react";
-import { loadOmeTiff } from "@hms-dbmi/viv";
+import { type PropsWithChildren, createContext, useContext, useRef } from "react";
+import type { loadOmeTiff } from "@hms-dbmi/viv";
 import { useChart } from "../../context";
 import { createStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { observer } from "mobx-react-lite";
-import { VivMDVReact } from "../VivMDVReact";
+import type { VivMDVReact } from "../VivMDVReact";
 import type { EqFn, Selector, ZustandStore } from "./zustandTypes";
 
 // what about loadOmeZarr, loadBioformatsZarr...

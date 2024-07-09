@@ -8,7 +8,6 @@ class ContextMenu{
     * based on the data passed to the show method
     */
     constructor(func){
-        let self=this;     
         this.setItemFunction=func;
         this.menus=[];
     }
@@ -43,7 +42,7 @@ class ContextMenu{
     * clicks outside the menu
     */
     remove(){      
-        for (let m of this.menus){
+        for (const m of this.menus){
             m.remove()
         }
         this.menus=[]
@@ -53,12 +52,12 @@ class ContextMenu{
     }
 
     _addMenu(items,left,top){
-        let menu = document.createElement("div");
+        const menu = document.createElement("div");
         const doc = this._getDocument()
 
-        let index=this.menus.length;
+        const index=this.menus.length;
         menu.classList.add("ciview-ctm-main");
-        for (let item of items){
+        for (const item of items){
             this._addItem(menu,item,index);    
         } 
         doc.body.append(menu);
@@ -66,8 +65,8 @@ class ContextMenu{
         if (left+rect.width>doc.body.clientWidth){
             left = doc.body.clientWidth-rect.width-3;
         }
-        menu.style.left=left+"px";
-        menu.style.top=top+"px";
+        menu.style.left=`${left}px`;
+        menu.style.top=`${top}px`;
         this.menus.push(menu)
     }
     _getDocument(){
@@ -101,7 +100,7 @@ class ContextMenu{
 
         if (item.icon){
             const icon= document.createElement("i");
-            for (let i of item.icon.split(" ")){
+            for (const i of item.icon.split(" ")){
                 icon.classList.add(i);
             }
             icon.classList.add("ciview-ctm-left-icon");
@@ -123,7 +122,7 @@ class ContextMenu{
             }
             if (item.subitems){
                 this._showSubmenu(el,item.subitems,index);
-                for (let i of menu.children){
+                for (const i of menu.children){
                     i.classList.remove("ciview-ctm-selected")
                 }
                 el.classList.add("ciview-ctm-selected");
