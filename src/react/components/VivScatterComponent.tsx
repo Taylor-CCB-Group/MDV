@@ -114,7 +114,7 @@ const Main = observer(() => {
             viewerStore.setState({ viewState: getDefaultInitialViewState(ome, { width, height }) });
         }
     }, [ome, width, height, viewState, viewerStore.setState]);
-    const extensions = useMemo(() => [new ColorPaletteExtension()], []);
+    const extensions = useMemo(() => [new ColorPaletteExtension(), new VivContrastExtension()], []);
     const detailView = useMemo(() => new DetailView({
         id: detailId,
         snapScaleBar: true,
