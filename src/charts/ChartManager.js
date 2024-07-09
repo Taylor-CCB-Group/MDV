@@ -172,10 +172,6 @@ class ChartManager{
         if (listener){
             this.addListener("_default",listener)
         }
-        if (config.websocket) {
-            // previously, we were always calling this - but it was only relevant to earlier experiment with Unity
-            connectIPC(this);
-        }
         this.transactions={};
 
 
@@ -252,7 +248,7 @@ class ChartManager{
             },this.menuBar);
         }
 
-        
+ 
         
         const themeButton = createMenuIcon("fas fa-adjust",{
             tooltip:{
@@ -278,6 +274,34 @@ class ChartManager{
             uploadButton.style.margin = "3px";
         }
 
+        if (config.websocket) {
+            const fn = async () => {
+                // previously, we were always calling connectIPC - but it was only relevant to earlier experiment with Unity
+                // and we had disabled websocket on server.
+                // started experimenting with socketio for chatMDV - mechanism is working, to an extent... 
+                // but actually, REST is probably best for this (maybe a protocol agnostic abstraction).
+                const { socket, sendMessage } = await connectIPC(this);
+                socket.on('message', (msg) => {
+                    alert(`received message '${msg.message}'`);
+                });
+
+                const chatButton = createMenuIcon("fas fa-comments", {
+                    tooltip: {
+                        text: "Open ChatMDV",
+                        position: "bottom-left"
+                    },
+                    func: async () => {
+                        const query = await prompt("Enter a query to send to ChatMDV");
+                        if (query) {
+                            const msg = { type: 'ping', message: query }
+                            sendMessage(msg);
+                        }
+                    }
+                }, this.rightMenuBar);
+            };
+            fn();
+        }
+        
         if (import.meta.env.DEV) {
             // add a button to take a screenshot of the current view
             // we don't actually want a button like this - I think we probably want to take a screenshot

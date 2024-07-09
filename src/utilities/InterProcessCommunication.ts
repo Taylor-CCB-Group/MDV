@@ -44,7 +44,10 @@ type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage | PingMessage;
 
 /** initial experimental IPC support. As of this writing, will attempt to 
  * - connect a 'vuplex' PostMessage interface for embedding in a VR environment in Unity
- * - connect a websocket to a socket.io server that will forward messages to other clients (not used yet)
+ * - connect a websocket to a socket.io server that will forward messages to other clients
+ *    - started to use this for ai chatbot, but actually REST is probably better for that
+ *    - could be useful for other things, like syncing views, or receiving updates from a server
+ *      e.g. about new data (e.g. from some kind of data pipeline), or about new views to load.
  */
 export default async function connectIPC(cm: ChartManager) {
     const params = new URLSearchParams(window.location.search);
@@ -74,10 +77,14 @@ export default async function connectIPC(cm: ChartManager) {
         sendMessage({ type: "popout", chartID: chart.config.id });
     }
 
-    socket.connect();
-    socket.on("connect", () => {
-        console.log("socket connected");
-        sendMessage({type: 'ping'})
+    await new Promise<void>((resolve, reject) => {
+        socket.connect();
+        socket.on("connect", () => {
+            console.log("socket connected");
+            sendMessage({type: 'ping'});
+            // this is probably not the right design - what about disconnects?
+            resolve();
+        });
     });
     function popout(chartID: string) {
         const chart = cm.charts[chartID];
@@ -146,4 +153,5 @@ export default async function connectIPC(cm: ChartManager) {
             });
         }
     }
+    return { socket, sendMessage };
 }
