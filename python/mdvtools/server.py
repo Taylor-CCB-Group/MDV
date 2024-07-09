@@ -80,7 +80,7 @@ def create_app(
     project: MDVProject,
     open_browser=True,
     port=5050,
-    websocket=False,
+    websocket=True,
     use_reloader=False,
     app: Optional[Flask] = None,
 ):
