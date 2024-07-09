@@ -3,6 +3,7 @@ import  BaseChart from "./BaseChart.js";
 import { PopOutWindow } from "../utilities/PopOutWindow";
 import  DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
+import ChatDialog from "./dialogs/ChatDialog";
 import { ContextMenu } from "../utilities/ContextMenu";
 import {BaseDialog} from "../utilities/Dialog.js";
 import {getRandomString} from "../utilities/Utilities.js";
@@ -281,23 +282,23 @@ class ChartManager{
                 // started experimenting with socketio for chatMDV - mechanism is working, to an extent... 
                 // but actually, REST is probably best for this (maybe a protocol agnostic abstraction).
                 const { socket, sendMessage } = await connectIPC(this);
-                socket.on('message', (msg) => {
-                    alert(`received message '${msg.message}'`);
-                });
-
+                this.ipc = { socket, sendMessage };
                 const chatButton = createMenuIcon("fas fa-comments", {
                     tooltip: {
                         text: "Open ChatMDV",
                         position: "bottom-left"
                     },
                     func: async () => {
-                        const query = await prompt("Enter a query to send to ChatMDV");
-                        if (query) {
-                            const msg = { type: 'ping', message: query }
-                            sendMessage(msg);
-                        }
+                        // new BaseDialog.experiment['ChatDialog']();
+                        new ChatDialog();
+                        // const query = await prompt("Enter a query to send to ChatMDV");
+                        // if (query) {
+                        //     const msg = { type: 'ping', message: query }
+                        //     sendMessage(msg);
+                        // }
                     }
                 }, this.rightMenuBar);
+                // chatButton.setAttribute('data-lucide', 'bot-message-square'); //didn't work
             };
             fn();
         }

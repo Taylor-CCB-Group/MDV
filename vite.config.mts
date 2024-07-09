@@ -107,7 +107,7 @@ export default defineConfig(env => { return {
         strictPort: true,
         proxy: {
             // these routes are proxied to flask server in 'single project' mode
-            '^/(get_|images|tracks|save).*': {
+            '^/(get_|images|tracks|save|chat).*': {
                 target: flaskURL_, //todo review before merging
                 changeOrigin: true,
             },

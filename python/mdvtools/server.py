@@ -111,6 +111,18 @@ def create_app(
             print('todo: websocket for multi-project')
     routes.add(route)
 
+    if websocket:
+        """
+        current prototype using 'websocket' as a flag that we interpret as 'enable chatMDV' for now.
+        """
+        print(f"websocket/chat enabled for {route}")
+        @project_bp.route("/chat", methods=["POST"])
+        def chat():
+            if not request.json:
+                return {"error": "No JSON data in request"}, 500
+            message = request.json.get("message")
+            return {"message": f"bleep bloop I'm a robot, you said: {message}"}
+
     @project_bp.route("/")
     def project_index():
         print("recieved request to project_index")
