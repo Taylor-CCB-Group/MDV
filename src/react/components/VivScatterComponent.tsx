@@ -13,6 +13,7 @@ import { GeoJsonLayer, PolygonLayer } from "deck.gl/typed";
 import { getVivId } from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
+import VivContrastExtension from "@/webgl/VivContrastExtension";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -43,7 +44,7 @@ const useRectLayer = () => {
             // fillOpacity: 0.1, //not working? why is there a prop for it if it doesn't work?
             // opacity: 0.2,
         });
-    }, [start, end]);
+    }, [start, end, layer_id]);
     return polygonLayer;
 }
 
@@ -70,7 +71,7 @@ const useJsonLayer = () => {
             textBackground: true,
             visible: showJson,
         }) : null;
-    }, [json, showJson]);
+    }, [json, showJson, layer_id, root]);
     return layer;
 }
 
@@ -112,20 +113,20 @@ const Main = observer(() => {
             // setViewState(getDefaultInitialViewState(ome, { width, height }));
             viewerStore.setState({ viewState: getDefaultInitialViewState(ome, { width, height }) });
         }
-    }, [ome]);
+    }, [ome, width, height, viewState, viewerStore.setState]);
     const extensions = useMemo(() => [new ColorPaletteExtension()], []);
     const detailView = useMemo(() => new DetailView({
         id: detailId,
         snapScaleBar: true,
         width, height
-    }), [id, width, height]);
+    }), [detailId, width, height]);
     useEffect(() => {
         if (scatterProps.viewState) {
             viewerStore.setState({ viewState: scatterProps.viewState });
             // setViewState(scatterProps.viewState);
             vsRef.current = scatterProps.viewState;
         }
-    }, [scatterProps.viewState])
+    }, [scatterProps.viewState, viewerStore.setState]);
     // TODO get viv working in popouts (seems to be some spurious feature-detection, should be fixed with new version of viv)
     const layerConfigX = {
         loader: ome,
