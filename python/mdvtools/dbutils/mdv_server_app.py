@@ -73,7 +73,7 @@ def serve_projects_from_filesystem(base_dir):
 
                     p = MDVProject(dir=project_path,id= str(next_id))
                     p.set_editable(True)
-                    p.serve(app=app, open_browser=False, backend=True)
+                    p.serve(app=app, open_browser=False, backend=True) 
                     print(f"Serving project: {project_path}")
 
                     # Create a new Project record in the database with the default name
