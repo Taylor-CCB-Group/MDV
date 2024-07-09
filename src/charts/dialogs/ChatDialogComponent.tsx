@@ -3,6 +3,16 @@ import { MessageCircleQuestion } from 'lucide-react';
 import useChat from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => {
+    return (
+        <div className={`mb-2 p-4 rounded-lg ${sender === 'user' ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'}`}>
+            {sender === 'user' ? <MessageCircleQuestion className=''/>
+            : <BotMessageSquare className='scale-x-[-1]' />}
+            {text}
+        </div>
+    );
+}
+
 
 const Chatbot = () => {
     const { messages, isSending, sendAPI } = useChat();
@@ -37,10 +47,7 @@ const Chatbot = () => {
         <div className="flex flex-col h-full mx-auto overflow-hidden">
             <div className="flex-1 p-4 overflow-y-auto">
                 {messages.map((message) => (
-                    <div key={message.id} className={`mb-2 p-2 rounded-lg ${message.sender === 'user' ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'}`}>
-                        {message.sender === 'user' ? <MessageCircleQuestion /> : <BotMessageSquare />}
-                        {message.text}
-                    </div>
+                    <Message key={message.id} text={message.text} sender={message.sender} />
                 ))}
                 <div ref={messagesEndRef} />
             </div>
