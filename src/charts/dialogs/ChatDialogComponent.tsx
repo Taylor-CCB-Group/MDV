@@ -2,16 +2,22 @@ import { BotMessageSquare } from 'lucide-react';
 import { MessageCircleQuestion } from 'lucide-react';
 import useChat from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import JsonView from 'react18-json-view';
 
 const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => {
     const isUser = sender === 'user';
+    try {
+        text = JSON.parse(text);
+    } catch (e) {
+    }
     return (
         <div>
             {isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />}
             <div className={`mb-2 p-4 rounded-lg ${
                 isUser ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'
                 }`}>
-                {text}
+                {/* {text} */}
+                <JsonView src={text} />
             </div>
         </div>
     );

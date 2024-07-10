@@ -19,7 +19,7 @@ from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint as Blueprint
 import os
 import pandas as pd
-from typing import Optional
+from typing import Optional, Callable, Any
 from datetime import datetime
 
 routes = set()
@@ -83,6 +83,7 @@ def create_app(
     websocket=True,
     use_reloader=False,
     app: Optional[Flask] = None,
+    chat_fn: Optional[Callable[[str], str]]=None,
 ):
     if app is None:
         route = ""
@@ -121,6 +122,9 @@ def create_app(
             if not request.json:
                 return {"error": "No JSON data in request"}, 500
             message = request.json.get("message")
+            if chat_fn is not None:
+                response = chat_fn(message)
+                return {"message": response}
             return {"message": f"bleep bloop I'm a robot, you said: {message}"}
 
     @project_bp.route("/")
