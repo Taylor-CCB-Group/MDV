@@ -31,8 +31,8 @@ const Chatbot = () => {
 
     const handleSend = async () => {
         if (!input.trim()) return;
-        await sendAPI(input);
         setInput('');
+        await sendAPI(input);
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
