@@ -5,6 +5,7 @@ import { VivProvider, useChannelsStore, useChannelsStoreApi, useImageSettingsSto
 import { Checkbox, FormControl, InputLabel, MenuItem, Select, Slider } from "@mui/material";
 import { PopoverPicker } from "./ColorPicker";
 import { getSingleSelectionStats } from "./avivatorish/utils";
+import { X } from 'lucide-react';
 
 export default function MainVivColorDialog() {
     return (
@@ -152,7 +153,7 @@ const ChannelController = ({ index }: { index: number }) => {
             onClick={() => {
                 removeChannel(index);
             }}>
-                x
+                <X />
             </button>
         </div>
         </>
