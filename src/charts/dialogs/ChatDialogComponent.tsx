@@ -4,11 +4,15 @@ import useChat from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => {
+    const isUser = sender === 'user';
     return (
-        <div className={`mb-2 p-4 rounded-lg ${sender === 'user' ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'}`}>
-            {sender === 'user' ? <MessageCircleQuestion className=''/>
-            : <BotMessageSquare className='scale-x-[-1]' />}
-            {text}
+        <div>
+            {isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />}
+            <div className={`mb-2 p-4 rounded-lg ${
+                isUser ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'
+                }`}>
+                {text}
+            </div>
         </div>
     );
 }
@@ -45,13 +49,13 @@ const Chatbot = () => {
     
     return (
         <div className="flex flex-col h-full mx-auto overflow-hidden">
-            <div className="flex-1 p-4 overflow-y-auto">
+            <div className="flex-1 p-1 overflow-y-auto">
                 {messages.map((message) => (
                     <Message key={message.id} text={message.text} sender={message.sender} />
                 ))}
                 <div ref={messagesEndRef} />
             </div>
-            <div className="flex p-4 border-t border-gray-300">
+            <div className="flex p-4 border-t w-full border-gray-300">
                 <input
                     type="text"
                     disabled={isSending}

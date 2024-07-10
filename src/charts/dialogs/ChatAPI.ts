@@ -27,11 +27,16 @@ const sendMessage = async (message: string, route = '/chat') => {
     return parsed;
 };
 
+const DefaultMessage: Message = {
+    text: 'Hello! How can I help you?',
+    sender: 'bot',
+    id: generateId(),
+}
 
 const useChat = () => {
     const { root } = useProject();
     const route = `${root}/chat`;
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<Message[]>([DefaultMessage]);
     const [isSending, setIsSending] = useState<boolean>(false);
 
     const appendMessage = (message: string, sender: 'bot' | 'user') => {
