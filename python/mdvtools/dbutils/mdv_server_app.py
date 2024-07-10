@@ -10,7 +10,7 @@ from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
-from mdvtools.dbutils.routes import register_global_routes
+#from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService
 
 def serve_projects_from_db():
