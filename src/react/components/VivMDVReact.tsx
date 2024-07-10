@@ -37,7 +37,7 @@ const MainChart = () => {
         if (!imgUrl) throw 'no image url';
         const source = { urlOrFile: imgUrl, description: 'test' };
         viewerStore.setState({ source });
-    }, [imgUrl]);
+    }, [imgUrl, viewerStore.setState]);
 
     const source = useViewerStore(store => store.source);
     useImage(source);
@@ -121,9 +121,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
-    constructor(dataStore, div, config) {
-        // todo better default config
-        config = {...scatterDefaults, ...config};
+    constructor(dataStore, div, originalConfig) {
+        const config = {...scatterDefaults, ...originalConfig};
         if (!config.channel) config.channel = 0;
         if (config.type === 'VivMdvRegionReact') {
             if (!config.viv.image_properties) config.viv.image_properties = DEFAUlT_CHANNEL_STATE;
@@ -311,7 +310,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             const { viewerStore, channelsStore, imageSettingsStore } = this.vivStores;
             const channels = channelsStore.getState();
             const viewer = viewerStore.getState();
-            const imageSettings = imageSettingsStore.getState();
+            // const imageSettings = imageSettingsStore.getState();
             // omit some things like width, height...
             // for 3D we'd want rotation etc, but if we keep entire viewState it causes problems (stuck zoom)
             const viewState = {target: viewer.viewState.target, zoom: viewer.viewState.zoom};
