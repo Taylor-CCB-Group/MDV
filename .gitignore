@@ -39,8 +39,6 @@ data/
 
 .idea
 xvenv/
-
 LLM/cache
 LLM/key.json
 secrets/
-
