@@ -1,11 +1,13 @@
-import { BotMessageSquare } from 'lucide-react';
+import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion } from 'lucide-react';
 import useChat from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
+import Markdown from 'react-markdown';
 
 const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => {
     const isUser = sender === 'user';
+    const pythonSections = extractPythonSections(text);
     try {
         text = JSON.parse(text);
     } catch (e) {
@@ -16,13 +18,53 @@ const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => 
             <div className={`mb-2 p-4 rounded-lg ${
                 isUser ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'
                 }`}>
-                {/* {text} */}
-                <JsonView src={text} />
+                {/* <JsonView src={text} /> */}
+                <MessageMarkdown text={text} />
             </div>
+            {pythonSections.map((section, index) => (
+                <PythonCode key={index} code={section} />
+            ))}
+        </div>
+    );
+}
+const MessageJson = ({ text }: { text: string }) => {
+    try {
+        text = JSON.parse(text);
+    } catch (e) {
+    }
+    return (
+        <JsonView src={text} />
+    );
+}
+function extractPythonSections(responseText: string) {
+    // Regular expression to match Python code blocks 
+    const pythonCodeRegex = /```python([\s\S]*?)```/g;
+    let matches; const pythonSections = [];
+    // Find all matches 
+    while ((matches = pythonCodeRegex.exec(responseText)) !== null) {
+        // Extract the code block without the backticks and "python" keyword 
+        pythonSections.push(matches[1].trim());
+    }
+    return pythonSections;
+}
+
+const PythonCode = ({ code }: { code: string }) => {
+    return (
+        <div className="p-4 bg-gray-200 dark:bg-gray-800 w-fit mb-4 rounded-lg">
+            <SquareTerminal />
+            <pre className="text-sm font-mono text-gray-800 dark:text-gray-200">{code}</pre>
         </div>
     );
 }
 
+const MessageMarkdown = ({ text }: { text: string }) => {
+    // nb, I asked the bot for a markdown test, and a few things were in this markdown rendering
+    // ~~strikethrough~~, tables, task-lists, and footnotes. 
+    // Also the example image, but that was probably because it was a bad link.
+    return (
+        <Markdown>{text}</Markdown>
+    );
+}
 
 const Chatbot = () => {
     const { messages, isSending, sendAPI } = useChat();

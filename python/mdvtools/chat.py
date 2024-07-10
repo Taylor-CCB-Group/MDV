@@ -6,12 +6,15 @@ import json
 # make sure there's a .env file in the same directory as this script with OPENAI_API_KEY=... & GITHUB_TOKEN=...
 load_dotenv()
 
+# consider what context the agents will run in... for now, this global thing that is only running on a given test project...
+# but we'd expect it to be in the context of a particular session interacting with a particular project
 code_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
 dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4")
 
 def chat_fn(question: str) -> str:
     response = code_llm.invoke(question)
-    return json.dumps(response.to_json())
+    # return json.dumps(response.to_json())
+    return response.content
 
 
 if __name__ == "__main__":
