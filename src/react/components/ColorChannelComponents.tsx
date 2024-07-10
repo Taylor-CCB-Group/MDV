@@ -147,7 +147,7 @@ const ChannelController = ({ index }: { index: number }) => {
                     channelsStore.setState({ contrastLimits });
                 }}
             />
-            <button
+            <button type="button"
             style={{marginLeft: '12px'}}
             onClick={() => {
                 removeChannel(index);
@@ -167,7 +167,7 @@ const AddChannel = () => {
     const canAddChannel = selections.length < 6;
     const addChannel = useChannelsStore(state => state.addChannel);
     const {use3d, setIsChannelLoading} = useViewerStore(({use3d, setIsChannelLoading}) => ({use3d, setIsChannelLoading}), shallow);
-    return <button 
+    return <button type="button"
     disabled={!canAddChannel}
     onClick={async () => {
         // would be nice to have less repition of this code here and in ChannelController
