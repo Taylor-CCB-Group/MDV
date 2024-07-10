@@ -1,79 +1,161 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-#from mdvtools.dbutils.mdv_server_app import db
-from sqlalchemy.orm import relationship
 
 db = SQLAlchemy()
 
-class Project(db.Model):
+class User(db.Model):
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(255), nullable=False, unique=False, default='unnamed_project')
+    email = db.Column(db.String(255), unique=True, nullable=False, default='')
+    confirmed_at = db.Column(db.DateTime, nullable=True)
+    password = db.Column(db.String(255), nullable=False, default='')
+    is_active = db.Column(db.Boolean, nullable=False, default=False)
+    first_name = db.Column(db.String(50), nullable=False, default='')
+    last_name = db.Column(db.String(50), nullable=False, default='')
+    administrator = db.Column(db.Boolean, nullable=False, default=False)
+    institution = db.Column(db.Text, nullable=True)
+    projects = db.relationship('UserProject', backref='user', lazy=True)
+    jobs = db.relationship('Job', backref='user', lazy=True)
+    permissions = db.relationship('Permission', backref='user', lazy=True)
+    preferences = db.relationship('UserPreference', backref='user', lazy=True)
+    #shared_objects = db.relationship('SharedObject', foreign_keys='SharedObject.shared_with', backref='shared_with_user', lazy=True)
+
+class Project(db.Model):
+    __tablename__ = 'projects'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(255), nullable=False, default='unnamed_project')
     path = db.Column(db.String(1024), nullable=False, unique=True)
     created_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     is_deleted = db.Column(db.Boolean, nullable=False, default=False)
-    deleted_timestamp = db.Column(db.DateTime, nullable=True, default=None)
+    deleted_timestamp = db.Column(db.DateTime, nullable=True)
     update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
     accessed_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    
-    def soft_delete(self):
-        self.is_deleted = True
-        self.deleted_timestamp = datetime.now()
-        db.session.commit()
-    
-    @classmethod
-    def create_project(cls, path):
-        new_project = cls(
-            path=path,
-            created_timestamp=datetime.now(),
-            update_timestamp=datetime.now(),
-            accessed_timestamp=datetime.now()
-        )
-        db.session.add(new_project)
-        db.session.commit()
-        return new_project
+    owner = db.Column(db.Integer)
+    type = db.Column(db.Text)
+    data = db.Column(db.JSON)
+    is_public = db.Column(db.Boolean, nullable=False, default=False)
+    date_made_public = db.Column(db.DateTime)
+    status = db.Column(db.Text)
+    genome = db.Column(db.String, db.ForeignKey('genomes.name'))
+    parent = db.Column(db.Integer)
+    description = db.Column(db.Text)
+    users = db.relationship('UserProject', backref='project', lazy=True)
+    files = db.relationship('File', backref='project', lazy=True)
+
+    __table_args__ = (
+        db.Index('idx_projects_genome', 'genome'),
+        db.Index('idx_projects_owner', 'owner'),
+    )
+
 
 class File(db.Model):
+    __tablename__ = 'files'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(255), nullable=False)
-    file_path = db.Column(db.String(255), nullable=True)
+    file_path = db.Column(db.String(255), nullable=False, unique=True)
     upload_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    projects = relationship("UserProject", backref="user", lazy=True)
-
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
 
 class UserProject(db.Model):
+    __tablename__ = 'user_projects'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     can_read = db.Column(db.Boolean, nullable=False, default=False)
     can_write = db.Column(db.Boolean, nullable=False, default=False)
 
+class Genome(db.Model):
+    __tablename__ = 'genomes'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    label = db.Column(db.Text)
+    data = db.Column(db.JSON)
+    database = db.Column(db.Text)
+    date_added = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    connections = db.Column(db.Integer)
+    icon = db.Column(db.Text)
+    is_public = db.Column(db.Boolean, nullable=False, default=True)
+    chrom_sizes = db.Column(db.JSON)
+    small_icon = db.Column(db.Text)
+    projects = db.relationship('Project', backref='genomes', lazy=True)
 
-# Function to create default entries
-# def create_default_projects():
-#     default_projects = ['pbmc3k', 'pbmc3k_project2']
-#     with app.app_context():
-#         # Create tables if they don't exist
-#         db.create_all()
+class Job(db.Model):
+    __tablename__ = 'jobs'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    inputs = db.Column(db.JSON)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    outputs = db.Column(db.JSON)
+    sent_on = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    status = db.Column(db.String(200))
+    class_name = db.Column(db.String(200))
+    genome = db.Column(db.String(100))
+    finished_on = db.Column(db.DateTime)
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
+    type = db.Column(db.String(200))
 
-#         # Iterate through default projects
-#         for project_name in default_projects:
-#             # Check if the project already exists
-#             existing_project = Project.query.filter_by(name=project_name).first()
+class Permission(db.Model):
+    __tablename__ = 'permissions'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    permission = db.Column(db.String(200), nullable=False)
+    value = db.Column(db.String(200), nullable=False)
 
-#             # If the project doesn't exist, add it
-#             if not existing_project:
-#                 project = Project(name=project_name)  # type: ignore
-#                 db.session.add(project)
+class SharedObject(db.Model):
+    __tablename__ = 'shared_objects'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    owner = db.Column(db.Integer)
+    shared_with = db.Column(db.Integer)
+    object_id = db.Column(db.Integer)
+    date_shared = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    level = db.Column(db.Text, nullable=False, default='view')
 
-#         # Commit the changes
-#         db.session.commit()
+class UserPreference(db.Model):
+    __tablename__ = 'user_preferences'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    preference = db.Column(db.Text, nullable=False)
+    data = db.Column(db.JSON)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
-# # Call the function to create default entries when the application starts
-# create_default_projects()
+class ViewSet(db.Model):
+    __tablename__ = 'view_sets'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    table_name = db.Column(db.String(100))
+    name = db.Column(db.String(200))
+    description = db.Column(db.Text)
+    date_added = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    date_modified = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    owner = db.Column(db.Integer, default=0)
+    is_public = db.Column(db.Boolean, default=False)
+    fields = db.Column(db.JSON)
+    data = db.Column(db.JSON)
+    date_made_public = db.Column(db.DateTime)
+    status = db.Column(db.Text)
+    is_deleted = db.Column(db.Boolean, default=False)
+
+class GeneSet(db.Model):
+    __tablename__ = 'gene_sets'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False)
+    table_name = db.Column(db.String(150))
+    data = db.Column(db.JSON)
+    date_added = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    date_modified = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    is_deleted = db.Column(db.Boolean, default=False)
+    description = db.Column(db.Text)
+
+# Indexes
+db.Index('idx_genes_name', GeneSet.name)
+db.Index('idx_views_table_name', ViewSet.table_name)
+db.Index('idx_views_name', ViewSet.name)
+
+# Event listener
+@db.event.listens_for(File, 'after_insert')
+@db.event.listens_for(File, 'after_update')
+@db.event.listens_for(File, 'after_delete')
+
+def update_project_timestamp(mapper, connection, target):
+    project = target.project
+    if project:
+        project.update_timestamp = datetime.now()
+        db.session.commit()

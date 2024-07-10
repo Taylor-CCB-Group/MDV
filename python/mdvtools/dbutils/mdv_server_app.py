@@ -1,7 +1,7 @@
 import os
 import json
 from flask import Flask, render_template, jsonify
-from flask_sqlalchemy import SQLAlchemy
+#from flask_sqlalchemy import SQLAlchemy
 # import threading
 # import random
 # import string
@@ -11,6 +11,7 @@ from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 from mdvtools.dbutils.routes import register_global_routes
+from mdvtools.dbutils.dbservice import ProjectService
 
 def serve_projects_from_db():
     try:
@@ -77,10 +78,11 @@ def serve_projects_from_filesystem(base_dir):
                     print(f"Serving project: {project_path}")
 
                     # Create a new Project record in the database with the default name
-                    new_project = Project(name=project_name, path=project_path)
-                    db.session.add(new_project)
-                    db.session.commit()
-                    print(f"Added project to DB: {new_project}")
+                    new_project = ProjectService.add_new_project(name=project_name, path=project_path)
+                    if new_project is None:
+                        raise ValueError(f"Failed to add project '{project_name}' to the database.")
+                    else:
+                        print(f"Added project to DB: {new_project}")
                 except Exception as e:
                     print(f"In create_projects_from_filesystem: Error creating project at path '{project_path}': {e}")
             else:
@@ -169,7 +171,6 @@ def index():
     return render_template('index.html')
 
 
-
 print("Routes..../projects")
 @app.route('/projects')
 def get_projects():
@@ -178,7 +179,7 @@ def get_projects():
         # Query the database to get all projects that aren't deleted
         print('/projects queried...')
         
-        projects = Project.query.filter_by(is_deleted=False).all()
+        projects = ProjectService.get_active_projects()
         
         # Return the list of projects with their IDs and names
         return jsonify([{"id": p.id, "name": p.name} for p in projects])
@@ -192,13 +193,11 @@ def create_project():
     try:
         print("Creating project")
         
-        # Get the next ID from the database
-        next_id = db.session.query(db.func.max(Project.id)).scalar()
+        # Get the next available ID
+        next_id = ProjectService.get_next_project_id()
         if next_id is None:
-            next_id = 1
-        else:
-            next_id += 1
-        
+            return jsonify({"status": "error", "message": "Failed to determine next project ID from db"}), 500
+
         # Create the project directory path
         project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
         
@@ -211,9 +210,13 @@ def create_project():
         
         # Create a new Project record in the database with the path
         print("Adding new project to the database")
-        new_project = Project.create_project(path=project_path)
+        new_project = ProjectService.add_new_project(path=project_path)
         
-        return jsonify({"id": new_project.id, "name": new_project.id, "status": "success"})
+        if new_project:
+            return jsonify({"id": new_project.id, "name": new_project.name, "status": "success"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to add new project to db"}), 500
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
     
@@ -225,23 +228,28 @@ def delete_project(project_id: int):
         print(f"Deleting project '{project_id}'")
         
         # Check if the project exists in the ProjectBlueprint.blueprints dictionary
-        if project_id not in ProjectBlueprint.blueprints:
-            return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in ProjectBlueprint.blueprints"}), 404
-        else:
-            # Find the project by ID and mark it as deleted
-            project = Project.query.filter_by(id=project_id).first()
-            if project is None:
-                return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
-            
-            # Remove the project from the ProjectBlueprint.blueprints dictionary
-            del ProjectBlueprint.blueprints[project_id]
-            print(f"Removed project '{project_id}' from ProjectBlueprint.blueprints")
-            
-            
-            # Soft delete the project
-            project.soft_delete()
-            
+        #if project_id not in ProjectBlueprint.blueprints:
+        #    return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in ProjectBlueprint.blueprints"}), 404
+        
+        # Find the project by ID 
+        project = ProjectService.get_project_by_id(project_id)
+        
+        if project is None:
+            return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
+        
+        # Remove the project from the ProjectBlueprint.blueprints dictionary
+        del ProjectBlueprint.blueprints[str(project_id)]
+        print(f"Removed project '{project_id}' from ProjectBlueprint.blueprints")
+        
+        
+        # Soft delete the project
+        delete_status = ProjectService.soft_delete_project(project_id)
+        
+        if delete_status:
             return jsonify({"status": "success"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to soft delete project in db"}), 500
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
