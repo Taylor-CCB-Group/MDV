@@ -125,7 +125,7 @@ try:
     print(config_file_path)
     with open(config_file_path) as config_file:
         config = json.load(config_file)
-        app.config['PREFERRED_URL_SCHEME'] = 'https'
+        app.config['PREFERRED_URL_SCHEME'] = 'https' 
         app.config['SQLALCHEMY_DATABASE_URI'] = config.get('database_uri', '')
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.get('track_modifications', False)
         app.config['upload_folder'] = config.get('upload_folder', '')
