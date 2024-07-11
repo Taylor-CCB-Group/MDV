@@ -133,6 +133,7 @@ const Chatbot = () => {
                 {messages.map((message) => (
                     <Message key={message.id} text={message.text} sender={message.sender} />
                 ))}
+                {isSending && (<div className="animate-pulse flex justify-center p-4">...</div>)}
                 <div ref={messagesEndRef} />
             </div>
             <div className="flex p-4 border-t w-full border-gray-300">
