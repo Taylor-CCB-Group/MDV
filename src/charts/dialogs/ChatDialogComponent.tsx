@@ -3,7 +3,10 @@ import { MessageCircleQuestion } from 'lucide-react';
 import useChat from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
-import Markdown from 'react-markdown';
+import ReactMarkdown from 'react-markdown';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+
 
 const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => {
     const isUser = sender === 'user';
@@ -49,20 +52,49 @@ function extractPythonSections(responseText: string) {
 }
 
 const PythonCode = ({ code }: { code: string }) => {
+    return null;
     return (
         <div className="p-4 bg-gray-200 dark:bg-gray-800 w-fit mb-4 rounded-lg">
             <SquareTerminal />
-            <pre className="text-sm font-mono text-gray-800 dark:text-gray-200">{code}</pre>
+            {/* <pre className="text-sm font-mono text-gray-800 dark:text-gray-200">{code}</pre> */}
+            <SyntaxHighlighter language="python" style={dracula}>
+                {code}
+            </SyntaxHighlighter>
         </div>
     );
 }
 
 const MessageMarkdown = ({ text }: { text: string }) => {
+    const markdown = text;
     // nb, I asked the bot for a markdown test, and a few things were in this markdown rendering
-    // ~~strikethrough~~, tables, task-lists, and footnotes. 
+    // ~~strikethrough~~, tables, task-lists, and footnotes. Would be possible to use a plugin for that.
     // Also the example image, but that was probably because it was a bad link.
     return (
-        <Markdown>{text}</Markdown>
+        <ReactMarkdown
+            children={markdown}
+            components={{
+                code({ node, className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || '')
+                    return match ? (
+                        <>
+                        <SquareTerminal onClick={() => alert(children)} /> {match[1]}:
+                        <SyntaxHighlighter
+                            className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto"
+                            children={String(children).replace(/\n$/, '')}
+                            style={dracula}
+                            language={match[1]}
+                            PreTag="div"
+                            {...props}
+                        />
+                        </>
+                    ) : (
+                        <code className={className} {...props}>
+                            {children}
+                        </code>
+                    )
+                }
+            }}
+        />
     );
 }
 
