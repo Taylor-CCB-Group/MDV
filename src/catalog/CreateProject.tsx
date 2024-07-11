@@ -1,10 +1,16 @@
+import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 
-
-export default function ProjectTemplates() {
+function ChatProject() {
     return (
-        <div className="grid p-5 m-5 outline-dashed rounded-3xl">
-            <h2 className="text-4xl text-center">Create Project...</h2>
-            <button 
+        <button type="button" className="flex flex-col place-content-center w-32 h-32 p-2 m-2 bg-blue-500 text-white rounded-xl">
+            <BotMessageSquare size={64} className='absolute self-center' />
+        </button>
+    )
+}
+
+function EmptyProject() {
+    return (
+        <button
             className="w-32 h-32 p-2 m-2 bg-blue-500 text-white rounded-xl"
             onClick={async () => {
                 const response = await fetch('/create_project', {
@@ -25,9 +31,21 @@ export default function ProjectTemplates() {
                     alert(response.statusText);
                 }
             }}>
-                <div className="text-6xl mb-2">+</div>
-                <div className="text-sm">Empty Project</div>
-            </button>    
+            <div className="text-6xl mb-2">+</div>
+            <div className="text-sm">Empty Project</div>
+        </button>
+    )
+}
+
+
+export default function ProjectTemplates() {
+    return (
+        <div className="p-5 m-5 outline-dashed rounded-3xl">
+            <h2 className="text-4xl text-center">Create Project...</h2>
+            <div className='flex'>
+                <EmptyProject />
+                <ChatProject />
+            </div>
         </div>
     )
 }
