@@ -23,24 +23,288 @@ from langchain.prompts import PromptTemplate
 import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 from dotenv import load_dotenv
 
+# %%
+print('# setting keys and variables')
+# .env file should have OPENAI_API_KEY & GITHUB_TOKEN
+# also currently need a key.json file with google-sheet config
+load_dotenv()
+# OPENAI_API_KEY environment variable will be used internally by OpenAI modules
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+
+GITHUB_REPO = "Taylor-CCB-Group/MDV" # @param {type:"string"}
+BRANCH_NAME = "mk-API"
+PROJECT_PATH_1 = "python/mdvtools/charts"
+PROJECT_PATH_2 = "python/mdvtools/test_projects"
+
+FILE_URL_PATH = "./"
+FILE_URL_NAME = "code_files_URL.txt"
+
+mypath = os.path.dirname(__file__)
+
+def crawl_github_repo(url: str, is_sub_dir: bool, branch_name: str, project_path: str, access_token=f"{GITHUB_TOKEN}"):
+    """
+    Crawls a GitHub repository to retrieve file URLs based on specified criteria.
+
+    Args:
+        url (str): The GitHub repository URL or sub-directory URL.
+        is_sub_dir (bool): Flag indicating if the current URL is a sub-directory.
+        branch_name (str): The branch name to crawl.
+        project_path (str): The path of the project in the repository.
+        access_token (str, optional): GitHub access token for authentication. Defaults to GITHUB_TOKEN.
+
+    Returns:
+        list: List of file URLs that match the criteria.
+    """
+    
+    # List of files to ignore
+    ignore_list = ['__init__.py', 'pbmc3k_tutorial.ipynb', 'pbmc3k_tutorial.py']
+
+    # Determine the appropriate API URL based on whether it's a sub-directory
+    if not is_sub_dir:
+        api_url = f"https://api.github.com/repos/{url}/contents/{project_path}?ref={branch_name}"
+    else:
+        api_url = url
+
+    # Set up headers for the GitHub API request, including authorization
+    headers = {
+        "Accept": "application/vnd.github.v3+json",
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    # Make a GET request to the GitHub API
+    response = requests.get(api_url, headers=headers)
+    # Raise an exception for any request errors
+    response.raise_for_status()
+
+    # Initialize an empty list to store file URLs
+    files = []
+
+    # Parse the JSON response content
+    contents = response.json()
+
+    # Iterate over the items in the contents
+    for item in contents:
+        # Check if the item is a file and meets the criteria for inclusion
+        if item['type'] == 'file' and item['name'] not in ignore_list and (item['name'].endswith('.py') or item['name'].endswith('.ipynb')):
+            files.append(item['html_url'])
+        # Check if the item is a directory (excluding hidden ones)
+        elif item['type'] == 'dir' and not item['name'].startswith("."):
+            # Recursively crawl the sub-directory
+            sub_files = crawl_github_repo(item['url'], True, branch_name, project_path)
+            # Pause briefly to avoid rate limiting
+            time.sleep(.1)
+            # Add the sub-directory files to the list
+            files.extend(sub_files)
+
+    # Return the list of collected file URLs
+    return files
+
+# Extracts the Python code from a .ipynb (Jupyter Notebook) file from GitHub
+def extract_python_code_from_ipynb(github_url: str, cell_type="code"):
+    # Convert the GitHub URL to the raw content URL
+    raw_url = github_url.replace("github.com", "raw.githubusercontent.com").replace(
+        "/blob/", "/"
+    )
+
+    # Make a GET request to fetch the raw content of the notebook
+    response = requests.get(raw_url)
+    response.raise_for_status()  # Check for any request errors
+
+    # Get the content of the notebook as text
+    notebook_content = response.text
+
+    # Read the notebook content using nbformat
+    notebook = nbformat.reads(notebook_content, as_version=nbformat.NO_CONVERT)
+
+    # Initialize a variable to store the extracted Python code
+    python_code = None
+
+    # Iterate over the cells in the notebook
+    for cell in notebook.cells:
+        # Check if the cell type matches the specified type
+        if cell.cell_type == cell_type:
+            # Append the cell's source code to the python_code variable
+            if not python_code:
+                python_code = cell.source
+            else:
+                python_code += "\n" + cell.source
+
+    # Return the extracted Python code
+    return python_code
+
+# Extracts the Python code from a .py file from GitHub
+def extract_python_code_from_py(github_url):
+    # Convert the GitHub URL to the raw content URL
+    raw_url = github_url.replace("github.com", "raw.githubusercontent.com").replace(
+        "/blob/", "/"
+    )
+
+    # Make a GET request to fetch the raw content of the Python file
+    response = requests.get(raw_url)
+    response.raise_for_status()  # Check for any request errors
+
+    # Get the content of the Python file as text
+    python_code = response.text
+    # print(python_code)
+
+    # Return the extracted Python code
+    return python_code
+
+def extract_code_from_response(response: str):
+    """Extracts Python code from a string response."""
+    # Use a regex pattern to match content between triple backticks
+    code_pattern = r"```python(.*?)```"
+    match = re.search(code_pattern, response, re.DOTALL)
+
+    if match:
+        # Extract the matched code and strip any leading/trailing whitespaces
+        return match.group(1).strip()
+    return None
+
+def reorder_parameters(script: str, dataframe_path: str):
+    # Load the dataframe to infer the column types
+    df = pd.read_csv(dataframe_path)
+    categorical_columns = df.select_dtypes(
+        include=["object", "category"]
+    ).columns.tolist()
+    numerical_columns = df.select_dtypes(include=["number"]).columns.tolist()
+
+    def is_categorical(column):
+        return column in categorical_columns
+
+    def is_numerical(column):
+        return column in numerical_columns
+
+    # Define a regex pattern to find function definitions that create BoxPlots
+    patterns = [
+        re.compile(
+            r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)BoxPlot\((.*?)\)", re.DOTALL
+        ),
+        re.compile(
+            r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)DotPlot\((.*?)\)", re.DOTALL
+        ),
+        re.compile(
+            r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)AbundanceBoxPlot\((.*?)\)",
+            re.DOTALL,
+        ),
+        re.compile(
+            r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)HistogramPlot\((.*?)\)", re.DOTALL
+        ),
+        re.compile(
+            r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)RingChart\((.*?)\)", re.DOTALL
+        ),
+        re.compile(
+            r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)RowChart\((.*?)\)", re.DOTALL
+        ),
+        re.compile(
+            r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)StackedRowChart\((.*?)\)", re.DOTALL
+        ),
+        re.compile(
+            r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)HeatmapPlot\((.*?)\)", re.DOTALL
+        ),
+    ]
+
+    for pattern in patterns:
+        if pattern.search(script):
+            # Define a regex pattern to find params and param patterns
+            pattern_param = re.compile(r'params\s*=\s*\[.*?\]|param\s*=\s*".*?"')
+
+            def reorder_params(match_param):
+                matched_text = match_param.group(0)  # Get the entire matched text
+
+                # Extract parameter names
+                if "params" in matched_text:
+                    param_list = re.findall(r"\'(.*?)\'", matched_text)
+                else:
+                    param_list = [re.findall(r"\'(.*?)\'", matched_text)[0]]
+
+                # Check for the presence of categorical and numerical variables
+                has_categorical = any(is_categorical(param) for param in param_list)
+                has_numerical = any(is_numerical(param) for param in param_list)
+
+                # Add a categorical variable if none is present
+                if not has_categorical and categorical_columns:
+                    param_list.insert(0, categorical_columns[0])
+                    has_categorical = True
+
+                if len(param_list) < 2:
+                    return matched_text  # No need to reorder if there are fewer than 2 parameters
+
+                first_param = param_list[0]
+                second_param = param_list[1]
+
+                # Check the types of the parameters using the dataframe
+                # if first_param in df.columns and second_param in df.columns:
+                if has_categorical and has_numerical:
+                    if not (
+                        is_categorical(first_param) and is_numerical(second_param)
+                    ):
+                        param_list[0], param_list[1] = param_list[1], param_list[0]
+
+                # Reconstruct the parameters with reordered values
+                if "params" in matched_text:
+                    reordered_params = (
+                        f"params = ['{param_list[0]}', '{param_list[1:]}']"
+                    )
+                else:
+                    reordered_params = f'param = "{param_list[0]}"'
+
+                return reordered_params.replace("'[", " ").replace("]'", "")
+
+            # Substitute the matches with reordered parameters
+            modified_script = re.sub(pattern_param, reorder_params, script)
+
+            return modified_script
+
+    return script
+
+prompt = """
+Based on the question asked and the CSV, please perform the following steps:
+
+1. Identify the data asked for in the question.
+2. Based on step 1, find the relevant column names in the CSV based on the information identified earlier in the question asked regarding data.
+3. Provide the relevant column names from step 2 in a list.
+4. For the purposes of this query, if the plot required is one of these:
+    a. heatmap
+    b. dot plot
+    c. box plot
+the suitable parameters should always be a categorigal variable (object or categorical) followed by numerical variables.
+"""
+
+
+packages_functions = """import os
+import pandas as pd
+from mdvtools.mdvproject import MDVProject
+from mdvtools.charts.heatmap_plot import HeatmapPlot
+from mdvtools.charts.histogram_plot import HistogramPlot
+from mdvtools.charts.dot_plot import DotPlot
+from mdvtools.charts.box_plot import BoxPlot
+from mdvtools.charts.scatter_plot_3D import ScatterPlot3D
+from mdvtools.charts.row_chart import RowChart
+from mdvtools.charts.scatter_plot import ScatterPlot
+from mdvtools.charts.abundance_box_plot import AbundanceBoxPlot
+from mdvtools.charts.stacked_row_plot import StackedRowChart
+from mdvtools.charts.ring_chart import RingChart
+from mdvtools.charts.violin_plot import ViolinPlot
+
+ViolinPlot
+
+import json \n
+\n
+
+def load_data(path):
+    #Load data from the specified CSV file.
+    return pd.read_csv(path, low_memory=False)
+
+def convert_plot_to_json(plot):
+    #Convert plot data to JSON format.
+    return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
+    
+"""
+
+
+
 def project_wizard(user_question: Optional[str]):
-    # %%
-    print('# setting keys and variables')
-    # .env file should have OPENAI_API_KEY & GITHUB_TOKEN
-    # also currently need a key.json file with google-sheet config
-    load_dotenv()
-    # OPENAI_API_KEY environment variable will be used internally by OpenAI modules
-    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-
-    GITHUB_REPO = "Taylor-CCB-Group/MDV" # @param {type:"string"}
-    BRANCH_NAME = "mk-API"
-    PROJECT_PATH_1 = "python/mdvtools/charts"
-    PROJECT_PATH_2 = "python/mdvtools/test_projects"
-
-    FILE_URL_PATH = "./"
-    FILE_URL_NAME = "code_files_URL.txt"
-
-    mypath = os.path.dirname(__file__)
 
     # %%
     print('# Initialize an instance of the ChatOpenAI class with specified parameters')
@@ -51,72 +315,11 @@ def project_wizard(user_question: Optional[str]):
 
     dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4")
 
-    # %%
-    def crawl_github_repo(url, is_sub_dir, branch_name, project_path, access_token=f"{GITHUB_TOKEN}"):
-        """
-        Crawls a GitHub repository to retrieve file URLs based on specified criteria.
-
-        Args:
-            url (str): The GitHub repository URL or sub-directory URL.
-            is_sub_dir (bool): Flag indicating if the current URL is a sub-directory.
-            branch_name (str): The branch name to crawl.
-            project_path (str): The path of the project in the repository.
-            access_token (str, optional): GitHub access token for authentication. Defaults to GITHUB_TOKEN.
-
-        Returns:
-            list: List of file URLs that match the criteria.
-        """
-        
-        # List of files to ignore
-        ignore_list = ['__init__.py', 'pbmc3k_tutorial.ipynb', 'pbmc3k_tutorial.py']
-
-        # Determine the appropriate API URL based on whether it's a sub-directory
-        if not is_sub_dir:
-            api_url = f"https://api.github.com/repos/{url}/contents/{project_path}?ref={branch_name}"
-        else:
-            api_url = url
-
-        # Set up headers for the GitHub API request, including authorization
-        headers = {
-            "Accept": "application/vnd.github.v3+json",
-            "Authorization": f"Bearer {access_token}"
-        }
-
-        # Make a GET request to the GitHub API
-        response = requests.get(api_url, headers=headers)
-        # Raise an exception for any request errors
-        response.raise_for_status()
-
-        # Initialize an empty list to store file URLs
-        files = []
-
-        # Parse the JSON response content
-        contents = response.json()
-
-        # Iterate over the items in the contents
-        for item in contents:
-            # Check if the item is a file and meets the criteria for inclusion
-            if item['type'] == 'file' and item['name'] not in ignore_list and (item['name'].endswith('.py') or item['name'].endswith('.ipynb')):
-                files.append(item['html_url'])
-            # Check if the item is a directory (excluding hidden ones)
-            elif item['type'] == 'dir' and not item['name'].startswith("."):
-                # Recursively crawl the sub-directory
-                sub_files = crawl_github_repo(item['url'], True, branch_name, project_path)
-                # Pause briefly to avoid rate limiting
-                time.sleep(.1)
-                # Add the sub-directory files to the list
-                files.extend(sub_files)
-
-        # Return the list of collected file URLs
-        return files
 
 
     # %%
     print('# Crawl the GitHub repository to get a list of relevant file URLs')
-    #code_files_urls_1 = crawl_github_repo(GITHUB_REPO, False, BRANCH_NAME, PROJECT_PATH_1, GITHUB_TOKEN)
-    code_files_urls_2 = crawl_github_repo(GITHUB_REPO, False, BRANCH_NAME, PROJECT_PATH_2, GITHUB_TOKEN)
-    #code_files_urls = code_files_urls_1 + code_files_urls_2
-    code_files_urls = code_files_urls_2
+    code_files_urls = crawl_github_repo(GITHUB_REPO, False, BRANCH_NAME, PROJECT_PATH_2, GITHUB_TOKEN)
 
     # Write the list of file URLs to a specified text file
     with open(FILE_URL_PATH + FILE_URL_NAME, 'w') as f:
@@ -125,52 +328,7 @@ def project_wizard(user_question: Optional[str]):
             f.write(item + '\n')
 
     # %%
-    # Extracts the Python code from a .ipynb (Jupyter Notebook) file from GitHub
-    def extract_python_code_from_ipynb(github_url, cell_type="code"):
-        # Convert the GitHub URL to the raw content URL
-        raw_url = github_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
 
-        # Make a GET request to fetch the raw content of the notebook
-        response = requests.get(raw_url)
-        response.raise_for_status()  # Check for any request errors
-
-        # Get the content of the notebook as text
-        notebook_content = response.text
-
-        # Read the notebook content using nbformat
-        notebook = nbformat.reads(notebook_content, as_version=nbformat.NO_CONVERT)
-
-        # Initialize a variable to store the extracted Python code
-        python_code = None
-
-        # Iterate over the cells in the notebook
-        for cell in notebook.cells:
-            # Check if the cell type matches the specified type
-            if cell.cell_type == cell_type:
-                # Append the cell's source code to the python_code variable
-                if not python_code:
-                    python_code = cell.source
-                else:
-                    python_code += "\n" + cell.source
-
-        # Return the extracted Python code
-        return python_code
-
-    # Extracts the Python code from a .py file from GitHub
-    def extract_python_code_from_py(github_url):
-        # Convert the GitHub URL to the raw content URL
-        raw_url = github_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
-        
-        # Make a GET request to fetch the raw content of the Python file
-        response = requests.get(raw_url)
-        response.raise_for_status()  # Check for any request errors
-
-        # Get the content of the Python file as text
-        python_code = response.text
-        print(python_code)
-
-        # Return the extracted Python code
-        return python_code
 
     # Read the list of file URLs from the specified text file
     with open(FILE_URL_PATH + FILE_URL_NAME) as f:
@@ -251,18 +409,6 @@ def project_wizard(user_question: Optional[str]):
         dataframe_llm, df_short, verbose=True, handle_parse_errors=True, allow_dangerous_code=True
     )
 
-    prompt = """
-    Based on the question asked and the CSV, please perform the following steps:
-
-    1. Identify the data asked for in the question.
-    2. Based on step 1, find the relevant column names in the CSV based on the information identified earlier in the question asked regarding data.
-    3. Provide the relevant column names from step 2 in a list.
-    4. For the purposes of this query, if the plot required is one of these:
-        a. heatmap
-        b. dot plot
-        c. box plot
-    the suitable parameters should always be a categorigal variable (object or categorical) followed by numerical variables.
-    """
 
     full_prompt = prompt + "\nQuestion: " + user_question
 
@@ -329,131 +475,20 @@ def project_wizard(user_question: Optional[str]):
     context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
 
     # %%
-    def extract_code_from_response(response):
-        """Extracts Python code from a string response."""
-        # Use a regex pattern to match content between triple backticks
-        code_pattern = r"```python(.*?)```"
-        match = re.search(code_pattern, response, re.DOTALL)
-        
-        if match:
-            # Extract the matched code and strip any leading/trailing whitespaces
-            return match.group(1).strip()
-        return None
-
+    
     code = extract_code_from_response(result)
 
     # %%
     original_script = code
 
     # %%
-    def reorder_parameters(script, dataframe_path):
-        # Load the dataframe to infer the column types
-        df = pd.read_csv(dataframe_path)
-        categorical_columns = df.select_dtypes(include=['object', 'category']).columns.tolist()
-        numerical_columns = df.select_dtypes(include=['number']).columns.tolist()
-
-        def is_categorical(column):
-            return column in categorical_columns
-
-        def is_numerical(column):
-            return column in numerical_columns
-        
-        # Define a regex pattern to find function definitions that create BoxPlots
-        patterns = [re.compile(r'def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)BoxPlot\((.*?)\)', re.DOTALL),
-                    re.compile(r'def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)DotPlot\((.*?)\)', re.DOTALL),
-                    re.compile(r'def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)AbundanceBoxPlot\((.*?)\)', re.DOTALL),
-                    re.compile(r'def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)HistogramPlot\((.*?)\)', re.DOTALL),
-                    re.compile(r'def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)RingChart\((.*?)\)', re.DOTALL),
-                    re.compile(r'def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)RowChart\((.*?)\)', re.DOTALL),
-                    re.compile(r'def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)StackedRowChart\((.*?)\)', re.DOTALL),
-                    re.compile(r'def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)HeatmapPlot\((.*?)\)', re.DOTALL)]
-
-        for pattern in patterns:
-            if pattern.search(script):
-                
-                # Define a regex pattern to find params and param patterns
-                pattern_param = re.compile(r'params\s*=\s*\[.*?\]|param\s*=\s*".*?"')
-                
-                def reorder_params(match_param):
-                    matched_text = match_param.group(0)  # Get the entire matched text
-
-                    # Extract parameter names
-                    if 'params' in matched_text:
-                        param_list = re.findall(r'\'(.*?)\'', matched_text)
-                    else:
-                        param_list = [re.findall(r'\'(.*?)\'', matched_text)[0]]
-                    
-                    # Check for the presence of categorical and numerical variables
-                    has_categorical = any(is_categorical(param) for param in param_list)
-                    has_numerical = any(is_numerical(param) for param in param_list)
-
-                    # Add a categorical variable if none is present
-                    if not has_categorical and categorical_columns:
-                        param_list.insert(0, categorical_columns[0])
-                        has_categorical = True
-
-                    if len(param_list) < 2:
-                        return matched_text  # No need to reorder if there are fewer than 2 parameters
-
-                    first_param = param_list[0]
-                    second_param = param_list[1]
-
-                    # Check the types of the parameters using the dataframe
-                    #if first_param in df.columns and second_param in df.columns:
-                    if has_categorical and has_numerical:
-                        if not (is_categorical(first_param) and is_numerical(second_param)):
-                            param_list[0], param_list[1] = param_list[1], param_list[0]
-
-                    # Reconstruct the parameters with reordered values
-                    if 'params' in matched_text:
-                        reordered_params = f"params = ['{param_list[0]}', '{param_list[1:]}']"
-                    else:
-                        reordered_params = f'param = "{param_list[0]}"'
-
-                    return reordered_params.replace('\'[', ' ').replace(']\'','')
-
-                # Substitute the matches with reordered parameters
-                modified_script = re.sub(pattern_param, reorder_params, script)
-
-                return modified_script
-            
-        return script
-            
 
     # %%
     print('# Apply the reorder transformation')
     modified_script = reorder_parameters(original_script, path_to_data)
 
     # %%
-    packages_functions = """import os
-    import pandas as pd
-    from mdvtools.mdvproject import MDVProject
-    from mdvtools.charts.heatmap_plot import HeatmapPlot
-    from mdvtools.charts.histogram_plot import HistogramPlot
-    from mdvtools.charts.dot_plot import DotPlot
-    from mdvtools.charts.box_plot import BoxPlot
-    from mdvtools.charts.scatter_plot_3D import ScatterPlot3D
-    from mdvtools.charts.row_chart import RowChart
-    from mdvtools.charts.scatter_plot import ScatterPlot
-    from mdvtools.charts.abundance_box_plot import AbundanceBoxPlot
-    from mdvtools.charts.stacked_row_plot import StackedRowChart
-    from mdvtools.charts.ring_chart import RingChart
-    from mdvtools.charts.violin_plot import ViolinPlot
 
-    ViolinPlot
-
-    import json \n
-    \n
-
-    def load_data(path):
-        #Load data from the specified CSV file.
-        return pd.read_csv(path, low_memory=False)
-
-    def convert_plot_to_json(plot):
-        #Convert plot data to JSON format.
-        return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
-        
-    """
 
     lines = modified_script.splitlines()
 
