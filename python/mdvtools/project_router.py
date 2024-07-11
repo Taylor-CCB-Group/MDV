@@ -13,7 +13,7 @@ class ProjectBlueprint:
     def register_app(app: Flask) -> None:
         @app.route("/project/<project_id>/", defaults={'subpath': ''}, methods=["GET", "POST"])
         @app.route("/project/<project_id>/<path:subpath>/", methods=["GET", "POST"])
-        @app.route("/project/<project_id>", defaults={'subpath': ''}, methods=["GET", "POST"])
+        @app.route("/project/<project_id>", defaults={'subpath': ''}, methods=["GET", "POST"]) 
         def project_route(project_id: str, subpath: str):
             """This generic route should call the appropriate method on the project with the given id.
             
