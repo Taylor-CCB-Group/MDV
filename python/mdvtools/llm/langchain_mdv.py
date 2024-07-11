@@ -413,7 +413,9 @@ def project_wizard(user_question: Optional[str]):
     full_prompt = prompt + "\nQuestion: " + user_question
 
     print('# the agent might raise an error. Sometimes repeating the same prompt helps...')
-    final_answer = agent.run(full_prompt)
+    response = agent.invoke(full_prompt) # agent.run is deprecated
+    assert('output' in response)
+    final_answer = response['output']
 
     # %%
     prompt_RAG = """ You can only generate python code based on the provided context. If a response cannot be formed strictly using the context, politely say you need more information to generate the plot.
