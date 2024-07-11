@@ -5,6 +5,7 @@ https://github.com/Taylor-CCB-Group/MDV/blob/mk-API/python/mdvtools/test_project
 https://github.com/Taylor-CCB-Group/MDV/blob/mk-API/python/mdvtools/test_projects/histogram_plot_example.py
 https://github.com/Taylor-CCB-Group/MDV/blob/mk-API/python/mdvtools/test_projects/multiline_plot_example.py
 https://github.com/Taylor-CCB-Group/MDV/blob/mk-API/python/mdvtools/test_projects/multiple_graphs_example.py
+https://github.com/Taylor-CCB-Group/MDV/blob/mk-API/python/mdvtools/test_projects/pie_chart_example.py
 https://github.com/Taylor-CCB-Group/MDV/blob/mk-API/python/mdvtools/test_projects/ring_chart_example.py
 https://github.com/Taylor-CCB-Group/MDV/blob/mk-API/python/mdvtools/test_projects/row_chart_example.py
 https://github.com/Taylor-CCB-Group/MDV/blob/mk-API/python/mdvtools/test_projects/scatter_plot_3D_example.py
