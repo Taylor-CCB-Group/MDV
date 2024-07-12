@@ -184,23 +184,15 @@ code_files_urls = crawl_github_repo()
 # Initialize an empty list to store the extracted code documents
 code_strings = []
 
-# Iterate over the list of file URLs
+# populate code_strings with the code from .py & .ipynb files in code_files_urls
 for i in range(0, len(code_files_urls)):
-    # Check if the file URL ends with ".py"
     if code_files_urls[i].endswith(".py"):
-        # Extract the Python code from the .py file
         content = extract_python_code_from_py(code_files_urls[i])
-        # Create a Document object with the extracted content and metadata
         doc = Document(page_content=content, metadata={"url": code_files_urls[i], "file_index": i})
-        # Append the Document object to the code_strings list
         code_strings.append(doc)
-        # Check if the file URL ends with ".py"
     elif code_files_urls[i].endswith(".ipynb"):
-        # Extract the Python code from the .py file
         content_ipynb = extract_python_code_from_ipynb(code_files_urls[i])
-        # Create a Document object with the extracted content and metadata
         doc_ipynb = Document(page_content=content_ipynb, metadata={"url": code_files_urls[i], "file_index": i})
-        # Append the Document object to the code_strings list
         code_strings.append(doc_ipynb)
 
 print('# Initialize a text splitter for chunking the code strings')
