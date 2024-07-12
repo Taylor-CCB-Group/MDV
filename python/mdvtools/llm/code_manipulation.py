@@ -18,6 +18,8 @@ def extract_code_from_response(response: str):
 def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
     if isinstance(dataframe, str):
         df = pd.read_csv(dataframe)
+    else:
+        df = dataframe
     categorical_columns = df.select_dtypes(
         include=["object", "category"]
     ).columns.tolist()
@@ -104,7 +106,7 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
 
     return script
 
-def prepare_code(result: str, data: str | pd.DataFrame, log: callable = print):
+def prepare_code(result: str, data: str | pd.DataFrame, log: callable = print, modify_existing_project=False, view_name="default"):
     original_script = extract_code_from_response(result)
 
     log("# Apply the reorder transformation")
@@ -133,6 +135,14 @@ def prepare_code(result: str, data: str | pd.DataFrame, log: callable = print):
 else:
     main()"""
     final_code = final_code.replace("project.serve()", "# project.serve()")
+    if modify_existing_project:
+        # not at all robust... won't be needed in future
+        final_code = final_code.replace("project.add_datasource", "# project.add_datasource")
+        # all lines that include `data_frame` can be somewhat safely removed with the current template
+        final_code = re.sub(r".*data_frame.*", "", final_code)
+        final_code = final_code.replace("delete_existing=True", "delete_existing=False")
+        final_code = final_code.replace("\"default\"", f"\"{view_name}\"")
+        
     return final_code
 
 def execute_code(final_code: str, open_code=False, log: callable = print):

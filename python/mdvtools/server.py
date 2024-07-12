@@ -21,7 +21,7 @@ import os
 import pandas as pd
 from typing import Optional, Callable, Any
 from datetime import datetime
-
+from mdvtools.llm.langchain_mdv import ProjectChat
 routes = set()
 
 
@@ -80,7 +80,7 @@ def create_app(
     project: MDVProject,
     open_browser=True,
     port=5050,
-    websocket=True,
+    websocket=True, # todo - pass something back to client in `state.json` that indicates whether this is enabled.
     use_reloader=False,
     app: Optional[Flask] = None,
     chat_fn: Optional[Callable[[str], str]]=None,
@@ -116,12 +116,20 @@ def create_app(
         """
         current prototype using 'websocket' as a flag that we interpret as 'enable chatMDV' for now.
         """
+        bot: Optional[ProjectChat] = None
         print(f"websocket/chat enabled for {route}")
         @project_bp.route("/chat", methods=["POST"])
         def chat():
+            nonlocal bot
             if not request.json:
                 return {"error": "No JSON data in request"}, 500
             message = request.json.get("message")
+            try:
+                if bot is None:
+                    bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
+                return {"message": bot.ask_question(message)}
+            except Exception as e:
+                print(e)
             if chat_fn is not None:
                 response = chat_fn(message)
                 return {"message": response}
@@ -158,7 +166,7 @@ def create_app(
             return "File not found", 404
         if file == "state":
             with open(path) as f:
-                print("processing state response.")
+                print("processing state response. websocket:", websocket)
                 state = json.load(f)
                 state["websocket"] = websocket
                 return state

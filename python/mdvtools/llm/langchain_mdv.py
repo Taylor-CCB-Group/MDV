@@ -16,7 +16,7 @@ import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 from dotenv import load_dotenv
 
 from .github_utils import crawl_github_repo, extract_python_code_from_py, extract_python_code_from_ipynb
-from .templates import get_prompt_RAG, prompt
+from .templates import get_createproject_prompt_RAG, prompt
 from .code_manipulation import prepare_code, execute_code
 
 print('# setting keys and variables')
@@ -75,6 +75,62 @@ retriever = db.as_retriever(
     search_kwargs={"k": 5},        # Set search parameters, in this case, return the top 5 results
 )
 
+class ProjectChat():
+    def __init__(self, project: MDVProject, log: Callable[[str], None] = print):
+        self.project = project
+        self.log = log
+        if len(project.datasources) == 0:
+            raise ValueError("The project does not have any datasources")
+        elif len(project.datasources) > 1:
+            log("The project has more than one datasource, only the first one will be used")
+        self.ds_name = project.datasources[0]['name']
+        try:
+            self.df = project.get_datasource_as_dataframe(self.ds_name)
+            log('Creating a temporary CSV file to store the dataframe, this will not be needed in the final version')
+            # XXX - 'mktemp is unsafe' - we should probably use a context manager here (according to copilot)
+            # self.csv_path = tempfile.mktemp(suffix=".csv")
+            # self.df.to_csv(self.csv_path)
+            self.code_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
+            self.dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4")
+            self.agent = lp.create_pandas_dataframe_agent(
+                self.dataframe_llm, self.df, verbose=True, handle_parse_errors=True, allow_dangerous_code=True
+            )
+            self.ok = True
+        except Exception as e:
+            # raise ValueError(f"An error occurred while trying to create the agent: {e[:100]}")
+            log(f"An error occurred while trying to create the agent: {str(e)[:100]}")
+            self.ok = False
+    
+    def ask_question(self, question: str): # async?
+        self.log(f"Asking the LLM: '{question}'")
+        if not self.ok:
+            return "This agent is not ready to answer questions"
+        full_prompt = prompt + "\nQuestion: " + question
+        try:
+            response = self.agent.invoke(full_prompt)
+            assert('output' in response)
+            #!!! csv_path is not wanted - the code tries to use that as data source name which is all wrong
+            prompt_RAG = get_createproject_prompt_RAG(self.project.id, self.ds_name, response['output'])
+            prompt_RAG_template = PromptTemplate(
+                template=prompt_RAG,
+                input_variables=["context", "question"]
+            )
+            qa_chain = RetrievalQA.from_llm(
+                llm=self.code_llm,
+                prompt=prompt_RAG_template,
+                retriever=retriever,
+                return_source_documents=True
+            )
+            context = retriever
+            output = qa_chain.invoke({"context": context, "query": question})
+            result = output["result"]
+            final_code = prepare_code(result, self.df, self.log, modify_existing_project=True, view_name=question)
+            execute_code(final_code, open_code=True, log=self.log)
+            self.log(final_code)
+            return f"I ran some code for you:\n\n```python\n{final_code}```"
+        except Exception as e:
+            return f"Error: {str(e)[:100]}"
+
 
 def project_wizard(user_question: Optional[str], project_name: str = 'project', log: Callable[[str], None] = print):
 
@@ -105,7 +161,7 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project', 
     assert('output' in response)
     final_answer = response['output']
 
-    prompt_RAG = get_prompt_RAG(project_name, path_to_data, final_answer)
+    prompt_RAG = get_createproject_prompt_RAG(project_name, path_to_data, final_answer)
 
     #The plot you should create is the same as the plot created in the context. Specify the parameters according to the respective files in the context for each plot type. DO NOT add any parameters that have not been defined previously.
 
