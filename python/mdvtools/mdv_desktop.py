@@ -1,7 +1,7 @@
 import os
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
-from .server import add_safe_headers
+from mdvtools.server import add_safe_headers
 from flask import Flask, render_template, jsonify, request
 import json
 import threading
