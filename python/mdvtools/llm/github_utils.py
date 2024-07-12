@@ -9,7 +9,8 @@ load_dotenv()
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
 GITHUB_REPO = "Taylor-CCB-Group/MDV"  # @param {type:"string"}
-BRANCH_NAME = "mk-API"
+# BRANCH_NAME = "mk-API"
+COMMIT_HASH = "af4192b" # latest commit by mk as of this writing
 PROJECT_PATH_1 = "python/mdvtools/charts"
 PROJECT_PATH_2 = "python/mdvtools/test_projects"
 
@@ -17,7 +18,7 @@ PROJECT_PATH_2 = "python/mdvtools/test_projects"
 def crawl_github_repo(
     url: str = GITHUB_REPO,
     is_sub_dir: bool = False,
-    branch_name: str = BRANCH_NAME,
+    branch_or_commit_name: str = COMMIT_HASH,
     project_path: str = PROJECT_PATH_2,
     access_token=f"{GITHUB_TOKEN}",
 ):
@@ -40,7 +41,7 @@ def crawl_github_repo(
 
     # Determine the appropriate API URL based on whether it's a sub-directory
     if not is_sub_dir:
-        api_url = f"https://api.github.com/repos/{url}/contents/{project_path}?ref={branch_name}"
+        api_url = f"https://api.github.com/repos/{url}/contents/{project_path}?ref={branch_or_commit_name}"
     else:
         api_url = url
 
@@ -73,7 +74,7 @@ def crawl_github_repo(
         # Check if the item is a directory (excluding hidden ones)
         elif item["type"] == "dir" and not item["name"].startswith("."):
             # Recursively crawl the sub-directory
-            sub_files = crawl_github_repo(item["url"], True, branch_name, project_path)
+            sub_files = crawl_github_repo(item["url"], True, branch_or_commit_name, project_path)
             # Pause briefly to avoid rate limiting
             time.sleep(0.1)
             # Add the sub-directory files to the list
