@@ -95,7 +95,20 @@ if __name__ == "__main__":
                 else str("".join(random.choices(string.ascii_letters, k=6)))
             )
             print(f"creating project '{project_id}'")
-            p = MDVProject(os.path.join(project_dir, project_id), delete_existing=True)
+            if "ai_query" in request.json:
+                # very provisional... just to get the idea of how this might work.
+                query = request.json["ai_query"]
+                if query:
+                    from mdvtools.llm.langchain_mdv import project_wizard                    
+                    try:
+                        # print('# test that we can import things as expected')
+                        # exec("from mdvtools.mdvproject import MDVProject\nMDVProject('')")
+                        # expect there to be a project ready to open after this...
+                        project_wizard(query, project_id)
+                    except Exception as e:
+                        print(f"[llm error] {e}")  # eg "name 'MDVProject' is not defined" when running in `exec()`?
+                        return jsonify({"status": "error", "message": str(e)}), 500
+            p = MDVProject(os.path.join(project_dir, project_id))
             p.set_editable(True)
             projects.append(p)
             p.serve(app=app, open_browser=False)

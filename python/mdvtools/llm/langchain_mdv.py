@@ -22,7 +22,8 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 from dotenv import load_dotenv
-
+import subprocess
+import tempfile
 # %%
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY & GITHUB_TOKEN
@@ -286,11 +287,7 @@ from mdvtools.charts.abundance_box_plot import AbundanceBoxPlot
 from mdvtools.charts.stacked_row_plot import StackedRowChart
 from mdvtools.charts.ring_chart import RingChart
 from mdvtools.charts.violin_plot import ViolinPlot
-
-ViolinPlot
-
-import json \n
-\n
+import json
 
 def load_data(path):
     #Load data from the specified CSV file.
@@ -304,7 +301,7 @@ def convert_plot_to_json(plot):
 
 
 
-def project_wizard(user_question: Optional[str]):
+def project_wizard(user_question: Optional[str], project_name: str = 'project'):
 
     # %%
     print('# Initialize an instance of the ChatOpenAI class with specified parameters')
@@ -418,6 +415,8 @@ def project_wizard(user_question: Optional[str]):
     final_answer = response['output']
 
     # %%
+    # todo use a different project foler - nb, this  isn't an f-string at the moment, and has some other template stuff I don't know about
+    # what is the difference between ProjectTemplate input_variables and the prompt string itself?
     prompt_RAG = """ You can only generate python code based on the provided context. If a response cannot be formed strictly using the context, politely say you need more information to generate the plot.
 
     Context: {context}]
@@ -428,7 +427,7 @@ def project_wizard(user_question: Optional[str]):
 
     All scripts in the context share a common workflow:
 
-    Setup: Define the project path, data path, and view name, the project path should always be: project_path = os.path.expanduser('~/mdv/project')
+    Setup: Define the project path, data path, and view name, the project path should always be: project_path = os.path.expanduser('~/mdv/"""+project_name+"""')
     Plot function definition: Define the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot) using a function in the same way as the context.
     Project Creation: Initialize an MDVProject instance using the method: MDVProject(project_path, delete_existing=True).
     Data Loading: Load data from the specified CSV file into a pandas DataFrame using the load_data(path) function.
@@ -482,16 +481,8 @@ def project_wizard(user_question: Optional[str]):
 
     # %%
     original_script = code
-
-    # %%
-
-    # %%
     print('# Apply the reorder transformation')
     modified_script = reorder_parameters(original_script, path_to_data)
-
-    # %%
-
-
     lines = modified_script.splitlines()
 
     # Find the starting line index
@@ -504,9 +495,9 @@ def project_wizard(user_question: Optional[str]):
     else:
         print("Pattern not found")
 
-    with open("temp_code_3.py", "w") as f:
-        f.write(packages_functions)
-        f.write(captured_lines)
+    # with open("temp_code_3.py", "w") as f:
+    #     f.write(packages_functions)
+    #     f.write(captured_lines)
         #f.write("\n".join(lines))
 
     # %%
@@ -514,8 +505,22 @@ def project_wizard(user_question: Optional[str]):
     # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
 
     # %%
-    print('# Run the saved Python file. This will start a server on localhost:5050, open the browser and display the plot with the server continuing to run in the background.')
+    # print('# Run the saved Python file. This will start a server on localhost:5050, open the browser and display the plot with the server continuing to run in the background.')
     # %run temp_code_3.py
+    print('# Executing the code...')
+    final_code = f"""{packages_functions}\n{captured_lines}
+else:
+    main()"""
+    final_code = final_code.replace("project.serve()", "# project.serve()")
+    print(final_code)
+    # exec(final_code) - I don't understand why this doesn't work
+    # "name 'MDVProject' is not defined"
+    with tempfile.NamedTemporaryFile(suffix='.py') as temp:
+        print(f'Writing to temp file: {temp.name}')
+        temp.write(final_code.encode())
+        temp.flush()
+        # subprocess.run(["code", temp.name])
+        subprocess.run(["python", temp.name])
 
 
 if __name__ == "__main__":
