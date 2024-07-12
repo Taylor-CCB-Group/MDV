@@ -24,18 +24,14 @@ from .github_utils import crawl_github_repo, extract_python_code_from_py, extrac
 
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY & GITHUB_TOKEN
-# also currently need a key.json file with google-sheet config
 load_dotenv()
 # OPENAI_API_KEY environment variable will be used internally by OpenAI modules
-
-FILE_URL_PATH = "./"
-FILE_URL_NAME = "code_files_URL.txt"
 
 mypath = os.path.dirname(__file__)
 
 
 def extract_code_from_response(response: str):
-    """Extracts Python code from a string response."""
+    """Extracts Python code from a markdown string response."""
     # Use a regex pattern to match content between triple backticks
     code_pattern = r"```python(.*?)```"
     match = re.search(code_pattern, response, re.DOTALL)
@@ -182,6 +178,61 @@ def convert_plot_to_json(plot):
     
 """
 
+print('# Crawl the GitHub repository to get a list of relevant file URLs')
+code_files_urls = crawl_github_repo()
+
+# Initialize an empty list to store the extracted code documents
+code_strings = []
+
+# Iterate over the list of file URLs
+for i in range(0, len(code_files_urls)):
+    # Check if the file URL ends with ".py"
+    if code_files_urls[i].endswith(".py"):
+        # Extract the Python code from the .py file
+        content = extract_python_code_from_py(code_files_urls[i])
+        # Create a Document object with the extracted content and metadata
+        doc = Document(page_content=content, metadata={"url": code_files_urls[i], "file_index": i})
+        # Append the Document object to the code_strings list
+        code_strings.append(doc)
+        # Check if the file URL ends with ".py"
+    elif code_files_urls[i].endswith(".ipynb"):
+        # Extract the Python code from the .py file
+        content_ipynb = extract_python_code_from_ipynb(code_files_urls[i])
+        # Create a Document object with the extracted content and metadata
+        doc_ipynb = Document(page_content=content_ipynb, metadata={"url": code_files_urls[i], "file_index": i})
+        # Append the Document object to the code_strings list
+        code_strings.append(doc_ipynb)
+
+print('# Initialize a text splitter for chunking the code strings')
+text_splitter = RecursiveCharacterTextSplitter.from_language(
+    language=Language.PYTHON,  # Specify the language as Python
+    chunk_size=20000,           # Set the chunk size to 1500 characters
+    chunk_overlap=2000          # Set the chunk overlap to 150 characters
+)
+
+print('# Split the code documents into chunks using the text splitter')
+texts = text_splitter.split_documents(code_strings)
+
+# Set the number of queries per minute (QPM) for embedding requests
+# EMBEDDING_QPM = 100 # unused
+
+# Set the number of batches for processing embeddings
+# EMBEDDING_NUM_BATCH = 5 # unused
+
+print('# Initialize an instance of the OpenAIEmbeddings class')
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-large"  # Specify the model to use for generating embeddings
+    )
+
+print('# Create an index from the embedded code chunks')
+print('# Use FAISS (Facebook AI Similarity Search) to create a searchable index')
+db = FAISS.from_documents(texts, embeddings)
+
+print('# Initialize the retriever from the FAISS index')
+retriever = db.as_retriever(
+    search_type="similarity",      # Specify the search type as "similarity"
+    search_kwargs={"k": 5},        # Set search parameters, in this case, return the top 5 results
+)
 
 
 def project_wizard(user_question: Optional[str], project_name: str = 'project'):
@@ -193,75 +244,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     code_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
 
     dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4")
-
-
-    print('# Crawl the GitHub repository to get a list of relevant file URLs')
-    code_files_urls = crawl_github_repo()
-
-    # Write the list of file URLs to a specified text file
-    with open(FILE_URL_PATH + FILE_URL_NAME, 'w') as f:
-        # Iterate through the list of file URLs and write each one to the file
-        for item in code_files_urls:
-            f.write(item + '\n')
-
-
-
-    # Read the list of file URLs from the specified text file
-    with open(FILE_URL_PATH + FILE_URL_NAME) as f:
-        code_files_urls = f.read().splitlines()
-
-    # Initialize an empty list to store the extracted code documents
-    code_strings = []
-
-    # Iterate over the list of file URLs
-    for i in range(0, len(code_files_urls)):
-        # Check if the file URL ends with ".py"
-        if code_files_urls[i].endswith(".py"):
-            # Extract the Python code from the .py file
-            content = extract_python_code_from_py(code_files_urls[i])
-            # Create a Document object with the extracted content and metadata
-            doc = Document(page_content=content, metadata={"url": code_files_urls[i], "file_index": i})
-            # Append the Document object to the code_strings list
-            code_strings.append(doc)
-            # Check if the file URL ends with ".py"
-        elif code_files_urls[i].endswith(".ipynb"):
-            # Extract the Python code from the .py file
-            content_ipynb = extract_python_code_from_ipynb(code_files_urls[i])
-            # Create a Document object with the extracted content and metadata
-            doc_ipynb = Document(page_content=content_ipynb, metadata={"url": code_files_urls[i], "file_index": i})
-            # Append the Document object to the code_strings list
-            code_strings.append(doc_ipynb)
-
-    print('# Initialize a text splitter for chunking the code strings')
-    text_splitter = RecursiveCharacterTextSplitter.from_language(
-        language=Language.PYTHON,  # Specify the language as Python
-        chunk_size=20000,           # Set the chunk size to 1500 characters
-        chunk_overlap=2000          # Set the chunk overlap to 150 characters
-    )
-
-    print('# Split the code documents into chunks using the text splitter')
-    texts = text_splitter.split_documents(code_strings)
-
-    # Set the number of queries per minute (QPM) for embedding requests
-    EMBEDDING_QPM = 100
-
-    # Set the number of batches for processing embeddings
-    EMBEDDING_NUM_BATCH = 5
-
-    print('# Initialize an instance of the OpenAIEmbeddings class')
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-large"  # Specify the model to use for generating embeddings
-        )
-
-    print('# Create an index from the embedded code chunks')
-    print('# Use FAISS (Facebook AI Similarity Search) to create a searchable index')
-    db = FAISS.from_documents(texts, embeddings)
-
-    print('# Initialize the retriever from the FAISS index')
-    retriever = db.as_retriever(
-        search_type="similarity",      # Specify the search type as "similarity"
-        search_kwargs={"k": 5},        # Set search parameters, in this case, return the top 5 results
-    )
 
     #user_question = "Create a heatmap plot of the localisation status vs the UTR length"
     if user_question is None:
@@ -336,10 +318,11 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
 
     # Extracting the file urls retrieved from the context 
 
-    context_information = output['source_documents']
-    context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
-    context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
-    context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
+    # unused
+    # context_information = output['source_documents']
+    # context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
+    # context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
+    # context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
 
     code = extract_code_from_response(result)
 
