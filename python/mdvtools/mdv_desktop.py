@@ -106,7 +106,7 @@ if __name__ == "__main__":
                         # print('# test that we can import things as expected')
                         # exec("from mdvtools.mdvproject import MDVProject\nMDVProject('')")
                         # expect there to be a project ready to open after this...
-                        project_wizard(query, project_id)
+                        project_wizard(query, project_id, log=lambda x: print(f'[llm {project_id}] {x}'))
                     except Exception as e:
                         print(f"[llm error] {e}")  # eg "name 'MDVProject' is not defined" when running in `exec()`?
                         return jsonify({"status": "error", "message": str(e)}), 500

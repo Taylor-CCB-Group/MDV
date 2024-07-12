@@ -5,7 +5,7 @@
 import os
 import pandas as pd
 import regex as re
-from typing import Optional
+from typing import Optional, Callable
 
 from langchain_openai import ChatOpenAI
 from langchain_openai import OpenAIEmbeddings
@@ -227,7 +227,7 @@ retriever = db.as_retriever(
 )
 
 
-def project_wizard(user_question: Optional[str], project_name: str = 'project'):
+def project_wizard(user_question: Optional[str], project_name: str = 'project', log: Callable[[str], None] = print):
 
     print('# Initialize an instance of the ChatOpenAI class with specified parameters')
     # Set the temperature to 0.1 for more deterministic responses
@@ -253,7 +253,7 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
 
     full_prompt = prompt + "\nQuestion: " + user_question
 
-    print('# the agent might raise an error. Sometimes repeating the same prompt helps...')
+    log('# the agent might raise an error. Sometimes repeating the same prompt helps...')
     response = agent.invoke(full_prompt) # agent.run is deprecated
     assert('output' in response)
     final_answer = response['output']
@@ -287,7 +287,7 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
 
     #The plot you should create is the same as the plot created in the context. Specify the parameters according to the respective files in the context for each plot type. DO NOT add any parameters that have not been defined previously.
 
-    print('# Create a PromptTemplate object using the defined RAG prompt')
+    log('# Create a PromptTemplate object using the defined RAG prompt')
     prompt_RAG_template = PromptTemplate(
         template=prompt_RAG,          # Specify the template string
         input_variables=["context", "question"]  # Define the input variables for the template
@@ -304,7 +304,7 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     # Define the context for the question (this should be retrieved by the retriever, but showing as an example)
     context = retriever
 
-    print('# Invoke the QA chain with the query and context')
+    log('# Invoke the QA chain with the query and context')
     output = qa_chain.invoke({"context": context, "query": user_question})
     result = output["result"]
 
@@ -319,7 +319,7 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     code = extract_code_from_response(result)
 
     original_script = code
-    print('# Apply the reorder transformation')
+    log('# Apply the reorder transformation')
     modified_script = reorder_parameters(original_script, path_to_data)
     lines = modified_script.splitlines()
 
@@ -329,9 +329,9 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     if start_index is not None:
         # Capture all lines starting from the first 'def'
         captured_lines = "\n".join(lines[start_index:])
-        #print("Captured part:\n", captured_lines)
+        #logger("Captured part:\n", captured_lines)
     else:
-        print("Pattern not found")
+        log("Pattern not found")
 
     # with open("temp_code_3.py", "w") as f:
     #     f.write(packages_functions)
@@ -341,18 +341,18 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     # Log the prompt and the output of the LLM to the google sheets
     # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
 
-    # print('# Run the saved Python file. This will start a server on localhost:5050, open the browser and display the plot with the server continuing to run in the background.')
+    # logger('# Run the saved Python file. This will start a server on localhost:5050, open the browser and display the plot with the server continuing to run in the background.')
     # %run temp_code_3.py
-    print('# Executing the code...')
+    log('# Executing the code...')
     final_code = f"""{packages_functions}\n{captured_lines}
 else:
     main()"""
     final_code = final_code.replace("project.serve()", "# project.serve()")
-    print(final_code)
+    log(final_code)
     # exec(final_code) - I don't understand why this doesn't work
     # "name 'MDVProject' is not defined"
     with tempfile.NamedTemporaryFile(suffix='.py') as temp:
-        print(f'Writing to temp file: {temp.name}')
+        log(f'Writing to temp file: {temp.name}')
         temp.write(final_code.encode())
         temp.flush()
         # subprocess.run(["code", temp.name])
