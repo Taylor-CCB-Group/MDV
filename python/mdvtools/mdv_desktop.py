@@ -94,6 +94,8 @@ if __name__ == "__main__":
                 if request.json and "id" in request.json
                 else str("".join(random.choices(string.ascii_letters, k=6)))
             )
+            # creating a project with the same id as an existing project is not allowed
+            assert(project_id not in [p.id for p in projects])
             print(f"creating project '{project_id}'")
             if "ai_query" in request.json:
                 # very provisional... just to get the idea of how this might work.
@@ -109,9 +111,16 @@ if __name__ == "__main__":
                         print(f"[llm error] {e}")  # eg "name 'MDVProject' is not defined" when running in `exec()`?
                         return jsonify({"status": "error", "message": str(e)}), 500
             p = MDVProject(os.path.join(project_dir, project_id))
-            p.set_editable(True)
-            projects.append(p)
-            p.serve(app=app, open_browser=False)
+            # in cases such as project_wizard, it's possible the project will already exist in this list
+            # having been picked up by the watcher thread - so we should check for another project with the same id in `projects`
+            if p.id not in [p.id for p in projects]:
+                p.set_editable(True)
+                projects.append(p)
+                p.serve(app=app, open_browser=False)
+            else:
+                # the frontend doesn't care about this, and it's not an error given that 
+                # we assert that the project doesn't already exist at the start of this function
+                print(f"project '{p.id}' is already being served")
             return jsonify({"id": p.id, "name": p.id, "status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
