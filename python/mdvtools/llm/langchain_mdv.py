@@ -83,7 +83,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project', 
     # Specify the model to use as "gpt-4o"
 
     code_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
-
     dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4")
 
     #user_question = "Create a heatmap plot of the localisation status vs the UTR length"
@@ -92,7 +91,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project', 
 
     path_to_data = os.path.join(mypath, "sample_data/data_cells.csv")
     df = pd.read_csv(path_to_data)
-
     df_short = df#.dropna().iloc[:2,1:]
 
     # could we get this to log with the log function?
@@ -133,7 +131,9 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project', 
     result = output["result"]
 
     # extract and process the code from the response
-    final_code = prepare_code(result, path_to_data, log)
+    # nb - what was path_to_data is currently only used within reorder_parameters here.
+    # the actual string is not used in the generated code, so we can pass df instead
+    final_code = prepare_code(result, df, log)
     log(final_code)
     # passing `log` around is a chore, would be nice to know if there's a better way
     execute_code(final_code, log=log)

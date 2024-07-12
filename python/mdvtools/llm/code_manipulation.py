@@ -30,6 +30,8 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
         return column in numerical_columns
 
     # Define a regex pattern to find function definitions that create BoxPlots
+    # todo we could have an array of expected plot types and use it to build one big regex
+    # that should make it easier to add new plot types.
     patterns = [
         re.compile(r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)BoxPlot\((.*?)\)", re.DOTALL),
         re.compile(r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)DotPlot\((.*?)\)", re.DOTALL),
@@ -102,11 +104,11 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
 
     return script
 
-def prepare_code(result: str, path_to_data: str, log: callable = print):
+def prepare_code(result: str, data: str | pd.DataFrame, log: callable = print):
     original_script = extract_code_from_response(result)
 
     log("# Apply the reorder transformation")
-    modified_script = reorder_parameters(original_script, path_to_data)
+    modified_script = reorder_parameters(original_script, data)
     lines = modified_script.splitlines()
 
     # Find the starting line index
