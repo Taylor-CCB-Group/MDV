@@ -1,7 +1,5 @@
-# %% [markdown]
-# # Code Generation using Retrieval Augmented Generation + LangChain
+# Code Generation using Retrieval Augmented Generation + LangChain
 
-# %%
 # importing packages
 
 import nbformat
@@ -24,7 +22,7 @@ import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 from dotenv import load_dotenv
 import subprocess
 import tempfile
-# %%
+
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY & GITHUB_TOKEN
 # also currently need a key.json file with google-sheet config
@@ -303,7 +301,6 @@ def convert_plot_to_json(plot):
 
 def project_wizard(user_question: Optional[str], project_name: str = 'project'):
 
-    # %%
     print('# Initialize an instance of the ChatOpenAI class with specified parameters')
     # Set the temperature to 0.1 for more deterministic responses
     # Specify the model to use as "gpt-4o"
@@ -313,8 +310,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4")
 
 
-
-    # %%
     print('# Crawl the GitHub repository to get a list of relevant file URLs')
     code_files_urls = crawl_github_repo(GITHUB_REPO, False, BRANCH_NAME, PROJECT_PATH_2, GITHUB_TOKEN)
 
@@ -324,14 +319,12 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
         for item in code_files_urls:
             f.write(item + '\n')
 
-    # %%
 
 
     # Read the list of file URLs from the specified text file
     with open(FILE_URL_PATH + FILE_URL_NAME) as f:
         code_files_urls = f.read().splitlines()
 
-    # %%
     # Initialize an empty list to store the extracted code documents
     code_strings = []
 
@@ -354,7 +347,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
             # Append the Document object to the code_strings list
             code_strings.append(doc_ipynb)
 
-    # %%
     print('# Initialize a text splitter for chunking the code strings')
     text_splitter = RecursiveCharacterTextSplitter.from_language(
         language=Language.PYTHON,  # Specify the language as Python
@@ -365,7 +357,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     print('# Split the code documents into chunks using the text splitter')
     texts = text_splitter.split_documents(code_strings)
 
-    # %%
     # Set the number of queries per minute (QPM) for embedding requests
     EMBEDDING_QPM = 100
 
@@ -377,31 +368,25 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
         model="text-embedding-3-large"  # Specify the model to use for generating embeddings
         )
 
-    # %%
     print('# Create an index from the embedded code chunks')
     print('# Use FAISS (Facebook AI Similarity Search) to create a searchable index')
     db = FAISS.from_documents(texts, embeddings)
 
-    # %%
     print('# Initialize the retriever from the FAISS index')
     retriever = db.as_retriever(
         search_type="similarity",      # Specify the search type as "similarity"
         search_kwargs={"k": 5},        # Set search parameters, in this case, return the top 5 results
     )
 
-    # %%
     #user_question = "Create a heatmap plot of the localisation status vs the UTR length"
     if user_question is None:
         user_question = input("What would you like to ask the LLM?")
 
-    # %%
     path_to_data = os.path.join(mypath, "sample_data/data_cells.csv")
     df = pd.read_csv(path_to_data)
 
-    # %%
     df_short = df#.dropna().iloc[:2,1:]
 
-    # %%
     agent = lp.create_pandas_dataframe_agent(
         dataframe_llm, df_short, verbose=True, handle_parse_errors=True, allow_dangerous_code=True
     )
@@ -414,7 +399,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     assert('output' in response)
     final_answer = response['output']
 
-    # %%
     # todo use a different project foler - nb, this  isn't an f-string at the moment, and has some other template stuff I don't know about
     # what is the difference between ProjectTemplate input_variables and the prompt string itself?
     prompt_RAG = """ You can only generate python code based on the provided context. If a response cannot be formed strictly using the context, politely say you need more information to generate the plot.
@@ -444,7 +428,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
 
     #The plot you should create is the same as the plot created in the context. Specify the parameters according to the respective files in the context for each plot type. DO NOT add any parameters that have not been defined previously.
 
-    # %%
     print('# Create a PromptTemplate object using the defined RAG prompt')
     prompt_RAG_template = PromptTemplate(
         template=prompt_RAG,          # Specify the template string
@@ -459,7 +442,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
         return_source_documents=True  # Configure the chain to return source documents
     )
 
-    # %%
     # Define the context for the question (this should be retrieved by the retriever, but showing as an example)
     context = retriever
 
@@ -467,7 +449,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     output = qa_chain.invoke({"context": context, "query": user_question})
     result = output["result"]
 
-    # %%
     # Extracting the file urls retrieved from the context 
 
     context_information = output['source_documents']
@@ -475,11 +456,8 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
     context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
 
-    # %%
-    
     code = extract_code_from_response(result)
 
-    # %%
     original_script = code
     print('# Apply the reorder transformation')
     modified_script = reorder_parameters(original_script, path_to_data)
@@ -500,11 +478,9 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project'):
     #     f.write(captured_lines)
         #f.write("\n".join(lines))
 
-    # %%
     # Log the prompt and the output of the LLM to the google sheets
     # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
 
-    # %%
     # print('# Run the saved Python file. This will start a server on localhost:5050, open the browser and display the plot with the server continuing to run in the background.')
     # %run temp_code_3.py
     print('# Executing the code...')
