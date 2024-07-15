@@ -125,7 +125,7 @@ class ProjectChat():
             output = qa_chain.invoke({"context": context, "query": question})
             result = output["result"]
             final_code = prepare_code(result, self.df, self.log, modify_existing_project=True, view_name=question)
-            execute_code(final_code, open_code=True, log=self.log)
+            execute_code(final_code, open_code=False, log=self.log)
             self.log(final_code)
             return f"I ran some code for you:\n\n```python\n{final_code}```"
         except Exception as e:
