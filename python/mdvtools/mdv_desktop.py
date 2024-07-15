@@ -61,8 +61,8 @@ def watch_folder(app: Flask):
             print(f"watcher adding '{p.id}'")
             try:
                 p.serve(open_browser=False, app=app)
-            except Exception:
-                print(f"error serving {p.id}...")
+            except Exception as e:
+                print(f"error serving {p.id}... {str(e)[:100]}")
     print("watcher exiting...")
 
 if __name__ == "__main__":
@@ -73,8 +73,8 @@ if __name__ == "__main__":
     for p in projects:
         try:
             p.serve(open_browser=False, app=app)
-        except Exception:
-            print(f"error serving {p.id}...")
+        except Exception as e:
+            print(f"error serving {p.id}... {str(e)[:100]}")
 
     @app.route("/")
     def index():
