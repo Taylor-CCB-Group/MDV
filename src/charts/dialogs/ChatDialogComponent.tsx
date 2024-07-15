@@ -1,5 +1,5 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
-import { MessageCircleQuestion } from 'lucide-react';
+import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star } from 'lucide-react';
 import useChat from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
@@ -27,9 +27,21 @@ const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => 
             {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
             ))}
+            {!isUser && <MessageFeedback />}
         </div>
     );
 }
+
+const MessageFeedback = () => {
+    return (
+        <div className='flex justify-end'>
+            <Star className='self-end scale-75' />
+            <ThumbsUp className='self-end scale-75' />
+            <ThumbsDown className='self-end scale-75' />
+        </div>
+    );
+}
+
 const MessageJson = ({ text }: { text: string }) => {
     try {
         text = JSON.parse(text);
