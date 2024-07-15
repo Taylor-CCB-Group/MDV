@@ -1,5 +1,5 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
-import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star } from 'lucide-react';
+import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen } from 'lucide-react';
 import useChat from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
@@ -33,11 +33,39 @@ const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => 
 }
 
 const MessageFeedback = () => {
+    const [isStarred, setIsStarred] = useState<boolean>(false);
+    const [isLiked, setIsLiked] = useState<boolean>(false);
+    const [isDisliked, setIsDisliked] = useState<boolean>(false);
+    const [showNotes, setShowNotes] = useState<boolean>(false);
+    const [notes, setNotes] = useState<string>('');
     return (
         <div className='flex justify-end'>
-            <Star className='self-end scale-75' />
-            <ThumbsUp className='self-end scale-75' />
-            <ThumbsDown className='self-end scale-75' />
+            <Star className='self-end scale-75' fill={isStarred ? 'var(--text_color)' : undefined}
+            onClick={() => setIsStarred(!isStarred)}
+            />
+            <ThumbsUp className='self-end scale-75' fill={isLiked ? 'var(--text_color)' : undefined}
+            onClick={() => {
+                setIsLiked(!isLiked);
+                setIsDisliked(false);
+            }}
+            />
+            <ThumbsDown className='self-end scale-75' fill={isDisliked ? 'var(--text_color)' : undefined}
+            onClick={() => {
+                setIsDisliked(!isDisliked);
+                setIsLiked(false);
+            }}
+            />
+            <NotebookPen className='self-end scale-75' fill={showNotes ? 'var(--text_color)' : undefined} 
+            onClick={() => setShowNotes(!showNotes)}
+            />
+            {showNotes && (
+                <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder='Add notes...'
+                    className='p-2 m-2 border border-gray-300 rounded-lg'
+                />
+            )}
         </div>
     );
 }
