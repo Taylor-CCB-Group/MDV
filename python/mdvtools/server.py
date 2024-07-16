@@ -84,6 +84,7 @@ def create_app(
     use_reloader=False,
     app: Optional[Flask] = None,
     chat_fn: Optional[Callable[[str], str]]=None,
+    chat_welcome: Optional[str]=None,
 ):
     if app is None:
         route = ""
@@ -118,21 +119,31 @@ def create_app(
         """
         bot: Optional[ProjectChat] = None
         print(f"websocket/chat enabled for {route}")
+        @project_bp.route("/chat_init", methods=["POST"])
+        def chat_init():
+            print("chat_init")
+            nonlocal bot, chat_welcome
+            if chat_welcome is not None:
+                return {"message": chat_welcome}
+            if bot is None:
+                bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
+            chat_welcome = "Hello, I'm an AI assistant that has access to the data in this project and is designed to help build views for visualising it. What can I help you with?"
+            return {"message": chat_welcome}
         @project_bp.route("/chat", methods=["POST"])
         def chat():
             nonlocal bot
             if not request.json:
                 return {"error": "No JSON data in request"}, 500
             message = request.json.get("message")
+            if chat_fn is not None:
+                response = chat_fn(message)
+                return {"message": response}
             try:
                 if bot is None:
                     bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
                 return {"message": bot.ask_question(message)}
             except Exception as e:
                 print(e)
-            if chat_fn is not None:
-                response = chat_fn(message)
-                return {"message": response}
             return {"message": f"bleep bloop I'm a robot, you said: {message}"}
 
     @project_bp.route("/")
