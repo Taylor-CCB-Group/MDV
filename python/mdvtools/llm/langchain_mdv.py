@@ -86,10 +86,6 @@ class ProjectChat():
         self.ds_name = project.datasources[0]['name']
         try:
             self.df = project.get_datasource_as_dataframe(self.ds_name)
-            log('Creating a temporary CSV file to store the dataframe, this will not be needed in the final version')
-            # XXX - 'mktemp is unsafe' - we should probably use a context manager here (according to copilot)
-            # self.csv_path = tempfile.mktemp(suffix=".csv")
-            # self.df.to_csv(self.csv_path)
             self.code_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
             self.dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4")
             self.agent = lp.create_pandas_dataframe_agent(
