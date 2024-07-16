@@ -19,7 +19,6 @@ from .github_utils import crawl_github_repo, extract_python_code_from_py, extrac
 from .templates import get_createproject_prompt_RAG, prompt
 from .code_manipulation import prepare_code
 from .code_execution import execute_code
-from .chatlog import log_chat
 
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY & GITHUB_TOKEN
@@ -132,7 +131,8 @@ class ProjectChat():
             final_code = prepare_code(result, self.df, self.log, modify_existing_project=True, view_name=question)
             # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
             # todo - save code at various stages of processing...
-            log_chat(output, prompt_RAG, final_code)
+            # log_chat(output, prompt_RAG, final_code)
+            self.project.log_chat_item(output, prompt_RAG, final_code)
             execute_code(final_code, open_code=False, log=self.log)
             self.log(final_code)
             return f"I ran some code for you:\n\n```python\n{final_code}```"

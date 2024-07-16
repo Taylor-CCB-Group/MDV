@@ -15,7 +15,8 @@ import string
 from os.path import join, split, exists
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
-from typing import Optional, NewType, List, Union
+from typing import Optional, NewType, List, Union, Any
+from mdvtools.llm.chatlog import log_chat
 import time
 
 DataSourceName = str  # NewType("DataSourceName", str)
@@ -55,6 +56,7 @@ class MDVProject:
         self.viewsfile = join(dir, "views.json")
         self.imagefolder = join(dir, "images")
         self.trackfolder = join(dir, "tracks")
+        self.chatfile = join(dir, "chat_log.json")
         if not exists(dir):
             os.mkdir(dir)
         if not exists(self.trackfolder):
@@ -69,6 +71,10 @@ class MDVProject:
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
                 o.write(json.dumps({"all_views": [], "popouturl": "popout.html"}))
+        if not exists(self.chatfile):
+            with open(self.chatfile, "w") as o:
+                o.write(json.dumps([]))
+        self.chat_log = get_json(self.chatfile) # could be heavy doing this in the constructor...
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
 
     @property
@@ -1175,6 +1181,39 @@ class MDVProject:
                     }
         self.set_datasource_metadata(md)
 
+    def log_chat_item(self, output: Any, prompt_template: str, response: str):
+        """
+        output: result of invoke 'from langchain.chains import RetrievalQA'
+        """
+        # todo refactor logging & probably change the structure of the chat log etc...
+        log_chat(output, prompt_template, response)
+        
+        context_information = output['source_documents']
+        context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
+        context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
+        context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
+
+        context = str(context_information_metadata_name)
+        prompt = output['query']
+
+        # this is NOT the format we want to save the chat log in long term
+        self.chat_log.append(
+            {
+                "context": context,
+                "prompt": prompt,
+                "prompt_template": prompt_template,
+                "response": response,
+            }
+        )
+        # this version tries to jsonify VectorDatabases & god knows what else
+        # self.chat_log.append(
+        #     {
+        #         "output": json.dumps(output),
+        #         "prompt_template": prompt_template,
+        #         "response": json.dumps(response),
+        #     }
+        # )
+        save_json(join(self.dir, "chat_log.json"), self.chat_log)
 
 def get_json(file):
     return json.loads(open(file).read())
