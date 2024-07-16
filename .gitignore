@@ -42,3 +42,4 @@ xvenv/
 
 LLM/cache
 LLM/key.json
+python/mdvtools/llm/key.json
