@@ -5,9 +5,14 @@ import { getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./
 let projectRoot = "";
 export async function fetchJsonConfig(url: string, root: string) {
     let resp = await fetch(url);
-    const config = await resp.json();
-    //rewriteBaseUrlRecursive(config, root); //removed.
-    return config;
+    try {
+        const config = await resp.json();
+        //rewriteBaseUrlRecursive(config, root); //removed.
+        return config;
+    } catch (e) {
+        console.error(`Error fetching ${url}: ${e}`);
+        return {error: e};
+    }
 }
 
 export function setProjectRoot(root: string) {
