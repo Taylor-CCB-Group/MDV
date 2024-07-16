@@ -19,7 +19,7 @@
     "build-jsdocs": "jsdoc -c docs/jsdocs/jsdoc.json",
     "build-tsdocs": "npx typedoc",
     "poetry-setup": "curl -sSL https://install.python-poetry.org | python3 -",
-    "python-setup": "python -m venv venv && source venv/bin/activate && cd python && poetry install --with dev,llm && npm run build-flask-vite",
+    "python-setup": "python -m venv venv && source venv/bin/activate && cd python && poetry install --with dev && npm run build-flask-vite",
     "chat": "source venv/bin/activate && python -m mdvtools.chat",
     "mdv_desktop": "source venv/bin/activate && python -m mdvtools.mdv_desktop",
     "docker_dev": "docker-compose up -d --force-recreate",

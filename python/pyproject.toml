@@ -27,6 +27,15 @@ pandas = "^2.1.1"
 scanpy = "^1.9.8"
 scipy = "^1.11.3"
 werkzeug = "^3.0.2"
+# previously in llm group
+langchain = "^0.2.7"
+langchain-experimental = "^0.0.62"
+regex = "^2024.5.15"
+langchain-openai = "^0.1.14"
+faiss-cpu = "^1.8.0.post1"
+tabulate = "^0.9.0"
+python-dotenv = "^1.0.1"
+nbformat = "^5.10.4"
 
 [tool.poetry.group.dev]
 optional = true
@@ -46,8 +55,6 @@ seaborn = "^0.13.2"
 umap-learn = "^0.5.6"
 statsmodels = "^0.14.2"
 generate-tiff-offsets = "^0.1.7"
-python-dotenv = "^1.0.1"
-
 
 
 [tool.poetry.group.docs]
@@ -66,17 +73,6 @@ optional = true
 flask-sqlalchemy = "^3.1.1"
 psycopg2 = "^2.9.9"
 
-[tool.poetry.group.llm]
-# optional = true
-
-
-[tool.poetry.group.llm.dependencies]
-langchain = "^0.2.7"
-langchain-experimental = "^0.0.62"
-regex = "^2024.5.15"
-langchain-openai = "^0.1.14"
-faiss-cpu = "^1.8.0.post1"
-tabulate = "^0.9.0"
 
 [tool.pyright]
 venvPath = "../venv/"
