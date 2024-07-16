@@ -1,7 +1,5 @@
 import pandas as pd
 import regex as re
-import subprocess
-import tempfile
 from .templates import packages_functions
 
 def extract_code_from_response(response: str):
@@ -144,14 +142,3 @@ else:
         final_code = final_code.replace("\"default\"", f"\"{view_name}\"")
         
     return final_code
-
-def execute_code(final_code: str, open_code=False, log: callable = print):
-    # exec(final_code) - I don't understand why this doesn't work
-    # "name 'MDVProject' is not defined"
-    with tempfile.NamedTemporaryFile(suffix=".py") as temp:
-        log(f"Writing to temp file: {temp.name}")
-        temp.write(final_code.encode())
-        temp.flush()
-        if open_code:
-            subprocess.run(["code", temp.name])
-        subprocess.run(["python", temp.name])

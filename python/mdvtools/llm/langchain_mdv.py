@@ -17,7 +17,8 @@ from dotenv import load_dotenv
 
 from .github_utils import crawl_github_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt
-from .code_manipulation import prepare_code, execute_code
+from .code_manipulation import prepare_code
+from .code_execution import execute_code
 
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY & GITHUB_TOKEN
