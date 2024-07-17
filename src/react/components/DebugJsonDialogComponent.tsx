@@ -24,7 +24,7 @@ export default function ({json, header}: {json: any, header?: string}) {
         <div className='max-h-[90vh] overflow-auto'>
             {header && <h2>{header}</h2>}
             <input type='text' value={filter} onChange={e => setFilter(e.target.value)} placeholder='Filter...'></input>
-            <JsonView src={filteredJson} />
+            <JsonView src={filteredJson} collapsed={2}/>
         </div>
     );
 }
