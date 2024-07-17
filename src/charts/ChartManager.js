@@ -197,9 +197,9 @@ class ChartManager{
       
         if (config.all_views){
        
-            this.viewSelect = createEl("select",{},this.menuBar);
+            this.viewSelect = createEl("select", { styles: { maxWidth: '50em' } },this.menuBar);
             for (let v of config.all_views){
-                createEl("option",{text:v,value:v},this.viewSelect)
+                createEl("option",{text:v, value:v},this.viewSelect)
             }
             createFilterElement(this.viewSelect, this.menuBar);
             this.viewSelect.addEventListener("change",(e)=>{
