@@ -29,7 +29,6 @@ const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => 
                 <PythonCode key={index} code={section} />
             ))}
             {!isUser && <MessageFeedback />}
-            {/* <RobotPandaSVG /> */}
         </div>
     );
 }
@@ -178,10 +177,13 @@ const Chatbot = () => {
                 {isSending && (<div className="animate-pulse flex justify-center p-4">...</div>)}
                 <div ref={messagesEndRef} />
             </div>
+            {/* <div className='absolute opacity-10 pointer-events-none top-0 right-0'>
+                <RobotPandaSVG />
+            </div> */}
             <div className="flex p-4 border-t w-full border-gray-300">
                 <input
                     type="text"
-                    disabled={isSending}
+                    // disabled={isSending} //we can still type while it's processing
                     value={input}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyPress}
