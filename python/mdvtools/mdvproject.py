@@ -1194,13 +1194,13 @@ class MDVProject:
         context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
 
         context = str(context_information_metadata_name)
-        prompt = output['query']
+        query = output['query']
 
         # this is NOT the format we want to save the chat log in long term
         self.chat_log.append(
             {
                 "context": context,
-                "prompt": prompt,
+                "query": query,
                 "prompt_template": prompt_template,
                 "response": response,
             }
