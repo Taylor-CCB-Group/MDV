@@ -8,6 +8,46 @@ const responseSchema = z.object({
     // viewName: z.string(),
 });
 
+// nb this is going to want to change a lot
+// we want to know what version of code it based the training on as well as a bunch of other things
+// and we probably want to be a bit flexible about what we accept and how to display it...
+// Has the user said they like or dislike the response? Made any notes?
+// we don't record that information yet - and it will mean a different way of interacting with the data
+// not just logging new items, but updating existing ones - so message ID is important (currently just a random string in front-end)
+const chatLogItemSchema = z.object({
+    context: z.string(),
+    query: z.string(),
+    prompt_template: z.string(),
+    response: z.string(),
+});
+const chatLogSchema = z.array(chatLogItemSchema);
+
+export const useChatLog = () => {
+    const { root } = useProject();
+    const route = `${root}/chat_log.json`;
+    const [chatLog, setChatLog] = useState<z.infer<typeof chatLogSchema>>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+
+    useEffect(() => {
+        const fetchChatLog = async () => {
+            setIsLoading(true);
+            try {
+                const response = await axios.get(route);
+                const parsed = chatLogSchema.parse(response.data);
+                setChatLog(parsed);
+            } catch (error) {
+                console.error('Error fetching chat log', error);
+            }
+            setIsLoading(false);
+        };
+        fetchChatLog();
+        const interval = setInterval(fetchChatLog, 2000);
+        return () => clearInterval(interval);
+    }, []);
+
+    return { chatLog, isLoading };
+}
+
 type ChatResponse = z.infer<typeof responseSchema>;
 
 type Message = {

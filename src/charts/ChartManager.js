@@ -4,6 +4,7 @@ import { PopOutWindow } from "../utilities/PopOutWindow";
 import  DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import ChatDialog from "./dialogs/ChatDialog";
+import ChatLogDialog from "./dialogs/ChatLogDialog";
 import { ContextMenu } from "../utilities/ContextMenu";
 import {BaseDialog} from "../utilities/Dialog.js";
 import {getRandomString} from "../utilities/Utilities.js";
@@ -289,22 +290,25 @@ class ChartManager{
                 // } catch (error) {
                 //     console.error('Failed to connect to websocket', error);
                 // }
-                const chatButton = createMenuIcon("fas fa-comments", {
+                createMenuIcon("fas fa-comments", {
                     tooltip: {
                         text: "Open ChatMDV",
                         position: "bottom-left"
                     },
                     func: async () => {
-                        // new BaseDialog.experiment['ChatDialog']();
                         new ChatDialog();
-                        // const query = await prompt("Enter a query to send to ChatMDV");
-                        // if (query) {
-                        //     const msg = { type: 'ping', message: query }
-                        //     sendMessage(msg);
-                        // }
                     }
                 }, this.rightMenuBar);
                 // chatButton.setAttribute('data-lucide', 'bot-message-square'); //didn't work
+                createMenuIcon("fas fa-file-alt", {
+                    tooltip: {
+                        text: "View Chat Log",
+                        position: "bottom-left"
+                    },
+                    func: async () => {
+                        new ChatLogDialog();
+                    }
+                }, this.rightMenuBar);
             };
             fn();
         }
