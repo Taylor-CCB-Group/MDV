@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useChatLog } from "./ChatAPI";
+import { ChatLogItem, useChatLog } from "./ChatAPI";
 import ReactMarkdown from "react-markdown";
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -28,6 +28,16 @@ const Code = ({ code }: { code: string }) => {
     )
 }
 
+const LogItem = ({ item }: { item: ChatLogItem }) => {
+    return (
+        <tr>
+            <td><Response response={item.context} /></td>
+            <td><Response response={item.query} /></td>
+            <td><Response response={item.prompt_template} /></td>
+            <td><Code code={item.response} /></td>
+        </tr>
+    )
+}
 
 const ChatLog = () => {
     const { chatLog } = useChatLog();
@@ -44,12 +54,7 @@ const ChatLog = () => {
                 </thead>
                 <tbody>
                     {chatLog.map((item, index) => (
-                        <tr key={index}>
-                            <td><Response response={item.context} /></td>
-                            <td><Response response={item.query} /></td>
-                            <td><Response response={item.prompt_template} /></td>
-                            <td><Code code={item.response} /></td>
-                        </tr>
+                        <LogItem key={index} item={item} />
                     ))}
                 </tbody>
             </table>
