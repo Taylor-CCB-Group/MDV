@@ -6,6 +6,7 @@ import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import RobotPandaSVG from './PandaSVG';
 
 
 const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => {
@@ -28,6 +29,7 @@ const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => 
                 <PythonCode key={index} code={section} />
             ))}
             {!isUser && <MessageFeedback />}
+            {/* <RobotPandaSVG /> */}
         </div>
     );
 }
