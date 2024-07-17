@@ -1183,9 +1183,14 @@ class MDVProject:
 
     def log_chat_item(self, output: Any, prompt_template: str, response: str):
         """
-        output: result of invoke 'from langchain.chains import RetrievalQA'
-        """
+        Initially the idea was to use a similar structure to "Jobs" in the db
+        Current version is designed to capture similar info to Maria's Google Sheet log
         # todo refactor logging & probably change the structure of the chat log etc...
+        also maybe restructure more of this class to be more modular
+        send chat logs over websocket, to a database, etc...
+        Args:
+            output: result of invoke 'from langchain.chains import RetrievalQA'
+        """
         log_chat(output, prompt_template, response)
         
         context_information = output['source_documents']
