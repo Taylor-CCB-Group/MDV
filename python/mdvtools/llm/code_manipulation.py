@@ -39,9 +39,9 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
             r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)AbundanceBoxPlot\((.*?)\)",
             re.DOTALL,
         ),
-        re.compile(
-            r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)HistogramPlot\((.*?)\)", re.DOTALL
-        ),
+        # re.compile(
+        #     r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)HistogramPlot\((.*?)\)", re.DOTALL
+        # ),
         re.compile(r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)RingChart\((.*?)\)", re.DOTALL),
         re.compile(r"def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)RowChart\((.*?)\)", re.DOTALL),
         re.compile(
@@ -64,7 +64,7 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
                 if "params" in matched_text:
                     param_list = re.findall(r"\'(.*?)\'", matched_text)
                 else:
-                    param_list = [re.findall(r"\'(.*?)\'", matched_text)[0]]
+                    param_list = [re.findall(r"\"(.*?)\"", matched_text)[0]]
 
                 # Check for the presence of categorical and numerical variables
                 has_categorical = any(is_categorical(param) for param in param_list)
