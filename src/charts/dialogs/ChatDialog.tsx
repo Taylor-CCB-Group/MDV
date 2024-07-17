@@ -35,6 +35,6 @@ class ChatDialog extends BaseDialog {
     }
 }
 
-BaseDialog.experiment["ChatDialog"] = ChatDialog;
+// BaseDialog.experiment["ChatDialog"] = ChatDialog; //we don't need this anymore
 
 export default ChatDialog;
