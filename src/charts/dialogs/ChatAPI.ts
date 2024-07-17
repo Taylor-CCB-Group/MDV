@@ -22,10 +22,12 @@ const chatLogItemSchema = z.object({
 });
 const chatLogSchema = z.array(chatLogItemSchema);
 
+export type ChatLogItem = z.infer<typeof chatLogItemSchema>;
+
 export const useChatLog = () => {
     const { root } = useProject();
     const route = `${root}/chat_log.json`;
-    const [chatLog, setChatLog] = useState<z.infer<typeof chatLogSchema>>([]);
+    const [chatLog, setChatLog] = useState<ChatLogItem[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
 
     useEffect(() => {
