@@ -24,7 +24,7 @@ class OffsetDialog extends BaseDialog{
 			position:"relative",
 			height:"60px"
 		}},this.dialog);
-		for (let pos of [["top","up"],["bottom","down"],["right","right"],["left","left"]]){
+		for (const pos of [["top","up"],["bottom","down"],["right","right"],["left","left"]]){
 			this._addPButton(pos);
 		}
 		createEl("div",{text:"Rotation"},this.dialog);
@@ -34,7 +34,7 @@ class OffsetDialog extends BaseDialog{
 				position:"relative"
 			}
 		},this.dialog);
-		for (let d of ["left","right"]){
+		for (const d of ["left","right"]){
 			this._addRButton(d);
 		}
 
@@ -49,7 +49,7 @@ class OffsetDialog extends BaseDialog{
 			this._showOffsets(this.groupSelect.value);
 		})
 		const vals =this.ds.columnIndex[this.ds.offsets.groups].values;
-		for (let v of vals){
+		for (const v of vals){
 			createEl("option",{
 			text:v,
 			value:v
@@ -70,8 +70,8 @@ class OffsetDialog extends BaseDialog{
 		const ds = this.plot.dataStore;
 		let x =0;
 		let y=0;
-		const am = parseFloat(this.offsetAm.value);
-		if (isNaN(am)){
+		const am = Number.parseFloat(this.offsetAm.value);
+		if (Number.isNaN(am)){
 			return;
 		}
 		x+=dir==="right"?am:0;
@@ -133,14 +133,14 @@ class OffsetDialog extends BaseDialog{
 		let xy=[0,0];
 		let angle=0;
 		const vs =  this.ds.offsets.values[this.filter || "all"];
-		if (vs && vs[group]){
+		if (vs?.[group]){
 			xy = vs[group].offsets;
 			angle =vs[group].rotation;
 		}
 
-		this.xoffset.textContent="x:"+xy[0].toFixed(1);
-		this.yoffset.textContent="y:"+xy[1].toFixed(1);
-		this.angle.textContent="angle:"+angle.toFixed(1);
+		this.xoffset.textContent=`x:${xy[0].toFixed(1)}`;
+		this.yoffset.textContent=`y:${xy[1].toFixed(1)}`;
+		this.angle.textContent=`angle:${angle.toFixed(1)}`;
 	}
 	
 
@@ -174,8 +174,8 @@ class OffsetDialog extends BaseDialog{
 
 		},this.rDiv);
 		j.addEventListener("click",e=>{
-			const am = parseFloat(this.offsetAn.value);
-			if (isNaN(am)){
+			const am = Number.parseFloat(this.offsetAn.value);
+			if (Number.isNaN(am)){
 				return;
 			}
 			const angle = dir==="left"?-am:am;
@@ -200,7 +200,7 @@ class WGLScatterPlot extends WGLChart{
             }
         }
 		if (!config.title){
-			config.title= x_name+" x "+y_name;	
+			config.title= `${x_name} x ${y_name}`;	
 		}
     	super(dataStore,div,config,{x:{},y:{}});
 	
@@ -216,12 +216,10 @@ class WGLScatterPlot extends WGLChart{
         this.minMaxX=this.dataStore.getMinMaxForColumn(this.x);
         this.minMaxY=this.dataStore.getMinMaxForColumn(this.y);
 		this.type="wgl_scatter_plot";
-
-		let self = this;
 		const c = this.config;
 		c.brush = c.brush || "poly";
 
-        let appConf= {brush:c.brush};
+        const appConf= {brush:c.brush};
         
         this.app = new WGL2DI(this.graphDiv,appConf);
 
@@ -234,14 +232,14 @@ class WGLScatterPlot extends WGLChart{
 		this.app.setBackGroundColor(c.background_color);
 
 
-        this.app.addHandler("brush_stopped",function(range,is_poly){
-		    self.resetButton.style.display = "inline";
-			self.app.setFilter(true);
+        this.app.addHandler("brush_stopped",(range,is_poly)=> {
+		    this.resetButton.style.display = "inline";
+			this.app.setFilter(true);
 		    if (!is_poly){
-		        self._createFilter(range);
+		        this._createFilter(range);
 		    }
 		    else{
-		    	self._createPolyFilter(range);
+		    	this._createPolyFilter(range);
 		    }
 		});
 
@@ -249,8 +247,8 @@ class WGLScatterPlot extends WGLChart{
 			c.image_opacity = c.image_opacity==null?1:c.image_opacity;
 			this.addBackgroundImage(c.background_image);
 		}
-		let cx = this.dataStore.columnIndex[this.x];
-		let cy = this.dataStore.columnIndex[this.y];
+		const cx = this.dataStore.columnIndex[this.x];
+		const cy = this.dataStore.columnIndex[this.y];
 		//will get some loss of precision for int32 plus no updating on data changed
 		this.app.addCircles({
 			x:cx.datatype==="int32"?new Float32Array(cx.data):cx.data,
@@ -344,7 +342,7 @@ class WGLScatterPlot extends WGLChart{
 			this.app.refresh();
 		}
         im.onerror=()=>{
-            delete this.config.background_image;
+            this.config.background_image = undefined;
         }
 	}
 
@@ -382,16 +380,16 @@ class WGLScatterPlot extends WGLChart{
     }
 
     _calculateRadius(){
-    	let width = this.width?this.width:1;
-		let max_x=this.config.max_x || this.config.max_x==0?this.config.max_x:this.minMaxX[1]; 	
-    	let min_x=this.config.min_x || this.config.min_x==0?this.config.min_x:this.minMaxX[0];
+    	// const width = this.width?this.width:1;
+		let max_x=this.config.max_x || this.config.max_x === 0 ? this.config.max_x : this.minMaxX[1]; 	
+    	let min_x=this.config.min_x || this.config.min_x === 0 ? this.config.min_x : this.minMaxX[0];
     	if (this.config.axis.x_log_scale){
     		max_x= this._getLogValue(max_x);
     		min_x= this._getLogValue(min_x);
     	}
 		
-		let range = max_x-min_x
-		let pt_px = Math.pow(range,1.50)/(Math.pow(this.dataStore.size,0.8)+range);
+		const range = max_x-min_x
+		const pt_px = range ** 1.50/((this.dataStore.size ** 0.8)+range);
 		//pt_px = pt_px<0.001?0.001:pt_px;
 		return (pt_px)*5;
 		
@@ -422,7 +420,7 @@ class WGLScatterPlot extends WGLChart{
 
     _createPolyFilter(vs){
     	this.range=true;
-    	for (let pt of vs){
+    	for (const pt of vs){
     		pt[1]=-pt[1];
     		if (this.config.axis.x_log_scale){
     			pt[0]=this._getInverseLogValue(pt[0]);
@@ -462,10 +460,10 @@ class WGLScatterPlot extends WGLChart{
     		min_x=this._getLogValue(min_x);
     	}
 
-        let x_margin=((max_x-min_x)/20);
-        let y_margin=((max_y-min_y)/20);
-        let x_range = (max_x-min_x)+2*x_margin;
-        let y_range= (max_y-min_y)+2*y_margin;
+        const x_margin=((max_x-min_x)/20);
+        const y_margin=((max_y-min_y)/20);
+        const x_range = (max_x-min_x)+2*x_margin;
+        const y_range= (max_y-min_y)+2*y_margin;
 
         const dim = this._getContentDimensions();
 		
@@ -548,7 +546,7 @@ class WGLScatterPlot extends WGLChart{
 				label:"Change Image",
 				func:x=>{
 					if (x==="__none__"){
-						delete c.background_image;
+						c.background_image = undefined;
 						this.app.removeImages();
 						this.app.refresh();
 						return;
@@ -560,7 +558,7 @@ class WGLScatterPlot extends WGLChart{
 					}
 					
 					c.background_image.url=x;
-					let t  = c.title.split("-")[0]
+					const t  = c.title.split("-")[0]
 					const f= c.image_choices.find(i=>i[1]===x);
 					c.background_image.name=f[0];
 					if (f[2]){
@@ -568,7 +566,7 @@ class WGLScatterPlot extends WGLChart{
 						c.background_image.height=f[3];
 						c.background_image.position=[f[4],f[5]];
 					}
-					this.setTitle(t+"-"+f[0])
+					this.setTitle(`${t}-${f[0]}`)
 					this.addBackgroundImage(c.background_image,replace);
 				}
 			})
@@ -577,10 +575,10 @@ class WGLScatterPlot extends WGLChart{
         if (c.region && rs && !c.viv){
 			const ic= rs.all_regions[c.region].images;
             const vals= [["None","__none__"]];
-			for (let n in ic){
+			for (const n in ic){
                 vals.push([n,n])
             }
-			let cv =c.background_image?.name || "__none__";
+			const cv =c.background_image?.name || "__none__";
 			settings.splice(1,0,{
 				type:"dropdown",
 				current_value:cv,
@@ -588,14 +586,14 @@ class WGLScatterPlot extends WGLChart{
 				label:"Change Image",
 				func:x=>{
 					if (x==="__none__"){
-						delete c.background_image;
+						c.background_image = undefined;
 						this.app.removeImages();
 						this.app.refresh();
 						return;
 					}
-					const replace = c.background_image?true:false;
+					const replace = !!c.background_image;
 					c.background_image=ic[x];	
-					this.setTitle(c.region+"-"+x)
+					this.setTitle(`${c.region}-${x}`)
 					this.addBackgroundImage(c.background_image,replace);
 				}
 			})
@@ -627,7 +625,7 @@ class WGLScatterPlot extends WGLChart{
 			current_value:c.background_color || "none",
 			func:(x)=>{
 				if (x==="none"){
-					delete c.background_color
+					c.background_color = undefined
 				}
 				else{
 					c.background_color=x

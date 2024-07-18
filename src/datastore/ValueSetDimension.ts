@@ -5,9 +5,6 @@ import Dimension from "./Dimension";
  * A dimension that includes values from a given Set.
  */
 class ValueSetDimension extends Dimension {
-    constructor(parent: DataStore) {
-        super(parent);
-    }
     /**
      * Filter the dimension to only include values from the given set.
      * @paraam {Set} valueSet

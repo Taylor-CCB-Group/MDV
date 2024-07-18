@@ -3,11 +3,7 @@ import "./all_css";
 import HmrHack from "../react/HmrHack";
 HmrHack();
 import ChartManager from "../charts/ChartManager.js";
-// import "../charts/RowSummaryBox.js"; //> should this be in ChartManager along with default charts? how useful is it?
 
-import TagModel from '../table/TagModel';
-import AnnotationDialog from "../charts/dialogs/AnnotationDialog";
-import { BaseDialog } from "../utilities/Dialog";
 import { fetchJsonConfig, getDataLoader, getPostData, setProjectRoot } from "../dataloaders/DataLoaderUtil";
 import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
@@ -103,7 +99,7 @@ async function loadData() {
 
     const listener = async (type: string, cm: ChartManager, data: any) => {
         if (type === "state_saved" && !staticFolder) {
-            const resp = await getPostData(root+'/save_state', data);
+            const resp = await getPostData(`${root}/save_state`, data);
             if (resp.success) {
                 cm.createInfoAlert("State saved", {duration: 2000});
                 cm.setAllColumnsClean();
@@ -135,20 +131,9 @@ async function loadData() {
 
     function extraFeatures(i: number) {
         const dsName = datasources[i].name;
-        const ds = cm.dsIndex[dsName];
-        let tagModel: TagModel; // = new TagModel(ds.dataStore);
-        function getTagModel() {
-            if (!tagModel) tagModel = new TagModel(ds.dataStore);
-            return tagModel;
-        }
-        // ds.dataStore.removeColumn('__tags');
         // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
         // should it be in the viewLoader callback? no ref to cm passed there.
         setTimeout(() => {
-            cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation", () => { new AnnotationDialog(ds.dataStore, getTagModel()); });
-            if (import.meta.env.DEV) {
-                cm.addMenuIcon(dsName, "fas fa-tags", "Tag Annotation (react)", () => { new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, getTagModel()); });
-            }
             cm.addMenuIcon(dsName, "fas fa-spinner", "Pre-Load Data", async () => {
                 const columns = datasources[i].columns.map(c => c.name);
                 cm.loadColumnSet(columns, dsName, () => { console.log("done loadColumnSet"); });

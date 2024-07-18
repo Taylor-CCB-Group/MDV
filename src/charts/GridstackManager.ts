@@ -1,8 +1,7 @@
 import 'gridstack/dist/gridstack.min.css';
 import { GridStack } from 'gridstack';
 import { debounce } from '../utilities/Utilities';
-import { DataSource, Chart, ChartManager } from './charts';
-import AnnotationDialog from './dialogs/AnnotationDialog';
+import type { Chart, ChartManager, DataSource } from './charts';
 
 function clearPosition(div) {
     div.style.position = '';
@@ -68,11 +67,10 @@ export default class GridStackManager {
             });
          
             const i = this.chartManager.addMenuIcon(ds.name, "fas fa-compress-arrows-alt", "compact layout", ()=>grid.compact());
-            //this.chartManager.addMenuIcon(ds.name, "fas fa-tags", "Tag annotation", () => {new AnnotationDialog(ds.dataStore)})
             this.grids.set(ds, {grid:grid,charts:new Set(),icon:i});
         }
-        
-        return this.grids.get(ds)!;
+
+        return this.grids.get(ds);
     }
 
     destroy(ds: DataSource){
@@ -84,25 +82,25 @@ export default class GridStackManager {
         const div = ds.contentDiv;
          //store sizes/positions of div elements
         const sizes = new Map();
-        for (let chart of gi.charts){
+        for (const chart of gi.charts){
             const d = chart.getDiv();
             sizes.set(d,[d.offsetWidth,d.offsetHeight,d.offsetLeft,d.offsetTop]);
             chart.removeLayout();
-            delete chart.config.gssize;
-            delete chart.config.gsposition;
+            chart.config.gssize = undefined;
+            chart.config.gsposition = undefined;
         }
                  
         gi.grid.destroy(false);
 
         //convert back to absolute positioning plus other clean up on the div
-        for (let chart of gi.charts){
+        for (const chart of gi.charts){
             const  d= chart.getDiv();
             const s = sizes.get(d);
             d.style.position="absolute";
-            d.style.width=(s[0]-5)+"px";
-            d.style.height=(s[1]-5)+"px";
-            d.style.left=s[2]+"px";
-            d.style.top=s[3]+"px";
+            d.style.width=`${s[0]-5}px`;
+            d.style.height=`${s[1]-5}px`;
+            d.style.left=`${s[2]}px`;
+            d.style.top=`${s[3]}px`;
             chart.config.size=[s[0]-5,s[1]-5];
             chart.config.position=[s[2],s[3]];
             d.classList.remove("grid-stack-item")
@@ -219,7 +217,7 @@ export default class GridStackManager {
         chart.removeLayout=()=>{
             grid.removeWidget(div,false); //doesn't remove listeners from handle...
             lockButton.remove();
-            delete div.gridstackPopoutCallback;
+            div.gridstackPopoutCallback = undefined;
             chart.remove = oldRemove;
             chart.changeBaseDocument = oldChangeBase;
             ro.disconnect();
@@ -299,8 +297,10 @@ function findFreeSpace(dataSource: DataSource) {
 
 export function positionChart(dataSource: DataSource, config: Config) {
   // some legacy code extracted to here and may be reviewed at some point.
-  let width = 300, height = 300; //consider having a preferred-size...
-  let left = 10, top = 10;
+  let width = 300;
+  let height = 300; //consider having a preferred-size...
+  let left = 10;
+  let top = 10;
   if (config.size) {
     width = config.size[0];
     height = config.size[1];

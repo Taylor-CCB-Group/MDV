@@ -190,7 +190,7 @@ BaseChart.types["image_table_chart"]={
     },
     extra_controls:(dataSource)=>{
         const imageSets=[];
-        for (let iname in dataSource.images){
+        for (const iname in dataSource.images){
             imageSets.push({name:iname,value:iname})
         }
         const sortableColumns = dataSource.getColumnList().map(c=>({name:c.name,value:c.field}));

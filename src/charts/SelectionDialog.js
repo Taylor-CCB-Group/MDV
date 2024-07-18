@@ -18,7 +18,7 @@ class SelectionDialog extends BaseChart{
         this.contentDiv.style.overflowY="auto";
        
        
-        for (let c of con){
+        for (const c of con){
             const col =dataStore.columnIndex[c];
             const div =createEl("div",{
                 styles:{padding:"5px"}
@@ -48,19 +48,19 @@ class SelectionDialog extends BaseChart{
 
     removeFilter(){
         const f= this.config.filters;    
-        for (let c in this.textFilters){
+        for (const c in this.textFilters){
             const t = this.textFilters[c];            
             t.unSelectAll()
             f[c].category=[];
         }
-        for (let c in this.numberFilters){
+        for (const c in this.numberFilters){
             const mm= this.dataStore.getMinMaxForColumn(c);
             const t = this.numberFilters[c];
             t.noUiSlider.set([mm[0],mm[1]])
             f[c]=null;
         }
         this.resetButton.style.display="none";
-        for (let c in this.dims){
+        for (const c in this.dims){
             this.dims[c].removeFilter(false);
         }
         this.dataStore.triggerFilter();    
@@ -118,8 +118,8 @@ class SelectionDialog extends BaseChart{
             documentElement:this.__doc__
         });
         sl.noUiSlider.on("set",values=>{
-            const min = parseFloat(values[0]);
-            const max = parseFloat(values[1]);
+            const min = Number.parseFloat(values[0]);
+            const max = Number.parseFloat(values[1]);
             if (min<=mm[0] && max >=mm[1]){
                 c.filters[col.field]=null;
             }
@@ -138,10 +138,10 @@ class SelectionDialog extends BaseChart{
         greaterThan.value=cv[0];
 
         greaterThan.addEventListener("blur",e=>{
-                let n = parseFloat(greaterThan.value);
+                let n = Number.parseFloat(greaterThan.value);
                
                 const cvi = sl.noUiSlider.get();
-                if (isNaN(n) || n > cvi[1]){
+                if (Number.isNaN(n) || n > cvi[1]){
                     return;
                 }
                 n  = n < mm[0]?mm[0]:n;
@@ -155,10 +155,10 @@ class SelectionDialog extends BaseChart{
 
         lessThan.addEventListener("blur",e=>{
             
-                let n = parseFloat(lessThan.value);
+                let n = Number.parseFloat(lessThan.value);
                
                 const cvi = sl.noUiSlider.get();
-                if (isNaN(n) || n < cvi[0]){
+                if (Number.isNaN(n) || n < cvi[0]){
                     return;
                 }
                 n= n>mm[1]?mm[1]:n;
@@ -186,7 +186,6 @@ class SelectionDialog extends BaseChart{
                 this.dims[col].removeFilter();
             }
             else{
-                let vs= f.category;
                 this.resetButton.style.display = "inline";
                 this.dims[col].filter("filterCategories",[col],f.category,notify)
             }    
@@ -293,7 +292,7 @@ class SelectionDialog extends BaseChart{
 
 
     remove(notify=true){
-        for (let c in this.dims){
+        for (const c in this.dims){
             this.dims[c].destroy(false);
         }
         Object.values(this.textFilters).forEach(x=>x.remove())

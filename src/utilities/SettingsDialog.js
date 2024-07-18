@@ -7,17 +7,22 @@ import { action } from "mobx";
 
 class SettingsDialog extends BaseDialog{
     constructor(config,content){
+        const originalOnClose = config.onclose;
+        config.onclose = () => {
+            if (originalOnClose) originalOnClose();
+            if (config.chart) config.chart.dialogs.splice(config.chart.dialogs.indexOf(this), 1);
+        };
         super(config,content);
     }
     
-    init(content, parent){
+    init(content){
         if (!this.controls) this.controls=[];
-        if (!parent) parent = this.dialog;
+        const parent = this.dialog;
         //experimental lil-gui version...
         // this.initLilGui(content);
         // return;
-        for (let s of content){
-            let d = createEl("div",{
+        for (const s of content){
+            const d = createEl("div",{
                 styles:{
                     // padding:"5px"
                 }
@@ -46,7 +51,7 @@ class SettingsDialog extends BaseDialog{
     initLilGui(content){
         const gui = new lgui({container: this.dialog});
         //gui.name = this.config.title + " Settings";
-        for (let s of content) {
+        for (const s of content) {
             switch (s.type) {
                 case "dropdown":
                     gui.add(s, 'current_value', s.values[0].map(c => c[s.values[1]])).name(s.label).onChange(s.func);
@@ -67,8 +72,6 @@ class SettingsDialog extends BaseDialog{
                 case "radiobuttons":
                     gui.add(s, 'current_value', s.choices).name(s.label).onChange(s.func);
                     break;
-                case "text":
-                case "textbox":
                 default:
                     gui.add(s, 'current_value').name(s.label).onChange(s.func);
             }
@@ -81,7 +84,7 @@ class SettingsDialog extends BaseDialog{
     }
     spinner(s,d){
          
-        let sp =createEl("input",{
+        const sp =createEl("input",{
             type:"number",
             value:s.current_value,
             max:s.max || null,
@@ -89,7 +92,7 @@ class SettingsDialog extends BaseDialog{
             step:s.step || 1
         },d);
         sp.addEventListener("change",(e)=>{
-            s.func(parseInt(sp.value));
+            s.func(Number.parseInt(sp.value));
         });
     }
     radiobuttons(s,d){
@@ -97,7 +100,7 @@ class SettingsDialog extends BaseDialog{
         const d1 =createEl("div",{
             classes:["ciview-radio-group"]
         },d)
-        for (let c of s.choices){
+        for (const c of s.choices){
             createEl("span",{   
                 text:c[0]
             },d1);
@@ -139,7 +142,7 @@ class SettingsDialog extends BaseDialog{
             documentElement: s.doc || this.config.doc
         });
         const change = (values) => {
-            s.func(parseFloat(values[0]))
+            s.func(Number.parseFloat(values[0]))
         };
         sl.noUiSlider.on("end", change);
         if (s.continuous) {
@@ -170,7 +173,7 @@ class SettingsDialog extends BaseDialog{
             }
         }, wrapper);
         createEl("br",{},d);
-        for (let item of s.values[0]){
+        for (const item of s.values[0]){
             // pass 1d array for simple list of strings, or [object[], text_field, value_field] for objects
             const text = s.values.length > 1 ? item[s.values[1]] : item;
             const value = s.values.length > 1 ? item[s.values[2]] : item;
@@ -210,7 +213,7 @@ class SettingsDialog extends BaseDialog{
             }
         }, wrapper);
         // createEl("br",{},d);
-        for (let item of s.values[0]) {
+        for (const item of s.values[0]) {
             // pass 1d array for simple list of strings, or [object[], text_field, value_field] for objects
             const text = s.values.length > 1 ? item[s.values[1]] : item;
             const value = s.values.length > 1 ? item[s.values[2]] : item;
@@ -249,7 +252,7 @@ class SettingsDialog extends BaseDialog{
             documentElement:s.doc
         });
         const change = (values) => {
-            s.func(parseFloat(values[0]), parseFloat(values[1]))
+            s.func(Number.parseFloat(values[0]), Number.parseFloat(values[1]))
         };
         sl.noUiSlider.on("end", change);
         if (s.continuous) {

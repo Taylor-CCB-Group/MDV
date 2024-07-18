@@ -13,6 +13,7 @@ import shutil
 import random
 import string
 from os.path import join, split, exists
+from pathlib import Path
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
@@ -45,9 +46,10 @@ numpy_dtypes = {
 
 
 class MDVProject:
-    def __init__(self, dir: str, id: Optional[str]=None, delete_existing=False):
+    def __init__(self, dir: str, id: Optional[str]=None, delete_existing=False, skip_column_clean=False):
+        self.skip_column_clean = skip_column_clean # signficant speedup for large datasets
         self.dir = dir
-        self.id = id if id else dir.split("/")[-1]
+        self.id = id if id else os.path.basename(dir)
         if delete_existing and exists(dir):
             shutil.rmtree(dir)
         self.h5file = join(dir, "datafile.h5")
@@ -70,7 +72,7 @@ class MDVProject:
                 o.close()
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
-                o.write(json.dumps({"all_views": [], "popouturl": "popout.html"}))
+                o.write(json.dumps({"all_views": []}))
         if not exists(self.chatfile):
             with open(self.chatfile, "w") as o:
                 o.write(json.dumps([]))
@@ -359,7 +361,7 @@ class MDVProject:
             raise AttributeError(f"{datasource} is not a group")
         if gr.get(column["field"]):
             del gr[column["field"]]
-        add_column_to_group(column, li, gr, len(li))
+        add_column_to_group(column, li, gr, len(li), self.skip_column_clean)
         h5.close()
         if col_exists:
             ds["columns"][ind[0]] = column
@@ -428,7 +430,7 @@ class MDVProject:
             # v slow - needs improving
             # py-right: `Argument of type "Series | Unknown | DataFrame" cannot be assigned to parameter "data" of type "Series"`
             ncol = newdf.apply(lambda row: d.get(row[0], missing_value), axis=1)
-            add_column_to_group(c, ncol, gr, len(ncol))
+            add_column_to_group(c, ncol, gr, len(ncol), self.skip_column_clean)
             ds["columns"].append(c)
         self.set_datasource_metadata(ds)
         h5.close()
@@ -666,7 +668,7 @@ class MDVProject:
             raise AttributeError("no columns to add")
         for col in columns:
             try:
-                add_column_to_group(col, dataframe[col["field"]], gr, size)
+                add_column_to_group(col, dataframe[col["field"]], gr, size, self.skip_column_clean)
             except Exception as e:
                 dodgy_columns.append(col["field"])
                 warnings.warn(
@@ -794,6 +796,10 @@ class MDVProject:
 
         create_app(self, **kwargs)
 
+    def delete(self):
+        # todo - remove from project routes, set a flag indicating it's been deleted
+        shutil.rmtree(self.dir)
+
     def get_configs(self):
         config = {
             "datasources": self.datasources,
@@ -821,8 +827,6 @@ class MDVProject:
         page = "page.html"
         template = join(tdir, page)
         page = open(template).read()
-        # dummy popout page
-        copyfile(join(tdir, "popout.html"), join(outdir, "popout.html"))
         # make sure the static files are referenced correctly
         page = page.replace("/static", "static")
         # call init with no route, will be interpreted as static page (at /)
@@ -833,6 +837,8 @@ class MDVProject:
         conf = self.state
         # can't edit static page
         conf["permission"] = "view"
+        # consider using this flag for determining front-end behaviour
+        conf["static"] = True
         # throttle the dataloading so don't get network errors
         conf["dataloading"] = {"split": 5, "threads": 2}
         save_json(join(outdir, "state.json"), conf)
@@ -1062,14 +1068,36 @@ class MDVProject:
                     "max_y": v["height"] + y,
                     "max_x": v["width"] + x,
                 },
+                # "images": v.get("images", {}),
                 "images": {},
             }
+            if "json" in v:
+                f = v["json"]
+                assert isinstance(f, str) # in future we may allow dict or list
+                if exists(f):
+                    # copy the json file to the project
+                    name = os.path.basename(f)
+                    rel = join(self.dir, "json", name)
+                    Path(rel).parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        shutil.copyfile(f, rel)
+                        all_regions[k]["json"] = join("json", name)
+                    except Exception as e:
+                        print(f"Skipping json for region {k} because of error copying {f} to {rel}\n{repr(e)}")
+                else:
+                    raise FileNotFoundError(f"json file '{f}' not found")
         # maybe warn if replacing existing regions
         # or add to existing regions
         md["regions"]["all_regions"] = all_regions
         self.set_datasource_metadata(md)
 
-    def add_region_images(self, datasource, data):
+    def add_region_images(self, datasource: DataSourceName, data):
+        """Adds images to regions in a datasource.
+        
+        Args:
+            datasource (str): The name of the datasource.
+            data (dict|str): A dictionary containing data about which images should be associated with 
+        """
         imdir = join(self.dir, "images", "regions")
         if not exists(imdir):
             os.makedirs(imdir)
@@ -1254,7 +1282,7 @@ def get_subgroup_bytes(grp, index, sparse=False):
 
 
 def add_column_to_group(
-    col: dict, data: pandas.Series | pandas.DataFrame, group: h5py.Group, length: int
+    col: dict, data: pandas.Series | pandas.DataFrame, group: h5py.Group, length: int, skip_column_clean: bool
 ):
     """
     col (dict): The column metadata (may be modified e.g. to add values)
@@ -1338,7 +1366,7 @@ def add_column_to_group(
 
     else:
         dt = numpy.int32 if col["datatype"] == "int32" else numpy.float32
-        clean = data.apply(pandas.to_numeric, errors="coerce")
+        clean = data if skip_column_clean else data.apply(pandas.to_numeric, errors="coerce") # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)

@@ -1,8 +1,10 @@
-import { DataColumn } from "../charts/charts";
-import DataStore from "../datastore/DataStore";
+import type { DataColumn } from "../charts/charts";
+import type DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
 
-type TagColumn = DataColumn<'multitext'>; //multitext...?
+//multitext was buggy (empty data buffer after loading project)
+//at least one multitext bug has been fixed, but we're still using text for now.
+type TagColumn = DataColumn<'text'>;
 
 const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
 const JOIN = '; '; //join with semi-colon and space.
@@ -14,15 +16,15 @@ const splitTags = (value: string) => value.split(SEP).filter(v=>v);
  * find all the indices that include 'tag' as one of those tags.
  */
 function getTagValueIndices(tag: string, col: TagColumn) {
-    if (tag.split(SEP).length > 1) console.error('todo: process multiple tags in tag input');
-    return col.values.map((v, i) => v.split(SEP).includes(tag) ? i : -1).filter(i => i != -1);
+    if (tag.match(SEP)) throw new Error('getTagValueIndices: tag must not contain separator (should be handled before calling this function)');
+    return col.values.map((v, i) => v.split(SEP).includes(tag) ? i : -1).filter(i => i !== -1);
 }
 
 export default class TagModel {
     readonly tagColumn: TagColumn;
     readonly dataModel: DataModel;
     listeners: (()=>void)[] = [];
-    constructor(dataStore: DataStore, columnName: string = '__tags') {
+    constructor(dataStore: DataStore, columnName = '__tags') {
         this.dataModel = new DataModel(dataStore, {autoupdate: true});
         this.dataModel.updateModel();
         //nb, this will replace any other "tag" listener on model (but the model is local to this object)
@@ -31,7 +33,7 @@ export default class TagModel {
         })
         if (!dataStore.columnIndex[columnName]) {
             // subgroup - user annotations?
-            const columnSpec = {name: columnName, datatype: 'multitext', editable: true, delimeter: ';', field: columnName};
+            const columnSpec = {name: columnName, datatype: 'text', editable: true, separator: ';', field: columnName};
             const data = new SharedArrayBuffer(dataStore.size * 2);
             dataStore.addColumn(columnSpec, data);
         }
@@ -43,26 +45,30 @@ export default class TagModel {
     }
     removeListener(callback: ()=>void) {
         const i = this.listeners.indexOf(callback);
-        if (i != -1) this.listeners.splice(i, 1);
+        if (i !== -1) this.listeners.splice(i, 1);
     }
     setTag(tag: string, tagValue = true) {
-        this.dataModel.updateModel();
         setTag({tag, ...this}, tagValue);
+        this.dataModel.updateModel(); //seems necessary after-all
+        //^^ not exactly intended design, should test more...
     }
     getTags() {
         return getTags(this.tagColumn);
     }
     entireSelectionHasTag(tag: string) {
         const col = this.tagColumn;
+        if (tag.match(SEP)) return tag.split(SEP).every(t => this.entireSelectionHasTag(t));
         const tagIndices = getTagValueIndices(tag, col);
         return !this.dataModel.data.some(v => !tagIndices.includes(col.data[v]));
     }
     getTagsInSelection() {
         const {dataModel, tagColumn: col} = this;
         const usedValuesByIndex = new Set<number>();
-        dataModel.data.forEach(i => usedValuesByIndex.add(col.data[i]));
+        for (const i of dataModel.data) {
+            usedValuesByIndex.add(col.data[i]);
+        }
         const values = [...usedValuesByIndex].map(i => col.values[i]);
-        return new Set(values.map(splitTags).flat());
+        return new Set(values.flatMap(splitTags));
     }
 }
 
@@ -85,6 +91,14 @@ function setTagOnAllSelectedValues(tagToChange: string, col: TagColumn, dataMode
     //     return;
     // }
     sanitizeTags(col);
+    if (tagToChange.match(SEP)) {
+        const changed = tagToChange.split(SEP)
+        .map(t => setTagOnAllSelectedValues(t, col, dataModel, false, tagValue))
+        .reduce((a, b) => a || b, false);
+        //todo check if this is the right way to handle notify
+        if (notify && changed) dataModel.dataStore.dataChanged([col.name]);
+        return;
+    }
     const indicesWithTag = getTagValueIndices(tagToChange, col); //refers to values that already contain 'tag'
 
     //If tagValue is true, map from the index of the value without the tag, to the index of the value with the tag.
@@ -118,14 +132,14 @@ function setTagOnAllSelectedValues(tagToChange: string, col: TagColumn, dataMode
         // this method is a bit unintuitive to write, and could be a source of bugs.
         const currentVal = col.data[data[i]];
         
-        if (tagValue == indicesWithTag.includes(currentVal)) continue;
+        if (tagValue === indicesWithTag.includes(currentVal)) continue;
         count++;
         // we've found a row that doesn't have the tag... if we were to add the tag, 
         // would that be a new value (ie, nothing else would have that combination of tags)?
         const untaggedIndex = currentVal;
         let taggedIndex = mapToAlteredTag.get(untaggedIndex);
         // undefined should be never, but it looks like that logic isn't right when removing tags
-        if (taggedIndex == undefined || taggedIndex == -1) {
+        if (taggedIndex === undefined || taggedIndex === -1) {
             const untaggedValue = col.values[untaggedIndex];
             const tags = splitTags(untaggedValue);
             const alteredTags = tagValue ? [tagToChange, ...tags] : tags.filter(t => t !== tagToChange);
@@ -133,10 +147,11 @@ function setTagOnAllSelectedValues(tagToChange: string, col: TagColumn, dataMode
             taggedIndex = getValueIndex(taggedValue, col);
             mapToAlteredTag.set(untaggedIndex, taggedIndex);
         }
-        col.data[data[i]] = taggedIndex!;
+        col.data[data[i]] = taggedIndex;
     }
     // console.log(`updated ${count}/${data.length} selected rows`);
     if (notify && count) dataModel.dataStore.dataChanged([col.name]);
+    return count !== 0; //return whether any changes were made
 }
 
 /** processes a given column so that tags appear in sorted order and without repitition.
@@ -148,10 +163,11 @@ function sanitizeTags(col: TagColumn, notify = false) {
         const sorted = [...new Set(splitTags(unsorted))].sort().join(JOIN);
         return {i, unsorted, sorted};
     });
-    const alreadySorted = vals.filter(v => v.sorted == v.unsorted);
+    const alreadySorted = vals.filter(v => v.sorted === v.unsorted);
     if (alreadySorted.length === vals.length) return;
     console.log('sanitizing tags...'); //not expected to happen unless other non-tag operations are performed on col?
     const values = alreadySorted.map(v => v.sorted);
+    if (values.length > 256) throw new Error(`text column '${col.name}' exceeded 256 values when sanitizing tags`);
     col.values = values;
     
     const mapToSorted = new Map<number, number>();
@@ -161,8 +177,9 @@ function sanitizeTags(col: TagColumn, notify = false) {
         mapToSorted.set(i, getValueIndex(sorted, col));
     }
     const usedValuesByIndex = new Set<number>();
-    for (let i=0; i<col.data.length; i++) {
-        const j = col.data[i] = mapToSorted.get(col.data[i])!;
+    for (const i in col.data) {
+        const j = mapToSorted.get(col.data[i]);
+        col.data[i] = j;
         usedValuesByIndex.add(j);
     }
     const nUnused = vals.length - usedValuesByIndex.size;
@@ -174,12 +191,14 @@ function sanitizeTags(col: TagColumn, notify = false) {
 }
 
 function getTags(col: TagColumn) {
-    return new Set(col.values.map(splitTags).flat());
+    return new Set(col.values.flatMap(splitTags));
 }
 
 function getTagsInSelection(col: TagColumn, dataModel: DataModel) {
     const usedValuesByIndex = new Set<number>();
-    dataModel.data.forEach(i => usedValuesByIndex.add(col.data[i]));
+    for (const i of dataModel.data) {
+        usedValuesByIndex.add(col.data[i]);
+    }
     const values = [...usedValuesByIndex].map(i => col.values[i]);
-    return new Set(values.map(splitTags).flat());
+    return new Set(values.flatMap(splitTags));
 }

@@ -5,7 +5,7 @@ import type { OME_TIFF } from "./components/avivatorish/state";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import { DataColumn } from "../charts/charts";
+import type { DataColumn } from "../charts/charts";
 
 /**
  * Get the chart's config.
@@ -54,6 +54,13 @@ export function useChartID(): string {
     return chart.config.id;
 }
 
+/** Get the document the chart is currently assigned to, which changes when popped-out.
+ * Used for mouse events etc that were previously on `window` to allow dragging out of the chart itself.
+ */
+export function useChartDoc() {
+    const chart = useChart();
+    return chart.__doc__;
+}
 
 export function useParamColumns(): DataColumn<any>[] {
     const chart = useChart();
@@ -76,7 +83,7 @@ export function useImgUrl(): string {
     const { regions } = useDataStore();
     if (!regions) {
         //throw `No image URL provided and no regions found in data store`; // plenty of other ways this could go wrong}
-        console.warn(`No image URL provided and no regions found in data store`); // plenty of other ways this could go wrong}
+        console.warn("No image URL provided and no regions found in data store"); // plenty of other ways this could go wrong}
         return '';
     }
     const i = regions.all_regions[config.region].viv_image;

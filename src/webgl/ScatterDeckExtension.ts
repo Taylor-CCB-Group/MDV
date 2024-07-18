@@ -16,7 +16,7 @@ export class ScatterSquareExtension extends LayerExtension {
     getShaders() {
         return {
             inject: {
-                'vs:#decl': `out float _lineWidthPixels;`,
+                'vs:#decl': "out float _lineWidthPixels;",
                 'vs:#main-end': `
                 //---- ScatterSquareExtension
                 // _outerRadiusPixels = outerRadiusPixels; // we might want this as an 'out', not used for now
@@ -33,6 +33,7 @@ export class ScatterSquareExtension extends LayerExtension {
                 //---- ScatterSquareExtension
                 // a bit wasteful to keep the original shader for circle rendering above
                 // we should arrange layers/extensions differently, but YOLO
+                // (actually, this is really dodgy & it's embarassing not rendering quads correctly)
                 if (stroked > 0.5) {
                     vec2 uv = abs(unitPosition);
                     float isLine = step(innerUnitRadius, max(uv.x, uv.y));
@@ -55,7 +56,9 @@ export class ScatterDensityExension extends LayerExtension {
     getShaders() {
         return {
             inject: {
-                'fs:#decl': `uniform float radiusScale; uniform float opacity;`,
+                // todo - add a uniform for ~kernelSigma
+                // todo - change picking behavior
+                'fs:#decl': "uniform float radiusScale; uniform float opacity;",
                 'fs:#main-end': `
                 //---- ScatterDensityExension
                 const float e = 2.718281828459045;

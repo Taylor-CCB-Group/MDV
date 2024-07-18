@@ -9,7 +9,7 @@
  * @param {Number} e.data[3].min - min value
  * @param {Number} e.data[3].max - max value
  */
-const func = function(e){
+const func = (e)=> {
     
     const arrType = e.data[2][1]==="int32"?Int32Array:Float32Array;
 	const data= new arrType(e.data[2][0]);
@@ -36,7 +36,7 @@ const func = function(e){
     return histogram;
 }
 
-self.onmessage= function(e){  
+self.onmessage= (e)=> {  
     if (e.data.length === undefined || typeof e.data === "string") {
         // WordCloud internal setZeroTimeout calls window.postmessage...
         // seems ok to ignore like this, but not a very clean solution

@@ -42,7 +42,7 @@ class MultiPieChart extends SVGChart{
         for (let i =0;i<len;i++){
             if (fc[i]===cat){
                 const d = data[c1d[i]].data;
-                let val = d[c2d[i]]
+                const val = d[c2d[i]]
                 if (val == null){
                     d[c2d[i]]=[c1d[i],c2d[i],vc[i],i,1]
                 }
@@ -54,13 +54,13 @@ class MultiPieChart extends SVGChart{
             }
         }
         for (let n=0;n<c1.values.length;n++){
-            let d= data[n].data;
+            const d= data[n].data;
             if (this.config.hide_self_interaction){
                 d.splice(n,1);
             }
             let sum =0;
-            for (let p of d){
-                if (isNaN(p[2])){
+            for (const p of d){
+                if (Number.isNaN(p[2])){
                     p[2]=0;
                 }
                 else{
@@ -131,10 +131,6 @@ class MultiPieChart extends SVGChart{
         const c1  = this.dataStore.getColumnColors(this.config.param[0]); 
         const v2 = this.dataStore.getColumnValues(this.config.param[1]);
         const c2  = this.dataStore.getColumnColors(this.config.param[1]);  
-        
-    
-        //update the pie chart
-        const self = this;
         const pas = this.graph_area.selectAll(".pie-area")
         .data(this.data)
         .join("g")
@@ -166,36 +162,36 @@ class MultiPieChart extends SVGChart{
          .attr("text-anchor", "middle")
          .attr("class","pie-text-header")
          .attr("y",-(ph/2)+(ph/10))
-         .attr("font-size",fontSize+"px")
+         .attr("font-size",`${fontSize}px`)
          .attr("dominant-baseline", "bottom") 
         .text(d=>d);
 
 
         pas.selectAll(".pie-outer")
         .data(d=>{
-            const r =self.pie(d.data.filter(x=>x[2]>0));
-            for (let i of r){
+            const r =this.pie(d.data.filter(x=>x[2]>0));
+            for (const i of r){
                 i.sum=d.sum;
             }
             return r;
         })
         .join("path")
         .attr("class","pie-outer")
-        .attr("stroke",d=>d.data[3]===self.highlight?"black":"white")
+        .attr("stroke",d=>d.data[3]===this.highlight?"black":"white")
         .attr("d",this.arc)
         .on("click",(e,d)=>{
-            self.dataStore.dataHighlighted([d.data[3]],self);
+            this.dataStore.dataHighlighted([d.data[3]],this);
         })
     .on("mouseover pointermove",(e,d)=>{          
         const c1 = v1[d.data[0]];
         const c2 = v2[d.data[1]];
         const p = ((d.data[2]/d.sum)*100).toFixed(2)
-        self.showToolTip(e,`${c1}<br>${c2}<br>${d.data[2].toFixed(2)}<br>${p}%`);
+        this.showToolTip(e,`${c1}<br>${c2}<br>${d.data[2].toFixed(2)}<br>${p}%`);
     }).
     on("mouseleave",()=>{
-        self.hideToolTip();
+        this.hideToolTip();
     })   
-        .style("stroke-width",d=>d.data[3]===self.highlight?"4px":"2px")
+        .style("stroke-width",d=>d.data[3]===this.highlight?"4px":"2px")
         .style("fill",(d,i)=>{    
                 return c2[d.data[1]]    
         });

@@ -3,8 +3,8 @@
 // - general shape of data structures NB - in many cases this can be inferred from JS, so I may remove these again...
 //   partly just using them as a form of documentation / notes-to-self.
 
-import DataStore from "../datastore/DataStore";
-
+import type DataStore from "../datastore/DataStore";
+import type BaseChart from "./BaseChart";
 export type DataType = 'integer' | 'double' | 'text' | 'unique' | 'multitext' | 'int32';
 
 type DataStructureTypes = {
@@ -108,6 +108,7 @@ export type ExtraControl<T extends GuiSpecType> = {
 // }
 // a.values[0].map(x => x.a);
 // ^^ still not well-typed... `x` is `any`.
+// biome-ignore lint/suspicious/noRedeclare: I should probably fix this...
 interface DataStore {
     getLoadedColumns: () => FieldName[];
     getColumnName: (col: FieldName) => ColumnName | null;
@@ -116,7 +117,7 @@ interface DataStore {
 }
 
 
-export interface Chart {
+export type Chart = {
     getDiv: () => HTMLElement;
     remove: () => void;
     addMenuIcon: (classes: string, info: string) => HTMLElement;
@@ -126,7 +127,8 @@ export interface Chart {
     removeLayout?:()=> void;
     config:any;
     dataStore: DataStore;
-};    
+    popoutIcon: HTMLElement;
+} & BaseChart;
 
 export type ChartState = {
     chart: Chart;

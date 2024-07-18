@@ -29,7 +29,7 @@ export default class SortableDimension extends Dimension {
                 const c = this.parent.columnIndex[x.col];
                 return {datatype:c.datatype,buffer:c.buffer,values:c.values,stringLength:c.stringLength,desc:x.desc};
             });
-            this.sortWorker.onmessage = function(e) {
+            this.sortWorker.onmessage = (e) => {
                 resolve(e.data);
             }
             this.sortWorker.postMessage({orderBuffer, columns:cols});
