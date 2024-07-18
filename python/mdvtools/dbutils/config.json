@@ -1,6 +1,6 @@
 {
-  "database_uri": "postgresql://admin:password@database/mdvdatabase",
-  "track_modifications": false,
+  "db_container": "mdv_db",
+  "db_track_modifications": false,
   "upload_folder": "/python",
   "projects_base_dir": "/app/mdv"
 }

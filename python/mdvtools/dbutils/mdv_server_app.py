@@ -13,6 +13,66 @@ from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService
 
+
+def load_config(app):
+    try:
+        config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+        with open(config_file_path) as config_file:
+            config = json.load(config_file)
+            app.config['PREFERRED_URL_SCHEME'] = 'https'
+            app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.get('track_modifications', False)
+            app.config['upload_folder'] = config.get('upload_folder', '')
+            app.config['projects_base_dir'] = config.get('projects_base_dir', '')
+            app.config['db_host'] = config.get('db_container', '')
+            print("Configuration loaded successfully!")
+    except FileNotFoundError:
+        print("Error: Configuration file not found.")
+        exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        exit(1)
+
+    # Load sensitive data from Docker secrets
+    def read_secret(secret_name):
+        secret_path = f'/run/secrets/{secret_name}'
+        try:
+            with open(secret_path, 'r') as secret_file:
+                return secret_file.read().strip()
+        except FileNotFoundError:
+            print(f"Error: Secret '{secret_name}' not found.")
+            exit(1)
+
+    db_user = read_secret('db_user')
+    db_password = read_secret('db_password')
+    db_name = read_secret('db_name')
+    db_host = app.config['db_container']
+
+    if not all([db_user, db_password, db_name, db_host]):
+        print("Error: One or more required secrets or configurations are missing.")
+        exit(1)
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+
+
+# Function to create base directory if it doesn't exist
+def create_base_directory():
+    base_dir = app.config.get('projects_base_dir', 'mdv')
+    try:
+        if not os.path.exists(base_dir):
+            os.makedirs(base_dir)
+            print(f"Created base directory: {base_dir}")
+        else:
+            print(f"Base directory already exists: {base_dir}")
+    except Exception as e:
+        print(f'Error creating base directory: {e}')
+        exit(1)
+
+def tables_exist():
+        inspector = db.inspect(db.engine)
+        print("printing table names")
+        print(inspector.get_table_names())
+        return inspector.get_table_names()
+
 def serve_projects_from_db():
     try:
         # Get all projects from the database
@@ -91,18 +151,7 @@ def serve_projects_from_filesystem(base_dir):
     except Exception as e:
         print(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
 
-# Function to create base directory if it doesn't exist
-def create_base_directory():
-    base_dir = app.config.get('projects_base_dir', 'mdv')
-    try:
-        if not os.path.exists(base_dir):
-            os.makedirs(base_dir)
-            print(f"Created base directory: {base_dir}")
-        else:
-            print(f"Base directory already exists: {base_dir}")
-    except Exception as e:
-        print(f'Error creating base directory: {e}')
-        exit(1)
+
 
 
 
@@ -116,40 +165,14 @@ print("creating base directory")
 create_base_directory()
     
 
-# Configuration and initialization of the Flask app and database
-print("adding database URI to app config")
-#app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI', '')
+
 print("adding config.json details to app config")
-try:
-    config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
-    print(config_file_path)
-    with open(config_file_path) as config_file:
-        config = json.load(config_file)
-        app.config['PREFERRED_URL_SCHEME'] = 'https' 
-        app.config['SQLALCHEMY_DATABASE_URI'] = config.get('database_uri', '')
-        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.get('track_modifications', False)
-        app.config['upload_folder'] = config.get('upload_folder', '')
-        app.config['projects_base_dir'] = config.get('projects_base_dir', '')
-        print("Configuration loaded successfully!")
-except FileNotFoundError:
-    print("Error: Configuration file not found.")
-except Exception as e:
-    print(f"An unexpected error occurred: {e}")
-
-
+load_config(app)
 
 print("Initializing app with db")
-
 db.init_app(app)
 
 print("creating tables")
-    
-def tables_exist():
-        inspector = db.inspect(db.engine)
-        print("printing table names")
-        print(inspector.get_table_names())
-        return inspector.get_table_names()
-
 with app.app_context():
     if not tables_exist():
         print("Creating database tables")
@@ -287,9 +310,6 @@ with app.app_context():
 
 if __name__ == '__main__':
     print("In main..")
-
-    
-    
     app.run(host='0.0.0.0', debug=True, port=5055)
     
     
