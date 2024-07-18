@@ -1,12 +1,12 @@
 import { Matrix4 } from '@math.gl/core';
-import { PickingInfo } from "deck.gl/typed";
-import { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
+import type { PickingInfo } from "deck.gl/typed";
+import type { ScatterPlotConfig, VivRoiConfig } from "./components/VivMDVReact";
 import { useChart, useDataStore } from "./context";
 import { useChartID, useChartSize, useConfig, useParamColumns } from "./hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
-import { ViewState } from './components/VivScatterComponent';
+import type { ViewState } from './components/VivScatterComponent';
 import { ScatterplotExLayer } from '../webgl/ImageArrayDeckExtension';
 import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 import { useHighlightedIndex } from './selectionHooks';
@@ -43,14 +43,14 @@ export function useFilteredIndices() {
                     //const filterIndex = col.values.indexOf(filterValue);
                     const filterIndex = catFilters.map(f => {
                         if (Array.isArray(f.category)) return f.category.map(c => dataStore.columnIndex[f.column].values.indexOf(c)) as number[];
-                        else return dataStore.columnIndex[f.column].values.indexOf(f.category) as number;
+                        return dataStore.columnIndex[f.column].values.indexOf(f.category) as number;
                     });
                     try {
                         // const filteredIndices = indices.filter(i => col.data[i] === filterIndex);
                         const filteredIndices = indices.filter(i => catFilters.every((_, j) => {
                             const f = filterIndex[j];
                             if (typeof f === 'number') return f === cols[j].data[i];
-                            else return f.some(fi => cols[j].data[i] === fi);
+                            return f.some(fi => cols[j].data[i] === fi);
                         }));
                         setFilteredIndices(filteredIndices);
                         // thinking about allowing gray-out of non-selected points... should be optional
@@ -114,7 +114,8 @@ export function useScatterplotLayer() {
     const colorBy = (chart as any).colorBy;
     const config = useConfig<ScatterPlotConfig>();
 
-    const { opacity, radius } = config;
+    const { opacity, radius, course_radius } = config;
+    const radiusScale = radius * course_radius;
 
     const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
@@ -122,24 +123,24 @@ export function useScatterplotLayer() {
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback((i: number) => {
-        return i === highlightedIndex ? 0.2*radius/scale : 0.0;
-    }, [radius, highlightedIndex, data]);
+        return i === highlightedIndex ? 0.2*radiusScale/scale : 0.0;
+    }, [radiusScale, highlightedIndex, data]);
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
         return chart.dataStore.columnIndex[config.tooltip.column]
     }, [config.tooltip.column]);
     const getTooltipVal = useCallback((i: number) => {
-        if (!tooltipCol) return '';
-        // careful now...
-        const valueIndex = tooltipCol.data[data[i]];
-        if (!tooltipCol.values) return valueIndex;
-        return tooltipCol.values[valueIndex];
-    }, [tooltipCol, tooltipCol?.data, tooltipCol?.values, data]);
+        // if (!tooltipCol?.data) return '#'+i;
+        return tooltipCol.getValue(data[i]);
+    }, [tooltipCol, data]);
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
-        () => {
+        ({object}) => {
             if (!config.tooltip.show) return;
+            // testing reading object properties --- pending further development
+            // (not hardcoding DN property etc)
+            // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
             const hoverInfo = hoverInfoRef.current;
             return hoverInfo && hoverInfo.index !== -1 && `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`;
         },
@@ -231,10 +232,10 @@ export function useScatterplotLayer() {
         setCurrentLayerHasRendered(false);
         return new ScatterplotExLayer({
         // loaders //<< this will be interesting to learn about
-        id: `scatter_${getVivId(id + 'detail-react')}`, // should satisfy VivViewer, could make this tidier
+        id: `scatter_${getVivId(`${id}detail-react`)}`, // should satisfy VivViewer, could make this tidier
         data,
         opacity,
-        radiusScale: radius,
+        radiusScale,
         getFillColor: colorBy ?? [255, 255, 255],
         getRadius: 1/scale,
         getPosition: (i, { target }) => {
@@ -280,7 +281,7 @@ export function useScatterplotLayer() {
             // },
         },
         extensions
-    })}, [id, data, opacity, radius, colorBy, cx, cy, highlightedIndex, scale, modelMatrix, extensions]);
+    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, highlightedIndex, scale, modelMatrix, extensions]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
         if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
         if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;

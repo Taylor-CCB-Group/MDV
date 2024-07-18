@@ -7,14 +7,14 @@ import ControlCameraOutlinedIcon from '@mui/icons-material/ControlCameraOutlined
 import StraightenIcon from '@mui/icons-material/Straighten';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMetadata, useViewerStore } from "./avivatorish/state";
-import { useFilteredIndices, useRegionScale, useScatterplotLayer } from "../scatter_state";
+import { useFilteredIndices, useRegionScale, type useScatterplotLayer } from "../scatter_state";
 import { useChart } from "../context";
 import { useMeasure, useRange } from "../spatial_context";
-import RangeDimension from "../../datastore/RangeDimension";
+import type RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
 import type { VivMDVReact } from "./VivMDVReact";
 import { runInAction } from "mobx";
-import { useChartSize } from "../hooks";
+import { useChartDoc, useChartSize } from "../hooks";
 import { sizeToMeters } from "./avivatorish/utils";
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
@@ -52,6 +52,7 @@ type P = [number, number];
 type EditorProps = { toolActive?: boolean, rangeDimension: RangeDimension } & ReturnType<typeof useScatterplotLayer>;
 function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, unproject, currentLayerHasRendered} : EditorProps) {
     const chart = useChart() as VivMDVReact;
+    const doc = useChartDoc();
     const cols = chart.config.param;
     // using both ref and state here so we can access the current value in the event handlers
     // (without needing to recreate them every time the state changes)
@@ -83,7 +84,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
             // if (!indexSet.has(i)) return true;
             const v1 = data1[i];
             const v2 = data2[i];
-            return !(v1 < range1[0] || v1 > range1[1] || v2 < range2[0] || v2 > range2[1] || isNaN(v1) || isNaN(v2))
+            return !(v1 < range1[0] || v1 > range1[1] || v2 < range2[0] || v2 > range2[1] || Number.isNaN(v1) || Number.isNaN(v2))
         }
         const args = { range1, range2, predicate };
 
@@ -115,8 +116,8 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
     }, [toolActive, end]);
     const handleMouseUp = useCallback((e: MouseEvent) => {
         handleMouseMove(e);
-        window.removeEventListener('mouseup', handleMouseUp);
-        window.removeEventListener('mousemove', handleMouseMove);
+        doc.removeEventListener('mouseup', handleMouseUp);
+        doc.removeEventListener('mousemove', handleMouseMove);
         updateRange();
     }, [toolActive, updateRange]);
 
@@ -139,8 +140,8 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
         setStart([p[0], p[1]]);
         setEnd([p[0], p[1]]);
         // setDragging(true); //dragging state is determined by whether the listeners are attached...
-        window.addEventListener('mouseup', handleMouseUp);
-        window.addEventListener('mousemove', handleMouseMove);
+        doc.addEventListener('mouseup', handleMouseUp);
+        doc.addEventListener('mousemove', handleMouseMove);
     }}
     />
     </>);
@@ -159,11 +160,12 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
     const handleMouseMove = useCallback((e: MouseEvent) => {
         setEnd(unproject(e));
     }, [unproject]);
+    const doc = useChartDoc();
     const handleMouseUp = useCallback((e: MouseEvent) => {
         handleMouseMove(e);
-        window.removeEventListener('mouseup', handleMouseUp);
-        window.removeEventListener('mousemove', handleMouseMove);
-    }, [handleMouseMove]);
+        doc.removeEventListener('mouseup', handleMouseUp);
+        doc.removeEventListener('mousemove', handleMouseMove);
+    }, [handleMouseMove, doc]);
     if (!toolActive && !hasStarted) return null;
     // could we unproject into the image layer rather than scatterplotLayer?
     // const startPixels = unproject(start);
@@ -195,8 +197,8 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
         setStart(p);
         setEnd(p);
         setHasStarted(true);
-        window.addEventListener('mouseup', handleMouseUp);
-        window.addEventListener('mousemove', handleMouseMove);        
+        doc.addEventListener('mouseup', handleMouseUp);
+        doc.addEventListener('mousemove', handleMouseMove);        
     }}
     onScroll={e => {e.preventDefault();}}
     >
@@ -210,7 +212,7 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
 }
 
 function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProps) {
-    const pLastRef = useRef([NaN, NaN]);
+    const pLastRef = useRef([Number.NaN, Number.NaN]);
     const handleMouseMove = useCallback((e: MouseEvent) => {
         const p = unproject(e);
         const pLast = pLastRef.current;
@@ -220,10 +222,11 @@ function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProp
         //this may redraw nice & fast without incurring react overhead, but now we're left with other problems i.e. rectangle editor not updating...
         scatterplotLayer.setNeedsRedraw();
     }, []);
+    const doc = useChartDoc();
     const handleMouseUp = useCallback((e: MouseEvent) => {
-        window.removeEventListener('mouseup', handleMouseUp);
-        window.removeEventListener('mousemove', handleMouseMove);
-    }, []);
+        doc.removeEventListener('mouseup', handleMouseUp);
+        doc.removeEventListener('mousemove', handleMouseMove);
+    }, [doc]);
 
     return (
         <>
@@ -237,8 +240,8 @@ function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProp
         onMouseDown={(e) => {
             const p = unproject(e);
             pLastRef.current = p;
-            window.addEventListener('mouseup', handleMouseUp);
-            window.addEventListener('mousemove', handleMouseMove);
+            doc.addEventListener('mouseup', handleMouseUp);
+            doc.addEventListener('mousemove', handleMouseMove);
         }}
         />
         </>
@@ -288,7 +291,6 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
             zIndex: 1,
             pointerEvents: selectedTool === 'Pan' ? 'none' : 'auto'
             }}
-            tabIndex={0}
             onMouseUp={(e) => {
                 // setSelectedTool('Pan');
             }}

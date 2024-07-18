@@ -1,0 +1,54 @@
+{
+	"$schema": "https://biomejs.dev/schemas/1.8.3/schema.json",
+	"organizeImports": {
+		"enabled": true
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			// we will make things stricter in the future
+			"complexity": {
+				"useLiteralKeys": "off",
+				"noForEach": "off",
+				"noUselessSwitchCase": "info"
+			},
+			"suspicious": {
+				"noExplicitAny": "off",
+				"noImplicitAnyLet": "off",
+				"noAssignInExpressions": "off"
+			},
+			"correctness": {
+				"useExhaustiveDependencies": "info",
+				"noSwitchDeclarations": "info"
+			},
+			"style": {
+				"useNumberNamespace": "info",
+				"noParameterAssign": "info",
+				"useTemplate": "info",
+				"useSingleVarDeclarator": "info",
+				"noUselessElse": "info",
+				"noArguments": "info"
+			},
+			"a11y": {
+				"useKeyWithClickEvents": "info"
+			},
+			"performance": {
+				"noDelete": "info"
+			}
+		}
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "space",
+		"indentWidth": 4 // considering changing to 2, but most of the codebase uses 4
+	},
+	"files": {
+		// todo - fix other code and remove these ignores (notwithstanding legacy)
+		"ignore": [
+			"./src/legacy/**/*",
+			"./src/browser/**/*",
+			"./src/table/SlickGrid.js"
+		]
+	}
+}

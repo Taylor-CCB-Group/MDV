@@ -2,7 +2,7 @@ import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import { BaseDialog } from "../../utilities/Dialog";
-import { DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivContextType, VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
+import { DEFAUlT_CHANNEL_STATE, type ROI, type VivConfig, type VivContextType, VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
 import type { ColumnName, DataColumn } from "../../charts/charts";
@@ -60,6 +60,7 @@ type CategoryFilter = {
 //viewState should be persisted... maybe a way of saving different snapshots?
 //could we infer or something to avoid having to repeat this?
 export type ScatterPlotConfig = {
+    course_radius: number,
     radius: number,
     opacity: number,
     color_by: ColumnName,
@@ -72,6 +73,7 @@ export type ScatterPlotConfig = {
     point_shape: "circle" | "square" | "gaussian"
 } & TooltipConfig;
 const scatterDefaults: ScatterPlotConfig = {
+    course_radius: 1,
     radius: 10,
     opacity: 1,
     color_by: null,
@@ -94,6 +96,8 @@ export type VivRoiConfig = {
     background_filter: CategoryFilter,
     roi: ROI,
     viv: VivConfig,
+    showJson: boolean,
+    json?: string, //for extra e.g. cell segmentation data - but we might want more than just a string...
     //image_properties: ChannelsState,
 } & ScatterPlotConfig;
 
@@ -108,7 +112,7 @@ export type VivMdvReactConfig = ScatterPlotConfig & (
 ) & { channel: number };
 export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
-    colorDialog: any;
+    colorDialog: ColorChannelDialogReactWrapper;
 
     vivStores?: VivContextType;
     get viewerStore() {
@@ -211,6 +215,10 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 current_value: tooltip.show,
                 func: (x: boolean) => {
                     tooltip.show = x;
+                    if (!tooltip.column) {
+                        console.warn("No tooltip column set, using first column... but we need to make sure it actually loads.");
+                        tooltip.column = cols[0].field;
+                    }
                 }
             },
             {
@@ -232,11 +240,20 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 }
             },
             {
+                type: "radiobuttons",
+                label: "course radius",
+                current_value: c.course_radius || 1,
+                choices: [[0.1, 0.1], [1, 1], [10, 10], [100, 100]],
+                func: x => {
+                    c.course_radius = x;
+                }
+            },
+            {
                 type: "slider",
                 label: "radius",
-                current_value: c.radius || 10,
+                current_value: c.radius || 5,
                 min: 0,
-                max: 500,
+                max: 20,
                 continuous: true,
                 func: x => {
                     c.radius = x;
@@ -259,6 +276,14 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 current_value: c.zoom_on_filter || false,
                 func: x => {
                     c.zoom_on_filter = x;
+                }
+            },
+            {
+                type: "check",
+                label: "show json layer",
+                current_value: c.showJson || false,
+                func: x => {
+                    c.showJson = x;
                 }
             },
             {
@@ -287,12 +312,15 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             const channels = channelsStore.getState();
             const viewer = viewerStore.getState();
             const imageSettings = imageSettingsStore.getState();
+            // omit some things like width, height...
+            // for 3D we'd want rotation etc, but if we keep entire viewState it causes problems (stuck zoom)
+            const viewState = {target: viewer.viewState.target, zoom: viewer.viewState.zoom};
             const viv = {
                 viewerStore: {
                     // could be that we want this to be where `'source'` comes from...
                     // we could be interested in use3d, useLens, useLinkedView... those would come from imageSettingsStore
                     // we might want an expanded version of 'pixelValues'...
-                    viewState: viewer.viewState,
+                    viewState, 
                 },
                 // we could call this `image_properties` and make it compatible with the 'legacy format' from VivScatterPlot
                 // or we could parse it into a nicer viv.channels[] array-of-objects format, and parse back when we load.

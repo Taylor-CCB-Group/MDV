@@ -24,7 +24,7 @@ export const PopoverPicker = ({ color, onChange }: { color?: MyRgbColor, onChang
             onChange={e => {
                 const c = e.target.value;
                 //get rgb values from hex string
-                const [r, g, b] = [c.slice(1, 3), c.slice(3, 5), c.slice(5, 7)].map(x => parseInt(x, 16));
+                const [r, g, b] = [c.slice(1, 3), c.slice(3, 5), c.slice(5, 7)].map(x => Number.parseInt(x, 16));
                 onChange([r, g, b]);
             }}
         />

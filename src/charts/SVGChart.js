@@ -28,7 +28,7 @@ class SVGChart extends BaseChart{
         }
         
         //add default values for axis if not specified in config
-        for (let at of [["x",25],["y",40],["ry",25],["tx",25]]){
+        for (const at of [["x",25],["y",40],["ry",25],["tx",25]]){
             const ati = axisTypes[at[0]]
             if (ati) {
                 cax[at[0]] = cax[at[0]] || {}//textsize:13,label:"",size:ati.size||at[1]};
@@ -77,7 +77,7 @@ class SVGChart extends BaseChart{
         
         }
         const rya = axisTypes["ry"];
-        if (rya && rya.label){
+        if (rya?.label){
             this.ry_axis_label=this.ry_axis_svg.append("text")
                 .attr("text-anchor", "middle")
                 .style("fill","black") 
@@ -165,7 +165,7 @@ class SVGChart extends BaseChart{
                 .attr("x",dim.width/2)
                 .attr("y",this.margins.bottom-4)
                 .text(this.config.axis.x.label)
-                .attr("font-size",this.config.axis.x.textsize+"px")
+                .attr("font-size",`${this.config.axis.x.textsize}px`)
                 .attr("font-family","Helvetica")
         }
 
@@ -176,7 +176,7 @@ class SVGChart extends BaseChart{
                 if (tinterval<8){
                     const ii = Math.round(this.y_scale.domain().length/(dim.height/10))
                     this.y_axis_call.tickFormat((d,i)=>{
-                        return i%ii==0?d:"";
+                        return i%ii===0?d:"";
                     });
 
                 }
@@ -207,9 +207,9 @@ class SVGChart extends BaseChart{
             this.y_axis_label
                 .attr("x",-dim.height/2)
                 .attr("y",-dim.left+10)
-                .attr("transform", `rotate(-90)`)
+                .attr("transform", "rotate(-90)")
                 .text(this.config.axis.y.label)
-                .attr("font-size",this.config.axis.y.textsize+"px")
+                .attr("font-size",`${this.config.axis.y.textsize}px`)
                 .attr("font-family","Helvetica")
     
         }
@@ -218,9 +218,9 @@ class SVGChart extends BaseChart{
             this.ry_axis_label
             .attr("x",dim.height/2)
             .attr("y",-this.margins.right+15)
-            .attr("transform", `rotate(90)`)
+            .attr("transform", "rotate(90)")
             .text(this.config.axis.ry.label)
-            .attr("font-size",this.config.axis.ry.textsize+"px")
+            .attr("font-size",`${this.config.axis.ry.textsize}px`)
         }
     }
 
@@ -242,12 +242,12 @@ class SVGChart extends BaseChart{
         const nodes= treeMap(nodeData);
         const desc=  nodes.descendants();
         const interval= b.width/number;
-        for (let n of desc){
+        for (const n of desc){
             if (!n.children){                     		
                 n.x =(interval/2)+(interval*n.data.order);
             }
         }
-        for (let n of desc){
+        for (const n of desc){
             if (!n.children){
                 let i=n.parent;            
                 while(i){
@@ -287,12 +287,12 @@ class SVGChart extends BaseChart{
         const nodes= treeMap(nodeData);
         const desc=  nodes.descendants();
         const interval= b.height/number;
-        for (let n of desc){
+        for (const n of desc){
             if (!n.children){                     		
                 n.x =(interval/2)+(interval*n.data.order);
             }
         }
-        for (let n of desc){
+        for (const n of desc){
             if (!n.children){
                 let i=n.parent;            
                 while(i){
@@ -449,10 +449,10 @@ class SVGChart extends BaseChart{
         if (!legend){
             return;
         }
-        legend._leg_g.attr("transform",`translate(0,0)`);
+        legend._leg_g.attr("transform","translate(0,0)");
         this.legend.querySelector("svg").append(legend._leg);
-        delete this.legend._leg;
-        delete this.legend._leg_g;
+        this.legend._leg = undefined;
+        this.legend._leg_g = undefined;
 
     }
 

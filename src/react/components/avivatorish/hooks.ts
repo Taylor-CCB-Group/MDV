@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 // import { useDropzone as useReactDropzone } from 'react-dropzone';
 import { shallow } from 'zustand/shallow';
 // eslint-disable-next-line camelcase
@@ -13,6 +13,7 @@ import {
     useChannelsStoreApi,
     useImageSettingsStoreApi
 } from './state';
+import type { VivConfig } from './state';
 import {
     createLoader,
     buildDefaultSelection,
@@ -22,8 +23,33 @@ import {
     isInterleaved
 } from './utils';
 import { COLOR_PALLETE, FILL_PIXEL_VALUE } from './constants';
+import { useConfig } from '@/react/hooks';
+
+export const useSavedVivConfig = () => {
+    const c = useConfig<{viv: VivConfig}>().viv;
+    const { viewerStore, channelsStore, imageSettingsStore } = c;
+    const viewerStoreApi = useViewerStoreApi();
+    const channelsStoreApi = useChannelsStoreApi();
+    const imageSettingsStoreApi = useImageSettingsStoreApi();
+    const applyConfig = useCallback(() => {
+        viewerStoreApi.setState(state => {
+            const newState = {...state, ...viewerStore};
+            return newState;
+        });
+        channelsStoreApi.setState(state => {
+            const newState = {...state, ...channelsStore};
+            return newState;
+        });
+        imageSettingsStoreApi.setState(state => {
+            const newState = {...state, ...imageSettingsStore};
+            return newState;
+        });
+    }, [viewerStore, channelsStore, imageSettingsStore]);
+    return applyConfig;
+}
 
 export const useImage = (source: {description: string, urlOrFile: string}, history?: any) => {
+    const applyConfig = useSavedVivConfig();
     const [use3d, toggleUse3d, toggleIsOffsetsSnackbarOn] = useViewerStore(
         store => [store.use3d, store.toggleUse3d, store.toggleIsOffsetsSnackbarOn],
         shallow
@@ -84,7 +110,7 @@ export const useImage = (source: {description: string, urlOrFile: string}, histo
                 );
             }
         }
-        if (source) changeLoader();
+        if (source) changeLoader().then(applyConfig);
     }, [source, history]); // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => {
         const changeSettings = async () => {
@@ -141,7 +167,7 @@ export const useImage = (source: {description: string, urlOrFile: string}, histo
                         ? [[255, 255, 255]]
                         : newDomains.map(
                             (_, i) =>
-                                (Channels[i]?.Color && Channels[i].Color.slice(0, -1)) ??
+                                (Channels[i]?.Color?.slice(0, -1)) ??
                                 COLOR_PALLETE[i]
                         );
                 viewerStore.setState({
@@ -172,7 +198,7 @@ export const useImage = (source: {description: string, urlOrFile: string}, histo
                 zSlice
             });
         };
-        if (metadata) changeSettings();
+        if (metadata) changeSettings().then(applyConfig);
     }, [loader, metadata]); // eslint-disable-line react-hooks/exhaustive-deps
 };
 

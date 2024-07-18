@@ -26,7 +26,7 @@ self.onmessage = (event: MessageEvent) => {
         } else if (uniqueTypes.has('boolean')) {
           columnTypes.push('boolean');
         } else if (uniqueTypes.has('string')) {
-          const isDate = columnValues.every((value) => !isNaN(Date.parse(value)));
+          const isDate = columnValues.every((value) => !Number.isNaN(Date.parse(value)));
           columnTypes.push(isDate ? 'date' : 'string');
         } else {
           columnTypes.push('unknown');

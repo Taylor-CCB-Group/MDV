@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useChart, useDataStore } from "../context";
 import { observer } from "mobx-react-lite";
-import { ColumnName } from "../../charts/charts";
+import type { ColumnName } from "../../charts/charts";
 import { useHighlightedIndex } from "../selectionHooks";
 
 function useColumnData(columnName: ColumnName, maxItems = 100) {
@@ -27,8 +27,8 @@ function useColumnData(columnName: ColumnName, maxItems = 100) {
             for (let j = 0; j < indices.length; j++) {
                 const i = indices[j];
                 const v = newColumnData[j] = column.data[i];
-                if (isNaN(v)) {
-                    newColumnData[j] = -Infinity;
+                if (Number.isNaN(v)) {
+                    newColumnData[j] = Number.NEGATIVE_INFINITY;
                 }
             }
             // may want to have a JS array of (index, value) tuples instead of two typed arrays...

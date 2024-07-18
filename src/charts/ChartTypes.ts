@@ -1,5 +1,5 @@
-import DataStore from "../datastore/DataStore";
-import BaseChart from "./BaseChart";
+import type DataStore from "../datastore/DataStore";
+import type BaseChart from "./BaseChart";
 import type { DataSource, ExtraControl, GuiSpecType } from "./charts";
 
 /**

@@ -53,7 +53,7 @@ class LinkDataDialog extends BaseDialog{
         this.dataTypeSelect = createEl("select",{},d);
 
         //
-        for (let id in this.dataTypes){
+        for (const id in this.dataTypes){
             const dt = this.dataTypes[id];
             createEl("option",{value:id ,text:dt.label},this.dataTypeSelect)
         }
@@ -86,7 +86,7 @@ class LinkDataDialog extends BaseDialog{
             ch.colorByColumn(param[0]);
         })
 
-        for (let cid in this.cm.charts){
+        for (const cid in this.cm.charts){
             const cinfo= this.cm.charts[cid];
             if (cinfo.dataSource.name===this.link.dataSource){
                 const ch = cinfo.chart;
@@ -120,7 +120,7 @@ class LinkDataDialog extends BaseDialog{
             
         });
         const list = this.linkDataStore.getColumnList("text");
-        for (let item of list){
+        for (const item of list){
                 
             createEl("option",{value:item.field,text:item.name},select);           
         }
@@ -131,7 +131,7 @@ class LinkDataDialog extends BaseDialog{
         //check to see if already have metadada
         const dt = this.dataTypeSelect.value
         const fieldIds=[];
-        for (let id of this.ids){
+        for (const id of this.ids){
             const cf = this.link.choose_field.id;
             const name  = this.ds.dataStore.getRowText(id,cf);
             fieldIds.push(`${dt}|${name}(${dt})|${id}`);
@@ -148,7 +148,7 @@ class LinkDataDialog extends BaseDialog{
 
     addIdsToList(ids){
         const f = this.link.choose_field.id;
-        for (let id of ids){
+        for (const id of ids){
             if (this.ids.has(id)){
                 continue;
             }

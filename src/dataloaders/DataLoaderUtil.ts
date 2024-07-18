@@ -4,8 +4,8 @@ import { getArrayBufferDataLoader, getLocalCompressedBinaryDataLoader } from "./
 
 let projectRoot = "";
 export async function fetchJsonConfig(url: string, root: string) {
-    let resp = await fetch(url);
     try {
+        const resp = await fetch(url);
         const config = await resp.json();
         //rewriteBaseUrlRecursive(config, root); //removed.
         return config;
@@ -24,9 +24,8 @@ export function buildPath(...args: string[]) {
     return args.map((part, i) => {
         if (i === 0) {
             return part.trim().replace(/[\/]*$/g, '')
-        } else {
-            return part.trim().replace(/(^[\/]*|[\/]*$)/g, '')
         }
+            return part.trim().replace(/(^[\/]*|[\/]*$)/g, '')
     }).filter(x => x.length).join('/')
 }
 
@@ -58,7 +57,7 @@ export function getDataLoader(isStaticFolder: boolean, datasources: Datasource[]
         rowDataLoader: loadRowDataStatic,
         binaryDataLoader: loadBinaryDataStatic
     } : {
-        function: getArrayBufferDataLoader(root+"/get_data"),
+        function: getArrayBufferDataLoader(`${root}/get_data`),
         viewLoader: getView,
         rowDataLoader: loadRowData,
         binaryDataLoader: loadBinaryData
@@ -67,7 +66,7 @@ export function getDataLoader(isStaticFolder: boolean, datasources: Datasource[]
 
     async function loadRowDataStatic(datasource: string, index: string) {
         const resp = await fetch(`${root}/rowdata/${datasource}/${index}.json`);
-        if (resp.status != 200) {
+        if (resp.status !== 200) {
             return null
         }
         return await resp.json()
@@ -82,12 +81,12 @@ export function getDataLoader(isStaticFolder: boolean, datasources: Datasource[]
 
 //loads unstructured data for each row
 async function loadRowData(datasource: string, index: string) {
-    return await getPostData(projectRoot+"/get_row_data", { datasource, index })
+    return await getPostData(`${projectRoot}/get_row_data`, { datasource, index })
 }
 //load view from API
 async function getView(view: string) {
     try {
-        return await getPostData(projectRoot+"/get_view", { view })
+        return await getPostData(`${projectRoot}/get_view`, { view })
     } catch (e) {
         //todo nicer dialog
         const dialog = createEl("dialog", { title: "Error loading view"});
@@ -102,7 +101,7 @@ async function getView(view: string) {
 }
 
 async function loadBinaryData(datasource: string, name: string) {
-    return await getPostData(projectRoot+"/get_binary_data", { datasource, name }, "arraybuffer");
+    return await getPostData(`${projectRoot}/get_binary_data`, { datasource, name }, "arraybuffer");
 }
 //send json args and return json/array buffer response
 export async function getPostData(url: string, args, return_type = "json") {
@@ -120,7 +119,6 @@ export async function getPostData(url: string, args, return_type = "json") {
     if (return_type === "json") {
         return await resp.json();
     }
-    else {
+    
         return await resp.arrayBuffer();
-    }
 }

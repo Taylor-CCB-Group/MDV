@@ -199,7 +199,7 @@ class VivViewerMDV {
     //most of this can move into createLayers()
     const {SizeX, SizeY, SizeZ, Channels: channels} = tiff.metadata.Pixels;
     const target = [SizeX/2, SizeY/2, SizeZ/2];
-    const id = '3d_' + DETAIL_VIEW_ID;
+    const id = `3d_${DETAIL_VIEW_ID}`;
     const loader = tiff.data;
     const n = channels.length;
     // this is wrong in cases where non-default set of channels is used.
@@ -308,7 +308,7 @@ class VivViewerMDV {
             contrastLimits:[],
             domains:[]
         }
-        for (let item of conf){
+        for (const item of conf){
             const name = item.name || item.Name;
             const c = this.channels.findIndex(x => x.Name===name);
             if (c === -1) {
@@ -322,7 +322,7 @@ class VivViewerMDV {
             // todo nicer default colors
             color = color ? typeof item.color === "string" ? hexToRGB(color) : color : [255,0,0];
             nconf.colors.push(color);
-            nconf.channelsVisible.push(item.visible==undefined?true:item.visible);
+            nconf.channelsVisible.push(item.visible===undefined?true:item.visible);
             nconf.contrastLimits.push(item.contrastLimits || null);
             nconf.domains.push(item.domains || null);
         }
@@ -382,7 +382,7 @@ class VivViewerMDV {
     if (this.config.channels){
       image_properties = this._parseChannels(this.config.channels)
     }
-    if (image_properties?.selections) for (let s of image_properties.selections){
+    if (image_properties?.selections) for (const s of image_properties.selections){
       s.id=getRandomString();
     }
     //check if there are any channels without contrast limits and get default values
@@ -395,7 +395,7 @@ class VivViewerMDV {
     }
     //get the default values and continue the set up
     this.getDefaultChannelValues(contrastLimitsToGet).then(data=>{
-        for (let d of data){
+        for (const d of data){
             image_properties.contrastLimits[d.index]=d.stats.contrastLimits;
             image_properties.domains[d.index]=d.stats.domain;
         }

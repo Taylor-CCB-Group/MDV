@@ -81,8 +81,9 @@ class SingleHeatMapGroup extends SVGChart{
         let oset2 = null;
         let y_len = y_col.values.length;
         let x_len = x_col.values.length;
+        // biome-ignore lint/style/useConst: this is very sus - why is there not similar logic for z_len?
         let z_len = z_col.values.length;
-        
+
 
         const so = c.specific_only;
         if (so){
@@ -122,7 +123,7 @@ class SingleHeatMapGroup extends SVGChart{
                         continue;
                     }
                 }
-                let d = data[px][py][fc[i]];
+                const d = data[px][py][fc[i]];
                 if (!d){
                     data[px][py][fc[i]]=[y[i],x[i],vc[i],i,1,fc[i]];
                 }
@@ -171,7 +172,6 @@ class SingleHeatMapGroup extends SVGChart{
         
         const grpWidth= dim.width/x_len_i;
         const arecWidth= (grpWidth-4)/z_len;
-        const self = this;
         const recHeight = dim.height/y_len;
         this.graph_area.selectAll(".heatmap-row")
         .data(this.data)
@@ -192,17 +192,17 @@ class SingleHeatMapGroup extends SVGChart{
         .attr("height",recHeight)
         .attr("width",arecWidth)
         .on("click",(e,d)=>{
-           self.dataStore.dataHighlighted([d[3]],self);
+           this.dataStore.dataHighlighted([d[3]],this);
         })
         .transition(trans)
         .attr("fill",(d,i)=>{
             if (!d){
                 return "#f4f0ec";
             }
-            if (isNaN(d[2])){
+            if (Number.isNaN(d[2])){
                 return "#f4f0ec";
             }
-            return self.colorFunction(d[2]);
+            return this.colorFunction(d[2]);
         });
 
         this.updateAxis();

@@ -5,8 +5,9 @@ import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
 import { StrictMode } from "react";
 import { createEl } from "../../utilities/ElementsTyped";
-import { Chart, DataSource } from "../../charts/charts";
+import type { Chart, DataSource } from "../../charts/charts";
 import { toPng, toSvg } from "html-to-image";
+import { ProjectProvider } from "@/modules/ProjectContext";
 
 function Fallback() {
     return <>
@@ -45,6 +46,7 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  */
 export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     declare config: T & BaseConfig;
+    declare popoutIcon: HTMLElement;
     get dataSource(): DataSource {
         return window.mdv.chartManager.charts[this.config.id].dataSource;
     }
@@ -81,9 +83,11 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         const ReactComponentFunction = this.ComponentFn;
         this.root = createMdvPortal((
             <StrictMode>
-                <ChartProvider chart={this} materialui>
-                    <ReactComponentFunction />
-                </ChartProvider>
+                <ProjectProvider>
+                    <ChartProvider chart={this} materialui>
+                        <ReactComponentFunction />
+                    </ChartProvider>                    
+                </ProjectProvider>
             </StrictMode>
         ), this.reactEl);
     }

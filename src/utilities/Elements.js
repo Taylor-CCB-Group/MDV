@@ -11,13 +11,13 @@ function createSVGEl(type,attrs,parent){
     const el = document.createElementNS("http://www.w3.org/2000/svg", type);
 
     if (attrs){
-        for (var idx in attrs) {
+        for (const idx in attrs) {
             if ((idx === 'styles' || idx === 'style') && typeof attrs[idx] === 'object') {
-                for (var prop in attrs[idx]){el.style[prop] = attrs[idx][prop];}
+                for (const prop in attrs[idx]){el.style[prop] = attrs[idx][prop];}
             } else if (idx === 'text') {
                 el.textContent = attrs[idx];
             } else if (idx==="classes"){
-                for (var cl of attrs[idx]){el.classList.add(cl)}
+                for (const cl of attrs[idx]){el.classList.add(cl)}
                  
             } else {
                 el.setAttributeNS(null,idx, attrs[idx]);
@@ -80,13 +80,13 @@ function createMenuIcon(icon,config,parent){
 
 }
 function addElProps(el,attrs){
-    for (var idx in attrs) {
+    for (const idx in attrs) {
         if ((idx === 'styles' || idx === 'style') && typeof attrs[idx] === 'object') {
-            for (var prop in attrs[idx]){el.style[prop] = attrs[idx][prop];}
+            for (const prop in attrs[idx]){el.style[prop] = attrs[idx][prop];}
         } else if (idx === 'text') {
             el.textContent = attrs[idx];
         } else if (idx==="classes"){
-            for (var cl of attrs[idx]){el.classList.add(cl)}
+            for (const cl of attrs[idx]){el.classList.add(cl)}
              
         } else {
             el.setAttribute(idx, attrs[idx]);
@@ -112,7 +112,7 @@ export function createFilterElement(selectEl, parent) {
     }, parent);
     filter.oninput = (e) => {
         const val = e.target.value.toLowerCase().split(" ");
-        for (let o of selectEl.options) {
+        for (const o of selectEl.options) {
             const filter = val.some((v) => o.text.toLowerCase().indexOf(v) === -1);
             if (filter) {
                 o.style.display = "none";
@@ -185,7 +185,7 @@ function makeSortable(list,config={}){
 
     //add dummy element, allows items to be dragged to the beginning
     //of the list i.e. after the dummy element
-    let firstDummyEl= createEl("div",  {styles:{height:"5px"}});
+    const firstDummyEl= createEl("div",  {styles:{height:"5px"}});
     list.prepend(firstDummyEl);
     firstDummyEl.addEventListener("dragover",handleDragOver);
     //add drag events to all child elements
@@ -230,14 +230,14 @@ function makeResizable(el,config={}){
     function initDrag(e) {
         ri.startX = e.clientX;
         ri.startY = e.clientY;
-        ri.startWidth = parseInt(document.defaultView.getComputedStyle(el).width, 10);
-        ri.startHeight = parseInt(document.defaultView.getComputedStyle(el).height, 10);
+        ri.startWidth = Number.parseInt(document.defaultView.getComputedStyle(el).width, 10);
+        ri.startHeight = Number.parseInt(document.defaultView.getComputedStyle(el).height, 10);
         el.__doc__.documentElement.addEventListener("mousemove", doDrag, false);
         el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
     }
     function doDrag(e) {
-        el.style.width = (ri.startWidth + e.clientX - ri.startX) + "px";
-        el.style.height = (ri.startHeight + e.clientY - ri.startY) + "px";
+        el.style.width = `${ri.startWidth + e.clientX - ri.startX}px`;
+        el.style.height = `${ri.startHeight + e.clientY - ri.startY}px`;
     }
     function stopDrag(e) {
         el.__doc__.documentElement.removeEventListener("mousemove", doDrag, false);
@@ -256,7 +256,7 @@ function removeResizable(el){
     if (ri.onresize){
         el.removeEventListener("mouseup",ri.onresize)
     }
-    delete el.__resizeinfo__;
+    el.__resizeinfo__ = undefined;
 
 
 }
@@ -269,7 +269,7 @@ function removeDraggable(el){
      d.handle.style.cursor=d.cursor;
      el.style.position=d.position;
      d.handle.onmousedown=null;
-     delete el.__draginfo__;
+     el.__draginfo__ = undefined;
 }
 
 
@@ -304,10 +304,13 @@ function makeDraggable(el,config={}){
         config.doc=document;
     }
 
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    let  handle= config.handle?el.querySelector(config.handle):el;
+    let pos1 = 0;
+    let pos2 = 0;
+    let pos3 = 0;
+    let pos4 = 0;
+    const  handle= config.handle?el.querySelector(config.handle):el;
     let cont = null;
-    let is_moving=false;
+    const is_moving=false;
     if (config.contain){
         cont={
             dir:config.contain
@@ -357,8 +360,8 @@ function makeDraggable(el,config={}){
         pos3 = e.clientX;
         pos4 = e.clientY;
         // set the element's new position:
-        let nt  = el.offsetTop -pos2;
-        let nl = el.offsetLeft - pos1;
+        const nt  = el.offsetTop -pos2;
+        const nl = el.offsetLeft - pos1;
         if (cont){
             if (nt<0 || (nt+cont.c_bb.height>cont.p_bb.height && cont.dir !=="topleft")){
                 return;
@@ -368,9 +371,9 @@ function makeDraggable(el,config={}){
             }
         }
         if (!config.y_axis){
-            el.style.top = (nt) + "px";
+            el.style.top = `${nt}px`;
         }
-        el.style.left = (nl) + "px";
+        el.style.left = `${nl}px`;
     }
   
     function closeDragElement() {
@@ -384,11 +387,11 @@ function makeDraggable(el,config={}){
 }
 
 function addResizeListener(element, endCallback, startCallback){
-    let box = element.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
     let width = box.width;
     let height = box.height;
     const list = (e)=>{
-        let box = element.getBoundingClientRect();
+        const box = element.getBoundingClientRect();
         if (box.width!==width || box.height!==height){
             endCallback(box.width,box.height);
         }
@@ -401,9 +404,9 @@ function addResizeListener(element, endCallback, startCallback){
 }
 
 function getElDim(el){
-    var rect = el.getBoundingClientRect(),
-    scrollLeft = window.pageXOffset || document.documentElement.scrollLeft,
-    scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const rect = el.getBoundingClientRect();
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     return { top: rect.top + scrollTop, left: rect.left + scrollLeft ,height:rect.height,width:rect.width}
 
 }

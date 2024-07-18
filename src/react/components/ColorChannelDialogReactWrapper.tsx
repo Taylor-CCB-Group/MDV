@@ -20,9 +20,13 @@ class ColorDialogReactWrapper extends BaseDialog {
         this._root = v;
     }
     constructor(parent: VivMDVReact) {
+        if (parent.__doc__ !== document) console.warn('ColorDialogReactWrapper may have styling issues in popouts...');
         const config = {
-            width: 500, title: `Color Channels (${parent.config.title})`, doc: document,
-            onclose: () => { (parent as any).colorDialog = null} //todo fix types
+            width: 500, title: `Color Channels (${parent.config.title})`, doc: parent.__doc__ || document,
+            onclose: () => { 
+                parent.colorDialog = null;
+                parent.dialogs.splice(parent.dialogs.indexOf(this), 1);
+            }
         };
         super(config, parent)
     }

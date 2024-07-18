@@ -42,6 +42,7 @@ class MLVPanel {
 	* @param {object} config - A config with the panel settings
 	*/
 	constructor (div,config={},tracks=[]) {
+		this.__doc__=document;
 		if (typeof div === "string"){
 			this.trackDiv=document.getElementById("#"+div)
 		}
@@ -136,6 +137,7 @@ class MLVPanel {
        	}
 
 		this.__doc__=document;
+		this.config=config;
       
        
        	this.retries=0;
@@ -148,6 +150,20 @@ class MLVPanel {
 			classes:["panel-error-message"]
 		},this.trackDiv)
     }
+
+	changeBaseDocument(doc){
+		if (this.config.allow_user_interactions){
+			this.removeDragHandler();
+			this.disableUserZoom();
+		}
+		this.remove
+		this.__doc__=doc;
+		if (this.config.allow_user_interactions){
+			this.allowUserDrag();
+			// not sure why zoom is not working otherwise.
+			this.allowUserZoom();
+		}
+	}
 
 	closeAllDialogs(){
 		for (let td in this.trackDialogs){
@@ -1001,6 +1017,7 @@ class MLVPanel {
 
 
     allowUserDrag(){
+		console.log('allowUserDrag')
 		this.drmdListener= e => {
     	 	if (e.shiftKey){
     	 		return;
@@ -1056,20 +1073,22 @@ class MLVPanel {
                }
         }
 
-		window.addEventListener("mousemove",this.drmmListener)
+		// >>> popout behaviour (we're not directly in a chart here, may need to pass a prop...)
+		// originally used this.trackDiv, which led to a bug where the move event would not be removed
+		this.__doc__.addEventListener("mousemove",this.drmmListener)
 
         this.drmuListener = e => {   
               this.is_dragging=false;
               this.start_dragging=false;
         }
-		window.addEventListener("mouseup",this.drmuListener)
+		this.__doc__.addEventListener("mouseup",this.drmuListener)
   
     }
 
     removeDragHandler(){
     	this.trackDiv.removeEventListener("mousedown",this.drmdListener);
-		window.removeEventListener("mousemove",this.drmmListener);
-		window.removeEventListener("mouseup",this.drmuListener);
+		this.__doc__.removeEventListener("mousemove",this.drmmListener);
+		this.__doc__.removeEventListener("mouseup",this.drmuListener);
 		this.drmdListener=null;
 		this.drmmListener=null;
 		this.drmuListener=null;

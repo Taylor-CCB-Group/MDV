@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "cross-env build=dev_pt vite --host",
     "vite-build": "tsc && cross-env build=dev_pt vite build --outDir ./vite-dist",
-    "build": "webpack --env build=desktop",
+    "build": "cross-env build=desktop vite build --outDir ./dist",
     "build-nofont": "cross-env build=production nofont=true vite build --outDir ./dist/basic",
     "build-flask-vite": "cross-env build=desktop_pt vite build --outDir ./python/mdvtools/static",
     "docs-env-setup": "python -m venv docsenv && source docsenv/bin/activate && cd docs && pip install -r requirements.txt && npm run build-docs-nix",
@@ -88,6 +88,7 @@
     "zustand": "^4.4.5"
   },
   "devDependencies": {
+    "@biomejs/biome": "1.8.3",
     "@types/node": "^20.12.7",
     "@types/react-dom": "^18.2.14",
     "@vitejs/plugin-react": "^4.2.1",
@@ -99,13 +100,9 @@
     "style-loader": "^3.3.1",
     "tailwindcss": "^3.4.3",
     "ts-loader": "^9.5.1",
-    "typedoc": "^0.25.13",
-    "typescript": "^5.3.3",
-    "vite": "^5.2.8",
-    "webpack": "^5.74.0",
-    "webpack-bundle-analyzer": "^4.7.0",
-    "webpack-cli": "^4.10.0",
-    "webpack-dev-server": "^4.11.1"
+    "typedoc": "^0.26.1",
+    "typescript": "^5.5.2",
+    "vite": "^5.2.8"
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "^0.20.1",

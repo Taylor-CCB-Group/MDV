@@ -19,7 +19,7 @@ export class ColorChannelDialog extends BaseDialog{
         const viv = this.viv=contents.viv;
         this.mainDiv=createEl("div",{},this.dialog)
         const channels  =this.viv.getSelectedChannels();
-        for (let c of channels){
+        for (const c of channels){
             this.addSlider(c);
         }
 
@@ -50,7 +50,7 @@ export class ColorChannelDialog extends BaseDialog{
             classes:["ciview-button-sm"],
             text:"Add Channel"
         },addDiv).addEventListener("click",()=>{
-            this.viv.addChannel({index:parseInt(sel.value),color:cca.value}).then(ch=>this.addSlider(ch));
+            this.viv.addChannel({index:Number.parseInt(sel.value),color:cca.value}).then(ch=>this.addSlider(ch));
         })
         createEl("button",{
             classes:["ciview-button-sm"],
@@ -98,7 +98,7 @@ export class ColorChannelDialog extends BaseDialog{
             tooltips:true
         },cont);
         sl.noUiSlider.on("update",(values)=>{
-            item.contrastLimits=[parseFloat(values[0]),parseFloat(values[1])];
+            item.contrastLimits=[Number.parseFloat(values[0]),Number.parseFloat(values[1])];
             this.viv.setChannel(item);
         });
         const cc= createEl("input",{
@@ -244,7 +244,7 @@ class VivScatterPlot extends DensityScatterPlot{
                                 if (base.startsWith("./")){
                                     base=base.substring(2)
                                 }
-                                base= window.location.href.split("?")[0]+"/"+base;
+                                base= `${window.location.href.split("?")[0]}/${base}`;
                             }
                         }
                         url = base + i.file;          
@@ -254,7 +254,7 @@ class VivScatterPlot extends DensityScatterPlot{
                 this.viv = new VivViewerMDV(this.vivCanvas,vc,this.app);
                 this.app.addHandler("pan_or_zoom",(offset,x_scale,y_scale)=>{
                     this.viv.setPanZoom(offset,x_scale,y_scale)
-                },c.id+"_viv")
+                },`${c.id}_viv`)
             });
         }
         return super.afterAppCreation();
@@ -269,7 +269,7 @@ BaseChart.types["viv_scatter_plot"]={
     ,
     extra_controls:(ds)=>{
         const vals=[];
-        for(let x in ds.regions.all_regions){
+        for(const x in ds.regions.all_regions){
             if (ds.regions.all_regions[x].viv_image){
                 vals.push({name:x,value:x});
             }      
@@ -285,7 +285,7 @@ BaseChart.types["viv_scatter_plot"]={
     },
     init:(config, ds, ec)=>{
         BaseChart.types["image_scatter_plot"].init(config,ds,ec);
-        delete config.background_image;
+        config.background_image = undefined;
         config.radius=0.5;
         config.viv={
             channels:ds.regions.avivator.default_channels,
