@@ -1276,75 +1276,16 @@ class WGL2DI{
 
             this._finish(evt);
             if (!this.dragging && !(this.brush || this.poly_brush) && evt.button===0){
-                    const position =this._getMousePosition(evt);
-                    const obj = this._getObjectAtPosition(position);
-					const apos= this._getActualPosition(position);
-                    if (obj){
-                        for (const i in this.handlers.object_clicked){
-                            this.handlers.object_clicked[i](obj,apos);
-                        }  
-                    }
+				const position =this._getMousePosition(evt);
+				const obj = this._getObjectAtPosition(position);
+				const apos= this._getActualPosition(position);
+				if (obj){
+					for (const i in this.handlers.object_clicked){
+						this.handlers.object_clicked[i](obj,apos);
+					}  
+				}
             }
-        
-            
-			/*//just a click event - inform handlers
-			if (self.config.brush){
-				self.div_container.style.cursor="crosshair";
-			}
-			if (self.brush && self.brush.resizing){
-				self._brushingStopped();
-				//return;
-			}
-			if (self.poly_brush && self.poly_brush.active){
-				self._finishPolyBrush();
-			}
-			if (!self.dragging && !(self.brush || self.poly_brush)){
-				//if (self.object_clicked){
-					var position =self._getMousePosition(evt);
-					var obj = self._getObjectAtPosition(position);
-					if (obj){
-						for (var i in self.handlers.object_clicked){
-							self.handlers.object_clicked[i](obj);
-						}  
-					}
-				//}
-
-			}
-			else{
-				//an object has finshed its drag
-				if (self.object_clicked){
-					self.object_clicked=null;
-					self.refresh(true);              
-				}
-				
-				//update which objects are now in view
-				else{
-					let ret = self.getRange();
-					if (self.loop){
-						self.loop.cancel();
-						self.loop=null;
-					}
-				
-					
-					
-					  
-
-					//self._drawPickBuffer(false);
-					//self._getObjectsInView();
-				
-					self.refresh();
-					ret.imageMoved= self.imageMoved;
-					self.imageMoved=null;
-					for (var i in self.handlers.panning_stopped){
-							self.handlers.panning_stopped[i](ret);
-					}
-				}
-				self.dragging=false;
-			}
-			self.object_clicked=null;
-			self.mouse_position=null;   */
 		};
-
 		this.div_container.addEventListener('wheel', (event)=> {
 			event.preventDefault();
 			const position =this._getActualPosition(this._getMousePosition(event));
@@ -1420,7 +1361,11 @@ class WGL2DI{
 				this.refresh();
 			}, 350);
 
-		});
+		}, { passive: false });
+		// https://github.com/Taylor-CCB-Group/MDV/issues/78 suggestion to add
+		// {passive: true} above to help with Chrome issue on popout. 
+		// Doesn't fix it for me, although setting to *false* does get rid of a console error
+		// "Unable to preventDefault inside passive event listener invocation."
 		this.div_container.addEventListener("mousedown", (evt) => {
 			this.__doc__.addEventListener("mousemove",mousemoveDragging);
 			this.__doc__.addEventListener("mouseup",mouseup);
