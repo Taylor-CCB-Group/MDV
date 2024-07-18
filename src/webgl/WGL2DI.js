@@ -219,7 +219,8 @@ class WGL2DI{
 			canvas:this.canvas,
 			attributes:{
 				antialias: false,
-				preserveDrawingBuffer: true //allows us to screenshot entire page without app.refresh() logic.
+				preserveDrawingBuffer: true, //allows us to screenshot entire page without app.refresh() logic.
+				willReadFrequently: true
 			}
 		});
 
