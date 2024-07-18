@@ -16,7 +16,7 @@ import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 from dotenv import load_dotenv
 
 from .github_utils import crawl_github_repo, extract_python_code_from_py, extract_python_code_from_ipynb
-from .templates import get_createproject_prompt_RAG, prompt
+from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import prepare_code
 from .code_execution import execute_code
 
@@ -102,7 +102,8 @@ class ProjectChat():
         self.log(f"Asking the LLM: '{question}'")
         if not self.ok:
             return "This agent is not ready to answer questions"
-        full_prompt = prompt + "\nQuestion: " + question
+        full_prompt = prompt_data + "\nQuestion: " + question
+        print(full_prompt)
         try:
             # sometimes this tries to draw with matplotlib... which causes an error that we can't catch
             # we don't control the code that's being run by the agent...
@@ -164,7 +165,7 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project', 
         dataframe_llm, df_short, verbose=True, handle_parse_errors=True, allow_dangerous_code=True
     )
 
-    full_prompt = prompt + "\nQuestion: " + user_question
+    full_prompt = prompt_data + "\nQuestion: " + user_question
 
     log('# the agent might raise an error. Sometimes repeating the same prompt helps...')
     response = agent.invoke(full_prompt) # agent.run is deprecated

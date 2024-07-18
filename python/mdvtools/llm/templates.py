@@ -1,15 +1,10 @@
 
-prompt = """
+prompt_data = """
 Based on the question asked and the CSV, please perform the following steps:
 
 1. Identify the data asked for in the question.
 2. Based on step 1, find the relevant column names in the CSV based on the information identified earlier in the question asked regarding data.
 3. Provide the relevant column names from step 2 in a list.
-4. For the purposes of this query, if the plot required is one of these:
-    a. heatmap
-    b. dot plot
-    c. box plot
-the suitable parameters should always be a categorigal variable (object or categorical) followed by numerical variables.
 """
 
 

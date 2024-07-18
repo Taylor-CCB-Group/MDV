@@ -313,4 +313,4 @@ p.add_rows_as_columns_subgroup("cells","genes","gs",adata.X,name="scores",label=
 
 p.set_view("default", view_config)
 p.set_editable(True)
-p.serve()
+p.serve(websocket=True)
