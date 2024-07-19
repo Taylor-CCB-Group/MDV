@@ -782,7 +782,15 @@ class ChartManager{
         //nothing to load - call any listeners
         if (this._toLoadCharts.size===0){
             this._toLoadCharts = undefined;
-            this._callListeners("view_loaded",this.currentView)
+            if (this.currentView === undefined) {
+                if (this.dataSources.length === 0) new FileUploadDialogReact();
+                else {
+                    // todo - separate out view code, with a solid model and start making some nice ui etc...
+                    this.showAddViewDialog();
+                }
+            } else {
+                this._callListeners("view_loaded",this.currentView);
+            }
         }
         //add charts - any columns will be added dynamically
         this._inInit = true;
@@ -889,8 +897,6 @@ class ChartManager{
                         const state = this.getState();
                         this._callListeners("state_saved",state);
                     }
-                   
-                    
                 }
             }]
         })

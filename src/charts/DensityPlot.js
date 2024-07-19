@@ -7,6 +7,7 @@ import {scaleSequential,scaleLinear} from 'd3-scale';
 import {interpolateYlGnBu} from 'd3-scale-chromatic';
 
 
+/** @deprecated currently unused? */
 class DensityPlot extends SVGChart{
     constructor(dataStore,div,config){
 		const x_name= dataStore.getColumnName(config.param[0]);
@@ -27,7 +28,7 @@ class DensityPlot extends SVGChart{
         this.dim=this.dataStore.getDimension("density_dimension");
         const mm1= this.dataStore.getMinMaxForColumn(c.param[0]);
         const mm2= this.dataStore.getMinMaxForColumn(c.param[1]);
-        this.contentDiv.addEventListener("wheel",e=>this.zoom(e));
+        this.contentDiv.addEventListener("wheel",e=>this.zoom(e), { passive: false });
         this.x_sc=1;
         this.y_sc=1;
         this._setRatio();
