@@ -89,6 +89,45 @@ const ChannelChooser = ({index}: {index: number}) => {
     )
 }
 
+const BrightnessContrast = ({ index }: { index: number }) => {
+    const { contrast, brightness } = useChannelsStore(({ contrast, brightness }) => ({ contrast, brightness }));
+    const channelsStore = useChannelsStoreApi();
+    const isChannelLoading = useViewerStore(state => state.isChannelLoading);
+    return (
+        <div className="col-span-4">
+        contrast:
+            <Slider
+                size="small"
+                disabled={isChannelLoading[index]}
+                value={contrast[index]}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={(_, v) => {
+                    contrast[index] = v as number;
+                    const newContrast = [...contrast];
+                    channelsStore.setState({ contrast: newContrast });
+                }}
+            />
+        brightness:
+            <Slider
+                size="small"
+                disabled={isChannelLoading[index]}
+                value={brightness[index]}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={(_, v) => {
+                    brightness[index] = v as number;
+                    const newbrightness = [...brightness];
+                    channelsStore.setState({ brightness: newbrightness });
+                }}
+            />
+        </div>
+    )
+}
+
+
 const ChannelController = ({ index }: { index: number }) => {
     const limits = useChannelsStore(({ contrastLimits }) => contrastLimits); //using shallow as per Avivator *prevents* re-rendering which should be happening
     const {colors, domains, channelsVisible, removeChannel} = useChannelsStore(({ colors, domains, channelsVisible, removeChannel }) => (
@@ -155,6 +194,7 @@ const ChannelController = ({ index }: { index: number }) => {
             }}>
                 <X />
             </button>
+            <BrightnessContrast index={index} />
         </div>
         </>
     )

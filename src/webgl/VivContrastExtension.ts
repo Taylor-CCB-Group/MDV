@@ -1,11 +1,15 @@
 import { type Layer, LayerExtension, type UpdateParameters } from "deck.gl/typed";
 
-export default class VivContrastExtension extends LayerExtension {
+export type ContrastProps = {
+    contrast: number[],
+    brightness: number[],
+}
+
+export default class VivContrastExtension extends LayerExtension<ContrastProps> {
     static get componentName(): string {
         return 'VivContrastExtension';
     }
-    // biome-ignore lint/complexity/noBannedTypes: deck.gl idiosyncracy
-    getShaders(this: Layer<{}>, extension: this) {
+    getShaders(this: Layer<ContrastProps>, extension: this) {
         return {
             inject: {
                 'fs:#decl': /*glsl*/`///----- VivContrastExtension decl
@@ -42,12 +46,23 @@ export default class VivContrastExtension extends LayerExtension {
             }
         }
     }
-    // biome-ignore lint/complexity/noBannedTypes: deck.gl idiosyncracy
-    updateState(this: Layer<{}>, params: UpdateParameters<Layer<{}>>, extension: this): void {
+    updateState(this: Layer<ContrastProps>, params: UpdateParameters<Layer<ContrastProps>>, extension: this): void {
+        const { props } = params;
+        const { contrast, brightness } = props;
         // should be arrays of 6... probably in imageSettingsStore.
-        // const { contrast, brightness } = this.props;
-        const contrast = [0.75, 0.75, 0.75, 0.75, 0.75, 0.75];
-        const brightness = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+        // --- would be nice if viv etc were better about managing variable number of channels ---
+        if (contrast.length !== 6 || brightness.length !== 6) {
+            // throw new Error('contrast and brightness must be arrays of length 6');
+            const contrastA = Array(6);
+            const brightnessA = Array(6);
+            for (let i = 0; i < 6; i++) {
+                //don't really car about default values for missing entries...
+                contrastA[i] = contrast[i] ?? 1;
+                brightnessA[i] = brightness[i] ?? 0;
+            }
+            for (const model of this.getModels()) model.setUniforms({ contrast: contrastA, brightness: brightnessA });
+            return;
+        }
         for (const model of this.getModels()) model.setUniforms({ contrast, brightness });
     }
 }

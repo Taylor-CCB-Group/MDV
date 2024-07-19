@@ -91,12 +91,14 @@ const Main = observer(() => {
     const {scatterplotLayer, getTooltip} = scatterProps;
     const jsonLayer = useJsonLayer();
 
-    const [colors, contrastLimits, channelsVisible, selections] = useChannelsStore(
+    const [colors, contrastLimits, channelsVisible, selections, brightness, contrast] = useChannelsStore(
         store => [
             store.colors,
             store.contrastLimits,
             store.channelsVisible,
-            store.selections
+            store.selections,
+            store.brightness,
+            store.contrast
         ],
         shallow
     );
@@ -135,6 +137,8 @@ const Main = observer(() => {
         extensions,
         colors,
         channelsVisible,
+        brightness,
+        contrast
     }
     const deckProps = {
         getTooltip,
