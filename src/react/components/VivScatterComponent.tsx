@@ -91,15 +91,11 @@ const Main = observer(() => {
     const {scatterplotLayer, getTooltip} = scatterProps;
     const jsonLayer = useJsonLayer();
 
-    const [colors, contrastLimits, channelsVisible, selections, brightness, contrast] = useChannelsStore(
-        store => [
-            store.colors,
-            store.contrastLimits,
-            store.channelsVisible,
-            store.selections,
-            store.brightness,
-            store.contrast
-        ],
+    // maybe more efficient to pick out properties like this... but it's very repetitive/verbose
+    const {colors, contrastLimits, channelsVisible, selections, brightness, contrast} = useChannelsStore(
+        ({ colors, contrastLimits, channelsVisible, selections, brightness, contrast }) => {
+            return { colors, contrastLimits, channelsVisible, selections, brightness, contrast }
+        },
         shallow
     );
 
