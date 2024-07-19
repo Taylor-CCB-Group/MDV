@@ -192,10 +192,10 @@ const AddChannel = () => {
 }
 
 export const Test = () => {
-    const colors = useChannelsStore(({ colors }) => colors);
+    const ids = useChannelsStore(({ ids }) => ids);
     return <div style={{width: '100%'}}>{
-        colors.map((_, i) => (
-            <ChannelController key={i} index={i} />
+        ids.map((id, i) => (
+            <ChannelController key={id} index={i} />
         ))}
         <AddChannel />
     </div>
