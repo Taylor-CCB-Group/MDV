@@ -193,7 +193,7 @@ const AddChannel = () => {
 
 export const Test = () => {
     const ids = useChannelsStore(({ ids }) => ids);
-    return <div style={{width: '100%'}}>{
+    return <div className=" bg-[hsl(var(--input))] w-full">{
         ids.map((id, i) => (
             <ChannelController key={id} index={i} />
         ))}
