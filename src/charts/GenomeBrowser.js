@@ -12,7 +12,7 @@ class GenomeBrowser extends BaseChart{
         c.type="genome_browser";
         const add_ruler= !c.tracks.find(x=>x["format"]==="ruler");
 
-        import ('../browser/panel.js?v0.1').then(({default:MLVPanel})=>{
+        import ('../browser/panel.js?v0.3').then(({default:MLVPanel})=>{
             this.browser = new MLVPanel(this.contentDiv,{
                 allow_user_interactions:true,
                 show_scale:true,
@@ -572,6 +572,9 @@ BaseChart.types["genome_browser"]={
             decode_function:"generic",
             displayMode:"EXPANDED"
         };
+        if  (gb.default_track.type){
+            df.type=gb.default_track.type;
+        }
         config.tracks=[df];
         if (gb.default_track_parameters){
             Object.assign(df,gb.default_track_parameters)

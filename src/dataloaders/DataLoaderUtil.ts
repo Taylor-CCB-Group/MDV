@@ -11,7 +11,7 @@ export async function fetchJsonConfig(url: string, root: string) {
         return config;
     } catch (e) {
         console.error(`Error fetching ${url}: ${e}`);
-        return {error: e};
+        return { error: e };
     }
 }
 
@@ -84,7 +84,8 @@ async function loadRowData(datasource: string, index: string) {
     return await getPostData(`${projectRoot}/get_row_data`, { datasource, index })
 }
 //load view from API
-async function getView(view: string) {
+async function getView(view?: string) {
+    if (!view) return undefined; //this seems to be a somewhat reasonable way to handle empty project with no views - but could do with more testing...
     try {
         return await getPostData(`${projectRoot}/get_view`, { view })
     } catch (e) {

@@ -112,6 +112,7 @@ export const useImage = (source: {description: string, urlOrFile: string}, histo
         }
         if (source) changeLoader().then(applyConfig);
     }, [source, history]); // eslint-disable-line react-hooks/exhaustive-deps
+    // biome-ignore lint/correctness/useExhaustiveDependencies: suppressed in viv as well, and would cause a bunch of re-running...
     useEffect(() => {
         const changeSettings = async () => {
             // Placeholder

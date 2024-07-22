@@ -25,11 +25,11 @@ function processArrayBuffer(data,columns,size){
 	let offset=0;
 	for (const column of columns){
         //default values for numbers
-		let arrayType= column.datatype==="int32"?Int32Array:Float32Array;
+        let arrayType= column.datatype==="int32"?Int32Array:Float32Array;
         //the length of the typed array
-		let arr_len=size;
+        let arr_len=size;
         //the number of bytes for each item in the column's data
- 		let bytes=4;
+        let bytes=4;
         //set the correct values for other datatypes
 		if (column.datatype==="unique" || column.datatype==="text"){
 			arrayType=Uint8Array;
@@ -59,23 +59,23 @@ function processArrayBuffer(data,columns,size){
 			const l = new Uint32Array(data,offset,1)[0];
 			offset+=4;
             //get the indexes
-			const indexes = new Uint32Array(data,offset,l);
-			offset+=l*4;
+            const indexes = new Uint32Array(data,offset,l);
+            offset+=l*4;
             //get the values
-			const values = new Float32Array(data,offset,l)
-			offset+=l*4;
-			const sab = new SharedArrayBuffer(size*4);
-			const new_arr= new Float32Array(sab);
+            const values = new Float32Array(data,offset,l)
+            offset+=l*4;
+            const sab = new SharedArrayBuffer(size*4);
+            const new_arr= new Float32Array(sab);
             //fill array with missing values
 			new_arr.fill(Number.NaN);
             //add the sparse data
-			for (let i=0;i<indexes.length;i++){
-				new_arr[indexes[i]]=values[i];	
-			}
-			dataList.push({data:sab,field:column.field});
-		}
-		else{
-			const len  = size*bytes;
+            for (let i=0;i<indexes.length;i++){
+                new_arr[indexes[i]]=values[i];	
+            }
+            dataList.push({data:sab,field:column.field});
+        }
+        else{
+            const len  = size*bytes;
             //get the data from the arraybuffer into a SharedArrayBuffer
             //unfortunately cannot be copied directly-  have to via a typed Array
 			const arr = new arrayType(data,offset,arr_len);
@@ -104,21 +104,22 @@ function processArrayBuffer(data,columns,size){
 * @param url {string} - The url of the api
 * @returns {function} a dataloader that can be used to construct {@link ChartManager}
 **/
-function getArrayBufferDataLoader(url){
-	return async(columns,dataSource,size)=>{
-		//get the data
-		const response = await fetch(url,{
-			method:"POST",
-			body:JSON.stringify({columns:columns,data_source:dataSource}),
-			headers: {
-				'Content-Type': 'application/json'
-			}
-		});
-		//the data is any arraybuffer containing each individual 
-		//column's raw data
-		const data = await response.arrayBuffer();
-		return processArrayBuffer(data,columns,size);
-	}
+function getArrayBufferDataLoader(url,decompress=false){
+    return async(columns,dataSource,size)=>{
+        //get the data
+        const response = await fetch(url,{
+            method:"POST",
+            body:JSON.stringify({columns:columns,data_source:dataSource}),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        //the data is any arraybuffer containing each individual 
+        //column's raw data
+        let data = await response.arrayBuffer();
+        data = decompress?await decompressData(data):data;
+        return processArrayBuffer(data,columns,size);
+    }
 }
 
 /**
