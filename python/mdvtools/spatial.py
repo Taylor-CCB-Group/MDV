@@ -59,10 +59,12 @@ def create_interaction_matrix_view(project,interaction_datasource,exclude_groups
         groups= col["values"]
         charts=[]
         y=5
+        x=5
         for metric in interaction_metrics:
             x=5
+            chart = {} # for pyright - not ideal.
             for group in groups:
-                if not group in exclude_groups:
+                if group not in exclude_groups:
                     chart = project.get_interaction_matrix(interaction_datasource,group,
                                                            metric,square_size=square_size)
                     chart["position"]=[x,y]

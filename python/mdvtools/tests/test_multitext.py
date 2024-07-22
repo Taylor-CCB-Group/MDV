@@ -23,7 +23,7 @@ def test_compliant_multitext():
         assert(not isinstance(different_cols, bool))
         assert(not any(different_cols))
         # this method is implicated in not gettting the right data type to send to the client
-        byte_data = p.get_byte_data([{ 'datasource': 'mt', 'column': 'test_data' }], None)  # <HDF5 dataset "__tags": shape (N,), type "<u2">
+        # byte_data = p.get_byte_data([{ 'datasource': 'mt', 'column': 'test_data' }], None)  # <HDF5 dataset "__tags": shape (N,), type "<u2">
         # <u2 is the NumPy little-endian unsigned 2-byte integer datatype, seems right for text16
         # for 'text' <HDF5 dataset "__tags": shape (N,), type "|u1">
         # todo catch the error with __tags saved from frontend...
