@@ -290,7 +290,7 @@ class MDVProject:
         if raw:
             return raw_data
         dt = cm["datatype"]
-        if dt == "text":
+        if dt == "text" or dt == "text16":
             data = [cm["values"][x] for x in raw_data]
         elif dt == "multitext":
             chunksize = raw_data.shape[0] / cm["stringLength"]
@@ -490,6 +490,7 @@ class MDVProject:
         parameters=["chr", "start", "end"],
         name=None,
         extra_params=None,
+        custom_track=None,
         overwrite=False,
     ):
         """
@@ -516,22 +517,40 @@ class MDVProject:
             raise AttributeError(
                 f"genome browser track already exists for {datasource}"
             )
-        # get all the genome locations
-        loc = [self.get_column(datasource, x) for x in parameters]
-        # write to a bed file
-        # nb - should check whether it actually improves anything adding {name} to filenames
-        bed = join(self.trackfolder, f"t_{name}.bed")
-        o = open(bed, "w")
-        for c, (chr, start, end) in enumerate(zip(loc[0], loc[1], loc[2])):
-            o.write(f"{chr}\t{start}\t{end}\t{c}\n")
-        o.close()
-        indexed_bed = join(self.trackfolder, f"loc_{name}.bed")
-        create_bed_gz_file(bed, indexed_bed)
-        os.remove(bed)
+        if not custom_track:
+            # get all the genome locations
+            loc = [self.get_column(datasource, x) for x in parameters]
+            # write to a bed file
+            # nb - should check whether it actually improves anything adding {name} to filenames
+            # bed = join(self.trackfolder, f"t_{name}.bed") # reverting to Martin's original
+            bed = join(self.trackfolder, "t.bed")
+            o = open(bed, "w")
+            for c, (chr, start, end) in enumerate(zip(loc[0], loc[1], loc[2])):
+                o.write(f"{chr}\t{start}\t{end}\t{c}\n")
+            o.close()
+            # indexed_bed = join(self.trackfolder, "loc_{name}.bed") # reverting to Martin's original
+            indexed_bed = join(self.trackfolder, "loc.bed")
+            create_bed_gz_file(bed, indexed_bed)
+            os.remove(bed)
+        else:
+            custom_track["location"]
+            # copy the custom track to the tracks folder
+            shutil.copy(custom_track["location"], join(self.trackfolder, "loc.bed.gz"))
+            # copy index file
+            shutil.copy(
+                custom_track["location"] + ".tbi",
+                join(self.trackfolder, "loc.bed.gz.tbi"),
+            )
+
+        if not name:
+            name = datasource
         gb = {
             "location_fields": parameters,
-            "default_track": {"url": f"tracks/loc_{name}.bed.gz", "label": name},
+            # "default_track": {"url": "tracks/loc_{name}.bed.gz", "label": name}, # reverting to Martin's original
+            "default_track": {"url": "tracks/loc.bed.gz", "label": name},
         }
+        if custom_track:
+            gb["default_track"]["type"] = custom_track["type"]
         if extra_params:
             gb.update(extra_params)
         ds = self.get_datasource_metadata(datasource)
@@ -664,7 +683,9 @@ class MDVProject:
             raise AttributeError("no columns to add")
         for col in columns:
             try:
-                add_column_to_group(col, dataframe[col["field"]], gr, size, self.skip_column_clean)
+                add_column_to_group(
+                    col, dataframe[col["field"]], gr, size, self.skip_column_clean
+                )
             except Exception as e:
                 dodgy_columns.append(col["field"])
                 warnings.warn(
@@ -1217,6 +1238,130 @@ class MDVProject:
                         # "original_folder": os.path.dirname(v["path"])
                     }
         self.set_datasource_metadata(md)
+
+    def get_interaction_matrix(self,datasource,group,interaction_metric,square_size=20):
+        '''
+        Args:
+            datasource (str): The name of the datasource.
+            group (str): The name of the group.
+            interaction_metric (str): The name of the interaction metric.
+        '''
+        md= self.get_datasource_metadata(datasource)
+        im_info = self.get_column_metadata(datasource,interaction_metric)
+        i = md.get("interactions")
+        if not i:
+            raise AttributeError(f"no interactions in {datasource}")
+        icd = self.get_column_metadata(datasource,i["interaction_columns"][0])["values"]
+        side = len(icd)*square_size
+        chart={
+            "type":"single_heat_map",
+            "param":i["interaction_columns"]+[interaction_metric]+[i["pivot_column"]],
+            "category":group,
+            "title":f"{group} - {im_info['name']}",
+            "size":[side,side],
+             "axis": {
+                "x": {
+                    "textSize": 13,
+                    "label": "",
+                    "size": 101,
+                    "tickfont": 11,
+                    "rotate_labels": True
+                },
+                "y": {
+                    "textSize": 13,
+                    "label": "",
+                    "size": 94,
+                    "tickfont": 10
+                }
+            }
+        }
+        return chart
+
+
+
+    def get_selection_dialog(self,datasource,selections):
+        filters={}
+        for s in selections:
+            sel = s.get("filter")
+            if sel:
+                col = self.get_column_metadata(datasource,s["column"])
+                if not col["datatype"] in ["text","text16","multitext"]:
+                    if sel[0]==None:
+                        sel[0]=col["minMax"][0]
+                    if sel[1]==None:
+                        sel[1]=col["minMax"][1]
+                else:
+                    if type(sel)==list:
+                        sel= {"category":sel}
+                filters[s["column"]]=sel
+        return {
+            "type":"selection_dialog",
+            "param":[x["column"] for x in selections],
+            "filters":filters
+        }
+
+    def get_image_plot(self,datsource,image_set):
+        md= self.get_datasource_metadata(datsource)
+        ims = md.get("images")
+        if not ims:
+            raise AttributeError(f"no images in {datsource}")
+        img= ims.get(image_set)
+        if not img:
+            raise AttributeError(f"no image set {image_set} in {datsource}")
+        
+        return {
+            "type":"image_table_chart",
+            "title":image_set,
+            "param":[img["key_column"]],
+            "image_set":image_set
+        }
+
+
+    def get_centroid_plot(self,datasource,region,background_image="_default",scale=0.5):
+        '''
+        Args:
+            datasource (str): The name of the datasource.
+            region (str): The name of the region.
+            background_image (str, optional): The name of the background image. Default is '_default'
+            scale (float, optional): The scale of the image. Default is 0.5
+        
+        Returns:
+            dict: The chart specification.
+        '''
+        md = self.get_datasource_metadata(datasource)
+        regions = md.get("regions")
+        if not regions:
+            raise AttributeError(f"no regions in specifeid")
+        r_info = regions["all_regions"].get(region)
+        if not r_info:
+            raise AttributeError(f"no region {region} in regions")
+        chart={
+            "type":"image_scatter_plot",
+            "param":regions["position_fields"]+[regions["default_color"]],
+            "background_filter":{
+                "column":regions["region_field"],
+                "category":region
+            },
+            "title":region,
+            "radius":3.5,
+            "color_by":regions["default_color"],
+            "color_legend":{"dsiplay":False},
+            "region":region,
+            "roi":r_info.get("roi")
+        }
+        dims = r_info["roi"]
+        mx = dims.get("min_x",0)
+        my = dims.get("min_y",0)
+        size= [dims["max_x"]-mx,dims["max_y"]-my]
+        size =[x*scale for x in size]
+        chart["size"]=size
+        if background_image:
+            if background_image=="_default":
+                background_image=r_info["default_image"]
+            chart["background_image"]=r_info["images"][background_image]
+
+        return chart
+
 
 
 def get_json(file):
