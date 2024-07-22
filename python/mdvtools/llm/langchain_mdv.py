@@ -20,6 +20,12 @@ from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import prepare_code
 from .code_execution import execute_code
 
+# sometimes this tries to draw with matplotlib... which causes an error that we can't catch
+# we don't control the code that's being run by the agent...
+# but we can call `matplotlib.use('Agg')` before calling the agent (and any other code that might try to draw)
+import matplotlib
+matplotlib.use('Agg') # this should prevent it making any windows etc
+
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY & GITHUB_TOKEN
 load_dotenv()
@@ -105,13 +111,7 @@ class ProjectChat():
         full_prompt = prompt_data + "\nQuestion: " + question
         print(full_prompt)
         try:
-            # sometimes this tries to draw with matplotlib... which causes an error that we can't catch
-            # we don't control the code that's being run by the agent...
-            # but we can call `matplotlib.use('Agg')` before calling the agent (and any other code that might try to draw)
-            import matplotlib
-            mpl_backend = matplotlib.get_backend() # probably overly cautious, trying to be a good citizen
-            matplotlib.use('Agg') # this should prevent it making any windows etc
-
+            
             response = self.agent.invoke(full_prompt) 
             assert('output' in response)
             #!!! csv_path is not wanted - the code tries to use that as data source name which is all wrong
@@ -139,8 +139,6 @@ class ProjectChat():
             return f"I ran some code for you:\n\n```python\n{final_code}```"
         except Exception as e:
             return f"Error: {str(e)[:100]}"
-        finally:
-            matplotlib.use(mpl_backend)
 
 
 def project_wizard(user_question: Optional[str], project_name: str = 'project', log: Callable[[str], None] = print):
