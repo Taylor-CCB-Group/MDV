@@ -36,6 +36,7 @@ export default class VivContrastExtension extends LayerExtension<ContrastProps> 
                 `,
                 'fs:DECKGL_PROCESS_INTENSITY': /*glsl*/`///----- VivContrastExtension DECKGL_PROCESS_INTENSITY
                 intensity = apply_contrast_limits(intensity, contrastLimits);
+                intensity = clamp(intensity, 0., 1.);
                 intensity = applyBrightnessContrast(intensity, channelIndex);
                 ///---- end VivContrastExtension
                 `,
