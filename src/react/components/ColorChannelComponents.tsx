@@ -94,7 +94,7 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     const channelsStore = useChannelsStoreApi();
     const isChannelLoading = useViewerStore(state => state.isChannelLoading);
     return (
-        <div className="col-span-4 flex align-middle text-center items-center gap-2">
+        <div className="col-span-5 pl-2 pr-2 flex items-center gap-4">
         contrast:
             <Slider
                 size="small"
@@ -226,6 +226,7 @@ const AddChannel = () => {
     const addChannel = useChannelsStore(state => state.addChannel);
     const {use3d, setIsChannelLoading} = useViewerStore(({use3d, setIsChannelLoading}) => ({use3d, setIsChannelLoading}), shallow);
     return <button type="button"
+    className="p-2 rounded-lg bg-slate-400"
     disabled={!canAddChannel}
     onClick={async () => {
         // would be nice to have less repition of this code here and in ChannelController
