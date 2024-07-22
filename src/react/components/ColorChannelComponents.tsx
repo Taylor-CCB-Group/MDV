@@ -94,19 +94,27 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     const channelsStore = useChannelsStoreApi();
     const isChannelLoading = useViewerStore(state => state.isChannelLoading);
     return (
-        <div className="col-span-4">
+        <div className="col-span-4 flex align-middle text-center items-center gap-2">
         contrast:
             <Slider
                 size="small"
                 disabled={isChannelLoading[index]}
                 value={contrast[index]}
-                min={0}
-                max={1}
+                min={0.1}
+                max={0.9}
                 step={0.01}
                 onChange={(_, v) => {
                     contrast[index] = v as number;
                     const newContrast = [...contrast];
                     channelsStore.setState({ contrast: newContrast });
+                }}
+                onClick={e => {
+                    // reset value on double-click
+                    if (e.detail === 2) {
+                        contrast[index] = 0.5;
+                        const newContrast = [...contrast];
+                        channelsStore.setState({ contrast: newContrast });
+                    }
                 }}
             />
         brightness:
@@ -114,13 +122,21 @@ const BrightnessContrast = ({ index }: { index: number }) => {
                 size="small"
                 disabled={isChannelLoading[index]}
                 value={brightness[index]}
-                min={0}
-                max={1}
+                min={0.01}
+                max={0.99}
                 step={0.01}
                 onChange={(_, v) => {
                     brightness[index] = v as number;
                     const newbrightness = [...brightness];
                     channelsStore.setState({ brightness: newbrightness });
+                }}
+                onClick={e => {
+                    // reset value on double-click
+                    if (e.detail === 2) {
+                        brightness[index] = 0.5;
+                        const newbrightness = [...brightness];
+                        channelsStore.setState({ brightness: newbrightness });
+                    }
                 }}
             />
         </div>
@@ -175,6 +191,7 @@ const ChannelController = ({ index }: { index: number }) => {
             />
             <Slider
                 size="small"
+                //slotProps={{ thumb: {  } }} //todo smaller thumb
                 disabled={isChannelLoading[index]}
                 style={{ color: colorString, marginLeft: '10px' }}
                 value={limits[index]}
@@ -188,7 +205,7 @@ const ChannelController = ({ index }: { index: number }) => {
                 }}
             />
             <button type="button"
-            style={{marginLeft: '12px'}}
+            className="pl-4"
             onClick={() => {
                 removeChannel(index);
             }}>
@@ -233,7 +250,7 @@ const AddChannel = () => {
 
 export const Test = () => {
     const ids = useChannelsStore(({ ids }) => ids);
-    return <div className=" bg-[hsl(var(--input))] w-full">{
+    return <div className="bg-[hsl(var(--input))] w-full">{
         ids.map((id, i) => (
             <ChannelController key={id} index={i} />
         ))}
