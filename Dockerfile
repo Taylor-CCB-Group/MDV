@@ -1,5 +1,5 @@
 # Build the frontend with npm
-FROM nikolaik/python-nodejs:python3.12-nodejs22 as frontend-builder
+FROM nikolaik/python-nodejs:python3.12-nodejs20 as frontend-builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -11,7 +11,7 @@ COPY . .
 RUN npm install
 
 # Run the npm build script for Flask and Vite
-RUN npm run build-flask-vite
+RUN npm run build-flask-dockerjs
 
 # bootstrap project folder - this won't be necessary in future
 RUN mkdir -p /app/mdv/pbmc3k /app/mdv/pbmc3k_project2

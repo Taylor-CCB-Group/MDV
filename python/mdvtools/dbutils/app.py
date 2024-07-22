@@ -2,7 +2,11 @@ import os
 import json
 from flask import Flask
 
-app = Flask(__name__, template_folder='../templates', static_folder='../static')
+# app = Flask(__name__, template_folder='../templates', static_folder='../static')
+# static_folder='../../../dist/flask'
+static_folder = "/app/dist/flask"
+print(f">>>>> static path exists? {os.path.exists(static_folder)} <<<<<")
+app = Flask(__name__, template_folder="../templates", static_folder=static_folder)
 
 try:
     config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
