@@ -70,7 +70,7 @@ export function useParamColumns(): DataColumn<any>[] {
         if (!param) return [];
         if (typeof chart.config.param === 'string') return [columnIndex[chart.config.param]];
         return chart.config.param.map(name => columnIndex[name])
-    }, [chart.config.param]);
+    }, [chart.config.param, columnIndex]);
     return columns;
 }
 
