@@ -27,7 +27,7 @@ class MultiBoxPlot extends SVGChart{
     onDataFiltered(dim){   
         const config= {analysis:"multi",scaleVals:[],category:this.config.category};
         const p =this.config.param;
-        let q = this.config.percentile_trim;
+        const q = this.config.percentile_trim;
         for (let x=1;x<p.length;x++){
             const col = this.dataStore.columnIndex[p[x]];
             config.scaleVals.push([q?col.quantiles[q][0]:col.minMax[0],q?col.quantiles[q][1]:col.minMax[1]]);
@@ -58,7 +58,7 @@ class MultiBoxPlot extends SVGChart{
             choices:[["No Trim","none"],["0.001","0.001"],["0.01","0.01"],["0.05","0.05"]],             
             func:(v)=>{
                 if (v==="none"){
-                    delete c.percentile_trim;
+                    c.percentile_trim = undefined;
                 }
                 else{
                     c.percentile_trim=v;
@@ -73,7 +73,6 @@ class MultiBoxPlot extends SVGChart{
     drawChart(){
         this.y_scale.domain([this.data.max,this.data.min]);
         this.updateAxis();
-        const self = this;
         const trans = select(this.contentDiv).transition()
         .duration(400).ease(easeLinear);
         const yscale = this.y_scale;
@@ -84,12 +83,12 @@ class MultiBoxPlot extends SVGChart{
         .data(this.data)
         .join("rect")     
         .attr("class","boxplot-rect")
-        .on("mouseover mousemove",(e,d)=>{    
-            const h= `${self.names[d.id]}`;             
-            self.showToolTip(e,h)
+        .on("mouseover pointermove",(e,d)=>{    
+            const h= `${this.names[d.id]}`;             
+            this.showToolTip(e,h)
         }).
         on("mouseleave",()=>{
-            self.hideToolTip();
+            this.hideToolTip();
         })   
         .transition(trans)
         .attr("x", (d,i)=>i*(vWidth-3)+((i+1)*3))
@@ -97,7 +96,7 @@ class MultiBoxPlot extends SVGChart{
         .attr("width",(vWidth-6)>1?vWidth-6:1)
         .attr("height",d=>{
             const w = yscale(d.Q1)-yscale(d.Q3);
-            return isNaN(w)?0:w;
+            return Number.isNaN(w)?0:w;
         })
         .attr("fill","none")
         .attr("stroke", (d,i)=>colors[i])
@@ -113,7 +112,7 @@ class MultiBoxPlot extends SVGChart{
         .attr("stroke-width", 3)
         
         .attr("d",(d,i)=>{
-            if (isNaN(d.med)){
+            if (Number.isNaN(d.med)){
                 return "";
             }
              const es=i*(vWidth-6)+((i+1)*6);

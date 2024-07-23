@@ -107,8 +107,8 @@ class CellRadialChart extends SVGChart{
         }
         this.state_legend = getColorLegend(colors,names,{label:col.name});
         this.contentDiv.append(this.state_legend);
-        this.state_legend.style.top= sl.position[1]+"px";
-        this.state_legend.style.left= sl.position[0]+"px";
+        this.state_legend.style.top= `${sl.position[1]}px`;
+        this.state_legend.style.left= `${sl.position[0]}px`;
 
 
     }
@@ -139,13 +139,12 @@ class CellRadialChart extends SVGChart{
         this.linkThicknessScale.domain(c.link_thickness.domain)
                             .range(c.link_thickness.range)
                             .clamp(true);
-        const self = this;
         const cwidth = c.link_thickness.type==="constant"
-        const width = c.link_thickness.width+"px"
+        const width = `${c.link_thickness.width}px`
         if (update){    
             this.links.attr("stroke-width", d=>{
                 if (d.depth===3){
-                    return cwidth?width:self.linkThicknessScale(tdata[d.id]);
+                    return cwidth?width:this.linkThicknessScale(tdata[d.id]);
                 }
                 return width;
             })
@@ -154,7 +153,6 @@ class CellRadialChart extends SVGChart{
 
     setLinkThicknessColumn(col){
         this.config.param[4]=col;
-        this._changeLinkThicknessScale(tq,null,true);
         const tq= this.dataStore.getColumnQuantile(col,0.01);
         this._changeLinkThicknessScale(tq,null,true);
     }
@@ -166,7 +164,7 @@ class CellRadialChart extends SVGChart{
         const c1 =  this.dataStore.getColumnValues(c.param[1]);
         const st =  this.dataStore.getColumnValues(c.param[0]);
         const tCols = this.dataStore.getColumnList("number");
-        let  tQuant= this.dataStore.getColumnQuantile(c.param[4],0.01);
+        const  tQuant= this.dataStore.getColumnQuantile(c.param[4],0.01);
 
 
 
@@ -334,7 +332,7 @@ class CellRadialChart extends SVGChart{
         const b = this._getContentDimensions();
         const c = this.config;
         const thick = this.dataStore.getRawColumn(this.config.param[4]);
-        let size_factor= Math.min(b.width,b.height);
+        const size_factor= Math.min(b.width,b.height);
         const radius = size_factor/2.8;
         this.graph_area.attr("transform", `translate(${b.left+b.width/2},${b.top+b.height/2})`);
         const wedgeColors=this.dataStore.getColumnColors(c.param[0]);
@@ -342,14 +340,13 @@ class CellRadialChart extends SVGChart{
         const c2Colors = this.dataStore.getColumnColors(c.param[2]);
         const stData=  this.dataStore.getRawColumn(c.param[0])
        
-        var tree = d3Tree()
+        const tree = d3Tree()
        
         .size([360, radius])
-        .separation(function(a, b) { return (a.parent == b.parent ? 1 : 2) / a.depth; });
+        .separation((a, b) => (a.parent === b.parent ? 1 : 2) / a.depth);
        
       
-        var root = tree(this.root);
-        const self = this;
+        const root = tree(this.root);
 
         this.graph_area.selectAll(".link").remove();
         this.graph_area.selectAll(".node").remove();
@@ -366,7 +363,7 @@ class CellRadialChart extends SVGChart{
             }
         })
         const wedgeData={};
-        for (let d of data){
+        for (const d of data){
             if (d.depth!==3){
                 continue;
             }
@@ -380,7 +377,7 @@ class CellRadialChart extends SVGChart{
             }
         }
         const wData=[];
-        for (let wd in wedgeData){
+        for (const wd in wedgeData){
             const item = wedgeData[wd];
             const info = wd.split("|")
             wData.push({
@@ -435,35 +432,29 @@ class CellRadialChart extends SVGChart{
             .attr("stroke", "currentColor")
             .attr("stroke-width", d=>{
                 if (d.depth===3){
-                    return cwidth?c.link_thickness.type:self.linkThicknessScale(thick[d.id]);
+                    return cwidth?c.link_thickness.type:this.linkThicknessScale(thick[d.id]);
                 }
                 return c.link_thickness.type;
             })
-            .attr("d", function(d) {
+            .attr("d", (d) => {
                 level_radii[d.depth]=d.y;
                 if (d.depth>1){
-                return "M" + project(d.x, d.y)
-                    + "C" + project(d.x, (d.y + d.parent.y) / 2)
-                    + " " + project(d.parent.x, (d.y + d.parent.y) / 2)
-                    + " " + project(d.parent.x, d.parent.y);
-                }
-                else{
+                    // biome-ignore lint/style/useTemplate: clearer to have this on several lines
                     return "M" + project(d.x, d.y)
-                    + "L" + project(d.parent.x,d.parent.y);
-                
-                
+                        + "C" + project(d.x, (d.y + d.parent.y) / 2)
+                        + " " + project(d.parent.x, (d.y + d.parent.y) / 2)
+                        + " " + project(d.parent.x, d.parent.y);
                 }
+                
+                    return `M${project(d.x, d.y)}L${project(d.parent.x,d.parent.y)}`;
             });
 
         const node = this.graph_area.selectAll(".node")
             .data(data)
             .enter().append("g")
-              .attr("class", function(d) { return "node" + (d.children ? " node--internal" : " node--leaf"); })
-              .attr("transform", function(d) {
-                   return "translate(" + project(d.x, d.y) + ")"; 
-
-                   }).on("click",function(d){
-                  self.nodeClicked(d);
+              .attr("class", (d) => `node${d.children ? " node--internal" : " node--leaf"}`)
+              .attr("transform", (d) => `translate(${project(d.x, d.y)})`).on("click",(d)=> {
+                  this.nodeClicked(d);
               });
     
         this.nodes= node.filter(d=>d.depth!==2).append("circle")
@@ -486,34 +477,32 @@ class CellRadialChart extends SVGChart{
                 }
              });
 
-        const fs = this.config.label_size+"px";
+        const fs = `${this.config.label_size}px`;
         node.append("text")
               .attr("dy", ".31em")
               .attr("font-size",fs)
               .style("fill","currentColor")
               .attr("font-family","Helvetica")
               .attr("x", d=> {
-                const x_off= d.depth==1?c.node_size.inner+1:c.node_size.outer+1;
+                const x_off= d.depth===1?c.node_size.inner+1:c.node_size.outer+1;
                 return d.x < 180 === !d.children ? x_off : -x_off; 
             })
               .attr("alignment-baseline",d=>d.depth===1 && c.central_links?"hanging":"baseline")
-              .style("text-anchor", function(d) { 
+              .style("text-anchor", (d) => { 
                   if (! d.children ){
                       return d.x < 180?"start" : "end"; 
                   }
-                  else {
+                  
                       return d.x > 180?"start" : "end"; 
-                  }
                   
               })
-              .attr("transform", function(d) {
+              .attr("transform", (d) => {
                     if ( d.depth ===1 && !(c.central_links)){
                         return ("rotate(0)");
                     }
-                  return "rotate(" + (d.x < 180 ? d.x - 90 : d.x + 90) + ")"; 
+                  return `rotate(${d.x < 180 ? d.x - 90 : d.x + 90})`; 
               })
-              .text(function(d) { 
-                return d.depth==2?"":d.data[2]; });
+              .text((d) => d.depth===2?"":d.data[2]);
     }
 
     setSize(x,y){
@@ -539,8 +528,8 @@ class CellRadialChart extends SVGChart{
         data.unshift(["root",null]);
         //add the second (inner) ring celltype|state
         const innerRingEntries= new Set()
-        for (let state of c.states){
-            for (let cell of c.center_cells){
+        for (const state of c.states){
+            for (const cell of c.center_cells){
                 const name = `${state}|${cell}`;
                 data.push([name,cell,state]);
                 innerRingEntries.add(name);    
@@ -566,7 +555,7 @@ class CellRadialChart extends SVGChart{
             //exclude certain interactions no way odf user adding this
             let exclude= false;
             if (c.exclude_interactions){
-                for (let e of c.exclude_interactions){
+                for (const e of c.exclude_interactions){
                     if (e.indexOf(c1) !==-1){
                         if (e.indexOf(c2)!==-1){
                             exclude=true;
@@ -600,7 +589,8 @@ class CellRadialChart extends SVGChart{
 
 
 function  project(x, y) {
-    let angle = (x - 90) / 180 * Math.PI, radius = y;
+    const angle = (x - 90) / 180 * Math.PI;
+    const radius = y;
     return [radius * Math.cos(angle), radius * Math.sin(angle)];
 }
 

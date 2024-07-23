@@ -1,6 +1,9 @@
 class Dimension{
 
-
+    /**
+     * @constructor
+     * @param {DataStore} parent
+     */
     constructor(parent){ 
         this.filterBuffer = new SharedArrayBuffer(parent.size);       
         this.parent=parent;
@@ -10,6 +13,43 @@ class Dimension{
         this.filterMethod = null;
     }
 
+    /**
+     * Filters the data based on a predicate function.
+     * The function should return false if the row should be filtered out.
+     */
+    filterPredicate(args, columns) {
+        const filter = this.parent.filterArray;
+        const parent = this.parent;
+        const predicate = args.predicate;
+        const localFilter = this.filterArray;
+        for (let i=0; i<this.parent.size; i++) {
+            // try ... catch to handle errors in the predicate
+            // let value = false;
+            // try {
+            //     value = !predicate(i);
+            // } catch (e) {
+            //     // console.error('Error in evaluating filterPredicate', e);
+            // }
+            const value = !predicate(i); //not much faster than try...catch
+            if (value){
+                if (localFilter[i]===0){
+                    if(++filter[i]===1){
+                        parent.filterSize--;
+                    }
+                }
+                localFilter[i]=1
+            }
+            else{
+                if (localFilter[i]===1){
+                    if(--filter[i]===0){
+                        parent.filterSize++;                    
+                    }                   
+                }
+                localFilter[i]=0;
+            }
+        }
+    }
+    
     removeFilter(notify=true){  
         if (!this.filterMethod){
             return;
@@ -18,12 +58,12 @@ class Dimension{
         const localFilter= this.filterArray;
         const parent = this.parent;
         const len = this.parent.size;
-        delete this.filterArguments;
-        delete this.filterColumns;
-        delete this.filterMethod;
+        this.filterArguments = undefined;
+        this.filterColumns = undefined;
+        this.filterMethod = undefined;
         for (let i=0;i<len;i++){
             if (localFilter[i]===1){
-                if(--filter[i]==0){
+                if(--filter[i]===0){
                     parent.filterSize++;
                 }
                 localFilter[i]=0;           
@@ -49,8 +89,8 @@ class Dimension{
         return this.filterArray;
     }
 
-    //needs to be removed - produces strange behaviour
-    filterOnIndex(indexSet){
+    //needs to be removed - produces strange behaviour << review
+    filterOnIndex(indexSet) {
         const filter = this.parent.filterArray;
         const len = this.parent.size;
         const localFilter= this.filterArray;
@@ -78,7 +118,8 @@ class Dimension{
     
     /**
     * Filters  the data
-    * @param {string} method- The name of the filter method
+    * @param {string} method- The name of the filter method.
+    * if 'filterPredicate' then the args should contain a predicate function
     * @param {string[]} columns - a list of column ids used in the filtering
     * @param {object} args - any extra arguments for filtering
     * @param {boolean} [notify=true] - notify any listeners in the dataStore that the 
@@ -108,9 +149,29 @@ class Dimension{
         if (notify){
             this.parent._callListeners("filtered",this);
         }
-        console.log(`method${method}: ${performance.now()-t}`);
+        if (performance.now()-t > 100) {
+            console.warn(`method${method}: ${performance.now()-t}`);
+        } else {
+            console.log(`method${method}: ${performance.now()-t}`);
+        }
     }
 
+    async getValueSet(column) {
+        const col = this.parent.columnIndex[column];
+        const data = col.data;
+        const parentFilter = this.parent.filterArray;
+        const filter = this.filterArray;
+        const len = this.parent.size;
+        const set = new Set();
+        for (let i=0;i<len;i++){
+            if (filter[i]===0 && parentFilter[i]===0){
+                if (col.values) {
+                    set.add(col.values[data[i]]);
+                } else set.add(data[i]);
+            }
+        }
+        return set;
+    }
 
     /**
     * updates the filter if data in the supplied columns has been altered
@@ -120,7 +181,7 @@ class Dimension{
     */
     reFilterOnDataChanged(columns){
         if (this.filterMethod && this.filterColumns){
-            for (let c of this.filterColumns){
+            for (const c of this.filterColumns){
                 if (typeof c === "string" && columns.indexOf(c)!==-1){
                     this.filter(this.filterMethod,this.filterColumns,this.filterArguments,false);
                     return true;
@@ -135,8 +196,8 @@ class Dimension{
     * Will increase size of local filters 
     */
     updateSize(){
-        let newBuff =  new SharedArrayBuffer(this.parent.size);
-        let newArr = new Uint8Array(newBuff);
+        const newBuff =  new SharedArrayBuffer(this.parent.size);
+        const newArr = new Uint8Array(newBuff);
         newArr.set(this.filterArray);
         this.filterBuffer =newBuff;  
         this.filterArray= newArr;

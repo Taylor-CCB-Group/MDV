@@ -2,6 +2,7 @@
 import BaseChart from "./BaseChart.js"
 import ImagePanZoom from "../utilities/PanZoom.js";
 import { createEl,makeSortable} from "../utilities/Elements.js";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
 
 class RowSummaryBox extends BaseChart{
     constructor(dataStore,div,config){
@@ -10,13 +11,13 @@ class RowSummaryBox extends BaseChart{
         if (config.image){
             const d = createEl("div",{
                 classes:["mdv-image-holder"],
-                style:{height:parseInt(this.width*0.7)+"px"}
+                style:{height:`${Number.parseInt(this.width*0.7)}px`}
             },this.contentDiv);       
             this.imViewer=new ImagePanZoom(d,this._getImage(0));
         }
         this.paramHolders={};
         const sectionDiv= createEl("div",{},this.contentDiv);
-        for (let p of this.config.param){
+        for (const p of this.config.param){
             if (p === this.img_param){
                 continue;
             }
@@ -48,7 +49,7 @@ class RowSummaryBox extends BaseChart{
 
     setParam(index){
        
-        for (let p in this.paramHolders){
+        for (const p in this.paramHolders){
             const data  = this.dataStore.getRowText(index,p)
             this.paramHolders[p].textContent=data;
             if (this.paramHolders[p].nodeName==="A"){
@@ -62,14 +63,14 @@ class RowSummaryBox extends BaseChart{
         const  p  = c.param[c.image.param];
         this.img_param=p;
         const data =this.dataStore.getRowText(index,p);
-        return `${c.image.base_url}${data}.${c.image.type}`
+        return getProjectURL(`${c.image.base_url}${data}.${c.image.type}`);
 
     }
 
     setSize(x,y){
         super.setSize(x,y);
         if (this.imViewer){
-            this.imViewer.container.style.height= Math.round(this.width*0.7)+"px";
+            this.imViewer.container.style.height= `${Math.round(this.width*0.7)}px`;
             this.imViewer.fit();
         }
     }
@@ -108,7 +109,7 @@ BaseChart.types["row_summary_box"]={
                 config.param = config.param || [];
                 config.param.push(li.key_column);
                 config.image={
-                    base_url:li.base_url,
+                    base_url: getProjectURL(li.base_url),
                     type:li.type,
                     param:config.param.length-1
                 }
@@ -121,7 +122,7 @@ BaseChart.types["row_summary_box"]={
         const li = dataSource.large_images;
         if (li){
             let vals=[];
-            for (let n in li){
+            for (const n in li){
                 vals.push({name:n,value:n});
             }
             vals = [{name:"none",value:"__none__"}].concat(vals);

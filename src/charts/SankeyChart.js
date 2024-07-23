@@ -104,7 +104,6 @@ class SankeyChart extends SVGChart{
             this.dataStore.getColumnColors(p[0]),
             this.dataStore.getColumnColors(p[1])
         ];
-        const self = this;
         let  nodePadding = 20-this.sankeyData.minNodes;
         nodePadding = nodePadding<1?1:nodePadding>10?10:nodePadding;
         const san =sankey()
@@ -123,16 +122,16 @@ class SankeyChart extends SVGChart{
         }*/)
         .join("path")
         .on("click",(e,d)=>{
-            self.filterMultipleCategories(d);
-        }).on("mouseover mousemove",(e,d)=>{
+            this.filterMultipleCategories(d);
+        }).on("mouseover pointermove",(e,d)=>{
             const s = d.source;        
-            const sn = self.dataStore.getColumnValues(self.config.param[s.param])[s.ind];  
+            const sn = this.dataStore.getColumnValues(this.config.param[s.param])[s.ind];  
             const t = d.target;
-            const tn = self.dataStore.getColumnValues(self.config.param[t.param])[t.ind];
-            self.showToolTip(e,`${sn}<br>${tn}<br>${d.trueValue}`);
+            const tn = this.dataStore.getColumnValues(this.config.param[t.param])[t.ind];
+            this.showToolTip(e,`${sn}<br>${tn}<br>${d.trueValue}`);
         }).
         on("mouseleave",()=>{
-            self.hideToolTip();
+            this.hideToolTip();
         })   
         .transition(trans)
         .attr("class","s-links")
@@ -142,15 +141,15 @@ class SankeyChart extends SVGChart{
         .attr("stroke-width", d => d.width)
         .attr("stoke-opacity", 0.5)
         .attr("opacity",d=>{
-            if (self.linkFilter){
-                if(d.source.id===self.linkFilter[0] && d.target.id===self.linkFilter[1]){
+            if (this.linkFilter){
+                if(d.source.id===this.linkFilter[0] && d.target.id===this.linkFilter[1]){
                     return 0.8;
                 }
                 return 0.2;
             }
           
-            if (self.nodeFilter){
-                if (d.source.id===self.nodeFilter || d.target.id===self.nodeFilter){
+            if (this.nodeFilter){
+                if (d.source.id===this.nodeFilter || d.target.id===this.nodeFilter){
                     return 0.8
                 }
                 return 0.2;
@@ -168,16 +167,16 @@ class SankeyChart extends SVGChart{
         .join("rect")
         .on("click",(e,d)=>{
             const col = p[d.param];
-            self.nodeFilter = (d.param===0?"A":"B") + d.ind;
-            self.linkFilter=null;
-            const values= self.dataStore.getColumnValues(col);
-            self.filterCategories(col,values[d.ind]);
-        }).on("mouseover mousemove",(e,d)=>{         
-            const n= self.dataStore.getColumnValues(self.config.param[d.param])[d.ind];
-            self.showToolTip(e,n)
+            this.nodeFilter = (d.param===0?"A":"B") + d.ind;
+            this.linkFilter=null;
+            const values= this.dataStore.getColumnValues(col);
+            this.filterCategories(col,values[d.ind]);
+        }).on("mouseover pointermove",(e,d)=>{         
+            const n= this.dataStore.getColumnValues(this.config.param[d.param])[d.ind];
+            this.showToolTip(e,n)
         }).
         on("mouseleave",()=>{
-            self.hideToolTip();
+            this.hideToolTip();
         })   
         .attr("class","s-nodes")
         .attr("x", d => d.x0)
@@ -197,9 +196,9 @@ class SankeyChart extends SVGChart{
         
         if (this.linkFilter){
             const f= {};
-            let i=parseInt(this.linkFilter[0].substring(1));
+            let i=Number.parseInt(this.linkFilter[0].substring(1));
             f[p[0]]=[this.dataStore.getColumnValues(p[0])[i]];
-            i = parseInt(this.linkFilter[1].substring(1));
+            i = Number.parseInt(this.linkFilter[1].substring(1));
             f[p[1]]=[this.dataStore.getColumnValues(p[1])[i]];
             return f;
         }
@@ -207,7 +206,7 @@ class SankeyChart extends SVGChart{
         if (this.nodeFilter){
             const f= {};
             const pi = this.nodeFilter.startsWith("A")?0:1;
-            let i=parseInt(this.nodeFilter.substring(1));
+            const i=Number.parseInt(this.nodeFilter.substring(1));
             f[p[pi]]=[this.dataStore.getColumnValues(p[pi])[i]];
             return f;
         }
@@ -221,7 +220,7 @@ class SankeyChart extends SVGChart{
         const v1 =  this.dataStore.getColumnValues(c1)[d.source.ind]
         const c2 = p[d.target.param];
         const v2 =  this.dataStore.getColumnValues(c2)[d.target.ind];
-        this.linkFilter= ["A"+d.source.ind,"B"+d.target.ind];
+        this.linkFilter= [`A${d.source.ind}`,`B${d.target.ind}`];
         this.resetButton.style.display = "inline";
         this.drawChart();
         this.dim.filter("filterMultipleCategories",[c1,c2],[v1,v2]);

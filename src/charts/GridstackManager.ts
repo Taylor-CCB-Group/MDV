@@ -1,8 +1,7 @@
 import 'gridstack/dist/gridstack.min.css';
 import { GridStack } from 'gridstack';
 import { debounce } from '../utilities/Utilities';
-import { DataSource, Chart, ChartManager } from './charts';
-import AnnotationDialog from './dialogs/AnnotationDialog';
+import type { Chart, ChartManager, DataSource } from './charts';
 
 function clearPosition(div) {
     div.style.position = '';
@@ -15,7 +14,7 @@ function clearPosition(div) {
 }
 
 declare global {
-    interface HTMLDivElement {
+    interface HTMLElement {
         gridstackNode?: any;
         gridstackPopoutCallback?: () => void;
     }
@@ -68,11 +67,10 @@ export default class GridStackManager {
             });
          
             const i = this.chartManager.addMenuIcon(ds.name, "fas fa-compress-arrows-alt", "compact layout", ()=>grid.compact());
-            //this.chartManager.addMenuIcon(ds.name, "fas fa-tags", "Tag annotation", () => {new AnnotationDialog(ds.dataStore)})
             this.grids.set(ds, {grid:grid,charts:new Set(),icon:i});
         }
-        
-        return this.grids.get(ds)!;
+
+        return this.grids.get(ds);
     }
 
     destroy(ds: DataSource){
@@ -84,25 +82,25 @@ export default class GridStackManager {
         const div = ds.contentDiv;
          //store sizes/positions of div elements
         const sizes = new Map();
-        for (let chart of gi.charts){
+        for (const chart of gi.charts){
             const d = chart.getDiv();
             sizes.set(d,[d.offsetWidth,d.offsetHeight,d.offsetLeft,d.offsetTop]);
             chart.removeLayout();
-            delete chart.config.gssize;
-            delete chart.config.gsposition;
+            chart.config.gssize = undefined;
+            chart.config.gsposition = undefined;
         }
                  
         gi.grid.destroy(false);
 
         //convert back to absolute positioning plus other clean up on the div
-        for (let chart of gi.charts){
+        for (const chart of gi.charts){
             const  d= chart.getDiv();
             const s = sizes.get(d);
             d.style.position="absolute";
-            d.style.width=(s[0]-5)+"px";
-            d.style.height=(s[1]-5)+"px";
-            d.style.left=s[2]+"px";
-            d.style.top=s[3]+"px";
+            d.style.width=`${s[0]-5}px`;
+            d.style.height=`${s[1]-5}px`;
+            d.style.left=`${s[2]}px`;
+            d.style.top=`${s[3]}px`;
             chart.config.size=[s[0]-5,s[1]-5];
             chart.config.position=[s[2],s[3]];
             d.classList.remove("grid-stack-item")
@@ -159,7 +157,7 @@ export default class GridStackManager {
         //nb, autoPosition property doesn't apply in update()?
         //passing options to makeWidget() or addWidget() does not evoke joy.
         if (!autoPosition) {
-            console.log({w, h, x, y});
+            console.log('gridstack:', chart.config.type, {w, h, x, y});
             grid.update(div, {w, h, x, y});
         } else {
             grid.update(div, {w, h});
@@ -219,13 +217,120 @@ export default class GridStackManager {
         chart.removeLayout=()=>{
             grid.removeWidget(div,false); //doesn't remove listeners from handle...
             lockButton.remove();
-            delete div.gridstackPopoutCallback;
+            div.gridstackPopoutCallback = undefined;
             chart.remove = oldRemove;
             chart.changeBaseDocument = oldChangeBase;
             ro.disconnect();
-        }
-
-        
+        };
     }
-    
+}
+
+
+/// some more layout stuff, subject to change / moving to a different file
+
+type P = [number, number];
+type Config = Partial<{ size: P; position: P; gssize: P; gsposition: P }>;
+function getVisibleChartBounds(dataSource: DataSource) {
+  const charts = Object.entries(window.mdv.chartManager.charts) as unknown as [
+    [string, { dataSource: DataSource; chart: Chart }],
+  ];
+  return charts
+    .filter((c) => c[1].dataSource === dataSource)
+    .map((c) => c[1].chart.getDiv().getBoundingClientRect());
+}
+
+function getGridInfo(dataSource: DataSource) {
+  const [cellW, cellH] = window.mdv.chartManager.gridStack.getCellDimensions(dataSource);
+  const rect = dataSource.contentDiv.getBoundingClientRect();
+  const rows = Math.floor(rect.height / cellH) * 2; //hack for more rows in layout
+  const cols = Math.floor(rect.width / cellW);
+  return { cellW, cellH: cellH/2, rows, cols };
+}
+
+function findFreeSpace(dataSource: DataSource) {
+  const occupiedRects = getVisibleChartBounds(dataSource);
+  const { cellW, cellH, rows, cols } = getGridInfo(dataSource);
+  const mainRect = dataSource.contentDiv.getBoundingClientRect();
+  const width = 2;
+  const height = 1;
+
+  // Initialize the grid
+  const grid = new Array(rows);
+  for (let i = 0; i < rows; i++) {
+    grid[i] = new Array(cols).fill(false);
+  }
+
+  // Mark the occupied cells
+  for (const rect of occupiedRects) {
+    // get outer-bounds in terms of nominal grid... with appropriate offset relative to mainRect...
+    const left = Math.floor((rect.left-mainRect.left) / cellW);
+    const top = Math.floor((rect.top-mainRect.top) / cellH);
+    const right = Math.min(cols, Math.ceil((rect.right-mainRect.left) / cellW));
+    const bottom = Math.min(rows, Math.ceil((rect.bottom-mainRect.top) / cellH));
+    for (let row = top; row < bottom; row++) {
+      for (let col = left; col < right; col++) {
+        grid[row][col] = true;
+      }
+    }
+  }
+
+  // Find a free space
+  for (let row = 0; row <= rows - height; row++) {
+    for (let col = 0; col <= cols - width; col++) {
+      let isFree = true;
+      for (let i = 0; i < height && isFree; i++) {
+        for (let j = 0; j < width && isFree; j++) {
+          if (grid[row + i][col + j]) {
+            isFree = false;
+          }
+        }
+      }
+      if (isFree) {
+        return { left: col*cellW, top: row*cellH };
+      }
+    }
+  }
+
+  // If no free space was found, return [10, 10]
+  return { left: 10, top: 10 };
+}
+
+export function positionChart(dataSource: DataSource, config: Config) {
+  // some legacy code extracted to here and may be reviewed at some point.
+  let width = 300;
+  let height = 300; //consider having a preferred-size...
+  let left = 10;
+  let top = 10;
+  if (config.size) {
+    width = config.size[0];
+    height = config.size[1];
+  }
+  const { chartManager } = window.mdv;
+  if (config.position) {
+    left = config.position[0];
+    top = config.position[1];
+  } 
+  else {
+    try {
+      const pos = findFreeSpace(dataSource);
+      left = pos.left;
+      top = pos.top;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  //hack approx position of grid stack elements
+
+  if (
+    chartManager.viewData.dataSources[dataSource.name].layout === "gridstack" &&
+    config.gssize
+  ) {
+    const cellDim = chartManager.gridStack.getCellDimensions(dataSource);
+    width = Math.round(config.gssize[0] * cellDim[0]);
+    height = Math.round(config.gssize[1] * cellDim[1]);
+    left = Math.round(config.gsposition[0] * (cellDim[0] + 5));
+    top = Math.floor(config.gsposition[1] * (cellDim[1] + 5));
+  }
+
+  return { width, height, left, top };
 }

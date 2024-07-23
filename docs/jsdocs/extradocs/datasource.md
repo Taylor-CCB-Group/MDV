@@ -1,7 +1,7 @@
 
 The DataStore is created with a size (number of rows) and a config 
 
-```
+```js
 const ds = new DataStore(1000, {....})
 ```
 In theory The config is optional, columns and their data can be added later, but practically a config is required and  can contain the following  
@@ -49,11 +49,11 @@ integer/double columns. In the former the colors array is mapped to the values a
 * **minMax** - for integer and double columns, the minimum/maximum values in an array of length 2
 
 * **quantiles** - an object with 0.05, 0.01 and 0.001 as keys, with each entry and array of the x and 1-x quantiles
-```
+```js
     {
         "quantiles": {
-            "0.05": [x, y]
-            "0.01": [x, y]
+            "0.05": [x, y],
+            "0.01": [x, y],
             "0.001": [x, y]
         }   
     }
@@ -71,7 +71,7 @@ minMax and quantiles will be calculated if not supplied but this may be slow for
 ### columnGroups
 
 A list of logically grouped columns, in the following format. Columns should be referenced by their field values. A column can belong to more than one group
-```
+```json
     "columnGroups": [
         {
             "columns": [
@@ -96,7 +96,7 @@ A list of logically grouped columns, in the following format. Columns should be 
 ### links
 A dictionary where the keys are the dataStores that this dataStore should link with and the entries are objects describing the links. See the section for linking to other DataStores
 
-```
+```json
     "links": {
         "ds1": {.....},
         "ds2": {.....}
@@ -111,7 +111,7 @@ Represent thumbnails for each data item. It should be an object containing 'imag
 * `key_column` - the column in the dataStore that contains the keys for each image
 * `type` - the type of image
 
-```
+```json
     {
         "images": {
             "set1": {
@@ -233,7 +233,7 @@ This is enabled by adding an offsets parameter to the config which is comprised 
 
 An example for x and y columns, where each panel can be offset in each ROI and the offset/rotation for panel1 in ROI_1 is specified is shown below:
 
-```
+```json
     "offsets": {
         "param": ["x", "y"]
         "groups": "panels",
@@ -249,7 +249,7 @@ An example for x and y columns, where each panel can be offset in each ROI and t
     }
 ```
 If no background filter is specified then a single entry "all" should be used in values:
-```
+```json
     "offsets": {
         "param": ["x", "y"]
         "groups": "panels",
@@ -267,7 +267,7 @@ If no background filter is specified then a single entry "all" should be used in
 
 To set the values use the `setColumnOffset` method 
 
-```
+```js
 //rotate by 45 deg
 let  data = {group: "panel1", rotation: 45, filter: "ROI_1"};
 ds.setColumnOffset(data);
@@ -279,7 +279,7 @@ ds.setColumnOffset(data, true);
 If no background filter has been specified, you should omit the filter value or set it to "all"
 
 To reset a group's offsets to the original values use `resetColumnOffsets`
-```
+```js
 ds.resetColumnOffsets("ROI_1", "panel1", true)
 ```
 The first parameter should be null or "all" if there is no background filter
@@ -330,13 +330,13 @@ Column data can be added by the following
 * Adding a data parameter to the column objects in the columns parameter of the config passed to the DataStores's constructor
 
 * Using the DataStore's `addColumn` method passing the data parameter as the second parameter
-    ```
+    ```js
         ds.addColumn({datatype: "text", "field": "myvals", name: "My Vals"}, data)
 
     ```
 
 * If a column has already been added,  use  `setColumn` method with the column's field and data
-    ```
+    ```js
         ds.setColumnData("myvals", data)
     ```
 
@@ -348,7 +348,7 @@ The column should not contain more than 256 unique values.
 * JavaScript Array(string) 
 * SharedArrayBuffer(uint8) - each position in the underlying array represents the index in the column's value array 
 
-```
+```js
     ["blue", "green", "green", "yellow", "blue", "green"]
     //would be converted to 
     values: ["green", "blue", yellow]
@@ -366,7 +366,7 @@ A column that can hold multiple (or no values)
 * JavaScript Array(string) - each string should contain comma delimited values (or an empty string) 
 * SharedArrayBuffer(uint16) - each data item is stringLength portion of the array with each position being the index of the value's array. 65535 represents no value
 
-```
+```js
     [ "A, B, C", "B, A", "A, B", "D, E", "E, C, D" ]
     //would be converted to
     values: ["A", "B", "C", "D", "E"]
@@ -378,7 +378,7 @@ A column that can hold multiple (or no values)
 A unique column represents text that can contain more than 256 values
 * JavaScript Array(string) - Can contain any number of unique values. 
 * SharedArrayBuffer(uint8)  - Each value is encoded by a set number (stringLength) of bytes (utf), padded by 0 values. stringLength is set by the longest value, so is not very efficient for an array containing a few long strings and many shorter ones.  
-```
+```js
     ["ZX1212", "X21", "F232", "D1"]
     //would be converted to
     data: [90, 88, 49, 50, 49, 50, 88, 50, 49, 0, 0, 0, 70, 50, 51, 50, 0, 0, 68, 49, 0, 0, 0, 0] //(Uint8Array)
@@ -389,7 +389,7 @@ A unique column represents text that can contain more than 256 values
 These are treated the same and are represented by Float32Array
 * JavaScript Array(number) -  an array of numbers
 * SharedArrayBuffer(Float32) 
-```
+```js
 [1.2, 3, 4.5.7]
 //would be converted to
 data: [1.2, 3, 4.5.7] //(Float32Array)
@@ -399,7 +399,7 @@ data: [1.2, 3, 4.5.7] //(Float32Array)
 This is represented by a Int32Array and is better far larger integers. e.g.  genomic locations. However, it can't hold an NaN which represents missing data
 * JavaScript Array(number) -  an array of numbers
 * SharedArrayBuffer(int32) 
-```
+```js
 [1.2, 3, 4.5.7]
 //would be converted to
 data: [1.2, 3, 4.5.7] //(Float32Array)
@@ -452,6 +452,7 @@ For example, in single cell data, the cell DataStore would be linked to the gene
 * **name** - the human readable name of the dataset e.g Gene Scores
 * **subgroups** - this specifies the  different groups of data available. It consists of a dictionary, with the identifying stub of the subgroup pointing to the name, type and label (what the user will see) of the subgroup.
 
+```json
         "subgroups": {
             "gs": {
                 "name": "gene_scores",
@@ -463,6 +464,7 @@ For example, in single cell data, the cell DataStore would be linked to the gene
                 "label": "Imputed Gene Score"
             }
         }
+```
 
 The number of columns could potentially be very large, depending on the number of rows in the linked dataset, thus unlike other columns these are not explicitly specified in the DataStore's config. The column's field will have the following format:
 
@@ -588,82 +590,122 @@ example
 
 ### access_data
 
-For a dataStore to access from a another datastore, specify access_data in the link. The index specifies a column in the linked datastore, but does not have to be used 
+For a datastore to access data from another datastore, specify `"access_data"` in the link.
+
+An optional `index` parameter can be used to specify a column in the linked datastore.
 
 ```json
 {
-    "name":"genes",
-    "links":{
-        "cells":{
-            "index":"cell_id",
-            "access_data":true
+    "name": "genes",
+    "links": {
+        "cells": {
+            "index": "cell_id",
+            "access_data": true
         }
-
     }
 }
 ```
-With the above example, when a chart in the gene's datasource is created, the setupLinks method (if it exists) will be called passing the cell datastore, the name of the index and a function. This functions will load (if necessary) any column data from the cell's datastore. The 'index' column is implicitly loaded and need not be specified in this function
+With the above example, when a chart in the gene's datasource is created, the `setupLinks` method (if it exists for the given type of chart - as of this writing, `GenomeBrowser` is the only chart implementing this) will be called. Arguments will be passed with the cell datastore, the name of the index and a `getDataFunction`. This function will load (if necessary) any column data from the cell's datastore. The 'index' column is implicitly loaded and need not be specified in this function
 ```javascript
-setupLinks(dataStore,index,func){
+setupLinks(dataStore, index, getDataFunction) {
     //keep for future use
-    this.dataLink= {
-        dataStore:dataStore,
-        index:index,
-        getDataFunction:func
-    }
+    this.dataLink = { dataStore, index, getDataFunction };
     //make sure cell_size data has been loaded
-    func(["cell_size"],()=>{
+    getDataFunction(["cell_size"],()=>{
         //if you need an index
         const cell_index = dataStore.getColumnIndex(index);
         const cell_size = dataStore.getRawColumn("cell_size");
         //do stuff
         //add listeners to the datastore
     })
-
 }
-
-
 ```
 
 
 
 ### sync_column_colors
 
-To link column colors , specify the column from the linked DataStore you wish the colors to match (link_to) and the column you want to match  (col) . You can link one column to many
+To link column colors, specify the column from the linked DataStore you wish the colors to match (`link_to`) and the column you want to match (`col`). You can link one column to many
 
-example
+#### example
 
 ```json
 {
-    "name":"cell interactions",
-    "links":{
-        "cells":{
-            "sync_column_colors":[
+    "name": "cell interactions",
+    "links": {
+        "cells": {
+            "sync_column_colors": [
                 {
-                    "link_to":"annotations",
-                    "col":"Cell Type 1"
-
+                    "link_to": "annotations",
+                    "col": "Cell Type 1"
                 },
                 {
-                    "link_to":"annotations",
-                    "col":"Cell Type 2"
+                    "link_to": "annotations",
+                    "col": "Cell Type 2"
                 }
             ]
         }
     }
 }
 ```
-In the above a value in the Cell Type 1 or Cell Type 2 columns in the cell interactions datasource will be the same color as it is in the cells annotation column
+In the above a value in the `Cell Type 1` or `Cell Type 2` columns in the `cell interactions` datasource will be the same color as it is in the `cells` `"annotation"` column
+
+### valueset
+
+This allows a column to be filtered in a target datasource based on the **set of unique values** from the current selection in the source datasource.
+
+#### example
+
+Users can use this to explore how lower-level `cells` data contributes to the `statistics` by making selections on `statistics` charts.
+
+Consider a scenario where the `cells` data source is clustered into regions (identified by a `cell_regionID` column), and there's a `statistics` data source representing region-based statistics. The link's source (`"source_column"`) is the `statistics` data source's `regionID` column, and the target (`"dest_column"`) is the `cells` data source's `cell_regionID` column.
+
+When a new filter (selection) is applied on a `statistics` scatterplot, a `valueset` parameter containing a `Set` of unique `regionID` values from the `statistics` data source is passed to the `cells` data source. This results in corresponding filtering on any charts displayed in `cells`.
+
+To add this functionality to an `MDVProject` `'p'` in Python, the following code:
+
+```python
+valueset_args = {
+    'source_column': "regionID",
+    'dest_column': "cell_regionID",
+}
+p.insert_link('statistics', 'cells', 'valueset', valueset_args)
+```
+
+Will add this config in the `statistics` datasource:
+
+```json
+{
+    "name": "statistics",
+    "links": {
+        "cells": {
+            "valueset": {
+                "source_column": "regionID",
+                "dest_column": "cell_regionID"
+            }
+        }
+    }
+}
+```
 
 ## Listeners
 
-Listeners can be added/removed from the DataStore with the `addListener` and `removeListener` methods. The callback passed to the addListener will be invoked with the type of event and any data relevant to the event.
+Listeners can be added/removed from the DataStore with the `addListener` and `removeListener` methods. The callback passed to the addListener will be invoked with the type of event and any data relevant to the event. Note that the first argument is not an event type, but an ID for the listener. Invoking `addListener` with the same ID will replace the existing listener and care must be taken such that the ID precisely differentiates the subject.
+
+```js
+    const listenerId = ds.addListener(`${chartId} data change listener`, (type, data) => {
+        if (type === "data_changed") {
+            console.log("data changed in columns: ", data.columns);
+        }
+    });
+    ds.removeListener(listenerId);
+```
 
 * data_changed
     *  columns - a list of column fields where the data had changed
     *  hasFiltered - true if the changing the data has caused the refiltering of the DataStore 
 
-* filtered - The DataStore has been filtered, no data is passed to the listener unless all filters have been removed, in which case 'all_removed' is passed.
+* filtered - The DataStore has been filtered, no data is passed to the listener unless all filters have been removed, in which case 'all_removed' is passed. << that's a lie.
 
 * column_removed - called when a column is removed passing the column's field (id)
 
@@ -684,7 +726,7 @@ This has two filtering methods filterCategories works on a single column whereas
 
     
 
-```
+```js
     const dim = datastore.getDimension("category_dimension");
     //filter items with red in color column
     dim.filter("filterCategories", ["color"], "blue");
@@ -699,7 +741,7 @@ This has two filtering methods filterCategories works on a single column whereas
 
 ### range dimension
 
-```
+```js
 
     const dim = datastore.getDimension("range_dimension");
     //filter on between 5 and 10
@@ -717,7 +759,7 @@ This has two filtering methods filterCategories works on a single column whereas
 
 All dimensions can filter on an arbitrary set of items using the item's index
 
-```
+```js
 
     const indexes = new Set([4, 5, 10, 12]);
     const dim = datastore.getDimension("range_dimension");
@@ -726,7 +768,7 @@ All dimensions can filter on an arbitrary set of items using the item's index
 
 When a filter is called on a dimension - the datastore informs all listeners and hence any updates are performed, which is likely to be expensive. Therefore, if you want to perform multiple filters, pass false as the fourth argument and then call triggerFilter on the datastore
 
-```
+```js
     rangeDim.filter("filterRange", ["x"], {min: 5, min: 10}, false);
     catDim.filter("filterCategories", ["color"], "blue", false);
     datastore.triggerFilter();

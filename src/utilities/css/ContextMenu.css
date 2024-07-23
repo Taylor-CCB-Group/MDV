@@ -6,45 +6,45 @@
   background: #888;
 }
 
-.Dark .slick-row.odd{
+.dark .slick-row.odd{
   background:#303030;
 }
 
-.Dark .ui-widget-content{
+.dark .ui-widget-content{
   color:white;
 }
 
-.Dark .even{
+.dark .even{
   background:#404040
 }
 
-.Dark .slick-header-column{
+.dark .slick-header-column{
   background:black;
   color:white;
 }
-.Dark .slick-header-column:hover {
+.dark .slick-header-column:hover {
   background: var(--menu-gradient);
 }
-.Dark .slick-header-columns{
+.dark .slick-header-columns{
   background:black
 }
-.Dark .slick-header{
+.dark .slick-header{
   background:black
 }
 
-.Dark .slick-viewport::-webkit-scrollbar-track {
+.dark .slick-viewport::-webkit-scrollbar-track {
   background: #585858;        /* color of the tracking area */
 }
 
-.Dark .slick-viewport::-webkit-scrollbar {
+.dark .slick-viewport::-webkit-scrollbar {
   width: 12px;
 }
-.Dark .slick-viewport::-webkit-scrollbar-thumb {
+.dark .slick-viewport::-webkit-scrollbar-thumb {
   background-color:	black ;
 
 }
 
-.Dark .slick-cell.selected{
+.dark .slick-cell.selected{
   background:	#5c3434
 }
 
@@ -92,7 +92,7 @@
   position:absolute;
   border-radius:6px;
   padding:4px;
-  background:burlywood;
+  background:var(--background_color);
   z-index:5;
 
 }
@@ -153,7 +153,7 @@
 	position:absolute;
 	z-index:1000;
 	border:1px solid black;
-  background:white;
+  background: var(--background_color);
 
    }
    .ciview-ctm-active{
@@ -282,15 +282,13 @@ select, input, textarea {
       color:#eee;
       font-size:20px;
       margin-left:auto;
-      margin-bottom:8px;
-      position:absolute;
-      top:3px;
-      right:7px
+      position: absolute;
+      right: 10px;
   }
 
   .ciview-dlg-content{ 
-        overflow-X:hidden;
-        overflow-Y:auto;
+        overflow-x:hidden;
+        overflow-y:auto;
         flex:1 1 auto;
         padding:5px;
   }
@@ -298,12 +296,12 @@ select, input, textarea {
   .ciview-dlg-header {
     padding: 6px;
     cursor: move;
-    background-color: #2196F3;
+    /* background-color: #2196F3; */
     color: #fff;
     text-overflow: ellipsis;
     overflow:hidden;
     flex:0 0 auto;
-    /* margin-bottom: 0.2em; */
+    display: flex;
   }
 
   .ciview-dlg-header-text{
@@ -456,3 +454,7 @@ select, input, textarea {
   .multiselect-dropdown span.maxselected {width:100%;}
   .multiselect-dropdown-all-selector {border-bottom:solid 1px #999;}
   
+.color-picker-no-border::-webkit-color-swatch {
+  padding: 0;
+  border: none;
+}

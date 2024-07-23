@@ -36,6 +36,7 @@ class ImageTableChart extends BaseChart{
 
         if (c.sortBy) this.sortBy(c.sortBy, c.sortOrder);
         if (c.color_by) this.colorByColumn(c.color_by);
+        if (c.pixelated) this.setPixelated(c.pixelated);
 	}
 
     setSize(x,y){
@@ -87,7 +88,11 @@ class ImageTableChart extends BaseChart{
         this.dataModel.sort(columnName, ascending ? "asc" : "desc");
         const ft = this.grid.getFirstTileInView();
         this.grid.show(ft);
-    } 
+    }
+    setPixelated(pixelated){
+        this.config.pixelated=pixelated;
+        this.grid.setPixelated(pixelated);
+    }
     setImageTitle(column){
         this.config.image_title = column;
         this.grid.setImageTitle(column);
@@ -101,7 +106,7 @@ class ImageTableChart extends BaseChart{
         return settings.concat([
         {
             type:"slider",
-            max:od[1]*4,
+            max: Math.max(128, od[1]*4),
             min:10,
             doc:this.__doc__,
             label:"Image Size",
@@ -109,6 +114,14 @@ class ImageTableChart extends BaseChart{
             func:x=>{
                 c.image_width=x;
                 this.grid.setImageWidth(x,true)
+            }
+        },
+        {
+            label: "Pixelated?",
+            type: "check",
+            current_value: c.pixelated || false,
+            func: x => {
+                this.setPixelated(x);
             }
         },
         {
@@ -177,7 +190,7 @@ BaseChart.types["image_table_chart"]={
     },
     extra_controls:(dataSource)=>{
         const imageSets=[];
-        for (let iname in dataSource.images){
+        for (const iname in dataSource.images){
             imageSets.push({name:iname,value:iname})
         }
         const sortableColumns = dataSource.getColumnList().map(c=>({name:c.name,value:c.field}));

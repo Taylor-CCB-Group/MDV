@@ -1,16 +1,19 @@
 
 import Dimension from "./Dimension.js";
 //register dimensions
-import  "./CategoryDimension.js";
+import "./CategoryDimension.js";
 import "./RangeDimension.js";
 import "./CatColDimension.js";
 import  "./CatRangeDimension.js";
 import "./DensityDimension.js";
+import "./ValueSetDimension";
 import "./SortableDimension.js";
 import "./DeepToolsDimension.js";
 import {scaleLinear,scaleSymlog} from "d3-scale";
 import {getColorLegend,getColorBar} from "../utilities/Color.js"
 import {quantileSorted} from 'd3-array';
+import { makeObservable, observable, action } from "mobx";
+import { isColumnNumeric, isColumnText } from "../utilities/Utilities.js";
 
 
 /**
@@ -20,7 +23,7 @@ import {quantileSorted} from 'd3-array';
 * @param {Object} [config] - setup information for the datastore.
 * @param {Object[]} [config.columns] - an array of column objects, specifying 
 * the metadata for data structure, see {@link DataStore#addColumn}
-* @param {Object[]} [config.columnGroups] - an array of objetcs each has
+* @param {Object[]} [config.columnGroups] - an array of objects each has
 * name, and a list of columns in that group
 * @param {Object} [config.links] - an object describing how this DataStore
 * links with other DataStore
@@ -28,9 +31,9 @@ import {quantileSorted} from 'd3-array';
 * are associated with each item/row in the DataStore
 * @param {Object} [config.large_iamges] - an object describing large images which
 * are associated with each item/row in the DataStore
-* @param {Object} [config.offsets] - an object specofying which columns can
+* @param {Object} [config.offsets] - an object specifying which columns can
 * have values that can be transformed and rotated and any transformations/
-* rotations appplied to them
+* rotations applied to them
 */
 
 class DataStore{
@@ -61,6 +64,23 @@ class DataStore{
         this.syncColumnColors=[];
         this.linkColumns=[];
         this.regions=config.regions;
+
+        //for react / mobx... makeAutoObservable causes problems with webworker.postMessage:
+        // `DOMException: Failed to execute 'postMessage' on 'Worker': [object Array] could not be cloned.`
+        // because it adds a mobx proxy to the array, which can't be cloned...
+        // so for now, rather than using makeAutoObservable, we'll just manually add the mobx stuff we need:
+        makeObservable(this, {
+            _filteredIndicesPromise: observable,
+            _callListeners: action,
+        }); 
+        
+        
+        // for re-usable filteredIndices
+        // todo mobx action
+        this.addListener('invalidateFilteredIndicesCache', action(() => {
+            //if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
+            this._filteredIndicesPromise = null;
+        }));
 
         if (config.row_data_loader){
             if (!dataLoader?.rowDataLoader){
@@ -103,13 +123,13 @@ class DataStore{
         this.tree_diagram=config.tree_diagram;
        
         if (config.columns){
-            for (let c of config.columns){
+            for (const c of config.columns){
                 this.addColumn(c,c.data);
             }
         }
 
         if (config.columnGroups){
-            for (let item of config.columnGroups){
+            for (const item of config.columnGroups){
                 this.addColumnGroup(item);
             }
         }
@@ -118,12 +138,12 @@ class DataStore{
         }
         if (config.links){
             this.links= config.links;
-            for (let ds in config.links){
+            for (const ds in config.links){
                 const link = config.links[ds];
                 if (link.rows_as_columns){
                     const sg= link.rows_as_columns.subgroups;
                     this.subgroupDataSources.add(ds);
-                    for (let t in sg){
+                    for (const t in sg){
                             this.subgroups[t]={
                                 subgroup:sg[t],
                                 dataSource:ds,
@@ -193,8 +213,12 @@ class DataStore{
     }
 
     _callListeners(type,data){
-        for (let id in this.listeners){
-            this.listeners[id](type,data);
+        for (const id in this.listeners){
+            try {
+                this.listeners[id](type,data);
+            } catch (e) {
+                console.error(`Error calling listener '${id}' for event '${type}'`, e);
+            }
         }
     }
 
@@ -206,8 +230,8 @@ class DataStore{
      */
     removeAllFilters(){
         this.filterArray.fill(0);
-        let noclear=[];
-        for (let dim of this.dimensions){     
+        const noclear=[];
+        for (const dim of this.dimensions){     
             if (dim.noclear){
                 noclear.push(dim);
                 continue
@@ -224,23 +248,21 @@ class DataStore{
         }  
         this.filterSize=this.size;
         //need to re-add the noclear filters (if any)
-        for (let dim of noclear){
+        for (const dim of noclear){
             const f= dim.filterArray;
             for (let n=0;n<f.length;n++){
                 if (f[n] === 1){
                     if(++this.filterArray[n]===1){
                         this.filterSize--;
-                    };
-
+                    }
                 }
-               
             }
         }
         this._callListeners("filtered","all_removed");
     }
 
     /** 
-    * This method should be called if the any data has been modified, specifiying the
+    * This method should be called if any data has been modified, specifying the
     * columns involved.
     * Any dimensions will re-filter if necessary i.e. if the modified columns are 
     * involved in the filter and single filtered event will be broadcast.
@@ -254,14 +276,14 @@ class DataStore{
     */
     dataChanged(columns,is_dirty=true){
         let hasFiltered=false;
-        for (let d of this.dimensions){
+        for (const d of this.dimensions){
             //this method will not call any listeners- wait until all done
            if (d.reFilterOnDataChanged(columns)){
                 hasFiltered=true;
            }
         }
         if (is_dirty){
-            for (let c of columns){
+            for (const c of columns){
                 this.setColumnIsDirty(c);
             }
         }
@@ -273,10 +295,10 @@ class DataStore{
     }
 
     /**
-     * This method calls any listeners to 'highlight' any rows specified e.g
+     * This method calls any listeners to 'highlight' any rows specified e.g.
      * rows in a table or points in a scatter plot
      * @param {array} indexes an array of indexes to items that should be highlighted
-     * @param {object} source the obect doing the highlighting
+     * @param {object} source the object doing the highlighting
      */
     dataHighlighted(indexes,source){
         this.highightedData=indexes;
@@ -375,14 +397,14 @@ class DataStore{
  
     //delete
     _calculateCategories(column){
-        let vs = column.values;
-        let d= column.data;
-        let ci = {};
-        for (let n of vs){
+        const vs = column.values;
+        const d= column.data;
+        const ci = {};
+        for (const n of vs){
             ci[n]=0;
         }
         for (let i=0;i<d.length;i++){
-            let v= vs[d[i]];
+            const v= vs[d[i]];
             ci[v]++;      
         }
     }
@@ -398,6 +420,7 @@ class DataStore{
     *   <li> double - any floating point data </li>
     *   <li> integer - any integer data </li>
     *   <li> text - data containing strings but with no more than 256 categories </li>
+    *   <li> text16 - data containing strings with up to 65536 categories </li>
     *   <li> unique - data contianing strings but with many categories </li>
     *   <li> multitext - 
     * </ul>
@@ -426,10 +449,15 @@ class DataStore{
     * been added and is not permanently stored in the backend
     */
     addColumn(column,data=null,dirty=false){
-        let c  = {
+        const c  = {
             name:column.name,
             field:column.field,
             datatype:column.datatype,
+            getValue: i => {
+                //this could be more efficient if the logic was inverted;
+                //i.e. getRowAsObject would call this method on all columns...
+                return this.getRowAsObject(i,[column.field])[column.field];
+            }
         }
         if (!c.field){
             c.field=column.name;
@@ -449,14 +477,14 @@ class DataStore{
             c.sgindex= column.sgindex;
             c.sgtype=column.sgtype;
         }
-        if (column.datatype === "text" || column.datatype === "multitext" || column.datatype === "text16"){
+        if (isColumnText(column)){
             c.stringLength= column.stringLength;
             if (column.delimiter){
                 c.delimiter=column.delimiter;
             }
-            c.values = column.values || [`Error: no values for '${c.name}'`];
+            c.values = column.values || [''];
         }
-        else if (column.datatype==="double" || column.datatype ==="integer" ||  column.datatype==="int32"){
+        else if (isColumnNumeric(column)){
             c.colorLogScale=column.colorLogScale;
             c.minMax=column.minMax;
             c.quantiles=column.quantiles;
@@ -477,14 +505,14 @@ class DataStore{
     }
 
     /**
-     * This method will return (case insensitive) any values in the column
+     * This method will return (case-insensitive) any values in the column
      * which contain the specified text (unique/text/multitext columns only)
      * @param {*} text - the query value
      * @param {*} column - the column to query
      * @param {*} number  - the maximum number of results to return
      * @returns {object[]} An array of objects with
      * <ul>
-     *  <li>value-  the actual text match   </li>
+     *  <li>value - the actual text match   </li>
      *  <li>index - for unique columns, the row index and for 
      *   text/multitext its index in the column's values array</li>
      * </ul>
@@ -504,7 +532,7 @@ class DataStore{
             for (let i = 0;i<d.length-len;i++){
                 let match=true;
                 for (let a=0;a<len;a++){
-                    if (bupper[a]!=d[i+a] && blower[a]!=d[i+a]){
+                    if (bupper[a]!==d[i+a] && blower[a]!==d[i+a]){
                         match=false;
                         break;
                     }
@@ -534,16 +562,14 @@ class DataStore{
                             match =false;
                             break;
                         }
-                        else{
+                        
                             console.log("match")
-                        }
                     }
                     if (match){
                         break;
                     }
-                    else{
+                    
                         console.log(n);
-                    }
                 }
                 if (match){
                     matches.push({
@@ -592,7 +618,7 @@ class DataStore{
 
     /**
     * returns a list of column name and fields (which have data) sorted by name 
-    * @param {Array|string} [filter] - can be either be a string -'number', 'all' or a column type.
+    * @param {Array|string} [filter] - can be either be a string -'number', 'string', 'all' or a column type.
     * Or an array of column types
     * @param {boolean} [addNone=false] if true then an extra object will be added to the list
     * with name 'None' and field '__none__'
@@ -610,7 +636,7 @@ class DataStore{
         });
         const f_array = Array.isArray(filter);  
         const has_sgs= sgs.length !== 0;
-        for (let f in this.columnIndex){
+        for (const f in this.columnIndex){
             const c= this.columnIndex[f];
             if (filter){
                 if (f_array){
@@ -619,7 +645,12 @@ class DataStore{
                     }
                 }
                 else if (filter==="number"){
-                    if (c.datatype === "text" || c.datatype==="unique" ||  c.datatype==="multitext" || c.datatype==="text16" ){
+                    if (!isColumnNumeric(c)){
+                        continue;
+                    }
+                }
+                else if (filter === "string") {
+                    if (!isColumnText(c)){
                         continue;
                     }
                 }
@@ -630,7 +661,7 @@ class DataStore{
             //subgroup columns separate
             if (has_sgs){
                 let has = false;
-                for (let s of sgs){
+                for (const s of sgs){
                     if (c.field.startsWith(`${s}|`)){
                         const sg = this.subgroups[s];
                         sgDataSources[s].push({name:c.name,field:c.field,datatype:c.datatype,
@@ -651,7 +682,7 @@ class DataStore{
         }
         let cols =  columns.sort((a,b)=> a.name.localeCompare(b.name));
         if (has_sgs){
-            for (let ds in sgDataSources){
+            for (const ds in sgDataSources){
                 sgDataSources[ds].sort((a,b)=> a.name.localeCompare(b.name));
                 cols=cols.concat(sgDataSources[ds]);
             }
@@ -664,7 +695,7 @@ class DataStore{
 
     /**
     * Creates and returns a dimension that it used to filter and group the data
-    * @param {string} type - the dimension type , the built in dimensions are 
+    * @param {string} type - the dimension type , the built-in dimensions are
     * 'category_dimension' for text  columns and 'range_dimension' for number
     * columns
     * @returns {Dimension} A dimension that can be used for grouping/filtering 
@@ -684,30 +715,32 @@ class DataStore{
     * for all columns. As an object is created, this method is slow,
     * so it is advisable not to use it for many rows at once.
     * @param {integer} index - The index of the row
-    * @returns {Object} An object containg key(field)/value pairs. An extra
-    * variable 'index' contianing the row index is also added to the object
+    * @param {string[]?} columns - The ids of columns to use. If not provided, `columnsWithData` will be used.
+    * @returns {Object} An object containing key(field)/value pairs. An extra
+    * variable 'index' containing the row index is also added to the object
     */
     getRowAsObject(index,columns){
         if (!columns){
             columns= this.columnsWithData;
         }
-        const obj={}
-        for (let c of columns){
+        const obj={} // pjt consider using Map if this is a bottleneck
+        for (const c of columns){
+            //todo invert this to use col.getValue(index)
             const col = this.columnIndex[c];
             let v= col.data[index];
             if (col.datatype === "text" || col.datatype === "text16") {
                 v= col.values[v];
             }
             else if (col.datatype==="double" || col.datatype==="integer" || col.datatype==="int32"){
-                if (isNaN(v)){
+                if (Number.isNaN(v)){
                     v="missing";
                 }
             }
             //multitext displayed as comma delimited values
-            else if (col.datatype=="multitext"){
+            else if (col.datatype==="multitext"){
                 const delim = ", ";
                 const d= col.data.slice(index*col.stringLength,(index*col.stringLength)+col.stringLength);
-                v= Array.from(d.filter(x=>x!=65535)).map(x=>col.values[x]).join(delim);
+                v= Array.from(d.filter(x=>x!==65535)).map(x=>col.values[x]).join(delim);
 
             }
             else{
@@ -722,7 +755,7 @@ class DataStore{
 
     /**
      * Returns the index of the first filtered item - slow
-     * @returns the index of the first filtered iten
+     * @returns the index of the first filtered item
      */
     getFirstFilteredIndex(){
         for (let n=0;n<this.size;n++){
@@ -732,12 +765,42 @@ class DataStore{
         }
     }
 
+    _filteredIndicesPromise = null;
+    _filteredIndexWorker = new Worker(new URL("./filteredIndexWorker.ts", import.meta.url));
+    /**
+     * Get an array of indexes of all the items that are not filtered.
+     * Subsequent calls will return a cached version of a reference to the promised array.
+     * This cached reference is invalidated by any event on this DataStore 
+     * (and will trigger mobx/react when re-assigned).
+     * @returns {Promise<Uint32Array>} A promise that resolves to an array of indexes
+     */
+    async getFilteredIndices() {
+        if (this._filteredIndicesPromise) {
+            // will be null if the filter has changed since the last call
+            return this._filteredIndicesPromise;
+        }
+        action(() => this._filteredIndicesPromise = new Promise((resolve, reject) => {
+            const worker = this._filteredIndexWorker;
+            const byteLength = this.filterSize * Uint32Array.BYTES_PER_ELEMENT;
+            const outputBuffer = new SharedArrayBuffer(byteLength);
+            // todo atomics... not really needed for this, but would be good to illustrate / learn.
+            worker.postMessage({
+                filterBuffer: this.filterBuffer, outputBuffer
+            });
+            worker.onmessage = (e) => {
+                resolve(new Uint32Array(outputBuffer));
+            };
+        }))();
+
+        return this._filteredIndicesPromise;
+    }
+
 
     /**
-     * Return an array of containing all the filterd values for
-     * the specified column - inefficent for large data sets
+     * Return an array of containing all the filtered values for
+     * the specified column - inefficient for large data sets
      * @param {string} column - the column's field.id
-     * @returns {string[]|number[]}  An array pf filtered valaues
+     * @returns {string[]|number[]}  An array pf filtered values
      */
     getFilteredValues(column){
         const arr =  new Array(this.filterSize);
@@ -810,8 +873,8 @@ class DataStore{
             fv = fc.values.indexOf(filter)
         }
     
-        let mmx=[Number.MAX_VALUE,Number.MIN_VALUE];
-        let mmy=[Number.MAX_VALUE,Number.MIN_VALUE];
+        const mmx=[Number.MAX_VALUE,Number.MIN_VALUE];
+        const mmy=[Number.MAX_VALUE,Number.MIN_VALUE];
 
         for (let n=0;n<this.size;n++){
             if (fc && fc.data[n] !== fv){
@@ -841,7 +904,7 @@ class DataStore{
 
     //gets the offset values
     //single - the only value to offset or rotate otherwise
-    //the valuea are obtained from the offsets config
+    //the values are obtained from the offsets config
     //rotate true or false- to rotate if not then offset
     _getOffsetValues(single,rotation){
         const o = this.offsets;
@@ -856,17 +919,17 @@ class DataStore{
         const gc= this.columnIndex[o.groups];
         const values=[];
       
-        for (let fv in o.values){
+        for (const fv in o.values){
             if (single &&  fv!==single.filter){
                 continue;
             }
 
         
-            for (let i in o.values[fv]){
+            for (const i in o.values[fv]){
                 if (single && i !==single.group){
                     continue;
                 }
-                let v= o.values[fv][i];
+                const v= o.values[fv][i];
             
                 const val={
                     index:gc.values.indexOf(i)
@@ -917,7 +980,7 @@ class DataStore{
 
     /**
      * resets the columns offsets to default values
-     * @param {sring} [filter] - the filter value - or null if no filter
+     * @param {string} [filter] - the filter value - or null if no filter
      * @param {string} group - The group/category to reset
      * @param {boolean} update - whether to inform listeners data has changed 
      */
@@ -969,16 +1032,16 @@ class DataStore{
      
         for (let n=0;n<this.size;n++){
          
-            for (let v of values){
+            for (const v of values){
                 if (v.filterData && v.filterData[n] !== v.filterValue){
                     continue;
                 }
                 if (groupData[n]===v.index){
                     if (rotation){
-                        let cx= v.rotation_center[0];
-                        let cy = v.rotation_center[1];
-                        let nx = (v.cos * (x.data[n] - cx)) + (v.sin * (y.data[n] - cy)) + cx;
-                        let ny = (v.cos * (y.data[n] - cy)) - (v.sin * (x.data[n] - cx)) + cy;
+                        const cx= v.rotation_center[0];
+                        const cy = v.rotation_center[1];
+                        const nx = (v.cos * (x.data[n] - cx)) + (v.sin * (y.data[n] - cy)) + cx;
+                        const ny = (v.cos * (y.data[n] - cy)) - (v.sin * (x.data[n] - cx)) + cy;
                         x.data[n]=nx;
                         y.data[n]=ny;
                     }else{
@@ -1079,7 +1142,7 @@ class DataStore{
     * @param {SharedArrayBuffer|Array} data  either a javascript array or shared array buffer 
     */
     setColumnData(column,data){
-        let c= this.columnIndex[column];
+        const c= this.columnIndex[column];
         if (!c){
             throw `column ${column} is not present in data store`
         }
@@ -1091,13 +1154,14 @@ class DataStore{
             buffer=data;
         }
         c.buffer=buffer;      
-        if (c.datatype === "integer" || c.datatype=="double" || c.datatype==="int32"){
+        if (c.datatype === "integer" || c.datatype==="double" || c.datatype==="int32"){
             const dataArray = c.data=  c.datatype==="int32"?new Int32Array(buffer):new Float32Array(buffer);
             if (!c.minMax){
-                let min =Number.MAX_VALUE, max = Number.MIN_VALUE;
+                let min =Number.MAX_VALUE;
+                let max = Number.MIN_VALUE;
                 for (let i=0;i<dataArray.length;i++){
-                    let value = dataArray[i];
-                    if (isNaN(value)){
+                    const value = dataArray[i];
+                    if (Number.isNaN(value)){
                         continue;
                     }
                     min = (value<min) ? value:min
@@ -1106,9 +1170,9 @@ class DataStore{
                 c.minMax=[min,max];
             }
             if (!c.quantiles){
-                const a  = c.data.filter(x=>!isNaN(x)).sort();
+                const a  = c.data.filter(x=>!Number.isNaN(x)).sort();
                 c.quantiles={};
-                for (let q of [0.05,0.01,0.001]){
+                for (const q of [0.05,0.01,0.001]){
                     c.quantiles[q]=[quantileSorted(a,q),quantileSorted(a,1-q)];           
                 }
             }         
@@ -1119,12 +1183,12 @@ class DataStore{
         else {
           c.data= new Uint8Array(buffer);
         }
-        this.columnsWithData.push(column);      
+        this.columnsWithData.push(column);
     }
 
     //experimental
     appendColumnData(column,data,newSize){
-        let c= this.columnIndex[column];
+        const c= this.columnIndex[column];
         let arrType= Uint8Array;
         let size = newSize;
         if (c.datatype === "integer" || c.datatype==="double"){
@@ -1140,8 +1204,8 @@ class DataStore{
             size=size*c.stringLength;
         }
         
-        let newBuffer = new SharedArrayBuffer(size);
-        let newArr= new arrType(newBuffer);
+        const newBuffer = new SharedArrayBuffer(size);
+        const newArr= new arrType(newBuffer);
         newArr.set(c.data);
         newArr.set(new arrType(data),c.data.length);
         c.data= newArr;
@@ -1152,11 +1216,11 @@ class DataStore{
     //experimental
     addDataToStore(columnData,size){
         const newSize=size+this.size;
-        for (let c of columnData){
+        for (const c of columnData){
             this.appendColumnData(c.column,c.data,newSize)
         }
-        let newBuffer = new SharedArrayBuffer(newSize);
-        let newArr = new Uint8Array(newBuffer);
+        const newBuffer = new SharedArrayBuffer(newSize);
+        const newArr = new Uint8Array(newBuffer);
         newArr.set(this.filterArray);
 
 
@@ -1165,7 +1229,7 @@ class DataStore{
         this.size = newSize;
         this.filterSize+=size;
         //update dimensions and redo any filters
-        for (let d of this.dimensions){
+        for (const d of this.dimensions){
             d.updateSize();
         }
         this._callListeners("data_added",this.size)
@@ -1175,7 +1239,7 @@ class DataStore{
     cleanColumnData(column){
         const index= {};
         const col = this.columnIndex[column];
-        for (let v in col.values){
+        for (const v in col.values){
             index[v]=0;
         }
         for (let i=0;i<this.size;i++){
@@ -1205,7 +1269,10 @@ class DataStore{
     _convertColumn(col,arr){
        
         const len =arr.length;
-        if (col.datatype==="text" || "text16"){
+        //pjt: note - looked like a bug here with `if (col.datatype==="text" || "text16")` - always truthy
+        //also, should this handle "multitext" as well? No - that has a separate case below.
+        //this was the source of bug with saving multitext columns for __tags
+        if (col.datatype === "text" || col.datatype === "text16"){
             const t8 = col.datatype==="text";
             const buff =new SharedArrayBuffer(t8?this.size:this.size*2);
             //work out number or rows with each value
@@ -1221,7 +1288,7 @@ class DataStore{
             }
             //sort values by number of rows
             const li=[];
-            for (let v in v_to_n){
+            for (const v in v_to_n){
                 li.push([v,v_to_n[v]])
             }
             col.values=[];
@@ -1239,7 +1306,7 @@ class DataStore{
             }
             return buff;
         }
-        else if (col.datatype === "integer" || col.datatype === "double" || col.datatype==="int32"){
+        if (col.datatype === "integer" || col.datatype === "double" || col.datatype==="int32"){
             const buff =new  SharedArrayBuffer(this.size*4);
             const a=  col.datatype==="int32"?new Int32Array(buff):new Float32Array(buff);
            
@@ -1249,9 +1316,9 @@ class DataStore{
             return buff
 
         }
-        else if (col.datatype=== "multitext"){
+        if (col.datatype=== "multitext"){
             const delim = col.delimiter || ",";
-            let vals = new Set();
+            const vals = new Set();
             let max=0;
             //first parse - get all possible values and max number
             //of values in a single field
@@ -1269,7 +1336,7 @@ class DataStore{
             //more efficent than using indexOf in array
             const map = {};
             let  index=0;
-            for (let v of  vals){
+            for (const v of  vals){
                 map[v]=index;
                 values[index]=v;
                 index++;
@@ -1293,7 +1360,7 @@ class DataStore{
             return buff;
 
         }
-        else{
+        
            
             
             let max = 0
@@ -1310,7 +1377,6 @@ class DataStore{
             }
            
             return buff;
-        }
 
     }
 
@@ -1335,6 +1401,7 @@ class DataStore{
     * <li> max - the maximum value </li>
     * <li> colors - the color scheme to use </li>
     * <li> colorLogScale- whether to use a log scale </li>
+    * <li> fallbackOnZero- whether to return the fallback color for zeros, as well as NaN </li>
     * </ul
     * @param {boolean} [config.useValue=false]  The returned function will require the
     * columns value, not index
@@ -1351,15 +1418,18 @@ class DataStore{
             }
             config.useValue=true;
         }
-        
+
         const data= c.data;
         const ov = config.overideValues|| {}
-        let  colors  =  this.getColumnColors(column,config);
+        const  colors  =  this.getColumnColors(column,config);
+        function isFallback(v){
+            return Number.isNaN(v) || (ov.fallbackOnZero && v===0);
+        }
         //simply return the color associated with the value
-        if (c.datatype==="text" || c.datatype==="text16"){                   
+        if (c.datatype==="text" || c.datatype==="text16" || c.datatype==="multitext"){                   
             return x=>colors[data[x]];
         }
-        else if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
+        if(c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){    
             const min = ov.min==null?c.minMax[0]:ov.min;
             const max = ov.max == null?c.minMax[1]:ov.max;
             const bins = config.bins || 100;
@@ -1368,7 +1438,7 @@ class DataStore{
             //the actual function - bins the value and returns the color for that bin
             if (config.useValue){
                 return v=>{
-                    if (isNaN(v)){
+                    if (isFallback(v)){
                         return fallbackColor;
                     }
                     let bin = Math.floor((v - min) / interval_size);
@@ -1381,11 +1451,11 @@ class DataStore{
                     return colors[bin];
                 }
 
-            }else{
+            }
                 return x=>{
                     const v= data[x];
                     //missing data
-                    if (isNaN(v)){
+                    if (isFallback(v)){
                         return fallbackColor;
                     }
                     let bin = Math.floor((v - min) / interval_size);
@@ -1397,7 +1467,6 @@ class DataStore{
                     }
                     return colors[bin];
                 }
-            }    
         }
     }
 
@@ -1419,21 +1488,21 @@ class DataStore{
      * Makes a color bar/legend based on the give column
      * @param {string} column - the field/id of the column 
      * @param {object} config - see [here]{@link DataStore#getColorFunction} 
-     * @returns {HMTLElemnt} - a color bar or color legend
+     * @returns {HTMLElement} - a color bar or color legend
      */
     getColorLegend(column,config={}){
         const colors = this.getColumnColors(column,config);
         const c= this.columnIndex[column];
         const name = config.name || c.name;
         if (c.datatype==="integer" || c.datatype==="double" || c.datatype==="int32"){
-            let   range= c.minMaX;
+            let range = c.minMaX;
             if (config.overideValues){
                 const ov = config.overideValues;
                 range = [ov.min==null?c.minMax[0]:ov.min,ov.max==null?c.minMax[1]:ov.max]
             }
             return getColorBar(colors,{range:range,label:name});
         }
-        if (c.datatype==="text" || c.datatype==="text16"){
+        if (isColumnText(c)){
             return getColorLegend(colors,c.values,{label:name});
         }  
     }
@@ -1500,9 +1569,9 @@ class DataStore{
     /**
      * Returns the colors that the column uses or default ones if none have been set
      * @param {string} column - the column's field or id
-     * @param {object} config - see see [here]{@link DataStore#getColorFunction} 
+     * @param {object} config - see [here]{@link DataStore#getColorFunction}
      * @returns {string[]} An array of colors. For text/multitext, the colors will correspond
-     * to the column's values. For double/integers it will contain binned values fron the min
+     * to the column's values. For double/integers it will contain binned values from the min
      * to max value
      */
     getColumnColors(column,config={}){
@@ -1514,9 +1583,9 @@ class DataStore{
         if (c.datatype==="double" || c.datatype==="integer" || c.datatype==="int32"){
             const ov = config.overideValues || {};
             const c_colors = ov.colors || (c.colors || defaultIPalette);
-            const min = ov.min == undefined ? c.minMax[0]:ov.min;
-            const max =  ov.max == undefined ? c.minMax[1]:ov.max;
-            //caclulate the color of each bin
+            const min = ov.min === undefined ? c.minMax[0]:ov.min;
+            const max =  ov.max === undefined ? c.minMax[1]:ov.max;
+            //calculate the color of each bin
             const ls= linspace(min,max,c_colors.length);
             const scale =scaleLinear().domain(ls).range(c_colors).clamp(true);
             const bins = ov.bins || 100;
@@ -1544,7 +1613,7 @@ class DataStore{
             }
             return colors
         }
-        else if (c.datatype==="text" || c.datatype==="multitext" || c.datatype==="text16"){
+        if (c.datatype==="text" || c.datatype==="multitext" || c.datatype==="text16"){
 
             let colors=  c.colors;
             if (! colors){
@@ -1605,7 +1674,7 @@ class DataStore{
     getColumnRange(column){
         const c = this.columnIndex[column];
         if (!c.minMax) {
-            console.error('unknown minMax for column ' + column);
+            console.error(`unknown minMax for column ${column}`);
             return [0, 50];
         }
         return c.minMax[1]-c.minMax[0];
@@ -1682,10 +1751,10 @@ class DataStore{
 }
 
 function linspace(start,end,n){
-    var out = [];
-    var delta = (end - start) / (n - 1);
+    const out = [];
+    const delta = (end - start) / (n - 1);
 
-    var i = 0;
+    let i = 0;
     while(i < (n - 1)) {
         out.push(start + (i * delta));
         i++;
@@ -1697,25 +1766,25 @@ function linspace(start,end,n){
 
 function hexToRGB(hex){
     hex=hex.replace("#","")
-    var bigint = parseInt(hex, 16);
-    var r = (bigint >> 16) & 255;
-    var g = (bigint >> 8) & 255;
-    var b = bigint & 255;
+    const bigint = Number.parseInt(hex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
     return [r,g,b];
 }
 
 function RGBToHex(rgb){
-     return "#"+rgb.map(x => {
+     return `#${rgb.map(x => {
         const hex = x.toString(16)
-        return hex.length === 1 ? '0' + hex : hex
-      }).join('');
+        return hex.length === 1 ? `0${hex}` : hex
+      }).join('')}`;
 }
 function rgbToRGB(rgb){
     if (!rgb){
         return [255,255,255];
     }
     rgb= rgb.substring(4,rgb.length-1).split(", ");
-    return rgb.map(x=>parseInt(x));
+    return rgb.map(x=>Number.parseInt(x));
 }
 
 const defaultPalette=[

@@ -1,0 +1,83 @@
+name: Python CI
+on:
+  push:
+    branches:
+      # FIXME replace this with main after merge to main
+      - pjt-dev
+#      - main
+    paths:
+      - 'python/**'
+  pull_request:
+    branches:
+      # FIXME replace this with main after merge to main
+      - pjt-dev
+#      - main
+    paths:
+      - 'python/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    defaults:
+      run:
+        working-directory: python
+    strategy:
+      matrix:
+        python-version: [ 3.12 ]
+        poetry-version: [ 1.7.1 ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: pipx install poetry
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'poetry'
+
+      - run: poetry install --with dev
+      - run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
+
+      - run: make test
+
+  pyright:
+    defaults:
+      run:
+        working-directory: python
+    strategy:
+      matrix:
+        python-version: [3.12]
+        pyright-version: [1.1.343]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: pipx install poetry
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'poetry'
+
+      - run: poetry install --with dev
+      - run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
+
+      - uses: jakebailey/pyright-action@v2
+        with:
+          version: ${{ matrix.pyright-version }}
+
+  ruff:
+    defaults:
+      run:
+        working-directory: python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: chartboost/ruff-action@v1
+        with:
+          args: "check"
+      - uses: chartboost/ruff-action@v1
+        with:
+          args: "format --check"

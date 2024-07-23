@@ -17,7 +17,7 @@ class SingleSeriesChart extends SVGChart{
         }     
         const p= this.config.param;
         const c= this.config;
-        let vals= this.dataStore.getColumnValues(p[0]);
+        const vals= this.dataStore.getColumnValues(p[0]);
         this.x_scale.domain(vals.slice(0));
         this.config.scale= this.config.scale || this.dataStore.getColumnQuantile(p[4],"0.001");
         this.initialSetUp();
@@ -73,7 +73,7 @@ class SingleSeriesChart extends SVGChart{
         let max=  null;
         for (let i =0;i<len;i++){
             if (c1[i]===cat1 && c2[i]===cat2){
-                if (isNaN(values[i])){
+                if (Number.isNaN(values[i])){
                     continue
                 }
                 max = max===null?values[i]:Math.max(values[i],max);
@@ -85,13 +85,13 @@ class SingleSeriesChart extends SVGChart{
                 eb.totals+=values[i];               
             }
         }
-        for (let eb of errorBars){
+        for (const eb of errorBars){
             eb.mean = eb.totals/eb.values.length;
             let n = eb.values.length-1;
             n= n===0?1:n;
-            eb.std= eb.values.reduce((prev,cur)=>prev+(Math.pow(cur-eb.mean,2)),0);
+            eb.std= eb.values.reduce((prev,cur)=>prev+((cur-eb.mean) ** 2),0);
             eb.std= Math.sqrt(eb.std/n);
-            delete eb.values
+            eb.values = undefined
         }
         this.errorBars=errorBars;
         const margin = (max-min)/10;
@@ -154,7 +154,6 @@ class SingleSeriesChart extends SVGChart{
         const svalues = this.dataStore.getColumnValues(p[3])
         const dim = this._getContentDimensions();
         const recWidth= dim.width/xvals.length;
-        const self = this;
         const colors = this.dataStore.getColumnColors(p[0]);
         const g= recWidth/4;
         const g1= recWidth/5;
@@ -164,18 +163,18 @@ class SingleSeriesChart extends SVGChart{
             .on("mouseover mousemove",(e,d)=>{          
                 const c1 = xvals[d[1]];
                 const sn = svalues[d[2]];
-                self.showToolTip(e,`${c1}<br>${sn}<br>${d[0]}`);
+                this.showToolTip(e,`${c1}<br>${sn}<br>${d[0]}`);
             }).
             on("mouseleave",()=>{
-                self.hideToolTip();
+                this.hideToolTip();
             })
             .on("click",(e,d)=>{
-                self.dataStore.dataHighlighted([d[3]],self);
+                this.dataStore.dataHighlighted([d[3]],this);
             })      
   
             .transition(trans)
             .attr("cx",d=>(recWidth/8)+(recWidth*(d[4]/8))+(d[1]*recWidth))
-            .attr("cy",d=>self.y_scale(d[0]))
+            .attr("cy",d=>this.y_scale(d[0]))
             .attr("r",5)
             .attr("fill",d=>colors[d[1]]);
 
@@ -185,9 +184,9 @@ class SingleSeriesChart extends SVGChart{
             .attr("d",(d,i)=>{
                 const x  = (i*recWidth) + (recWidth/2);
                 
-                const av  = self.y_scale(d.mean);
-                let sd1 =self.y_scale(d.mean+d.std);
-                let sd2  =self.y_scale(d.mean-d.std)
+                const av  = this.y_scale(d.mean);
+                const sd1 =this.y_scale(d.mean+d.std);
+                const sd2  =this.y_scale(d.mean-d.std)
                 return `M${x} ${sd1} L${x} ${sd2}
                         M${x-g} ${av} L${x+g} ${av} 
                         M${x-g1} ${sd1} L${x+g1} ${sd1}     

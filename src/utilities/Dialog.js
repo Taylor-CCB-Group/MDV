@@ -1,4 +1,4 @@
-import {createEl,makeResizable,makeDraggable} from "./Elements.js";
+import {createEl,makeResizable,makeDraggable, removeResizable, removeDraggable} from "./Elements.js";
 
 class BaseDialog{
   /**
@@ -24,12 +24,12 @@ class BaseDialog{
   * @param {object} content The object passed to the init method
   */
 
-constructor (config={},content) {
+constructor (config,content) {
     config.doc=config.doc || document;
     this.config=config;
     this.buttons={};
-    const width = config.width?config.width+"px":"";
-    const height = config.height?config.height+"px":"";
+    const width = config.width?`${config.width}px`:"";
+    const height = config.height?`${config.height}px`:"";
    
 
     this.outer= createEl("div",{
@@ -56,10 +56,11 @@ constructor (config={},content) {
     });
 
     this.dialog=createEl("div",{
-    classes:["ciview-dlg-content"]
+      classes:["ciview-dlg-content"]
+    },this.outer);
 
-  },this.outer)
-
+    //... needs fixing in popout / when doc changes
+    //(if this was more react-y it should just work)
     makeResizable(this.outer,{
       doc:config.doc,
       onresizeend:(x,y)=>{
@@ -81,7 +82,7 @@ constructor (config={},content) {
       if (!this.footer){
         this._addFooter();
       }
-      for (let but of config.buttons){
+      for (const but of config.buttons){
         this._addButton(but);
       }
     }
@@ -96,7 +97,7 @@ constructor (config={},content) {
     const dbox =this.outer.getBoundingClientRect();
     if (config.maxHeight && dbox.height>config.maxHeight){
       dbox.height = config.maxHeight;
-      this.outer.style.height=config.maxHeight+"px";
+      this.outer.style.height=`${config.maxHeight}px`;
     }
 
 
@@ -112,19 +113,47 @@ constructor (config={},content) {
 
    
     if (pos[0]+dbox.width > bbox.width){
-      let w= bbox.width-dbox.width;
+      const w= bbox.width-dbox.width;
       pos[0]=w<0?0:w;
       
     }
     if (pos[1]+dbox.height > bbox.height){
-      let h= bbox.height-dbox.height;
+      const h= bbox.height-dbox.height;
       pos[1]=h<0?0:h;
       
     }
-    this.outer.style.left =pos[0]+"px";
-    this.outer.style.top =pos[1]+"px"
+    this.outer.style.left =`${pos[0]}px`;
+    this.outer.style.top =`${pos[1]}px`
     
 
+  }
+  setParent(parent) {
+    // need to makeResizable and makeDraggable work with this
+    removeResizable(this.outer);
+    removeDraggable(this.outer);
+    if (parent) {
+      parent.append(this.outer);
+      makeResizable(this.outer, {
+        doc: parent.ownerDocument,
+        onresizeend:(x,y) => {
+        this.onResize(x,y)
+      }});
+      makeDraggable(this.outer, {
+        doc: parent.ownerDocument,
+        handle:".ciview-dlg-header"    
+      });
+    } else {
+      this.config.doc.body.append(this.outer);
+      makeResizable(this.outer, {
+        doc: this.config.doc,
+        onresizeend:(x,y) => {
+        this.onResize(x,y)
+      }});
+      makeDraggable(this.outer, {
+        doc: this.config.doc,
+        handle:".ciview-dlg-header"    
+      });
+    }
   }
 
   _addFooter(){
@@ -179,11 +208,13 @@ constructor (config={},content) {
     }
   }
 
+  _closed = false;
   /**
   * Closes the dialog and removes it from the DOM
   */
   close(){
-    
+    if (this._closed) return;
+    this._closed = true;
     if (this.config.onclose){
       this.config.onclose();
     }
@@ -194,7 +225,7 @@ constructor (config={},content) {
   /**
   * This method should be overridden to add content to the dialog
   */
-  init(){}
+  init(content){}
 
   /**
   * This method should be overridden if the layout needs
@@ -202,7 +233,12 @@ constructor (config={},content) {
   * @param {integer} x the new width of the dialog
   * @param {integer} y the new height of the dialog
   */
-  onResize(x,y){}
+  onResize(x, y) {
+    if (this.outer) {
+        this.outer.style.width = `${x}px`;
+        this.outer.style.height = `${y}px`;
+    }
+}
 
 
 }
@@ -216,8 +252,8 @@ function getTextInput(title,event,doc=document){
       styles:{
         position:"absolute",
         zIndex:200,
-        left:event.clientX+"px",
-        top:event.clientY+"px",
+        left:`${event.clientX}px`,
+        top:`${event.clientY}px`,
         background:"white",
         padding:"5px"
       }
@@ -246,6 +282,7 @@ function getTextInput(title,event,doc=document){
 
 }
 
+//move this, type it differently... figure out what it is that makes it tick, or not.
 BaseDialog.experiment = {};
 
 export {BaseDialog,getTextInput};

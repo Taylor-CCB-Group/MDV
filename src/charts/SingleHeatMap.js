@@ -74,9 +74,9 @@ class SingleHeatMap extends SVGChart{
     initialSetUp(){
         const c = this.config;
         const p = c.param;      
-        const y_col =this.dataStore.columnIndex[p[0]]
+        const y_col = this.dataStore.columnIndex[p[0]]
         const y = y_col.data;
-        const x_col= this.dataStore.columnIndex[p[1]]
+        const x_col = this.dataStore.columnIndex[p[1]]
         const x = x_col.data;
         let oset1= null;
         let oset2 = null;
@@ -85,18 +85,18 @@ class SingleHeatMap extends SVGChart{
         this.y_scale.domain(y_col.values.slice(0));
         this.x_scale.domain(x_col.values.slice(0));
         //get which cells to display - based on selections in dialog
-        for (let d of this.dataStore.dimensions){
+        for (const d of this.dataStore.dimensions){
             if (d.filterColumns && d.noclear){
-                if (d.filterColumns[0]===p[0]){
-                    const s1 =d.filterArguments;
-                    oset1 = s1.map(x=>y_col.values.indexOf(x));
+                if (d.filterColumns[0] === p[0]){
+                    const s1 = d.filterArguments;
+                    oset1 = s1.map(x => y_col.values.indexOf(x));
                     y_len = s1.length;
                     this.y_scale.domain(s1.slice(0)); 
                 }
-                if (d.filterColumns[0]===p[1]){
-                    const s2=d.filterArguments;
-                    oset2 = s2.map(x=>x_col.values.indexOf(x));
-                    x_len =  s2.length;
+                if (d.filterColumns[0] === p[1]){
+                    const s2 = d.filterArguments;
+                    oset2 = s2.map(x => x_col.values.indexOf(x));
+                    x_len = s2.length;
                     this.x_scale.domain(s2.slice(0));   
                 }
             } 
@@ -108,44 +108,44 @@ class SingleHeatMap extends SVGChart{
         const vc  = ci[p[2]].data;  
         const len = this.dataStore.size;
         const data= new Array();
-        for (let n=0;n<y_len;n++){
+        for (let n=0; n<y_len; n++){
             data[n]=new Array(x_len);
         }
         const cat = this.dataStore.columnIndex[p[3]].values.indexOf(c.category);
         let ct1 = null;
         let ct2 = null;
         if (c.show_group_interactions){
-            ct1= this.dataStore.getRawColumn(p[4]);
-            ct2= this.dataStore.getRawColumn(p[5]);     
+            ct1 = this.dataStore.getRawColumn(p[4]);
+            ct2 = this.dataStore.getRawColumn(p[5]);
         }
-        for (let i =0;i<len;i++){
+        for (let i=0; i<len; i++){
             if (fc[i]===cat){
                 let py = y[i];
                 let px = x[i];
-                py= oset1?oset1.indexOf(py):py;
-                px = oset2?oset2.indexOf(px):px;
+                py = oset1 ? oset1.indexOf(py) : py;
+                px = oset2 ? oset2.indexOf(px) : px;
                 
                 if (px===-1 || py===-1){
                     continue;
                 }
                 
-                let d = data[py][px];
+                const d = data[py][px];
                 if (!d){
-                    data[py][px]=[y[i],x[i],vc[i],i,1];
+                    data[py][px] = [y[i], x[i], vc[i], i, 1];
                     if (ct1){
                         data[py][px].push(`${ct1[i]}-${ct2[i]}`);
                     }               
                 }
                 else{
-                    d[2]+=vc[i];
+                    d[2] += vc[i];
                     d[4]++;
                 }      
             }
         }
-        for (let y1=0;y1<y_len;y1++){
-            for (let x1=0;x1<x_len;x1++){
-                const d= data[y1][x1];
-                d[2]/=d[4];
+        for (let y1=0; y1<y_len; y1++){
+            for (let x1=0; x1<x_len; x1++){
+                const d = data[y1][x1];
+                d[2] /= d[4];
             }
         }
         this.data=data;
@@ -163,7 +163,6 @@ class SingleHeatMap extends SVGChart{
         const x_len = this.x_scale.domain().length;
         const dim = this._getContentDimensions();
         const recWidth= dim.width/x_len;
-        const self = this;
         const recHeight = dim.height/y_len;
         const f  = this.dataStore.filterArray;
         const mcol = "#E0E0E0";//"#f4f0ec"
@@ -172,7 +171,7 @@ class SingleHeatMap extends SVGChart{
         let v2 =null;
         //two extra columns describing the groups each cell is in
         //get the group interactions
-        if ( p.length==6){
+        if ( p.length===6){
             //get the raw columns and create matrix to hold the data 
             const gv1=this.dataStore.getColumnValues(p[4]);
             const gv2= this.dataStore.getColumnValues(p[5]);
@@ -201,22 +200,22 @@ class SingleHeatMap extends SVGChart{
         .attr("height",recHeight-2)
         .attr("width",recWidth-2)
         .on("click",(e,d)=>{
-           self.dataStore.dataHighlighted([d[3]],self);
+           this.dataStore.dataHighlighted([d[3]],this);
         })
-        .on("mouseover mousemove",(e,d)=>{ 
+        .on("mouseover pointermove",(e,d)=>{ 
             const col = xvals[d[0]];
             const row  =yvals[d[1]];
-            self.showToolTip(e,`${col}<br>${row}<br>${d[2].toPrecision(3)}`);
+            this.showToolTip(e,`${col}<br>${row}<br>${d[2].toPrecision(3)}`);
         }).
         on("mouseleave",()=>{
-            self.hideToolTip();
+            this.hideToolTip();
         })   
         .transition(trans)
         .attr("fill",(d,i)=>{
             if (!d){
                 return mcol;
             }
-            if (isNaN(d[2])){
+            if (Number.isNaN(d[2])){
                 return mcol;
             }
             if (f[d[3]]>0){
@@ -226,7 +225,7 @@ class SingleHeatMap extends SVGChart{
             if (interactions){
                 interactions[v1[d[3]]][v2[d[1]]]++;
             }
-            return self.colorFunction(d[2]);
+            return this.colorFunction(d[2]);
         });
         //label the group interactions
         if (interactions){

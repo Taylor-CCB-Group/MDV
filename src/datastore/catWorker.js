@@ -1,11 +1,7 @@
-
-
-
-
-
-onmessage= function(e){
+// biome-ignore lint/suspicious/noGlobalAssign: relatively innocuous in simple web worker
+onmessage= (e)=> {
     const config = e.data[3];
-    const dtype = config.datatype=="text16" || config.datatype=="multitext"?Uint16Array:Uint8Array
+    const dtype = config.datatype==="text16" || config.datatype==="multitext"?Uint16Array:Uint8Array
     const data=new dtype(e.data[2]);
     const lFilter=new  Uint8Array(e.data[0]);
     const gFilter = new  Uint8Array(e.data[1]);
@@ -144,7 +140,7 @@ function calculateSets(lFilter,gFilter,data,config){
             }           
         }
         const st = i*ilen;
-        let arr = data.slice(st,st+ilen).toString();
+        const arr = data.slice(st,st+ilen).toString();
 
         
         const val = sets.get(arr);
@@ -230,10 +226,10 @@ function getStackedData(lFilter,gFilter,data,data2,config){
         matrix[data[i]].values[data2[i]].count++;
         matrix[data[i]].total++;
     }
-    for (let r of matrix){
+    for (const r of matrix){
         let rt = 0;
         let rpt=0;
-        for (let i of r.values){
+        for (const i of r.values){
             const per= r.total===0?0:i.count/r.total;
             i.pos=rt;
             i.per=per;
@@ -251,10 +247,10 @@ function getSankeyData(lFilter,gFilter,data,data2,config){
     const len = data.length;
     const matrix = new Array(len1);
     const nodes1= config.values.map((x,i)=>{
-        return "A"+i;
+        return `A${i}`;
     });
     const nodes2= config.values2.map((x,i)=>{
-        return"B"+i;
+        return`B${i}`;
     });
 
 
@@ -308,7 +304,7 @@ function getSankeyData(lFilter,gFilter,data,data2,config){
 function std(arr,av){
     let n=arr.length-1;
     n=n===0?1:n;
-    let std = arr.reduce((prev,cur)=>prev+(Math.pow(cur-av,2)),0);
+    const std = arr.reduce((prev,cur)=>prev+((cur-av) ** 2),0);
     return Math.sqrt(std/n);
 
 }

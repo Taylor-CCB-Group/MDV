@@ -17,10 +17,10 @@ class DeepToolsHeatMap extends SVGChart{
         this.graphDiv = createEl("div",{
             styles:{
                 position:"absolute",
-                left:box.left+"px",
-                top:box.top+"px",
-                width:box.width+"px",
-                height:box.height+"px"
+                left:`${box.left}px`,
+                top:`${box.top}px`,
+                width:`${box.width}px`,
+                height:`${box.height}px`
             }
         },this.contentDiv);
         const c = this.config;
@@ -150,8 +150,8 @@ class DeepToolsHeatMap extends SVGChart{
 		super.setSize(x,y);
 		const dim = this._getContentDimensions();
 		this.app.setSize(dim.width,dim.height);
-        this.graphDiv.style.left = dim.left+"px";
-        this.graphDiv.style.top = dim.top+"px";
+        this.graphDiv.style.left = `${dim.left}px`;
+        this.graphDiv.style.top = `${dim.top}px`;
 		this.updateAxis();
 	}
 
@@ -229,8 +229,8 @@ class DeepToolsHeatMap extends SVGChart{
                 current_value:c.sortBy || "__default__",
                 values:[sortCols,"name","field"],
                 func:(x)=>{
-                    if (x=="__default__"){
-                        delete c.sortBy;
+                    if (x==="__default__"){
+                        c.sortBy = undefined;
                         this.sortBy()
                     }
                     else{

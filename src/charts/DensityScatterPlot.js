@@ -50,8 +50,13 @@ class DensityScatterPlot extends WGLScatterPlot{
         const p =  c.param;
         super.onDataFiltered(dim);
         const vals =this.dataStore.getColumnValues(c.param[2])
-        this.catKeys= [vals.indexOf(c.category1),vals.indexOf(c.category2)];
-        if (this.catKeys[0]===-1 && this.catKeys[1]===-1){
+        try {
+            this.catKeys= [vals.indexOf(c.category1),vals.indexOf(c.category2)];
+            if (this.catKeys[0]===-1 && this.catKeys[1]===-1){
+                this.data=[null,null];
+                return;
+            }
+        } catch (e) {
             this.data=[null,null];
             return;
         }
@@ -78,7 +83,7 @@ class DensityScatterPlot extends WGLScatterPlot{
     _drawContours(color,colorScale,i){
         const dpc= `dp-poly-${i}`;
         const c =this.config;
-        this.graph_area.selectAll("."+dpc)
+        this.graph_area.selectAll(`.${dpc}`)
         .data(this.data[i])
         .join("path")
         .attr("class",dpc)
@@ -96,7 +101,7 @@ class DensityScatterPlot extends WGLScatterPlot{
     }
 
     removeCategory(c){
-        delete this.config["category"+c];
+        delete this.config[`category${c}`];
         this.data[c-1]=null;
         this.catKeys[c-1]=-1;
         this.graph_area.selectAll(`.dp-poly-${c-1}`).remove();
@@ -114,14 +119,14 @@ class DensityScatterPlot extends WGLScatterPlot{
 
     drawChart(tTime=400){
         const c = this.config;
-        for (let i in this.catKeys){
-            let ck=this.catKeys[i];
+        for (const i in this.catKeys){
+            const ck=this.catKeys[i];
             if (ck===-1){
                 this.graph_area.selectAll(`.dp-poly-${i}`).remove();
             }
             else{
-                let color = this.dataStore.getColumnColors(c.param[2])[ck]
-                let  colorScale = scaleLinear([0,1-c.contour_intensity],["white",color]);
+                const color = this.dataStore.getColumnColors(c.param[2])[ck]
+                const  colorScale = scaleLinear([0,1-c.contour_intensity],["white",color]);
                 this._drawContours(color,colorScale,i);
         
             }
@@ -129,7 +134,7 @@ class DensityScatterPlot extends WGLScatterPlot{
     }
 
     getContextMenu(){
-        let cm = super.getContextMenu();
+        const cm = super.getContextMenu();
         if (this.dataStore.regions && !this.config.viv){
             cm.push({
                 text:"Set as Default Image",
@@ -168,7 +173,9 @@ class DensityScatterPlot extends WGLScatterPlot{
         const s= super.getSettings();
         const c = this.config;
         const cols = this.dataStore.getColumnList("text")
-        let cats = this.dataStore.getColumnValues(c.param[2]);
+        // returning undefined e.g. for numeric 'DAPI' column...
+        // changing this at least means it doesn't crash (need to review 'Contour Category' stuff though...)
+        let cats = this.dataStore.getColumnValues(c.param[2]) || [];
         cats= cats.map(x=>{
             return {t:x}
         });
@@ -186,12 +193,12 @@ class DensityScatterPlot extends WGLScatterPlot{
                    
                 },
                 onchange:(controls,x)=>{
-                    let cats = this.dataStore.getColumnValues(x);
+                    const cats = this.dataStore.getColumnValues(x);
                     const cs = cats.slice(0);
                     cs.push("None");
-                    for (let n of ["Contour Category 1","Contour Category 2"]){
+                    for (const n of ["Contour Category 1","Contour Category 2"]){
                         controls[n].innerHTML="";
-                        for (let c of cs){
+                        for (const c of cs){
                             createEl("option",{
                                 text:c,
                                 value:c
@@ -324,7 +331,7 @@ BaseChart.types["image_scatter_plot"]={
     required:["regions"],
     extra_controls:(ds)=>{
         const vals=[];
-        for(let x in ds.regions.all_regions){
+        for(const x in ds.regions.all_regions){
             vals.push({name:x,value:x})
         }
         return [
@@ -336,20 +343,21 @@ BaseChart.types["image_scatter_plot"]={
             }
         ]
     },
-    init:(config, ds, ec)=>{
-        const r =  ds.regions;
-        const sr= r.all_regions[ec.region];
-        config.color_by= r.default_color;
-        config.param=r.position_fields.concat([r.default_color]);
-        config.background_filter={
-            column:r.region_field,
-            category:ec.region
+    init: (config, ds, ec) => {
+        const r = ds.regions;
+        const sr = r.all_regions[ec.region];
+        config.color_by = r.default_color;
+        config.param = r.position_fields.concat([r.default_color]);
+        config.background_filter = {
+            column: r.region_field,
+            category: ec.region
         };
-        config.color_legend={display:false};
-        config.region=ec.region;
-        config.roi=sr.roi;
-        config.background_image=sr.images[sr.default_image];
-        config.title= ec.region + (sr.default_image?`-${sr.default_image}`:"");
+        config.color_legend = { display: false };
+        config.region = ec.region;
+        config.roi = sr.roi;
+        config.json = sr.json;
+        config.background_image = sr.images[sr.default_image];
+        config.title = ec.region + (sr.default_image ? `-${sr.default_image}` : "");
     }
 }
 

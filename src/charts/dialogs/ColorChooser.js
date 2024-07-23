@@ -7,7 +7,7 @@ class ColorChooser extends BaseDialog{
             footer:true,
             width:500,
             maxHeight:500,
-            title:"Field Colors For "+ds.name,
+            title:`Field Colors For ${ds.name}`,
             columns:2,
             buttons:[{
                 text:"Apply",
@@ -19,7 +19,7 @@ class ColorChooser extends BaseDialog{
     }
 
     init(content){
-        let cm = this.cm =content.cm;
+        const cm = this.cm =content.cm;
         this.ds = content.ds;
         const c2 = this.columns[1];
         this.columns[0].style.overflowY="auto";
@@ -106,8 +106,8 @@ class ColorChooser extends BaseDialog{
         const ds = this.cm.getDataSource(name);
         this.dataSource=ds;
         this.dsName=name;
-        const cols = ds.getColumnList("text");
-        for (let c of cols){
+        const cols = ds.getColumnList("string");
+        for (const c of cols){
             createEl("option",{
                 text:c.name,
                 value:c.field
@@ -126,7 +126,7 @@ class ColorChooser extends BaseDialog{
         this.colorChoosers.forEach(x=>colors[x.__index]=x.value);
         this.dataSource.setColumnColors(this.column,colors);
         this.dataSource.dataChanged([this.column],false,false);
-        for (let d of this.cm.dataSources){
+        for (const d of this.cm.dataSources){
             const ds  = d.dataStore;
             const scc = ds.syncColumnColors.find(x=>x.dataSource===this.dataSource.name);
             if (scc){

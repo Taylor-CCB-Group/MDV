@@ -36,36 +36,42 @@ import SettingsDialog from "../utilities/SettingsDialog.js";
 import canvasToSvg from "canvas-to-svg";
 
 class MLVPanel {
-    /**
-    * Creates a panel
-    * @param {array} tracks - a list of config objects describing each track
-    * @param {object} config - A config with the panel settings
-    */
-    constructor (div,config={},tracks=[]) {
-        if (typeof div === "string"){
-            this.trackDiv=document.getElementById("#"+div)
-        }
-        else{
-            this.trackDiv = div;
-        }
-        const box = this.trackDiv.getBoundingClientRect();
-    
-        this.height = box.height
-        this.width= box.width;
-    
-        this.tracks={}
-        this.track_order=[];
-        this.trackLabels={};
-        this.trackDialogs={};
-        for (let t_config of tracks){
-            let track=MLVTrack.getTrack(t_config);
-            this.tracks[track.config.track_id]=track;
-            this.track_order.push(track.config.track_id);
-            this._addTrackLabel(track.config)
-        }
-        //check for linked scales
-        this._tracksChanged();
-        this.legend= null;
+	/**
+	* Creates a panel
+	* @param {array} tracks - a list of config objects describing each track
+	* @param {object} config - A config with the panel settings
+	*/
+	constructor (div,config={},tracks=[]) {
+		this.__doc__=document;
+		if (typeof div === "string"){
+			this.trackDiv=document.getElementById("#"+div)
+		}
+		else{
+			this.trackDiv = div;
+		}
+		const box = this.trackDiv.getBoundingClientRect();
+	
+		this.height = box.height
+		this.width= box.width;
+	
+		this.tracks={}
+		this.track_order=[];
+		this.trackLabels={};
+		this.trackDialogs={};
+		for (let t_config of tracks){
+			try {
+				let track=MLVTrack.getTrack(t_config);
+				this.tracks[track.config.track_id]=track;
+				this.track_order.push(track.config.track_id);
+				this._addTrackLabel(track.config)
+			} catch (e) {
+				//todo show error message
+				console.error(e);
+			}
+		}
+		//check for linked scales
+		this._tracksChanged();
+		this.legend= null;
 
       
            this.trackDiv.style.position="relative";
@@ -130,18 +136,33 @@ class MLVPanel {
                this.new_layout=true;
            }
 
-        this.__doc__=document;
+		this.__doc__=document;
+        this.config=config;
       
        
            this.retries=0;
            this.yOffset=0;
 
-        this.loadingIcon=createEl("i",{
-            classes:["fas","fa-spinner","fa-spin","panel-loading-icon"]
-        },this.trackDiv);
-        this.messageAlert=createEl("div",{
-            classes:["panel-error-message"]
-        },this.trackDiv)
+		this.loadingIcon=createEl("i",{
+			classes:["fas","fa-spinner","fa-spin","panel-loading-icon"]
+		},this.trackDiv);
+		this.messageAlert=createEl("div",{
+			classes:["panel-error-message"]
+		},this.trackDiv)
+    }
+
+	changeBaseDocument(doc){
+		if (this.config.allow_user_interactions){
+			this.removeDragHandler();
+			this.disableUserZoom();
+		}
+		this.remove
+		this.__doc__=doc;
+		if (this.config.allow_user_interactions){
+			this.allowUserDrag();
+			// not sure why zoom is not working otherwise.
+			this.allowUserZoom();
+		}
     }
 
     closeAllDialogs(){
@@ -378,6 +399,9 @@ class MLVPanel {
         this.trackDialogs[track_id] && this.trackDialogs[track_id].close();
         delete this.trackDialogs[track_id];
       
+        if (this.legend){
+    		this.legend.removeTrack(track_id);
+    	}
         let config =  this.tracks[track_id].config
         delete this.tracks[track_id];
         if (! not_propagate){
@@ -538,7 +562,7 @@ class MLVPanel {
     }
 
 
-    async getAllFeatures(bpStart, bpEnd,force,data) {
+    async getAllFeatures(bpStart, bpEnd, force, data) {
         let promises = [];
         this._display_order=[];
         for (let track_id  of this.track_order){
@@ -547,13 +571,7 @@ class MLVPanel {
                 continue;
             }
             this._display_order.push(track_id);
-            promises.push(track.getFeatures(this.chr,bpStart,bpEnd,force,data).catch(e=>{
-
-                return track.getFeatures(this.chr, bpStart, bpEnd, force, data).catch(e=>{
-
-                    return track.getFeatures(this.chr, bpStart, bpEnd, force, data)
-                })
-            }));
+            promises.push(track.getFeatures(this.chr,bpStart,bpEnd,force,data));       
         }
         return await Promise.all(promises.map(p => p.catch(e => e)));
     }
@@ -643,7 +661,6 @@ class MLVPanel {
                     
                     if (all_features) {
                         
-                        
                         let buffer = null;
                         if (svg){
                             //create mock canvas
@@ -687,23 +704,21 @@ class MLVPanel {
                         for (let id in self.tracks){
                             const c= self.tracks[id].config
 
-                            if (c.hide){
-                                self.trackLabels[c.track_id].style.display="none";
-                            }
-                        }
-                        
-                        for (var i in all_features){
-                            
-                            let track = self.tracks[self._display_order[i]];
-                            
-                            const l = self.trackLabels[track.config.track_id];
-                            if (l){
-                                l.textContent=track.config.short_label;
-                                l.title = track.config.short_label;
-                                l.style.display="block";
-                                l.style.top=(top+self.yOffset)+"px";
+							if (c.hide){
+								self.trackLabels[c.track_id].style.display="none";
+							}
+						}
+						
+                        for (const i in all_features){
+                        	let track = self.tracks[self._display_order[i]];
+							
+							const l = self.trackLabels[track.config.track_id];
+							if (l){
+								l.style.display="block";
+								l.style.top=(top+self.yOffset)+"px";
 
                             }
+
                             options.features=all_features[i];
                         
                             let group = track.config.group
@@ -717,26 +732,35 @@ class MLVPanel {
                                 options.height=self.groups[group].height;
                                 track.bottom=options.top+options.height;
 
-                            }
-                            else{
-                                options.top =top;
-                                track.top=top;
-                                options.height= track.config.height;
-                                top+=options.height;
-                                track.bottom=top;
-                            }
-                            if (typeof options.features === "string" && track.config.type!=="fasta" ){
-                                track.drawMessage(options);
-                                continue;
-                            }
-                            
-                            
-                            ctx.save();
-                            ctx.rect(0,options.top,options.pixelWidth,options.height);
-                            ctx.clip();
-                            ctx.beginPath();
-                            track.drawFeatures(options);
-                            ctx.restore()
+                        	}
+							else{
+                        		options.top =top;
+								track.top=top;
+								options.height= track.config.height;
+								top+=options.height;
+								track.bottom=top;
+                        	}
+							if (typeof options.features === "string" && track.config.type!=="fasta" ){
+								track.drawMessage(options);
+								continue;
+							}
+                        	
+							
+							ctx.save();
+							ctx.rect(0,options.top,options.pixelWidth,options.height);
+							ctx.clip();
+							ctx.beginPath();
+                        try {
+							track.drawFeatures(options);
+                        } catch (e) {
+								console.error(e);
+								const txtOptions = {
+									...options,
+									features: e.message
+								}
+								track.drawMessage(txtOptions);
+							}
+							ctx.restore()
                                    
                             if (self.show_scale){
                                 const sctx = svg?ctx:self.scale_buffer_ctx;
@@ -963,21 +987,21 @@ class MLVPanel {
             })
         }
     
-        this.fcListener= (e)=> {
-             if (this.loading){
-                 return;
-             }
-             clearTimeout(this.foto);
-             this.foto=setTimeout(()=>{
-                 if (!this.is_dragging){
-                    let i=this.getFeatureAt(e);
-                    if (i.track){
-                        this._callListeners("featureclick",{track:i.track,feature:i.feature,event:e});
-                    }
-                 }
-             },200);
-         };
-         this.trackDiv.addEventListener("click",this.fcListener)
+		this.fcListener= (e)=> {
+    	 	if (this.loading){
+    	 		return;
+    	 	}
+    	 	clearTimeout(this.foto);
+    	 	this.foto=setTimeout(()=>{
+    	 		if (!this.is_dragging){
+					let i=this.getFeatureAt(e);
+					if (i.track && i.feature) {
+						this._callListeners("featureclick",{track:i.track,feature:i.feature,event:e});
+					}
+    	 		}
+    	 	},200);
+    	 };
+		 this.trackDiv.addEventListener("click",this.fcListener)
 
     }
 
@@ -991,10 +1015,10 @@ class MLVPanel {
 
 
     allowUserDrag(){
-        this.drmdListener= e => {
-             if (e.shiftKey){
-                 return;
-             }
+		this.drmdListener= e => {
+    	 	if (e.shiftKey){
+    	 		return;
+    	 	}
             const co = this._getCoords(e)
             this.isMouseDown = true;
             this.start_dragging=true;
@@ -1046,52 +1070,59 @@ class MLVPanel {
                }
         }
 
-        this.trackDiv.addEventListener("mousemove",this.drmmListener)
+		// >>> popout behaviour (we're not directly in a chart here, may need to pass a prop...)
+		// originally used this.trackDiv, which led to a bug where the move event would not be removed
+		this.__doc__.addEventListener("mousemove",this.drmmListener)
 
         this.drmuListener = e => {   
               this.is_dragging=false;
               this.start_dragging=false;
         }
-        this.trackDiv.addEventListener("mouseup",this.drmuListener)
+		this.__doc__.addEventListener("mouseup",this.drmuListener)
   
     }
 
     removeDragHandler(){
-        this.trackDiv.removeEventListener("mousedown",this.drmdListener);
-        this.trackDiv.removeEventListener("mousemove",this.drmmListener);
-        this.trackDiv.removeEventListener("mouseup",this.drmuListener);
-        this.drmdListener=null;
-        this.drmmListener=null;
-        this.drmuListener=null;
+    	this.trackDiv.removeEventListener("mousedown",this.drmdListener);
+		this.__doc__.removeEventListener("mousemove",this.drmmListener);
+		this.__doc__.removeEventListener("mouseup",this.drmuListener);
+		this.drmdListener=null;
+		this.drmmListener=null;
+		this.drmuListener=null;
     }
 
     _getCoords(e){
-        const box = this.canvas.getBoundingClientRect();
-        const x = e.clientX - Math.round(box.left);
-        const y = e.clientY - Math.round(box.top);
+		const box = this.canvas.getBoundingClientRect();
+    	//not sure if removing Math.round helps or not
+		const x = e.clientX - box.left;
+        const y = e.clientY - box.top;
         return {x,y};   	
     }
 
 
     allowUserZoom(){
-        this.zmListener= e =>{
-        
-            e.preventDefault();
-            let deltaY= e.deltaY;
-            if (deltaY === undefined){
-                deltaY=e.detail
-            }
-             if (this.loading || (this.bpPerPixel<0.05 && deltaY<0)){
-                 return;
-             }
-             
-             let canvasCoords = this._getCoords(e);
-            let factor = deltaY>0?2:0.5;
+		this.zmListener= e =>{
+		
+			e.preventDefault();
+			let deltaY= e.deltaY;
+			if (deltaY === undefined){
+				deltaY=e.detail
+			}
+    	 	if (this.loading || (this.bpPerPixel<0.05 && deltaY<0)){
+    	 		return;
+    	 	}
+    	 	
+    	 	let canvasCoords = this._getCoords(e);
+            // todo test sensitivity with different input devices
+			let factor = deltaY > 0 ? 1.25 : 0.8;
+			if (e.wheelDelta !== undefined) {
+				factor = Math.pow(2, -e.wheelDelta / 36);
+			}
             let mbp= (this.start+ canvasCoords.x * this.bpPerPixel)
             let new_length = (this.end-this.start)*factor;
             let new_start = mbp-((canvasCoords.x/this.canvas.width)*new_length);
-            this.start=  new_start
-            this.end= new_start+new_length;        
+            this.start = new_start;
+            this.end = new_start+new_length;        
             this.repaint();      
         }
         this.trackDiv.addEventListener('wheel',this.zmListener);     

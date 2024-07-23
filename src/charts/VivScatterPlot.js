@@ -4,6 +4,7 @@ import BaseChart from "./BaseChart.js";
 import {createEl} from "../utilities/Elements.js";
 import {BaseDialog} from "../utilities/Dialog.js";
 import noUiSlider from "nouislider";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";
 
 export class ColorChannelDialog extends BaseDialog{
     constructor(viv,doc,ds){
@@ -18,7 +19,7 @@ export class ColorChannelDialog extends BaseDialog{
         const viv = this.viv=contents.viv;
         this.mainDiv=createEl("div",{},this.dialog)
         const channels  =this.viv.getSelectedChannels();
-        for (let c of channels){
+        for (const c of channels){
             this.addSlider(c);
         }
 
@@ -49,7 +50,7 @@ export class ColorChannelDialog extends BaseDialog{
             classes:["ciview-button-sm"],
             text:"Add Channel"
         },addDiv).addEventListener("click",()=>{
-            this.viv.addChannel({index:parseInt(sel.value),color:cca.value}).then(ch=>this.addSlider(ch));
+            this.viv.addChannel({index:Number.parseInt(sel.value),color:cca.value}).then(ch=>this.addSlider(ch));
         })
         createEl("button",{
             classes:["ciview-button-sm"],
@@ -97,7 +98,7 @@ export class ColorChannelDialog extends BaseDialog{
             tooltips:true
         },cont);
         sl.noUiSlider.on("update",(values)=>{
-            item.contrastLimits=[parseFloat(values[0]),parseFloat(values[1])];
+            item.contrastLimits=[Number.parseFloat(values[0]),Number.parseFloat(values[1])];
             this.viv.setChannel(item);
         });
         const cc= createEl("input",{
@@ -145,7 +146,7 @@ export class ColorChannelDialog extends BaseDialog{
 
 class VivScatterPlot extends DensityScatterPlot{
     constructor(dataStore,div,config){
-        const x_name= dataStore.getColumnName(config.param[0]);
+        const x_name = dataStore.getColumnName(config.param[0]);
         const y_name = dataStore.getColumnName(config.param[1]);
         if (!config.axis){
 
@@ -170,7 +171,7 @@ class VivScatterPlot extends DensityScatterPlot{
         }
     }
 
-    // PJT *Channel methods moved to VivViewer.
+    // PJT *Channel methods moved to VivViewerMDV.
 
     remove(){
         if (this.viv.deck){
@@ -224,13 +225,14 @@ class VivScatterPlot extends DensityScatterPlot{
             this.graphDiv.prepend(this.vivCanvas);
             
 
-            import ('../webgl/VivViewer.js?v0.5').then(({default:VivViewer})=>{
+            import ('../webgl/VivViewerMDV.js').then(({default:VivViewerMDV})=>{
                 //new config
                 const r  = this.dataStore.regions;
                 const vc  = Object.assign({},c.viv);
                 //local or remote url
                 if(r){
-                    const i = r.all_regions[c.region].viv_image;                  
+                    const i = r.all_regions[c.region].viv_image;
+                    //c.viv.url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file;
                     let url = i.url;
                     //is specified by file and base
                     if (!url){
@@ -244,17 +246,17 @@ class VivScatterPlot extends DensityScatterPlot{
                                 if (base.startsWith("./")){
                                     base=base.substring(2)
                                 }
-                                base= window.location.href.split("?")[0]+"/"+base;
+                                base= `${window.location.href.split("?")[0]}/${base}`;
                             }
                         }
                         url = base + i.file;          
                     }               
                     vc.url =url;
                 }
-                this.viv = new VivViewer(this.vivCanvas,vc,this.app);
+                this.viv = new VivViewerMDV(this.vivCanvas,vc,this.app);
                 this.app.addHandler("pan_or_zoom",(offset,x_scale,y_scale)=>{
                     this.viv.setPanZoom(offset,x_scale,y_scale)
-                },c.id+"_viv")
+                },`${c.id}_viv`)
             });
         }
         return super.afterAppCreation();
@@ -269,7 +271,7 @@ BaseChart.types["viv_scatter_plot"]={
     ,
     extra_controls:(ds)=>{
         const vals=[];
-        for(let x in ds.regions.all_regions){
+        for(const x in ds.regions.all_regions){
             if (ds.regions.all_regions[x].viv_image){
                 vals.push({name:x,value:x});
             }      
@@ -285,7 +287,7 @@ BaseChart.types["viv_scatter_plot"]={
     },
     init:(config, ds, ec)=>{
         BaseChart.types["image_scatter_plot"].init(config,ds,ec);
-        delete config.background_image;
+        config.background_image = undefined;
         config.radius=0.5;
         config.viv={
             channels:ds.regions.avivator.default_channels,

@@ -2,11 +2,11 @@ import { DataModel } from "../table/DataModel.js";
 import { Deck } from '@deck.gl/core/typed';
 import BaseChart from "./BaseChart.js";
 import { createEl } from "../utilities/Elements.js";
-import { ImageArray } from "../webgl/ImageArray.js";
+import { ImageArray } from "../webgl/ImageArray";
 //import { ScatterplotLayer } from 'deck.gl/typed'; // -no, using ScatterplotExLayer
-import { ScatterplotExLayer, ImageArrayDeckExtension } from '../webgl/ImageArrayDeckExtension.js';
+import { ScatterplotExLayer, ImageArrayDeckExtension } from '../webgl/ImageArrayDeckExtension';
 import { OrthographicView } from "deck.gl/typed";
-import Dimension from "../datastore/Dimension.js";
+import type Dimension from "../datastore/Dimension.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
 type Column = { data: Float32Array, minMax: [number, number] }
@@ -20,6 +20,7 @@ class ImageScatterChart extends BaseChart {
     billboard = true;
     size = 13;
     opacity = 255;
+    saturation = 1;
     spaceX = 600;
     spaceY = 392;
     colorBy?: (index: number) => number[];
@@ -30,19 +31,19 @@ class ImageScatterChart extends BaseChart {
         const canvas = this.canvas = createEl("canvas", {}, this.contentDiv);
         //const gl = canvas.getContext("webgl2"); // do we need to take care of disposing resources as well?
         const { base_url, image_key, texture_size } = config.images;
-        this.dataModel = new DataModel(dataStore, { autoUpdate: false });
+        this.dataModel = new DataModel(dataStore, { autoupdate: false });
         
         //---- PJT XXX::: this always trips me up... wasting too much time here...
         this.dataModel.setColumns([...config.param, image_key, config.image_title]);
         this.dataModel.updateModel();
         //----------------
-
+        const s = Number.parseInt(texture_size);
         this.imageArray = new ImageArray(dataStore, canvas, this.dataModel, {
             base_url,
             image_type: config.images.type,
             image_key,
-            width: texture_size,
-            height: texture_size,
+            width: s,
+            height: s,
         });
         this.imageArray.onProgress = (n) => {
             this.progress = n;
@@ -61,19 +62,25 @@ class ImageScatterChart extends BaseChart {
                 zoom: 0, //0 means "one pixel is one unit", 1 scales by 2
             },
             getTooltip: (info) => {
-                const { index, picked } = info;
-                const { param } = this.config;
-                const { columnIndex } = this.dataStore;
-                const cx = columnIndex[param[0]] as Column;
-                const cy = columnIndex[param[1]] as Column;
+                try {
+                    const { index, picked } = info;
+                    const { param } = this.config;
+                    const { columnIndex } = this.dataStore;
+                    const cx = columnIndex[param[0]] as Column;
+                    const cy = columnIndex[param[1]] as Column;
 
-                const titleColumn = this.config.image_title;
-                const text = this.dataModel.getItemField(index, titleColumn);
-                return picked && {html: `
-                <div>${titleColumn}: '${text}'</div>
-                <div>x: '${param[0]}' = '${cx.data[index]}'</div>
-                <div>y: '${param[1]}' = '${cy.data[index]}'</div>
-                `,}
+                    const titleColumn = this.config.image_title;
+                    //no image_title sometimes?
+                    const text = this.dataModel.getItemField(index, titleColumn);
+                    return picked && {html: `
+                    <div>${titleColumn}: '${text}'</div>
+                    <div>x: '${param[0]}' = '${cx.data[index]}'</div>
+                    <div>y: '${param[1]}' = '${cy.data[index]}'</div>
+                    `,}
+                } catch (error) {
+                    console.error(error);
+                    return `error: ${error}`;
+                }
             },
             // glOptions: {},
             // parameters: {},
@@ -114,17 +121,19 @@ class ImageScatterChart extends BaseChart {
             getImageIndex: (i: K) => imageArray.getImageIndex(i),
             getImageAspect: (i: K) => imageArray.getImageAspect(i),
             getPosition: (i: K, {target}) => {
-                //[n(cx, i), n(cy, i), n(cz, i)] // say no to garbage
+                // say no to garbage (probably doesn't matter with generational GC & this being in 'nursery')
+                //[n(cx, i), n(cy, i), n(cz, i)]
                 target[0] = n(cx, i, this.spaceX);
                 target[1] = n(cy, i, this.spaceY);
                 target[2] = 0;//n(cz, i);
-                return target;
+                return target as unknown as Float32Array; // deck.gl types are wrong AFAICT;
             },
             getRadius: 1,
             radiusScale: this.size,
             // getFillColor: this.colorBy ? (i: K)=>[...this.colorBy(i), this.opacity] : [255, 255, 255, this.opacity],
             opacity: this.opacity/255,
-            getFillColor: this.colorBy ? (i: K)=>this.colorBy(i) : [255, 255, 255],
+            saturation: this.saturation,
+            getFillColor: (this.colorBy ? (i: K)=>this.colorBy(i) : [255, 255, 255]) as unknown as any,
             imageArray,
             updateTriggers: {
                 // what is this actually for?
@@ -159,7 +168,7 @@ class ImageScatterChart extends BaseChart {
     
     getColorOptions() {
         return {
-            colorby: "all",            
+            colorby: "all",
         }
     }
 
@@ -231,6 +240,19 @@ class ImageScatterChart extends BaseChart {
                     this.updateDeck();
                 }
             },
+            {
+                type: "slider",
+                name: "saturation",
+                label: "saturation",
+                current_value: this.saturation,
+                min: 0,
+                max: 1,
+                continuous: true,
+                func: (v) => {
+                    this.saturation = v;
+                    this.updateDeck();
+                }
+            },
         ]
     }
 }
@@ -239,7 +261,8 @@ BaseChart.types["ImageScatterChart"] = {
     class: ImageScatterChart,
     name: "Image Scatter Plot",
     required: ["images"],
-    methodsUsingColumns: ["updateDeck"],
+    // this wasn't needed here... also my type was wrong (for BaseChart.types).
+    // methodsUsingColumns: ["updateDeck"],
     configEntriesUsingColumns: ["image_key", "image_title"],
 
     init: (config, dataSource, extraControls) => {
@@ -256,14 +279,14 @@ BaseChart.types["ImageScatterChart"] = {
         //allows configEntriesUsingColumns to work without this being a param.
         config.image_key = i.key_column;
     },
-    extra_controls: (dataSource) => {
+    extra_controls: (dataStore) => {
         const imageSets = [];
-        for (let iname in dataSource.images) {
+        for (const iname in dataStore.images) {
             imageSets.push({ name: iname, value: iname })
         }
         console.log('imageSets', imageSets);
-        const sortableColumns = dataSource.getLoadedColumns().map(c => ({ name: c, value: c }));
-        const imageSizes = [32, 64, 128, 256, 512, 1024].map(s => ({ name: s, value: s }));
+        const sortableColumns = dataStore.getLoadedColumns().map(c => ({ name: c, value: c }));
+        const imageSizes = [32, 64, 128, 256, 512, 1024].map(s => `${s}`).map(s => ({ name: s, value: s }));
         return [
             //drop down of available image sets
             {
@@ -283,7 +306,7 @@ BaseChart.types["ImageScatterChart"] = {
                 name: "texture_size",
                 label: "Texture Size",
                 values: imageSizes,
-                defaultVal: 256
+                defaultVal: '256'
             },
         ];
     },
@@ -306,6 +329,6 @@ BaseChart.types["ImageScatterChart"] = {
         //     name: "radius"
         // },
     ]
-};
+};// as ChartType<ImageScatterChart>; //doesn't help much
 
 export default ImageScatterChart;

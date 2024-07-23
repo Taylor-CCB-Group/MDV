@@ -7,6 +7,7 @@ import {scaleSequential,scaleLinear} from 'd3-scale';
 import {interpolateYlGnBu} from 'd3-scale-chromatic';
 
 
+/** @deprecated currently unused? */
 class DensityPlot extends SVGChart{
     constructor(dataStore,div,config){
 		const x_name= dataStore.getColumnName(config.param[0]);
@@ -19,7 +20,7 @@ class DensityPlot extends SVGChart{
             }
         }
 		if (!config.title){
-			config.title= x_name+" x "+y_name;	
+			config.title= `${x_name} x ${y_name}`;	
 		}
 
     	super(dataStore,div,config,{x:{},y:{}});
@@ -27,7 +28,7 @@ class DensityPlot extends SVGChart{
         this.dim=this.dataStore.getDimension("density_dimension");
         const mm1= this.dataStore.getMinMaxForColumn(c.param[0]);
         const mm2= this.dataStore.getMinMaxForColumn(c.param[1]);
-        this.contentDiv.addEventListener("wheel",e=>this.zoom(e));
+        this.contentDiv.addEventListener("wheel",e=>this.zoom(e), { passive: false });
         this.x_sc=1;
         this.y_sc=1;
         this._setRatio();
@@ -63,7 +64,7 @@ class DensityPlot extends SVGChart{
     }
 
     zoom(e){
-        var rect = this.contentDiv.getBoundingClientRect();
+        const rect = this.contentDiv.getBoundingClientRect();
         const box =this._getContentDimensions()
     	const x= e.clientX-rect.left-box.left;
         const y = e.clientY-rect.top-box.top;
@@ -165,7 +166,7 @@ class DensityPlot extends SVGChart{
 
     drawChart(tTime=400){
 
-        var color = scaleSequential(interpolateYlGnBu)
+        const color = scaleSequential(interpolateYlGnBu)
     .domain([0, 0.5]); 
         const trans =  select(this.contentDiv).transition()
         .duration(tTime).ease(easeLinear);
@@ -175,7 +176,7 @@ class DensityPlot extends SVGChart{
         .join("path")
         .attr("class","dp-polygon")
       .attr("d", geoPath())
-      .attr("fill", function(d) { return color(d.value); })
+      .attr("fill", (d) => color(d.value))
 
     }
 

@@ -1,27 +1,32 @@
 import { BaseDialog } from "./Dialog.js";
-import { createEl } from "./Elements.js";
-import noUiSlider from "nouislider";
+import { createEl, createFilterElement } from "./Elements.js";
+import noUiSlider, { create } from "nouislider";
 // import lgui from 'lil-gui';
-
+import { action } from "mobx";
 
 
 class SettingsDialog extends BaseDialog{
     constructor(config,content){
+        const originalOnClose = config.onclose;
+        config.onclose = () => {
+            if (originalOnClose) originalOnClose();
+            if (config.chart) config.chart.dialogs.splice(config.chart.dialogs.indexOf(this), 1);
+        };
         super(config,content);
-        
     }
-
+    
     init(content){
-        this.controls=[]
+        if (!this.controls) this.controls=[];
+        const parent = this.dialog;
         //experimental lil-gui version...
         // this.initLilGui(content);
         // return;
-        for (let s of content){
-            let d = createEl("div",{
+        for (const s of content){
+            const d = createEl("div",{
                 styles:{
                     // padding:"5px"
                 }
-            },this.dialog);
+            },parent);
             if (s.type !== "button"){
                 createEl("label",{text:s.label},d);
             }
@@ -36,13 +41,17 @@ class SettingsDialog extends BaseDialog{
                 console.warn(`SettingsDialog doesn't have a method '${s.type}'`);
                 continue;
             }
-            this.controls[s.label] = this[s.type](s,d);
+            if (this.config.useMobx && s.func) { //mobx complains about mutating state outside of actions
+                // we could check whether we'd already wrapped the function, but getSettings() returns a new object each time
+                s.func = action(`${s.label} <action>`, s.func);
+            }
+            this.controls[s.label] = this[s.type](s,d); //this is going to go wrong if the label isn't unique - like if we have multiple similar layers
         }
     }
     initLilGui(content){
         const gui = new lgui({container: this.dialog});
         //gui.name = this.config.title + " Settings";
-        for (let s of content) {
+        for (const s of content) {
             switch (s.type) {
                 case "dropdown":
                     gui.add(s, 'current_value', s.values[0].map(c => c[s.values[1]])).name(s.label).onChange(s.func);
@@ -63,8 +72,6 @@ class SettingsDialog extends BaseDialog{
                 case "radiobuttons":
                     gui.add(s, 'current_value', s.choices).name(s.label).onChange(s.func);
                     break;
-                case "text":
-                case "textbox":
                 default:
                     gui.add(s, 'current_value').name(s.label).onChange(s.func);
             }
@@ -73,11 +80,11 @@ class SettingsDialog extends BaseDialog{
             
     /** TODO */
     folder(s, d) {
-        const container = d;
+        this.init(s.current_value);
     }
     spinner(s,d){
          
-        let sp =createEl("input",{
+        const sp =createEl("input",{
             type:"number",
             value:s.current_value,
             max:s.max || null,
@@ -85,7 +92,7 @@ class SettingsDialog extends BaseDialog{
             step:s.step || 1
         },d);
         sp.addEventListener("change",(e)=>{
-            s.func(parseInt(sp.value));
+            s.func(Number.parseInt(sp.value));
         });
     }
     radiobuttons(s,d){
@@ -93,7 +100,7 @@ class SettingsDialog extends BaseDialog{
         const d1 =createEl("div",{
             classes:["ciview-radio-group"]
         },d)
-        for (let c of s.choices){
+        for (const c of s.choices){
             createEl("span",{   
                 text:c[0]
             },d1);
@@ -146,7 +153,7 @@ class SettingsDialog extends BaseDialog{
             documentElement: s.doc || this.config.doc
         });
         const change = (values) => {
-            s.func(parseFloat(values[0]))
+            s.func(Number.parseFloat(values[0]))
         };
         sl.noUiSlider.on("end", change);
         if (s.continuous) {
@@ -167,29 +174,31 @@ class SettingsDialog extends BaseDialog{
     }
 
 
-    multidropdown(s,d){
+    multidropdown(s, d){
+        const wrapper = createEl("div");
         const dd = createEl("select",{
             multiple:true,
             styles:{
                 maxWidth:"200px",
                 height:"100px"
             }
-        });
+        }, wrapper);
         createEl("br",{},d);
-        for (let item of s.values[0]){
-            const v =item[s.values[2]];
+        for (const item of s.values[0]){
+            // pass 1d array for simple list of strings, or [object[], text_field, value_field] for objects
+            const text = s.values.length > 1 ? item[s.values[1]] : item;
+            const value = s.values.length > 1 ? item[s.values[2]] : item;
             const args = {
-                text:item[s.values[1]],
-                value:v
+                text,
+                value
             }
-            const sel = s.current_value.indexOf(v) !== -1;
+            const sel = s.current_value.indexOf(value) !== -1;
             if (sel){
                 args.selected=true;
             }
 
             createEl("option",args,dd)
         }
-        d.append(dd);
         createEl("br",{},d);
         const b = createEl("button",{
             classes:["ciview-button-sm"],
@@ -198,6 +207,8 @@ class SettingsDialog extends BaseDialog{
         b.addEventListener("click",(e)=>{
             s.func(Array.from(dd.selectedOptions).map(x=>x.value));
         })
+        createFilterElement(dd, wrapper);
+        d.append(wrapper);
         return dd;
     }
        
@@ -205,20 +216,23 @@ class SettingsDialog extends BaseDialog{
 
     
 
-    dropdown(s,d){
+    dropdown(s, d){
+        const wrapper = createEl("div");
         const dd = createEl("select",{
             styles:{
                 maxWidth:"200px"
             }
-        });
+        }, wrapper);
         // createEl("br",{},d);
-        for (let item of s.values[0]){
+        for (const item of s.values[0]) {
+            // pass 1d array for simple list of strings, or [object[], text_field, value_field] for objects
+            const text = s.values.length > 1 ? item[s.values[1]] : item;
+            const value = s.values.length > 1 ? item[s.values[2]] : item;
             createEl("option",{
-                text:item[s.values[1]],
-                value:item[s.values[2]]
+                text,
+                value
             },dd)
         }
-        d.append(dd);
         dd.value=s.current_value;
         dd.addEventListener("change",(e)=>{
             s.func(dd.value,this.controls);
@@ -227,7 +241,9 @@ class SettingsDialog extends BaseDialog{
                 s.onchange(this.controls,dd.value);
             }
         });
-        return dd;
+        createFilterElement(dd, wrapper);
+        d.append(wrapper);
+        return wrapper;
     }
 
     doubleslider(s,d){
@@ -247,7 +263,7 @@ class SettingsDialog extends BaseDialog{
             documentElement:s.doc
         });
         const change = (values) => {
-            s.func(parseFloat(values[0]), parseFloat(values[1]))
+            s.func(Number.parseFloat(values[0]), Number.parseFloat(values[1]))
         };
         sl.noUiSlider.on("end", change);
         if (s.continuous) {

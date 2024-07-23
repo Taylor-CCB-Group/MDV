@@ -63,13 +63,16 @@ class RowChart extends CategoryChart{
         
        
         const units = chartWidth/this.maxCount;
-        const self = this;
         let  data = this.rowData;
+        if (!data) {
+            //seen this happen at least once when it shouldn't have, likely related to other data-loading issues
+            console.error(">>> No data for row chart - probably a bug, needs tracking...");
+        }
         let maxCount = this.maxCount;
   
         if (c.exclude_categories){
             const ex = new Set()
-            for (let n of c.exclude_categories){
+            for (const n of c.exclude_categories){
                 ex.add(vals.indexOf(n))
             }
             data= this.rowData.filter((x,i)=>!ex.has(i));
@@ -98,13 +101,18 @@ class RowChart extends CategoryChart{
         .join("rect")
         .attr("class","row-bar")
         .on("click",(e,d)=>{
-            self.filterCategories(vals[d[1]],e.shiftKey);
+            this.filterCategories(vals[d[1]],e.shiftKey);
         })
+        .on("mouseover", (e, d) => {
+            if (!c.show_tooltip) return;
+            this.showToolTip(e, `${vals[d[1]]}: ${d[0]}`);
+        })
+        .on("mouseout", () => this.hideToolTip())
         .transition(trans)
         .style("fill",(d)=>{
             const i = d[1];
-            if (self.filter.length>0){
-                if (self.filter.indexOf(vals[i])===-1){
+            if (this.filter.length>0){
+                if (this.filter.indexOf(vals[i])===-1){
                     return "lightgray"
                 }
             }
@@ -123,18 +131,22 @@ class RowChart extends CategoryChart{
         .data(data,d=>d[1])
         .join("text")
         .on("click",(e,d)=>{
-            self.filterCategories(vals[d[1]],e.shiftKey);
+            this.filterCategories(vals[d[1]],e.shiftKey);
         })
+        .on("mouseover", (e, d) => {
+            if (!c.show_tooltip) return;
+            this.showToolTip(e, `${vals[d[1]]}: ${d[0]}`);
+        })
+        .on("mouseout", () => this.hideToolTip())
         .attr("class","row-text")
         .transition(trans)
         .text((d)=>vals[d[1]]===""?"none":vals[d[1]])
-        .attr("font-size",fontSize+"px")
+        .attr("font-size",`${fontSize}px`)
         .attr("x",5)
         .style("fill","currentColor")
         .attr("y",(d,i)=>((i+1)*3)+(i*barHeight)+(barHeight/2))
         //.attr("text-anchor", "middle")
         .attr("dominant-baseline", "central") 
-
     }
 
     getSettings() {
@@ -184,6 +196,14 @@ class RowChart extends CategoryChart{
                 func: x => {
                     c.wordcloud = x;
                     this.drawChart();
+                }
+            },
+            {
+                type: "check",
+                label: "Show tooltip",
+                current_value: c.show_tooltip,
+                func: x => {
+                    c.show_tooltip = x;
                 }
             }
         ])

@@ -1,4 +1,5 @@
-onmessage=function(e){
+// biome-ignore lint/suspicious/noGlobalAssign: relatively innocuous in simple web worker
+onmessage=(e)=> {
     const {orderBuffer,filterBuffer,dimensions,data,displayData,colorScale,colorOnly}=e.data;
     //get access to the shared buffers
     const len = dimensions.length;
@@ -20,7 +21,7 @@ onmessage=function(e){
    
     let i=0;
    
-    for (let n of order){
+    for (const n of order){
         if (filter[n]===0){
             currentRows[n]=i;
             reverse_map[i]=n;

@@ -10,7 +10,7 @@ class GenomeBrowser extends BaseChart{
         this.contentDiv.style.width="100%";
         this.contentDiv.style.height="100%";
         c.type="genome_browser";
-        const add_ruler= c.tracks.find(x=>x["format"]==="ruler")?false:true;
+        const add_ruler= !c.tracks.find(x=>x["format"]==="ruler");
 
         import ('../browser/panel.js?v0.3').then(({default:MLVPanel})=>{
             this.browser = new MLVPanel(this.contentDiv,{
@@ -24,14 +24,14 @@ class GenomeBrowser extends BaseChart{
             this.baseTrack= this.browser.getTrack("_base_track");
             this.baseTrack.dataStore = this.dataStore;
        
-            this.addMenuIcon("fa fa-eye-slash",config.legend || "Shoow/Hide Tracks",
+            this.addMenuIcon("fa fa-eye-slash",config.legend || "Show/Hide Tracks",
                 {
                     func:e=>this.showHideDialog()
     
                 });
             this.locText=createEl("input",{styles:{fontSize:"11px"}},this.menuSpace);
             this.locText.addEventListener("keypress",e=>{
-                if (e.keyCode==13){
+                if (e.key === "Enter") {
                     const loc = this._calculatePosition(this.locText.value);
                     this.browser.update(loc.chr,loc.start,loc.end);
                 }
@@ -47,7 +47,7 @@ class GenomeBrowser extends BaseChart{
                 const col = c.color_wig_tracks_by;
                 const vc= this.dataStore.getValueToColor(col);
                 //color any wig tracks
-                for (let v in vc){
+                for (const v in vc){
                     const tr =this.browser.tracks[`${col}|${v}`];
                     if (tr){
                         tr.config.color= vc[v];
@@ -74,7 +74,7 @@ class GenomeBrowser extends BaseChart{
             case "featureclick":
                 if (data.track.config.track_id==="_base_track"){
                     const fIndex = data.feature.data[0];
-                    this.dataStore.dataHighlighted([parseInt(fIndex)],this);
+                    this.dataStore.dataHighlighted([Number.parseInt(fIndex)],this);
                 }
                 if (data.track.config.track_id==="_bam"){
                     console.log(data.feature);                
@@ -101,42 +101,41 @@ class GenomeBrowser extends BaseChart{
 
     //called when chart is created passing the linked datastore
     //and the index key to id as well as the function to get data fron
-    //the datastore (ensure column and index are loaded beofre carrying
-    //out the function)
-    setupLinks(dataStore,index,func){
-        if (! this.browser){
-            setTimeout(()=>this.setupLinks(dataStore,index,func),100)
+    //the datastore (ensure column and index are loaded before calling
+    //the function)
+    setupLinks(dataStore, index, getDataFunction) {
+        if (! this.browser) {
+            //could change this so it could `await browser`
+            //but I don't want to change anything substantial here when
+            //I don't have a working example of this chart in any projects.
+            setTimeout(()=>this.setupLinks(dataStore,index,getDataFunction),100)
         }
        
-        this.dataLink= {
-            dataStore:dataStore,
-            index:index,
-            getDataFunction:func
-        }
+        this.dataLink = { dataStore, index, getDataFunction };
         if (!this.bamscatrack){
             return;
         }
         const cat = this.config.cluster_reads;
       
-        dataStore.addListener("gb_"+this.config.id,(type,data)=>{
-            if (type==="filtered"){
+        dataStore.addListener(`gb_${this.config.id}`, (type,data) => {
+            if (type==="filtered") {
                 this.filterReads(data);
             }
-            //has the data used to cluster reads changed
+            //has the data used to cluster reads changed?
             //if so update the atac track
-            else if (type==="data_changed"){
+            else if (type==="data_changed") {
                 const cl = this.config.cluster_reads;
                 if (data.columns.indexOf(cl) !==-1){
                     this.changeClusters(cl,true)
                 }
             }
         })
-        func([cat],()=>{
+        getDataFunction([cat], ()=>{
             const ind = dataStore.getColumnIndex(index);
             const colors = dataStore.getColumnColors(cat);
             const col = dataStore.columnIndex[cat];
             this.bamscatrack.setCategories(cat,col.data,col.values,colors);
-                //get basic dimension from the other datastore         
+            //get basic dimension from the other datastore         
             this.cellDim= dataStore.getDimension("base_dimension");
           
             this.bamscatrack.addIndex(ind);
@@ -152,10 +151,9 @@ class GenomeBrowser extends BaseChart{
                 const ci = ind[bc];
                 return cf(ci);
             })*/
-            const g= this.config.genome_location;
-            if (g){
-                
-                this.browser.update(g.chr,g.start,g.end,true);
+            const g = this.config.genome_location;
+            if (g) {
+                this.browser.update(g.chr, g.start, g.end, true);
             }
             else{
                 this.onDataHighlighted({indexes:[0]});
@@ -166,7 +164,7 @@ class GenomeBrowser extends BaseChart{
     changeClusters(column,recalculateCats=false){
         this.config.cluster_reads=column;
         const ds = this.dataLink.dataStore;
-        this.dataLink.getDataFunction([column],()=>{
+        this.dataLink.getDataFunction([column], ()=>{
             const colors = ds.getColumnColors(column);
             const col = ds.columnIndex[column];
             this.bamscatrack.setCategories(column,col.data,col.values,colors,true,recalculateCats);
@@ -186,7 +184,7 @@ class GenomeBrowser extends BaseChart{
                 type:"checkbox",
                 id:c.track_id,
                 label:c.short_label,
-                current_value:c.hide?false:true
+                current_value:!c.hide
             }
         });
         new CustomDialog({
@@ -196,7 +194,7 @@ class GenomeBrowser extends BaseChart{
             buttons:[{
                 text:"Update",
                 method:vals=>{
-                    for (let id in vals){
+                    for (const id in vals){
                         b.tracks[id].config.hide=!vals[id]
                     }
                     b.update();
@@ -245,7 +243,7 @@ class GenomeBrowser extends BaseChart{
         const col= columns[0].col;
         const vc= this.dataStore.getValueToColor(col);
         //color the wig tracks properly
-        for (let v in vc){
+        for (const v in vc){
             const tr =this.browser.tracks[`${col}|${v}`];
             if (tr){
                 tr.config.color= vc[v];
@@ -257,8 +255,8 @@ class GenomeBrowser extends BaseChart{
     _setPhasedSNPs(info,color){
         if (info){
             const d = info.split(",").map(x=>x.split(":"));
-            for (let i of d){
-               const st = parseInt(i[1])
+            for (const i of d){
+               const st = Number.parseInt(i[1])
                this.browser.setHighlightedRegion({chr:i[0],start:st,end:st+1},i[0]+i[1],color)
             }
        }
@@ -273,24 +271,24 @@ class GenomeBrowser extends BaseChart{
         const vm = this.config.view_margins;
         const o = this.dataStore.getRowAsObject(data.indexes[0],p);
         //some basic checks
-        let st = o[p[2]]>o[p[1]]?o[p[1]]:o[p[2]];
+        const st = o[p[2]]>o[p[1]]?o[p[1]]:o[p[2]];
         let en = o[p[2]]>o[p[1]]?o[p[2]]:o[p[1]];
         const rowData = data.data;
 
         //this should be done elsewhere
         const phased= []
         const not_phased=[]
-        if (rowData && rowData.phase_data){
+        if (rowData?.phase_data){
             this.browser.removeAllHighlightedRegions();
             this._setPhasedSNPs(rowData.more_peak_haplotype,"blue");
             this._setPhasedSNPs(rowData.less_peak_haplotype,"red"); 
-            for (let id of this.browser.track_order){
-                let pd = rowData.phase_data[id];
+            for (const id of this.browser.track_order){
+                const pd = rowData.phase_data[id];
                 if (!id.startsWith("Don")){
                     continue;
                 }          
                 if (pd){
-                    if (pd.ratio[0]==0 && pd.ratio[1]==0){
+                    if (pd.ratio[0]===0 && pd.ratio[1]===0){
                         this.browser.setTrackAttribute(id,"phase_data",null)
                     } 
                     else{       
@@ -311,7 +309,7 @@ class GenomeBrowser extends BaseChart{
             const new_order =phased.concat(not_phased);
             const track_order=[];
             let index=0;
-            for (let id of this.browser.track_order){
+            for (const id of this.browser.track_order){
                 if (id.startsWith("Don")){
                     track_order.push(new_order[index]);
                     index++
@@ -327,17 +325,17 @@ class GenomeBrowser extends BaseChart{
         const fcp =this.config.feature_present_column;
         if (fcp){
             const ids =  this.dataStore.getRowText(data.indexes[0],fcp).split(", ");
-            for (let id of ids){
+            for (const id of ids){
                 this.browser.setTrackAttribute(id,"color","#35de26")
             }
             const not =this.dataStore.getColumnValues(fcp).slice(0).filter(x=>ids.indexOf(x) ===-1);
-            for (let id of not){
+            for (const id of not){
                 this.browser.setTrackAttribute(id,"color","#939c92")
             }
             const new_order = ids.concat(not)
             const track_order=[];
             let index=0;
-            for (let id of this.browser.track_order){
+            for (const id of this.browser.track_order){
                 if (new_order.indexOf(id) !==-1){
                     track_order.push(new_order[index]);
                     index++
@@ -371,7 +369,7 @@ class GenomeBrowser extends BaseChart{
     }
 
     getImage(callback,type){
-        if (type=="svg"){
+        if (type==="svg"){
             this.browser.repaint(true,false,callback)
         }
         else{
@@ -395,7 +393,7 @@ class GenomeBrowser extends BaseChart{
     _calculatePosition(text){
 		text=text.replace(/,/g,"");
 	
-		let arr = text.split(":");
+		const arr = text.split(":");
 		let chr = null;
 		let pos = null;
 		if (arr.length===1){
@@ -406,8 +404,8 @@ class GenomeBrowser extends BaseChart{
 			chr =arr[0];
 			pos=arr[1];
 		}
-		let arr2= pos.split("-");
-		return ({chr:chr,start:parseInt(arr2[0]),end:parseInt(arr2[1])});
+		const arr2= pos.split("-");
+		return ({chr:chr,start:Number.parseInt(arr2[0]),end:Number.parseInt(arr2[1])});
 	}
 
 
@@ -425,7 +423,7 @@ class GenomeBrowser extends BaseChart{
     setLabelFunction(column){
         if (!column){
             this.browser.setTrackLabelFunction("_base_track",null);
-            delete this.config.feature_label;
+            this.config.feature_label = undefined;
         }
         else{
             this.config.feature_label=column;
@@ -464,7 +462,7 @@ class GenomeBrowser extends BaseChart{
     changeBaseDocument(doc){
         this.browser.closeAllDialogs();
         super.changeBaseDocument(doc);
-        this.browser.__doc__=doc;   
+        this.browser.changeBaseDocument(doc);
     }
 
 
@@ -477,7 +475,7 @@ class GenomeBrowser extends BaseChart{
     remove(notify=true){
         if (this.cellDim){
             this.cellDim.destroy(notify);
-            this.dataLink.dataStore.removeListener("gb_"+this.config.id);
+            this.dataLink.dataStore.removeListener(`gb_${this.config.id}`);
         }
         super.remove();
     }
@@ -533,8 +531,8 @@ class GenomeBrowser extends BaseChart{
             current_value:c.view_margins.value,
             only_update_on_enter:true,
             func:(x)=>{
-                x= parseInt(x);
-                x= isNaN(x)?c.view_margins.type==="percentage"?20:1000:x;
+                x= Number.parseInt(x);
+                x= Number.isNaN(x)?c.view_margins.type==="percentage"?20:1000:x;
                 c.view_margins.value=x;
                 const d = this.dataStore.getHighlightedData();
                 if (d){
@@ -596,7 +594,7 @@ BaseChart.types["genome_browser"]={
         //add any default tracks
         config.default_track = gb.default_track.url;
         if (gb.default_tracks){
-            for (let t of gb.default_tracks){
+            for (const t of gb.default_tracks){
                 config.tracks.push(JSON.parse(JSON.stringify(t)));
             }         
         }

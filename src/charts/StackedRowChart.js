@@ -100,7 +100,6 @@ class StackedRowChart extends SVGChart{
         const colors= this.dataStore.getColumnColors(c.param[1]);
         const yvalues = this.dataStore.getColumnValues(c.param[0]);
         const xvalues = this.dataStore.getColumnValues(c.param[1]);
-        const self = this;
         
         const trans =  select(this.contentDiv).transition()
         .duration(tTime).ease(easeLinear);
@@ -130,11 +129,11 @@ class StackedRowChart extends SVGChart{
                 .attr("width",d=>d.per*box.width)
                 .attr("height",bheight)
                 .attr("fill",d=>colors[d.id])
-                .on("mouseover mousemove",(e,d)=>{           
-                    self.showToolTip(e,`${xvalues[d.id]}<br>${d.count}`);
+                .on("mouseover pointermove",(e,d)=>{           
+                    this.showToolTip(e,`${xvalues[d.id]}<br>${d.count}`);
                 }).
                 on("mouseleave",()=>{
-                    self.hideToolTip();
+                    this.hideToolTip();
                 }),
             update=>update.transition(trans)
                 .attr("x",d=>d.perpos*box.width)

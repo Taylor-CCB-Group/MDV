@@ -2,14 +2,16 @@ import {getRandomString} from "../utilities/Utilities.js";
 import {ContextMenu} from "../utilities/ContextMenu.js";
 import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog";
+import { chartTypes } from "./ChartTypes";
+import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 
 
 class BaseChart{
     /**
      * The base constructor
-     * @param {DataStore} dataStore - The datastore object thta contains the data for this chart
-     * @param {string} div - The id of the div element or the element itself to house the graph
-     * @param {Object} config - The config describing the graph
+     * @param {DataStore} dataStore - The datastore object that contains the data for this chart
+     * @param {string | HTMLDivElement} div - The id of the div element or the element itself to house the chart
+     * @param {Object} config - The config describing the chart
      */
     constructor(dataStore,div,config){
         //******adapt legacy configs
@@ -19,7 +21,6 @@ class BaseChart{
             }
         }
         //**********
-
 
         //copy the config
         this.config=JSON.parse(JSON.stringify(config))
@@ -80,6 +81,9 @@ class BaseChart{
                 this.onDataAdded(data);
             }
             else if (type==="data_highlighted"){
+                if (data.source === this) {
+                    this._callListeners("data_highlighted", data);
+                }
                 if (this.onDataHighlighted){
                     this.onDataHighlighted(data);
                 }
@@ -89,7 +93,23 @@ class BaseChart{
    
         //set up context menu and icon which opens it
         this.contextMenu = new ContextMenu((data)=>{     
-            return this.getContextMenu(data);
+            const menu = this.getContextMenu(data);
+            if (import.meta.env.MODE !== "production") {
+                menu.push({
+                    text:"debug chart",
+                    icon:"fas fa-bug",
+                    func:()=>{
+                        window.mdv.debugChart = this;
+                        this.dialogs.push(new DebugJsonDialogReactWrapper(this.config, this));
+                    }
+                });
+                menu.push({
+                    text: "copy config JSON to clipboard",
+                    icon: "fas fa-copy",
+                    func: () => navigator.clipboard.writeText(JSON.stringify(this.config, null, 2))
+                });
+            }
+            return menu;
         })
 
         this.addMenuIcon("fas fa-bars","more")
@@ -102,6 +122,30 @@ class BaseChart{
            
         //info icon
         this.legendIcon = this.addMenuIcon("fas fa-info",config.legend || "No description",{size:"medium"});
+
+        let oldSize = config.size;
+        this.contentDiv.addEventListener("fullscreenchange", ()=>{
+            //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
+            if (document.fullscreenElement) {
+                if (this.contentDiv !== document.fullscreenElement) console.error('unexpected fullscreen element');
+                const rect = window.screen;
+                this.setSize(rect.width, rect.height);
+                for (const d of this.dialogs) {
+                    d.setParent(this.contentDiv);
+                }
+            } else {
+                this.setSize(...oldSize);
+                for (const d of this.dialogs) {
+                    d.setParent(null);
+                }
+            }
+        });
+        this.addMenuIcon("fas fa-expand","fullscreen", {
+            func: async ()=>{
+                oldSize = this.config.size;
+                await this.contentDiv.requestFullscreen();
+            }
+        });
      
         this.div.append(this.titleBar);
         this.div.append(this.contentDiv); 
@@ -110,7 +154,7 @@ class BaseChart{
         //work out width and height based on container
         this._setDimensions();
     }
-
+    dialogs = [];
     _getContentDimensions(){
         return{ //PJT to review re. gridstack.
             top:5,
@@ -153,7 +197,7 @@ class BaseChart{
     }
 
     _callListeners(type,data){
-        for (let id in this.listeners){
+        for (const id in this.listeners){
             this.listeners[id](type,data);
         }
     }
@@ -219,7 +263,7 @@ class BaseChart{
             if (typeof this.config.param === "string" ){
                 cols=[this.config.param];
             }
-            for (let p of cols){
+            for (const p of cols){
                 if (columns.indexOf(p)!==-1){
                     isDirty=true;
                     break;
@@ -274,7 +318,7 @@ class BaseChart{
             if (this.legend){
                 this.config.color_legend.pos=[this.legend.offsetLeft,this.legend.offsetTop];
                 this.legend.remove();
-                delete this.legend;
+                this.legend = undefined;
             }
             return;
         }
@@ -291,8 +335,8 @@ class BaseChart{
             if (!cl.pos){
                 cl.pos=[box.left,box.top]
             }
-            ll= cl.pos[0]+"px";
-            lt= cl.pos[1]+"px";
+            ll= `${cl.pos[0]}px`;
+            lt= `${cl.pos[1]}px`;
         }
         this.legend = this.getColorLegend();
         if (!this.legend) {
@@ -312,7 +356,8 @@ class BaseChart{
         const conf ={
             asArray:asArray,
             overideValues:{
-                colorLogScale:this.config.log_color_scale
+                colorLogScale:this.config.log_color_scale,
+                fallbackOnZero: this.config.fallbackOnZero
             }
         }
         this._addTrimmedColor(column,conf);
@@ -346,7 +391,7 @@ class BaseChart{
         if (typeof this.config.param === "string" ){
             cols=[this.config.param];
         }
-        for (let p of cols){
+        for (const p of cols){
             if (column===p){
                 isDirty=true;
                 break;
@@ -358,7 +403,7 @@ class BaseChart{
         }
         if (this.colorByColumn){
             if (this.config.color_by===column){
-                delete this.config.color_by;
+                this.config.color_by = undefined;
                 this.colorByDefault();
             }
         }
@@ -369,6 +414,8 @@ class BaseChart{
     onDataAdded(newSize){
         this.onDataFiltered();
     }
+
+    onDataHighlighted(data){}
 
     addToolTip(){
         this._tooltip = createEl("div",{
@@ -381,13 +428,15 @@ class BaseChart{
     }
 
     showToolTip(e,msg){
+        if (!this._tooltip) this.addToolTip();
         this._tooltip.innerHTML=msg;
         this._tooltip.style.display= "inline-block";
-        this._tooltip.style.left= (3+e.clientX)+"px";
-        this._tooltip.style.top=(3+e.clientY)+"px"
+        this._tooltip.style.left= `${3+e.clientX}px`;
+        this._tooltip.style.top=`${3+e.clientY}px`
     }
 
     hideToolTip(){
+        if (!this._tooltip) return;
         this._tooltip.style.display="none";
     }
 
@@ -401,6 +450,10 @@ class BaseChart{
         if (this._tooltip){
             this._tooltip.remove();
         }
+        for (const d of this.dialogs){
+            d.close();
+        }
+        // dynamic props?
     }
 
 
@@ -426,7 +479,7 @@ class BaseChart{
     */
     getSettings(){
         const c= this.config;
-        let settings = [
+        const settings = [
             {
                 type:"text",
                 label:"Chart Name",
@@ -439,8 +492,8 @@ class BaseChart{
         const colorOptions = this.getColorOptions();
         
         if (colorOptions.colorby){
-            //cannot color by multitext or unique (at the moment)
-            const filter = colorOptions.colorby==="all"?["int32","text","integer","double","text16"]:colorOptions.colorby;
+            //cannot color by unique (at the moment)
+            const filter = colorOptions.colorby==="all"?["int32","text","integer","double","text16","multitext"]:colorOptions.colorby;
             const cols = this.dataStore.getColumnList(filter);
             cols.push({name:"None",field:"_none"})
             settings.push({
@@ -450,7 +503,7 @@ class BaseChart{
                 current_value:c.color_by || "_none",
                 func:(x)=>{
                     if (x==="_none"){
-                        delete c.color_by
+                        c.color_by = undefined
                         this.colorByDefault();
                     }
                     else{
@@ -499,6 +552,18 @@ class BaseChart{
                 }
             });
             settings.push({
+                label:"Treat zero as missing",
+                type:"check",
+                
+                current_value:c.fallbackOnZero,
+                func:(x)=>{      
+                    c.fallbackOnZero = x;
+                    if (c.color_by){
+                        this.colorByColumn(c.color_by);
+                    }
+                }
+            });
+            settings.push({
                 type:"radiobuttons",
                 label:"Trim Color Scale to Percentile",
                 current_value:c.trim_color_scale || "none",
@@ -531,19 +596,29 @@ class BaseChart{
 
    
     _openSettingsDialog(e){
-        if (!this.settingsDialog){
-          this.settingsDialog=  new SettingsDialog({
+        if (!this.settingsDialog) {
+            if (import.meta.env.DEV) {
+                // this.settingsDialog = new SettingsDialogReactWrapper(this);
+                // return;
+            };
+            this.settingsDialog = new SettingsDialog({
                 maxHeight:400,
                 doc:this.__doc__ || document,
                 width:300,
                 title:"Settings",
                 position:[e.pageX,e.pageY],
-                onclose:()=>this.settingsDialog=null
-
+                useMobx: this.useMobx,
+                onclose:() => {
+                    this.settingsDialog = null;
+                    this.dialogs.splice(this.dialogs.indexOf(this.settingsDialog), 1);
+                }
             },this.getSettings());
-
+            this.dialogs.push(this.settingsDialog);
         }
-      
+        //experimenting with making the parent always be contentDiv (not only in fullscreen mode)
+        //doesn't work ATM because of stacking context - may want to review that more generally 
+        //(can be annoying with tooltips...)
+        //this.settingsDialog.setParent(this.contentDiv);
     }
 
   
@@ -584,6 +659,15 @@ class BaseChart{
         if (this.addToContextMenu){
             menu=menu.concat(this.addToContextMenu());
         }
+        menu.push({
+            text: "experimental settings dialog",
+            icon: "fas fa-cog",
+            func: async () => {
+                const m = await import("../react/components/SettingsDialogReactWrapper");
+                const SettingsDialogReactWrapper = m.default;
+                this.dialogs.push(new SettingsDialogReactWrapper(this));
+            }
+        });
         return menu;
     }
 
@@ -601,10 +685,16 @@ class BaseChart{
     * @param {document} doc - the document that the chart will use 
     */
     changeBaseDocument(doc){
+        //this needs to be reviewed for popout windows
+        // - mouse events need to be on the right window ✅
+        // - dialogs need to be on the right window ✅ / transferred
         this.contextMenu.__doc__=doc;
         this.__doc__=doc;
-        if (this.settingsDialog){
-            this.settingsDialog.close();
+        for (const d of this.dialogs){
+            // d.close();
+            // how about changing the parent of the dialog?
+            // like we do with fullscreen (make sure drag works after this)
+            d.setParent(doc.body);
         }
         if (this.legend){
             this.legend.__doc__=doc;
@@ -614,7 +704,7 @@ class BaseChart{
             this.addToolTip();
         }
         if (this.extra_legends){
-            for (let l of this.extra_legends){
+            for (const l of this.extra_legends){
                 if (this[l]){
                     this[l].__doc__=doc;
                 }
@@ -663,8 +753,8 @@ class BaseChart{
     setSize(x,y){
         //if supplied change the div dimensions
         if (x){
-            this.div.style.height=y+"px";
-            this.div.style.width=x+"px";
+            this.div.style.height=`${y}px`;
+            this.div.style.width=`${x}px`;
         }
         //calculate width and height based on outer div
         this._setDimensions();
@@ -683,17 +773,17 @@ class BaseChart{
 
     /**
      * Downloads an image of the chart
-     * @param {string} im_type - either svg or png 
+     * @param {"svg" | "png"} im_type - either svg or png 
      */
     downloadImage(im_type){ 
         const originalColor =this.contentDiv.style.color;
         this.contentDiv.style.color = "black";
         this.getImage(resp=>{
-            let link =document.createElement("a");
-            let name = this.config.title || "image"
-            link.download=name+"."+im_type;
+            const link =document.createElement("a");
+            const name = this.config.title || "image"
+            link.download=`${name}.${im_type}`;
             if (im_type==="svg"){
-                link.href="data:image/svg+xml," + encodeURIComponent(resp);
+                link.href=`data:image/svg+xml,${encodeURIComponent(resp)}`;
             }
             else{
                 let url =resp.toDataURL('image/png');
@@ -726,22 +816,22 @@ class BaseChart{
   }
 
   getImageFromSVG(svg,callback) {
-    var copy = svg.cloneNode(true);
+    const copy = svg.cloneNode(true);
     copyStylesInline(copy, svg);
-    var canvas = document.createElement("canvas");
-    //var bbox = svg.getBBox();
+    const canvas = document.createElement("canvas");
+    //const bbox = svg.getBBox();
     copy.style.top = "0px";
     canvas.width = svg.width.baseVal.value
     canvas.height =svg.height.baseVal.value
-    var ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    var data = (new XMLSerializer()).serializeToString(copy);
-    var DOMURL = window.URL || window.webkitURL || window;
-    var img = new Image();
-    var svgBlob = new Blob([data], {type: "image/svg+xml;charset=utf-8"});
-    var url = DOMURL.createObjectURL(svgBlob);
+    const data = (new XMLSerializer()).serializeToString(copy);
+    const DOMURL = window.URL || window.webkitURL || window;
+    const img = new Image();
+    const svgBlob = new Blob([data], {type: "image/svg+xml;charset=utf-8"});
+    const url = DOMURL.createObjectURL(svgBlob);
     img.src = url;
-          img.onload = function () {
+          img.onload = () => {
           ctx.drawImage(img, 0, 0);
           callback(canvas,ctx)
     }
@@ -756,34 +846,24 @@ class BaseChart{
 
 /**
  * A dictionary of all the chart types
- * @type {Record<string, {
- * "class": class, 
- * name: string,
- * required?: string[],
- * init?: (config:object, dataSource:object, extraControls:object)=>void,
- * extra_controls?: (dataSource:object)=>{type: string, name: string, label?: string, values?: object, defaultVal?: object}[],
- * params?: {type:string|string[], name:string}[],
- * configEntriesUsingColumns?: string[],
- * methodsUsingColumns?: string[],
- * }>}
  */
-BaseChart.types={};
+BaseChart.types = chartTypes;
 
 function copyStylesInline(destinationNode, sourceNode) {
-    var containerElements = ["svg","g"];
-    for (var cd = 0; cd < destinationNode.childNodes.length; cd++) {
-        var child = destinationNode.childNodes[cd];
-        if (containerElements.indexOf(child.tagName) != -1) {
+    const containerElements = ["svg","g"];
+    for (let cd = 0; cd < destinationNode.childNodes.length; cd++) {
+        const child = destinationNode.childNodes[cd];
+        if (containerElements.indexOf(child.tagName) !== -1) {
              copyStylesInline(child, sourceNode.childNodes[cd]);
              continue;
         }
-        var style = sourceNode.childNodes[cd].currentStyle || window.getComputedStyle(sourceNode.childNodes[cd]);
-        if (style == "undefined" || style == null) continue;
-        for (var st = 0; st < style.length; st++){
+        const style = sourceNode.childNodes[cd].currentStyle || window.getComputedStyle(sourceNode.childNodes[cd]);
+        if (style === "undefined" || style == null) continue;
+        for (let st = 0; st < style.length; st++){
              child.style.setProperty(style[st], style.getPropertyValue(style[st]));
         }
     }
- }
+}
  
 
   

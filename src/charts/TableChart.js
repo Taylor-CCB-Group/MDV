@@ -14,12 +14,10 @@ class TableChart extends BaseChart{
 		super(dataStore,div,config);
         this.config.type="table_chart";
         let cols = [];
-        //add the index column 
-        //TODO fix sorting on index column
-        cols = [{field:"__index__",id:"__index__",name:"index",datatype:"integer",sortable:true,width:100}];
-        let index=0;
+        //add the index column (unless told not to)
+        if (config.include_index !== false) cols = [{field:"__index__",id:"__index__",name:"index",datatype:"integer",sortable:true,width:100}];
         const cw = config.column_widths || {};
-        for (let c of this.config.param){
+        for (const c of this.config.param){
             const column = dataStore.columnIndex[c];
             const col = {
                 id:column.field,
@@ -29,7 +27,7 @@ class TableChart extends BaseChart{
                 sortable:true,
                 width:cw[c]?cw[c]:100
             }
-            // PJT coerce multitext internally... for now(?)
+            // TODO review PJT coerce multitext internally... for now(?)
             if (column.datatype === "multitext") col.datatype = "text";
             
             if (column.editable){
@@ -49,7 +47,7 @@ class TableChart extends BaseChart{
             autoEdit: true,
             enableAsyncPostRender: true,
             frozenColumn:null,
-           // showHeaderRow:true,
+            //showHeaderRow:true,
             //headerRowHeight:40
         };	
         this.dataModel = new DataModel(dataStore, {autoupdate:false});
@@ -75,7 +73,6 @@ class TableChart extends BaseChart{
        
 
 
-       
         this.mode="select";
         //this._changeMode();
         this.grid.setSelectionModel(new RowSelectionModel());
@@ -83,16 +80,13 @@ class TableChart extends BaseChart{
         this.grid.init();
       
         this.grid.onSort.subscribe( (e, args)=> {
-            this.dataModel.sort(args.columnId,args.sortAsc?"asc":"desc");
-            this.grid.invalidateAllRows();
-            this.grid.render();
+            this._sort(args);
         });
-
+        
         this.grid.onSelectedRowsChanged.subscribe( (e, args)=> {
             if (this.mode==="select"){
                 this._rowsSelected(args);
-            }
-            
+            }            
         });
         
 
@@ -117,11 +111,14 @@ class TableChart extends BaseChart{
         this.filter=[];
         this.themeChanged();
         this.onDataFiltered();
-
-      
-     
+        if (this.config.sort) this._sort(this.config.sort);//now done in onDataFiltered()
 	}
-
+    _sort({columnId, sortAsc}) {
+        this.dataModel.sort(columnId, sortAsc ? "asc" : "desc");
+        this.grid.invalidateAllRows();
+        this.grid.render();
+        this.config.sort = { columnId, sortAsc };
+    }
    
 
     onDataHighlighted(data){
@@ -161,7 +158,7 @@ class TableChart extends BaseChart{
 
         config.param = cols.filter(x=>x.field!=="__index__").map(x=>x.field);
         config.column_widths= {};
-        for (let c of cols){
+        for (const c of cols){
             if (c.width!==100){
                 config.column_widths[c.field]=c.width;
             }
@@ -246,7 +243,7 @@ class TableChart extends BaseChart{
             const cols = this.grid.getColumns();
             position-=1;
             if (position<0){
-                position==0;
+                position===0;
             }
             else if (position>=cols.length){
                 position = cols.length-1;
@@ -271,7 +268,7 @@ class TableChart extends BaseChart{
     }
 
     _updateOverlay(args){
-        var column = this.grid.getColumns()[args.range.fromCell];
+        const column = this.grid.getColumns()[args.range.fromCell];
 
         // Ensure the column is editable
         if (!column.editor) {
@@ -284,7 +281,7 @@ class TableChart extends BaseChart{
     }
     _rowsSelected(args){
         const indexes=[];
-        for (let i of args.rows){
+        for (const i of args.rows){
             indexes.push(this.dataModel.data[i]);
         }
         
@@ -292,9 +289,9 @@ class TableChart extends BaseChart{
     }
 
 
-    // pjt: deprecated
+    // pjt: deprecated?
     themeChanged(){
-        console.warn('themeChanged() deprecated');
+        // console.warn('themeChanged() deprecated');
     }
 
    
@@ -338,8 +335,11 @@ class TableChart extends BaseChart{
     onDataFiltered(){
         if (this.isPinned){
             return;
-        }    
-        this.dataModel.updateModel()
+        }
+        this.dataModel.updateModel();
+        if (this.config.sort) {
+            this._sort(this.config.sort);
+        }
     }    
 }
 
@@ -351,7 +351,7 @@ class EditColumnDialog extends BaseDialog{
             columns:2,
             width:380,
             maxHeight:500,
-            title:"Bulk Edit "+ columnName
+            title:`Bulk Edit ${columnName}`
         }
         super(config, { table, column });
     }
@@ -440,7 +440,7 @@ class AddColumnDialog extends BaseDialog{
         createEl("div",{text:"Copy Existing Column"},dc);
         const cols = table.getColumnInfo()
         this.cloneCol =createEl("select",{},d2);
-        for (let c of cols){
+        for (const c of cols){
             createEl("option",{text:c.name,value:c.field},this.cloneCol);
         }
         const d3 = createEl("div",{style:dstyle},this.dialog);
@@ -455,9 +455,9 @@ class AddColumnDialog extends BaseDialog{
             this.name.focus();
             return;
         }
-        let clone = this.cloneCheck.checked?this.cloneCol.value:null;
-        let pos = parseInt(this.position.value);
-        pos = isNaN(pos)?null:pos
+        const clone = this.cloneCheck.checked?this.cloneCol.value:null;
+        let pos = Number.parseInt(this.position.value);
+        pos = Number.isNaN(pos)?null:pos
         this.table.createColumn(this.name.value,clone,pos);
         this.close();
     }
@@ -476,5 +476,16 @@ BaseChart.types["table_chart"]={
     params:[{
         type:"_multi_column:all",
         name:"Columns To Display"
-    }]
+    }],
+    extra_controls: () => {
+        //maybe '_multi_column:all' should handle this?
+        return [{
+            type: "checkbox",
+            name: "include_index",
+            label: "Include Index",
+        }]
+    },
+    init: (config, ds, ec) => {
+        config.include_index = ec.include_index;
+    }
 }

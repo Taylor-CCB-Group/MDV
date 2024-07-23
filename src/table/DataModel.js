@@ -4,11 +4,12 @@ class DataModel {
     constructor(dataStore,config={}){
         this.dataStore = dataStore;
         this.data = new Int32Array(0);
-        let len  = 0;
+        const len  = 0;
         for (let n=0;n<len;n++){
             this.data[n]=n;
         }
         this.size=len;
+        this.listeners = {};
         if (config.autoupdate == null || config.autoupdate===true){
             dataStore.addListener("sss",(type)=>{
                 if (type==="filtered"){
@@ -16,8 +17,6 @@ class DataModel {
                 }
             });
         }
-       
-        this.listeners={}
     }
 
     getLength(){
@@ -33,6 +32,13 @@ class DataModel {
     }
 
     sort(column,order){
+        if (column === "__index__") {
+            this.data.sort();
+            if (order==="desc"){
+                this.data.reverse();
+            }
+            return;
+        }
         const col = this.dataStore.getRawColumn(column);
         const c = this.dataStore.columnIndex[column];
 
@@ -55,8 +61,8 @@ class DataModel {
                 this.data.sort((a,b)=>{
                     let va= col[a];
                     let vb = col[b];
-                    va= isNaN(va)?Number.MAX_VALUE:va;
-                    vb= isNaN(vb)?Number.MAX_VALUE:vb;
+                    va= Number.isNaN(va)?Number.MAX_VALUE:va;
+                    vb= Number.isNaN(vb)?Number.MAX_VALUE:vb;
                     return va-vb;
                 });
             }
@@ -64,8 +70,8 @@ class DataModel {
                 this.data.sort((a,b)=>{
                     let va= col[a];
                     let vb = col[b];
-                    va= isNaN(va)?Number.MIN_VALUE:va;
-                    vb= isNaN(vb)?Number.MIN_VALUE:vb;
+                    va= Number.isNaN(va)?Number.MIN_VALUE:va;
+                    vb= Number.isNaN(vb)?Number.MIN_VALUE:vb;
                     return vb-va;
                 });
             }
@@ -100,7 +106,7 @@ class DataModel {
 
     getValueSuggestion(val,column){
         const values = this.dataStore.getColumnValues(column);
-        for (let v of values){
+        for (const v of values){
             if (v===val){
                 return v
             }
@@ -125,7 +131,7 @@ class DataModel {
 
     updateValue(value,row,column,notify=true){
         const col = this.dataStore.columnIndex[column];
-        let valPos= this._getValueIndex(value,col);
+        const valPos= this._getValueIndex(value,col);
         col.data[row]=valPos;
         if (notify){
             this.dataStore.dataChanged([column]);
@@ -137,8 +143,8 @@ class DataModel {
         const arr = this.dataStore.getRawColumn(col);
         const val =dir==="+"?arr[this.data[start]]:arr[this.data[end]];
         let i = dir==="+"?start:end;
-        let inc = dir==="+"?+1:-1;
-        let lim = dir==="+"?end+1:start-1;
+        const inc = dir==="+"?+1:-1;
+        const lim = dir==="+"?end+1:start-1;
         for (;i!==lim;i+=inc){
             arr[this.data[i]]=val;
         }
@@ -150,14 +156,14 @@ class DataModel {
     replaceValues(value,replace,column,notify=true){
         const col = this.dataStore.columnIndex[column];
        
-        let valPos= this._getValueIndex(value,col);
+        const valPos= this._getValueIndex(value,col);
         if (replace==="_all_"){
             for (let i=0;i<this.data.length;i++){
                 col.data[this.data[i]]=valPos;
             }
         }
         else if (replace==="_blank_"){
-            let bIndex= col.values.indexOf(value);
+            const bIndex= col.values.indexOf(value);
             //no blanks to replace
             if (bIndex===-1){
                 return;
@@ -169,13 +175,13 @@ class DataModel {
                 }
             }
         }
-        else if (replace=="_delete_"){
+        else if (replace==="_delete_"){
             this.dataStore.cleanColumnData(column);
             return;
 
         }
         else{
-            let repPos= this._getValueIndex(replace,col);
+            const repPos= this._getValueIndex(replace,col);
             for (let i=0;i<this.data.length;i++){
                 const index = this.data[i]
                 if (col.data[index]===valPos){
@@ -200,7 +206,7 @@ class DataModel {
             }
         }
         this.size=this.dataStore.filterSize;
-        for (let id in this.listeners){
+        for (const id in this.listeners){
             this.listeners[id]()
         }
     }

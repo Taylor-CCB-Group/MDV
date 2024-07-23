@@ -2,13 +2,15 @@
 import Dimension from "./Dimension.js";
 
 class RangeDimension extends Dimension{
-    constructor(column,parent){
-        super(column, parent);   
+    /**
+     * @param {DataStore} parent
+     */
+    constructor(parent) {
+        super(parent);
         this.worker= new Worker (new URL("./binWorker.js?v=1",import.meta.url));  
     }
 
-    filterSquare(args,columns){
-     
+    filterSquare(args, columns) { 
         let data1= null;
         if (typeof columns[0] !== "string"){
             data1= columns[0];
@@ -18,46 +20,30 @@ class RangeDimension extends Dimension{
         }
         
         const data2 = this.parent.columnIndex[columns[1]].data;
-        const filter = this.parent.filterArray;
-        const parent = this.parent;
-        const range1 =args.range1;
-        const range2 =args.range2;
-      
-        const localFilter= this.filterArray;
-        for (let i=0;i<this.parent.size;i++){
+        const range1 = args.range1;
+        const range2 = args.range2;
+        const predicate = i => {
             const v1 = data1[i];
             const v2 = data2[i];
-            if ( v1<range1[0] || v1>range1[1] || v2<range2[0] || v2>range2[1] || isNaN(v1) || isNaN(v2)){
-               
-                if (localFilter[i]===0){
-                    if(++filter[i]===1){
-                        parent.filterSize--;
-                                         
-                    }
-                }                  
-                localFilter[i]=1
-            }
-            else{
-                if (localFilter[i]===1){
-                    if(--filter[i]===0){
-                        parent.filterSize++;                    
-                    }                   
-                }
-                localFilter[i]=0;
-            }
+            return v1>=range1[0] && v1<=range1[1] && v2>=range2[0] && v2<=range2[1] && !Number.isNaN(v1) && !Number.isNaN(v2);
         }
+        return this.filterPredicate({predicate}, columns);
     }
 
+    /**
+     * @param {Array<[number, number]>} args
+     */
     filterPoly(args,columns){
         const points=args;
-        let minX=Number.MAX_VALUE, minY= Number.MAX_VALUE;
-        let maxX=Number.MIN_VALUE, maxY= Number.MIN_VALUE;
-        for (let pt of points){
+        let minX=Number.MAX_VALUE;
+        let minY= Number.MAX_VALUE;
+        let maxX=Number.MIN_VALUE;
+        let maxY= Number.MIN_VALUE;
+        for (const pt of points){
             minX=Math.min(minX,pt[0]);
             maxX= Math.max(maxX,pt[0]);
             minY=Math.min(minY,pt[1]);
             maxY= Math.max(maxY,pt[1]);
-
         }
         let data1= null;
         if (typeof columns[0] !== "string"){
@@ -67,80 +53,41 @@ class RangeDimension extends Dimension{
             data1 = this.parent.columnIndex[columns[0]].data;
         }
         const data2 = this.parent.columnIndex[columns[1]].data;
-        const filter = this.parent.filterArray;
-        const parent = this.parent;
-        const len = parent.size;
-        const vs =points;
-        const localFilter= this.filterArray;
-        for (let n=0;n<len;n++){
-			let x = data1[n], y = data2[n];
-			let inside = false;
-            if (x<minX || x>maxX || y<minY || y>maxY || isNaN(x) || isNaN(y)){
-                if (localFilter[n]===0){
-                    if(++filter[n]===1){
-                        parent.filterSize--;
-                                         
-                    };
-                }                  
-                localFilter[n]=1
+        const vs = points;
+
+        const predicate = i => {
+            const x = data1[i];
+            const y = data2[i];
+            let inside = false;
+            if (x<minX || x>maxX || y<minY || y>maxY || Number.isNaN(x) || Number.isNaN(y)){
+                return false;
             }
-            else{
-                for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-                    let xi = vs[i][0], yi = vs[i][1];
-                    let xj = vs[j][0], yj = vs[j][1];
+            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                const xi = vs[i][0];
+                const yi = vs[i][1];
+                const xj = vs[j][0];
+                const yj = vs[j][1];
 
-                    let intersect = ((yi > y) != (yj > y))
-                        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-                    if (intersect) inside = !inside;
-                }
+                const intersect = ((yi > y) !== (yj > y))
+                    && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
 
-                if(!inside){
-                    if (localFilter[n]===0){
-                        if(++filter[n]===1){
-                            parent.filterSize--;
-                                            
-                        };
-                    }                  
-                    localFilter[n]=1;
-                }
-                else{
-                    if (localFilter[n]===1){
-                        if(--filter[n]===0){
-                            parent.filterSize++;                    
-                        }                   
-                    }
-                    localFilter[n]=0;
-                }
-            }		
-		}
+        return this.filterPredicate({predicate}, columns);
     }
 
     filterRange(args,columns){
         const min = args.min;
         const max=args.max;   
         const arr = this.parent.columnIndex[columns[0]].data;
-        const filter = this.parent.filterArray;
-        const localFilter= this.filterArray;
-        const parent = this.parent;
-        for (let i=0;i<this.parent.size;i++){
+        // performance seems similar to non-predicate version
+        const predicate = i => {
             const v = arr[i];
-            if (v<min || v>max || isNaN(v)){
-                if (localFilter[i]===0){
-                    if(++filter[i]===1){
-                        parent.filterSize--;
-                    };
-                }             
-                localFilter[i]=1
-            }
-            else{
-                if (localFilter[i]===1){
-                    if(--filter[i]===0){
-                        parent.filterSize++;
-                    }
-                }
-                localFilter[i]=0;
-            }
-        }   
+            return v >= min && v <= max && !Number.isNaN(v);
+        }
+        return this.filterPredicate({predicate}, columns);
     }
 
     getBins(callback,column,config={}){
