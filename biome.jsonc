@@ -16,7 +16,8 @@
 			"suspicious": {
 				"noExplicitAny": "off",
 				"noImplicitAnyLet": "off",
-				"noAssignInExpressions": "off"
+				"noAssignInExpressions": "off",
+				"noPrototypeBuiltins": "off"
 			},
 			"correctness": {
 				"useExhaustiveDependencies": "info",
@@ -31,7 +32,8 @@
 				"noArguments": "off"
 			},
 			"a11y": {
-				"useKeyWithClickEvents": "off"
+				"useKeyWithClickEvents": "off",
+				"noSvgWithoutTitle": "off"
 			},
 			"performance": {
 				"noDelete": "info"
@@ -48,7 +50,8 @@
 		"ignore": [
 			"./src/legacy/**/*",
 			"./src/browser/**/*",
-			"./src/table/Slick*"
+			"./src/table/Slick*",
+			"./src/venn/**/*"
 		]
 	}
 }

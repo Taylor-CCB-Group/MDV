@@ -60,6 +60,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
     const { start, end } = useRange();
     // this is glitchy - not clear whether it was actually working correctly prior to local changes or not
     // ??? especially bad when measure tool is used first...
+    // biome-ignore lint/correctness/useExhaustiveDependencies: not confident in this code...
     const updateRange = useCallback(async () => {
         if (!rangeDimension) return;
         const s = startRef.current;
@@ -113,13 +114,13 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
         if (!toolActive) return;
         const p = unproject(e);
         setEnd(p);
-    }, [toolActive, end]);
+    }, [toolActive, unproject, setEnd]);
     const handleMouseUp = useCallback((e: MouseEvent) => {
         handleMouseMove(e);
         doc.removeEventListener('mouseup', handleMouseUp);
         doc.removeEventListener('mousemove', handleMouseMove);
         updateRange();
-    }, [toolActive, updateRange]);
+    }, [updateRange, handleMouseMove, doc]);
 
     if (!currentLayerHasRendered) return null; //if we pass this, I thought it meant we have internalState, but it seems not...
     if (!scatterplotLayer.internalState) return null;
@@ -159,7 +160,7 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
     const { startPixels, setStart, endPixels, setEnd } = useMeasure();
     const handleMouseMove = useCallback((e: MouseEvent) => {
         setEnd(unproject(e));
-    }, [unproject]);
+    }, [unproject, setEnd]);
     const doc = useChartDoc();
     const handleMouseUp = useCallback((e: MouseEvent) => {
         handleMouseMove(e);
@@ -221,12 +222,12 @@ function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProp
         modelMatrix.translate([dx, dy, 0]);
         //this may redraw nice & fast without incurring react overhead, but now we're left with other problems i.e. rectangle editor not updating...
         scatterplotLayer.setNeedsRedraw();
-    }, []);
+    }, [modelMatrix.translate, scatterplotLayer.setNeedsRedraw, unproject]);
     const doc = useChartDoc();
     const handleMouseUp = useCallback((e: MouseEvent) => {
         doc.removeEventListener('mouseup', handleMouseUp);
         doc.removeEventListener('mousemove', handleMouseMove);
-    }, [doc]);
+    }, [doc, handleMouseMove]);
 
     return (
         <>

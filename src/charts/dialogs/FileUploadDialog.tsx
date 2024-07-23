@@ -92,7 +92,7 @@ const Button = ({
   const { bgColor, hoverColor, darkBgColor, darkHoverColor } = colorStyles[color] || colorStyles.blue;
 
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       className={`${size} ${marginTop} ${bgColor} ${hoverColor} ${darkBgColor} ${darkHoverColor} text-white rounded self-center cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-500 disabled:opacity-70`}
       disabled={disabled}
@@ -237,7 +237,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
         fileSize: (file.size / (1024 * 1024)).toFixed(2) // Convert to MB
       });
     }
-  }, []);
+  }, [summary]);
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,

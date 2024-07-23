@@ -283,7 +283,7 @@ export function useScatterplotLayer() {
             // },
         },
         extensions
-    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, highlightedIndex, scale, modelMatrix, extensions]);
+    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
         if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
         if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;
@@ -298,7 +298,7 @@ export function useScatterplotLayer() {
         const p3 = m.transform(p) as P;
         m.invert();
         return p3;
-    }, [scatterplotLayer, modelMatrix, currentLayerHasRendered, scale]);
+    }, [scatterplotLayer, modelMatrix, currentLayerHasRendered, chart.contentDiv.getBoundingClientRect]);
     // const project = 
     const onAfterRender = () => setCurrentLayerHasRendered(true);
     return {
