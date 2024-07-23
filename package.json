@@ -23,7 +23,9 @@
     "python-setup": "python -m venv venv && source venv/bin/activate && cd python && poetry install --with dev && npm run build-flask-vite",
     "mdv_desktop": "source venv/bin/activate && python -m mdvtools.mdv_desktop",
     "docker_dev": "docker-compose up -d --force-recreate",
-    "fix_npm_win": "npm config set script-shell \"cmd\""
+    "fix_npm_win": "npm config set script-shell \"cmd\"",
+    "jslint": "biome lint --write ./src",
+    "jsformat": "biome format --write ./src"
   },
   "repository": {
     "type": "git",
@@ -81,6 +83,7 @@
     "styled-components": "^6.1.8",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
+    "uuid": "^10.0.0",
     "wordcloud": "^1.2.2",
     "zustand": "^4.4.5"
   },
