@@ -2,12 +2,14 @@
 import {intersectionArea, circleOverlap, circleCircleIntersection, distance} from './circleintersection.js';
 
 function zeros(x){
-	var r = new Array(x);
-	for (var i = 0; i < x; ++i){
-		r[i] = 0; } return r;
+	const r = new Array(x);
+	for (let i = 0; i < x; ++i) {
+		r[i] = 0; 
+    }
+    return r;
 }
 function zerosM(x,y){
-	return zeros(x).map(function() { return zeros(y); });
+	return zeros(x).map(() => zeros(y));
 }
 
 function norm2(a)  {
@@ -15,24 +17,24 @@ function norm2(a)  {
 }
 
 function scale(ret, value, c) {
-    for (var i = 0; i < value.length; ++i) {
+    for (let i = 0; i < value.length; ++i) {
         ret[i] = value[i] * c;
     }
 }
 function weightedSum(ret, w1, v1, w2, v2) {
-    for (var j = 0; j < ret.length; ++j) {
+    for (let j = 0; j < ret.length; ++j) {
         ret[j] = w1 * v1[j] + w2 * v2[j];
     }
 }
 
 function gemv(output, A, x) {
-    for (var i = 0; i < output.length; ++i) {
+    for (let i = 0; i < output.length; ++i) {
         output[i] = dot(A[i], x);
     }
 }
 function dot(a, b) {
-    var ret = 0;
-    for (var i = 0; i < a.length; ++i) {
+    let ret = 0;
+    for (let i = 0; i < a.length; ++i) {
         ret += a[i] * b[i];
     }
     return ret;
@@ -40,7 +42,8 @@ function dot(a, b) {
 
 
 function wolfeLineSearch(f, pk, current, next, a, c1, c2) {
-    var phi0 = current.fx, phiPrime0 = dot(current.fxprime, pk),
+    // biome-ignore lint/style/useSingleVarDeclarator: don't mind too much
+    let phi0 = current.fx, phiPrime0 = dot(current.fxprime, pk),
         phi = phi0, phi_old = phi0,
         phiPrime = phiPrime0,
         a0 = 0;
@@ -50,7 +53,7 @@ function wolfeLineSearch(f, pk, current, next, a, c1, c2) {
     c2 = c2 || 0.1;
 
     function zoom(a_lo, a_high, phi_lo) {
-        for (var iteration = 0; iteration < 16; ++iteration) {
+        for (let iteration = 0; iteration < 16; ++iteration) {
             a = (a_lo + a_high)/2;
             weightedSum(next.x, 1.0, current.x, a, pk);
             phi = next.fx = f(next.x, next.fxprime);
@@ -77,7 +80,7 @@ function wolfeLineSearch(f, pk, current, next, a, c1, c2) {
         return 0;
     }
 
-    for (var iteration = 0; iteration < 10; ++iteration) {
+    for (let iteration = 0; iteration < 10; ++iteration) {
         weightedSum(next.x, 1.0, current.x, a, pk);
         phi = next.fx = f(next.x, next.fxprime);
         phiPrime = dot(next.fxprime, pk);
@@ -106,7 +109,8 @@ function wolfeLineSearch(f, pk, current, next, a, c1, c2) {
 function conjugateGradient(f, initial, params) {
     // allocate all memory up front here, keep out of the loop for perfomance
     // reasons
-    var current = {x: initial.slice(), fx: 0, fxprime: initial.slice()},
+    // biome-ignore lint/style/useSingleVarDeclarator: this is a bit ugly but never mind
+    let current = {x: initial.slice(), fx: 0, fxprime: initial.slice()},
         next = {x: initial.slice(), fx: 0, fxprime: initial.slice()},
         yk = initial.slice(),
         pk, temp,
@@ -120,7 +124,7 @@ function conjugateGradient(f, initial, params) {
     pk = current.fxprime.slice();
     scale(pk, current.fxprime,-1);
 
-    for (var i = 0; i < maxIterations; ++i) {
+    for (let i = 0; i < maxIterations; ++i) {
         a = wolfeLineSearch(f, pk, current, next, a);
 
         // todo: history in wrong spot?
@@ -137,11 +141,11 @@ function conjugateGradient(f, initial, params) {
             scale(pk, current.fxprime, -1);
 
         } else {
-            // update direction using Polak–Ribiere CG method
+            // update direction using Polakï¿½Ribiere CG method
             weightedSum(yk, 1, next.fxprime, -1, current.fxprime);
 
-            var delta_k = dot(current.fxprime, current.fxprime),
-                beta_k = Math.max(0, dot(yk, next.fxprime) / delta_k);
+            const delta_k = dot(current.fxprime, current.fxprime);
+            const beta_k = Math.max(0, dot(yk, next.fxprime) / delta_k);
 
             weightedSum(pk, beta_k, pk, -1, next.fxprime);
 
@@ -167,7 +171,8 @@ function conjugateGradient(f, initial, params) {
 
 function bisect(f, a, b, parameters) {
     parameters = parameters || {};
-    var maxIterations = parameters.maxIterations || 100,
+    // biome-ignore lint/style/useSingleVarDeclarator: <explanation>
+    let maxIterations = parameters.maxIterations || 100,
         tolerance = parameters.tolerance || 1e-10,
         fA = f(a),
         fB = f(b),
@@ -180,10 +185,10 @@ function bisect(f, a, b, parameters) {
     if (fA === 0) return a;
     if (fB === 0) return b;
 
-    for (var i = 0; i < maxIterations; ++i) {
+    for (let i = 0; i < maxIterations; ++i) {
         delta /= 2;
-        var mid = a + delta,
-            fMid = f(mid);
+        const mid = a + delta;
+        const fMid = f(mid);
 
         if (fMid * fA >= 0) {
             a = mid;
@@ -199,7 +204,8 @@ function bisect(f, a, b, parameters) {
 function nelderMead(f, x0, parameters) {
     parameters = parameters || {};
 
-    var maxIterations = parameters.maxIterations || x0.length * 200,
+    // biome-ignore lint/style/useSingleVarDeclarator: <explanation>
+    let maxIterations = parameters.maxIterations || x0.length * 200,
         nonZeroDelta = parameters.nonZeroDelta || 1.05,
         zeroDelta = parameters.zeroDelta || 0.001,
         minErrorDelta = parameters.minErrorDelta || 1e-6,
@@ -211,13 +217,13 @@ function nelderMead(f, x0, parameters) {
         maxDiff;
 
     // initialize simplex.
-    var N = x0.length,
-        simplex = new Array(N + 1);
+    const N = x0.length;
+    const simplex = new Array(N + 1);
     simplex[0] = x0;
     simplex[0].fx = f(x0);
     simplex[0].id = 0;
-    for (var i = 0; i < N; ++i) {
-        var point = x0.slice();
+    for (let i = 0; i < N; ++i) {
+        const point = x0.slice();
         point[i] = point[i] ? point[i] * nonZeroDelta : zeroDelta;
         simplex[i+1] = point;
         simplex[i+1].fx = f(point);
@@ -225,32 +231,32 @@ function nelderMead(f, x0, parameters) {
     }
 
     function updateSimplex(value) {
-        for (var i = 0; i < value.length; i++) {
+        for (let i = 0; i < value.length; i++) {
             simplex[N][i] = value[i];
         }
         simplex[N].fx = value.fx;
     }
 
-    var sortOrder = function(a, b) { return a.fx - b.fx; };
+    const sortOrder = (a, b) => a.fx - b.fx;
 
-    var centroid = x0.slice(),
-        reflected = x0.slice(),
-        contracted = x0.slice(),
-        expanded = x0.slice();
+    const centroid = x0.slice();
+    const reflected = x0.slice();
+    const contracted = x0.slice();
+    const expanded = x0.slice();
 
-    for (var iteration = 0; iteration < maxIterations; ++iteration) {
+    for (let iteration = 0; iteration < maxIterations; ++iteration) {
         simplex.sort(sortOrder);
 
         if (parameters.history) {
             // copy the simplex (since later iterations will mutate) and
             // sort it to have a consistent order between iterations
-            var sortedSimplex = simplex.map(function (x) {
-                var state = x.slice();
+            const sortedSimplex = simplex.map((x) => {
+                const state = x.slice();
                 state.fx = x.fx;
                 state.id = x.id;
                 return state;
             });
-            sortedSimplex.sort(function(a,b) { return a.id - b.id; });
+            sortedSimplex.sort((a,b) => a.id - b.id);
 
             parameters.history.push({x: simplex[0].slice(),
                                      fx: simplex[0].fx,
@@ -258,7 +264,7 @@ function nelderMead(f, x0, parameters) {
         }
 
         maxDiff = 0;
-        for (i = 0; i < N; ++i) {
+        for (let i = 0; i < N; ++i) {
             maxDiff = Math.max(maxDiff, Math.abs(simplex[0][i] - simplex[1][i]));
         }
 
@@ -268,9 +274,9 @@ function nelderMead(f, x0, parameters) {
         }
 
         // compute the centroid of all but the worst point in the simplex
-        for (i = 0; i < N; ++i) {
+        for (let i = 0; i < N; ++i) {
             centroid[i] = 0;
-            for (var j = 0; j < N; ++j) {
+            for (let j = 0; j < N; ++j) {
                 centroid[i] += simplex[j][i];
             }
             centroid[i] /= N;
@@ -278,7 +284,7 @@ function nelderMead(f, x0, parameters) {
 
         // reflect the worst point past the centroid  and compute loss at reflected
         // point
-        var worst = simplex[N];
+        const worst = simplex[N];
         weightedSum(reflected, 1+rho, centroid, -rho, worst);
         reflected.fx = f(reflected);
 
@@ -296,7 +302,7 @@ function nelderMead(f, x0, parameters) {
         // if the reflected point is worse than the second worst, we need to
         // contract
         else if (reflected.fx >= simplex[N-1].fx) {
-            var shouldReduce = false;
+            let shouldReduce = false;
 
             if (reflected.fx > worst.fx) {
                 // do an inside contraction
@@ -345,17 +351,19 @@ roughly correspond to the desired overlaps */
 function venn(areas, parameters) {
     parameters = parameters || {};
     parameters.maxIterations = parameters.maxIterations || 500;
-    var initialLayout = parameters.initialLayout || bestInitialLayout;
-    var loss = parameters.lossFunction || lossFunction;
+    const initialLayout = parameters.initialLayout || bestInitialLayout;
+    const loss = parameters.lossFunction || lossFunction;
 
     // add in missing pairwise areas as having 0 size
     areas = addMissingAreas(areas);
 
     // initial layout is done greedily
-    var circles = initialLayout(areas, parameters);
+    const circles = initialLayout(areas, parameters);
 
     // transform x/y coordinates to a vector to optimize
-    var initial = [], setids = [], setid;
+    const initial = [];
+    const setids = [];
+    let setid;
     for (setid in circles) {
         if (circles.hasOwnProperty(setid)) {
             initial.push(circles[setid].x);
@@ -365,13 +373,13 @@ function venn(areas, parameters) {
     }
 
     // optimize initial layout from our loss function
-    var totalFunctionCalls = 0;
-    var solution = nelderMead(
-        function(values) {
+    let totalFunctionCalls = 0;
+    const solution = nelderMead(
+        (values) => {
             totalFunctionCalls += 1;
-            var current = {};
-            for (var i = 0; i < setids.length; ++i) {
-                var setid = setids[i];
+            const current = {};
+            for (let i = 0; i < setids.length; ++i) {
+                const setid = setids[i];
                 current[setid] = {x: values[2 * i],
                                   y: values[2 * i + 1],
                                   radius : circles[setid].radius,
@@ -384,8 +392,8 @@ function venn(areas, parameters) {
         parameters);
 
     // transform solution vector back to x/y points
-    var positions = solution.x;
-    for (var i = 0; i < setids.length; ++i) {
+    const positions = solution.x;
+    for (let i = 0; i < setids.length; ++i) {
         setid = setids[i];
         circles[setid].x = positions[2 * i];
         circles[setid].y = positions[2 * i + 1];
@@ -394,7 +402,7 @@ function venn(areas, parameters) {
     return circles;
 }
 
-var SMALL = 1e-10;
+const SMALL = 1e-10;
 
 /** Returns the distance necessary for two circles of radius r1 + r2 to
 have the overlap area 'overlap' */
@@ -404,9 +412,7 @@ function distanceFromIntersectArea(r1, r2, overlap) {
         return Math.abs(r1 - r2);
     }
 
-    return bisect(function(distance) {
-        return circleOverlap(r1, r2, distance) - overlap;
-    }, 0, r1 + r2);
+    return bisect((distance) => circleOverlap(r1, r2, distance) - overlap, 0, r1 + r2);
 }
 
 /** Missing pair-wise intersection area data can cause problems:
@@ -417,19 +423,24 @@ function addMissingAreas(areas) {
     areas = areas.slice();
 
     // two circle intersections that aren't defined
-    var ids = [], pairs = {}, i, j, a, b;
+    const ids = [];
+    const pairs = {};
+    let i;
+    let j;
+    let a;
+    let b;
     for (i = 0; i < areas.length; ++i) {
-        var area = areas[i];
-        if (area.sets.length == 1) {
+        const area = areas[i];
+        if (area.sets.length === 1) {
             ids.push(area.sets[0]);
-        } else if (area.sets.length == 2) {
+        } else if (area.sets.length === 2) {
             a = area.sets[0];
             b = area.sets[1];
             pairs[[a, b]] = true;
             pairs[[b, a]] = true;
         }
     }
-    ids.sort(function(a, b) { return a > b; });
+    ids.sort((a, b) => a > b);
 
     for (i = 0; i < ids.length; ++i) {
         a = ids[i];
@@ -448,24 +459,24 @@ function addMissingAreas(areas) {
 /// and the other indicating if there are subset or disjoint set relationships
 function getDistanceMatrices(areas, sets, setids) {
     // initialize an empty distance matrix between all the points
-    var distances = zerosM(sets.length, sets.length),
-        constraints = zerosM(sets.length, sets.length);
+    const distances = zerosM(sets.length, sets.length);
+    const constraints = zerosM(sets.length, sets.length);
 
     // compute required distances between all the sets such that
     // the areas match
-    areas.filter(function(x) { return x.sets.length == 2; })
-        .map(function(current) {
-        var left = setids[current.sets[0]],
-            right = setids[current.sets[1]],
-            r1 = Math.sqrt(sets[left].size / Math.PI),
-            r2 = Math.sqrt(sets[right].size / Math.PI),
-            distance = distanceFromIntersectArea(r1, r2, current.size);
+    areas.filter((x) => x.sets.length === 2)
+        .map((current) => {
+        const left = setids[current.sets[0]];
+        const right = setids[current.sets[1]];
+        const r1 = Math.sqrt(sets[left].size / Math.PI);
+        const r2 = Math.sqrt(sets[right].size / Math.PI);
+        const distance = distanceFromIntersectArea(r1, r2, current.size);
 
         distances[left][right] = distances[right][left] = distance;
 
         // also update constraints to indicate if its a subset or disjoint
         // relationship
-        var c = 0;
+        let c = 0;
         if (current.size + 1e-10 >= Math.min(sets[left].size,
                                              sets[right].size)) {
             c = 1;
@@ -480,21 +491,24 @@ function getDistanceMatrices(areas, sets, setids) {
 
 /// computes the gradient and loss simulatenously for our constrained MDS optimizer
 function constrainedMDSGradient(x, fxprime, distances, constraints) {
-    var loss = 0, i;
+    let loss = 0;
+    let i;
     for (i = 0; i < fxprime.length; ++i) {
         fxprime[i] = 0;
     }
 
     for (i = 0; i < distances.length; ++i) {
-        var xi = x[2 * i], yi = x[2 * i + 1];
-        for (var j = i + 1; j < distances.length; ++j) {
-            var xj = x[2 * j], yj = x[2 * j + 1],
-                dij = distances[i][j],
-                constraint = constraints[i][j];
+        const xi = x[2 * i];
+        const yi = x[2 * i + 1];
+        for (let j = i + 1; j < distances.length; ++j) {
+            const xj = x[2 * j];
+            const yj = x[2 * j + 1];
+            const dij = distances[i][j];
+            const constraint = constraints[i][j];
 
-            var squaredDistance = (xj - xi) * (xj - xi) + (yj - yi) * (yj - yi),
-                distance = Math.sqrt(squaredDistance),
-                delta = squaredDistance - dij * dij;
+            const squaredDistance = (xj - xi) * (xj - xi) + (yj - yi) * (yj - yi);
+            const distance = Math.sqrt(squaredDistance);
+            const delta = squaredDistance - dij * dij;
 
             if (((constraint > 0) && (distance <= dij)) ||
                 ((constraint < 0) && (distance >= dij))) {
@@ -515,17 +529,17 @@ function constrainedMDSGradient(x, fxprime, distances, constraints) {
 
 /// takes the best working variant of either constrained MDS or greedy
 export function bestInitialLayout(areas, params) {
-    var initial = greedyLayout(areas, params);
-    var loss = params.lossFunction || lossFunction;
+    let initial = greedyLayout(areas, params);
+    const loss = params.lossFunction || lossFunction;
 
     // greedylayout is sufficient for all 2/3 circle cases. try out
     // constrained MDS for higher order problems, take its output
     // if it outperforms. (greedy is aesthetically better on 2/3 circles
     // since it axis aligns)
     if (areas.length >= 8) {
-        var constrained  = constrainedMDSLayout(areas, params),
-            constrainedLoss = loss(constrained, areas),
-            greedyLoss = loss(initial, areas);
+        const constrained  = constrainedMDSLayout(areas, params);
+        const constrainedLoss = loss(constrained, areas);
+        const greedyLoss = loss(initial, areas);
 
         if (constrainedLoss + 1e-8 < greedyLoss) {
             initial = constrained;
@@ -537,47 +551,47 @@ export function bestInitialLayout(areas, params) {
 /// use the constrained MDS variant to generate an initial layout
 function constrainedMDSLayout(areas, params) {
     params = params || {};
-    var restarts = params.restarts || 10;
+    const restarts = params.restarts || 10;
 
     // bidirectionally map sets to a rowid  (so we can create a matrix)
-    var sets = [], setids = {}, i;
+    const sets = [];
+    const setids = {};
+    let i;
     for (i = 0; i < areas.length; ++i ) {
-        var area = areas[i];
-        if (area.sets.length == 1) {
+        const area = areas[i];
+        if (area.sets.length === 1) {
             setids[area.sets[0]] = sets.length;
             sets.push(area);
         }
     }
 
-    var matrices = getDistanceMatrices(areas, sets, setids),
-        distances = matrices.distances,
-        constraints = matrices.constraints;
+    const matrices = getDistanceMatrices(areas, sets, setids);
+    let distances = matrices.distances;
+    const constraints = matrices.constraints;
 
     // keep distances bounded, things get messed up otherwise.
     // TODO: proper preconditioner?
-    var norm = norm2(distances.map(norm2))/(distances.length);
-    distances = distances.map(function (row) {
-        return row.map(function (value) { return value / norm; });});
+    const norm = norm2(distances.map(norm2))/(distances.length);
+    distances = distances.map((row) => row.map((value) => value / norm));
 
-    var obj = function(x, fxprime) {
-        return constrainedMDSGradient(x, fxprime, distances, constraints);
-    };
+    const obj = (x, fxprime) => constrainedMDSGradient(x, fxprime, distances, constraints);
 
-    var best, current;
+    let best;
+    let current;
     for (i = 0; i < restarts; ++i) {
-        var initial = zeros(distances.length*2).map(Math.random);
+        const initial = zeros(distances.length*2).map(Math.random);
 
         current = conjugateGradient(obj, initial, params);
         if (!best || (current.fx < best.fx)) {
             best = current;
         }
     }
-    var positions = best.x;
+    const positions = best.x;
 
     // translate rows back to (x,y,radius) coordinates
-    var circles = {};
+    const circles = {};
     for (i = 0; i < sets.length; ++i) {
-        var set = sets[i];
+        const set = sets[i];
         circles[set.sets[0]] = {
             x: positions[2*i] * norm,
             y: positions[2*i + 1] * norm,
@@ -597,12 +611,14 @@ function constrainedMDSLayout(areas, params) {
 least overlapped, attempting to position each new set such that the
 overlapping areas to already positioned sets are basically right */
 function greedyLayout(areas, params) {
-    var loss = params && params.lossFunction ? params.lossFunction : lossFunction;
+    const loss = params?.lossFunction ? params.lossFunction : lossFunction;
     // define a circle for each set
-    var circles = {}, setOverlaps = {}, set;
-    for (var i = 0; i < areas.length; ++i) {
-        var area = areas[i];
-        if (area.sets.length == 1) {
+    const circles = {};
+    const setOverlaps = {};
+    let set;
+    for (let i = 0; i < areas.length; ++i) {
+        const area = areas[i];
+        if (area.sets.length === 1) {
             set = area.sets[0];
             circles[set] = {x: 1e10, y: 1e10,
                             rowid: circles.length,
@@ -611,13 +627,14 @@ function greedyLayout(areas, params) {
             setOverlaps[set] = [];
         }
     }
-    areas = areas.filter(function(a) { return a.sets.length == 2; });
+    areas = areas.filter((a) => a.sets.length === 2);
 
     // map each set to a list of all the other sets that overlap it
     for (i = 0; i < areas.length; ++i) {
-        var current = areas[i];
-        var weight = current.hasOwnProperty('weight') ? current.weight : 1.0;
-        var left = current.sets[0], right = current.sets[1];
+        const current = areas[i];
+        let weight = current.hasOwnProperty('weight') ? current.weight : 1.0;
+        const left = current.sets[0];
+        const right = current.sets[1];
 
         // completely overlapped circles shouldn't be positioned early here
         if (current.size + SMALL >= Math.min(circles[left].size,
@@ -630,10 +647,10 @@ function greedyLayout(areas, params) {
     }
 
     // get list of most overlapped sets
-    var mostOverlapped = [];
+    const mostOverlapped = [];
     for (set in setOverlaps) {
         if (setOverlaps.hasOwnProperty(set)) {
-            var size = 0;
+            let size = 0;
             for (i = 0; i < setOverlaps[set].length; ++i) {
                 size += setOverlaps[set][i].size * setOverlaps[set][i].weight;
             }
@@ -649,7 +666,7 @@ function greedyLayout(areas, params) {
     mostOverlapped.sort(sortOrder);
 
     // keep track of what sets have been laid out
-    var positioned = {};
+    const positioned = {};
     function isPositioned(element) {
         return element.set in positioned;
     }
@@ -668,8 +685,8 @@ function greedyLayout(areas, params) {
     // answer: probably not
     // var distances = venn.getDistanceMatrices(circles, areas).distances;
     for (i = 1; i < mostOverlapped.length; ++i) {
-        var setIndex = mostOverlapped[i].set,
-            overlap = setOverlaps[setIndex].filter(isPositioned);
+        const setIndex = mostOverlapped[i].set;
+        const overlap = setOverlaps[setIndex].filter(isPositioned);
         set = circles[setIndex];
         overlap.sort(sortOrder);
 
@@ -678,11 +695,11 @@ function greedyLayout(areas, params) {
             throw "ERROR: missing pairwise overlap information";
         }
 
-        var points = [];
-        for (var j = 0; j < overlap.length; ++j) {
+        const points = [];
+        for (let j = 0; j < overlap.length; ++j) {
             // get appropriate distance from most overlapped already added set
-            var p1 = circles[overlap[j].set],
-                d1 = distanceFromIntersectArea(set.radius, p1.radius,
+            const p1 = circles[overlap[j].set];
+            const d1 = distanceFromIntersectArea(set.radius, p1.radius,
                                                overlap[j].size);
 
             // sample positions at 90 degrees for maximum aesthetics
@@ -693,16 +710,16 @@ function greedyLayout(areas, params) {
 
             // if we have at least 2 overlaps, then figure out where the
             // set should be positioned analytically and try those too
-            for (var k = j + 1; k < overlap.length; ++k) {
-                var p2 = circles[overlap[k].set],
-                    d2 = distanceFromIntersectArea(set.radius, p2.radius,
+            for (let k = j + 1; k < overlap.length; ++k) {
+                const p2 = circles[overlap[k].set];
+                const d2 = distanceFromIntersectArea(set.radius, p2.radius,
                                                    overlap[k].size);
 
-                var extraPoints = circleCircleIntersection(
+                const extraPoints = circleCircleIntersection(
                     { x: p1.x, y: p1.y, radius: d1},
                     { x: p2.x, y: p2.y, radius: d2});
 
-                for (var l = 0; l < extraPoints.length; ++l) {
+                for (let l = 0; l < extraPoints.length; ++l) {
                     points.push(extraPoints[l]);
                 }
             }
@@ -710,11 +727,12 @@ function greedyLayout(areas, params) {
 
         // we have some candidate positions for the set, examine loss
         // at each position to figure out where to put it at
-        var bestLoss = 1e50, bestPoint = points[0];
+        let bestLoss = 1e50;
+        let bestPoint = points[0];
         for (j = 0; j < points.length; ++j) {
             circles[setIndex].x = points[j].x;
             circles[setIndex].y = points[j].y;
-            var localLoss = loss(circles, areas);
+            const localLoss = loss(circles, areas);
             if (localLoss < bestLoss) {
                 bestLoss = localLoss;
                 bestPoint = points[j];
@@ -731,26 +749,27 @@ function greedyLayout(areas, params) {
 the distance from the actual overlaps to the desired overlaps. Note that
 this method ignores overlaps of more than 2 circles */
 function lossFunction(sets, overlaps) {
-    var output = 0;
+    let output = 0;
 
     function getCircles(indices) {
-        return indices.map(function(i) { return sets[i]; });
+        return indices.map((i) => sets[i]);
     }
 
-    for (var i = 0; i < overlaps.length; ++i) {
-        var area = overlaps[i], overlap;
-        if (area.sets.length == 1) {
+    for (let i = 0; i < overlaps.length; ++i) {
+        const area = overlaps[i];
+        let overlap;
+        if (area.sets.length === 1) {
             continue;
-        } else if (area.sets.length == 2) {
-            var left = sets[area.sets[0]],
-                right = sets[area.sets[1]];
+        }if (area.sets.length === 2) {
+            const left = sets[area.sets[0]];
+            const right = sets[area.sets[1]];
             overlap = circleOverlap(left.radius, right.radius,
                                     distance(left, right));
         } else {
             overlap = intersectionArea(getCircles(area.sets));
         }
 
-        var weight = area.hasOwnProperty('weight') ? area.weight : 1.0;
+        const weight = area.hasOwnProperty('weight') ? area.weight : 1.0;
         output += weight * (overlap - area.size) * (overlap - area.size);
     }
 
@@ -760,16 +779,16 @@ function lossFunction(sets, overlaps) {
 // orientates a bunch of circles to point in orientation
 function orientateCircles(circles, orientation, orientationOrder) {
     if (orientationOrder === null) {
-        circles.sort(function (a, b) { return b.radius - a.radius; });
+        circles.sort((a, b) => b.radius - a.radius);
     } else {
         circles.sort(orientationOrder);
     }
 
-    var i;
+    let i;
     // shift circles so largest circle is at (0, 0)
     if (circles.length > 0) {
-        var largestX = circles[0].x,
-            largestY = circles[0].y;
+        const largestX = circles[0].x;
+        const largestY = circles[0].y;
 
         for (i = 0; i < circles.length; ++i) {
             circles[i].x -= largestX;
@@ -777,10 +796,10 @@ function orientateCircles(circles, orientation, orientationOrder) {
         }
     }
 
-    if (circles.length == 2) {
+    if (circles.length === 2) {
         // if the second circle is a subset of the first, arrange so that
         // it is off to one side. hack for https://github.com/benfred/venn.js/issues/120
-        var dist = distance(circles[0], circles[1]);
+        const dist = distance(circles[0], circles[1]);
         if (dist < Math.abs(circles[1].radius - circles[0].radius)) {
             circles[1].x = circles[0].x + circles[0].radius - circles[1].radius - 1e-10;
             circles[1].y = circles[0].y;
@@ -790,9 +809,11 @@ function orientateCircles(circles, orientation, orientationOrder) {
     // rotate circles so that second largest is at an angle of 'orientation'
     // from largest
     if (circles.length > 1) {
-        var rotation = Math.atan2(circles[1].x, circles[1].y) - orientation,
-            c = Math.cos(rotation),
-            s = Math.sin(rotation), x, y;
+        const rotation = Math.atan2(circles[1].x, circles[1].y) - orientation;
+        const c = Math.cos(rotation);
+        const s = Math.sin(rotation);
+        let x;
+        let y;
 
         for (i = 0; i < circles.length; ++i) {
             x = circles[i].x;
@@ -805,13 +826,13 @@ function orientateCircles(circles, orientation, orientationOrder) {
     // mirror solution if third solution is above plane specified by
     // first two circles
     if (circles.length > 2) {
-        var angle = Math.atan2(circles[2].x, circles[2].y) - orientation;
+        let angle = Math.atan2(circles[2].x, circles[2].y) - orientation;
         while (angle < 0) { angle += 2* Math.PI; }
         while (angle > 2*Math.PI) { angle -= 2* Math.PI; }
         if (angle > Math.PI) {
-            var slope = circles[1].y / (1e-10 + circles[1].x);
+            const slope = circles[1].y / (1e-10 + circles[1].x);
             for (i = 0; i < circles.length; ++i) {
-                var d = (circles[i].x + slope * circles[i].y) / (1 + slope*slope);
+                const d = (circles[i].x + slope * circles[i].y) / (1 + slope*slope);
                 circles[i].x = 2 * d - circles[i].x;
                 circles[i].y = 2 * d * slope - circles[i].y;
             }
@@ -821,7 +842,7 @@ function orientateCircles(circles, orientation, orientationOrder) {
 
 function disjointCluster(circles) {
     // union-find clustering to get disjoint sets
-    circles.map(function(circle) { circle.parent = circle; });
+    circles.map((circle) => { circle.parent = circle; });
 
     // path compression step in union find
     function find(circle) {
@@ -832,14 +853,15 @@ function disjointCluster(circles) {
     }
 
     function union(x, y) {
-        var xRoot = find(x), yRoot = find(y);
+        const xRoot = find(x);
+        const yRoot = find(y);
         xRoot.parent = yRoot;
     }
 
     // get the union of all overlapping sets
-    for (var i = 0; i < circles.length; ++i) {
-        for (var j = i + 1; j < circles.length; ++j) {
-            var maxDistance = circles[i].radius + circles[j].radius;
+    for (let i = 0; i < circles.length; ++i) {
+        for (let j = i + 1; j < circles.length; ++j) {
+            const maxDistance = circles[i].radius + circles[j].radius;
             if (distance(circles[i], circles[j]) + 1e-10 < maxDistance) {
                 union(circles[j], circles[i]);
             }
@@ -847,7 +869,8 @@ function disjointCluster(circles) {
     }
 
     // find all the disjoint clusters and group them together
-    var disjointClusters = {}, setid;
+    const disjointClusters = {};
+    let setid;
     for (i = 0; i < circles.length; ++i) {
         setid = find(circles[i]).parent.setid;
         if (!(setid in disjointClusters)) {
@@ -857,10 +880,10 @@ function disjointCluster(circles) {
     }
 
     // cleanup bookkeeping
-    circles.map(function(circle) { delete circle.parent; });
+    circles.map((circle) => { circle.parent = undefined; });
 
     // return in more usable form
-    var ret = [];
+    const ret = [];
     for (setid in disjointClusters) {
         if (disjointClusters.hasOwnProperty(setid)) {
             ret.push(disjointClusters[setid]);
@@ -870,11 +893,11 @@ function disjointCluster(circles) {
 }
 
 function getBoundingBox(circles) {
-    var minMax = function(d) {
-        var hi = Math.max.apply(null, circles.map(
-                                function(c) { return c[d] + c.radius; } )),
-            lo = Math.min.apply(null, circles.map(
-                                function(c) { return c[d] - c.radius;} ));
+    const minMax = (d) => {
+        const hi = Math.max.apply(null, circles.map(
+                                (c) => c[d] + c.radius ));
+        const lo = Math.min.apply(null, circles.map(
+                                (c) => c[d] - c.radius ));
         return {max:hi, min:lo};
     };
 
@@ -888,10 +911,12 @@ function normalizeSolution(solution, orientation, orientationOrder) {
 
     // work with a list instead of a dictionary, and take a copy so we
     // don't mutate input
-    var circles = [], i, setid;
+    let circles = [];
+    let i;
+    let setid;
     for (setid in solution) {
         if (solution.hasOwnProperty(setid)) {
-            var previous = solution[setid];
+            const previous = solution[setid];
             circles.push({x: previous.x,
                           y: previous.y,
                           radius: previous.radius,
@@ -900,27 +925,30 @@ function normalizeSolution(solution, orientation, orientationOrder) {
     }
 
     // get all the disjoint clusters
-    var clusters = disjointCluster(circles);
+    const clusters = disjointCluster(circles);
 
     // orientate all disjoint sets, get sizes
     for (i = 0; i < clusters.length; ++i) {
         orientateCircles(clusters[i], orientation, orientationOrder);
-        var bounds = getBoundingBox(clusters[i]);
+        const bounds = getBoundingBox(clusters[i]);
         clusters[i].size = (bounds.xRange.max - bounds.xRange.min) * (bounds.yRange.max - bounds.yRange.min);
         clusters[i].bounds = bounds;
     }
-    clusters.sort(function(a, b) { return b.size - a.size; });
+    clusters.sort((a, b) => b.size - a.size);
 
     // orientate the largest at 0,0, and get the bounds
     circles = clusters[0];
-    var returnBounds = circles.bounds;
+    let returnBounds = circles.bounds;
 
-    var spacing = (returnBounds.xRange.max - returnBounds.xRange.min)/50;
+    const spacing = (returnBounds.xRange.max - returnBounds.xRange.min)/50;
 
     function addCluster(cluster, right, bottom) {
         if (!cluster) return;
 
-        var bounds = cluster.bounds, xOffset, yOffset, centreing;
+        const bounds = cluster.bounds;
+        let xOffset;
+        let yOffset;
+        let centreing;
 
         if (right) {
             xOffset = returnBounds.xRange.max  - bounds.xRange.min + spacing;
@@ -940,14 +968,14 @@ function normalizeSolution(solution, orientation, orientationOrder) {
             if (centreing < 0) yOffset += centreing;
         }
 
-        for (var j = 0; j < cluster.length; ++j) {
+        for (let j = 0; j < cluster.length; ++j) {
             cluster[j].x += xOffset;
             cluster[j].y += yOffset;
             circles.push(cluster[j]);
         }
     }
 
-    var index = 1;
+    let index = 1;
     while (index < clusters.length) {
         addCluster(clusters[index], true, false);
         addCluster(clusters[index+1], false, true);
@@ -960,7 +988,7 @@ function normalizeSolution(solution, orientation, orientationOrder) {
     }
 
     // convert back to solution form
-    var ret = {};
+    const ret = {};
     for (i = 0; i < circles.length; ++i) {
         ret[circles[i].setid] = circles[i];
     }
@@ -971,8 +999,9 @@ function normalizeSolution(solution, orientation, orientationOrder) {
 a rectangle of width/height - with padding around the borders. also
 centers the diagram in the available space at the same time */
 function scaleSolution(solution, width, height, padding) {
-    var circles = [], setids = [];
-    for (var setid in solution) {
+    const circles = [];
+    const setids = [];
+    for (const setid in solution) {
         if (solution.hasOwnProperty(setid)) {
             setids.push(setid);
             circles.push(solution[setid]);
@@ -982,27 +1011,26 @@ function scaleSolution(solution, width, height, padding) {
     width -= 2*padding;
     height -= 2*padding;
 
-    var bounds = getBoundingBox(circles),
-        xRange = bounds.xRange,
-        yRange = bounds.yRange;
+    const bounds = getBoundingBox(circles);
+    const xRange = bounds.xRange;
+    const yRange = bounds.yRange;
 
-    if ((xRange.max == xRange.min) ||
-        (yRange.max == yRange.min)) {
+    if ((xRange.max === xRange.min) ||
+        (yRange.max === yRange.min)) {
         console.log("not scaling solution: zero size detected");
         return solution;
     }
 
-    var xScaling = width  / (xRange.max - xRange.min),
-        yScaling = height / (yRange.max - yRange.min),
-        scaling = Math.min(yScaling, xScaling),
+    const xScaling = width  / (xRange.max - xRange.min);
+    const yScaling = height / (yRange.max - yRange.min);
+    const scaling = Math.min(yScaling, xScaling);
+    // while we're at it, center the diagram too
+    const xOffset = (width -  (xRange.max - xRange.min) * scaling) / 2;
+    const yOffset = (height - (yRange.max - yRange.min) * scaling) / 2;
 
-        // while we're at it, center the diagram too
-        xOffset = (width -  (xRange.max - xRange.min) * scaling) / 2,
-        yOffset = (height - (yRange.max - yRange.min) * scaling) / 2;
-
-    var scaled = {};
-    for (var i = 0; i < circles.length; ++i) {
-        var circle = circles[i];
+    const scaled = {};
+    for (let i = 0; i < circles.length; ++i) {
+        const circle = circles[i];
         scaled[setids[i]] = {
             radius: scaling * circle.radius,
             x: padding + xOffset + (circle.x - xRange.min) * scaling,
