@@ -16,18 +16,19 @@ def serve_projects(projects):
                 print(p.name, p.state)
                 p.serve(open_browser=False, app=app)
             except Exception as e:
-                print(f'Error serving {p.name}: {e}')
+                print(f"Error serving {p.name}: {e}")
     except Exception as e:
-        print(f'Error registering routes: {e}')
+        print(f"Error registering routes: {e}")
 
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     try:
-        config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+        config_file_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "config.json"
+        )
         with open(config_file_path) as config_file:
             config = json.load(config_file)
-            base_dir = config.get('projects_base_dir', 'mdv')
+            base_dir = config.get("projects_base_dir", "mdv")
     except FileNotFoundError:
         print("Error: mdv_server_app.py -> Configuration file not found.")
         exit(1)
@@ -35,13 +36,13 @@ if __name__ == '__main__':
         print(f"An unexpected error occurred while loading configuration: {e}")
         exit(1)
 
-    #base_dir = os.path.join(os.path.expanduser('~'), 'mdv')
+    # base_dir = os.path.join(os.path.expanduser('~'), 'mdv')
 
     if not os.path.exists(base_dir):
         try:
             os.makedirs(base_dir)
         except Exception as e:
-            print(f'Error creating base directory: {e}')
+            print(f"Error creating base directory: {e}")
             exit(1)
 
     app.after_request(add_safe_headers)
@@ -51,12 +52,12 @@ if __name__ == '__main__':
             db.create_all()
             register_global_routes()
             projects = create_all_projects(base_dir)
-            
+
             serve_projects(projects)
         except Exception as e:
-            print(f'Error initializing app: {e}')
+            print(f"Error initializing app: {e}")
 
     try:
-         app.run(host='0.0.0.0', debug=True, port=5055)
+        app.run(host="0.0.0.0", debug=True, port=5055)
     except Exception as e:
-        print(f'Error running app: {e}')
+        print(f"Error running app: {e}")

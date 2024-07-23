@@ -79,12 +79,15 @@ print(A(), A(a=5, b=6))
 
 """
 
+
 class ScatterChart(BaseChart, ColorProperties):
     type: Literal["wgl_scatter_plot"]
     axis: Axes
 
+
 # class StackedRowChart(BaseChart, ColorProperties):
 #     axis: Axes
+
 
 def StackedRowChart(**kwargs: BaseChart | ColorProperties):
     return {"type": "stacked_row_chart", **kwargs}

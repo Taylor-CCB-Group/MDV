@@ -7,6 +7,7 @@ from sqlalchemy.orm import relationship
 
 db = SQLAlchemy(app)
 
+
 @dataclass
 class Project(db.Model):
     id: int = field(init=False)
@@ -14,6 +15,7 @@ class Project(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(255), nullable=False, unique=True)
+
 
 @dataclass
 class File(db.Model):
@@ -28,8 +30,11 @@ class File(db.Model):
     name = db.Column(db.String(255), nullable=False)
     file_path = db.Column(db.String(255), nullable=True)
     upload_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    update_timestamp = db.Column(
+        db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
+    )
+    project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False)
+
 
 @dataclass
 class User(db.Model):
@@ -40,7 +45,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    projects = relationship('UserProject', backref='user', lazy=True)
+    projects = relationship("UserProject", backref="user", lazy=True)
+
 
 @dataclass
 class UserProject(db.Model):
@@ -51,14 +57,15 @@ class UserProject(db.Model):
     can_write: bool = field(default=False)
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False)
     can_read = db.Column(db.Boolean, nullable=False, default=False)
     can_write = db.Column(db.Boolean, nullable=False, default=False)
 
+
 # Function to create default entries
 def create_default_projects():
-    default_projects = ['pbmc3k', 'pbmc3k_project2']
+    default_projects = ["pbmc3k", "pbmc3k_project2"]
     with app.app_context():
         # Create tables if they don't exist
         db.create_all()
@@ -75,6 +82,7 @@ def create_default_projects():
 
         # Commit the changes
         db.session.commit()
+
 
 # Call the function to create default entries when the application starts
 create_default_projects()

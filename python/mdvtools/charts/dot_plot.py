@@ -1,5 +1,6 @@
 from mdvtools.charts.base_plot import BasePlot
 
+
 class DotPlot(BasePlot):
     def __init__(self, title, params, size, position, id=None):
         super().__init__(title, "dot_plot", params, size, position, id)
@@ -13,15 +14,9 @@ class DotPlot(BasePlot):
         self.plot_data["color_scale"] = {"log": log_scale}
 
     def set_color_legend(self, display, position):
-        self.plot_data["color_legend"] = {
-            "display": display,
-            "pos": position
-        }
+        self.plot_data["color_legend"] = {"display": display, "pos": position}
 
     def set_fraction_legend(self, display, position):
-        self.plot_data["fraction_legend"] = {
-            "display": display,
-            "pos": position
-        }
+        self.plot_data["fraction_legend"] = {"display": display, "pos": position}
 
     # Additional methods for customization (e.g., tooltip visibility) can be added here
