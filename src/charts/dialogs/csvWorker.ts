@@ -60,18 +60,18 @@ self.onmessage = (event: MessageEvent) => {
             const columnValues = results.data.map((row: any) => row[name]);
             const uniqueTypes = new Set(columnValues.map((value: any) => typeof value));
 
-            if (uniqueTypes.has('number')) {
-              const isFloat = columnValues.some((value: any) => Number(value) !== Math.floor(Number(value)));
-              columnTypes.push(isFloat ? 'float' : 'integer');
-            } else if (uniqueTypes.has('boolean')) {
-              columnTypes.push('boolean');
-            } else if (uniqueTypes.has('string')) {
-              const isDate = columnValues.every((value: any) => !isNaN(Date.parse(value)));
-              columnTypes.push(isDate ? 'date' : 'string');
-            } else {
-              columnTypes.push('unknown');
-            }
-          });
+        if (uniqueTypes.has('number')) {
+          const isFloat = columnValues.some((value) => Number(value) !== Math.floor(Number(value)));
+          columnTypes.push(isFloat ? 'float' : 'integer');
+        } else if (uniqueTypes.has('boolean')) {
+          columnTypes.push('boolean');
+        } else if (uniqueTypes.has('string')) {
+          const isDate = columnValues.every((value) => !Number.isNaN(Date.parse(value)));
+          columnTypes.push(isDate ? 'date' : 'string');
+        } else {
+          columnTypes.push('unknown');
+        }
+      });
 
           const secondRowValuesArray = columnNames.map((name) => secondRowValues[name]);
 

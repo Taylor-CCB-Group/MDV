@@ -85,7 +85,7 @@ class SingleHeatMap extends SVGChart{
         this.y_scale.domain(y_col.values.slice(0));
         this.x_scale.domain(x_col.values.slice(0));
         //get which cells to display - based on selections in dialog
-        for (let d of this.dataStore.dimensions){
+        for (const d of this.dataStore.dimensions){
             if (d.filterColumns && d.noclear){
                 if (d.filterColumns[0] === p[0]){
                     const s1 = d.filterArguments;
@@ -129,7 +129,7 @@ class SingleHeatMap extends SVGChart{
                     continue;
                 }
                 
-                let d = data[py][px];
+                const d = data[py][px];
                 if (!d){
                     data[py][px] = [y[i], x[i], vc[i], i, 1];
                     if (ct1){
@@ -163,7 +163,6 @@ class SingleHeatMap extends SVGChart{
         const x_len = this.x_scale.domain().length;
         const dim = this._getContentDimensions();
         const recWidth= dim.width/x_len;
-        const self = this;
         const recHeight = dim.height/y_len;
         const f  = this.dataStore.filterArray;
         const mcol = "#E0E0E0";//"#f4f0ec"
@@ -172,7 +171,7 @@ class SingleHeatMap extends SVGChart{
         let v2 =null;
         //two extra columns describing the groups each cell is in
         //get the group interactions
-        if ( p.length==6){
+        if ( p.length===6){
             //get the raw columns and create matrix to hold the data 
             const gv1=this.dataStore.getColumnValues(p[4]);
             const gv2= this.dataStore.getColumnValues(p[5]);
@@ -201,22 +200,22 @@ class SingleHeatMap extends SVGChart{
         .attr("height",recHeight-2)
         .attr("width",recWidth-2)
         .on("click",(e,d)=>{
-           self.dataStore.dataHighlighted([d[3]],self);
+           this.dataStore.dataHighlighted([d[3]],this);
         })
         .on("mouseover pointermove",(e,d)=>{ 
             const col = xvals[d[0]];
             const row  =yvals[d[1]];
-            self.showToolTip(e,`${col}<br>${row}<br>${d[2].toPrecision(3)}`);
+            this.showToolTip(e,`${col}<br>${row}<br>${d[2].toPrecision(3)}`);
         }).
         on("mouseleave",()=>{
-            self.hideToolTip();
+            this.hideToolTip();
         })   
         .transition(trans)
         .attr("fill",(d,i)=>{
             if (!d){
                 return mcol;
             }
-            if (isNaN(d[2])){
+            if (Number.isNaN(d[2])){
                 return mcol;
             }
             if (f[d[3]]>0){
@@ -226,7 +225,7 @@ class SingleHeatMap extends SVGChart{
             if (interactions){
                 interactions[v1[d[3]]][v2[d[1]]]++;
             }
-            return self.colorFunction(d[2]);
+            return this.colorFunction(d[2]);
         });
         //label the group interactions
         if (interactions){

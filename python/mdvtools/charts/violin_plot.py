@@ -2,6 +2,7 @@
 
 from mdvtools.charts.base_plot import BasePlot
 
+
 class ViolinPlot(BasePlot):
     def __init__(self, title, params, size, position, id=None):
         super().__init__(title, "violin_plot", params, size, position, id)
@@ -30,7 +31,7 @@ class ViolinPlot(BasePlot):
     def set_tooltip(self, show, content=None):
         self.plot_data["tooltip"] = {
             "show": show,
-            "content": content if content else "default"
+            "content": content if content else "default",
         }
 
     # Additional methods specific to violin plots can be added here

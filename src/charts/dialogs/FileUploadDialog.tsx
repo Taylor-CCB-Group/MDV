@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
+import type React from "react";
+import { useState, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from 'axios';
 import { useProject } from "../../modules/ProjectContext";
@@ -56,7 +57,7 @@ const FileInputLabel = ({ children, ...props }) => (
 const Spinner = () => {
   return <div className="w-16 h-16 border-8 mt-10 border-blue-500 border-dashed rounded-full animate-spin" style={{
     borderColor: "blue transparent blue transparent"
-  }}></div>;
+  }} />;
 };
 
 const colorStyles = {
@@ -102,7 +103,7 @@ const Button = ({
 };
 
 const ProgressBar = ({ value, max }) => (
-  <progress className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded" value={value} max={max}></progress>
+  <progress className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded" value={value} max={max} />
 );
 
 const Message = ({ children }) => (
@@ -368,7 +369,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
       headers: {
         'Content-Type': 'multipart/form-data'
       },
-      onUploadProgress: function (progressEvent) {
+      onUploadProgress: (progressEvent) => {
         const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         setProgress(percentComplete); // Update the progress as the file uploads
       }
@@ -487,7 +488,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             {isDragActive ? (
               <DynamicText text={"Drop files here..."} />
             ) : (
-              <DynamicText text={state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : rejectionMessage} className={rejectionMessageStyle} />
+              <DynamicText text={state.selectedFiles.length > 0 ? `Selected file: ${state.selectedFiles[0].name}` : rejectionMessage} className={rejectionMessageStyle} />
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>

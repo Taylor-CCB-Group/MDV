@@ -20,7 +20,7 @@ function getColorLegend(colors,names,config={}){
     const container = createEl("div",{
         styles:{
             width:"120px",
-            height:((height>215?215:height)+35)+"px",
+            height:`${(height>215?215:height)+35}px`,
             position:"absolute",
             border:"0.5px solid black" 
         },
@@ -119,7 +119,7 @@ function getColorLegend(colors,names,config={}){
 function getColorBar(colors,config={}){
     const c = config;
     const len =colors.length;
-    const colorPct= colors.map((c,i)=>[Math.floor((i/len)*100)+"%",c]);
+    const colorPct= colors.map((c,i)=>[`${Math.floor((i/len)*100)}%`,c]);
     const width =c.width || 120;
     const height = c.height || 45;
     const svg = createSVGEl("svg",{

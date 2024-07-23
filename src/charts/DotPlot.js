@@ -86,14 +86,14 @@ class DotPlot extends SVGChart{
             l.remove();  
         }
         if (!c.fraction_legend.display){
-            delete this.nodeFractionLegend;
+            this.nodeFractionLegend = undefined;
             return;
         }
         const pos = c.fraction_legend.position || [0,0];
         this.fractionLegend=getColorLegendCustom(this.fractionScale,{label:"fraction",type:"circle"});
         this.contentDiv.append(this.fractionLegend);
-        this.fractionLegend.style.top= pos[1]+"px";
-        this.fractionLegend.style.left= pos[0]+"px";
+        this.fractionLegend.style.top= `${pos[1]}px`;
+        this.fractionLegend.style.left= `${pos[0]}px`;
     }
 
     getConfig(){
@@ -140,7 +140,6 @@ class DotPlot extends SVGChart{
         .duration(tTime).ease(easeLinear);
         const dim = this._getContentDimensions();
         const cWidth= dim.width/(this.config.param.length-1);
-        const self = this;
         const fa=  this.dim.filterMethod;
         this.setColorFunction();
         const vals =this.dataStore.getColumnValues(this.config.param[0]);
@@ -171,12 +170,12 @@ class DotPlot extends SVGChart{
             .attr("class","dotplot-circle")
             .attr("stroke","black")
             .on("click",(e,d)=>{
-                self.filterCategories(vals[d.cat_id],d.id);
+                this.filterCategories(vals[d.cat_id],d.id);
             })
         )
         .attr("stroke-width",d=>{
             if (fa){
-                if(self.dim.filterArguments.cat===vals[d.cat_id] && self.dim.filterColumns[1]===d.id){
+                if(this.dim.filterArguments.cat===vals[d.cat_id] && this.dim.filterColumns[1]===d.id){
                     return 4;
                 }
             }
@@ -186,10 +185,10 @@ class DotPlot extends SVGChart{
       
         .attr("cx",(d,i)=>(i*cWidth)+(0.5*cWidth))
         .attr("cy",cyPos)
-        .attr("r",d=>self.fractionScale(d.frac))
+        .attr("r",d=>this.fractionScale(d.frac))
         .attr("fill",(d,i)=>{
          
-            return self.colorFunction(d.mean);
+            return this.colorFunction(d.mean);
         });
     }
   

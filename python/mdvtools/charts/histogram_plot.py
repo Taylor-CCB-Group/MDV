@@ -1,7 +1,18 @@
 from mdvtools.charts.base_plot import BasePlot
 
+
 class HistogramPlot(BasePlot):
-    def __init__(self, title, param, bin_number, display_min, display_max, size, position, id=None):
+    def __init__(
+        self,
+        title,
+        param,
+        bin_number,
+        display_min,
+        display_max,
+        size,
+        position,
+        id=None,
+    ):
         super().__init__(title, "bar_chart", param, size, position, id)
         self.plot_data["bin_number"] = bin_number
         self.plot_data["display_min"] = display_min
@@ -12,7 +23,7 @@ class HistogramPlot(BasePlot):
             "size": size,
             "label": label,
             "textSize": textsize,
-            "tickfont": tickfont
+            "tickfont": tickfont,
         }
 
     def set_y_axis(self, size, label, textsize, tickfont, rotate_labels):
@@ -21,5 +32,5 @@ class HistogramPlot(BasePlot):
             "label": label,
             "textSize": textsize,
             "tickfont": tickfont,
-            "rotate_labels": rotate_labels
+            "rotate_labels": rotate_labels,
         }

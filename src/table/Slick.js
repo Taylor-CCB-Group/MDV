@@ -12,14 +12,14 @@
      * @constructor
      */
     function EventData() {
-      var isPropagationStopped = false;
-      var isImmediatePropagationStopped = false;
+      let isPropagationStopped = false;
+      let isImmediatePropagationStopped = false;
   
       /***
        * Stops event from propagating up the DOM tree.
        * @method stopPropagation
        */
-      this.stopPropagation = function () {
+      this.stopPropagation = () => {
         isPropagationStopped = true;
       };
   
@@ -28,15 +28,13 @@
        * @method isPropagationStopped
        * @return {Boolean}
        */
-      this.isPropagationStopped = function () {
-        return isPropagationStopped;
-      };
+      this.isPropagationStopped = () => isPropagationStopped;
   
       /***
        * Prevents the rest of the handlers from being executed.
        * @method stopImmediatePropagation
        */
-      this.stopImmediatePropagation = function () {
+      this.stopImmediatePropagation = () => {
         isImmediatePropagationStopped = true;
       };
   
@@ -45,9 +43,7 @@
        * @method isImmediatePropagationStopped
        * @return {Boolean}
        */
-      this.isImmediatePropagationStopped = function () {
-        return isImmediatePropagationStopped;
-      };
+      this.isImmediatePropagationStopped = () => isImmediatePropagationStopped;
     }
   
     /***
@@ -56,7 +52,7 @@
      * @constructor
      */
     function Event() {
-      var handlers = [];
+      const handlers = [];
   
       /***
        * Adds an event handler to be called when the event is fired.
@@ -65,7 +61,7 @@
        * @method subscribe
        * @param fn {Function} Event handler.
        */
-      this.subscribe = function (fn) {
+      this.subscribe = (fn) => {
         handlers.push(fn);
       };
   
@@ -74,8 +70,8 @@
        * @method unsubscribe
        * @param fn {Function} Event handler to be removed.
        */
-      this.unsubscribe = function (fn) {
-        for (var i = handlers.length - 1; i >= 0; i--) {
+      this.unsubscribe = (fn) => {
+        for (let i = handlers.length - 1; i >= 0; i--) {
           if (handlers[i] === fn) {
             handlers.splice(i, 1);
           }
@@ -99,8 +95,8 @@
         e = e || new EventData();
         scope = scope || this;
   
-        var returnValue;
-        for (var i = 0; i < handlers.length && !(e.isPropagationStopped() || e.isImmediatePropagationStopped()); i++) {
+        let returnValue;
+        for (let i = 0; i < handlers.length && !(e.isPropagationStopped() || e.isImmediatePropagationStopped()); i++) {
           returnValue = handlers[i].call(scope, e, args);
         }
   
@@ -109,7 +105,7 @@
     }
   
     function EventHandler() {
-      var handlers = [];
+      let handlers = [];
   
       this.subscribe = function (event, handler) {
         handlers.push({
@@ -122,7 +118,7 @@
       };
   
       this.unsubscribe = function (event, handler) {
-        var i = handlers.length;
+        let i = handlers.length;
         while (i--) {
           if (handlers[i].event === event &&
               handlers[i].handler === handler) {
@@ -136,7 +132,7 @@
       };
   
       this.unsubscribeAll = function () {
-        var i = handlers.length;
+        let i = handlers.length;
         while (i--) {
           handlers[i].event.unsubscribe(handlers[i].handler);
         }
@@ -191,7 +187,7 @@
        * @return {Boolean}
        */
       this.isSingleRow = function () {
-        return this.fromRow == this.toRow;
+        return this.fromRow === this.toRow;
       };
   
       /***
@@ -200,7 +196,7 @@
        * @return {Boolean}
        */
       this.isSingleCell = function () {
-        return this.fromRow == this.toRow && this.fromCell == this.toCell;
+        return this.fromRow === this.toRow && this.fromCell === this.toCell;
       };
   
       /***
@@ -222,11 +218,10 @@
        */
       this.toString = function () {
         if (this.isSingleCell()) {
-          return "(" + this.fromRow + ":" + this.fromCell + ")";
+          return `(${this.fromRow}:${this.fromCell})`;
         }
-        else {
-          return "(" + this.fromRow + ":" + this.fromCell + " - " + this.toRow + ":" + this.toCell + ")";
-        }
+        
+          return `(${this.fromRow}:${this.fromCell} - ${this.toRow}:${this.toCell})`;
       };
     }
   
@@ -376,7 +371,7 @@
      * @constructor
      */
     function EditorLock() {
-      var activeEditController = null;
+      let activeEditController = null;
   
       /***
        * Returns true if a specified edit controller is active (has the edit lock).
@@ -385,9 +380,7 @@
        * @param editController {EditController}
        * @return {Boolean}
        */
-      this.isActive = function (editController) {
-        return (editController ? activeEditController === editController : activeEditController !== null);
-      };
+      this.isActive = (editController) => (editController ? activeEditController === editController : activeEditController !== null);
   
       /***
        * Sets the specified edit controller as the active edit controller (acquire edit lock).
@@ -395,7 +388,7 @@
        * @method activate
        * @param editController {EditController} edit controller acquiring the lock
        */
-      this.activate = function (editController) {
+      this.activate = (editController) => {
         if (editController === activeEditController) { // already activated?
           return;
         }
@@ -417,7 +410,7 @@
        * @method deactivate
        * @param editController {EditController} edit controller releasing the lock
        */
-      this.deactivate = function (editController) {
+      this.deactivate = (editController) => {
         if (!activeEditController) {
           return;
         }
@@ -435,9 +428,7 @@
        * @method commitCurrentEdit
        * @return {Boolean}
        */
-      this.commitCurrentEdit = function () {
-        return (activeEditController ? activeEditController.commitCurrentEdit() : true);
-      };
+      this.commitCurrentEdit = () => (activeEditController ? activeEditController.commitCurrentEdit() : true);
   
       /***
        * Attempts to cancel the current edit by calling "cancelCurrentEdit" method on the active edit
@@ -459,7 +450,7 @@
      */
     function TreeColumns(treeColumns) {
   
-      var columnsById = {};
+      const columnsById = {};
   
       function init() {
         mapToId(treeColumns);
@@ -467,7 +458,7 @@
   
       function mapToId(columns) {
         columns
-          .forEach(function (column) {
+          .forEach((column) => {
             columnsById[column.id] = column;
   
             if (column.columns)
@@ -477,9 +468,9 @@
   
       function filter(node, condition) {
   
-        return node.filter(function (column) {
+        return node.filter((column) => {
   
-          var valid = condition.call(column);
+          const valid = condition.call(column);
   
           if (valid && column.columns)
             column.columns = filter(column.columns, condition);
@@ -491,13 +482,13 @@
   
       function sort(columns, grid) {
         columns
-          .sort(function (a, b) {
-            var indexA = getOrDefault(grid.getColumnIndex(a.id)),
-              indexB = getOrDefault(grid.getColumnIndex(b.id));
+          .sort((a, b) => {
+            const indexA = getOrDefault(grid.getColumnIndex(a.id));
+            const indexB = getOrDefault(grid.getColumnIndex(b.id));
   
             return indexA - indexB;
           })
-          .forEach(function (column) {
+          .forEach((column) => {
             if (column.columns)
               sort(column.columns, grid);
           });
@@ -509,7 +500,7 @@
   
       function getDepth(node) {
         if (node.length)
-          for (var i in node)
+          for (const i in node)
             return getDepth(node[i]);
         else if (node.columns)
           return 1 + getDepth(node.columns);
@@ -518,22 +509,20 @@
       }
   
       function getColumnsInDepth(node, depth, current) {
-        var columns = [];
+        let columns = [];
         current = current || 0;
   
-        if (depth == current) {
+        if (depth === current) {
   
           if (node.length)
-            node.forEach(function(n) {
+            node.forEach((n) => {
               if (n.columns)
-                n.extractColumns = function() {
-                  return extractColumns(n);
-                };
+                n.extractColumns = () => extractColumns(n);
             });
   
           return node;
-        } else
-          for (var i in node)
+        }
+          for (const i in node)
             if (node[i].columns) {
               columns = columns.concat(getColumnsInDepth(node[i].columns, depth, current + 1));
             }
@@ -542,11 +531,11 @@
       }
   
       function extractColumns(node) {
-        var result = [];
+        let result = [];
   
         if (node.hasOwnProperty('length')) {
   
-          for (var i = 0; i < node.length; i++)
+          for (let i = 0; i < node.length; i++)
             result = result.concat(extractColumns(node[i]));
   
         } else {
@@ -571,58 +560,38 @@
   
       init();
   
-      this.hasDepth = function () {
+      this.hasDepth = () => {
   
-        for (var i in treeColumns)
+        for (const i in treeColumns)
           if (treeColumns[i].hasOwnProperty('columns'))
             return true;
   
         return false;
       };
   
-      this.getTreeColumns = function () {
-        return treeColumns;
-      };
+      this.getTreeColumns = () => treeColumns;
   
       this.extractColumns = function () {
         return this.hasDepth()? extractColumns(treeColumns): treeColumns;
       };
   
-      this.getDepth = function () {
-        return getDepth(treeColumns);
-      };
+      this.getDepth = () => getDepth(treeColumns);
   
-      this.getColumnsInDepth = function (depth) {
-        return getColumnsInDepth(treeColumns, depth);
-      };
+      this.getColumnsInDepth = (depth) => getColumnsInDepth(treeColumns, depth);
   
-      this.getColumnsInGroup = function (groups) {
-        return extractColumns(groups);
-      };
+      this.getColumnsInGroup = (groups) => extractColumns(groups);
   
-      this.visibleColumns = function () {
-        return filter(cloneTreeColumns(), function () {
+      this.visibleColumns = () => filter(cloneTreeColumns(), function () {
           return this.visible;
         });
-      };
   
-      this.filter = function (condition) {
-        return filter(cloneTreeColumns(), condition);
-      };
+      this.filter = (condition) => filter(cloneTreeColumns(), condition);
   
-      this.reOrder = function (grid) {
-        return sort(treeColumns, grid);
-      };
+      this.reOrder = (grid) => sort(treeColumns, grid);
   
-      this.getById = function (id) {
-        return columnsById[id];
-      };
+      this.getById = (id) => columnsById[id];
   
-      this.getInIds = function (ids) {
-        return ids.map(function (id) {
-          return columnsById[id];
-        });
-      };
+      this.getInIds = (ids) => ids.map((id) => columnsById[id]);
     }
     
     /***
@@ -631,8 +600,8 @@
      * @class Map
      * @constructor
      */
-    var Map = 'Map' in window ? window.Map : function Map() {
-      var data = {};
+    const Map = 'Map' in window ? window.Map : function Map() {
+      const data = {};
       
       /***
        * Gets the item with the given key from the map or undefined if
@@ -640,9 +609,7 @@
        * @method get
        * @param key {Map} The key of the item in the map.
        */
-      this.get = function(key) {
-        return data[key];
-      };
+      this.get = (key) => data[key];
   
       /***
        * Adds or updates the item with the given key in the map. 
@@ -650,7 +617,7 @@
        * @param key The key of the item in the map.
        * @param value The value to insert into the map of the item in the map.
        */
-      this.set = function(key, value) {
+      this.set = (key, value) => {
         data[key] = value;
       };
       
@@ -660,16 +627,14 @@
        * @param key The key of the item in the map.
        * @return {Boolean}
        */    
-      this.has = function(key) {
-        return key in data;
-      };
+      this.has = (key) => key in data;
       
       /***
        * Removes the item with the given key from the map. 
        * @method delete
        * @param key The key of the item in the map.
        */
-      this.delete = function(key) {
+      this.delete = (key) => {
         delete data[key];
       };
     };

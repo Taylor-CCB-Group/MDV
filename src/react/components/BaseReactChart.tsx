@@ -5,7 +5,9 @@ import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
 import { StrictMode } from "react";
 import { createEl } from "../../utilities/ElementsTyped";
-import { Chart, DataSource } from "../../charts/charts";
+import type { Chart, DataSource } from "../../charts/charts";
+import { toPng, toSvg } from "html-to-image";
+import { ProjectProvider } from "@/modules/ProjectContext";
 
 function Fallback() {
     return <>
@@ -44,6 +46,7 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  */
 export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     declare config: T & BaseConfig;
+    declare popoutIcon: HTMLElement;
     get dataSource(): DataSource {
         return window.mdv.chartManager.charts[this.config.id].dataSource;
     }
@@ -80,13 +83,25 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         const ReactComponentFunction = this.ComponentFn;
         this.root = createMdvPortal((
             <StrictMode>
-                <ChartProvider chart={this} materialui>
-                    <ReactComponentFunction />
-                </ChartProvider>
+                <ProjectProvider>
+                    <ChartProvider chart={this} materialui>
+                        <ReactComponentFunction />
+                    </ChartProvider>                    
+                </ProjectProvider>
             </StrictMode>
         ), this.reactEl);
     }
+    //todo: implement this
+    // getImage(callback: (imgCa: string) => void, type: "svg" | "png" = "png"): void {
+    //     // "Charts should have a `getImage()` method that takes a function and a type, either 'svg' or 'png'.
+    //     // The callback should pass a serialized svg string in the case of svg, or 
+    //     // a canvas element in the case of a png. (??)
+    //     // if (type === "png") toPng(this.reactEl).then(callback);
+    //     // if (type === "svg") toSvg(this.reactEl).then(callback);
+    //     if (type === "png") {
 
+    //     }
+    // }
     changeBaseDocument(doc: Document): void {
         // how confident are we that this will work?
         // will need re-testing if we implement different state management...

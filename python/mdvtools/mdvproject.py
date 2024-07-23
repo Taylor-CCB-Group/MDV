@@ -13,10 +13,13 @@ import shutil
 import random
 import string
 from os.path import join, split, exists
+from pathlib import Path
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
-from typing import Optional, NewType, List, Union
+from typing import Optional, NewType, List, Union, Any
+from .charts.view import View
 import time
+import copy
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -44,9 +47,18 @@ numpy_dtypes = {
 
 
 class MDVProject:
-    def __init__(self, dir: str, id: Optional[str]=None, delete_existing=False):
+    def __init__(
+        self,
+        dir: str,
+        id: Optional[str] = None,
+        delete_existing=False,
+        skip_column_clean=False,
+    ):
+        self.skip_column_clean = (
+            skip_column_clean  # signficant speedup for large datasets
+        )
         self.dir = dir
-        self.id = id if id else dir.split("/")[-1]
+        self.id = id if id else os.path.basename(dir)
         if delete_existing and exists(dir):
             shutil.rmtree(dir)
         self.h5file = join(dir, "datafile.h5")
@@ -68,7 +80,7 @@ class MDVProject:
                 o.close()
         if not exists(self.statefile):
             with open(self.statefile, "w") as o:
-                o.write(json.dumps({"all_views": [], "popouturl": "popout.html"}))
+                o.write(json.dumps({"all_views": []}))
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
 
     @property
@@ -80,7 +92,7 @@ class MDVProject:
         save_json(self.datasourcesfile, value)
 
     @property
-    def views(self):
+    def views(self) -> dict[str, View]:
         return get_json(self.viewsfile)
 
     @views.setter
@@ -138,8 +150,8 @@ class MDVProject:
 
     def set_interactions(
         self,
-        interaction_ds,
-        parent_ds,
+        interaction_ds: str,
+        parent_ds: str,
         pivot_column="sample_id",
         parent_column="annotation",
         is_single_region=True,
@@ -286,7 +298,7 @@ class MDVProject:
         if raw:
             return raw_data
         dt = cm["datatype"]
-        if dt == "text":
+        if dt == "text" or dt == "text16":
             data = [cm["values"][x] for x in raw_data]
         elif dt == "multitext":
             chunksize = raw_data.shape[0] / cm["stringLength"]
@@ -353,7 +365,7 @@ class MDVProject:
             raise AttributeError(f"{datasource} is not a group")
         if gr.get(column["field"]):
             del gr[column["field"]]
-        add_column_to_group(column, li, gr, len(li))
+        add_column_to_group(column, li, gr, len(li), self.skip_column_clean)
         h5.close()
         if col_exists:
             ds["columns"][ind[0]] = column
@@ -422,7 +434,7 @@ class MDVProject:
             # v slow - needs improving
             # py-right: `Argument of type "Series | Unknown | DataFrame" cannot be assigned to parameter "data" of type "Series"`
             ncol = newdf.apply(lambda row: d.get(row[0], missing_value), axis=1)
-            add_column_to_group(c, ncol, gr, len(ncol))
+            add_column_to_group(c, ncol, gr, len(ncol), self.skip_column_clean)
             ds["columns"].append(c)
         self.set_datasource_metadata(ds)
         h5.close()
@@ -486,6 +498,7 @@ class MDVProject:
         parameters=["chr", "start", "end"],
         name=None,
         extra_params=None,
+        custom_track=None,
         overwrite=False,
     ):
         """
@@ -512,22 +525,40 @@ class MDVProject:
             raise AttributeError(
                 f"genome browser track already exists for {datasource}"
             )
-        # get all the genome locations
-        loc = [self.get_column(datasource, x) for x in parameters]
-        # write to a bed file
-        # nb - should check whether it actually improves anything adding {name} to filenames
-        bed = join(self.trackfolder, f"t_{name}.bed")
-        o = open(bed, "w")
-        for c, (chr, start, end) in enumerate(zip(loc[0], loc[1], loc[2])):
-            o.write(f"{chr}\t{start}\t{end}\t{c}\n")
-        o.close()
-        indexed_bed = join(self.trackfolder, f"loc_{name}.bed")
-        create_bed_gz_file(bed, indexed_bed)
-        os.remove(bed)
+        if not custom_track:
+            # get all the genome locations
+            loc = [self.get_column(datasource, x) for x in parameters]
+            # write to a bed file
+            # nb - should check whether it actually improves anything adding {name} to filenames
+            # bed = join(self.trackfolder, f"t_{name}.bed") # reverting to Martin's original
+            bed = join(self.trackfolder, "t.bed")
+            o = open(bed, "w")
+            for c, (chr, start, end) in enumerate(zip(loc[0], loc[1], loc[2])):
+                o.write(f"{chr}\t{start}\t{end}\t{c}\n")
+            o.close()
+            # indexed_bed = join(self.trackfolder, "loc_{name}.bed") # reverting to Martin's original
+            indexed_bed = join(self.trackfolder, "loc.bed")
+            create_bed_gz_file(bed, indexed_bed)
+            os.remove(bed)
+        else:
+            custom_track["location"]
+            # copy the custom track to the tracks folder
+            shutil.copy(custom_track["location"], join(self.trackfolder, "loc.bed.gz"))
+            # copy index file
+            shutil.copy(
+                custom_track["location"] + ".tbi",
+                join(self.trackfolder, "loc.bed.gz.tbi"),
+            )
+
+        if not name:
+            name = datasource
         gb = {
             "location_fields": parameters,
-            "default_track": {"url": f"tracks/loc_{name}.bed.gz", "label": name},
+            # "default_track": {"url": "tracks/loc_{name}.bed.gz", "label": name}, # reverting to Martin's original
+            "default_track": {"url": "tracks/loc.bed.gz", "label": name},
         }
+        if custom_track:
+            gb["default_track"]["type"] = custom_track["type"]
         if extra_params:
             gb.update(extra_params)
         ds = self.get_datasource_metadata(datasource)
@@ -660,7 +691,9 @@ class MDVProject:
             raise AttributeError("no columns to add")
         for col in columns:
             try:
-                add_column_to_group(col, dataframe[col["field"]], gr, size)
+                add_column_to_group(
+                    col, dataframe[col["field"]], gr, size, self.skip_column_clean
+                )
             except Exception as e:
                 dodgy_columns.append(col["field"])
                 warnings.warn(
@@ -708,7 +741,9 @@ class MDVProject:
         llink[linktype] = data
         self.set_datasource_metadata(ds)
 
-    def add_rows_as_columns_link(self, ds_row: str, ds_col: str, column_name: str, name: str):
+    def add_rows_as_columns_link(
+        self, ds_row: str, ds_col: str, column_name: str, name: str
+    ):
         """
         Adds a link between two datasources, such that columns may be added to the `ds_row` datasource
         based on the values in the `ds_col` datasource dynamically at runtime. The values in the `column_name` column of the
@@ -732,10 +767,16 @@ class MDVProject:
         self.insert_link(ds_row, ds_col, "rows_as_columns", data)
 
     def add_rows_as_columns_subgroup(
-        self, row_ds: str, col_ds: str, stub: str, data, name:Optional[str]=None, label:Optional[str]=None, sparse=False
+        self,
+        row_ds: str,
+        col_ds: str,
+        stub: str,
+        data,
+        name: Optional[str] = None,
+        label: Optional[str] = None,
+        sparse=False,
     ):
-        '''
-        '''
+        """ """
         name = name if name else stub
         label = label if label else name
         h5 = self._get_h5_handle()
@@ -743,8 +784,8 @@ class MDVProject:
         if not isinstance(ds, h5py.Group):
             raise AttributeError(f"{row_ds} is not a group")
         if name in ds:
-            raise 
-        gr = ds.create_group(name) # we could check for existing name first...
+            raise
+        gr = ds.create_group(name)  # we could check for existing name first...
         # sparse is passed as an argument - maybe we should infer it automatically from the data
         # (isinstance of spmatrix)
         if sparse:
@@ -788,6 +829,10 @@ class MDVProject:
 
         create_app(self, **kwargs)
 
+    def delete(self):
+        # todo - remove from project routes, set a flag indicating it's been deleted
+        shutil.rmtree(self.dir)
+
     def get_configs(self):
         config = {
             "datasources": self.datasources,
@@ -815,8 +860,6 @@ class MDVProject:
         page = "page.html"
         template = join(tdir, page)
         page = open(template).read()
-        # dummy popout page
-        copyfile(join(tdir, "popout.html"), join(outdir, "popout.html"))
         # make sure the static files are referenced correctly
         page = page.replace("/static", "static")
         # call init with no route, will be interpreted as static page (at /)
@@ -827,6 +870,8 @@ class MDVProject:
         conf = self.state
         # can't edit static page
         conf["permission"] = "view"
+        # consider using this flag for determining front-end behaviour
+        conf["static"] = True
         # throttle the dataloading so don't get network errors
         conf["dataloading"] = {"split": 5, "threads": 2}
         save_json(join(outdir, "state.json"), conf)
@@ -911,15 +956,30 @@ class MDVProject:
 
         self.set_datasource_metadata(ds)
 
-    def get_view(self, view):
+    def get_view(self, view: str):
         views = self.views
         return views.get(view)
 
-    def set_view(self, name, view, make_default=False):
+    def set_view(self, name: str, view: Optional[View | Any], make_default=False):
+        """Sets the view with the given name to the supplied view data.
+        If the view is None, then the view will be deleted.
+        """
         views = self.views
         # update or add the view
         if view:
-            views[name] = view
+            # clone, in case a calling script might get confused by the view being changed
+            view2 = copy.deepcopy(view)
+            # generate ids for the views if not present
+            # may consider more robust id generation & other checks here
+            initialCharts = view2["initialCharts"]
+            for ds in initialCharts:
+                # todo check that there is a ds with that name
+                for c in initialCharts[ds]:
+                    if "id" not in c:
+                        c["id"] = str(
+                            "".join(random.choices(string.ascii_letters, k=6))
+                        )
+            views[name] = view2
         # remove the view
         else:
             if views.get(name):
@@ -1056,14 +1116,38 @@ class MDVProject:
                     "max_y": v["height"] + y,
                     "max_x": v["width"] + x,
                 },
+                # "images": v.get("images", {}),
                 "images": {},
             }
+            if "json" in v:
+                f = v["json"]
+                assert isinstance(f, str)  # in future we may allow dict or list
+                if exists(f):
+                    # copy the json file to the project
+                    name = os.path.basename(f)
+                    rel = join(self.dir, "json", name)
+                    Path(rel).parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        shutil.copyfile(f, rel)
+                        all_regions[k]["json"] = join("json", name)
+                    except Exception as e:
+                        print(
+                            f"Skipping json for region {k} because of error copying {f} to {rel}\n{repr(e)}"
+                        )
+                else:
+                    raise FileNotFoundError(f"json file '{f}' not found")
         # maybe warn if replacing existing regions
         # or add to existing regions
         md["regions"]["all_regions"] = all_regions
         self.set_datasource_metadata(md)
 
-    def add_region_images(self, datasource, data):
+    def add_region_images(self, datasource: DataSourceName, data):
+        """Adds images to regions in a datasource.
+
+        Args:
+            datasource (str): The name of the datasource.
+            data (dict|str): A dictionary containing data about which images should be associated with
+        """
         imdir = join(self.dir, "images", "regions")
         if not exists(imdir):
             os.makedirs(imdir)
@@ -1175,6 +1259,129 @@ class MDVProject:
                     }
         self.set_datasource_metadata(md)
 
+    def get_interaction_matrix(
+        self, datasource, group, interaction_metric, square_size=20
+    ):
+        """
+        Args:
+            datasource (str): The name of the datasource.
+            group (str): The name of the group.
+            interaction_metric (str): The name of the interaction metric.
+        """
+        md = self.get_datasource_metadata(datasource)
+        im_info = self.get_column_metadata(datasource, interaction_metric)
+        i = md.get("interactions")
+        if not i:
+            raise AttributeError(f"no interactions in {datasource}")
+        icd = self.get_column_metadata(datasource, i["interaction_columns"][0])[
+            "values"
+        ]
+        side = len(icd) * square_size
+        chart = {
+            "type": "single_heat_map",
+            "param": i["interaction_columns"]
+            + [interaction_metric]
+            + [i["pivot_column"]],
+            "category": group,
+            "title": f"{group} - {im_info['name']}",
+            "size": [side, side],
+            "axis": {
+                "x": {
+                    "textSize": 13,
+                    "label": "",
+                    "size": 101,
+                    "tickfont": 11,
+                    "rotate_labels": True,
+                },
+                "y": {"textSize": 13, "label": "", "size": 94, "tickfont": 10},
+            },
+        }
+        return chart
+
+    def get_selection_dialog(self, datasource, selections):
+        filters = {}
+        for s in selections:
+            sel = s.get("filter")
+            if sel:
+                col = self.get_column_metadata(datasource, s["column"])
+                if col["datatype"] not in ["text", "text16", "multitext"]:
+                    if sel[0] is None:
+                        sel[0] = col["minMax"][0]
+                    if sel[1] is None:
+                        sel[1] = col["minMax"][1]
+                else:
+                    if isinstance(sel, list):
+                        sel = {"category": sel}
+                filters[s["column"]] = sel
+        return {
+            "type": "selection_dialog",
+            "param": [x["column"] for x in selections],
+            "filters": filters,
+        }
+
+    def get_image_plot(self, datsource, image_set):
+        md = self.get_datasource_metadata(datsource)
+        ims = md.get("images")
+        if not ims:
+            raise AttributeError(f"no images in {datsource}")
+        img = ims.get(image_set)
+        if not img:
+            raise AttributeError(f"no image set {image_set} in {datsource}")
+
+        return {
+            "type": "image_table_chart",
+            "title": image_set,
+            "param": [img["key_column"]],
+            "image_set": image_set,
+        }
+
+    def get_centroid_plot(
+        self, datasource, region, background_image="_default", scale=0.5
+    ):
+        """
+        Args:
+            datasource (str): The name of the datasource.
+            region (str): The name of the region.
+            background_image (str, optional): The name of the background image. Default is '_default'
+            scale (float, optional): The scale of the image. Default is 0.5
+
+        Returns:
+            dict: The chart specification.
+        """
+        md = self.get_datasource_metadata(datasource)
+        regions = md.get("regions")
+        if not regions:
+            raise AttributeError("no regions in specifeid")
+        r_info = regions["all_regions"].get(region)
+        if not r_info:
+            raise AttributeError(f"no region {region} in regions")
+        chart = {
+            "type": "image_scatter_plot",
+            "param": regions["position_fields"] + [regions["default_color"]],
+            "background_filter": {
+                "column": regions["region_field"],
+                "category": region,
+            },
+            "title": region,
+            "radius": 3.5,
+            "color_by": regions["default_color"],
+            "color_legend": {"dsiplay": False},
+            "region": region,
+            "roi": r_info.get("roi"),
+        }
+        dims = r_info["roi"]
+        mx = dims.get("min_x", 0)
+        my = dims.get("min_y", 0)
+        size = [dims["max_x"] - mx, dims["max_y"] - my]
+        size = [x * scale for x in size]
+        chart["size"] = size
+        if background_image:
+            if background_image == "_default":
+                background_image = r_info["default_image"]
+            chart["background_image"] = r_info["images"][background_image]
+
+        return chart
+
 
 def get_json(file):
     return json.loads(open(file).read())
@@ -1210,7 +1417,11 @@ def get_subgroup_bytes(grp, index, sparse=False):
 
 
 def add_column_to_group(
-    col: dict, data: pandas.Series | pandas.DataFrame, group: h5py.Group, length: int
+    col: dict,
+    data: pandas.Series | pandas.DataFrame,
+    group: h5py.Group,
+    length: int,
+    skip_column_clean: bool,
 ):
     """
     col (dict): The column metadata (may be modified e.g. to add values)
@@ -1294,7 +1505,11 @@ def add_column_to_group(
 
     else:
         dt = numpy.int32 if col["datatype"] == "int32" else numpy.float32
-        clean = data.apply(pandas.to_numeric, errors="coerce")
+        clean = (
+            data
+            if skip_column_clean
+            else data.apply(pandas.to_numeric, errors="coerce")
+        )  # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import BaseChart from "../../charts/BaseChart";
-import { BaseConfig, BaseReactChart } from "./BaseReactChart";
+import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { useChart } from "../context";
 import { useChartID } from "../hooks";
 
@@ -14,7 +14,7 @@ function ReactTest() {
     const [text, setText] = useState(parent.config.text);
     useEffect(() => {
         dataStore.addListener(id, () => setFilterSize(dataStore.filterSize));
-        parent.addListener("text", (type, data) => setText(data + ' ' + parent.config.wordSize));
+        parent.addListener("text", (type, data) => setText(`${data} ${parent.config.wordSize}`));
         const colNameWords = parent.config.param[0];
         const colNameSize = parent.config.param[1];
 
@@ -32,7 +32,7 @@ function ReactTest() {
         setWords(wordsVals);
         console.log(sizeVals);
 
-        if (dim && dim.getAverages) {
+        if (dim?.getAverages) {
             dim.getAverages(data => {
                 console.log(data);
             }, [colNameSize], {})

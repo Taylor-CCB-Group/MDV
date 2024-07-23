@@ -20,6 +20,7 @@ dist/_avocato
 *.spec
 python/build
 python/data
+python/mdvtools/dbutils/__pycache__
 python/mdvtools/tests/temp/*
 python/mdvtools/test_projects/cache/*
 python/mdvtools/static/*

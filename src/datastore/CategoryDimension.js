@@ -24,20 +24,19 @@ class CategoryDimension extends Dimension{
                     return false;
                 }
                 return this.filterPredicate({predicate});
-            } //end multitext
-            else {
+            }
+            
                 const predicate = i => data[i] === ind;
                 return this.filterPredicate({predicate});
-            }     
-        } //end typeof category === "string"
-        else { //category is an array
+        }
+        
             const cats = new Set();
-            for (let cat of category){
+            for (const cat of category){
                 cats.add(vals.indexOf(cat));
             }
             if (col.datatype==="multitext"){
                 const int = col.stringLength;
-                let ao = category.operand === "and";
+                const ao = category.operand === "and";
                 const catsArr = category.map(c => vals.indexOf(c));
                 const singleCat = cats.size === 1;
 
@@ -46,7 +45,7 @@ class CategoryDimension extends Dimension{
                     //nb, this is based on the premise that we want "and" of ['a', 'a'] to require two 'a's, so using array rather than Set
                     //in any case, we need to remove found categories for a given row as we go,
                     //otherwise we end up with a false positive if the same category is used twice
-                    let catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
+                    const catsToFind = ao ? catsArr.slice(0) : cats; //nb slice is faster than [...spread]
                     for (let n=st; n < st+int; n++) {
                         if (data[n]===65535) {
                             //... if this row only has one item, we can't possibly have two of the same item,
@@ -75,15 +74,15 @@ class CategoryDimension extends Dimension{
                     return false;
                 }
                 return this.filterPredicate({predicate});
-            } //end multitext
-            else{
+            }
+            
                 const catsArr = Array.from(cats);
                 // special cases for 1 or 2 categories; marginally faster than Set.has
                 if (catsArr.length === 1) {
                     const val = catsArr[0];
                     const predicate = i => data[i] === val;
                     return this.filterPredicate({predicate});
-                } else if (catsArr.length === 2) {
+                }if (catsArr.length === 2) {
                     const val1 = catsArr[0];
                     const val2 = catsArr[1];
                     const predicate = i => data[i] === val1 || data[i] === val2;
@@ -93,8 +92,6 @@ class CategoryDimension extends Dimension{
                 const predicate = i => cats.has(data[i]);
                 // const predicate = i => catsArr.includes(data[i]);
                 return this.filterPredicate({predicate});
-            }
-        }  
     }
     filterCategories(args,columns){
         if (window.predicateTest) return this.filterCategoriesPredicate(args, columns);
@@ -168,12 +165,12 @@ class CategoryDimension extends Dimension{
             }     
         }
         else {
-            for (let cat of category){
+            for (const cat of category){
                 cats.add(vals.indexOf(cat));
             }
             if (col.datatype==="multitext"){
                 const int = col.stringLength;
-                let ao = category.operand === "and";
+                const ao = category.operand === "and";
                 const catsArr = category.map(c => vals.indexOf(c));
                 const singleCat = cats.size === 1;
                 for (let i=0;i<len;i++){

@@ -1,8 +1,7 @@
 import BaseChart from "../../charts/BaseChart";
-import { BaseReactChart } from "./BaseReactChart";
+import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
-import { BaseDialog } from "../../utilities/Dialog";
-import { DEFAUlT_CHANNEL_STATE, ROI, VivConfig, VivContextType, VivProvider, useViewerStore, useViewerStoreApi } from "./avivatorish/state";
+import { type ROI, type VivConfig, type VivContextType, VivProvider, useViewerStore, useViewerStoreApi, applyDefaultChannelState } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
 import type { ColumnName, DataColumn } from "../../charts/charts";
@@ -37,7 +36,7 @@ const MainChart = () => {
         if (!imgUrl) throw 'no image url';
         const source = { urlOrFile: imgUrl, description: 'test' };
         viewerStore.setState({ source });
-    }, [imgUrl]);
+    }, [imgUrl, viewerStore.setState]);
 
     const source = useViewerStore(store => store.source);
     useImage(source);
@@ -60,6 +59,7 @@ type CategoryFilter = {
 //viewState should be persisted... maybe a way of saving different snapshots?
 //could we infer or something to avoid having to repeat this?
 export type ScatterPlotConfig = {
+    course_radius: number,
     radius: number,
     opacity: number,
     color_by: ColumnName,
@@ -72,6 +72,7 @@ export type ScatterPlotConfig = {
     point_shape: "circle" | "square" | "gaussian"
 } & TooltipConfig;
 const scatterDefaults: ScatterPlotConfig = {
+    course_radius: 1,
     radius: 10,
     opacity: 1,
     color_by: null,
@@ -94,6 +95,8 @@ export type VivRoiConfig = {
     background_filter: CategoryFilter,
     roi: ROI,
     viv: VivConfig,
+    showJson: boolean,
+    json?: string, //for extra e.g. cell segmentation data - but we might want more than just a string...
     //image_properties: ChannelsState,
 } & ScatterPlotConfig;
 
@@ -108,7 +111,7 @@ export type VivMdvReactConfig = ScatterPlotConfig & (
 ) & { channel: number };
 export type VivMDVReact = VivMdvReact;
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
-    colorDialog: any;
+    colorDialog: ColorChannelDialogReactWrapper;
 
     vivStores?: VivContextType;
     get viewerStore() {
@@ -117,16 +120,23 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
-    constructor(dataStore, div, config) {
-        // todo better default config
-        config = {...scatterDefaults, ...config};
+    constructor(dataStore, div, originalConfig: VivMdvReactConfig & BaseConfig) {
+        const config = {...scatterDefaults, ...originalConfig};
         if (!config.channel) config.channel = 0;
-        if (config.type === 'VivMdvRegionReact') {
-            if (!config.viv.image_properties) config.viv.image_properties = DEFAUlT_CHANNEL_STATE;
-        } else if (config.type === 'VivMdvReact') {
-            if (config.overviewOn === undefined) config.overviewOn = false;
-            if (config.image_properties === undefined) config.image_properties = DEFAUlT_CHANNEL_STATE;
-        }
+        // === some dead code ===
+        // if (config.type === 'VivMdvRegionReact') {
+        //     // we don't use viv.image_properties, we use viv.channelsStore et al.
+        //     // if (!config.viv.image_properties) config.viv.image_properties = DEFAUlT_CHANNEL_STATE;
+        //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
+        //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
+        // } else if (config.type === 'VivMdvReact') {
+        //     //unused
+        //     if (config.overviewOn === undefined) config.overviewOn = false;
+        //     // if (config.image_properties === undefined) config.image_properties = DEFAUlT_CHANNEL_STATE;
+        //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
+        //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
+        // }
+        config.viv = applyDefaultChannelState(config.viv);
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
         super(dataStore, div, config, ReactTest);
@@ -136,7 +146,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             colorByColumn: action,
             colorByDefault: action,
         });
-        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", (e) => {
+        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", () => {
             if (!this.colorDialog) {
                 this.colorDialog = new ColorChannelDialogReactWrapper(this);
                 this.dialogs.push(this.colorDialog);
@@ -211,6 +221,10 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 current_value: tooltip.show,
                 func: (x: boolean) => {
                     tooltip.show = x;
+                    if (!tooltip.column) {
+                        console.warn("No tooltip column set, using first column... but we need to make sure it actually loads.");
+                        tooltip.column = cols[0].field;
+                    }
                 }
             },
             {
@@ -232,11 +246,20 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 }
             },
             {
+                type: "radiobuttons",
+                label: "course radius",
+                current_value: c.course_radius || 1,
+                choices: [[0.1, 0.1], [1, 1], [10, 10], [100, 100]],
+                func: x => {
+                    c.course_radius = x;
+                }
+            },
+            {
                 type: "slider",
                 label: "radius",
-                current_value: c.radius || 10,
+                current_value: c.radius || 5,
                 min: 0,
-                max: 500,
+                max: 20,
                 continuous: true,
                 func: x => {
                     c.radius = x;
@@ -259,6 +282,14 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 current_value: c.zoom_on_filter || false,
                 func: x => {
                     c.zoom_on_filter = x;
+                }
+            },
+            {
+                type: "check",
+                label: "show json layer",
+                current_value: c.showJson || false,
+                func: x => {
+                    c.showJson = x;
                 }
             },
             {
@@ -286,13 +317,16 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             const { viewerStore, channelsStore, imageSettingsStore } = this.vivStores;
             const channels = channelsStore.getState();
             const viewer = viewerStore.getState();
-            const imageSettings = imageSettingsStore.getState();
+            // const imageSettings = imageSettingsStore.getState();
+            // omit some things like width, height...
+            // for 3D we'd want rotation etc, but if we keep entire viewState it causes problems (stuck zoom)
+            const viewState = {target: viewer.viewState.target, zoom: viewer.viewState.zoom};
             const viv = {
                 viewerStore: {
                     // could be that we want this to be where `'source'` comes from...
                     // we could be interested in use3d, useLens, useLinkedView... those would come from imageSettingsStore
                     // we might want an expanded version of 'pixelValues'...
-                    viewState: viewer.viewState,
+                    viewState, 
                 },
                 // we could call this `image_properties` and make it compatible with the 'legacy format' from VivScatterPlot
                 // or we could parse it into a nicer viv.channels[] array-of-objects format, and parse back when we load.
@@ -300,6 +334,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     channelsVisible: channels.channelsVisible,
                     colors: channels.colors,
                     contrastLimits: channels.contrastLimits,
+                    brightness: channels.brightness,
+                    contrast: channels.contrast,
                     domains: channels.domains,
                     selections: channels.selections,
                 },

@@ -1,7 +1,7 @@
 import { action } from "mobx";
 import BaseChart from "../../charts/BaseChart";
-import DataStore from "../../datastore/DataStore";
-import { BaseConfig, BaseReactChart } from "./BaseReactChart";
+import type DataStore from "../../datastore/DataStore";
+import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { HighlightedFeatureComponent } from "./HighlightedFeatureComponent";
 
 type HighlightedFeatureConfig = {

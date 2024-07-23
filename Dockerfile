@@ -1,42 +1,31 @@
-# Stage 1: Build the frontend with npm
-FROM node:14 AS frontend-builder
+# Build the frontend with npm
+FROM nikolaik/python-nodejs:python3.12-nodejs20 as frontend-builder
 
 # Set the working directory inside the container
 WORKDIR /app
-
-# Copy package.json and package-lock.json to the working directory
-COPY package.json .
-COPY package-lock.json .
-
-# Install npm dependencies
-RUN npm install
 
 # Copy the entire project to the working directory
 COPY . .
 
+# Install npm dependencies
+RUN npm install
+
 # Run the npm build script for Flask and Vite
-RUN npm run build-flask-vite
+RUN npm run build-flask-dockerjs
 
-# Stage 2: Build the Python backend
-FROM python:3.10.9 AS python-builder
+# bootstrap project folder - this won't be necessary in future
+RUN mkdir -p /app/mdv/pbmc3k /app/mdv/pbmc3k_project2
 
-# Set the working directory inside the container
-WORKDIR /app
+# Install HDF5 library, for some reason poetry can't install it in this context as of now
+# see https://github.com/h5py/h5py/issues/2146 for similar-ish issue
+RUN apt-get update && apt-get install -y libhdf5-dev
 
-# Copy everything from inside the frontend-builder /app to /app
-COPY --from=frontend-builder /app/python /app/python
-
-# Set the working directory to the Python directory
+# Install Python dependencies using Poetry
 WORKDIR /app/python
-
-# Install Python dependencies
-RUN pip install -e /app/python
-
-# Set the working directory back to /app
-WORKDIR /app
+RUN poetry install --with dev,backend 
 
 # Expose the port that Flask will run on
-EXPOSE 5052
+EXPOSE 5055 
 
 # Run your Python script
-CMD ["python", "-m", "mdvtools.test_projects.scanpy_pbmc3k"]
+CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]

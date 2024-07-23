@@ -92,7 +92,7 @@ class HistogramChart extends SVGChart{
             return;
         }
         const iSize = (c.display_max-c.display_min)/(c.bin_number);
-        let st  = c.display_min;
+        const st  = c.display_min;
         for (let i=0;i<c.bin_number;i++){
             const pos=st+(i*iSize)
             if (pos<= this.filter[0] || pos>this.filter[1]){
@@ -165,14 +165,13 @@ class HistogramChart extends SVGChart{
 
         this.updateAxis();
         const units = cdim.height/maxBar;
-        const self = this;
-        let join =this.graph_area.selectAll(".bar")
+        const join =this.graph_area.selectAll(".bar")
         
         .data(this.binData)
         .join("rect")       
         .transition(trans)
         .style("fill",(d,i)=>{
-           return self.binFiltered[i]?"gray":"blue"
+           return this.binFiltered[i]?"gray":"blue"
         })
         .attr("class","bar")
         .attr("x",(d,i)=>((i+1)*3)+(i*barWidth))
