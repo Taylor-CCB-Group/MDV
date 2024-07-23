@@ -70,6 +70,7 @@ function useCreateRange(chart: BaseReactChart<any>) {
         endRef.current = p;
         setEndX(p);
     };
+    // biome-ignore lint/correctness/useExhaustiveDependencies: THIS SHOULD REALLY BE FIXED - we may not want this code at all, anyway.
     useEffect(() => {
         if (!ds) return;
         const rd = ds.getDimension('range_dimension') as RangeDimension;

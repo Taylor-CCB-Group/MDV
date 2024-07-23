@@ -25,6 +25,7 @@ export function useFilteredIndices() {
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
     const [filteredOutIndices, setFilteredOutIndices] = useState(new Uint32Array());
+    // biome-ignore lint/correctness/useExhaustiveDependencies: shouldn't be ignoring this, but some deps don't tend to change as of now.
     useEffect(() => {
         // return
         let cancelled = false;
@@ -102,7 +103,7 @@ export function useScatterModelMatrix() {
     useEffect(() => {
         const m = new Matrix4().scale(s);
         setModelMatrix(m);
-    }, [scale]);
+    }, [s]);
     return {modelMatrix, setModelMatrix};
 }
 
@@ -124,16 +125,17 @@ export function useScatterplotLayer() {
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback((i: number) => {
         return i === highlightedIndex ? 0.2*radiusScale/scale : 0.0;
-    }, [radiusScale, highlightedIndex, data]);
+    }, [radiusScale, highlightedIndex]);
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
         return chart.dataStore.columnIndex[config.tooltip.column]
-    }, [config.tooltip.column]);
+    }, [config.tooltip, chart.dataStore.columnIndex]);
     const getTooltipVal = useCallback((i: number) => {
         // if (!tooltipCol?.data) return '#'+i;
         return tooltipCol.getValue(data[i]);
     }, [tooltipCol, data]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: fix this
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
         ({object}) => {
@@ -219,7 +221,7 @@ export function useScatterplotLayer() {
             transitionEasing: x => -(Math.cos(Math.PI * x) - 1) / 2, //https://easings.net/#easeInOutSine
             // transitionInterpolator: new FlyToInterpolator({speed: 1}), //applicable for MapState - latitude is required
         });
-    }, [data, cx, cy, scale]);
+    }, [data, cx, cy, chartHeight, chartWidth, config.zoom_on_filter, modelMatrix.transformAsPoint]);
     const { point_shape } = config;
 
     const extensions = useMemo(() => {
