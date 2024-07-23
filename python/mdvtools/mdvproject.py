@@ -1285,13 +1285,13 @@ class MDVProject:
             sel = s.get("filter")
             if sel:
                 col = self.get_column_metadata(datasource,s["column"])
-                if not col["datatype"] in ["text","text16","multitext"]:
-                    if sel[0]==None:
+                if col["datatype"] not in ["text","text16","multitext"]:
+                    if sel[0] is None:
                         sel[0]=col["minMax"][0]
-                    if sel[1]==None:
+                    if sel[1] is None:
                         sel[1]=col["minMax"][1]
                 else:
-                    if type(sel)==list:
+                    if isinstance(sel, list):
                         sel= {"category":sel}
                 filters[s["column"]]=sel
         return {
@@ -1331,7 +1331,7 @@ class MDVProject:
         md = self.get_datasource_metadata(datasource)
         regions = md.get("regions")
         if not regions:
-            raise AttributeError(f"no regions in specifeid")
+            raise AttributeError("no regions in specifeid")
         r_info = regions["all_regions"].get(region)
         if not r_info:
             raise AttributeError(f"no region {region} in regions")

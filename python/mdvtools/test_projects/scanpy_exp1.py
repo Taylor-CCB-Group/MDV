@@ -1,9 +1,5 @@
-from mdvtools.conversions import convert_scanpy_to_mdv
-from mdvtools.mdvproject import MDVProject
-import scanpy as sc
 import os
 import shutil
-import mdvtools.chart_prototypes as cp
 
 #base = os.path.expanduser('~/mdv')
 #project_folder = os.path.join(base, 'pbmc3k')

@@ -384,7 +384,7 @@ def add_datasource_backend(project):
         db.session.commit()
         return jsonify({'message': f'File Validation Status: Success. Successfully added csv as a new datasource and files {file_set} have been modified under project "{name}"'}), 200
     
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         # Rollback transaction on database error
         db.session.rollback()
         return jsonify({'error': 'Database error occurred'}), 500
