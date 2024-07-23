@@ -1,17 +1,24 @@
 import { useState } from "react";
-import { ChatLogItem, useChatLog } from "./ChatAPI";
+import { type ChatLogItem, useChatLog } from "./ChatAPI";
 import ReactMarkdown from "react-markdown";
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion"
 
 
 const Response = ({ response }: { response: string }) => {
     const [expanded, setExpanded] = useState(false);
     return (
         <div onClick={() => setExpanded(!expanded)}
-        className={`${expanded ? '' : 'max-h-12 overflow-hidden'}`}
+            className={`${expanded ? '' : 'max-h-12 overflow-hidden'}`}
         >
             {/* {response} */}
+            {/* biome-ignore lint/correctness/noChildrenProp: <explanation> */}
             <ReactMarkdown children={response} />
         </div>
     )
@@ -23,12 +30,13 @@ const Code = ({ code }: { code: string }) => {
         <div onClick={() => setExpanded(!expanded)}
             className={`${expanded ? '' : 'max-h-12 overflow-hidden'}`}
         >
-        <SyntaxHighlighter language={"python"} children={code} style={dracula}/>
+            {/* biome-ignore lint/correctness/noChildrenProp: <explanation> */}
+            <SyntaxHighlighter language={"python"} children={code} style={dracula} />
         </div>
     )
 }
 
-const LogItem = ({ item }: { item: ChatLogItem }) => {
+const LogTableItem = ({ item }: { item: ChatLogItem }) => {
     return (
         <tr>
             <td><Response response={item.context} /></td>
@@ -39,7 +47,7 @@ const LogItem = ({ item }: { item: ChatLogItem }) => {
     )
 }
 
-const ChatLog = () => {
+const ChatLogTable = () => {
     const { chatLog } = useChatLog();
     return (
         <div>
@@ -54,12 +62,35 @@ const ChatLog = () => {
                 </thead>
                 <tbody>
                     {chatLog.map((item, index) => (
-                        <LogItem key={index} item={item} />
+                        <LogTableItem key={index} item={item} />
                     ))}
                 </tbody>
             </table>
         </div>
     )
 }
+
+const LogItem = ({ item }: { item: ChatLogItem }) => {
+    return (
+        <AccordionItem className="w-full" value={item.query}>
+            <AccordionTrigger>{item.query}</AccordionTrigger>
+            <AccordionContent>
+                <Code code={item.response} />
+            </AccordionContent>
+        </AccordionItem>
+    )
+}
+
+const ChatLog = () => {
+    const { chatLog } = useChatLog();
+    return (
+        <Accordion type='multiple' collapsible>
+            {chatLog.map((item) => (
+                <LogItem key={item.query} item={item} />
+            ))}
+        </Accordion>
+    )
+}
+
 
 export default ChatLog;
