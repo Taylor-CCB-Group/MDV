@@ -1,3 +1,4 @@
+// biome-ignore lint/suspicious/noGlobalAssign: relatively innocuous in simple web worker
 onmessage= function(e){
     if (e.data[4].analysis==="multi"){
         this.postMessage(multiBoxPlot(e));

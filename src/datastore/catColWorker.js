@@ -1,7 +1,4 @@
-
-
-
-
+// biome-ignore lint/suspicious/noGlobalAssign: relatively innocuous in simple web worker
 onmessage= (e)=> {  
     const data= [];
     for (const item of e.data[3]){

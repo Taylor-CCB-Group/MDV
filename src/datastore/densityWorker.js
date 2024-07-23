@@ -2,7 +2,7 @@ import {contourDensity} from "d3-contour";
 import {scaleLinear} from "d3-scale";
 
 
-
+// biome-ignore lint/suspicious/noGlobalAssign: relatively innocuous in simple web worker
 onmessage= (e)=> {
     const config = e.data[5];
     const cat = new Uint8Array(e.data[4]);
