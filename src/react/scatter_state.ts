@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from './components/VivScatterComponent';
-import { ScatterplotExLayer } from '../webgl/ImageArrayDeckExtension';
+import { ScatterplotExLayer } from '@/webgl/ScatterplotExLayer';
 import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 import { useHighlightedIndex } from './selectionHooks';
 
