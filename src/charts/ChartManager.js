@@ -1625,26 +1625,21 @@ class ChartManager{
             },
             text:config.title
         },div)
-        return new Promise((resolve,reject)=>{
-            const func = ()=>{
-                this._addChart(dataSource,config,div,notify);
-                resolve();
-            }
+        try {
             // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
-            try {
-                this._getColumnsThen(dataSource, neededCols, func);
-            } catch (error) {
-                this.clearInfoAlerts();
-                const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
-                    type: "warning"
-                });
-                console.log(error);
-                const idiv = this.infoAlerts[id].div;
-                idiv.onclick = () => idiv.remove();
-                div.remove();
-                reject(error);
-            }
-        });
+            await this._getColumnsAsync(dataSource, neededCols);
+            this._addChart(dataSource, config, div, notify);
+        } catch (error) {
+            this.clearInfoAlerts();
+            const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
+                type: "warning"
+            });
+            console.log(error);
+            const idiv = this.infoAlerts[id].div;
+            idiv.onclick = () => idiv.remove();
+            div.remove();
+            throw new Error(error); //probably not a great way to handle this
+        }
     }
 
     
