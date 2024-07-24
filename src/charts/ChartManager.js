@@ -197,7 +197,7 @@ class ChartManager{
       
         if (config.all_views){
        
-            this.viewSelect = createEl("select",{},this.menuBar);
+            this.viewSelect = createEl("select",{style:{maxWidth: '50em'}},this.menuBar);
             for (const v of config.all_views){
                 createEl("option",{text:v,value:v},this.viewSelect)
             }
