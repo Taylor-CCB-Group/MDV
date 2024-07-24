@@ -333,7 +333,7 @@ class VivViewerMDV {
     for (const item of conf) {
       const chan = this.channels.findIndex(x => x.Name === item.name);
       if (chan === -1) {
-        console.log('channel not found', item.name);
+        console.warn(`channel '${item.name}' not found, uniforms housekeeping will be a bit messed up`);
         continue;
       }
       nconf.selections.push({ z: 0, t: 0, c: chan });
