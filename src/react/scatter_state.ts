@@ -7,7 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from './components/VivScatterComponent';
-import { ScatterplotExLayer } from '@/webgl/ScatterplotExLayer';
+// import { ScatterplotExLayer } from '@/webgl/ScatterplotExLayer';
+import SpatialLayer from '@/webgl/SpatialLayer';
 import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 import { useHighlightedIndex } from './selectionHooks';
 
@@ -232,7 +233,8 @@ export function useScatterplotLayer() {
     const [currentLayerHasRendered, setCurrentLayerHasRendered] = useState(false);
     const scatterplotLayer = useMemo(() => {
         setCurrentLayerHasRendered(false);
-        return new ScatterplotExLayer({
+        // return new ScatterplotExLayer({ //old
+        return new SpatialLayer({ //new
         // loaders //<< this will be interesting to learn about
         id: `scatter_${getVivId(`${id}detail-react`)}`, // should satisfy VivViewer, could make this tidier
         data,
@@ -282,6 +284,10 @@ export function useScatterplotLayer() {
             //     duration: 300,
             // },
         },
+        contour_bandwidth: 0.1,
+        contour_intensity: 0.5,
+        contour_opacity: 0.5,
+        contourParameter: "leiden",
         extensions
     })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
