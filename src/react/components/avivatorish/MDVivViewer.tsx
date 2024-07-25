@@ -62,6 +62,7 @@ type VivViewerWrapperState = { viewStates: any }
  */
 class VivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivViewerWrapperState> {
     constructor(props) {
+        console.warn('using custom VivViewerWrapper via MDVivViewer for testing');
         super(props);
         this.state = {
             viewStates: {}
@@ -89,6 +90,7 @@ class VivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivVie
      */
     // eslint-disable-next-line class-methods-use-this
     layerFilter({ layer, viewport }) {
+        //return true; // for testing whether viv id matching is an issue
         return layer.id.includes(getVivId(viewport.id));
     }
 
