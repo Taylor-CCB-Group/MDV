@@ -74,10 +74,10 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 data: this.props.data,
                 radiusPixels: 100, //todo - custom version that doesn't have to use pixels (simpler)
                 opacity: 0.2,
-                weightsTextureSize: 256,
-                // colorRange: [rgb(0, 47, 97), rgb(0, 95, 133), rgb(0, 139, 152), rgb(0, 181, 153), rgb(24, 220, 130), rgb(151, 245, 84), rgb(255, 255, 0)],
-                colorRange: contourColors,
-                // debounceTimeout: 10,
+                // weightsTextureSize: 256,
+                colorRange: [rgb(0, 47, 97), rgb(0, 95, 133), rgb(0, 139, 152), rgb(0, 181, 153), rgb(24, 220, 130), rgb(151, 245, 84), rgb(255, 255, 0)],
+                // colorRange: contourColors,
+                debounceTimeout: 1000,
                 extensions: [new HeatmapContourExtension()]
             })),
             // nb, ContourLayer exists, but I think I want to do something different...
