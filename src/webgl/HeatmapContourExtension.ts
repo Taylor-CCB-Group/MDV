@@ -186,13 +186,15 @@ export default class HeatmapContourExtension extends LayerExtension {
     }
 }
 
-const myTriangleFS = /*glsl*/`
-#define SHADER_NAME triangle-layer-fragment-shader
+//struggling to get #version 300 es to work...
+//bigger picture, we want a very different version of HeatmapLayer anyway.
+const myTriangleFS = /*glsl*/`//#version 300 es
+#define SHADER_NAME triangle-layer-fragment-contour-shader
 
 precision highp float;
 
 uniform float opacity;
-uniform sampler2D texture;
+uniform sampler2D weightTexture; //using name 'texture' caused indirect glsl compiler errors with version 300 es(?)
 uniform sampler2D colorTexture;
 uniform float aggregationMode;
 
@@ -209,26 +211,33 @@ vec4 getLinearColor(float value) {
 
 float contour(float value) {
     //placeholder pending getting surrounding code in better shape
-    return mod(value, 10.0) < 0.1 ? 1.0 : 0.0;
+    return mod(value, 1.0) < 0.1 ? 1.0 : 0.0;
+}
+float smoothContour(float value) {
+    float w = .3;//fwidth(value); //todo derivatives
+    float f = .1;
+    float wa = smoothstep(0., w * f, mod(value * f, 1.));
+    wa = 1. - max(smoothstep(1.-w, 1., wa), smoothstep(w, 0., wa));
+    return smoothstep(0., 1., wa*0.5);
+    // return contour(value);
 }
 
 void main(void) {
-  vec4 weights = texture2D(texture, vTexCoords);
+  vec4 weights = texture2D(weightTexture, vTexCoords);
   float weight = weights.r;
 
   if (aggregationMode > 0.5) {
     weight /= max(1.0, weights.a);
   }
-
   // discard pixels with 0 weight.
   if (weight <= 0.) {
-     discard;
+    discard;
   }
 
   vec4 linearColor = getLinearColor(weight);
-  float c = contour(weight);
-//   linearColor = mix(linearColor, vec4(1.0, 1.0, 1.0, 1.0), c);
-  linearColor = c * vec4(1.);
+  float c = smoothContour(weight);
+  linearColor = mix(linearColor, vec4(1.0, 1.0, 1.0, 1.0), c);
+  //   linearColor = c * vec4(1.);
   linearColor.a *= opacity;
   gl_FragColor =linearColor;
 }
@@ -258,13 +267,20 @@ export class ExtendableHeatmapLayer extends HeatmapLayer {
         shaders._fs = `#version 300 es\n${shaders._fs}`;
         return shaders;
     }
-    // biome-ignore lint/complexity/noBannedTypes: <explanation>
+    // biome-ignore lint/complexity/noBannedTypes: banned types are the least of our worries here
     protected getSubLayerClass<T extends Layer<{}>>(subLayerId: string, DefaultLayerClass: _ConstructorOf<T>): _ConstructorOf<T> {
         const theClass = super.getSubLayerClass(subLayerId, DefaultLayerClass);
         if (subLayerId === 'triangle') {
             if (!theClass.prototype.__originalGetShaders__) {
                 console.log(">>> saving original getShaders()... this should only happen once...");
                 theClass.prototype.__originalGetShaders__ = theClass.prototype.getShaders;
+                const originalDraw = theClass.prototype.draw;
+                //changed name of texture to weightTexture, now the shader compiles with version 300 es
+                //(although it then doesn't render anything?)
+                theClass.prototype.draw = function (opts) {
+                    opts.uniforms.weightTexture = (this.props as any).texture;
+                    return originalDraw.call(this, opts);
+                }
             }
             console.log(">>> applying new getShaders() to TriangleLayer prototype...");
             const originalGetShaders = theClass.prototype.__originalGetShaders__;
