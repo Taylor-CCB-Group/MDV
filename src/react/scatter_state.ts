@@ -286,7 +286,7 @@ export function useScatterplotLayer() {
         },
         contour_bandwidth: 0.1,
         contour_intensity: 0.5,
-        contour_opacity: 0.5,
+        contour_opacity: 0.01,
         contourParameter: "leiden",
         extensions
     })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth]);
