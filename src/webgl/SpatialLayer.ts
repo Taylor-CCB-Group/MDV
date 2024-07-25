@@ -1,4 +1,4 @@
-import { CompositeLayer, type Layer, type LayersList } from "deck.gl/typed";
+import { CompositeLayer, ContourLayer, HeatmapLayer, type Layer, type LayersList } from "deck.gl/typed";
 import type { LayerContext, ScatterplotLayerProps } from "deck.gl/typed";
 import { ScatterplotExLayer } from './ScatterplotExLayer';
 import { Framebuffer } from "@luma.gl/core";
@@ -19,6 +19,10 @@ export type DualContourLayerProps = {
 
 export type SpatialLayerProps = ScatterplotLayerProps & DualContourLayerProps;
 
+function rgb(r: number, g: number, b: number): [number, number, number] {
+    return [r, g, b];
+}
+
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     static layerName = 'SpatialLayer';
     static defaultProps = ScatterplotExLayer.defaultProps;
@@ -30,12 +34,13 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     initializeState(context: LayerContext): void {
         super.initializeState(context);
         // this will change with new deck.gl version, context.device rather than context.gl...
-        const framebuffer = new Framebuffer(context.gl, {});
+        // const framebuffer = new Framebuffer(context.gl, {});
     }
     renderLayers(): Layer<SpatialLayerProps> | LayersList {
         // for this to be rendered in a VivViewer, the id must have an appropriate pattern
         // to satisfy `layer.id.includes(getVivId(viewport.id));` in VivViewer.tsx (we can use MDVivViewer for testing)
         const id = `spatial_composite.${this.props.id}`;
+        // order matters here, we should make a ui where we can easily control it
         return [
             new ScatterplotExLayer(this.getSubLayerProps({
                 ...this.props,
@@ -57,7 +62,35 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 radiusScale: 100,
                 extensions: [new ScatterDensityExension()]
             })),
-            // todo rendering into intermediate buffers, applying contour shader, blending them together...
+            // todo applying contour shader, TCM...
+            new HeatmapLayer(this.getSubLayerProps({
+                ...this.props,
+                id: 'spatial.heatmap',
+                data: this.props.data,
+                radiusPixels: 40, //todo - custom version that doesn't have to use pixels (simpler)
+                opacity: 0.2,
+                weightsTextureSize: 256,
+                colorRange: [rgb(0, 47, 97), rgb(0, 95, 133), rgb(0, 139, 152), rgb(0, 181, 153), rgb(24, 220, 130), rgb(151, 245, 84), rgb(255, 255, 0)],
+                // debounceTimeout: 10,
+            })),
+            // nb, ContourLayer exists, but I think I want to do something different...
+            // that said, I should at least see how it works...
+            // new ContourLayer(this.getSubLayerProps({
+            //     ...this.props,
+            //     id: 'spatial.contour2',
+            //     data: this.props.data,
+            //     // opacity: this.props.contour_opacity,
+            //     // radiusScale: 100, // I don't understand how to embiggen the influence of the points
+            //     cellSize: 1e6, //<<< very important, it can't infer sensible defaults
+            //     // getWeight: (d) => 10,
+            //     contours: [
+            //         { threshold: 0.1, color: [255, 0, 0] },
+            //         // { threshold: 0.5, color: [0, 255, 0] },
+            //         { threshold: [0.5, 1.5], color: [255, 255, 255] },
+            //         { threshold: 2, color: [255, 255, 255] },
+            //     ],
+            //     opacity: 0.1,
+            // })),
         ];
     }
 }
