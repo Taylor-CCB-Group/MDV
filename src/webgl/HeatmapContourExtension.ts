@@ -186,9 +186,8 @@ export default class HeatmapContourExtension extends LayerExtension {
     }
 }
 
-//struggling to get #version 300 es to work...
 //bigger picture, we want a very different version of HeatmapLayer anyway.
-const myTriangleFS = /*glsl*/`//#version 300 es
+const myTriangleFS = /*glsl*/`#version 300 es
 #define SHADER_NAME triangle-layer-fragment-contour-shader
 
 precision highp float;
@@ -215,7 +214,7 @@ float contour(float value) {
 }
 float smoothContour(float value) {
     float width = 0.1;
-    float w = .1;//fwidth(value); //todo derivatives
+    float w = fwidth(value);
     float f = .5;
     float wa = smoothstep(0., w * f, mod(value * f, 1.));
     wa = 1. - max(smoothstep(1.-w, 1., wa), smoothstep(w, 0., wa));
@@ -294,6 +293,7 @@ export class ExtendableHeatmapLayer extends HeatmapLayer {
                     //will we get the new updated shader code without needing to mangle the prototype every time?
                     //no, probably closed on the the old module version when HMR happens
                     shaders.fs = myTriangleFS;
+                    shaders.vs = `#version 300 es\n${shaders.vs}`;
                     return shaders;
                 }
             }
