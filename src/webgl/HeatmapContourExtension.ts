@@ -214,8 +214,9 @@ float contour(float value) {
     return mod(value, 1.0) < 0.1 ? 1.0 : 0.0;
 }
 float smoothContour(float value) {
-    float w = .3;//fwidth(value); //todo derivatives
-    float f = .1;
+    float width = 0.1;
+    float w = .1;//fwidth(value); //todo derivatives
+    float f = .5;
     float wa = smoothstep(0., w * f, mod(value * f, 1.));
     wa = 1. - max(smoothstep(1.-w, 1., wa), smoothstep(w, 0., wa));
     return smoothstep(0., 1., wa*0.5);
@@ -239,6 +240,7 @@ void main(void) {
   linearColor = mix(linearColor, vec4(1.0, 1.0, 1.0, 1.0), c);
   //   linearColor = c * vec4(1.);
   linearColor.a *= opacity;
+  linearColor.a = max(linearColor.a, c*2.);
   gl_FragColor =linearColor;
 }
 `;
