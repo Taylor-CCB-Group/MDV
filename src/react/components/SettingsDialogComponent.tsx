@@ -151,7 +151,8 @@ const RadioButtonComponent = ({props}: {props: GuiSpec<'radiobuttons'>}) => {
                             {v[0]}
                         </span>
                         <input
-                        type="radio" value={v[1]} checked={v[1] === props.current_value} onChange={action(e => {
+                            // biome-ignore lint/suspicious/noDoubleEquals: number == string is ok here
+                            type="radio" value={v[1]} checked={v[1] == props.current_value} onChange={action(e => {
                             props.current_value = e.currentTarget.value;
                             if (props.func) props.func(e.currentTarget.value);
                         })}/>
