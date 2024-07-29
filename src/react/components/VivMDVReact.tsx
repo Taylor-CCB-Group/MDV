@@ -9,6 +9,7 @@ import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
 import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
+import type { DualContourLayerProps } from "@/webgl/SpatialLayer";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -68,9 +69,10 @@ export type ScatterPlotConfig = {
         // todo: add more options here...
     },
     category_filters: Array<CategoryFilter>,
+    //on_filter: "hide" | "grey", //todo
     zoom_on_filter: boolean,
     point_shape: "circle" | "square" | "gaussian"
-} & TooltipConfig;
+} & TooltipConfig & DualContourLayerProps;
 const scatterDefaults: ScatterPlotConfig = {
     course_radius: 1,
     radius: 10,
@@ -85,6 +87,10 @@ const scatterDefaults: ScatterPlotConfig = {
     category_filters: [],
     zoom_on_filter: false,
     point_shape: "circle",
+    contour_fill: false,
+    contour_bandwidth: 0.1,
+    contour_intensity: 1,
+    contour_opacity: 0.5,
 };
 export type VivRoiConfig = {
     // making this 'type' very specific will let us infer the rest of the type, i.e.
@@ -136,6 +142,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
         //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
         // }
+        
+        // consider adapting `channels` from old format to new format...
         config.viv = applyDefaultChannelState(config.viv);
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
@@ -174,6 +182,13 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const { tooltip } = c;
         const cols = this.dataStore.getColumnList() as DataColumn<any>[];
         const settings = super.getSettings();
+
+        let cats = this.dataStore.getColumnValues(c.param[2]) || [];
+        cats = cats.map(x => {
+            return { t: x }
+        });
+        cats.push({ t: "None" });
+
         // What I would like is ability to
         // - change selected image at runtime.
         // - choose multiple categories on which to filter.
@@ -291,6 +306,96 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 func: x => {
                     c.showJson = x;
                 }
+            },
+            {
+                type: "folder",
+                label: "Contour Settings",
+                current_value: [
+                    {
+                        type: "folder",
+                        label: "Category selection",
+                        current_value: [
+                            //maybe 2-spaces format is better...
+                            {
+                                type: "dropdown",
+                                label: "Contour parameter",
+                                // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
+                                current_value: c.contourParameter || c.param[2],
+                                values: [cols, "name", "field"],
+                                func: x => {
+                                    c.contourParameter = c.param[2] = x;
+                                }
+                            },
+                            {
+                                type: "dropdown",
+                                label: "Contour Category 1",
+                                current_value: c.category1 || "None",
+                                values: [cats, "t", "t"],
+                                func: (x) => {
+                                    if (x === "None") x = null;
+                                    c.category1 = x;
+                                }
+                            },
+                            {
+                                type: "dropdown",
+                                label: "Contour Category 2",
+                                current_value: c.category2 || "None",
+                                values: [cats, "t", "t"],
+                                func: (x) => {
+                                    if (x === "None") x = null;
+                                    c.category2 = x;
+                                }
+                            },
+                        ],
+                        func: (x) => {},
+                    },
+                    {
+                        type: "slider",
+                        max: 25,
+                        min: 1,
+        
+                        // doc: this.__doc__, //why?
+                        current_value: c.contour_bandwidth,
+                        label: "KDE Bandwidth",
+                        continuous: true,
+                        func: (x) => {
+                            c.contour_bandwidth = x;
+                        }
+                    },
+                    {
+                        label: "Fill Contours",
+                        type: "check",
+                        current_value: c.contour_fill,
+                        func: (x) => {
+                            c.contour_fill = x;
+                        }
+                    },
+                    {
+                        type: "slider",
+                        max: 1,
+                        min: 0,
+                        current_value: c.contour_intensity,
+                        continuous: true,
+                        label: "Fill Intensity",
+                        func: (x) => {
+                            c.contour_intensity = x;
+                        }
+                    },
+                    {
+                        type: "slider",
+                        max: 1,
+                        min: 0,
+        
+                        doc: this.__doc__,
+                        current_value: c.contour_opacity,
+                        continuous: false,//why so slow?
+                        label: "Contour opacity",
+                        func: (x) => {
+                            c.contour_opacity = x ** 3;
+                        }
+                    },
+                ],
+                func: (x) => {},
             },
             {
                 type: 'folder',

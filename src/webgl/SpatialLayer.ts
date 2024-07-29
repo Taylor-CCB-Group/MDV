@@ -10,9 +10,10 @@ import HeatmapContourExtension, { ExtendableHeatmapLayer } from "./HeatmapContou
  * but this should be somewhat compatible with the previous implementation 
  */
 export type DualContourLayerProps = {
-    contourParameter: string,
+    contourParameter?: string, //this is param[2] in the original code
     category1?: string,
     category2?: string,
+    contour_fill: boolean,
     contour_bandwidth: number,
     contour_intensity: number,
     contour_opacity: number,
@@ -39,12 +40,10 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     initializeState(context: LayerContext): void {
         super.initializeState(context);
         // this will change with new deck.gl version, context.device rather than context.gl...
+        // still considering how to structure coomposite layers...
         // const framebuffer = new Framebuffer(context.gl, {});
     }
     renderLayers(): Layer<SpatialLayerProps> | LayersList {
-        // for this to be rendered in a VivViewer, the id must have an appropriate pattern
-        // to satisfy `layer.id.includes(getVivId(viewport.id));` in VivViewer.tsx (we can use MDVivViewer for testing)
-        const id = `spatial_composite.${this.props.id}`;
         // order matters here, we should make a ui where we can easily control it
         return [
             new ScatterplotExLayer(this.getSubLayerProps({
@@ -63,41 +62,25 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 id: 'spatial.contour1',
                 // when deck updates we can use their category filter...
                 data: this.props.data,
-                opacity: this.props.contour_opacity,
+                opacity: 0.5,
                 radiusScale: 100,
                 extensions: [new ScatterDensityExension()]
             })),
             // todo applying contour shader, TCM...
             new ExtendableHeatmapLayer(this.getSubLayerProps({
-                ...this.props,
+                // ...this.props, // this makes it very slow, we need to be more selective
+                getPosition: this.props.getPosition,
                 id: 'spatial.heatmap',
                 data: this.props.data,
                 radiusPixels: 100, //todo - custom version that doesn't have to use pixels (simpler)
-                opacity: 0.1,
+                opacity: this.props.contour_intensity,
+                getWeight: (d: any) => 1,
                 // weightsTextureSize: 256,
                 colorRange: [rgb(0, 47, 97), rgb(0, 95, 133), rgb(0, 139, 152), rgb(0, 181, 153), rgb(24, 220, 130), rgb(151, 245, 84), rgb(255, 255, 0)],
                 // colorRange: contourColors,
                 // debounceTimeout: 1000,
                 // extensions: [new HeatmapContourExtension()] // doesn't do anything here - needs to apply to the right shader
             })),
-            // nb, ContourLayer exists, but I think I want to do something different...
-            // that said, I should at least see how it works...
-            // new ContourLayer(this.getSubLayerProps({
-            //     ...this.props,
-            //     id: 'spatial.contour2',
-            //     data: this.props.data,
-            //     // opacity: this.props.contour_opacity,
-            //     // radiusScale: 100, // I don't understand how to embiggen the influence of the points
-            //     cellSize: 1e6, //<<< very important, it can't infer sensible defaults
-            //     // getWeight: (d) => 10,
-            //     contours: [
-            //         { threshold: 0.1, color: [255, 0, 0] },
-            //         // { threshold: 0.5, color: [0, 255, 0] },
-            //         { threshold: [0.5, 1.5], color: [255, 255, 255] },
-            //         { threshold: 2, color: [255, 255, 255] },
-            //     ],
-            //     opacity: 0.1,
-            // })),
         ];
     }
 }

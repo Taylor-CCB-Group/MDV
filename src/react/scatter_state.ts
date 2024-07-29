@@ -284,12 +284,18 @@ export function useScatterplotLayer() {
             //     duration: 300,
             // },
         },
-        contour_bandwidth: 0.1,
-        contour_intensity: 0.5,
-        contour_opacity: 0.01,
-        contourParameter: "leiden",
+        // ...config, //make sure contour properties are passed through
+        contour_bandwidth: config.contour_bandwidth,
+        contour_fill: config.contour_fill,
+        contour_intensity: config.contour_intensity,
+        contour_opacity: config.contour_opacity,
+        category1: config.category1,
+        category2: config.category2,
         extensions
-    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth]);
+    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth,
+        // there must be a better way... right now this is really slow to re-render when tweaking config
+        config.category1, config.category2, config.contour_bandwidth, config.contour_fill, config.contour_intensity, config.contour_opacity
+    ]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
         if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
         if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;
