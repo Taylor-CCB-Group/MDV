@@ -9,7 +9,7 @@ import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
 import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
-import type { DualContourLayerProps } from "@/webgl/SpatialLayer";
+import type { DualContourLegacyConfig } from "../contour_state";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -72,7 +72,7 @@ export type ScatterPlotConfig = {
     //on_filter: "hide" | "grey", //todo
     zoom_on_filter: boolean,
     point_shape: "circle" | "square" | "gaussian"
-} & TooltipConfig & DualContourLayerProps;
+} & TooltipConfig & DualContourLegacyConfig;
 const scatterDefaults: ScatterPlotConfig = {
     course_radius: 1,
     radius: 10,

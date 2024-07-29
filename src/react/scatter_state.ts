@@ -12,6 +12,7 @@ import SpatialLayer from '@/webgl/SpatialLayer';
 import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 import { useHighlightedIndex } from './selectionHooks';
 import type { DataColumn } from '@/charts/charts';
+import { useLegacyDualContour } from './contour_state';
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -140,8 +141,7 @@ export function useScatterplotLayer() {
     const getLineWidth = useCallback((i: number) => {
         return i === highlightedIndex ? 0.2*radiusScale/scale : 0.0;
     }, [radiusScale, highlightedIndex]);
-    const getContourWeight1 = useContourWeight(contourParameter, config.category1);
-    const getContourWeight2 = useContourWeight(contourParameter, config.category2);
+    const contourLayers = useLegacyDualContour();
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
@@ -247,8 +247,7 @@ export function useScatterplotLayer() {
     }, [point_shape]);
     const [currentLayerHasRendered, setCurrentLayerHasRendered] = useState(false);
     const scatterplotLayer = useMemo(() => {
-        setCurrentLayerHasRendered(false);
-        // return new ScatterplotExLayer({ //old
+        setCurrentLayerHasRendered(false); //<<< this is fishy
         return new SpatialLayer({ //new
         // loaders //<< this will be interesting to learn about
         id: `scatter_${getVivId(`${id}detail-react`)}`, // should satisfy VivViewer, could make this tidier
@@ -302,19 +301,9 @@ export function useScatterplotLayer() {
             // },
         },
         // ...config, //make sure contour properties are passed through
-        contour_bandwidth: config.contour_bandwidth,
-        contour_fill: config.contour_fill,
-        contour_intensity: config.contour_intensity,
-        contour_opacity: config.contour_opacity,
-        category1: config.category1,
-        category2: config.category2,
-        getContourWeight1,
-        getContourWeight2,
+        contourLayers,
         extensions
-    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, getContourWeight1, getContourWeight2, scale, modelMatrix, extensions, chart, getLineWidth,
-        // there must be a better way... right now this is really slow to re-render when tweaking config
-        config.category1, config.category2, config.contour_bandwidth, config.contour_fill, config.contour_intensity, config.contour_opacity
-    ]);
+    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth, contourLayers]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
         if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
         if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;

@@ -1,28 +1,15 @@
-import { CompositeLayer, ContourLayer, HeatmapLayer, type Layer, type LayersList } from "deck.gl/typed";
+import { CompositeLayer, type Layer, type LayersList } from "deck.gl/typed";
 import type { LayerContext, ScatterplotLayerProps } from "deck.gl/typed";
 import { ScatterplotExLayer } from './ScatterplotExLayer';
 import { Framebuffer } from "@luma.gl/core";
 import { ScatterDensityExension } from "./ScatterDeckExtension";
 import HeatmapContourExtension, { ExtendableHeatmapLayer } from "./HeatmapContourExtension";
+import type { useContour } from "@/react/contour_state";
 
 
-/** In future I think we want something more flexible & expressive,
- * but this should be somewhat compatible with the previous implementation 
- */
-export type DualContourLayerProps = {
-    contourParameter?: string, //this is param[2] in the original code
-    category1?: string,
-    category2?: string,
-    contour_fill: boolean,
-    contour_bandwidth: number,
-    contour_intensity: number,
-    contour_opacity: number,
-}
-
-export type SpatialLayerProps = ScatterplotLayerProps & DualContourLayerProps & {
-    // this is how we're doing these category filters for now
-    getContourWeight1: (i: number) => number,
-    getContourWeight2: (i: number) => number,
+export type SpatialLayerProps = ScatterplotLayerProps & {
+    //pending typing that allows for other kinds of layers etc
+    contourLayers: ReturnType<typeof useContour>[],
 };
 
 function rgb(r: number, g: number, b: number, a=255): [number, number, number, number] {
@@ -63,37 +50,7 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 id: 'spatial.scatterplot',
             })),
             // now we need more layers, using gaussian density.
-            new ScatterplotExLayer(this.getSubLayerProps({
-                ...this.props,
-                id: 'spatial.contour1',
-                // when deck updates we can use their category filter...
-                data: this.props.data,
-                opacity: 0.5,
-                getRadius: this.props.getContourWeight1,
-                updateTriggers: {
-                    getRadius: this.props.getContourWeight1
-                },
-                radiusScale: 100,
-                extensions: [new ScatterDensityExension()]
-            })),
-            // todo applying contour shader, TCM...
-            new ExtendableHeatmapLayer(this.getSubLayerProps({
-                // ...this.props, // this makes it very slow, we need to be more selective
-                getPosition: this.props.getPosition,
-                id: 'spatial.heatmap',
-                data: this.props.data,
-                radiusPixels: 100, //todo - custom version that doesn't have to use pixels (simpler)
-                opacity: this.props.contour_intensity,
-                getWeight: this.props.getContourWeight2,
-                updateTriggers: {
-                    getWeight: this.props.getContourWeight2
-                },
-                // weightsTextureSize: 256,
-                colorRange: viridis,
-                // colorRange: contourColors,
-                // debounceTimeout: 1000,
-                // extensions: [new HeatmapContourExtension()] // doesn't do anything here - needs to apply to the right shader
-            })),
+            ...this.props.contourLayers.map((props) => new ExtendableHeatmapLayer(this.getSubLayerProps(props))),
         ];
     }
 }
