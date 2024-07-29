@@ -11,6 +11,7 @@ import type { ViewState } from './components/VivScatterComponent';
 import SpatialLayer from '@/webgl/SpatialLayer';
 import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 import { useHighlightedIndex } from './selectionHooks';
+import type { DataColumn } from '@/charts/charts';
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -108,6 +109,18 @@ export function useScatterModelMatrix() {
     return {modelMatrix, setModelMatrix};
 }
 
+function useContourWeight(contourParameter: DataColumn<any>, category: string) {
+    //todo consider what happens when contourParameter is not categorical/text-like.
+    //down the line we may consider modulating the weight etc.
+    const categoryValueIndex = useMemo(() => {
+        return contourParameter.values.indexOf(category);
+    }, [contourParameter, category]);
+    const getContourWeight = useCallback((i: number) => {
+        return contourParameter.data[i] === categoryValueIndex ? 1 : 0;
+    }, [contourParameter, categoryValueIndex]);
+    return getContourWeight;
+}
+
 type Tooltip = (PickingInfo) => string;
 type P = [number, number];
 export function useScatterplotLayer() {
@@ -120,13 +133,15 @@ export function useScatterplotLayer() {
     const radiusScale = radius * course_radius;
 
     const data = useFilteredIndices();
-    const [cx, cy] = useParamColumns();
+    const [cx, cy, contourParameter] = useParamColumns();
     const hoverInfoRef = useRef<PickingInfo>(null);
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback((i: number) => {
         return i === highlightedIndex ? 0.2*radiusScale/scale : 0.0;
     }, [radiusScale, highlightedIndex]);
+    const getContourWeight1 = useContourWeight(contourParameter, config.category1);
+    const getContourWeight2 = useContourWeight(contourParameter, config.category2);
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
@@ -253,7 +268,9 @@ export function useScatterplotLayer() {
             getFillColor: colorBy, //this is working; removing it breaks the color change...
             // modelMatrix: modelMatrix, // this is not necessary, manipulating the matrix works anyway
             // getLineWith: clickIndex, // this does not work, seems to need something like a function
-            getLineWidth
+            getLineWidth,
+            //as of now, the SpatialLayer implemetation needs to figure this out for each sub-layer.
+            // getContourWeight1: config.category1, 
         },
         pickable: true,
         onHover: (info) => {
@@ -291,8 +308,10 @@ export function useScatterplotLayer() {
         contour_opacity: config.contour_opacity,
         category1: config.category1,
         category2: config.category2,
+        getContourWeight1,
+        getContourWeight2,
         extensions
-    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth,
+    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, getContourWeight1, getContourWeight2, scale, modelMatrix, extensions, chart, getLineWidth,
         // there must be a better way... right now this is really slow to re-render when tweaking config
         config.category1, config.category2, config.contour_bandwidth, config.contour_fill, config.contour_intensity, config.contour_opacity
     ]);

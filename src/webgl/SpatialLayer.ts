@@ -19,7 +19,11 @@ export type DualContourLayerProps = {
     contour_opacity: number,
 }
 
-export type SpatialLayerProps = ScatterplotLayerProps & DualContourLayerProps;
+export type SpatialLayerProps = ScatterplotLayerProps & DualContourLayerProps & {
+    // this is how we're doing these category filters for now
+    getContourWeight1: (i: number) => number,
+    getContourWeight2: (i: number) => number,
+};
 
 function rgb(r: number, g: number, b: number, a=255): [number, number, number, number] {
     return [r, g, b, a];
@@ -65,6 +69,10 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 // when deck updates we can use their category filter...
                 data: this.props.data,
                 opacity: 0.5,
+                getRadius: this.props.getContourWeight1,
+                updateTriggers: {
+                    getRadius: this.props.getContourWeight1
+                },
                 radiusScale: 100,
                 extensions: [new ScatterDensityExension()]
             })),
@@ -76,7 +84,10 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 data: this.props.data,
                 radiusPixels: 100, //todo - custom version that doesn't have to use pixels (simpler)
                 opacity: this.props.contour_intensity,
-                getWeight: (i: number) => 1, //todo category filter / potentially arbitrary weight fn
+                getWeight: this.props.getContourWeight2,
+                updateTriggers: {
+                    getWeight: this.props.getContourWeight2
+                },
                 // weightsTextureSize: 256,
                 colorRange: viridis,
                 // colorRange: contourColors,
