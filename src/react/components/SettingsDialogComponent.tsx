@@ -190,6 +190,7 @@ const FolderComponent = ({props}: {props: GuiSpec<'folder'>}) => {
     const settings = useMemo(() => (
         props.current_value.map(setting => ({setting, id: uuid()}))
     ), [props.current_value]);
+    if (settings.length === 0) return null;
     return (   
         <Accordion type='single' collapsible className="w-full col-span-2">
             <AccordionItem value={props.label}>
