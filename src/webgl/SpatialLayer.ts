@@ -29,6 +29,8 @@ const contourColors = Array.from({ length: 200 }, (_, i) => {
     const v = i % 20 <= 1 ? 255 : 0;
     return rgb(v, v, v, v);
 });
+const viridis = [rgb(0, 47, 97), rgb(0, 95, 133), rgb(0, 139, 152), rgb(0, 181, 153), rgb(24, 220, 130), rgb(151, 245, 84), rgb(255, 255, 0)] as const;
+
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     static layerName = 'SpatialLayer';
     static defaultProps = ScatterplotExLayer.defaultProps;
@@ -74,9 +76,9 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 data: this.props.data,
                 radiusPixels: 100, //todo - custom version that doesn't have to use pixels (simpler)
                 opacity: this.props.contour_intensity,
-                getWeight: (d: any) => 1,
+                getWeight: (i: number) => 1, //todo category filter / potentially arbitrary weight fn
                 // weightsTextureSize: 256,
-                colorRange: [rgb(0, 47, 97), rgb(0, 95, 133), rgb(0, 139, 152), rgb(0, 181, 153), rgb(24, 220, 130), rgb(151, 245, 84), rgb(255, 255, 0)],
+                colorRange: viridis,
                 // colorRange: contourColors,
                 // debounceTimeout: 1000,
                 // extensions: [new HeatmapContourExtension()] // doesn't do anything here - needs to apply to the right shader

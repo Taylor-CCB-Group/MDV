@@ -227,12 +227,12 @@ export class ExtendableHeatmapLayer extends HeatmapLayer {
                     return originalDraw.call(this, opts);
                 }
             }
-            console.log(">>> applying new getShaders() to TriangleLayer prototype...");
             const originalGetShaders = theClass.prototype.__originalGetShaders__;
             const myTriangleFS = heatmapPresentationFS;
             //thought we could get away without doing this every time we update the shader code...
             //but moving the shader to a separate module isn't enough to get this to work
             if (theClass.prototype.__lastShader !== myTriangleFS) {
+                console.log(">>> applying new getShaders() to TriangleLayer prototype...");
                 theClass.prototype.__lastShader = myTriangleFS;
                 theClass.prototype.getShaders = () => {
                     console.log(">>> getShaders called...");
