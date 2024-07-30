@@ -126,7 +126,7 @@ const Main = observer(() => {
         }
     }, [scatterProps.viewState, viewerStore.setState]);
     // TODO get viv working in popouts (seems to be some spurious feature-detection, should be fixed with new version of viv)
-    const layerConfigX = {
+    const layerConfig = useMemo(() => ({
         loader: ome,
         selections,
         contrastLimits,
@@ -135,8 +135,8 @@ const Main = observer(() => {
         channelsVisible,
         brightness,
         contrast
-    }
-    const deckProps = {
+    }), [ome, selections, contrastLimits, extensions, colors, channelsVisible, brightness, contrast]);
+    const deckProps = useMemo(() => ({
         getTooltip,
         style: {
             zIndex: '-1',
@@ -153,7 +153,7 @@ const Main = observer(() => {
         glOptions: {
             preserveDrawingBuffer: true,
         }
-    }
+    }), [scatterplotLayer, rectLayer, jsonLayer, id, getTooltip, scatterProps.onAfterRender]);
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
     return (
         <>
@@ -179,7 +179,7 @@ const Main = observer(() => {
             </pre>
             <VivViewer
                 views={[detailView]}
-                layerProps={[layerConfigX]}
+                layerProps={[layerConfig]}
                 viewStates={[{ ...viewState, id: detailId }]}
                 onViewStateChange={e => {
                     viewerStore.setState({ viewState: { ...e.viewState, id: detailId } });
