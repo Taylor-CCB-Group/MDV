@@ -320,9 +320,10 @@ export function useScatterplotLayer() {
         return p3;
     }, [scatterplotLayer, modelMatrix, currentLayerHasRendered, chart.contentDiv.getBoundingClientRect]);
     // const project = 
-    const onAfterRender = () => setCurrentLayerHasRendered(true);
-    return {
+    const onAfterRender = useCallback(() => setCurrentLayerHasRendered(true), []);
+    return useMemo(() => ({
         scatterplotLayer, getTooltip, modelMatrix, modelMatrixRef, viewState,
         currentLayerHasRendered, onAfterRender, unproject
-    };
+    }), [scatterplotLayer, getTooltip, modelMatrix, viewState,
+        currentLayerHasRendered, onAfterRender, unproject]);
 }

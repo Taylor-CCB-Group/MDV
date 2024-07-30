@@ -20,25 +20,15 @@ type ContourProps = {
     opacity: number,
 }
 
-function useContourWeight(contourParameter: DataColumn<any>, category: string) {
-    //todo consider what happens when contourParameter is not categorical/text-like.
-    //down the line we may consider modulating the weight etc.
-    const categoryValueIndex = useMemo(() => {
-        return contourParameter.values.indexOf(category);
-    }, [contourParameter, category]);
-    const getContourWeight = useCallback((i: number) => {
-        return contourParameter.data[i] === categoryValueIndex ? 1 : 0;
-    }, [contourParameter, categoryValueIndex]);
-    return getContourWeight;
-}
-
 function useColorRange(contourParameter: DataColumn<any>, category: string) {
     const ds = useDataStore();
     const columnColors = useMemo(() => ds.getColumnColors(contourParameter.name, {asArray: true, useValue: true}), [ds, contourParameter]);
     const categoryValueIndex = useMemo(() => {
+        if (!contourParameter || !contourParameter.values) return -1;
         return contourParameter.values.indexOf(category);
     }, [contourParameter, category]);
     const colorRange = useMemo(() => {
+        if (categoryValueIndex === -1) return [[0, 0, 0, 0]];
         const color = columnColors[categoryValueIndex];
         // return [[...color, 255], [...color, 255]];
         console.log('color', color, category);
@@ -47,32 +37,44 @@ function useColorRange(contourParameter: DataColumn<any>, category: string) {
     return colorRange;
 }
 
+function useCategoryFilterIndices(contourParameter: DataColumn<any>, category: string) {
+    const data = useFilteredIndices();
+    const categoryValueIndex = useMemo(() => {
+        if (!contourParameter || !contourParameter.values) return -1;
+        return contourParameter.values.indexOf(category);
+    }, [contourParameter, category]);
+    const filteredIndices = useMemo(() => {
+        if (categoryValueIndex === -1) return [];
+        return data.filter(i => contourParameter.data[i] === categoryValueIndex);
+    }, [data, categoryValueIndex, contourParameter]);
+    return filteredIndices;
+}
+
 export function useContour(props: ContourProps) {
     const {id, parameter, category, fill, bandwidth, intensity, opacity} = props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
-    const data = useFilteredIndices();
     const [cx, cy, contourParameter] = useParamColumns();
-    const getWeight = useContourWeight(contourParameter, category);
+    const data = useCategoryFilterIndices(contourParameter, category);
+    // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);
 
-    return useMemo(() => ({
-        id,
-        data,
-        getWeight,
-        opacity: intensity,
-        getPosition: (i: number, { target }: { target: number[] | Float32Array }) => {
-            target[0] = cx.data[i];
-            target[1] = cy.data[i];
-            target[2] = 0;
-            return target;
-        },
-        colorRange,
-        updateTriggers: {
-            getWeight
-        },
-        // debounceTimeout: 1000,
-    }), [id, data, getWeight, intensity, cx, cy, colorRange]);
+    return useMemo(() => {
+        if (!category) return undefined;
+        //todo if I return a layer here rather than props, will it behave as expected?
+        return {
+            id,
+            data,
+            opacity: intensity,
+            getPosition: (i: number, { target }: { target: number[] | Float32Array }) => {
+                target[0] = cx.data[i];
+                target[1] = cy.data[i];
+                target[2] = 0;
+                return target;
+            },
+            colorRange,
+        };
+    }, [id, data, category, intensity, cx, cy, colorRange]);
 }
 
 /** In future I think we want something more flexible & expressive,

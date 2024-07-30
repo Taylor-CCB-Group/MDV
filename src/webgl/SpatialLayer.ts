@@ -50,7 +50,8 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                 id: 'spatial.scatterplot',
             })),
             // now we need more layers, using gaussian density.
-            ...this.props.contourLayers.map((props) => new ExtendableHeatmapLayer(this.getSubLayerProps(props))),
+            // consider trying to render density map at lower resolution, then upscaling on debounce.
+            ...this.props.contourLayers.filter(l=>l).map((props) => new ExtendableHeatmapLayer(this.getSubLayerProps(props))),
         ];
     }
 }
