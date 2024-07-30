@@ -153,7 +153,6 @@ class CellRadialChart extends SVGChart{
 
     setLinkThicknessColumn(col){
         this.config.param[4]=col;
-        this._changeLinkThicknessScale(tq,null,true);
         const tq= this.dataStore.getColumnQuantile(col,0.01);
         this._changeLinkThicknessScale(tq,null,true);
     }

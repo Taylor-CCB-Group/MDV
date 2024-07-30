@@ -8,6 +8,7 @@ from datetime import datetime
 import os
 
 
+
 def register_global_routes(app, db, project_dir):
     
     @app.route('/')
@@ -92,13 +93,13 @@ def register_global_routes(app, db, project_dir):
     @app.route('/upload', methods=['POST'])
     def upload():
         try:
-            project_name = request.form.get('project_name')
+            project_name = request.form.get("project_name")
             if not project_name:
-                return jsonify({'error': 'Project name is missing.'}), 400
-            
-            file = request.files['file']
+                return jsonify({"error": "Project name is missing."}), 400
+
+            file = request.files["file"]
             if not file:
-                return jsonify({'error': 'No file selected.'}), 400
+                return jsonify({"error": "No file selected."}), 400
 
             file_path = os.path.join(app.config['projects_base_dir'], project_name, file.filename)  # type: ignore
 
@@ -125,7 +126,11 @@ def register_global_routes(app, db, project_dir):
 
                 db.session.commit()
 
-                return jsonify({'message': f'File "{file.filename}" under project "{project_name}" exists already. File has been replaced.'}), 200
+                return jsonify(
+                    {
+                        "message": f'File "{file.filename}" under project "{project_name}" exists already. File has been replaced.'
+                    }
+                ), 200
             else:
                 # Save the file to the uploads directory
                 file.save(file_path)
@@ -136,6 +141,10 @@ def register_global_routes(app, db, project_dir):
                 db.session.add(new_file)
                 db.session.commit()
 
-                return jsonify({'message': f'File uploaded successfully under project "{project_name}"'}), 200
+                return jsonify(
+                    {
+                        "message": f'File uploaded successfully under project "{project_name}"'
+                    }
+                ), 200
         except Exception as e:
             return jsonify({'error in /upload api': str(e)}), 500

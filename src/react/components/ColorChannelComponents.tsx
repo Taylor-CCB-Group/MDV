@@ -5,6 +5,7 @@ import { VivProvider, useChannelsStore, useChannelsStoreApi, useImageSettingsSto
 import { Checkbox, FormControl, InputLabel, MenuItem, Select, Slider } from "@mui/material";
 import { PopoverPicker } from "./ColorPicker";
 import { getSingleSelectionStats } from "./avivatorish/utils";
+import { X } from 'lucide-react';
 
 export default function MainVivColorDialog() {
     return (
@@ -88,6 +89,61 @@ const ChannelChooser = ({index}: {index: number}) => {
     )
 }
 
+const BrightnessContrast = ({ index }: { index: number }) => {
+    const { contrast, brightness } = useChannelsStore(({ contrast, brightness }) => ({ contrast, brightness }));
+    const channelsStore = useChannelsStoreApi();
+    const isChannelLoading = useViewerStore(state => state.isChannelLoading);
+    return (
+        <div className="col-span-5 pl-2 pr-2 flex items-center gap-4">
+        contrast:
+            <Slider
+                size="small"
+                disabled={isChannelLoading[index]}
+                value={contrast[index]}
+                min={0.1}
+                max={0.9}
+                step={0.01}
+                onChange={(_, v) => {
+                    contrast[index] = v as number;
+                    const newContrast = [...contrast];
+                    channelsStore.setState({ contrast: newContrast });
+                }}
+                onClick={e => {
+                    // reset value on double-click
+                    if (e.detail === 2) {
+                        contrast[index] = 0.5;
+                        const newContrast = [...contrast];
+                        channelsStore.setState({ contrast: newContrast });
+                    }
+                }}
+            />
+        brightness:
+            <Slider
+                size="small"
+                disabled={isChannelLoading[index]}
+                value={brightness[index]}
+                min={0.01}
+                max={0.99}
+                step={0.01}
+                onChange={(_, v) => {
+                    brightness[index] = v as number;
+                    const newbrightness = [...brightness];
+                    channelsStore.setState({ brightness: newbrightness });
+                }}
+                onClick={e => {
+                    // reset value on double-click
+                    if (e.detail === 2) {
+                        brightness[index] = 0.5;
+                        const newbrightness = [...brightness];
+                        channelsStore.setState({ brightness: newbrightness });
+                    }
+                }}
+            />
+        </div>
+    )
+}
+
+
 const ChannelController = ({ index }: { index: number }) => {
     const limits = useChannelsStore(({ contrastLimits }) => contrastLimits); //using shallow as per Avivator *prevents* re-rendering which should be happening
     const {colors, domains, channelsVisible, removeChannel} = useChannelsStore(({ colors, domains, channelsVisible, removeChannel }) => (
@@ -135,6 +191,7 @@ const ChannelController = ({ index }: { index: number }) => {
             />
             <Slider
                 size="small"
+                //slotProps={{ thumb: {  } }} //todo smaller thumb
                 disabled={isChannelLoading[index]}
                 style={{ color: colorString, marginLeft: '10px' }}
                 value={limits[index]}
@@ -147,13 +204,14 @@ const ChannelController = ({ index }: { index: number }) => {
                     channelsStore.setState({ contrastLimits });
                 }}
             />
-            <button
-            style={{marginLeft: '12px'}}
+            <button type="button"
+            className="pl-4"
             onClick={() => {
                 removeChannel(index);
             }}>
-                x
+                <X />
             </button>
+            <BrightnessContrast index={index} />
         </div>
         </>
     )
@@ -167,7 +225,8 @@ const AddChannel = () => {
     const canAddChannel = selections.length < 6;
     const addChannel = useChannelsStore(state => state.addChannel);
     const {use3d, setIsChannelLoading} = useViewerStore(({use3d, setIsChannelLoading}) => ({use3d, setIsChannelLoading}), shallow);
-    return <button 
+    return <button type="button"
+    className="p-2 rounded-lg bg-slate-400"
     disabled={!canAddChannel}
     onClick={async () => {
         // would be nice to have less repition of this code here and in ChannelController
@@ -191,10 +250,10 @@ const AddChannel = () => {
 }
 
 export const Test = () => {
-    const colors = useChannelsStore(({ colors }) => colors);
-    return <div style={{width: '100%'}}>{
-        colors.map((_, i) => (
-            <ChannelController key={i} index={i} />
+    const ids = useChannelsStore(({ ids }) => ids);
+    return <div className="bg-[hsl(var(--input))] w-full">{
+        ids.map((id, i) => (
+            <ChannelController key={id} index={i} />
         ))}
         <AddChannel />
     </div>

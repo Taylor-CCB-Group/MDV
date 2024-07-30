@@ -10,7 +10,7 @@ function MTag({tag, tagModel}: {tag: string, tagModel: TagModel}) {
     return (
     <div className="bg-blue-600 p-2 m-1 rounded-lg flex justify-between items-center">
         {tag}
-        <button onClick={() => tagModel.setTag(tag, false)}>
+        <button type="button" onClick={() => tagModel.setTag(tag, false)}>
             <X />
         </button>
     </div>

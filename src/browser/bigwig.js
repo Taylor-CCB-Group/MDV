@@ -525,7 +525,8 @@ class BWReader{
 
     async loadRPTree(offset) {
         let rpTree = this.rpTreeCache[offset];
-        if (!rpTree) {
+        //sometimes the rptree loads but has no root node if there was a network error
+        if (!rpTree && rpTree.rootNode) {
             rpTree = new RPTree(offset, this.contentLength, this.config, this.littleEndian);
             this.rpTreeCache[offset] = rpTree;
             await rpTree.load()
@@ -678,7 +679,6 @@ class RPTree{
             console.log("null item");
             return false;
         }
-
         return ((chrIdx > item.startChrom) || (chrIdx == item.startChrom && endBase >= item.startBase)) &&
             ((chrIdx < item.endChrom) || (chrIdx == item.endChrom && startBase < item.endBase));
     }

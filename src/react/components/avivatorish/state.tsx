@@ -47,12 +47,17 @@ export type ChannelsState = {
   selections: { z: number, c: number, t: number }[],
   loader: any, //TBD
   image: number,
-  ids: string[]
+  ids: string[],
+  // props for VivContrastExtension
+  brightness: number[],
+  contrast: number[],
 }
 
 export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
   channelsVisible: [] as boolean[],
   contrastLimits: [] as [number, number][],
+  brightness: [] as number[], //not ending up as mobx observables... not sure why
+  contrast: [] as number[],
   colors: [],
   domains: [] as [number, number][],
   selections: [] as { z: number, c: number, t: number }[],
@@ -64,6 +69,8 @@ export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
 const DEFAUlT_CHANNEL_VALUES = {
   channelsVisible: true,
   contrastLimits: [0, 65535],
+  brightness: 0.5,
+  contrast: 0.5,
   colors: [255, 255, 255],
   domains: [0, 65535],
   selections: { z: 0, c: 0, t: 0 },
@@ -108,6 +115,7 @@ const DEFAULT_VIEWER_STATE = {
   source: null as { urlOrFile: string, description: string } | null,
   pyramidResolution: 0
 };
+type ViewerState = typeof DEFAULT_VIEWER_STATE;
 
 // --- following how VivViewerMDV _parseChannels() works: (not used) ---
 // export type MdvVivChannelConfig = {
@@ -126,9 +134,9 @@ export type VivConfig = {
   // vs...
   // image_properties: ChannelsState,
   // vs...
-  viewerStore?: Partial<ViewerStore>,
-  channelsStore?: Partial<ChannelsStore>,
-  imageSettingsStore?: Partial<ImageSettingsStore>,
+  viewerStore?: Partial<ViewerState>,
+  channelsStore?: Partial<ChannelsState>,
+  imageSettingsStore?: Partial<ImageState>,
   //>>>?
   url: string
 }
@@ -155,7 +163,7 @@ export type VivContextType = {
     addChannel: (newProperties: Partial<typeof DEFAUlT_CHANNEL_VALUES>) => void
   }>,
   imageSettingsStore: ZustandStore<WithToggles<ImageState>>,
-  viewerStore: ZustandStore<WithToggles<typeof DEFAULT_VIEWER_STATE> & {
+  viewerStore: ZustandStore<WithToggles<ViewerState> & {
     setIsChannelLoading: (index: number, val: boolean) => void,
     addIsChannelLoading: (val: boolean) => void,
     removeIsChannelLoading: (index: number) => void
@@ -320,3 +328,24 @@ export const useMetadata = () => {
   return Array.isArray(metadata) ? metadata[image] : metadata;
 };
 
+/** Add default values to a *config* (not an instance of actual store) that may have been serialized before
+ * certain properties were added to the model. For example, brightness and contrast did not exist,
+ * there should be arrays of correct length corresponding to the number of channels.
+ */
+export const applyDefaultChannelState = (config: Partial<VivConfig>) => {
+  // return config as VivConfig;
+  const newConfig = config as VivConfig;
+  //seemed like simplest way to deal with viv's fixed number of channels, but doesn't work after manipulation
+  const n = 6;//newConfig.channelsStore.channelsVisible.length; 
+  if (!newConfig.channelsStore) newConfig.channelsStore = {};
+  for (const [k, v] of Object.entries(DEFAUlT_CHANNEL_VALUES)) {
+    if (k === "ids") continue;
+    // it would be nice if this was more generic, but for now we are explicitly dealing with brightness and contrast...
+    if (k !== "brightness" && k !== "contrast") continue;
+    if (newConfig.channelsStore[k] === undefined) {
+      console.log(`adding default value ${v} for`, k);
+      newConfig.channelsStore[k] = new Array(n).fill(v);
+    }
+  }
+  return newConfig;
+}

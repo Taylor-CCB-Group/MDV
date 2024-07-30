@@ -9,6 +9,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion"
+import { v4 as uuid } from 'uuid';
 
 const TextComponent = ({props}: {props: GuiSpec<'text'>}) => (
         <>
@@ -88,12 +89,13 @@ const DropdownComponent = ({props}: {props: GuiSpec<'dropdown' | 'multidropdown'
                 props.current_value = e.target.value;
                 if (props.func) props.func(e.target.value);
             })}>
-                {props.values[0].map((item, i) => {
+                {props.values[0].map((item) => {
                     const s = props;
                     const text = s.values.length > 1 ? item[s.values[1]] : item;
                     const value = s.values.length > 1 ? item[s.values[2]] : item;
+                    const id = uuid();
                     if (filterArray.some(f => !text.toLowerCase().includes(f))) return null;
-                    return <option key={i} value={value}>{text}</option>
+                    return <option key={id} value={value}>{text}</option>
                 })}
             </select>
             <div />
@@ -116,7 +118,9 @@ const CheckboxComponent = ({props}: {props: GuiSpec<'check'>}) => (
     );
 
 const RadioButtonComponent = ({props}: {props: GuiSpec<'radiobuttons'>}) => {
-    const id = useId();
+    const choices = useMemo(() => (
+        props.choices.map(v => ({v, id: uuid()}))
+    ), [props.choices]);
     return (
         <>
             <label>{props.label}</label>
@@ -139,20 +143,19 @@ const RadioButtonComponent = ({props}: {props: GuiSpec<'radiobuttons'>}) => {
                 })}
             </RadioGroup> */}
             <div className="ciview-radio-group">
-                {props.choices.map((v, i) => (
-                    <>
+                {choices.map(({v, id}) => (
+                    <span key={id}>
                         <span 
                         className="m-1"
-                        key={i + id}
                         >
                             {v[0]}
                         </span>
-                        <input key={`${i + id}input`}
+                        <input
                         type="radio" value={v[1]} checked={v[1] === props.current_value} onChange={action(e => {
                             props.current_value = e.currentTarget.value;
                             if (props.func) props.func(e.currentTarget.value);
                         })}/>
-                    </>
+                    </span>
                 ))}
             </div>
         </>
@@ -175,22 +178,28 @@ const DoubleSliderComponent = ({props}: {props: GuiSpec<'doubleslider'>}) => (
 
 const ButtonComponent = ({props}: {props: GuiSpec<'button'>}) => (
         <>
-            <button onClick={action(e => {
+            <button type="button" onClick={action(e => {
                 if (props.func) props.func(undefined);
             })}>{props.label}</button>
         </>
     );
 
-const FolderComponent = ({props}: {props: GuiSpec<'folder'>}) => (
+const FolderComponent = ({props}: {props: GuiSpec<'folder'>}) => {
+    // add uuid to each setting to avoid key collisions
+    const settings = useMemo(() => (
+        props.current_value.map(setting => ({setting, id: uuid()}))
+    ), [props.current_value]);
+    return (   
         <Accordion type='single' collapsible className="w-full col-span-2">
             <AccordionItem value={props.label}>
                 <AccordionTrigger>{props.label}</AccordionTrigger>
                 <AccordionContent>
-                    {props.current_value.map((setting, i) => <AbstractComponent key={i} props={setting} />)}
+                    {settings.map(({setting, id}) => <AbstractComponent key={id} props={setting} />)}
                 </AccordionContent>
             </AccordionItem>
         </Accordion>
     )
+}
 
 const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> = {
     'text': observer(TextComponent),
@@ -209,7 +218,7 @@ const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> =
 const ErrorComponent = ({props}: {props: GuiSpec<GuiSpecType>}) => {
     const [expanded, setExpanded] = useState(false);
     return (
-        <div className="border-red-500 border-2 border-solid" onClick={e => setExpanded(!expanded)}>
+        <div className="border-red-500 border-2 border-solid" onClick={() => setExpanded(!expanded)}>
             <h2>Error...</h2>
             <pre>{JSON.stringify(props, null, 2).substring(0, expanded ? undefined : 100)}</pre>
         </div>
@@ -229,14 +238,14 @@ const AbstractComponent = observer(({props}: {props: GuiSpec<GuiSpecType>}) => {
 
 export default observer(({chart}: {chart: Chart}) => {
     const settings = useMemo(() => {
-        const settings = chart.getSettings();
+        const settings = chart.getSettings().map(setting => ({setting, id: uuid()}));
         const wrap = {settings};
         makeAutoObservable(wrap);
         return wrap.settings;
     }, [chart]);
     return (
         <div className="w-full">
-            {settings.map((setting, i) => <AbstractComponent key={i} props={setting} />)}
+            {settings.map(({setting, id}) => <AbstractComponent key={id} props={setting} />)}
         </div>
     )
 })

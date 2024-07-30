@@ -1,3 +1,4 @@
+// biome-ignore lint/suspicious/noGlobalAssign: relatively innocuous in simple web worker
 onmessage=(e)=> {
     const {orderBuffer,filterBuffer,dimensions,data,displayData,colorScale,colorOnly}=e.data;
     //get access to the shared buffers

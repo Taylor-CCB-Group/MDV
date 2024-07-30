@@ -2,6 +2,7 @@
 
 from mdvtools.charts.base_plot import BasePlot
 
+
 class RingChart(BasePlot):
     def __init__(self, title, param, size, position, id=None):
         super().__init__(title, "ring_chart", [param], size, position, id)
@@ -30,8 +31,7 @@ class RingChart(BasePlot):
     def set_tick_font(self, tick_font):
         self.plot_data["axis"]["x"]["tickfont"] = tick_font
 
-    #def set_hole_size(self, hole_size):
+    # def set_hole_size(self, hole_size):
     #    self.hole_size = hole_size
 
-    
     # Additional methods specific to ring charts can be added here

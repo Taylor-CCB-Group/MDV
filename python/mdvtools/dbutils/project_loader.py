@@ -3,6 +3,7 @@ import json
 from mdvtools.mdvproject import MDVProject
 from mdvtools.dbutils.dbmodels import Project
 
+
 # def load_projects_from_config(base_dir):
 #     config_file = os.path.join(base_dir, 'project_config.json')
 #     config_projects = []

@@ -174,7 +174,9 @@ class VivScatterPlot extends DensityScatterPlot{
     // PJT *Channel methods moved to VivViewerMDV.
 
     remove(){
-        this.viv.deck.finalize();
+        if (this.viv.deck){
+            this.viv.deck.finalize();
+        }
         super.remove();  
     }
 

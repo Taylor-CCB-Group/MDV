@@ -1,8 +1,4 @@
-
-
-
-
-
+// biome-ignore lint/suspicious/noGlobalAssign: relatively innocuous in simple web worker
 onmessage= (e)=> {
     const config = e.data[3];
     const dtype = config.datatype==="text16" || config.datatype==="multitext"?Uint16Array:Uint8Array

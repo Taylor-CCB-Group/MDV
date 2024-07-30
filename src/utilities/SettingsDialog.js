@@ -117,6 +117,17 @@ class SettingsDialog extends BaseDialog{
         }
     }
 
+
+    colorChooser(s,d){
+        const cc = createEl("input",{
+            type:"color",
+            value:s.current_value
+        },d);
+        cc.addEventListener("change",(e)=>{
+            s.func(cc.value);
+        })
+    }
+
     button(s,d){
         d.style.textAlign = "center";
         createEl("button",{

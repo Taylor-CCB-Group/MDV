@@ -12,6 +12,7 @@
     "build": "cross-env build=desktop vite build --outDir ./dist",
     "build-nofont": "cross-env build=production nofont=true vite build --outDir ./dist/basic",
     "build-flask-vite": "cross-env build=desktop_pt vite build --outDir ./python/mdvtools/static",
+    "build-flask-dockerjs": "cross-env build=desktop_pt vite build --outDir ./dist/flask",
     "docs-env-setup": "python -m venv docsenv && source docsenv/bin/activate && cd docs && pip install -r requirements.txt && npm run build-docs-nix",
     "build-docs": "sphinx-build -M html docs/maindocs docs/maindocs/_build",
     "build-docs-nix": "source docsenv/bin/activate && npm run build-docs",
@@ -26,7 +27,9 @@
     "docker_stack_rm": "docker stack rm mdv_stack",
     "docker_createandpush": "docker build -t my_mdv_app_image:latest . && docker tag my_mdv_app_image:latest jayeshire/my_mdv_app_image:latest && docker push jayeshire/my_mdv_app_image:latest",
     "docker_stack_deploy": "docker stack deploy -c docker-compose-stack.yml mdv_stack",
-    "fix_npm_win": "npm config set script-shell \"cmd\""
+    "fix_npm_win": "npm config set script-shell \"cmd\"",
+    "jslint": "biome lint --write ./src",
+    "jsformat": "biome format --write ./src"
   },
   "repository": {
     "type": "git",
@@ -84,6 +87,7 @@
     "styled-components": "^6.1.8",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
+    "uuid": "^10.0.0",
     "wordcloud": "^1.2.2",
     "zustand": "^4.4.5"
   },
