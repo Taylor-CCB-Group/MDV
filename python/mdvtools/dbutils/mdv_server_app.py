@@ -45,7 +45,7 @@ def load_config(app):
     db_user = read_secret('db_user')
     db_password = read_secret('db_password')
     db_name = read_secret('db_name')
-    db_host = app.config['db_container']
+    db_host = app.config['db_host']
 
     if not all([db_user, db_password, db_name, db_host]):
         print("Error: One or more required secrets or configurations are missing.")
