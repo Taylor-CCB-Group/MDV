@@ -3,6 +3,8 @@ import { useMemo, useCallback } from "react";
 import { useConfig, useParamColumns } from "./hooks";
 import { useFilteredIndices } from "./scatter_state";
 import { useChart, useDataStore } from "./context";
+import { useViewerStore } from "./components/avivatorish/state";
+import { useDebounce } from "use-debounce";
 
 
 /** need to be clearer on which prop types are for which parts of layer spec...
@@ -58,10 +60,18 @@ export function useContour(props: ContourProps) {
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);
+    const {zoom } = useViewerStore(store => store.viewState);
+    // we can compensate so that we don't have radiusPixels, but it makes it very slow...
+    //won't be necessary when we implement heatmap differently
+    const [debounceZoom] = useDebounce(zoom, 500);
+    
 
     return useMemo(() => {
         if (!category) return undefined;
-        //todo if I return a layer here rather than props, will it behave as expected?
+        //If I return a layer here rather than props, will it behave as expected?
+        //not really - we want to pass this into getSublayerProps() so the id is used correctly
+        const radiusPixels = 20*bandwidth * 2 ** debounceZoom;
+        // console.log('radiusPixels', radiusPixels);
         return {
             id,
             data,
@@ -73,8 +83,10 @@ export function useContour(props: ContourProps) {
                 return target;
             },
             colorRange,
+            radiusPixels,
+            debounce: 1000,
         };
-    }, [id, data, category, intensity, cx, cy, colorRange]);
+    }, [id, data, category, intensity, cx, cy, colorRange, debounceZoom, bandwidth]);
 }
 
 /** In future I think we want something more flexible & expressive,
