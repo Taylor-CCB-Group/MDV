@@ -1,6 +1,7 @@
 import os
 import time
 import json
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from flask import Flask, render_template, jsonify
 #from flask_sqlalchemy import SQLAlchemy
@@ -23,8 +24,9 @@ def wait_for_database():
 
     for attempt in range(max_retries):
         try:
-            # Test database connection
-            db.engine.execute('SELECT 1')
+            # Test database connection using engine.connect()
+            with db.engine.connect() as connection:
+                connection.execute(text('SELECT 1'))
             print("************ Database is ready! ************")
             return
         except OperationalError:
