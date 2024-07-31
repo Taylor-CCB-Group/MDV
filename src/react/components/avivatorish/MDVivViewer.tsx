@@ -60,7 +60,7 @@ type VivViewerWrapperState = { viewStates: any }
  * @property {HandleCoordinate} handleCoordinate
  * @ignore
  */
-class VivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivViewerWrapperState> {
+class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivViewerWrapperState> {
     constructor(props) {
         console.warn('using custom VivViewerWrapper via MDVivViewer for testing');
         super(props);
@@ -336,4 +336,4 @@ class VivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivVie
  * although I may still want to add some types to the regular VivViewer
  * and this can maybe be useful for debugging sometimes.
  */
-export default (props: VivViewerWrapperProps) => <VivViewerWrapper {...props} />
+export default (props: VivViewerWrapperProps) => <MDVivViewerWrapper {...props} />

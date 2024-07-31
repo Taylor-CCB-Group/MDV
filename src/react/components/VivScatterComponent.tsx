@@ -10,7 +10,7 @@ import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
 import { SpatialAnnotationProvider, useRange } from "../spatial_context";
 import { GeoJsonLayer, PolygonLayer } from "deck.gl/typed";
-import { getVivId } from "./avivatorish/MDVivViewer";
+import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
@@ -104,7 +104,7 @@ const Main = observer(() => {
     const vsRef = useRef<ViewState>();
     const vsDebugDivRef = useRef<HTMLPreElement>(null);
     
-    useLayoutEffect(() => {
+    useEffect(() => {
         if (!ome) return;
         if (!viewState) {
             //WIP <-- c.f. Avivator's useViewerStore() hook
@@ -177,7 +177,7 @@ const Main = observer(() => {
             }}
             >
             </pre>
-            <VivViewer
+            <MDVivViewer
                 views={[detailView]}
                 layerProps={[layerConfig]}
                 viewStates={[{ ...viewState, id: detailId }]}
