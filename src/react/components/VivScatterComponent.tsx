@@ -14,6 +14,7 @@ import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
+import { trace } from "mobx";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -155,28 +156,10 @@ const Main = observer(() => {
         }
     }), [scatterplotLayer, rectLayer, jsonLayer, id, getTooltip, scatterProps.onAfterRender]);
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
+    if (import.meta.env.DEV) trace();
     return (
         <>
             <SelectionOverlay {...scatterProps} />
-            <pre ref={vsDebugDivRef} 
-            style={{ 
-                display: 'none', // <-- set to block to debug viewState
-                position: 'absolute', bottom: 2, left: 2, zIndex: 1000, backgroundColor: 'rgba(40,40,40,0.5)',
-                backdropFilter: 'blur(2px)',
-                outline: '1px solid white',
-                fontSize: '9px',
-                //  pointerEvents: 'none'
-            }}
-            onClick={() => {
-                // center on image
-                const vs = getDefaultInitialViewState(ome, { width, height }) as any;
-                vs.zoom = (vs.zoom || -10) + Math.random()*0.0001; //salt the zoom to force a re-render
-                vsRef.current = vs;
-                // setViewState(vs);
-                viewerStore.setState({ viewState: vs });
-            }}
-            >
-            </pre>
             <MDVivViewer
                 views={[detailView]}
                 layerProps={[layerConfig]}
