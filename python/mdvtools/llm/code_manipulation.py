@@ -52,6 +52,8 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
         ),
     ]
 
+    pattern_multiline = re.compile(r'def\s+(\w*)\s*\((.*?)\):\s*\n(.*?)MultiLinePlot\((.*?)\)', re.DOTALL)
+
     for pattern in patterns:
         if pattern.search(script):
             # Define a regex pattern to find params and param patterns
@@ -63,6 +65,7 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
                 # Extract parameter names
                 if "params" in matched_text:
                     param_list = re.findall(r"\'(.*?)\'", matched_text)
+                    param_list = re.findall(r"\"(.*?)\"", matched_text)
                 else:
                     param_list = [re.findall(r"\"(.*?)\"", matched_text)[0]]
 
@@ -101,6 +104,54 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
             modified_script = re.sub(pattern_param, reorder_params, script)
 
             return modified_script
+
+    if pattern_multiline.search(script):
+        # Define a regex pattern to find params and param patterns
+        pattern_param = re.compile(r'params\s*=\s*\[.*?\]|param\s*=\s*".*?"')
+        
+        def reorder_params_multiline(match_param):
+            matched_text = match_param.group(0)  # Get the entire matched text
+
+            # Extract parameter names
+            if 'params' in matched_text:
+                param_list = re.findall(r'\'(.*?)\'', matched_text)
+                param_list = re.findall(r'\"(.*?)\"', matched_text)
+            else:
+                param_list = [re.findall(r'\"(.*?)\"', matched_text)[0]]
+            
+            # Check for the presence of categorical and numerical variables
+            has_categorical = any(is_categorical(param) for param in param_list)
+            has_numerical = any(is_numerical(param) for param in param_list)
+
+            # Add a categorical variable if none is present
+            if not has_categorical and categorical_columns:
+                param_list.insert(0, categorical_columns[0])
+                has_categorical = True
+
+            if len(param_list) < 2:
+                return matched_text  # No need to reorder if there are fewer than 2 parameters
+
+            first_param = param_list[0]
+            second_param = param_list[1]
+
+            # Check the types of the parameters using the dataframe
+            #if first_param in df.columns and second_param in df.columns:
+            if has_categorical and has_numerical:
+                if not (is_numerical(first_param) and is_categorical(second_param)):
+                    param_list[0], param_list[1] = param_list[1], param_list[0]
+
+            # Reconstruct the parameters with reordered values
+            if 'params' in matched_text:
+                reordered_params = f"params = ['{param_list[0]}', '{param_list[1:]}']"
+            else:
+                reordered_params = f'param = "{param_list[0]}"'
+
+            return reordered_params.replace('\'[', ' ').replace(']\'','')
+
+        # Substitute the matches with reordered parameters
+        modified_script_multiline = re.sub(pattern_param, reorder_params_multiline, script)
+
+        return modified_script_multiline
 
     return script
 

@@ -22,6 +22,7 @@ from mdvtools.charts.abundance_box_plot import AbundanceBoxPlot
 from mdvtools.charts.stacked_row_plot import StackedRowChart
 from mdvtools.charts.ring_chart import RingChart
 from mdvtools.charts.violin_plot import ViolinPlot
+from mdvtools.charts.multi_line_plot import MultiLinePlot
 import json
 
 def load_data(path):
