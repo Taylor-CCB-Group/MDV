@@ -1,5 +1,7 @@
 import os
+import time
 import json
+from sqlalchemy.exc import OperationalError
 from flask import Flask, render_template, jsonify
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
@@ -12,6 +14,25 @@ from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService
+
+
+def wait_for_database():
+    """Wait for the database to be ready before proceeding."""
+    max_retries = 30
+    delay = 5  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            # Test database connection
+            db.engine.execute('SELECT 1')
+            print("********** Database is ready ************")
+            return
+        except OperationalError:
+            print(f"Database not ready, retrying in {delay} seconds...")
+            time.sleep(delay)
+    
+    print("Error: Database did not become available in time.")
+    exit(1)
 
 
 def load_config(app):
@@ -311,6 +332,7 @@ with app.app_context():
 
 if __name__ == '__main__':
     print("In main..")
+    wait_for_database()
     app.run(host='0.0.0.0', debug=True, port=5055)
     
     
