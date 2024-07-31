@@ -14,6 +14,8 @@ services:
     deploy:
       restart_policy:
         condition: none  # Prevent restarting on failure 
+    networks:
+      - app_net
 
   mdv_db:
     image: postgres:latest
@@ -27,6 +29,8 @@ services:
       - db_user
       - db_password
       - db_name
+    networks:
+      - app_net
 
 secrets:
   db_user:
