@@ -1,4 +1,4 @@
-import type { _ConstructorOf } from "@deck.gl/core/typed";
+import type { LayersList, UpdateParameters, _ConstructorOf } from "@deck.gl/core/typed";
 import { LayerExtension } from "deck.gl";
 import { HeatmapLayer, type Layer } from "deck.gl/typed";
 import heatmapPresentationFS from './shaders/heatmap-presentation-layer-fragment.glsl?raw';
@@ -186,6 +186,7 @@ export default class HeatmapContourExtension extends LayerExtension {
         }
     }
 }
+type ExtraContourProps = { contourOpacity: number };
 
 
 /** Original HeatmapLayer doesn't seem to apply extensions...
@@ -200,7 +201,7 @@ export default class HeatmapContourExtension extends LayerExtension {
  * other aspects of how the heatmap is rendered 
  * - i.e. with a kernel in screen pixels vs coordinates.
  */
-export class ExtendableHeatmapLayer extends HeatmapLayer {
+export class ExtendableHeatmapLayer extends HeatmapLayer<Uint32Array, ExtraContourProps> {
     getShaders(type) {
         // type is just used as `type === 'max-weights-transform'`
         // not to distinguish e.g. between weights transform and color rendering.
@@ -212,6 +213,21 @@ export class ExtendableHeatmapLayer extends HeatmapLayer {
         shaders._fs = `#version 300 es\n${shaders._fs}`;
         return shaders;
     }
+    // updateState(opts: UpdateParameters<this>): void {
+    //     super.updateState(opts);
+    //     const { props } = opts;
+    //     const { contourOpacity } = props;
+    //     if (contourOpacity === undefined) {
+    //         throw new Error('contourOpacity must be defined');
+    //     }
+    //     // how do we update the state of a sublayer?
+    //     super.updateState(opts);
+    // }
+    // renderLayers(): LayersList | Layer<ExtraContourProps> {
+    //     const layer = super.renderLayers() as any;
+    //     layer.setState({ contourOpacity: this.props.contourOpacity });
+    //     return layer;
+    // }
     // biome-ignore lint/complexity/noBannedTypes: banned types are the least of our worries here
     protected getSubLayerClass<T extends Layer<{}>>(subLayerId: string, DefaultLayerClass: _ConstructorOf<T>): _ConstructorOf<T> {
         const theClass = super.getSubLayerClass(subLayerId, DefaultLayerClass);
@@ -244,6 +260,23 @@ export class ExtendableHeatmapLayer extends HeatmapLayer {
                     return shaders;
                 }
             }
+            // // I need to get a property from the HeatmapLayer props into the sublayer...
+            // if (!theClass.prototype.__originalUpdateState__) {
+            //     console.log(">>> saving original updateState()... this should only happen once...");
+            //     theClass.prototype.__originalUpdateState__ = theClass.prototype.updateState;
+            //     theClass.prototype.updateState = function (params) {
+            //         console.log(">>> updateState called...");
+            //         const { props } = params;
+            //         const { contourOpacity } = props as ExtraContourProps;
+            //         if (contourOpacity === undefined) {
+            //             throw new Error('contourOpacity must be defined');
+            //         }
+            //         for (const model of this.getModels()) {
+            //             model.setUniforms({ contourOpacity });
+            //         }
+            //         return this.__originalUpdateState__(params);
+            //     }
+            // }
         }
         return theClass;
     }

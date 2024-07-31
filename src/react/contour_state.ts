@@ -76,6 +76,7 @@ export function useContour(props: ContourProps) {
             id,
             data,
             opacity: fill ? intensity : 0,
+            contourOpacity: opacity,
             getPosition: (i: number, { target }: { target: number[] | Float32Array }) => {
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
@@ -88,7 +89,7 @@ export function useContour(props: ContourProps) {
             weightsTextureSize: 512, //there could be a performance related parameter to tweak
             pickable: false,
         };
-    }, [id, data, category, intensity, cx, cy, colorRange, debounceZoom, bandwidth, fill]);
+    }, [id, data, category, intensity, cx, cy, colorRange, debounceZoom, bandwidth, fill, opacity]);
 }
 
 /** In future I think we want something more flexible & expressive,
