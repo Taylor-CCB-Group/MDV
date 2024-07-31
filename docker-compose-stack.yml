@@ -1,6 +1,6 @@
 services:
   mdv_app:
-    image: jayeshire/my_mdv_app_image:latest
+    image: my_mdv_app_image
     ports:
       - "5055:5055"
     volumes:
