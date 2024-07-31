@@ -7,9 +7,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from './components/VivScatterComponent';
-import { ScatterplotExLayer } from '../webgl/ImageArrayDeckExtension';
+// import { ScatterplotExLayer } from '@/webgl/ScatterplotExLayer';
+import SpatialLayer from '@/webgl/SpatialLayer';
 import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 import { useHighlightedIndex } from './selectionHooks';
+import type { DataColumn } from '@/charts/charts';
+import { useLegacyDualContour } from './contour_state';
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -107,6 +110,18 @@ export function useScatterModelMatrix() {
     return {modelMatrix, setModelMatrix};
 }
 
+function useContourWeight(contourParameter: DataColumn<any>, category: string) {
+    //todo consider what happens when contourParameter is not categorical/text-like.
+    //down the line we may consider modulating the weight etc.
+    const categoryValueIndex = useMemo(() => {
+        return contourParameter.values.indexOf(category);
+    }, [contourParameter, category]);
+    const getContourWeight = useCallback((i: number) => {
+        return contourParameter.data[i] === categoryValueIndex ? 1 : 0;
+    }, [contourParameter, categoryValueIndex]);
+    return getContourWeight;
+}
+
 type Tooltip = (PickingInfo) => string;
 type P = [number, number];
 export function useScatterplotLayer() {
@@ -119,13 +134,14 @@ export function useScatterplotLayer() {
     const radiusScale = radius * course_radius;
 
     const data = useFilteredIndices();
-    const [cx, cy] = useParamColumns();
+    const [cx, cy, contourParameter] = useParamColumns();
     const hoverInfoRef = useRef<PickingInfo>(null);
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback((i: number) => {
         return i === highlightedIndex ? 0.2*radiusScale/scale : 0.0;
     }, [radiusScale, highlightedIndex]);
+    const contourLayers = useLegacyDualContour();
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip) return undefined;
@@ -231,8 +247,8 @@ export function useScatterplotLayer() {
     }, [point_shape]);
     const [currentLayerHasRendered, setCurrentLayerHasRendered] = useState(false);
     const scatterplotLayer = useMemo(() => {
-        setCurrentLayerHasRendered(false);
-        return new ScatterplotExLayer({
+        setCurrentLayerHasRendered(false); //<<< this is fishy
+        return new SpatialLayer({ //new
         // loaders //<< this will be interesting to learn about
         id: `scatter_${getVivId(`${id}detail-react`)}`, // should satisfy VivViewer, could make this tidier
         data,
@@ -251,7 +267,9 @@ export function useScatterplotLayer() {
             getFillColor: colorBy, //this is working; removing it breaks the color change...
             // modelMatrix: modelMatrix, // this is not necessary, manipulating the matrix works anyway
             // getLineWith: clickIndex, // this does not work, seems to need something like a function
-            getLineWidth
+            getLineWidth,
+            //as of now, the SpatialLayer implemetation needs to figure this out for each sub-layer.
+            // getContourWeight1: config.category1, 
         },
         pickable: true,
         onHover: (info) => {
@@ -282,8 +300,10 @@ export function useScatterplotLayer() {
             //     duration: 300,
             // },
         },
+        // ...config, //make sure contour properties are passed through
+        contourLayers,
         extensions
-    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth]);
+    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth, contourLayers]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
         if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
         if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;
@@ -300,9 +320,10 @@ export function useScatterplotLayer() {
         return p3;
     }, [scatterplotLayer, modelMatrix, currentLayerHasRendered, chart.contentDiv.getBoundingClientRect]);
     // const project = 
-    const onAfterRender = () => setCurrentLayerHasRendered(true);
-    return {
+    const onAfterRender = useCallback(() => setCurrentLayerHasRendered(true), []);
+    return useMemo(() => ({
         scatterplotLayer, getTooltip, modelMatrix, modelMatrixRef, viewState,
         currentLayerHasRendered, onAfterRender, unproject
-    };
+    }), [scatterplotLayer, getTooltip, modelMatrix, viewState,
+        currentLayerHasRendered, onAfterRender, unproject]);
 }

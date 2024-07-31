@@ -58,7 +58,7 @@ export class ScatterDensityExension extends LayerExtension {
             inject: {
                 // todo - add a uniform for ~kernelSigma
                 // todo - change picking behavior
-                'fs:#decl': "uniform float radiusScale; uniform float opacity;",
+                'fs:#decl': "uniform float opacity;",
                 'fs:#main-end': `
                 //---- ScatterDensityExension
                 const float e = 2.718281828459045;
