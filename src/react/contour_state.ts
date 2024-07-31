@@ -70,12 +70,12 @@ export function useContour(props: ContourProps) {
         if (!category) return undefined;
         //If I return a layer here rather than props, will it behave as expected?
         //not really - we want to pass this into getSublayerProps() so the id is used correctly
-        const radiusPixels = 20*bandwidth * 2 ** debounceZoom;
+        const radiusPixels = 30*bandwidth * 2 ** debounceZoom;
         // console.log('radiusPixels', radiusPixels);
         return {
             id,
             data,
-            opacity: intensity,
+            opacity: fill ? intensity : 0,
             getPosition: (i: number, { target }: { target: number[] | Float32Array }) => {
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
@@ -85,8 +85,10 @@ export function useContour(props: ContourProps) {
             colorRange,
             radiusPixels,
             debounce: 1000,
+            weightsTextureSize: 512, //there could be a performance related parameter to tweak
+            pickable: false,
         };
-    }, [id, data, category, intensity, cx, cy, colorRange, debounceZoom, bandwidth]);
+    }, [id, data, category, intensity, cx, cy, colorRange, debounceZoom, bandwidth, fill]);
 }
 
 /** In future I think we want something more flexible & expressive,
