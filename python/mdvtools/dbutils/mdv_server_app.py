@@ -179,6 +179,8 @@ def serve_projects_from_filesystem(base_dir):
 
 
 print("script starts..")
+print("******* waiting for db to set up")
+wait_for_database()
 
 app = Flask(__name__, template_folder='../templates', static_folder='../../../dist/flask')
 static_folder = "/app/dist/flask"
