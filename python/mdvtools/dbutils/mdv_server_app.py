@@ -157,7 +157,8 @@ def serve_projects_from_filesystem(base_dir):
 
 print("script starts..")
 
-app = Flask(__name__, template_folder='../templates', static_folder='../static')
+app = Flask(__name__, template_folder='../templates', static_folder='../../../dist/flask')
+static_folder = "/app/dist/flask"
 app.after_request(add_safe_headers)
 
 

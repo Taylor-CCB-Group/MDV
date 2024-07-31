@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   mdv_app:
     image: jayeshire/my_mdv_app_image:latest
@@ -40,3 +39,7 @@ secrets:
 volumes:
   postgres-data:
   mdv-data:
+
+networks:
+  app_net:
+    driver: overlay

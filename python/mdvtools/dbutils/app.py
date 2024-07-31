@@ -1,4 +1,4 @@
-import os
+""" import os
 import json
 from flask import Flask
 
@@ -25,5 +25,4 @@ try:
 except FileNotFoundError:
     print("Error: app.py script -> Configuration file not found.")
 except Exception as e:
-    print(f"An unexpected error occurred: {e}")
-
+    print(f"An unexpected error occurred: {e}") """
