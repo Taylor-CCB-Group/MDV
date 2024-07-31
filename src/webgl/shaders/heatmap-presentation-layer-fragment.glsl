@@ -12,6 +12,30 @@ varying vec2 vTexCoords;
 varying float vIntensityMin;
 varying float vIntensityMax;
 
+// todo more structured uniforms, array of structs...
+uniform float contourOpacity;
+// struct ContourProps {
+//     vec2 increment;
+//     float lineWidth;
+//     vec3 color;
+// };
+// uniform ContourProps contourProps;
+
+float smoothContour(float value) {
+    // value = clamp(value * vIntensityMax, 0., 1.);
+    float width = 1.5; //todo better control, more coherent maths
+    float w = width * fwidth(value);
+    float f = 0.5; // reciprocol bandwidth
+    if (value < f) return 0.; //todo something better
+    // if (value > 50. * f) return 1.; //metaballs
+    float wa = smoothstep(0., (w * f), mod(value * f, 1.)-0.5); //nb -0.5 is to center the contour
+    wa = 1. - max(smoothstep(1.-w, 1., wa), smoothstep(w, 0., wa));
+    // return 0.0;
+    return smoothstep(0., 1., wa*0.5);
+    // return contour(value);
+}
+
+
 vec4 getLinearColor(float value) {
   float factor = clamp(value * vIntensityMax, 0., 1.);
   vec4 color = texture2D(colorTexture, vec2(factor, 0.5));
@@ -19,20 +43,6 @@ vec4 getLinearColor(float value) {
   return color;
 }
 
-float contour(float value) {
-    //placeholder pending getting surrounding code in better shape
-    return mod(value, 1.0) < 0.1 ? 1.0 : 0.0;
-}
-float smoothContour(float value) {
-    float width = 0.1; //todo better control
-    float w = fwidth(value);
-    float f = .5;
-    if (value < f) return 0.; //todo something better
-    float wa = smoothstep(0., w * f, mod(value * f, 1.));
-    wa = 1. - max(smoothstep(1.-w, 1., wa), smoothstep(w, 0., wa));
-    return smoothstep(0., 1., wa*0.5);
-    // return contour(value);
-}
 
 void main(void) {
   vec4 weights = texture2D(weightTexture, vTexCoords);
@@ -49,7 +59,9 @@ void main(void) {
   vec4 linearColor = getLinearColor(weight);
   // todo allow for multiple contours, with different properties
   float c = smoothContour(weight);
-  linearColor = mix(linearColor, vec4(1.0, 1.0, 1.0, 1.0), c);
+  vec4 fullColor = texture2D(colorTexture, vec2(1.0, 0.5)); //should be a uniform
+  //fullColor = vec4(1.);
+  linearColor = mix(linearColor, fullColor, c);
   //   linearColor = c * vec4(1.);
   linearColor.a *= opacity;
   linearColor.a = max(linearColor.a, c*2.);
