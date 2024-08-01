@@ -10,6 +10,7 @@ import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
 import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
 import type { DualContourLegacyConfig } from "../contour_state";
+import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -234,10 +235,12 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 type: "check",
                 label: "Show Tooltip",
                 current_value: tooltip.show,
-                func: (x: boolean) => {
+                func: async (x: boolean) => {
                     tooltip.show = x;
                     if (!tooltip.column) {
-                        console.warn("No tooltip column set, using first column... but we need to make sure it actually loads.");
+                        const columnName = cols[0].field;
+                        console.log("No tooltip column set, using first column:", columnName);
+                        await loadColumn(this.dataStore.name, cols[0].field);
                         tooltip.column = cols[0].field;
                     }
                 }
@@ -247,7 +250,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 label: "Tooltip value",
                 current_value: c.tooltip.column || cols[0].field,
                 values: [cols, "name", "field"],
-                func: (c) => {
+                func: async (c) => {
+                    await loadColumn(this.dataStore.name, c);
                     tooltip.column = c;
                 }
             },
