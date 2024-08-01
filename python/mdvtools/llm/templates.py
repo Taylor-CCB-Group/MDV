@@ -23,6 +23,8 @@ from mdvtools.charts.stacked_row_plot import StackedRowChart
 from mdvtools.charts.ring_chart import RingChart
 from mdvtools.charts.violin_plot import ViolinPlot
 from mdvtools.charts.multi_line_plot import MultiLinePlot
+from mdvtools.charts.table_plot import TablePlot
+from mdvtools.charts.wordcloud_plot import WordcloudPlot
 import json
 
 def load_data(path):
