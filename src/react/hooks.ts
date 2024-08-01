@@ -78,14 +78,18 @@ export function useParamColumns(): DataColumn<any>[] {
 // this is breaking rules of hooks etc in short term while I figure out how to do this properly
 export function useImgUrl(): string {
     const config = useConfig() as any;
-    if (config.imageURL) return config.imageURL;
-    // see VivScatterPlot.afterAppCreation() ...
     const { regions } = useDataStore();
-    if (!regions) {
-        //throw `No image URL provided and no regions found in data store`; // plenty of other ways this could go wrong}
-        console.warn("No image URL provided and no regions found in data store"); // plenty of other ways this could go wrong}
-        return '';
-    }
-    const i = regions.all_regions[config.region].viv_image;
-    return i.url ? i.url : getProjectURL(regions.avivator.base_url) + i.file;
+    const url = useMemo(() => {
+        console.log('updating useImgUrl memo', config.region);
+        if (config.imageURL) return config.imageURL;
+        // see VivScatterPlot.afterAppCreation() ...
+        if (!regions) {
+            //throw `No image URL provided and no regions found in data store`; // plenty of other ways this could go wrong}
+            console.warn("No image URL provided and no regions found in data store"); // plenty of other ways this could go wrong}
+            return '';
+        }
+        const i = regions.all_regions[config.region].viv_image;
+        return i.url ? i.url : getProjectURL(regions.avivator.base_url) + i.file;
+    }, [config, regions, config.region, config.imageURL]);
+    return url;
 }

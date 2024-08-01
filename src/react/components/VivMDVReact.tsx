@@ -11,6 +11,7 @@ import { useImgUrl } from "../hooks";
 import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
 import type { DualContourLegacyConfig } from "../contour_state";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
+import { observer } from "mobx-react-lite";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -29,7 +30,7 @@ function ReactTest() {
 
 
 /** comparable to main `<Avivator />` component */
-const MainChart = () => {
+const MainChart = observer(() => {
     const imgUrl = useImgUrl();
     const isViewerLoading = useViewerStore(store => store.isViewerLoading);
     const viewerStore = useViewerStoreApi();
@@ -43,7 +44,7 @@ const MainChart = () => {
     const source = useViewerStore(store => store.source);
     useImage(source);
     return (!isViewerLoading && <VivScatter />);
-};
+});
 
 
 
@@ -99,6 +100,7 @@ export type VivRoiConfig = {
     // ... except that we also need to check the other condition, because 'string' could also be that.
     // so it's not completely ideal.
     type: "VivMdvRegionReact" | "viv_scatter_plot",
+    region: string,
     background_filter: CategoryFilter,
     roi: ROI,
     viv: VivConfig,
@@ -210,27 +212,23 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             }
         });
         //   ^^ kinda want a more react-y SettingsDialog for that...
-        // todo switch image, <- more coherent region logic...
-        // const ds = this.dataStore;
-        // const images = [];
-        // for (const r in ds.regions.all_regions) {
-        //     const viv = ds.regions.all_regions[r].viv_image;
-        //     if (viv) {
-        //         const x = viv.url || viv.file;
-        //         images.push({name: x, value: x});
-        //     }
-        // }
+        // todo make sure associated json etc switches when region changes
+        const ds = this.dataStore;
+        const imageRegionKeys = Object.keys(ds.regions.all_regions).filter(r => ds.regions.all_regions[r].viv_image);
+        const images = imageRegionKeys.map(r => ({name: r, value: r}));
         return settings.concat([
-            // {
-            //     type: "dropdown",
-            //     label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
-            //     current_value: c.viv.url,
-            //     values: [images, 'name', 'value'],
-            //     func: (v) => {
-            //         c.viv.url = v;
-            //         c.background_filter.category = v;
-            //     }
-            // },
+            {
+                type: "dropdown",
+                label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
+                current_value: c.region,
+                values: [images, 'name', 'value'],
+                func: (v) => {
+                    // c.viv.url = v;
+                    // ideally, c.region could be enough to also know what json etc is relevant...
+                    c.region = v;
+                    c.background_filter.category = v;
+                }
+            },
             {
                 type: "check",
                 label: "Show Tooltip",
