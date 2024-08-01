@@ -223,9 +223,15 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 current_value: c.region,
                 values: [images, 'name', 'value'],
                 func: (v) => {
+                    console.log('setting image region:', v);
+                    //nb, 'this' is not the chart...
+                    if (c.title === c.region) {
+                        c.title = v;
+                    }
                     // c.viv.url = v;
                     // ideally, c.region could be enough to also know what json etc is relevant...
                     c.region = v;
+                    // and background_filter.category should be inferred from the region...
                     c.background_filter.category = v;
                 }
             },
