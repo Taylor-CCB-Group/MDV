@@ -60,7 +60,7 @@ export function useContour(props: ContourProps) {
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);
-    const {zoom } = useViewerStore(store => store.viewState);
+    const { zoom } = useViewerStore(store => store.viewState) ?? { zoom: 0 };
     // we can compensate so that we don't have radiusPixels, but it makes it very slow...
     //won't be necessary when we implement heatmap differently
     const [debounceZoom] = useDebounce(zoom, 500);
