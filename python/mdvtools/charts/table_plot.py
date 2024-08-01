@@ -6,4 +6,4 @@ class TablePlot(BasePlot):
         self.plot_data["include_index"] = index
 
 
-    # Any additional methods specific to wordclouds can be added here
+    # Any additional methods specific to table plots can be added here
