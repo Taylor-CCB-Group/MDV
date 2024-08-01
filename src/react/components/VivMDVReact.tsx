@@ -105,7 +105,8 @@ export type VivRoiConfig = {
     roi: ROI,
     viv: VivConfig,
     showJson: boolean,
-    json?: string, //for extra e.g. cell segmentation data - but we might want more than just a string...
+    // json should come from associated config.region
+    // json?: string, //for extra e.g. cell segmentation data - but we might want more than just a string...
     //image_properties: ChannelsState,
 } & ScatterPlotConfig;
 

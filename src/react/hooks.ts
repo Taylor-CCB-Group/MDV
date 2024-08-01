@@ -6,6 +6,7 @@ import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
 import type { DataColumn } from "../charts/charts";
+import type { VivRoiConfig } from "./components/VivMDVReact";
 
 /**
  * Get the chart's config.
@@ -74,22 +75,32 @@ export function useParamColumns(): DataColumn<any>[] {
     return columns;
 }
 
-// slightly rough - we might have multiple images in a config, or generally think about this differently
-// this is breaking rules of hooks etc in short term while I figure out how to do this properly
-export function useImgUrl(): string {
-    const config = useConfig() as any;
+/** If the chart in current context has an associated region, referred to by the key `config.region`, this should return it
+ * such that relevant information (like image URL, associated geojson layers...) can be retrieved.
+ */
+export function useRegion() {
+    const config = useConfig<VivRoiConfig>();
     const { regions } = useDataStore();
+    const region = useMemo(() => {
+        if (!regions) return undefined;
+        //we could add a dash of zod here?
+        //at the moment, this just returns 'any'.
+        return regions.all_regions[config.region];
+    }, [config.region, regions]);
+    return region;
+}
+
+
+/**
+ * This assumes that the current chart context has a `config.region` key that refers to a region with `viv_image` in the data store.
+ */
+export function useImgUrl(): string {
+    const region = useRegion();
+    const avivator = useDataStore().regions.avivator;
     const url = useMemo(() => {
-        console.log('updating useImgUrl memo', config.region);
-        if (config.imageURL) return config.imageURL;
-        // see VivScatterPlot.afterAppCreation() ...
-        if (!regions) {
-            //throw `No image URL provided and no regions found in data store`; // plenty of other ways this could go wrong}
-            console.warn("No image URL provided and no regions found in data store"); // plenty of other ways this could go wrong}
-            return '';
-        }
-        const i = regions.all_regions[config.region].viv_image;
-        return i.url ? i.url : getProjectURL(regions.avivator.base_url) + i.file;
-    }, [config, regions, config.region, config.imageURL]);
+        // if (config.imageURL) return config.imageURL; //deprecated
+        const i = region.viv_image;
+        return i.url ? i.url : getProjectURL(avivator.base_url) + i.file;
+    }, [region, avivator]);
     return url;
 }

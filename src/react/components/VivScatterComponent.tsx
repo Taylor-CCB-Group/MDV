@@ -2,7 +2,7 @@ import { getDefaultInitialViewState, ColorPaletteExtension, DetailView, VivViewe
 import { observer } from "mobx-react-lite";
 import { useState, useLayoutEffect, useMemo, useEffect, useRef } from "react";
 import { shallow } from "zustand/shallow";
-import { useChartSize, useChartID, useConfig } from "../hooks";
+import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import { useScatterplotLayer } from "../scatter_state";
 import SelectionOverlay from "./SelectionOverlay";
 import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
@@ -52,7 +52,8 @@ const useRectLayer = () => {
 const useJsonLayer = () => {
     const id = useChartID();
     const { root } = useProject();
-    const { json, showJson } = useConfig<VivRoiConfig>();
+    const { showJson } = useConfig<VivRoiConfig>();
+    const { json } = useRegion(); // return type is 'any' and we assume 'json' will be a string - but want that to be different in future.
     const layer_id = `json_${getVivId(`${id}detail-react`)}`;
     const layer = useMemo(() => {
         return json ? new GeoJsonLayer({
