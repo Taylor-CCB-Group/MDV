@@ -1,4 +1,4 @@
-import { makeAutoObservable } from "mobx";
+import { autorun, makeAutoObservable } from "mobx";
 import BaseChart from "../../charts/BaseChart";
 import { createMdvPortal } from "@/react/react_utils";
 import type DataStore from '../../datastore/DataStore'
@@ -54,6 +54,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     root: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
     ComponentFn: TComponent<T & BaseConfig>;
+    private titleReactionDispoer: ReturnType<typeof autorun>;
     protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: T & BaseConfig, ReactComponentFunction: TComponent<T & BaseConfig> = Fallback) {
         super(dataStore, div, config);
         config = this.config; //original config will be copied by super, before doing things like adding id to it...
@@ -65,6 +66,9 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
                 //we are using makeAutoObservable and not referring to config directly...
                 makeAutoObservable(config);
             }
+        });
+        this.titleReactionDispoer = autorun(() => {
+            this.setTitle(config.title);
         });
         // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
         // that worked, with extra extraneous number that changed to be observed by the hook...
@@ -114,5 +118,6 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         // **is there any React teardown we should be considering?**
         this.root.unmount();
         super.remove();
+        this.titleReactionDispoer();
     }
 }

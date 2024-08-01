@@ -9,6 +9,9 @@ import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
 import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
+import type { DualContourLegacyConfig } from "../contour_state";
+import { loadColumn } from "@/dataloaders/DataLoaderUtil";
+import { observer } from "mobx-react-lite";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -27,7 +30,7 @@ function ReactTest() {
 
 
 /** comparable to main `<Avivator />` component */
-const MainChart = () => {
+const MainChart = observer(() => {
     const imgUrl = useImgUrl();
     const isViewerLoading = useViewerStore(store => store.isViewerLoading);
     const viewerStore = useViewerStoreApi();
@@ -41,7 +44,7 @@ const MainChart = () => {
     const source = useViewerStore(store => store.source);
     useImage(source);
     return (!isViewerLoading && <VivScatter />);
-};
+});
 
 
 
@@ -68,9 +71,10 @@ export type ScatterPlotConfig = {
         // todo: add more options here...
     },
     category_filters: Array<CategoryFilter>,
+    //on_filter: "hide" | "grey", //todo
     zoom_on_filter: boolean,
     point_shape: "circle" | "square" | "gaussian"
-} & TooltipConfig;
+} & TooltipConfig & DualContourLegacyConfig;
 const scatterDefaults: ScatterPlotConfig = {
     course_radius: 1,
     radius: 10,
@@ -85,6 +89,10 @@ const scatterDefaults: ScatterPlotConfig = {
     category_filters: [],
     zoom_on_filter: false,
     point_shape: "circle",
+    contour_fill: false,
+    contour_bandwidth: 0.1,
+    contour_intensity: 1,
+    contour_opacity: 0.5,
 };
 export type VivRoiConfig = {
     // making this 'type' very specific will let us infer the rest of the type, i.e.
@@ -92,11 +100,13 @@ export type VivRoiConfig = {
     // ... except that we also need to check the other condition, because 'string' could also be that.
     // so it's not completely ideal.
     type: "VivMdvRegionReact" | "viv_scatter_plot",
+    region: string,
     background_filter: CategoryFilter,
     roi: ROI,
     viv: VivConfig,
     showJson: boolean,
-    json?: string, //for extra e.g. cell segmentation data - but we might want more than just a string...
+    // json should come from associated config.region
+    // json?: string, //for extra e.g. cell segmentation data - but we might want more than just a string...
     //image_properties: ChannelsState,
 } & ScatterPlotConfig;
 
@@ -136,6 +146,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
         //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
         // }
+        
+        // consider adapting `channels` from old format to new format...
         config.viv = applyDefaultChannelState(config.viv);
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
@@ -174,6 +186,13 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const { tooltip } = c;
         const cols = this.dataStore.getColumnList() as DataColumn<any>[];
         const settings = super.getSettings();
+
+        let cats = this.dataStore.getColumnValues(c.param[2]) || [];
+        cats = cats.map(x => {
+            return { t: x }
+        });
+        cats.push({ t: "None" });
+
         // What I would like is ability to
         // - change selected image at runtime.
         // - choose multiple categories on which to filter.
@@ -194,35 +213,39 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             }
         });
         //   ^^ kinda want a more react-y SettingsDialog for that...
-        // todo switch image, <- more coherent region logic...
-        // const ds = this.dataStore;
-        // const images = [];
-        // for (const r in ds.regions.all_regions) {
-        //     const viv = ds.regions.all_regions[r].viv_image;
-        //     if (viv) {
-        //         const x = viv.url || viv.file;
-        //         images.push({name: x, value: x});
-        //     }
-        // }
+        // todo make sure associated json etc switches when region changes
+        const ds = this.dataStore;
+        const imageRegionKeys = Object.keys(ds.regions.all_regions).filter(r => ds.regions.all_regions[r].viv_image);
+        const images = imageRegionKeys.map(r => ({name: r, value: r}));
         return settings.concat([
-            // {
-            //     type: "dropdown",
-            //     label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
-            //     current_value: c.viv.url,
-            //     values: [images, 'name', 'value'],
-            //     func: (v) => {
-            //         c.viv.url = v;
-            //         c.background_filter.category = v;
-            //     }
-            // },
+            {
+                type: "dropdown",
+                label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
+                current_value: c.region,
+                values: [images, 'name', 'value'],
+                func: (v) => {
+                    console.log('setting image region:', v);
+                    //nb, 'this' is not the chart...
+                    if (c.title === c.region) {
+                        c.title = v;
+                    }
+                    // c.viv.url = v;
+                    // ideally, c.region could be enough to also know what json etc is relevant...
+                    c.region = v;
+                    // and background_filter.category should be inferred from the region...
+                    c.background_filter.category = v;
+                }
+            },
             {
                 type: "check",
                 label: "Show Tooltip",
                 current_value: tooltip.show,
-                func: (x: boolean) => {
+                func: async (x: boolean) => {
                     tooltip.show = x;
                     if (!tooltip.column) {
-                        console.warn("No tooltip column set, using first column... but we need to make sure it actually loads.");
+                        const columnName = cols[0].field;
+                        console.log("No tooltip column set, using first column:", columnName);
+                        await loadColumn(this.dataStore.name, cols[0].field);
                         tooltip.column = cols[0].field;
                     }
                 }
@@ -232,7 +255,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 label: "Tooltip value",
                 current_value: c.tooltip.column || cols[0].field,
                 values: [cols, "name", "field"],
-                func: (c) => {
+                func: async (c) => {
+                    await loadColumn(this.dataStore.name, c);
                     tooltip.column = c;
                 }
             },
@@ -291,6 +315,96 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 func: x => {
                     c.showJson = x;
                 }
+            },
+            {
+                type: "folder",
+                label: "Contour Settings",
+                current_value: [
+                    {
+                        type: "folder",
+                        label: "Category selection",
+                        current_value: [
+                            //maybe 2-spaces format is better...
+                            {
+                                type: "dropdown",
+                                label: "Contour parameter",
+                                // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
+                                current_value: c.contourParameter || c.param[2],
+                                values: [cols, "name", "field"],
+                                func: x => {
+                                    c.contourParameter = c.param[2] = x;
+                                }
+                            },
+                            {
+                                type: "dropdown",
+                                label: "Contour Category 1",
+                                current_value: c.category1 || "None",
+                                values: [cats, "t", "t"],
+                                func: (x) => {
+                                    if (x === "None") x = null;
+                                    c.category1 = x;
+                                }
+                            },
+                            {
+                                type: "dropdown",
+                                label: "Contour Category 2",
+                                current_value: c.category2 || "None",
+                                values: [cats, "t", "t"],
+                                func: (x) => {
+                                    if (x === "None") x = null;
+                                    c.category2 = x;
+                                }
+                            },
+                        ],
+                        func: (x) => {},
+                    },
+                    {
+                        type: "slider",
+                        max: 25,
+                        min: 1,
+        
+                        // doc: this.__doc__, //why?
+                        current_value: c.contour_bandwidth,
+                        label: "KDE Bandwidth",
+                        continuous: true,
+                        func: (x) => {
+                            c.contour_bandwidth = x;
+                        }
+                    },
+                    {
+                        label: "Fill Contours",
+                        type: "check",
+                        current_value: c.contour_fill,
+                        func: (x) => {
+                            c.contour_fill = x;
+                        }
+                    },
+                    {
+                        type: "slider",
+                        max: 1,
+                        min: 0,
+                        current_value: c.contour_intensity,
+                        continuous: true,
+                        label: "Fill Intensity",
+                        func: (x) => {
+                            c.contour_intensity = x;
+                        }
+                    },
+                    {
+                        type: "slider",
+                        max: 1,
+                        min: 0,
+        
+                        doc: this.__doc__,
+                        current_value: c.contour_opacity,
+                        continuous: false,//why so slow?
+                        label: "Contour opacity",
+                        func: (x) => {
+                            c.contour_opacity = x ** 3;
+                        }
+                    },
+                ],
+                func: (x) => {},
             },
             {
                 type: 'folder',

@@ -2,9 +2,28 @@
 
 from mdvtools.charts.base_plot import BasePlot
 
+
 class ScatterPlot3D(BasePlot):
-    def __init__(self, title, params, size, position, id=None, default_color="#377eb8", brush="default", center=[0, 0, 0], on_filter="hide", radius=5, opacity=0.8, axis_scales=[1, 1, 1], camera=None, **kwargs):
-        super().__init__(title, "wgl_3d_scatter_plot", params, size, position, id, **kwargs)
+    def __init__(
+        self,
+        title,
+        params,
+        size,
+        position,
+        id=None,
+        default_color="#377eb8",
+        brush="default",
+        center=[0, 0, 0],
+        on_filter="hide",
+        radius=5,
+        opacity=0.8,
+        axis_scales=[1, 1, 1],
+        camera=None,
+        **kwargs,
+    ):
+        super().__init__(
+            title, "wgl_3d_scatter_plot", params, size, position, id, **kwargs
+        )
         self.plot_data["default_color"] = default_color
         self.plot_data["brush"] = brush
         self.plot_data["center"] = center
@@ -12,7 +31,9 @@ class ScatterPlot3D(BasePlot):
         self.plot_data["radius"] = radius
         self.plot_data["opacity"] = opacity
         self.plot_data["axis_scales"] = axis_scales
-        self.plot_data["camera"] = camera if camera is not None else {"distance": 1000, "theta": 0, "phi": 0}
+        self.plot_data["camera"] = (
+            camera if camera is not None else {"distance": 1000, "theta": 0, "phi": 0}
+        )
 
     # Set the color for the plot
     def set_default_color(self, color):

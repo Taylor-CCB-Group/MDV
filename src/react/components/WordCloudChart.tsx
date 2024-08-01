@@ -12,7 +12,9 @@ function ReactTest() {
     const [dim] = useState(dataStore.getDimension("catcol_dimension"));
     const [words, setWords] = useState(['hello', 'world']);
     const [text, setText] = useState(parent.config.text);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: print a warning about potential bugs - if we use this, we should fix it.
     useEffect(() => {
+        console.warn('WordCloudChart effect liable to be buggy');
         dataStore.addListener(id, () => setFilterSize(dataStore.filterSize));
         parent.addListener("text", (type, data) => setText(`${data} ${parent.config.wordSize}`));
         const colNameWords = parent.config.param[0];

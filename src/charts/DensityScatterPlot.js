@@ -252,6 +252,7 @@ class DensityScatterPlot extends WGLScatterPlot{
                 doc:this.__doc__,
                 current_value:c.contour_bandwidth,
                 label:"KDE Bandwidth",
+                continuous:true,
                 func:(x)=>{
                     c.contour_bandwidth=x;
                     this.onDataFiltered();
@@ -279,6 +280,7 @@ class DensityScatterPlot extends WGLScatterPlot{
         
                 doc:this.__doc__,
                 current_value:c.contour_intensity,
+                continuous: true,
                 label:"Fill Intensity",
                 func:(x)=>{
                     c.contour_intensity=x;
@@ -292,6 +294,7 @@ class DensityScatterPlot extends WGLScatterPlot{
         
                 doc:this.__doc__,
                 current_value:c.contour_opacity,
+                continuous: true,
                 label:"Contour opacity",
                 func:(x)=>{
                     c.contour_opacity=x;

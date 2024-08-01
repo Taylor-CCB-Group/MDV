@@ -92,7 +92,7 @@ const Button = ({
   const { bgColor, hoverColor, darkBgColor, darkHoverColor } = colorStyles[color] || colorStyles.blue;
 
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       className={`${size} ${marginTop} ${bgColor} ${hoverColor} ${darkBgColor} ${darkHoverColor} text-white rounded self-center cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-500 disabled:opacity-70`}
       disabled={disabled}
@@ -142,6 +142,23 @@ const ErrorHeading = ({ children }) => (
   <h4 className="mt-0 text-lg font-bold">
     {children}
   </h4>
+);
+
+const FileInput = ({ value, onChange, isDisabled }) => (
+  <div className="pr-4">
+    <label htmlFor="datasourceName" className="text-center m-0 font-bold text-sm sm:text-lg md:text-xl">
+      Datasource name:
+    </label>
+    <input
+      id="datasourceName"
+      type="text"
+      value={value}
+      onChange={onChange}
+      className="p-2 border rounded focus:outline-none focus:ring focus:border-blue-300 dark:text-gray-300 dark:bg-gray-800 w-full"
+      placeholder="Enter datasource name"
+      disabled={isDisabled}
+    />
+  </div>
 );
 
 // Reducer function
@@ -204,7 +221,10 @@ const useFileUploadProgress = () => {
 const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ onClose, onResize }) => {
   const { root } = useProject();
 
+  const [datasourceName, setDatasourceName] = useState("");
+
   const [summary, setSummary] = useState({
+    datasourceName: "",
     fileName: "",
     fileSize: "",
     rowCount: 0,
@@ -231,13 +251,27 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     dispatch({ type: "SET_SELECTED_FILES", payload: acceptedFiles });
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
+      const newDatasourceName = file.name.replace('.csv', '');
+
+      setDatasourceName(newDatasourceName); // Initialize datasourceName with file name
+
       setSummary({
         ...summary,
+        datasourceName: newDatasourceName,
         fileName: file.name,
         fileSize: (file.size / (1024 * 1024)).toFixed(2) // Convert to MB
       });
     }
-  }, []);
+  }, [summary]);
+
+  const handleDatasourceNameChange = (event) => {
+    const { value } = event.target;
+    setDatasourceName(value); // Update the state with the new value
+    setSummary((prevSummary) => ({
+      ...prevSummary,
+      datasourceName: value, // Update datasourceName in the summary object
+    }));
+  };
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
@@ -247,6 +281,35 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
   });
   const rejectionMessage = fileRejections.length > 0 ? "Only CSV files can be selected" : "Drag and drop files here or click the button below to upload";
   const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
+
+  const getTextWidth = (canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, text: string) => {
+    context.font = getComputedStyle(document.body).fontSize + ' Arial';
+    return context.measureText(text).width;
+  };
+
+  // Function to calculate the maximum total width needed for the ColumnPreview component
+  const calculateTotalWidth = (columnNames: string[], columnTypes: string[], secondRowValues: string[]) => {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    let maxColumnNameWidth = 0;
+    let maxColumnTypeWidth = 0;
+    let maxColumnSecondRowWidth = 0;
+
+    // Calculate the maximum width of column names
+    maxColumnNameWidth = Math.max(...columnNames.map(name => getTextWidth(canvas, context, name)));
+
+    // Calculate the maximum width of column types
+    maxColumnTypeWidth = Math.max(...columnTypes.map(type => getTextWidth(canvas, context, type)));
+
+    // Calculate the maximum width of second row values
+    maxColumnSecondRowWidth = Math.max(...secondRowValues.map(value => getTextWidth(canvas, context, value)));
+
+    // Calculate the total width needed for the ColumnPreview component
+    const totalWidth = maxColumnNameWidth + maxColumnTypeWidth + maxColumnSecondRowWidth + 32; // Add padding
+    canvas.remove();
+    return Math.max(600, totalWidth);
+  };
 
   const handleValidateClick = () => {
     const file = state.selectedFiles[0];
@@ -273,7 +336,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             rowCount,
             columnCount
           }));
-          onResize(600, 630);
+
+          // Calculate the total width needed for the ColumnPreview component
+          const totalWidth = calculateTotalWidth(columnNames, columnTypes, secondRowValues);
+          onResize(totalWidth, 730);
           dispatch({ type: "SET_IS_VALIDATING", payload: false });
           dispatch({ type: "SET_VALIDATION_RESULT", payload: { columnNames, columnTypes } });
         }
@@ -293,7 +359,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
     const formData = new FormData();
     formData.append("file", state.selectedFiles[0]);
-    formData.append("name", state.selectedFiles[0].name);
+    formData.append("name", datasourceName);
     // formData.append("view", "TRUE");
     // formData.append("backend", "TRUE");
     formData.append("replace", '');
@@ -343,7 +409,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
   const handleClose = async () => {
     dispatch({ type: "SET_FILE_SUMMARY", payload: null });
-    onResize(450, 295);
+    onResize(450, 320);
     onClose();
   };
 
@@ -392,6 +458,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
           <FileSummary>
             <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
             <FileSummaryText>
+              <strong>{"Datasource name"}</strong> {summary.datasourceName}
+            </FileSummaryText>
+            <FileSummaryText>
               <strong>{"File name"}</strong> {summary.fileName}
             </FileSummaryText>
             <FileSummaryText>
@@ -423,13 +492,21 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
-          <Button onClick={handleValidateClick}
-            disabled={(state.selectedFiles.length === 0 || state.isUploading)}
-            marginTop="mt-5"
-            color="blue"
-          >
-            {"Validate File"}
-          </Button>
+          <div className="w-full flex items-center pl-4 pr-4">
+            <FileInput
+              value={datasourceName}
+              onChange={handleDatasourceNameChange}
+              isDisabled={state.selectedFiles.length === 0}
+            />
+            <Button onClick={handleValidateClick}
+              disabled={(state.selectedFiles.length === 0 || state.isUploading)}
+              marginTop="mt-5"
+              size="px-6 py-0.5"
+              color="blue"
+            >
+              {"Validate File"}
+            </Button>
+          </div>
         </>
       )}
     </Container>

@@ -208,21 +208,46 @@ function getHierarchicalNodes(data,config={}){
 }
 
 
-function parseNewick(tree){
-    let r={};
-    for(let e=[],s=tree.split(/\s*(;|\(|\)|,|:)\s*/),t=0;t<s.length;t++){
-        const n=s[t];
-        switch(n){
-            case"(": {const c={};r.children=[c],e.push(r),r=c;break;
-            }
-            case",": {const c={};e[e.length-1].children.push(c),r=c;break;
-            }
-            case")":r=e.pop();break;case":":break;
-            default: {const h=s[t-1];")"===h||"("===h||","===h?r.name=n:":"===h&&(r.length=Number.parseFloat(n));
-            }
-        }
-    }
-    return d3_hierarchy(r);    
+// function parseNewick(tree){
+//    let r={};
+//    for(let e=[],s=tree.split(/\s*(;|\(|\)|,|:)\s*/),t=0;t<s.length;t++){
+//       const n=s[t];
+//       switch(n){
+//          case"(": {const c={};r.children=[c],e.push(r),r=c;break;
+//          }
+//          case",": {const c={};e[e.length-1].children.push(c),r=c;break;
+//          }
+//          case")":r=e.pop();break;case":":break;
+//          default: {const h=s[t-1];")"===h||"("===h||","===h?r.name=n:":"===h&&(r.length=Number.parseFloat(n));
+//          }
+//       }
+//    }
+//    return r; //d3_hierarchy(r);
+// }
+
+// replaced version above with https://stackoverflow.com/questions/51373300/how-to-convert-newick-tree-format-to-a-tree-like-hierarchical-object
+// because the linter was complaining and I found the above version hard to read. Seems to produce similar results, fairly trivial but not well tested.
+function parseNewick(tree) {
+   let nextid = 0;
+   const regex = /([^:;,()\s]*)(?:\s*:\s*([\d.]+)\s*)?([,);])|(\S)/g;
+   const newick = `${tree};`;
+
+   const r = (function recurse(parentid = -1) {
+      const children = [];
+      // biome-ignore lint/style/useSingleVarDeclarator: not too worried about this
+      let name, length, delim, ch, all, id = nextid++;;
+
+      [all, name, length, delim, ch] = regex.exec(newick);
+      if (ch === "(") {
+         while ("(,".includes(ch)) {
+            [node, ch] = recurse(id);
+            children.push(node);
+         }
+         [all, name, length, delim, ch] = regex.exec(newick);
+      }
+      return [{ id, name, length: +length, parentid, children }, delim];
+   })()[0];
+   return d3_hierarchy(r);
 }
 
 export {HierarchicalClustering,getHierarchicalNodes,parseNewick};

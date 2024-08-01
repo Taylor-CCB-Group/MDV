@@ -16,7 +16,8 @@
 			"suspicious": {
 				"noExplicitAny": "off",
 				"noImplicitAnyLet": "off",
-				"noAssignInExpressions": "off"
+				"noAssignInExpressions": "off",
+				"noPrototypeBuiltins": "off"
 			},
 			"correctness": {
 				"useExhaustiveDependencies": "info",
@@ -24,14 +25,15 @@
 			},
 			"style": {
 				"useNumberNamespace": "info",
-				"noParameterAssign": "info",
+				"noParameterAssign": "off",
 				"useTemplate": "info",
 				"useSingleVarDeclarator": "info",
 				"noUselessElse": "info",
-				"noArguments": "info"
+				"noArguments": "off"
 			},
 			"a11y": {
-				"useKeyWithClickEvents": "info"
+				"useKeyWithClickEvents": "off",
+				"noSvgWithoutTitle": "off"
 			},
 			"performance": {
 				"noDelete": "info"
@@ -48,7 +50,8 @@
 		"ignore": [
 			"./src/legacy/**/*",
 			"./src/browser/**/*",
-			"./src/table/SlickGrid.js"
+			"./src/table/Slick*",
+			"./src/venn/**/*"
 		]
 	}
 }

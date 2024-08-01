@@ -53,5 +53,5 @@ export const useViewStateLink = () => {
             thisChart.ignoreStateUpdate = false;
         });
         return unsubscribe;
-    }, [viewerStore, id]);
+    }, [viewerStore, id, metadata.Pixels.PhysicalSizeX, metadata.Pixels.PhysicalSizeXUnit]);
 }

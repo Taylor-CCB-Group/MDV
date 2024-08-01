@@ -9,8 +9,10 @@ function useColumnData(columnName: ColumnName, maxItems = 100) {
     const [columnData, setColumnData] = useState<Float32Array>(null);
     const [indices, setIndices] = useState<Uint32Array>(null);
     const [column, setColumn] = useState(null);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: ds._filteredIndicesPromise is used to trigger reactivity
     useEffect(() => {
-        const cm = window.mdv.chartManager!;
+        if (!window.mdv.chartManager) return;
+        const cm = window.mdv.chartManager;
         const indexPromise = ds.getFilteredIndices();
         const colPromise = cm._getColumnsAsync(ds.name, [columnName]);
         setColumn(null);
@@ -41,7 +43,7 @@ function useColumnData(columnName: ColumnName, maxItems = 100) {
         return () => {
             cancel = true;
         };
-    }, [columnName, ds._filteredIndicesPromise]);
+    }, [columnName, ds._filteredIndicesPromise, ds.name, ds.columnIndex, maxItems, ds.getFilteredIndices]);
     return {columnData, indices, column};
 }
 
@@ -73,6 +75,7 @@ export const HighlightedFeatureComponent = observer(() => {
     const highlightValue = column?.data[highlightedIndex];
     return (
         <div style={{fontSize: '0.8rem'}}>
+            {/* biome-ignore lint/security/noDangerouslySetInnerHtml: todo use ReactMarkdown component instead */}
             <div dangerouslySetInnerHTML={{__html: html}} />
             <em>"{chart.config.param[0]}"</em>
             <br />

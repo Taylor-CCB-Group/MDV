@@ -3,15 +3,16 @@ import json
 from mdvtools.mdvproject import MDVProject
 from mdvtools.dbutils.dbmodels import Project
 
+
 def load_projects_from_config(base_dir):
-    config_file = os.path.join(base_dir, 'project_config.json')
+    config_file = os.path.join(base_dir, "project_config.json")
     config_projects = []
 
     try:
         if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 config = json.load(f)
-                for d in config.get('projects', []):
+                for d in config.get("projects", []):
                     print(f"Adding project '{d}' from config file")
                     try:
                         config_projects.append(MDVProject(os.path.join(base_dir, d)))
@@ -19,12 +20,13 @@ def load_projects_from_config(base_dir):
                         print(f"Error adding project '{d}' from config file: {e}")
         else:
             print("load_projects_from_config: Projects config file doesn't exist.")
-            with open(config_file, 'w') as f:
-                json.dump({'projects': []}, f)
+            with open(config_file, "w") as f:
+                json.dump({"projects": []}, f)
     except Exception as e:
         print(f"Error loading projects from config: {e}")
 
     return config_projects
+
 
 def create_projects_from_db(base_dir):
     db_projects = []
@@ -41,7 +43,9 @@ def create_projects_from_db(base_dir):
                 if os.path.exists(project_path):
                     db_projects.append(MDVProject(project_path))
                 else:
-                    print(f"Error in create_projects_from_db: Project path '{project_path}' does not exist.")
+                    print(
+                        f"Error in create_projects_from_db: Project path '{project_path}' does not exist."
+                    )
             except Exception as e:
                 print(f"Error creating project '{project_name}': {e}")
     except Exception as e:
@@ -58,4 +62,3 @@ def create_all_projects(base_dir):
     except Exception as e:
         print(f"Error creating all projects: {e}")
         return []
-

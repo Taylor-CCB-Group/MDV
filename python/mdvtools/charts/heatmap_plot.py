@@ -2,6 +2,7 @@
 
 from mdvtools.charts.base_plot import BasePlot
 
+
 class HeatmapPlot(BasePlot):
     def __init__(self, title, params, size, position, id=None, **kwargs):
         super().__init__(title, "heat_map", params, size, position, id, **kwargs)
@@ -25,16 +26,9 @@ class HeatmapPlot(BasePlot):
         self.plot_data["tooltip"] = {"show": show}
 
     def set_x_axis(self, axis_labels, axis_title):
-        self.plot_data["x_axis"] = {
-            "labels": axis_labels,
-            "title": axis_title
-        }
+        self.plot_data["x_axis"] = {"labels": axis_labels, "title": axis_title}
 
     def set_y_axis(self, axis_labels, axis_title):
-        self.plot_data["y_axis"] = {
-            "labels": axis_labels,
-            "title": axis_title
-        }
+        self.plot_data["y_axis"] = {"labels": axis_labels, "title": axis_title}
 
     # Any additional methods specific to heatmaps can be added here
-

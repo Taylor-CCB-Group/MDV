@@ -1,5 +1,6 @@
 from mdvtools.charts.base_plot import BasePlot
 
+
 class BoxPlot(BasePlot):
     def __init__(self, title, params, size, position, id=None):
         super().__init__(title, "box_plot", params, size, position, id)
@@ -34,10 +35,7 @@ class BoxPlot(BasePlot):
         self.plot_data["color_by"] = color_by
 
     def set_color_legend(self, display, position):
-        self.plot_data["color_legend"] = {
-            "display": display,
-            "pos": position
-        }
+        self.plot_data["color_legend"] = {"display": display, "pos": position}
 
     def set_tooltip(self, show):
         self.plot_data["tooltip"] = {"show": show}

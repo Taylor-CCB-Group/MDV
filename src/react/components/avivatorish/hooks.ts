@@ -44,7 +44,7 @@ export const useSavedVivConfig = () => {
             const newState = {...state, ...imageSettingsStore};
             return newState;
         });
-    }, [viewerStore, channelsStore, imageSettingsStore]);
+    }, [viewerStore, channelsStore, imageSettingsStore, channelsStoreApi.setState, viewerStoreApi.setState, imageSettingsStoreApi.setState]);
     return applyConfig;
 }
 
@@ -63,6 +63,7 @@ export const useImage = (source: {description: string, urlOrFile: string}, histo
     const viewerStore = useViewerStoreApi();
     const channelsStore = useChannelsStoreApi();
     const imageSettingsStore = useImageSettingsStoreApi();
+    // biome-ignore lint/correctness/useExhaustiveDependencies: disabled in viv as well, and would cause a bunch of re-running...
     useEffect(() => {
         async function changeLoader() {
             // Placeholder
