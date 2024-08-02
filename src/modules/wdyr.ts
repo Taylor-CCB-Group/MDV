@@ -14,6 +14,6 @@ async function loadWdyr() {
     });
 };
 const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('wdyr') !== undefined) {
+if (urlParams.get('wdyr')) {
     loadWdyr();
 }
