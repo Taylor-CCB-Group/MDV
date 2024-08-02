@@ -62,9 +62,9 @@ export type DropdownMappedValues<T extends string, V extends string> = [
     Array<DropdownMappedValue<T, V>>, T, V
 ];
 export type DropDownValues = DropdownMappedValues<string, string> | [Array<string>];
-export type GuiValueTypes = {
+export type GuiValueTypes = { //is the premise of this correct? technically, could we have a dropdown of numbers?
     "dropdown": string;
-    "multidropdown": any;
+    "multidropdown": string | string[]; 
     "check": boolean;
     "text": string;
     "textbox": string;

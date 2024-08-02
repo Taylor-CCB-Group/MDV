@@ -1,6 +1,6 @@
 import type { CategoricalDataType, DataColumn } from "@/charts/charts";
-import { useMemo, useCallback } from "react";
-import { useConfig, useParamColumns } from "./hooks";
+import { useMemo } from "react";
+import { useConfig, useNamedColumn, useParamColumns } from "./hooks";
 import { useFilteredIndices } from "./scatter_state";
 import { useChart, useDataStore } from "./context";
 import { useViewerStore } from "./components/avivatorish/state";
@@ -73,7 +73,8 @@ export function useContour(props: ContourProps) {
     const {id, parameter, category, fill, bandwidth, intensity, opacity} = props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
-    const [cx, cy, contourParameter] = useParamColumns();
+    const [cx, cy] = useParamColumns();
+    const contourParameter = useNamedColumn(parameter);
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
 import { useChart, useDataStore } from "./context";
 import type { OME_TIFF } from "./components/avivatorish/state";
-import { getProjectURL } from "../dataloaders/DataLoaderUtil";
+import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
 import type { DataColumn } from "../charts/charts";
@@ -70,9 +70,20 @@ export function useParamColumns(): DataColumn<any>[] {
         const param = chart.config.param;
         if (!param) return [];
         if (typeof chart.config.param === 'string') return [columnIndex[chart.config.param]];
+        // we should make sure they are loaded as well...
         return chart.config.param.map(name => columnIndex[name])
     }, [chart.config.param, columnIndex]);
     return columns;
+}
+
+export function useNamedColumn(name: string): DataColumn<any> {
+    const chart = useChart();
+    const { columnIndex } = chart.dataStore;
+    useEffect(() => {
+        // todo more proper managing of this so that users of the hook don't have potentially undefined data
+        loadColumn(chart.dataStore.name, name);
+    }, [name, chart.dataStore]);
+    return columnIndex[name];
 }
 
 /** If the chart in current context has an associated region, referred to by the key `config.region`, this should return it
