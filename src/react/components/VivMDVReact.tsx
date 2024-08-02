@@ -336,7 +336,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                 }
                             },
                             {
-                                type: "dropdown",
+                                type: "multidropdown",
                                 label: "Contour Category 1",
                                 current_value: c.category1 || "None",
                                 values: [cats, "t", "t"],
@@ -346,7 +346,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                 }
                             },
                             {
-                                type: "dropdown",
+                                type: "multidropdown",
                                 label: "Contour Category 2",
                                 current_value: c.category2 || "None",
                                 values: [cats, "t", "t"],

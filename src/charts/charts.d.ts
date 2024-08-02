@@ -5,12 +5,14 @@
 
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
-export type DataType = 'integer' | 'double' | 'text' | 'unique' | 'multitext' | 'int32';
+export type DataType = 'integer' | 'double' | 'text' | 'text16' | 'unique' | 'multitext' | 'int32';
+export type CategoricalDataType = 'text' | 'text16' | 'multitext';
 
 type DataStructureTypes = {
     'integer': Uint32Array;
     'double': Float32Array; //why is it called 'double'???
     'text': Uint8Array;
+    'text16': Uint16Array;
     'multitext': Uint16Array;
     'unique': Uint8Array; //not sure about this either.
 }
@@ -18,6 +20,7 @@ type DataValuesTypes = {
     'integer': undefined;
     'double': undefined;
     'text': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
+    'text16': string[];
     'multitext': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
     'unique': string[];
 }
