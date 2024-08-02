@@ -77,15 +77,22 @@ const DropdownComponent = ({props}: {props: GuiSpec<'dropdown' | 'multidropdown'
     // }
     if (!props.values) return <>DropdownComponent: no values</>;
     const v = props.type === 'multidropdown' && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
+    const multiple = props.type === 'multidropdown';
     return (
         <>
             <label htmlFor={id}>{props.label}</label>
             <select 
             id={id}
-            multiple={props.type === 'multidropdown'}
+            multiple={multiple}
             value={v}
             className="w-full"
             onChange={action(e => {
+                if (multiple) {
+                    const selected = Array.from(e.target.selectedOptions).map(o => o.value);
+                    props.current_value = selected;
+                    if (props.func) props.func(selected);
+                    return;
+                }
                 props.current_value = e.target.value;
                 if (props.func) props.func(e.target.value);
             })}>
