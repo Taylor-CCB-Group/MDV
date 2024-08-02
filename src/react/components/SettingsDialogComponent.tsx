@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useState, useMemo, useId } from "react";
+import { useState, useMemo, useId, useCallback } from "react";
 import type { Chart, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -70,21 +70,34 @@ const DropdownComponent = ({props}: {props: GuiSpec<'dropdown' | 'multidropdown'
     const id = useId();
     const [filter, setFilter] = useState('');
     const filterArray = filter.toLowerCase().split(' ');
+    const multiple = props.type === 'multidropdown';
     // const textFilter = (item: string | DropdownMappedValue<string, string>) => {
     //     if (typeof item === 'string') return filter.some(f => !item.toLowerCase().includes(f));
     //     const exclude = filter.some(f => !item.toString().toLowerCase().includes(f));
     //     return true;
     // }
-    if (!props.values) return <>DropdownComponent: no values</>;
-    const v = props.type === 'multidropdown' && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
-    const multiple = props.type === 'multidropdown';
+    // if (!v) return <>DropdownComponent: no values</>; // I guess we'll get an ErrorComponent if we don't handle here... shouldn't happen though
+    const v = multiple && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
+    // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
+    const useObjectKeys = props.values.length === 3;
+    const [valueObjectArray, textKey, valueKey] = props.values;
+    // for some reason I can't get this to work with useMemo, but it's not particularly heavy - we also don't memoize the children of the dropdown...
+    // so if we do find this is expensive, we can definitely optimize better.
+    // we just want a string array to filter on to avoid throwing error e.g. if we have a current_value that's not in the dropdown because category changed.
+    const validVals = useObjectKeys ? valueObjectArray.map(item => item[valueKey]) : valueObjectArray;
+    
+    const validVal = useCallback((v: string) => validVals.some(item => item === v), [validVals]);
+    const isArray = Array.isArray(v);
+    const allValid = isArray ? v.every(validVal) : validVal(v);
+    const okValue = allValid ? v : (isArray ? v.filter(validVal) : null); //not ok after changing category?
+
     return (
         <>
             <label htmlFor={id}>{props.label}</label>
             <select 
             id={id}
             multiple={multiple}
-            value={v}
+            value={okValue}
             className="w-full"
             onChange={action(e => {
                 if (multiple && e.target.selectedOptions.length > 1) {
@@ -97,9 +110,8 @@ const DropdownComponent = ({props}: {props: GuiSpec<'dropdown' | 'multidropdown'
                 if (props.func) props.func(e.target.value);
             })}>
                 {props.values[0].map((item) => {
-                    const s = props;
-                    const text = s.values.length > 1 ? item[s.values[1]] : item;
-                    const value = s.values.length > 1 ? item[s.values[2]] : item;
+                    const text = useObjectKeys ? item[textKey] : item;
+                    const value = useObjectKeys ? item[valueKey] : item;
                     const id = uuid();
                     if (filterArray.some(f => !text.toLowerCase().includes(f))) return null;
                     return <option key={id} value={value}>{text}</option>
