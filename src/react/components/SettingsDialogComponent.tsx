@@ -87,7 +87,7 @@ const DropdownComponent = ({props}: {props: GuiSpec<'dropdown' | 'multidropdown'
             value={v}
             className="w-full"
             onChange={action(e => {
-                if (multiple) {
+                if (multiple && e.target.selectedOptions.length > 1) {
                     const selected = Array.from(e.target.selectedOptions).map(o => o.value);
                     props.current_value = selected;
                     if (props.func) props.func(selected);
