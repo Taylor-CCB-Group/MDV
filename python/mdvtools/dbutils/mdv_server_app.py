@@ -339,7 +339,7 @@ with app.app_context():
 
 if __name__ == '__main__':
     print("In main..")
-    wait_for_database()
+    #wait_for_database()
     app.run(host='0.0.0.0', debug=True, port=5055)
     
     

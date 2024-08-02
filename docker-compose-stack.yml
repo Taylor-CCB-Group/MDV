@@ -1,6 +1,8 @@
 services:
   mdv_app:
-    image: my_mdv_app_image
+    build:
+      context: .
+    image: mdv_wout_gunicorn_mac
     ports:
       - "5055:5055"
     volumes:
@@ -29,8 +31,12 @@ services:
       - db_user
       - db_password
       - db_name
+    deploy:
+      restart_policy:
+        condition: none  # Prevent restarting on failure
     networks:
       - app_net
+    
 
 secrets:
   db_user:
