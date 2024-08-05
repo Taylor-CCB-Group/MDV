@@ -118,6 +118,14 @@ class BaseChart{
         this.addMenuIcon("fas fa-cog","settings")
         .addEventListener("click",(e)=>this._openSettingsDialog(e));
 
+        this.addMenuIcon("fas fa-copy", "duplicate chart")
+        .addEventListener("click", () => {
+            const newConfig = JSON.parse(JSON.stringify(this.getConfig()));
+            newConfig.id = getRandomString();
+            newConfig.title = `${newConfig.title} copy`;
+            window.mdv.chartManager.addChart(this.dataStore.name, newConfig);
+        });
+
       
            
         //info icon
