@@ -1460,14 +1460,11 @@ class ChartManager{
                 this.layoutMenus[ds.name].show(e);
             }
         },ds.menuBar);
-        let tagModel;
-        function getTagModel() {
-            if (!tagModel) tagModel = new TagModel(ds.dataStore);
-            return tagModel;
-        }
+        //previously we shared a TagModel between invocations of the annotation dialog
+        //but they should be able to change columns - not sure if the sharing had any benefits
         this.addMenuIcon(ds.name,"fas fa-tags", "Tag Annotation", ()=> {
             //todo - check whether we have a reason for hacky import here
-            new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, getTagModel());
+            new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore);
         });
 
         if (dataStore.links){

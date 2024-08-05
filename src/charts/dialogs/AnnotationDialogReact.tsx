@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type DataStore from "../../datastore/DataStore.js";
-import type TagModel from "../../table/TagModel";
+import TagModel from "../../table/TagModel";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createMdvPortal } from "@/react/react_utils";
 import { X } from "lucide-react";
@@ -30,8 +30,13 @@ function TagInput({tagModel}: {tagModel: TagModel}) {
     )
 }
 
+function ChooseColumn() {
 
-function AnnotationDialogComponent({tagModel}: {tagModel: TagModel}) {
+}
+
+
+function AnnotationDialogComponent({dataStore}: {dataStore: DataStore}) {
+    const tagModel = useMemo(() => new TagModel(dataStore), [dataStore]);
     const [tagList, setTagList] = useState(tagModel.getTags());
     const [tagsInSelection, setTagsInSelection] = useState(tagModel.getTagsInSelection());
     useEffect(() => {
@@ -64,22 +69,22 @@ function AnnotationDialogComponent({tagModel}: {tagModel: TagModel}) {
 
 
 class AnnotationDialogReact extends BaseDialog {
-    tagModel: TagModel;
+    // tagModel: TagModel; //prefer to keep this state in react... but we do need to know what the dataStore is.
     // tagColumn: DataColumn<'text'>;
     // dataModel: DataModel;
     // tagListElement: HTMLDivElement;
     // tagInput: any;
     root: ReturnType<typeof createMdvPortal>;
-    constructor(dataStore: DataStore, tagModel: TagModel) {
+    constructor(dataStore: DataStore) {
         super({
-            title: "Annotate selection",
+            title: `Annotate '${dataStore.name}'`,
             width: 400,
             height: 200,
         }, null);
-        this.outer.classList.add('annotationDialog');
+        // this.outer.classList.add('annotationDialog');
         // this.tagModel = new TagModel(dataStore);
-        this.tagModel = tagModel;
-        this.root = createMdvPortal(<AnnotationDialogComponent tagModel={this.tagModel} />, this.dialog);
+        // this.tagModel = tagModel;
+        this.root = createMdvPortal(<AnnotationDialogComponent dataStore={dataStore} />, this.dialog);
     }
     close(): void {
         super.close();
