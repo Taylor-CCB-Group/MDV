@@ -33,7 +33,7 @@ class ColorDialogReactWrapper extends BaseDialog {
     init(parent: VivMDVReact) {
         const div = createEl('div', {}, this.dialog);
         this.root = createMdvPortal((
-            <ChartProvider chart={parent} materialui>
+            <ChartProvider chart={parent}>
                 <ColorChannelDialogReact />
             </ChartProvider>
         ), div);

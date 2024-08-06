@@ -3,11 +3,9 @@ import BaseChart from "../../charts/BaseChart";
 import { createMdvPortal } from "@/react/react_utils";
 import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
-import { StrictMode } from "react";
 import { createEl } from "../../utilities/ElementsTyped";
 import type { Chart, DataSource } from "../../charts/charts";
 import { toPng, toSvg } from "html-to-image";
-import { ProjectProvider } from "@/modules/ProjectContext";
 
 function Fallback() {
     return <>
@@ -86,13 +84,9 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     private mountReact() {
         const ReactComponentFunction = this.ComponentFn;
         this.root = createMdvPortal((
-            <StrictMode>
-                <ProjectProvider>
-                    <ChartProvider chart={this} materialui>
-                        <ReactComponentFunction />
-                    </ChartProvider>                    
-                </ProjectProvider>
-            </StrictMode>
+            <ChartProvider chart={this}>
+                <ReactComponentFunction />
+            </ChartProvider>                    
         ), this.reactEl);
     }
     //todo: implement this
