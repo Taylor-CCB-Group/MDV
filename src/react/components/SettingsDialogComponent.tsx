@@ -10,36 +10,37 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 import { v4 as uuid } from 'uuid';
+import { MenuItem, Select } from "@mui/material";
 
-const TextComponent = ({props}: {props: GuiSpec<'text'>}) => (
-        <>
-            <label>{props.label}</label>
-            <input type="text" value={props.current_value} onChange={action(e => {
-                props.current_value = e.target.value;
-                if (props.func) props.func(e.target.value);
-            })} 
+const TextComponent = ({ props }: { props: GuiSpec<'text'> }) => (
+    <>
+        <label>{props.label}</label>
+        <input type="text" value={props.current_value} onChange={action(e => {
+            props.current_value = e.target.value;
+            if (props.func) props.func(e.target.value);
+        })}
             className="w-full"
-            />
-        </>
-    );
+        />
+    </>
+);
 
-const TextBoxComponent = ({props}: {props: GuiSpec<'text'>}) => (
-        <>
-            <label>{props.label}</label>
-            <div />
-            <textarea value={props.current_value} onChange={action(e => {
-                props.current_value = e.target.value;
-                if (props.func) props.func(e.target.value);
-            })} 
+const TextBoxComponent = ({ props }: { props: GuiSpec<'text'> }) => (
+    <>
+        <label>{props.label}</label>
+        <div />
+        <textarea value={props.current_value} onChange={action(e => {
+            props.current_value = e.target.value;
+            if (props.func) props.func(e.target.value);
+        })}
             className="w-full col-span-2"
-            />
-        </>
-    );
+        />
+    </>
+);
 
-const SliderComponent = ({props}: {props: GuiSpec<'slider'>}) => (
-        <>
-            <label>{props.label}</label>
-            <input type="range" value={props.current_value} 
+const SliderComponent = ({ props }: { props: GuiSpec<'slider'> }) => (
+    <>
+        <label>{props.label}</label>
+        <input type="range" value={props.current_value}
             min={props.min || 0}
             max={props.max || 1}
             step={props.step || 0.01}
@@ -48,14 +49,14 @@ const SliderComponent = ({props}: {props: GuiSpec<'slider'>}) => (
                 props.current_value = value;
                 if (props.func) props.func(value);
             })} />
-        </>
-    );
+    </>
+);
 
-const SpinnerComponent = ({props}: {props: GuiSpec<'spinner'>}) => (
-        <>
-            <label>{props.label}</label>
-            <input type="number"
-            value={props.current_value} 
+const SpinnerComponent = ({ props }: { props: GuiSpec<'spinner'> }) => (
+    <>
+        <label>{props.label}</label>
+        <input type="number"
+            value={props.current_value}
             min={props.min || 0}
             max={props.max || null}
             step={props.step || 1}
@@ -63,10 +64,10 @@ const SpinnerComponent = ({props}: {props: GuiSpec<'spinner'>}) => (
                 const value = props.current_value = Number.parseInt(e.target.value);
                 if (props.func) props.func(value);
             })} />
-        </>
-    )
+    </>
+)
 
-const DropdownComponent = ({props}: {props: GuiSpec<'dropdown' | 'multidropdown'>}) => {
+const DropdownComponent = ({ props }: { props: GuiSpec<'dropdown' | 'multidropdown'> }) => {
     const id = useId();
     const [filter, setFilter] = useState('');
     const filterArray = filter.toLowerCase().split(' ');
@@ -84,61 +85,72 @@ const DropdownComponent = ({props}: {props: GuiSpec<'dropdown' | 'multidropdown'
     // for some reason I can't get this to work with useMemo, but it's not particularly heavy - we also don't memoize the children of the dropdown...
     // so if we do find this is expensive, we can definitely optimize better.
     // we just want a string array to filter on to avoid throwing error e.g. if we have a current_value that's not in the dropdown because category changed.
+    //todo handle multitext / tags properly.
     const validVals = useObjectKeys ? valueObjectArray.map(item => item[valueKey]) : valueObjectArray;
-    
+
     const validVal = useCallback((v: string) => validVals.some(item => item === v), [validVals]);
     const isArray = Array.isArray(v);
     const allValid = isArray ? v.every(validVal) : validVal(v);
     const okValue = allValid ? v : (isArray ? v.filter(validVal) : null); //not ok after changing category?
 
+    // type E = SelectChangeEvent<string | string[]>;
+    type E = { target: { value: string | string[] } }; // material-ui vs native types are different, but compatible enough to use this here
+    const handleChange = action((e: E) => {
+        const {
+            target: { value },
+        } = e;
+        if (multiple && Array.isArray(value) && value.length > 1) {
+            const selected = Array.from(value);// .map(o => o.value);
+            props.current_value = selected;
+            if (props.func) props.func(selected);
+            return;
+        }
+        props.current_value = value;
+        if (props.func) props.func(value);
+    });
+
     return (
         <>
             <label htmlFor={id}>{props.label}</label>
-            <select 
-            id={id}
-            multiple={multiple}
-            value={okValue}
-            className="w-full"
-            onChange={action(e => {
-                if (multiple && e.target.selectedOptions.length > 1) {
-                    const selected = Array.from(e.target.selectedOptions).map(o => o.value);
-                    props.current_value = selected;
-                    if (props.func) props.func(selected);
-                    return;
-                }
-                props.current_value = e.target.value;
-                if (props.func) props.func(e.target.value);
-            })}>
+            <Select
+                // https://github.com/snakesilk/react-fullscreen/issues/44
+                // MenuProps={{container: () => document.getElementById('fullscreen-node')}} //todo maybe a hook to get the fullscreen node or document.body
+                size="small"
+                id={id}
+                multiple={multiple}
+                value={okValue}
+                className="w-full"
+                onChange={handleChange}>
                 {props.values[0].map((item) => {
                     const text = useObjectKeys ? item[textKey] : item;
                     const value = useObjectKeys ? item[valueKey] : item;
                     const id = uuid();
                     if (filterArray.some(f => !text.toLowerCase().includes(f))) return null;
-                    return <option key={id} value={value}>{text}</option>
+                    return <MenuItem key={id} value={value}>{text}</MenuItem>
                 })}
-            </select>
+            </Select>
             <div />
-            <input type="text" value={filter} placeholder="Filter options..." 
-            onChange={(e => setFilter(e.target.value))} 
-            className="m-1 pl-1 justify-self-center"
+            <input type="text" value={filter} placeholder="Filter options..."
+                onChange={(e => setFilter(e.target.value))}
+                className="m-1 pl-1 justify-self-center"
             />
         </>
     )
 };
 
-const CheckboxComponent = ({props}: {props: GuiSpec<'check'>}) => (
-        <>
-            <label>{props.label}</label>
-            <input type="checkbox" checked={props.current_value} onChange={action(e => {
-                props.current_value = e.target.checked;
-                if (props.func) props.func(e.target.checked);
-            })}/>
-        </>
-    );
+const CheckboxComponent = ({ props }: { props: GuiSpec<'check'> }) => (
+    <>
+        <label>{props.label}</label>
+        <input type="checkbox" checked={props.current_value} onChange={action(e => {
+            props.current_value = e.target.checked;
+            if (props.func) props.func(e.target.checked);
+        })} />
+    </>
+);
 
-const RadioButtonComponent = ({props}: {props: GuiSpec<'radiobuttons'>}) => {
+const RadioButtonComponent = ({ props }: { props: GuiSpec<'radiobuttons'> }) => {
     const choices = useMemo(() => (
-        props.choices.map(v => ({v, id: uuid()}))
+        props.choices.map(v => ({ v, id: uuid() }))
     ), [props.choices]);
     return (
         <>
@@ -162,19 +174,19 @@ const RadioButtonComponent = ({props}: {props: GuiSpec<'radiobuttons'>}) => {
                 })}
             </RadioGroup> */}
             <div className="ciview-radio-group">
-                {choices.map(({v, id}) => (
+                {choices.map(({ v, id }) => (
                     <span key={id}>
-                        <span 
-                        className="m-1"
+                        <span
+                            className="m-1"
                         >
                             {v[0]}
                         </span>
                         <input
                             // biome-ignore lint/suspicious/noDoubleEquals: number == string is ok here
                             type="radio" value={v[1]} checked={v[1] == props.current_value} onChange={action(e => {
-                            props.current_value = e.currentTarget.value;
-                            if (props.func) props.func(e.currentTarget.value);
-                        })}/>
+                                props.current_value = e.currentTarget.value;
+                                if (props.func) props.func(e.currentTarget.value);
+                            })} />
                     </span>
                 ))}
             </div>
@@ -182,47 +194,47 @@ const RadioButtonComponent = ({props}: {props: GuiSpec<'radiobuttons'>}) => {
     )
 };
 
-const DoubleSliderComponent = ({props}: {props: GuiSpec<'doubleslider'>}) => (
-        <>
-            <label>{props.label}</label>
-            <input type="range" value={props.current_value[0]} onChange={action(e => {
-                const v = props.current_value[0] = Number.parseFloat(e.target.value);
-                if (props.func) props.func([v, props.current_value[1]]);
-            })} />
-            <input type="range" value={props.current_value[1]} onChange={action(e => {
-                const v = props.current_value[1] = Number.parseFloat(e.target.value);
-                if (props.func) props.func([props.current_value[0], v]);
-            })} />
-        </>
-    );
+const DoubleSliderComponent = ({ props }: { props: GuiSpec<'doubleslider'> }) => (
+    <>
+        <label>{props.label}</label>
+        <input type="range" value={props.current_value[0]} onChange={action(e => {
+            const v = props.current_value[0] = Number.parseFloat(e.target.value);
+            if (props.func) props.func([v, props.current_value[1]]);
+        })} />
+        <input type="range" value={props.current_value[1]} onChange={action(e => {
+            const v = props.current_value[1] = Number.parseFloat(e.target.value);
+            if (props.func) props.func([props.current_value[0], v]);
+        })} />
+    </>
+);
 
-const ButtonComponent = ({props}: {props: GuiSpec<'button'>}) => (
-        <>
-            <button type="button" onClick={action(e => {
-                if (props.func) props.func(undefined);
-            })}>{props.label}</button>
-        </>
-    );
+const ButtonComponent = ({ props }: { props: GuiSpec<'button'> }) => (
+    <>
+        <button type="button" onClick={action(e => {
+            if (props.func) props.func(undefined);
+        })}>{props.label}</button>
+    </>
+);
 
-const FolderComponent = ({props}: {props: GuiSpec<'folder'>}) => {
+const FolderComponent = ({ props }: { props: GuiSpec<'folder'> }) => {
     // add uuid to each setting to avoid key collisions
     const settings = useMemo(() => (
-        props.current_value.map(setting => ({setting, id: uuid()}))
+        props.current_value.map(setting => ({ setting, id: uuid() }))
     ), [props.current_value]);
     if (settings.length === 0) return null;
-    return (   
+    return (
         <Accordion type='single' collapsible className="w-full col-span-2">
             <AccordionItem value={props.label}>
                 <AccordionTrigger>{props.label}</AccordionTrigger>
                 <AccordionContent>
-                    {settings.map(({setting, id}) => <AbstractComponent key={id} props={setting} />)}
+                    {settings.map(({ setting, id }) => <AbstractComponent key={id} props={setting} />)}
                 </AccordionContent>
             </AccordionItem>
         </Accordion>
     )
 }
 
-const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> = {
+const Components: Record<GuiSpecType, React.FC<{ props: GuiSpec<GuiSpecType> }>> = {
     'text': observer(TextComponent),
     'textbox': observer(TextBoxComponent),
     'slider': observer(SliderComponent),
@@ -236,7 +248,7 @@ const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> =
     'folder': observer(FolderComponent),
 } as const;
 
-const ErrorComponent = ({props}: {props: GuiSpec<GuiSpecType>}) => {
+const ErrorComponent = ({ props }: { props: GuiSpec<GuiSpecType> }) => {
     const [expanded, setExpanded] = useState(false);
     return (
         <div className="border-red-500 border-2 border-solid" onClick={() => setExpanded(!expanded)}>
@@ -246,7 +258,7 @@ const ErrorComponent = ({props}: {props: GuiSpec<GuiSpecType>}) => {
     )
 }
 
-const AbstractComponent = observer(({props}: {props: GuiSpec<GuiSpecType>}) => {
+const AbstractComponent = observer(({ props }: { props: GuiSpec<GuiSpecType> }) => {
     const Component = Components[props.type];
     return (
         <div className="grid grid-cols-2 p-1 justify-items-start">
@@ -257,16 +269,16 @@ const AbstractComponent = observer(({props}: {props: GuiSpec<GuiSpecType>}) => {
     )
 })
 
-export default observer(({chart}: {chart: Chart}) => {
+export default observer(({ chart }: { chart: Chart }) => {
     const settings = useMemo(() => {
-        const settings = chart.getSettings().map(setting => ({setting, id: uuid()}));
-        const wrap = {settings};
+        const settings = chart.getSettings().map(setting => ({ setting, id: uuid() }));
+        const wrap = { settings };
         makeAutoObservable(wrap);
         return wrap.settings;
     }, [chart]);
     return (
         <div className="w-full">
-            {settings.map(({setting, id}) => <AbstractComponent key={id} props={setting} />)}
+            {settings.map(({ setting, id }) => <AbstractComponent key={id} props={setting} />)}
         </div>
     )
 })
