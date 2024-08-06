@@ -21,11 +21,10 @@ RUN npm run build-flask-dockerjs
 
 # Install HDF5 library, for some reason poetry can't install it in this context as of now
 # see https://github.com/h5py/h5py/issues/2146 for similar-ish issue
-RUN apt-get update && \
-    apt-get install -y libhdf5-dev \
-    netcat \
-    telnet \
-    iputils-ping
+RUN apt-get update && apt-get install -y libhdf5-dev || (cat /var/log/apt/term.log && exit 1)
+RUN apt-get install -y netcat-openbsd || (cat /var/log/apt/term.log && exit 1)
+RUN apt-get install -y telnet || (cat /var/log/apt/term.log && exit 1)
+RUN apt-get install -y iputils-ping || (cat /var/log/apt/term.log && exit 1)
 
 #RUN pip install gunicorn
 # Install Python dependencies using Poetry
