@@ -1,7 +1,7 @@
 import BaseChart from "../../charts/BaseChart";
 import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { action, makeAutoObservable, makeObservable, observable } from "mobx";
-import { type ROI, type VivConfig, type VivContextType, VivProvider, useViewerStore, useViewerStoreApi, applyDefaultChannelState } from "./avivatorish/state";
+import { type ROI, type VivConfig, type VivContextType, VivProvider, useViewerStore, useViewerStoreApi, applyDefaultChannelState, createVivStores } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
 import type { ColumnName, DataColumn, DataType } from "../../charts/charts";
@@ -12,6 +12,7 @@ import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
 import type { DualContourLegacyConfig } from "../contour_state";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
+import { useChart } from "../context";
 
 function ReactTest() {
     // to make this look more like Avivator...
@@ -20,8 +21,9 @@ function ReactTest() {
     // so VivProvider should have whatever is necessary to adapt our config to that
     // and we'd useLoader() as opposed to useOmeTiff()
     // ... and hopefully our version of Avivator hooks will have better types ...
+    const { vivStores } = useChart() as VivMdvReact;
     return (
-    <VivProvider>
+    <VivProvider vivStores={vivStores}>
         <MainChart />
     </VivProvider>
     )
@@ -149,7 +151,7 @@ function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog: ColorChannelDialogReactWrapper;
 
-    vivStores?: VivContextType;
+    vivStores: VivContextType;
     get viewerStore() {
         return this.vivStores?.viewerStore;
     }
@@ -173,6 +175,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 this.dialogs.push(this.colorDialog);
             }
         });
+        this.vivStores = createVivStores();
     }
     colorBy?: (i: number) => [r: number, g: number, b: number];
     colorByColumn(col?: ColumnName) {
