@@ -88,7 +88,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         this.root = createMdvPortal((
             <StrictMode>
                 <ProjectProvider>
-                    <ChartProvider chart={this} materialui>
+                    <ChartProvider chart={this}>
                         <ReactComponentFunction />
                     </ChartProvider>                    
                 </ProjectProvider>
