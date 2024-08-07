@@ -10,7 +10,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 import { v4 as uuid } from 'uuid';
-import { MenuItem, Select } from "@mui/material";
+import { Chip, MenuItem, Select } from "@mui/material";
 // import DropdownSettingsComponent from "./DropdownComponent";
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
@@ -81,43 +81,47 @@ function DropdownAutocompleteComponent({ props }: { props: GuiSpec<'dropdown' | 
     // todo review 'virtualization' for large lists 
     const id = useId();
     const multiple = props.type === 'multidropdown';
-    const v = multiple && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
-
+    
     // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
     const useObjectKeys = props.values.length === 3;
     const [valueObjectArray, textKey, valueKey] = props.values;
-
+    
     //todo handle multitext / tags properly.
-    const validVals = useObjectKeys ? valueObjectArray.map(item => item[valueKey]) : valueObjectArray;
+    
+    // todo think about how this relates to different type logic with {text, value, original}
+    // const validVals = useObjectKeys ? valueObjectArray.map(item => item[valueKey]) : valueObjectArray;
+    
+    const toOption = original => {
+        const text: string = useObjectKeys ? original[textKey] : original;
+        // is value really always a string?
+        const value: string = useObjectKeys ? original[valueKey] : original;
+        // const id: string = uuid();
+        return { text, value, original };
+    };
+    type OptionType = ReturnType<typeof toOption>;
+    const options = props.values[0].map(toOption);
 
-    const validVal = useCallback((v: string) => validVals.some(item => item === v), [validVals]);
+    
+    // ------
+    // deal with cases where the options have changed (e.g. values from a different column) 
+    // and may be incompatible with props.current_value
+    // ------
+    // if 'multiple' is true, make sure we get an array even if one / zero values selected.
+    // second half of ternary will either be the existing array if 'multiple', or the single value otherwise.
+    const v = multiple && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
+    // check that and maybe provide a bit of a type guard
+    if (multiple !== Array.isArray(v)) throw "logical inconsistency - 'multidropdown' value should be coerced to array by now";
+    const validVal = useCallback((v: string) => options.some(item => item.value === v), [options]);
     const isArray = Array.isArray(v);
     const allValid = isArray ? v.every(validVal) : validVal(v);
-    const okValue = allValid ? v : (isArray ? v.filter(validVal) : null); //not ok after changing category?
+    const okValue = allValid ? v : (isArray ? v.filter(validVal) : null);
+    //map from 'value' string to option object
+    const okOption = Array.isArray(okValue)
+     ? okValue.map(v => options.find(o => o.value === v))
+     : [options.find(o => o.value === v)];
 
-    const options = props.values[0].map(item => {
-        const text: string = useObjectKeys ? item[textKey] : item;
-        // is value really always a string?
-        const value: string = useObjectKeys ? item[valueKey] : item;
-        // const id: string = uuid();
-        return { text, value };
-    });
+
     
-    type E = { target: { value: string | string[] } }; // material-ui vs native types are different, but compatible enough to use this here
-    const handleChange = action((e: E) => {
-        const {
-            target: { value },
-        } = e;
-        if (multiple && Array.isArray(value) && value.length > 1) {
-            const selected = Array.from(value);// .map(o => o.value);
-            props.current_value = selected;
-            if (props.func) props.func(selected);
-            return;
-        }
-        props.current_value = value;
-        if (props.func) props.func(value);
-    });
-
     return (
         <>
             <label className="align-middle" htmlFor={id}>{props.label}</label>
@@ -127,14 +131,25 @@ function DropdownAutocompleteComponent({ props }: { props: GuiSpec<'dropdown' | 
                 size="small"
                 id={id}
                 options={options}
-                disableCloseOnSelect
+                disableCloseOnSelect={multiple}
                 getOptionLabel={(option) => option.text}
-                onChange={(e, valueA) => {
-                    const value = Array.isArray(valueA) ? valueA.map((v: { text: string }) => v.text) : valueA.text;
-                    handleChange({ target: { value } });
-                }}
-                isOptionEqualToValue={(option, value) => option.value === value.value}
+                value={okOption}
+                onChange={action((_, value: OptionType) => { //added type annotation because mobx seems to fluff the inference
+                    if (Array.isArray(value)) { // && valueA.length > 1) {
+                        const selected = Array.from(value).map((a: OptionType) => a.value);
+                        props.current_value = selected;
+                        if (props.func) props.func(selected);
+                        return;
+                    }
+                    props.current_value = value.value;
+                    if (props.func) props.func(value.value);
+                })}
+                // isOptionEqualToValue={(option, value) => option.original === value.original}
                 renderOption={(props, option, { selected }) => {
+                    // we could potentially render something richer here - like color swatches or icons
+                    // if we had a richer sense of the data in context 
+                    // ^^ e.g. if we had a `GuiSpec<'category'>` it could have it's own internal logic for
+                    // managing internal state, and also use a richer component here.
                     const { key, ...optionProps } = props as typeof props & { key: string }; //questionable mui types?
                     if (multiple) return (
                         <li key={key} {...optionProps}>
@@ -149,14 +164,17 @@ function DropdownAutocompleteComponent({ props }: { props: GuiSpec<'dropdown' | 
                     )
                     return <li key={key} {...optionProps}>{option.text}</li>
                 }}
+                renderTags={(tagValue, getTagProps) => {
+                    //seems to be a material-ui bug with not properly handling key / props...
+                    //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
+                    return tagValue.map((option, index) => (
+                        <Chip {...getTagProps({ index })} key={option.value} label={option.text} />
+                    ))
+                }}
                 renderInput={(params) => (
                     <TextField {...params}
-                        // we could potentially render something richer here - like color swatches or icons
-                        // if we had a richer sense of the data in context 
-                        // ^^ e.g. if we had a `GuiSpec<'category'>` it could have it's own internal logic for
-                        // managing internal state, and also use a richer component here.
                         // label="Checkboxes" 
-                        placeholder={props.label}
+                        // placeholder={props.label}
                     />
                 )}
             />
