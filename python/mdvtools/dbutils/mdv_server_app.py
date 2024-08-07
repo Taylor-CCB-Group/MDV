@@ -76,7 +76,7 @@ def load_config(app):
         print("Error: One or more required secrets or configurations are missing.")
         exit(1)
 
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@10.0.1.3:5432/{db_name}'
 
 
 # Function to create base directory if it doesn't exist
