@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useState, useMemo, useId, useCallback } from "react";
+import { useState, useMemo, useId, useCallback, useEffect } from "react";
 import type { Chart, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -11,6 +11,13 @@ import {
 } from "@/components/ui/accordion"
 import { v4 as uuid } from 'uuid';
 import { MenuItem, Select } from "@mui/material";
+// import DropdownSettingsComponent from "./DropdownComponent";
+import Checkbox from '@mui/material/Checkbox';
+import TextField from '@mui/material/TextField';
+import Autocomplete from '@mui/material/Autocomplete';
+import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
+
 
 const TextComponent = ({ props }: { props: GuiSpec<'text'> }) => (
     <>
@@ -67,17 +74,101 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<'spinner'> }) => (
     </>
 )
 
+const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
+const checkedIcon = <CheckBoxIcon fontSize="small" />;
+
+function DropdownAutocompleteComponent({ props }: { props: GuiSpec<'dropdown' | 'multidropdown'> }) {
+    // todo review 'virtualization' for large lists 
+    const id = useId();
+    const multiple = props.type === 'multidropdown';
+    const v = multiple && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
+
+    // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
+    const useObjectKeys = props.values.length === 3;
+    const [valueObjectArray, textKey, valueKey] = props.values;
+
+    //todo handle multitext / tags properly.
+    const validVals = useObjectKeys ? valueObjectArray.map(item => item[valueKey]) : valueObjectArray;
+
+    const validVal = useCallback((v: string) => validVals.some(item => item === v), [validVals]);
+    const isArray = Array.isArray(v);
+    const allValid = isArray ? v.every(validVal) : validVal(v);
+    const okValue = allValid ? v : (isArray ? v.filter(validVal) : null); //not ok after changing category?
+
+    const options = props.values[0].map(item => {
+        const text: string = useObjectKeys ? item[textKey] : item;
+        // is value really always a string?
+        const value: string = useObjectKeys ? item[valueKey] : item;
+        // const id: string = uuid();
+        return { text, value };
+    });
+    
+    type E = { target: { value: string | string[] } }; // material-ui vs native types are different, but compatible enough to use this here
+    const handleChange = action((e: E) => {
+        const {
+            target: { value },
+        } = e;
+        if (multiple && Array.isArray(value) && value.length > 1) {
+            const selected = Array.from(value);// .map(o => o.value);
+            props.current_value = selected;
+            if (props.func) props.func(selected);
+            return;
+        }
+        props.current_value = value;
+        if (props.func) props.func(value);
+    });
+
+    return (
+        <>
+            <label className="align-middle" htmlFor={id}>{props.label}</label>
+            <Autocomplete
+                className="w-full"
+                multiple={multiple}
+                size="small"
+                id={id}
+                options={options}
+                disableCloseOnSelect
+                getOptionLabel={(option) => option.text}
+                onChange={(e, valueA) => {
+                    const value = Array.isArray(valueA) ? valueA.map((v: { text: string }) => v.text) : valueA.text;
+                    handleChange({ target: { value } });
+                }}
+                isOptionEqualToValue={(option, value) => option.value === value.value}
+                renderOption={(props, option, { selected }) => {
+                    const { key, ...optionProps } = props as typeof props & { key: string }; //questionable mui types?
+                    if (multiple) return (
+                        <li key={key} {...optionProps}>
+                            <Checkbox
+                                icon={icon}
+                                checkedIcon={checkedIcon}
+                                style={{ marginRight: 8 }}
+                                checked={selected}
+                            />
+                            {option.text}
+                        </li>
+                    )
+                    return <li key={key} {...optionProps}>{option.text}</li>
+                }}
+                renderInput={(params) => (
+                    <TextField {...params}
+                        // we could potentially render something richer here - like color swatches or icons
+                        // if we had a richer sense of the data in context 
+                        // ^^ e.g. if we had a `GuiSpec<'category'>` it could have it's own internal logic for
+                        // managing internal state, and also use a richer component here.
+                        // label="Checkboxes" 
+                        placeholder={props.label}
+                    />
+                )}
+            />
+        </>
+    );
+}
+
 const DropdownComponent = ({ props }: { props: GuiSpec<'dropdown' | 'multidropdown'> }) => {
     const id = useId();
     const [filter, setFilter] = useState('');
     const filterArray = filter.toLowerCase().split(' ');
     const multiple = props.type === 'multidropdown';
-    // const textFilter = (item: string | DropdownMappedValue<string, string>) => {
-    //     if (typeof item === 'string') return filter.some(f => !item.toLowerCase().includes(f));
-    //     const exclude = filter.some(f => !item.toString().toLowerCase().includes(f));
-    //     return true;
-    // }
-    // if (!v) return <>DropdownComponent: no values</>; // I guess we'll get an ErrorComponent if we don't handle here... shouldn't happen though
     const v = multiple && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
     // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
     const useObjectKeys = props.values.length === 3;
@@ -242,8 +333,9 @@ const Components: Record<GuiSpecType, React.FC<{ props: GuiSpec<GuiSpecType> }>>
     'textbox': observer(TextBoxComponent),
     'slider': observer(SliderComponent),
     'spinner': observer(SpinnerComponent),
-    'dropdown': observer(DropdownComponent),
-    'multidropdown': observer(DropdownComponent),
+    'dropdown': observer(DropdownComponent), //todo also use Autocomplete for this
+    // 'multidropdown': observer(DropdownComponent),
+    'multidropdown': observer(DropdownAutocompleteComponent),
     'check': observer(CheckboxComponent),
     'radiobuttons': observer(RadioButtonComponent),
     'doubleslider': observer(DoubleSliderComponent),
@@ -273,6 +365,7 @@ const AbstractComponent = observer(({ props }: { props: GuiSpec<GuiSpecType> }) 
 })
 
 export default observer(({ chart }: { chart: Chart }) => {
+    
     const settings = useMemo(() => {
         const settings = chart.getSettings().map(setting => ({ setting, id: uuid() }));
         const wrap = { settings };
