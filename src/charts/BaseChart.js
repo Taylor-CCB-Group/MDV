@@ -4,6 +4,7 @@ import {createEl} from "../utilities/Elements.js";
 import SettingsDialog from "../utilities/SettingsDialog";
 import { chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
+import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
 
 
 class BaseChart{
@@ -605,28 +606,10 @@ class BaseChart{
    
     _openSettingsDialog(e){
         if (!this.settingsDialog) {
-            if (import.meta.env.DEV) {
-                // this.settingsDialog = new SettingsDialogReactWrapper(this);
-                // return;
-            };
-            this.settingsDialog = new SettingsDialog({
-                maxHeight:400,
-                doc:this.__doc__ || document,
-                width:300,
-                title:"Settings",
-                position:[e.pageX,e.pageY],
-                useMobx: this.useMobx,
-                onclose:() => {
-                    this.settingsDialog = null;
-                    this.dialogs.splice(this.dialogs.indexOf(this.settingsDialog), 1);
-                }
-            },this.getSettings());
+            // the dialog will set `this.settingsDialog = null` (and remove itself from this.dialogs) when it closes.
+            this.settingsDialog = new SettingsDialogReactWrapper(this, [e.pageX, e.pageY]);
             this.dialogs.push(this.settingsDialog);
         }
-        //experimenting with making the parent always be contentDiv (not only in fullscreen mode)
-        //doesn't work ATM because of stacking context - may want to review that more generally 
-        //(can be annoying with tooltips...)
-        //this.settingsDialog.setParent(this.contentDiv);
     }
 
   
