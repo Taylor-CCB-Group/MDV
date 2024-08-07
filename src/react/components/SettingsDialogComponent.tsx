@@ -223,7 +223,10 @@ const FolderComponent = ({ props }: { props: GuiSpec<'folder'> }) => {
     ), [props.current_value]);
     if (settings.length === 0) return null;
     return (
-        <Accordion type='single' collapsible className="w-full col-span-2">
+        <Accordion type='single' collapsible className="w-full col-span-2"
+        //expand by default
+        defaultValue={props.label}
+        >
             <AccordionItem value={props.label}>
                 <AccordionTrigger>{props.label}</AccordionTrigger>
                 <AccordionContent>
