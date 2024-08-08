@@ -27,7 +27,7 @@ def wait_for_database():
             # Test database connection using engine.connect()
             with db.engine.connect() as connection:
                 connection.execute(text('SELECT 1'))
-            print("************* Database is ready! *************")
+            print("************** Database is ready! *************")
             return
         except OperationalError:
             print(f"Database not ready, retrying in {delay} seconds...")
@@ -204,7 +204,7 @@ db.init_app(app)
 print("creating tables")
 with app.app_context():
     print("******** waiting for db to set up")
-    #wait_for_database()
+    wait_for_database()
     if not tables_exist():
         print("Creating database tables")
         db.create_all()
