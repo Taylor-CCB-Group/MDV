@@ -1,0 +1,33 @@
+services:
+  mdv_app:
+    build:
+      context: .
+    image: jayeshire/mdv-frontend:latest
+    ports:
+      - "5055:5055"
+    volumes:
+      - mdv-data:/app/mdv
+      - ./secrets/db_user:/run/secrets/db_user:ro
+      - ./secrets/db_password:/run/secrets/db_password:ro
+      - ./secrets/db_name:/run/secrets/db_name:ro 
+    depends_on:
+      - mdv_db
+    
+    
+  mdv_db:
+    image: postgres:latest
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./secrets/db_user:/run/secrets/db_user:ro
+      - ./secrets/db_password:/run/secrets/db_password:ro
+      - ./secrets/db_name:/run/secrets/db_name:ro
+    environment:
+      POSTGRES_USER_FILE: /run/secrets/db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB_FILE: /run/secrets/db_name
+    
+    
+volumes:
+  postgres-data:
+  mdv-data:
+
