@@ -21,7 +21,8 @@ class FileUploadDialogReact extends BaseDialog {
                     onClose={() => this.close()}
                     onResize={(width: number, height: number) => this.resizeDialog(width, height)} // Pass the resize callback
                 />,
-                this.dialog
+                this.dialog,
+                this
             );
         } else {
             console.error("Dialog element not found");

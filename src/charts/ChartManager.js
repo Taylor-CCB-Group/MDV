@@ -48,6 +48,7 @@ import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
+import { makeObservable, observable, action } from "mobx";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -171,6 +172,10 @@ class ChartManager{
         if (listener){
             this.addListener("_default",listener)
         }
+        makeObservable(this, {
+            theme: observable,
+            setTheme: action
+        });
         //we may want to move this, for now I don't think it's doing any harm and avoids changes to multiple index files:
         connectIPC(this);
         this.transactions={};
