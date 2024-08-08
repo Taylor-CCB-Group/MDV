@@ -57,10 +57,16 @@ export type DataSource = {
     regions?: Record<string, any>;
 };
 
-export type DropdownMappedValue<T extends string, V extends string> = { [P in T]: string } & { [P in V]: string };
-export type DropdownMappedValues<T extends string, V extends string> = [
+
+type DropdownMappedValue<T extends string, V extends string> = { [P in T]: string } & { [P in V]: string };
+/** tuple of `[object[], textKey, valueKey]` where `textKey` and `valueKey` are string properties of the object. */
+type DropdownMappedValues<T extends string, V extends string> = [
     Array<DropdownMappedValue<T, V>>, T, V
 ];
+/** `'values'` for a dropdown are either a one-element array (with the element being a string array used for both 'text' and 'value'),
+ * or a tuple of [object[], textKey, valueKey] where `textKey` and `valueKey` are properties of the object that will be used for 'text'
+ * and 'value' respectively.
+ */
 export type DropDownValues = DropdownMappedValues<string, string> | [Array<string>];
 export type GuiValueTypes = { //is the premise of this correct? technically, could we have a dropdown of numbers?
     "dropdown": string;
