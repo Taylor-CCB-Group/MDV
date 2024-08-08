@@ -12,33 +12,34 @@ export default function popoutChart(chart: Chart) {
     const popoutWindow = window.open('', chart.config.title, 'width=800,height=600');
     popoutWindow.document.body.style.overflow = 'hidden';
 
-    const copyStyles = () => {
-        Array.from(document.styleSheets).forEach(styleSheet => {
-            if (styleSheet.href) {
-                const newLink = popoutWindow.document.createElement('link');
-                newLink.rel = 'stylesheet';
-                newLink.href = styleSheet.href;
-                popoutWindow.document.head.appendChild(newLink);
-            } else if (styleSheet.cssRules) {
-                const newStyle = popoutWindow.document.createElement('style');
-                Array.from(styleSheet.cssRules).forEach(rule => {
-                    newStyle.appendChild(popoutWindow.document.createTextNode(rule.cssText));
-                });
-                popoutWindow.document.head.appendChild(newStyle);
-            }
-        });
+    // Function to add a stylesheet or style element to the popout window
+    const addStyleElement = (styleElement: HTMLStyleElement | HTMLLinkElement) => {
+        if (styleElement instanceof HTMLLinkElement) {
+            const newLink = popoutWindow.document.createElement('link');
+            newLink.rel = 'stylesheet';
+            newLink.href = styleElement.href;
+            popoutWindow.document.head.appendChild(newLink);
+        } else if (styleElement instanceof HTMLStyleElement) {
+            const newStyle = popoutWindow.document.createElement('style');
+            newStyle.innerHTML = styleElement.innerHTML;
+            popoutWindow.document.head.appendChild(newStyle);
+        }
     };
 
-    // Initial style copy
-    copyStyles();
+    // Initial copy of all existing styles
+    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleElement) => {
+        addStyleElement(styleElement as HTMLStyleElement | HTMLLinkElement);
+    });
 
-    // Observe changes in the main window's head and sync to popout window
+    // Observe the main window's head for new stylesheets and style elements
     const observer = new MutationObserver(mutations => {
         mutations.forEach(mutation => {
-            if (mutation.type === 'childList') {
-                copyStyles(); //this works but is slow
-                // mutation.addedNodes.forEach(node => {
-
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                mutation.addedNodes.forEach(node => {
+                    if (node instanceof HTMLLinkElement || node instanceof HTMLStyleElement) {
+                        addStyleElement(node);
+                    }
+                });
             }
         });
     });
