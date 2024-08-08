@@ -200,7 +200,7 @@ db.init_app(app)
 print("creating tables")
 with app.app_context():
     print("******* waiting for db to set up")
-    wait_for_database()
+    #wait_for_database()
     if not tables_exist():
         print("Creating database tables")
         db.create_all()
