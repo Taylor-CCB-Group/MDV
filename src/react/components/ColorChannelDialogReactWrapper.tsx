@@ -37,7 +37,7 @@ class ColorDialogReactWrapper extends BaseDialog {
             <ChartProvider chart={parent}>
                 <ColorChannelDialogReact vivStores={parent.vivStores}/>
             </ChartProvider>
-        ), div);
+        ), div, this);
     }
     close() {
         super.close();

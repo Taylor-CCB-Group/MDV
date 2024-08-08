@@ -11,20 +11,45 @@ export default function popoutChart(chart: Chart) {
     removeDraggable(div);
     const popoutWindow = window.open('', chart.config.title, 'width=800,height=600');
     popoutWindow.document.body.style.overflow = 'hidden';
-    Array.from(document.styleSheets).forEach(styleSheet => {
-        if (styleSheet.href) {
+
+    // Function to add a stylesheet or style element to the popout window
+    const addStyleElement = (styleElement: HTMLStyleElement | HTMLLinkElement) => {
+        if (styleElement instanceof HTMLLinkElement) {
             const newLink = popoutWindow.document.createElement('link');
             newLink.rel = 'stylesheet';
-            newLink.href = styleSheet.href;
+            newLink.href = styleElement.href;
             popoutWindow.document.head.appendChild(newLink);
-        } else if (styleSheet.cssRules) {
+        } else if (styleElement instanceof HTMLStyleElement) {
             const newStyle = popoutWindow.document.createElement('style');
-            Array.from(styleSheet.cssRules).forEach(rule => {
-                newStyle.appendChild(popoutWindow.document.createTextNode(rule.cssText));
-            });
+            newStyle.innerHTML = styleElement.innerHTML;
             popoutWindow.document.head.appendChild(newStyle);
         }
+    };
+
+    // Initial copy of all existing styles
+    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleElement) => {
+        addStyleElement(styleElement as HTMLStyleElement | HTMLLinkElement);
     });
+
+    // Observe the main window's head for new stylesheets and style elements
+    const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                mutation.addedNodes.forEach(node => {
+                    if (node instanceof HTMLLinkElement || node instanceof HTMLStyleElement) {
+                        addStyleElement(node);
+                    }
+                });
+            }
+        });
+    });
+
+    // Start observing the main window's head for changes
+    observer.observe(document.head, {
+        childList: true,
+        subtree: true,
+    });
+
     popoutWindow.document.body.append(div);
     chart.changeBaseDocument(popoutWindow.document);
     const popStyles = pushSetStyles(chart);
@@ -43,6 +68,10 @@ export default function popoutChart(chart: Chart) {
         chartManager._makeChartRD(chart);
         chartManager.charts[chart.config.id].win = mainWindow;
         chart.changeBaseDocument(document);
+        observer.disconnect();
+    });
+    mainWindow.addEventListener('unload', () => {
+        popoutWindow.close();
     });
     return popoutWindow;
 }

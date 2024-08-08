@@ -86,8 +86,8 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         this.root = createMdvPortal((
             <ChartProvider chart={this}>
                 <ReactComponentFunction />
-            </ChartProvider>                    
-        ), this.reactEl);
+            </ChartProvider>
+        ), this.reactEl, this);
     }
     //todo: implement this
     // getImage(callback: (imgCa: string) => void, type: "svg" | "png" = "png"): void {

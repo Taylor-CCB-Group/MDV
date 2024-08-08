@@ -31,7 +31,7 @@ class DebugChartReactWrapper extends BaseDialog {
         const div = createEl('div', {}, this.dialog);
         this.root = createMdvPortal((
             <DebugChart chart={parent} />
-        ), div);
+        ), div, this);
     }
     close() {
         super.close();

@@ -19,13 +19,16 @@ class SettingsDialogReactWrapper extends BaseDialog {
     set root(v) {
         this._root = v;
     }
-    constructor(chart: Chart) {
+    constructor(chart: Chart, position?: [number, number]) {
         // if this is intended to be a drop-in replacement for existing SettingsDialog,
         // it isn't only used by 'charts', but e.g. tracks.
         const name = chart.config.title || `${chart.config.type} ${chart.config.id}`;
-        const config = { //TODO review popout behavior, use `__doc` or whatever here instead of `document` when appropriate
-            width: 500, title: `Settings (${name})`, doc: chart.__doc__ || document,
-            onclose: () => { chart.dialogs.splice(chart.dialogs.indexOf(this), 1) }
+        const config = {
+            width: 500, title: `Settings (${name})`, doc: chart.__doc__ || document, position,
+            onclose: () => { 
+                chart.dialogs.splice(chart.dialogs.indexOf(this), 1);
+                if (chart.settingsDialog === this) chart.settingsDialog = null;
+            }
         };
         super(config, chart);
     }
@@ -33,7 +36,7 @@ class SettingsDialogReactWrapper extends BaseDialog {
         const div = createEl('div', {}, this.dialog);
         this.root = createMdvPortal((
             <SettingsDialog chart={chart} />
-        ), div);
+        ), div, this);
     }
     close() {
         super.close();
