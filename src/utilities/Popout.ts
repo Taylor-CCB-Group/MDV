@@ -44,6 +44,9 @@ export default function popoutChart(chart: Chart) {
         chartManager.charts[chart.config.id].win = mainWindow;
         chart.changeBaseDocument(document);
     });
+    mainWindow.addEventListener('unload', () => {
+        popoutWindow.close();
+    });
     return popoutWindow;
 }
 
