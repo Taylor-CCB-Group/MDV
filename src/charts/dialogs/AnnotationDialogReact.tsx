@@ -79,7 +79,7 @@ class AnnotationDialogReact extends BaseDialog {
         this.outer.classList.add('annotationDialog');
         // this.tagModel = new TagModel(dataStore);
         this.tagModel = tagModel;
-        this.root = createMdvPortal(<AnnotationDialogComponent tagModel={this.tagModel} />, this.dialog);
+        this.root = createMdvPortal(<AnnotationDialogComponent tagModel={this.tagModel} />, this.dialog, this);
     }
     close(): void {
         super.close();

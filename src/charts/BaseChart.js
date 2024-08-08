@@ -1,10 +1,10 @@
 import {getRandomString} from "../utilities/Utilities.js";
 import {ContextMenu} from "../utilities/ContextMenu.js";
 import {createEl} from "../utilities/Elements.js";
-import SettingsDialog from "../utilities/SettingsDialog";
 import { chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
+import { makeAutoObservable, action } from "mobx";
 
 
 class BaseChart{
@@ -133,22 +133,24 @@ class BaseChart{
         this.legendIcon = this.addMenuIcon("fas fa-info",config.legend || "No description",{size:"medium"});
 
         let oldSize = config.size;
-        this.contentDiv.addEventListener("fullscreenchange", ()=>{
+        this.contentDiv.addEventListener("fullscreenchange", action(()=>{
             //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
             if (document.fullscreenElement) {
                 if (this.contentDiv !== document.fullscreenElement) console.error('unexpected fullscreen element');
+                this.observable.container = this.contentDiv;
                 const rect = window.screen;
                 this.setSize(rect.width, rect.height);
                 for (const d of this.dialogs) {
                     d.setParent(this.contentDiv);
                 }
             } else {
+                this.observable.container = this.__doc__.body;
                 this.setSize(...oldSize);
                 for (const d of this.dialogs) {
                     d.setParent(null);
                 }
             }
-        });
+        }));
         this.addMenuIcon("fas fa-expand","fullscreen", {
             func: async ()=>{
                 oldSize = this.config.size;
@@ -162,6 +164,10 @@ class BaseChart{
 
         //work out width and height based on container
         this._setDimensions();
+        // provide some observable mobx state for useOuterContainer()
+        this.observable = makeAutoObservable({
+            container: this.__doc__.body
+        });
     }
     dialogs = [];
     _getContentDimensions(){
@@ -679,7 +685,10 @@ class BaseChart{
         //this needs to be reviewed for popout windows
         // - mouse events need to be on the right window ✅
         // - dialogs need to be on the right window ✅ / transferred
+        // - fullscreen... some permutations of dialog behaviour / mouse events on deck are a bit odd
+        //   ^^ that's not a changeBaseDocument() thing, it's a fullscreen thing...
         this.contextMenu.__doc__=doc;
+        action(() => this.observable.container = doc.body)();
         this.__doc__=doc;
         for (const d of this.dialogs){
             // d.close();

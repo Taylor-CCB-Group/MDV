@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/accordion"
 import { v4 as uuid } from 'uuid';
 import { Chip, MenuItem, Select } from "@mui/material";
-// import DropdownSettingsComponent from "./DropdownComponent";
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
@@ -81,6 +80,7 @@ function DropdownAutocompleteComponent({ props }: { props: GuiSpec<'dropdown' | 
     // todo review 'virtualization' for large lists 
     const id = useId();
     const multiple = props.type === 'multidropdown';
+    if (!multiple) console.warn('DropdownAutocompleteComoponet with non-multi dropdown is WIP');
     
     // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
     const useObjectKeys = props.values.length === 3;
@@ -222,8 +222,6 @@ const DropdownComponent = ({ props }: { props: GuiSpec<'dropdown' | 'multidropdo
         <>
             <label htmlFor={id}>{props.label}</label>
             <Select
-                // https://github.com/snakesilk/react-fullscreen/issues/44
-                // MenuProps={{container: () => document.getElementById('fullscreen-node')}} //todo maybe a hook to get the fullscreen node or document.body
                 size="small"
                 id={id}
                 multiple={multiple}

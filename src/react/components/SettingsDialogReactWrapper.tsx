@@ -36,7 +36,7 @@ class SettingsDialogReactWrapper extends BaseDialog {
         const div = createEl('div', {}, this.dialog);
         this.root = createMdvPortal((
             <SettingsDialog chart={chart} />
-        ), div);
+        ), div, this);
     }
     close() {
         super.close();
