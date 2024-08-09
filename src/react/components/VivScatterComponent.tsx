@@ -15,6 +15,7 @@ import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { trace } from "mobx";
+import { useOuterContainer } from "../screen_state";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -86,6 +87,7 @@ const Main = observer(() => {
     const [width, height] = useChartSize();
     const id = useChartID();
     const detailId = `${id}detail-react`;
+    const outerContainer = useOuterContainer();
 
     //useSpatialLayers()
     const rectLayer = useRectLayer();
@@ -162,6 +164,7 @@ const Main = observer(() => {
         <>
             <SelectionOverlay {...scatterProps} />
             <MDVivViewer
+                outerContainer={outerContainer}
                 views={[detailView]}
                 layerProps={[layerConfig]}
                 viewStates={[{ ...viewState, id: detailId }]}
