@@ -3,8 +3,8 @@ import type DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
 
 //multitext was buggy (empty data buffer after loading project)
-//at least one multitext bug has been fixed, but we're still using text for now.
-type TagColumn = DataColumn<'text'>;
+const COL_TYPE = 'multitext';
+export type TagColumn = DataColumn<'multitext'>;
 
 const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
 const JOIN = '; '; //join with semi-colon and space.
@@ -16,28 +16,57 @@ const splitTags = (value: string) => value.split(SEP).filter(v=>v);
  * find all the indices that include 'tag' as one of those tags.
  */
 function getTagValueIndices(tag: string, col: TagColumn) {
+    // nb there is a delimiter in the column metadata - not part of my type definition as of yet.
+    // we should use that instead of SEP.
     if (tag.match(SEP)) throw new Error('getTagValueIndices: tag must not contain separator (should be handled before calling this function)');
     return col.values.map((v, i) => v.split(SEP).includes(tag) ? i : -1).filter(i => i !== -1);
 }
 
+/**
+ * TagModel is a class that manages a column of tags in a DataStore.
+ * 
+ * Shiu et al. (2019) describe a "tag model" as a way to manage tags in a data store.
+ * ^^ no they don't, copilot made that up. They published some actual research about covid transmission.
+ * 
+ * 
+ * How do we want to use this class?]
+ * We could have an instance associated with any multitext column in a DataStore.
+ * That could be bad because this has destructive side-effects from 'sanitizing' values
+ * which would not be expected by general multitext columns.
+ * However, there could be a way to make this only apply to columns that are explicitly flagged
+ * as intended to have tag-like semantics.
+ * I want to be able to make things like category filters which rather than refer to column.values,
+ * refer to the tags in a column - with an efficient way to check if a row has a tag.
+ * Some of the internals of this implementation could be useful for that.
+ */
 export default class TagModel {
     readonly tagColumn: TagColumn;
+    readonly dataStore: DataStore;
     readonly dataModel: DataModel;
-    listeners: (()=>void)[] = [];
+    private listeners: (()=>void)[] = [];
     constructor(dataStore: DataStore, columnName = '__tags') {
+        this.dataStore = dataStore;
         this.dataModel = new DataModel(dataStore, {autoupdate: true});
         this.dataModel.updateModel();
         //nb, this will replace any other "tag" listener on model (but the model is local to this object)
         this.dataModel.addListener("tag", () => {
-            this.listeners.map(callback => callback());
-        })
+            this.callListeners();
+        });
         if (!dataStore.columnIndex[columnName]) {
-            // subgroup - user annotations?
-            const columnSpec = {name: columnName, datatype: 'text', editable: true, separator: ';', field: columnName};
+            // subgroup - default to 'annotations' but also allow user to specify?
+            // DataStore.addColumn() could take a spec that includes subgroup info,
+            // but it seems to make it a lot more complicated than just setting a string property here.
+            const columnSpec = {name: columnName, datatype: 'multitext', editable: true, separator: ';', field: columnName};
+            //dataStore.size * 2 should be right for 'multitext' - wrong for 'text'
             const data = new SharedArrayBuffer(dataStore.size * 2);
             dataStore.addColumn(columnSpec, data);
         }
-        this.tagColumn = dataStore.columnIndex[columnName];
+        const col = dataStore.columnIndex[columnName];
+        if (col.datatype !== COL_TYPE) throw new Error(`column '${columnName}' is not of type '${COL_TYPE}'`);
+        this.tagColumn = col;
+    }
+    private callListeners() {
+        this.listeners.map(callback => callback());
     }
     addListener(callback: ()=>void) {
         this.listeners.push(callback);
@@ -70,6 +99,11 @@ export default class TagModel {
         const values = [...usedValuesByIndex].map(i => col.values[i]);
         return new Set(values.flatMap(splitTags));
     }
+    // getTagsNotInSelection() {
+    //     const allTags = getTags(this.tagColumn);
+    //     const inSelection = this.getTagsInSelection();
+    //     return new Set([...allTags].filter(t => !inSelection.has(t)));
+    // }
 }
 
 function getValueIndex(value: string, col: TagColumn) {
