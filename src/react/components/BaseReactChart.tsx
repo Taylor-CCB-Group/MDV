@@ -52,7 +52,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     root: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
     ComponentFn: TComponent<T & BaseConfig>;
-    private titleReactionDispoer: ReturnType<typeof autorun>;
+    private titleReactionDisposer: ReturnType<typeof autorun>;
     protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: T & BaseConfig, ReactComponentFunction: TComponent<T & BaseConfig> = Fallback) {
         super(dataStore, div, config);
         config = this.config; //original config will be copied by super, before doing things like adding id to it...
@@ -65,7 +65,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
                 makeAutoObservable(config);
             }
         });
-        this.titleReactionDispoer = autorun(() => {
+        this.titleReactionDisposer = autorun(() => {
             this.setTitle(config.title);
         });
         // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
@@ -100,18 +100,11 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
 
     //     }
     // }
-    changeBaseDocument(doc: Document): void {
-        // how confident are we that this will work?
-        // will need re-testing if we implement different state management...
-        this.root.unmount();
-        super.changeBaseDocument(doc);
-        this.mountReact();
-    }
     remove(): void {
         // make sure dim and anything else relevant is removed...
         // **is there any React teardown we should be considering?**
         this.root.unmount();
         super.remove();
-        this.titleReactionDispoer();
+        this.titleReactionDisposer();
     }
 }

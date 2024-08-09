@@ -429,7 +429,7 @@ class VivViewerMDV {
         viewState: baseViewState,
         width: this.width,
         height: this.height,
-        useDevicePixels: false,
+        useDevicePixels: true,
         initialViewState,
         controller: use3d
       });
