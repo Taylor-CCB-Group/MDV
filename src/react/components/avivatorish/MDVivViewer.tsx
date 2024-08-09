@@ -62,7 +62,7 @@ type VivViewerWrapperState = { viewStates: any }
  */
 class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivViewerWrapperState> {
     constructor(props) {
-        console.warn('using custom VivViewerWrapper via MDVivViewer for testing');
+        console.log('using custom VivViewerWrapper via MDVivViewer for testing');
         super(props);
         this.state = {
             viewStates: {}
@@ -332,8 +332,9 @@ class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivV
 
 /**
  * This is a wrapper around the VivViewer component from @hms-dbmi/viv
- * *** NOT NECESSARY ANYMORE ***
- * although I may still want to add some types to the regular VivViewer
- * and this can maybe be useful for debugging sometimes.
+ * This can maybe be useful for debugging sometimes vs using vanilla <VivViewer>.
+ * We may want to add more of our functionality here in future to help with how we
+ * manage other layers rendered with viv (as of this writing, the scale-bar from here gets obscured,
+ * and we may want to do things which share more data / rendering logic in various ways...)
  */
 export default (props: VivViewerWrapperProps) => <MDVivViewerWrapper {...props} />
