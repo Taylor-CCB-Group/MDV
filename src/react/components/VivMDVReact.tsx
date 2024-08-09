@@ -14,13 +14,13 @@ import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 
-function ReactTest() {
-    // to make this look more like Avivator...
-    // we probably don't want OmeTiffProvider to be a thing...
-    // we should use a VivProvider, with hooks that look more like Avivator's
-    // so VivProvider should have whatever is necessary to adapt our config to that
-    // and we'd useLoader() as opposed to useOmeTiff()
-    // ... and hopefully our version of Avivator hooks will have better types ...
+function VivScatterChartRoot() {
+    // to make this look like Avivator...
+    // we use a VivProvider, with hooks that are mofified versions of Avivator's
+    // VivProvider makes the vivStores available to the chart so that the chart can update & use the viewerStore et al.
+    // in a way that is similar to Avivator - with the caveat that use of state in callbacks needs to be done
+    // with saving a reference to e.g. `useViewerStoreApi()` and calling the `setState` method on that
+    // rather than `useViewerStore.setState()`.
     const { vivStores } = useChart() as VivMdvReact;
     return (
     <VivProvider vivStores={vivStores}>
@@ -162,7 +162,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
         const config = adaptConfig(originalConfig);
-        super(dataStore, div, config, ReactTest);
+        super(dataStore, div, config, VivScatterChartRoot);
         this.colorByColumn(config.color_by);
         makeObservable(this, {
             colorBy: observable,
