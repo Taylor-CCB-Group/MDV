@@ -350,8 +350,8 @@ class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivV
 
 /**
  * This is a wrapper around the VivViewer component from @hms-dbmi/viv
- * *** NOT NECESSARY ANYMORE ***
- * although I may still want to add some types to the regular VivViewer
- * and this can maybe be useful for debugging sometimes.
+ * *** THIS IS NOW ACTUALLY NECESSARY ***
+ * to fix issues with mouse events in popouts.
+ * In future, we may handle more interesting things here to do with layer rendering.
  */
 export default (props: VivViewerWrapperProps) => <MDVivViewerWrapper {...props} />
