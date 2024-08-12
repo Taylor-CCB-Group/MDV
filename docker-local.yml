@@ -3,7 +3,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-local
     #image: jayeshire/mdv-frontend:1.23
     networks:
       - default
