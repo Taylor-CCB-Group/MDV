@@ -4,7 +4,8 @@ import BaseChart from "./BaseChart.js";
 import { createEl } from "../utilities/Elements.js";
 import { ImageArray } from "../webgl/ImageArray";
 //import { ScatterplotLayer } from 'deck.gl/typed'; // -no, using ScatterplotExLayer
-import { ScatterplotExLayer, ImageArrayDeckExtension } from '../webgl/ImageArrayDeckExtension';
+import { ImageArrayDeckExtension } from '../webgl/ImageArrayDeckExtension';
+import { ScatterplotExLayer } from '@/webgl/ScatterplotExLayer.js';
 import { OrthographicView } from "deck.gl/typed";
 import type Dimension from "../datastore/Dimension.js";
 

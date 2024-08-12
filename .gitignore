@@ -33,6 +33,7 @@ docs/maindocs/_build/
 docs/maindocs/autoapi/
 
 venv/
+venv
 docsenv/
 data/
 

@@ -5,9 +5,10 @@ import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./ColorChannelComponents";
 import { ChartProvider } from "../context";
+import type { VivContextType } from "./avivatorish/state";
 
-const ColorChannelDialogReact = observer(function ColorChannelDialogReact() {
-    return (<Gui />)
+const ColorChannelDialogReact = observer(function ColorChannelDialogReact({ vivStores } : {vivStores: VivContextType}) {
+    return (<Gui vivStores={vivStores} />)
 });
 
 
@@ -33,10 +34,10 @@ class ColorDialogReactWrapper extends BaseDialog {
     init(parent: VivMDVReact) {
         const div = createEl('div', {}, this.dialog);
         this.root = createMdvPortal((
-            <ChartProvider chart={parent} materialui>
-                <ColorChannelDialogReact />
+            <ChartProvider chart={parent}>
+                <ColorChannelDialogReact vivStores={parent.vivStores}/>
             </ChartProvider>
-        ), div);
+        ), div, this);
     }
     close() {
         super.close();

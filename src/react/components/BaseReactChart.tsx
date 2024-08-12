@@ -1,13 +1,11 @@
-import { makeAutoObservable } from "mobx";
+import { autorun, makeAutoObservable } from "mobx";
 import BaseChart from "../../charts/BaseChart";
 import { createMdvPortal } from "@/react/react_utils";
 import type DataStore from '../../datastore/DataStore'
 import { ChartProvider } from "../context";
-import { StrictMode } from "react";
 import { createEl } from "../../utilities/ElementsTyped";
 import type { Chart, DataSource } from "../../charts/charts";
 import { toPng, toSvg } from "html-to-image";
-import { ProjectProvider } from "@/modules/ProjectContext";
 
 function Fallback() {
     return <>
@@ -54,6 +52,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     root: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
     ComponentFn: TComponent<T & BaseConfig>;
+    private titleReactionDisposer: ReturnType<typeof autorun>;
     protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: T & BaseConfig, ReactComponentFunction: TComponent<T & BaseConfig> = Fallback) {
         super(dataStore, div, config);
         config = this.config; //original config will be copied by super, before doing things like adding id to it...
@@ -65,6 +64,9 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
                 //we are using makeAutoObservable and not referring to config directly...
                 makeAutoObservable(config);
             }
+        });
+        this.titleReactionDisposer = autorun(() => {
+            this.setTitle(config.title);
         });
         // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
         // that worked, with extra extraneous number that changed to be observed by the hook...
@@ -82,14 +84,10 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     private mountReact() {
         const ReactComponentFunction = this.ComponentFn;
         this.root = createMdvPortal((
-            <StrictMode>
-                <ProjectProvider>
-                    <ChartProvider chart={this} materialui>
-                        <ReactComponentFunction />
-                    </ChartProvider>                    
-                </ProjectProvider>
-            </StrictMode>
-        ), this.reactEl);
+            <ChartProvider chart={this}>
+                <ReactComponentFunction />
+            </ChartProvider>
+        ), this.reactEl, this);
     }
     //todo: implement this
     // getImage(callback: (imgCa: string) => void, type: "svg" | "png" = "png"): void {
@@ -102,17 +100,11 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
 
     //     }
     // }
-    changeBaseDocument(doc: Document): void {
-        // how confident are we that this will work?
-        // will need re-testing if we implement different state management...
-        this.root.unmount();
-        super.changeBaseDocument(doc);
-        this.mountReact();
-    }
     remove(): void {
         // make sure dim and anything else relevant is removed...
         // **is there any React teardown we should be considering?**
         this.root.unmount();
         super.remove();
+        this.titleReactionDisposer();
     }
 }

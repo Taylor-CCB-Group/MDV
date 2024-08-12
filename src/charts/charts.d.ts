@@ -5,12 +5,14 @@
 
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
-export type DataType = 'integer' | 'double' | 'text' | 'unique' | 'multitext' | 'int32';
+export type DataType = 'integer' | 'double' | 'text' | 'text16' | 'unique' | 'multitext' | 'int32';
+export type CategoricalDataType = 'text' | 'text16' | 'multitext';
 
 type DataStructureTypes = {
     'integer': Uint32Array;
     'double': Float32Array; //why is it called 'double'???
     'text': Uint8Array;
+    'text16': Uint16Array;
     'multitext': Uint16Array;
     'unique': Uint8Array; //not sure about this either.
 }
@@ -18,6 +20,7 @@ type DataValuesTypes = {
     'integer': undefined;
     'double': undefined;
     'text': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
+    'text16': string[];
     'multitext': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
     'unique': string[];
 }
@@ -54,14 +57,20 @@ export type DataSource = {
     regions?: Record<string, any>;
 };
 
-export type DropdownMappedValue<T extends string, V extends string> = { [P in T]: string } & { [P in V]: string };
-export type DropdownMappedValues<T extends string, V extends string> = [
+
+type DropdownMappedValue<T extends string, V extends string> = { [P in T]: string } & { [P in V]: string };
+/** tuple of `[object[], textKey, valueKey]` where `textKey` and `valueKey` are string properties of the object. */
+type DropdownMappedValues<T extends string, V extends string> = [
     Array<DropdownMappedValue<T, V>>, T, V
 ];
+/** `'values'` for a dropdown are either a one-element array (with the element being a string array used for both 'text' and 'value'),
+ * or a tuple of [object[], textKey, valueKey] where `textKey` and `valueKey` are properties of the object that will be used for 'text'
+ * and 'value' respectively.
+ */
 export type DropDownValues = DropdownMappedValues<string, string> | [Array<string>];
-export type GuiValueTypes = {
+export type GuiValueTypes = { //is the premise of this correct? technically, could we have a dropdown of numbers?
     "dropdown": string;
-    "multidropdown": any;
+    "multidropdown": string | string[]; 
     "check": boolean;
     "text": string;
     "textbox": string;

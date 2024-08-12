@@ -233,9 +233,10 @@ class VivScatterPlot extends DensityScatterPlot{
                 if(r){
                     const i = r.all_regions[c.region].viv_image;
                     //c.viv.url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file;
-                    let url = i.url;
+                    let url = i.url ? i.url : getProjectURL(r.avivator.base_url) + i.file;
                     //is specified by file and base
                     if (!url){
+                        //nb: I patched above to use getProjectURL, and this may be redundant
                         let base= r.avivator.base_url;
                         //has to be full url
                         if (! base.startsWith("http")){

@@ -1,3 +1,4 @@
+import { action, makeAutoObservable } from "mobx";
 import {createEl,makeResizable,makeDraggable, removeResizable, removeDraggable} from "./Elements.js";
 
 class BaseDialog{
@@ -24,7 +25,7 @@ class BaseDialog{
   * @param {object} content The object passed to the init method
   */
 
-constructor (config,content) {
+  constructor (config,content) {
     config.doc=config.doc || document;
     this.config=config;
     this.buttons={};
@@ -125,22 +126,27 @@ constructor (config,content) {
     this.outer.style.left =`${pos[0]}px`;
     this.outer.style.top =`${pos[1]}px`
     
-
+    // provide some observable mobx state for useOuterContainer()
+    this.observable = makeAutoObservable({
+      container: config.doc.body
+    });
   }
   setParent(parent) {
+    // this.__doc__ = parent || document;
+    action(() => this.observable.container = parent || document.body)();
     // need to makeResizable and makeDraggable work with this
     removeResizable(this.outer);
     removeDraggable(this.outer);
     if (parent) {
       parent.append(this.outer);
       makeResizable(this.outer, {
-        doc: parent.ownerDocument,
+        doc: parent.ownerDocument, //is ownerDocument a safe bet? What if we're fullscreen? then we can't resize anyway.
         onresizeend:(x,y) => {
         this.onResize(x,y)
       }});
       makeDraggable(this.outer, {
         doc: parent.ownerDocument,
-        handle:".ciview-dlg-header"    
+        handle:".ciview-dlg-header"
       });
     } else {
       this.config.doc.body.append(this.outer);
@@ -238,7 +244,7 @@ constructor (config,content) {
         this.outer.style.width = `${x}px`;
         this.outer.style.height = `${y}px`;
     }
-}
+  }
 
 
 }

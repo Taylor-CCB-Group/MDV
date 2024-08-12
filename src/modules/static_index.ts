@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import './wdyr';
 import "./all_css";
 import HmrHack from "../react/HmrHack";
 HmrHack();
@@ -8,6 +9,7 @@ import { fetchJsonConfig, getDataLoader, getPostData, setProjectRoot } from "../
 import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
 import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
+
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
 declare global {

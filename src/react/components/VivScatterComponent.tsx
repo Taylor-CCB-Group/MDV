@@ -2,7 +2,7 @@ import { getDefaultInitialViewState, ColorPaletteExtension, DetailView, VivViewe
 import { observer } from "mobx-react-lite";
 import { useState, useLayoutEffect, useMemo, useEffect, useRef } from "react";
 import { shallow } from "zustand/shallow";
-import { useChartSize, useChartID, useConfig } from "../hooks";
+import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
 import { useScatterplotLayer } from "../scatter_state";
 import SelectionOverlay from "./SelectionOverlay";
 import { useLoader, type OME_TIFF, useViewerStoreApi, useChannelsStore, useViewerStore } from "./avivatorish/state";
@@ -10,10 +10,12 @@ import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
 import { SpatialAnnotationProvider, useRange } from "../spatial_context";
 import { GeoJsonLayer, PolygonLayer } from "deck.gl/typed";
-import { getVivId } from "./avivatorish/MDVivViewer";
+import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
+import { trace } from "mobx";
+import { useOuterContainer } from "../screen_state";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -51,7 +53,8 @@ const useRectLayer = () => {
 const useJsonLayer = () => {
     const id = useChartID();
     const { root } = useProject();
-    const { json, showJson } = useConfig<VivRoiConfig>();
+    const { showJson } = useConfig<VivRoiConfig>();
+    const { json } = useRegion(); // return type is 'any' and we assume 'json' will be a string - but want that to be different in future.
     const layer_id = `json_${getVivId(`${id}detail-react`)}`;
     const layer = useMemo(() => {
         return json ? new GeoJsonLayer({
@@ -84,6 +87,7 @@ const Main = observer(() => {
     const [width, height] = useChartSize();
     const id = useChartID();
     const detailId = `${id}detail-react`;
+    const outerContainer = useOuterContainer();
 
     //useSpatialLayers()
     const rectLayer = useRectLayer();
@@ -104,7 +108,7 @@ const Main = observer(() => {
     const vsRef = useRef<ViewState>();
     const vsDebugDivRef = useRef<HTMLPreElement>(null);
     
-    useLayoutEffect(() => {
+    useEffect(() => {
         if (!ome) return;
         if (!viewState) {
             //WIP <-- c.f. Avivator's useViewerStore() hook
@@ -126,7 +130,7 @@ const Main = observer(() => {
         }
     }, [scatterProps.viewState, viewerStore.setState]);
     // TODO get viv working in popouts (seems to be some spurious feature-detection, should be fixed with new version of viv)
-    const layerConfigX = {
+    const layerConfig = useMemo(() => ({
         loader: ome,
         selections,
         contrastLimits,
@@ -135,8 +139,8 @@ const Main = observer(() => {
         channelsVisible,
         brightness,
         contrast
-    }
-    const deckProps = {
+    }), [ome, selections, contrastLimits, extensions, colors, channelsVisible, brightness, contrast]);
+    const deckProps = useMemo(() => ({
         getTooltip,
         style: {
             zIndex: '-1',
@@ -153,33 +157,16 @@ const Main = observer(() => {
         glOptions: {
             preserveDrawingBuffer: true,
         }
-    }
+    }), [scatterplotLayer, rectLayer, jsonLayer, id, getTooltip, scatterProps.onAfterRender]);
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
+    if (import.meta.env.DEV) trace();
     return (
         <>
             <SelectionOverlay {...scatterProps} />
-            <pre ref={vsDebugDivRef} 
-            style={{ 
-                display: 'none', // <-- set to block to debug viewState
-                position: 'absolute', bottom: 2, left: 2, zIndex: 1000, backgroundColor: 'rgba(40,40,40,0.5)',
-                backdropFilter: 'blur(2px)',
-                outline: '1px solid white',
-                fontSize: '9px',
-                //  pointerEvents: 'none'
-            }}
-            onClick={() => {
-                // center on image
-                const vs = getDefaultInitialViewState(ome, { width, height }) as any;
-                vs.zoom = (vs.zoom || -10) + Math.random()*0.0001; //salt the zoom to force a re-render
-                vsRef.current = vs;
-                // setViewState(vs);
-                viewerStore.setState({ viewState: vs });
-            }}
-            >
-            </pre>
-            <VivViewer
+            <MDVivViewer
+                outerContainer={outerContainer}
                 views={[detailView]}
-                layerProps={[layerConfigX]}
+                layerProps={[layerConfig]}
                 viewStates={[{ ...viewState, id: detailId }]}
                 onViewStateChange={e => {
                     viewerStore.setState({ viewState: { ...e.viewState, id: detailId } });

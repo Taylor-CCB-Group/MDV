@@ -1,15 +1,15 @@
-import { useId, useState } from "react";
+import { useId, useMemo } from "react";
 import { shallow } from 'zustand/shallow';
-import { VivProvider, useChannelsStore, useChannelsStoreApi, useImageSettingsStoreApi, useLoader, useMetadata, useViewerStore } from "./avivatorish/state";
+import { type VivContextType, VivProvider, useChannelsStore, useChannelsStoreApi, useImageSettingsStoreApi, useLoader, useMetadata, useViewerStore } from "./avivatorish/state";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
 import { Checkbox, FormControl, InputLabel, MenuItem, Select, Slider } from "@mui/material";
 import { PopoverPicker } from "./ColorPicker";
 import { getSingleSelectionStats } from "./avivatorish/utils";
 import { X } from 'lucide-react';
 
-export default function MainVivColorDialog() {
+export default function MainVivColorDialog({ vivStores } : { vivStores: VivContextType }) {
     return (
-        <VivProvider>
+        <VivProvider vivStores={vivStores}>
             <Test />
         </VivProvider>
     )
@@ -61,7 +61,7 @@ const ChannelChooser = ({index}: {index: number}) => {
         <select
         disabled={isChannelLoading[index]}
         value={selections[index].c}
-        style={{width: '100%', padding: '0.2em'}} 
+        className="w-full p-1"
         onChange={async e => {
             // see Avivator Controller.jsx onSelectionChange
             try {
@@ -160,18 +160,19 @@ const ChannelController = ({ index }: { index: number }) => {
     // not sure I want to be using material.ui... consider adding a widget abstration layer.
     // not jumping right in with using it for all layout etc because I don't want to be tied to it.
     // Starting to use tailwind here.
+    // memoizing styles to avoid re-rendering - not sure how to translate to tailwind, not thought about it much yet.
+    const gridStyle = useMemo(() => ({
+        gridTemplateColumns: '0.4fr 0.1fr 0.1fr 1fr 0.1fr',
+    }), []);
+    const sliderStyle = useMemo(() => ({
+        color: colorString,
+        marginLeft: '10px',
+    }), [colorString]);
     return (
         <>
         <div
         className="grid justify-start items-center p-1"
-        style = {{
-            // padding: '10px',
-            // display: 'grid',
-            gridTemplateColumns: '0.4fr 0.1fr 0.1fr 1fr 0.1fr',
-            // justifyItems: 'flex-start',
-            // alignItems: 'center',
-            // gap: '10px',
-        }}
+        style = {gridStyle}
         >
             <ChannelChooser index={index} />
             <Checkbox
@@ -193,7 +194,7 @@ const ChannelController = ({ index }: { index: number }) => {
                 size="small"
                 //slotProps={{ thumb: {  } }} //todo smaller thumb
                 disabled={isChannelLoading[index]}
-                style={{ color: colorString, marginLeft: '10px' }}
+                style={sliderStyle}
                 value={limits[index]}
                 min={domains[index][0]}
                 max={domains[index][1]}

@@ -7,9 +7,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from './components/VivScatterComponent';
-import { ScatterplotExLayer } from '../webgl/ImageArrayDeckExtension';
+// import { ScatterplotExLayer } from '@/webgl/ScatterplotExLayer';
+import SpatialLayer from '@/webgl/SpatialLayer';
 import { ScatterSquareExtension, ScatterDensityExension } from '../webgl/ScatterDeckExtension';
 import { useHighlightedIndex } from './selectionHooks';
+import type { DataColumn } from '@/charts/charts';
+import { useLegacyDualContour } from './contour_state';
 
 /**
  * Get a {Uint32Array} of the currently filtered indices.
@@ -107,50 +110,10 @@ export function useScatterModelMatrix() {
     return {modelMatrix, setModelMatrix};
 }
 
-type Tooltip = (PickingInfo) => string;
-type P = [number, number];
-export function useScatterplotLayer() {
-    const id = useChartID();
-    const chart = useChart();
-    const colorBy = (chart as any).colorBy;
+function useZoomOnFilter(modelMatrix: Matrix4) {
     const config = useConfig<ScatterPlotConfig>();
-
-    const { opacity, radius, course_radius } = config;
-    const radiusScale = radius * course_radius;
-
     const data = useFilteredIndices();
     const [cx, cy] = useParamColumns();
-    const hoverInfoRef = useRef<PickingInfo>(null);
-    const highlightedIndex = useHighlightedIndex();
-    // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
-    const getLineWidth = useCallback((i: number) => {
-        return i === highlightedIndex ? 0.2*radiusScale/scale : 0.0;
-    }, [radiusScale, highlightedIndex]);
-
-    const tooltipCol = useMemo(() => {
-        if (!config.tooltip) return undefined;
-        return chart.dataStore.columnIndex[config.tooltip.column]
-    }, [config.tooltip, chart.dataStore.columnIndex]);
-    const getTooltipVal = useCallback((i: number) => {
-        // if (!tooltipCol?.data) return '#'+i;
-        return tooltipCol.getValue(data[i]);
-    }, [tooltipCol, data]);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: fix this
-    const getTooltip = useCallback(
-        //todo nicer tooltip interface (and review how this hook works)
-        ({object}) => {
-            if (!config.tooltip.show) return;
-            // testing reading object properties --- pending further development
-            // (not hardcoding DN property etc)
-            // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
-            const hoverInfo = hoverInfoRef.current;
-            return hoverInfo && hoverInfo.index !== -1 && `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`;
-        },
-    [hoverInfoRef, getTooltipVal, config.tooltip.show]);
-
-    const scale = useRegionScale();
-    const {modelMatrix, setModelMatrix} = useScatterModelMatrix();
-    const modelMatrixRef = useRef(modelMatrix);
     const [chartWidth, chartHeight] = useChartSize(); //not sure we want this, potentially re-rendering too often...
     // not using as dependency for scaling viewState to data - we don't want to zoom as chart size changes
     // (at least for now - may consider making this configurable / testing it out)
@@ -186,14 +149,14 @@ export function useScatterplotLayer() {
                 return;
             }
         }
-        
+
         // Step 2: Calculate the center of the bounding box
         // - take into account transform matrices
         // could review using scatterplotLayer.project / projectPosition
         // quicker to do once than for every point
         [minX, minY] = modelMatrix.transformAsPoint([minX, minY, 0]);
         [maxX, maxY] = modelMatrix.transformAsPoint([maxX, maxY, 0]);
-        
+
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
 
@@ -222,6 +185,56 @@ export function useScatterplotLayer() {
             // transitionInterpolator: new FlyToInterpolator({speed: 1}), //applicable for MapState - latitude is required
         });
     }, [data, cx, cy, chartHeight, chartWidth, config.zoom_on_filter, modelMatrix.transformAsPoint]);
+    return viewState;
+}
+
+
+type Tooltip = (PickingInfo) => string;
+type P = [number, number];
+export function useScatterplotLayer() {
+    const id = useChartID();
+    const chart = useChart();
+    const colorBy = (chart as any).colorBy;
+    const config = useConfig<ScatterPlotConfig>();
+
+    const { opacity, radius, course_radius } = config;
+    const radiusScale = radius * course_radius;
+
+    const data = useFilteredIndices();
+    const [cx, cy, contourParameter] = useParamColumns();
+    const hoverInfoRef = useRef<PickingInfo>(null);
+    const highlightedIndex = useHighlightedIndex();
+    // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
+    const getLineWidth = useCallback((i: number) => {
+        return i === highlightedIndex ? 0.2*radiusScale/scale : 0.0;
+    }, [radiusScale, highlightedIndex]);
+    const contourLayers = useLegacyDualContour();
+
+    const tooltipCol = useMemo(() => {
+        if (!config.tooltip) return undefined;
+        return chart.dataStore.columnIndex[config.tooltip.column]
+    }, [config.tooltip, config.tooltip.column, chart.dataStore.columnIndex]);
+    const getTooltipVal = useCallback((i: number) => {
+        // if (!tooltipCol?.data) return '#'+i;
+        return tooltipCol.getValue(data[i]);
+    }, [tooltipCol, data]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: fix this
+    const getTooltip = useCallback(
+        //todo nicer tooltip interface (and review how this hook works)
+        ({object}) => {
+            if (!config.tooltip.show) return;
+            // testing reading object properties --- pending further development
+            // (not hardcoding DN property etc)
+            // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
+            const hoverInfo = hoverInfoRef.current;
+            return hoverInfo && hoverInfo.index !== -1 && `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`;
+        },
+    [hoverInfoRef, getTooltipVal, config.tooltip.show]);
+
+    const scale = useRegionScale();
+    const {modelMatrix, setModelMatrix} = useScatterModelMatrix();
+    const modelMatrixRef = useRef(modelMatrix);
+    const viewState = useZoomOnFilter(modelMatrix);
     const { point_shape } = config;
 
     const extensions = useMemo(() => {
@@ -231,8 +244,8 @@ export function useScatterplotLayer() {
     }, [point_shape]);
     const [currentLayerHasRendered, setCurrentLayerHasRendered] = useState(false);
     const scatterplotLayer = useMemo(() => {
-        setCurrentLayerHasRendered(false);
-        return new ScatterplotExLayer({
+        setCurrentLayerHasRendered(false); //<<< this is fishy
+        return new SpatialLayer({ //new
         // loaders //<< this will be interesting to learn about
         id: `scatter_${getVivId(`${id}detail-react`)}`, // should satisfy VivViewer, could make this tidier
         data,
@@ -251,7 +264,9 @@ export function useScatterplotLayer() {
             getFillColor: colorBy, //this is working; removing it breaks the color change...
             // modelMatrix: modelMatrix, // this is not necessary, manipulating the matrix works anyway
             // getLineWith: clickIndex, // this does not work, seems to need something like a function
-            getLineWidth
+            getLineWidth,
+            //as of now, the SpatialLayer implemetation needs to figure this out for each sub-layer.
+            // getContourWeight1: config.category1, 
         },
         pickable: true,
         onHover: (info) => {
@@ -282,8 +297,10 @@ export function useScatterplotLayer() {
             //     duration: 300,
             // },
         },
+        // ...config, //make sure contour properties are passed through
+        contourLayers,
         extensions
-    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth]);
+    })}, [id, data, opacity, radiusScale, colorBy, cx, cy, scale, modelMatrix, extensions, chart, getLineWidth, contourLayers]);
     const unproject = useCallback((e: MouseEvent | React.MouseEvent | P) => {
         if (!currentLayerHasRendered || !scatterplotLayer.internalState) throw new Error('scatterplotLayer not ready');
         if (Array.isArray(e)) e = {clientX: e[0], clientY: e[1]} as MouseEvent;
@@ -300,9 +317,10 @@ export function useScatterplotLayer() {
         return p3;
     }, [scatterplotLayer, modelMatrix, currentLayerHasRendered, chart.contentDiv.getBoundingClientRect]);
     // const project = 
-    const onAfterRender = () => setCurrentLayerHasRendered(true);
-    return {
+    const onAfterRender = useCallback(() => setCurrentLayerHasRendered(true), []);
+    return useMemo(() => ({
         scatterplotLayer, getTooltip, modelMatrix, modelMatrixRef, viewState,
         currentLayerHasRendered, onAfterRender, unproject
-    };
+    }), [scatterplotLayer, getTooltip, modelMatrix, viewState,
+        currentLayerHasRendered, onAfterRender, unproject]);
 }

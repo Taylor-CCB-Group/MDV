@@ -16,6 +16,7 @@ import type { VivMDVReact } from "./VivMDVReact";
 import { runInAction } from "mobx";
 import { useChartDoc, useChartSize } from "../hooks";
 import { sizeToMeters } from "./avivatorish/utils";
+import clsx from "clsx";
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
@@ -127,13 +128,7 @@ function RectangleEditor({toolActive = false, scatterplotLayer, rangeDimension, 
 
     return (
     <>
-    <div style={{
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        top: 0,
-        left: 0,
-    }}
+    <div className="absolute top-0 left-0 w-full h-full"
     onMouseDown={(e) => {
         if (!toolActive) return;
         const p = unproject(e);
@@ -171,27 +166,36 @@ function MeasureTool({scatterplotLayer, unproject, toolActive} : EditorProps) {
     // could we unproject into the image layer rather than scatterplotLayer?
     // const startPixels = unproject(start);
     // const endPixels = unproject(end);
-    // todo make this a layer in deck.gl & hopefully avoid exceptions...
+    // todo make this a layer in deck.gl?
+    console.warn('MeasureTool is in development and may not work as expected.');
     const start = scatterplotLayer.project(startPixels);
     const end = scatterplotLayer.project(endPixels);
     const length = physicalSize * Math.sqrt((endPixels[0] - startPixels[0])**2 + (endPixels[1] - startPixels[1])**2) / scale;
+    const f = Math.round;
+    // <<< XXX this isn't working and I don't know why... values look right but css isn't applied >>>
+    // const className = clsx("absolute", `top-[${f(end[1] + 10)}px]`, `left-[${f(end[0] + 10)}px]`); //possible HMR problem with rule-of-hooks?
+    // console.log('measure tool className=', className);
     return (<>
-    <div style={{
+    <div 
+    // todo make this a layer in deck.gl? or at least avoid style literal...
+    // className={clsx("absolute", `top-[${f(end[1] + 10)}px]`, `left-[${f(end[0] + 10)}px]`)}
+    // className={clsx("absolute", "top-[380px]", `left-[${f(end[0] + 10)}px]`)} //this works
+    // className={className}
+    
+    style={{
         position: 'absolute',
         width: '100%',
         height: '100px',
         display: hasStarted ? 'block' : 'none',
         top: end[1] + 10,
         left: end[0] + 10,
-    }}>
+    }}
+    >
         {(sizeToMeters(length, 'mm')).toFixed(2)}mm
     </div>
     <svg
     viewBox={`0 0 ${w} ${h}`}
-    style={{
-        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'transparent',
-        pointerEvents: toolActive ? 'auto' : 'none',
-    }}
+    className={clsx("absolute top-0 left-0 w-full h-full bg-transparent", toolActive ? 'pointer-events-auto' : 'pointer-events-none')}
     onMouseDown={e => {
         if (!toolActive) return;
         const p = unproject([e.clientX, e.clientY]);
@@ -231,13 +235,8 @@ function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProp
 
     return (
         <>
-        <div style={{
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            top: 0,
-            left: 0,
-        }}
+        <div 
+        className="absolute top-0 left-0 w-full h-full"
         onMouseDown={(e) => {
             const p = unproject(e);
             pLastRef.current = p;
@@ -246,6 +245,25 @@ function TransformEditor({scatterplotLayer, modelMatrix, unproject} : EditorProp
         }}
         />
         </>
+    )
+}
+
+const ToolButton = ({name, ToolIcon, selectedTool, setSelectedTool}) => {
+    const style = useMemo(() => ({
+        backgroundColor: selectedTool === name ? 'rgba(255,255,255,0.2)' : 'transparent',
+        borderRadius: 10,
+        zIndex: 2,
+    }), [selectedTool, name]);
+    return (
+        <Tooltip title={name}>
+            <IconButton 
+            style={style} 
+            onClick={() => setSelectedTool(name)}
+            aria-label={name}
+            >
+                <ToolIcon />
+            </IconButton>
+        </Tooltip>
     )
 }
 
@@ -259,15 +277,9 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
     // It would be good to have a poly-line tool with draggable points, though.
     // Also a brush tool for painting on masks with variable radius.
     const toolButtons = useMemo(() => {
-        return ToolArray.map(({name, ToolIcon}) => {
-            return <Tooltip title={name} key={name}><IconButton style={{
-                backgroundColor: selectedTool === name ? 'rgba(255,255,255,0.2)' : 'transparent',
-                borderRadius: 10,
-                zIndex: 2,
-            }} onClick={() => setSelectedTool(name)}
-            aria-label={name}
-            ><ToolIcon /></IconButton></Tooltip>
-        });
+        return ToolArray.map(({name, ToolIcon}) => (<ToolButton 
+            key={name} name={name} ToolIcon={ToolIcon} selectedTool={selectedTool} setSelectedTool={setSelectedTool} 
+        />));
     }, [selectedTool]);
     const { rangeDimension } = useRange();
     // state: { selectedTool: 'rectangle' | 'circle' | 'polygon' | 'lasso' | 'magic wand' | 'none' }
@@ -281,18 +293,15 @@ export default observer(function SelectionOverlay(scatterProps : ReturnType<type
     // if (!scatterProps.currentLayerHasRendered) return null;
     return (
         <>
-        <ButtonGroup variant="contained" aria-label="choose tool for manipulating view or selection" style={{zIndex: 2, padding: '0.3em'}}>
+        <ButtonGroup variant="contained" aria-label="choose tool for manipulating view or selection" 
+        className="z-[2] p-2"
+        // style={{zIndex: 2, padding: '0.3em'}}
+        >
             {toolButtons}
         </ButtonGroup>
-        <div style={{
-            position: 'absolute',
-            top: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 1,
-            pointerEvents: selectedTool === 'Pan' ? 'none' : 'auto'
-            }}
+            <div className={`absolute top-0 left-0 w-full h-full z-[1] ${selectedTool === 'Pan' ? 'pointer-events-none' : 'pointer-events-auto'}`}
             onMouseUp={(e) => {
+                console.log('mouse up');
                 // setSelectedTool('Pan');
             }}
             onMouseDown={(e) => {

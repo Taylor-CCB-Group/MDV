@@ -49,6 +49,7 @@ import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
+import { makeObservable, observable, action } from "mobx";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -172,6 +173,10 @@ class ChartManager{
         if (listener){
             this.addListener("_default",listener)
         }
+        makeObservable(this, {
+            theme: observable,
+            setTheme: action
+        });
         //we may want to move this, for now I don't think it's doing any harm and avoids changes to multiple index files:
         connectIPC(this);
         this.transactions={};
@@ -197,7 +202,7 @@ class ChartManager{
       
         if (config.all_views){
        
-            this.viewSelect = createEl("select",{},this.menuBar);
+            this.viewSelect = createEl("select",{style:{maxWidth: '50em'}},this.menuBar);
             for (const v of config.all_views){
                 createEl("option",{text:v,value:v},this.viewSelect)
             }
@@ -1625,26 +1630,21 @@ class ChartManager{
             },
             text:config.title
         },div)
-        return new Promise((resolve,reject)=>{
-            const func = ()=>{
-                this._addChart(dataSource,config,div,notify);
-                resolve();
-            }
+        try {
             // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
-            try {
-                this._getColumnsThen(dataSource, neededCols, func);
-            } catch (error) {
-                this.clearInfoAlerts();
-                const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
-                    type: "warning"
-                });
-                console.log(error);
-                const idiv = this.infoAlerts[id].div;
-                idiv.onclick = () => idiv.remove();
-                div.remove();
-                reject(error);
-            }
-        });
+            await this._getColumnsAsync(dataSource, neededCols);
+            this._addChart(dataSource, config, div, notify);
+        } catch (error) {
+            this.clearInfoAlerts();
+            const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
+                type: "warning"
+            });
+            console.log(error);
+            const idiv = this.infoAlerts[id].div;
+            idiv.onclick = () => idiv.remove();
+            div.remove();
+            throw new Error(error); //probably not a great way to handle this
+        }
     }
 
     

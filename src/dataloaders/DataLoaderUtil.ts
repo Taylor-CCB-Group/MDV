@@ -123,3 +123,19 @@ export async function getPostData(url: string, args, return_type = "json") {
     
         return await resp.arrayBuffer();
 }
+
+/** Get a column with given name from the given dataSource, fetching from server if necessary.
+ * Returns a Column object when the data is loaded.
+ */
+export async function loadColumn(datasourceName: string, columnName: string) {
+    return new Promise((resolve, reject) => {
+        try {
+            const ds = window.mdv.chartManager.getDataSource(datasourceName);
+            const column = ds.columnIndex[columnName];
+            if (ds.columnsWithData.includes(columnName)) resolve(column); //hopefully this is trustworthy
+            else window.mdv.chartManager.loadColumnSet([columnName], datasourceName, () => resolve(column));
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
