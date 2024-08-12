@@ -26,6 +26,7 @@ const MaterialWrapper = observer(function MaterialWrapper({ children }: PropsWit
         components: {
             MuiPopper: { defaultProps },
             MuiPopover: { defaultProps },
+            MuiDialog: { defaultProps }
         }
     }), [prefersDarkMode, defaultProps]);
 
