@@ -67,17 +67,17 @@ def load_config(app):
             print(f"Error: Secret '{secret_name}' not found.")
             exit(1)
 
-    #db_user = read_secret('db_user')
-    #db_password = read_secret('db_password')
-    #db_name = read_secret('db_name')
-    #db_host = app.config['db_host']
+    db_user = read_secret('db_user')
+    db_password = read_secret('db_password')
+    db_name = read_secret('db_name')
+    db_host = app.config['db_host']
 
-    #if not all([db_user, db_password, db_name, db_host]):
-    #    print("Error: One or more required secrets or configurations are missing.")
-    #    exit(1)
+    if not all([db_user, db_password, db_name, db_host]):
+        print("Error: One or more required secrets or configurations are missing.")
+        exit(1)
 
-    #app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
-    app.config['SQLALCHEMY_DATABASE_URI'] = config.get('database_uri', '')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+    #app.config['SQLALCHEMY_DATABASE_URI'] = config.get('database_uri', '')
        
 
 
