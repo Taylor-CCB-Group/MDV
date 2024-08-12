@@ -56,7 +56,7 @@ class File(db.Model):
     upload_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-
+    
 class UserProject(db.Model):
     __tablename__ = 'user_projects'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -149,13 +149,22 @@ db.Index('idx_genes_name', GeneSet.name)
 db.Index('idx_views_table_name', ViewSet.table_name)
 db.Index('idx_views_name', ViewSet.name)
 
-# Event listener
 @db.event.listens_for(File, 'after_insert')
 @db.event.listens_for(File, 'after_update')
 @db.event.listens_for(File, 'after_delete')
-
 def update_project_timestamp(mapper, connection, target):
-    project = target.project
-    if project:
-        project.update_timestamp = datetime.now()
-        db.session.commit()
+    try:
+        # Ensure target.project is the correct way to access the associated Project
+        project = target.project
+        if project:
+            # Update the project's timestamp
+            project.update_timestamp = datetime.now()
+            db.session.commit()
+            print(f"Updated project timestamp for project ID {project.id}")
+        else:
+            print(f"No associated project found for file ID {target.id}")
+    except Exception as e:
+        print(f"Error updating project timestamp: {e}")
+        db.session.rollback()  # Rollback in case of an error
+
+

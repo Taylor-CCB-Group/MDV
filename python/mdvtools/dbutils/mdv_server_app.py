@@ -14,7 +14,7 @@ from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
-from mdvtools.dbutils.dbservice import ProjectService
+from mdvtools.dbutils.dbservice import ProjectService, FileService
 
 
 def wait_for_database():
@@ -117,6 +117,23 @@ def serve_projects_from_db():
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(app=app, open_browser=False, backend=True)
                     print(f"Serving project: {project.path}")
+
+                    # Update or add files in the database to reflect the actual files in the filesystem
+                    for root, dirs, files in os.walk(project.path):
+                        for file_name in files:
+                            full_file_path = os.path.join(root, file_name)
+
+                            # Use the utility function to add or update the file in the database
+                            updated_file = FileService.add_or_update_file_in_project(
+                                file_name=file_name,
+                                file_path=full_file_path,
+                                project_id=project.id
+                            )
+                            if updated_file is None:
+                                print(f"Failed to add or update file '{file_name}' in the database.")
+                            else:
+                                print(f"Processed file in DB: {updated_file}")
+
                 except Exception as e:
                     print(f"Error serving project '{project.path}': {e}")
             else:
@@ -168,6 +185,26 @@ def serve_projects_from_filesystem(base_dir):
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
                     else:
                         print(f"Added project to DB: {new_project}")
+                    
+                    # Add files from the project directory to the database
+                    for root, dirs, files in os.walk(project_path):
+                        for file_name in files:
+                            # Construct the full file path
+                            full_file_path = os.path.join(root, file_name)
+                            
+                            # Use the full file path when adding or updating the file in the database
+                            new_file = FileService.add_or_update_file_in_project(
+                                file_name=file_name,
+                                file_path=full_file_path,
+                                project_id=new_project.id
+                            )
+                            
+                            if new_file is None:
+                                raise ValueError(f"Failed to add file '{file_name}' to the database.")
+                            else:
+                                print(f"Added file to DB: {new_file}")
+
+
                 except Exception as e:
                     print(f"In create_projects_from_filesystem: Error creating project at path '{project_path}': {e}")
             else:
