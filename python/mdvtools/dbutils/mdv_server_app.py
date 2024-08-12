@@ -181,11 +181,19 @@ def serve_projects_from_filesystem(base_dir):
 
 
 print("script starts..")
+import os
+print("Current Working Directory:", os.getcwd())
 
 
-app = Flask(__name__, template_folder='../templates', static_folder='../../../dist/flask')
-static_folder = "/app/dist/flask"
+app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
+#static_folder = "/app/dist/flask"
 app.after_request(add_safe_headers)
+
+print("---------")
+stat = app.static_folder      
+print(stat)
+print(app.template_folder)
+print(os.listdir(app.static_folder))      
 
 
 print("creating base directory")
