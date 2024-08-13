@@ -1,0 +1,1680 @@
+[
+  {
+    "name": "cells",
+    "columns": [
+      {
+        "datatype": "integer",
+        "name": "Object Id",
+        "field": "Object Id",
+        "minMax": [
+          1.0,
+          66989.0
+        ],
+        "quantiles": {
+          "0.001": [
+            22.0,
+            66288.95900000003
+          ],
+          "0.01": [
+            216.0,
+            62969.58999999997
+          ],
+          "0.05": [
+            1076.0,
+            52083.0
+          ]
+        }
+      },
+      {
+        "datatype": "integer",
+        "name": "area_pixels",
+        "field": "area_pixels",
+        "minMax": [
+          24.0,
+          11561.0
+        ],
+        "quantiles": {
+          "0.001": [
+            38.0,
+            2309.9590000000317
+          ],
+          "0.01": [
+            84.0,
+            1513.0
+          ],
+          "0.05": [
+            185.0,
+            1117.0
+          ]
+        }
+      },
+      {
+        "datatype": "text",
+        "name": "sample_id",
+        "field": "sample_id",
+        "values": [
+          "mRNAlowdose-Lesioned_SAMPLE_10_ROI_2",
+          "mRNAlowdose-Lesioned_SAMPLE_10_ROI_1",
+          "Unvaccinated-Lesioned_SAMPLE_3_ROI_2",
+          "mRNAlowdose-NonLesioned_SAMPLE_10_ROI_2",
+          "DNAonedose-Lesioned_SAMPLE_15_ROI_1",
+          "DNAonedose-NonLesioned_SAMPLE_15_ROI_1",
+          "mRNAlowdose-NonLesioned_SAMPLE_10_ROI_1",
+          "DNAtwodose-Lesioned_SAMPLE_14_ROI_2",
+          "Unvaccinated-NonLesioned_SAMPLE_3_ROI_1",
+          "ViralVector-NonLesioned_SAMPLE_2_ROI_1",
+          "DNAtwodose-NonLesioned_SAMPLE_14_ROI_1",
+          "mRNAhighdose-Lesioned_SAMPLE_11_ROI_2",
+          "DNAonedose-NonLesioned_SAMPLE_15_ROI_2",
+          "Unvaccinated-Lesioned_SAMPLE_3_ROI_1",
+          "Rechallenge-NonLesioned_SAMPLE_8_ROI_1",
+          "DNAtwodose-Lesioned_SAMPLE_14_ROI_1",
+          "Rechallenge-Lesioned_SAMPLE_8_ROI_1",
+          "Unvaccinated-Lesioned_SAMPLE_4_ROI_1",
+          "mRNAhighdose-Lesioned_SAMPLE_11_ROI_1",
+          "ViralVector-NonLesioned_SAMPLE_2_ROI_2",
+          "ViralVector-Lesioned_SAMPLE_2_ROI_2"
+        ]
+      },
+      {
+        "name": "leiden",
+        "datatype": "text",
+        "field": "leiden",
+        "values": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14"
+        ]
+      },
+      {
+        "datatype": "double",
+        "name": "X_pca_1",
+        "field": "X_pca_1",
+        "minMax": [
+          -7.7755694,
+          8.8832655
+        ],
+        "quantiles": {
+          "0.001": [
+            -5.746135240077972,
+            7.59384556865694
+          ],
+          "0.01": [
+            -4.382175760269165,
+            5.295798707008341
+          ],
+          "0.05": [
+            -2.9343880891799925,
+            3.1269449591636644
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "X_pca_2",
+        "field": "X_pca_2",
+        "minMax": [
+          -4.070558,
+          5.147465
+        ],
+        "quantiles": {
+          "0.001": [
+            -2.9388269340991973,
+            3.799673441171708
+          ],
+          "0.01": [
+            -2.245680582523346,
+            2.8254608869552573
+          ],
+          "0.05": [
+            -1.6670103549957276,
+            1.9197192311286895
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "X_pca_3",
+        "field": "X_pca_3",
+        "minMax": [
+          -4.5006905,
+          5.24296
+        ],
+        "quantiles": {
+          "0.001": [
+            -2.87459228348732,
+            3.450240782260951
+          ],
+          "0.01": [
+            -2.094781744480133,
+            2.498507359027861
+          ],
+          "0.05": [
+            -1.4630451440811154,
+            1.6624359488487241
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "X_pca_harmony_1",
+        "field": "X_pca_harmony_1",
+        "minMax": [
+          -7.140018,
+          9.099815
+        ],
+        "quantiles": {
+          "0.001": [
+            -5.594914916038513,
+            7.363002315998115
+          ],
+          "0.01": [
+            -4.332833623886109,
+            4.998201923370354
+          ],
+          "0.05": [
+            -3.012459099292755,
+            3.0231942057609555
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "X_pca_harmony_2",
+        "field": "X_pca_harmony_2",
+        "minMax": [
+          -4.0307374,
+          4.8987675
+        ],
+        "quantiles": {
+          "0.001": [
+            -2.6798338572978975,
+            3.604854379653955
+          ],
+          "0.01": [
+            -2.0386744213104246,
+            2.7364858150482143
+          ],
+          "0.05": [
+            -1.5474484801292419,
+            1.9064772844314575
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "X_pca_harmony_3",
+        "field": "X_pca_harmony_3",
+        "minMax": [
+          -4.101803,
+          5.110565
+        ],
+        "quantiles": {
+          "0.001": [
+            -2.7179190900325776,
+            3.2439876732826316
+          ],
+          "0.01": [
+            -2.0160450387001037,
+            2.359092962741848
+          ],
+          "0.05": [
+            -1.4262056469917297,
+            1.600677955150604
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "X_umap_1",
+        "field": "X_umap_1",
+        "minMax": [
+          0.3577946,
+          15.317251
+        ],
+        "quantiles": {
+          "0.001": [
+            1.2331015245914458,
+            14.983794516563417
+          ],
+          "0.01": [
+            2.37454270362854,
+            14.408157730102538
+          ],
+          "0.05": [
+            4.220196270942688,
+            13.541093683242797
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "X_umap_2",
+        "field": "X_umap_2",
+        "minMax": [
+          -4.1991982,
+          6.5787206
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.3478439223766325,
+            5.8834360227584845
+          ],
+          "0.01": [
+            -2.681917943954468,
+            5.301321873664854
+          ],
+          "0.05": [
+            -1.7557793140411375,
+            4.437037110328671
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "X_umap_3",
+        "field": "X_umap_3",
+        "minMax": [
+          -0.88723063,
+          12.023148
+        ],
+        "quantiles": {
+          "0.001": [
+            -0.2619683136343956,
+            11.464816315650948
+          ],
+          "0.01": [
+            0.5772806918621063,
+            10.744605207443234
+          ],
+          "0.05": [
+            1.8452448368072512,
+            9.946779203414915
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_DAPI",
+        "field": "log2_DAPI",
+        "minMax": [
+          8.560792,
+          15.999978
+        ],
+        "quantiles": {
+          "0.001": [
+            10.488240396499634,
+            15.973617519378667
+          ],
+          "0.01": [
+            12.733217592239379,
+            15.774465465545655
+          ],
+          "0.05": [
+            13.274268531799317,
+            15.52248282432556
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_CD103",
+        "field": "log2_CD103",
+        "minMax": [
+          0.0,
+          15.106509
+        ],
+        "quantiles": {
+          "0.001": [
+            0.0,
+            12.570575759887909
+          ],
+          "0.01": [
+            0.0,
+            11.659763774871823
+          ],
+          "0.05": [
+            0.0,
+            10.77377986907959
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_CD16",
+        "field": "log2_CD16",
+        "minMax": [
+          0.0,
+          15.936522
+        ],
+        "quantiles": {
+          "0.001": [
+            0.0,
+            15.131383963584906
+          ],
+          "0.01": [
+            0.0,
+            14.282140150070187
+          ],
+          "0.05": [
+            0.0,
+            13.249415540695187
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_CD20",
+        "field": "log2_CD20",
+        "minMax": [
+          0.0,
+          15.184377
+        ],
+        "quantiles": {
+          "0.001": [
+            0.0,
+            12.885032964706424
+          ],
+          "0.01": [
+            0.2353370125591753,
+            11.47385592460632
+          ],
+          "0.05": [
+            5.8742035865783695,
+            10.037551593780513
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_CD3",
+        "field": "log2_CD3",
+        "minMax": [
+          0.0,
+          15.957329
+        ],
+        "quantiles": {
+          "0.001": [
+            6.7551491298675534,
+            15.307308240890508
+          ],
+          "0.01": [
+            10.022517747879029,
+            14.786590433120727
+          ],
+          "0.05": [
+            10.594842338562012,
+            14.213454103469848
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_CD31",
+        "field": "log2_CD31",
+        "minMax": [
+          0.0,
+          15.999978
+        ],
+        "quantiles": {
+          "0.001": [
+            3.7454697253704072,
+            14.089094051361116
+          ],
+          "0.01": [
+            9.838681964874267,
+            13.560595588684082
+          ],
+          "0.05": [
+            10.685111236572265,
+            13.126330041885376
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_CD4",
+        "field": "log2_CD4",
+        "minMax": [
+          0.0,
+          15.9779825
+        ],
+        "quantiles": {
+          "0.001": [
+            0.0,
+            15.160143700599676
+          ],
+          "0.01": [
+            9.605655117034912,
+            14.613660116195677
+          ],
+          "0.05": [
+            10.552696228027344,
+            13.965049743652342
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_CD45",
+        "field": "log2_CD45",
+        "minMax": [
+          7.910933,
+          15.961956
+        ],
+        "quantiles": {
+          "0.001": [
+            11.257796767234803,
+            15.45345663166047
+          ],
+          "0.01": [
+            11.951198463439942,
+            15.037799568176268
+          ],
+          "0.05": [
+            12.332168865203858,
+            14.707765245437622
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_CD56",
+        "field": "log2_CD56",
+        "minMax": [
+          0.0,
+          15.815849
+        ],
+        "quantiles": {
+          "0.001": [
+            5.081010012626648,
+            14.773114500045779
+          ],
+          "0.01": [
+            9.97575942993164,
+            14.42884533882141
+          ],
+          "0.05": [
+            11.223237371444702,
+            14.136335325241088
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_CD68",
+        "field": "log2_CD68",
+        "minMax": [
+          0.0,
+          15.417767
+        ],
+        "quantiles": {
+          "0.001": [
+            7.947706284999847,
+            14.28007227611543
+          ],
+          "0.01": [
+            9.260706396102906,
+            13.285055513381954
+          ],
+          "0.05": [
+            9.717832994461059,
+            12.293607473373413
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_FOXP3",
+        "field": "log2_FOXP3",
+        "minMax": [
+          0.0,
+          15.755397
+        ],
+        "quantiles": {
+          "0.001": [
+            0.0,
+            13.1179378757477
+          ],
+          "0.01": [
+            6.79215516090393,
+            11.477159576416016
+          ],
+          "0.05": [
+            8.100068187713623,
+            10.7045392036438
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_HLADR",
+        "field": "log2_HLADR",
+        "minMax": [
+          0.0,
+          15.992221
+        ],
+        "quantiles": {
+          "0.001": [
+            8.276627893447875,
+            15.535191343307504
+          ],
+          "0.01": [
+            10.303864860534668,
+            14.797401924133297
+          ],
+          "0.05": [
+            11.231333875656128,
+            14.084038686752319
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "log2_PANCK",
+        "field": "log2_PANCK",
+        "minMax": [
+          0.0,
+          15.98991
+        ],
+        "quantiles": {
+          "0.001": [
+            7.515778437614441,
+            15.087131336212174
+          ],
+          "0.01": [
+            9.02071964263916,
+            14.432547168731688
+          ],
+          "0.05": [
+            9.85826358795166,
+            13.72213454246521
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "spatial_X_coord",
+        "field": "spatial_X_coord",
+        "minMax": [
+          1.886076,
+          9327.5
+        ],
+        "quantiles": {
+          "0.001": [
+            6.696372318267822,
+            9207.53417089844
+          ],
+          "0.01": [
+            47.659339904785156,
+            8286.685009765622
+          ],
+          "0.05": [
+            246.41313629150392,
+            5763.7626953125
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "spatial_Y_coord",
+        "field": "spatial_Y_coord",
+        "minMax": [
+          1.490566,
+          9299.408
+        ],
+        "quantiles": {
+          "0.001": [
+            7.000134428024292,
+            9214.45047265627
+          ],
+          "0.01": [
+            53.333322525024414,
+            8429.982519531248
+          ],
+          "0.05": [
+            268.84517974853514,
+            6783.773510742187
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_DAPI",
+        "field": "zscore_DAPI",
+        "minMax": [
+          -10.5712185,
+          2.8106823
+        ],
+        "quantiles": {
+          "0.001": [
+            -5.901842679977417,
+            2.243681533336645
+          ],
+          "0.01": [
+            -3.0617763686180117,
+            1.742367346286772
+          ],
+          "0.05": [
+            -1.7874212622642516,
+            1.2979842126369474
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_CD103",
+        "field": "zscore_CD103",
+        "minMax": [
+          -6.4086404,
+          3.5576012
+        ],
+        "quantiles": {
+          "0.001": [
+            -4.344106674194336,
+            2.3110298030376444
+          ],
+          "0.01": [
+            -2.916562080383301,
+            1.7868942010402642
+          ],
+          "0.05": [
+            -1.7557705163955688,
+            1.3337511122226697
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_CD16",
+        "field": "zscore_CD16",
+        "minMax": [
+          -6.2505774,
+          2.94674
+        ],
+        "quantiles": {
+          "0.001": [
+            -4.150846481323242,
+            2.44730153775216
+          ],
+          "0.01": [
+            -2.7366447591781617,
+            1.9880612409114835
+          ],
+          "0.05": [
+            -1.481215476989746,
+            1.5136905848979934
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_CD20",
+        "field": "zscore_CD20",
+        "minMax": [
+          -13.521465,
+          7.9304976
+        ],
+        "quantiles": {
+          "0.001": [
+            -8.777628898620605,
+            3.818893654108061
+          ],
+          "0.01": [
+            -3.9349038410186767,
+            2.347189548015593
+          ],
+          "0.05": [
+            -1.3008450508117675,
+            1.056397724151611
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_CD3",
+        "field": "zscore_CD3",
+        "minMax": [
+          -19.083767,
+          5.801009
+        ],
+        "quantiles": {
+          "0.001": [
+            -4.882705509662628,
+            3.933008928298951
+          ],
+          "0.01": [
+            -2.2010427045822145,
+            2.7991959118842917
+          ],
+          "0.05": [
+            -1.3826038002967833,
+            1.8108118116855612
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_CD31",
+        "field": "zscore_CD31",
+        "minMax": [
+          -21.40381,
+          6.0642905
+        ],
+        "quantiles": {
+          "0.001": [
+            -7.723641979217529,
+            3.1080791728496564
+          ],
+          "0.01": [
+            -2.482265200614929,
+            2.179576377868651
+          ],
+          "0.05": [
+            -1.4914707422256466,
+            1.4740860223770138
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_CD4",
+        "field": "zscore_CD4",
+        "minMax": [
+          -17.785433,
+          5.6118903
+        ],
+        "quantiles": {
+          "0.001": [
+            -8.965518951416016,
+            3.3748171176910997
+          ],
+          "0.01": [
+            -2.1801689004898073,
+            2.4468382930755554
+          ],
+          "0.05": [
+            -1.2896744847297668,
+            1.6270000994205471
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_CD45",
+        "field": "zscore_CD45",
+        "minMax": [
+          -12.957138,
+          5.694083
+        ],
+        "quantiles": {
+          "0.001": [
+            -4.452186597824097,
+            3.2684925024509632
+          ],
+          "0.01": [
+            -2.5604669141769407,
+            2.3437938308715793
+          ],
+          "0.05": [
+            -1.6059506654739377,
+            1.5899865567684157
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_CD56",
+        "field": "zscore_CD56",
+        "minMax": [
+          -22.965183,
+          4.026194
+        ],
+        "quantiles": {
+          "0.001": [
+            -8.673067327499389,
+            2.3024573690891805
+          ],
+          "0.01": [
+            -2.7791679787635806,
+            1.664669164419174
+          ],
+          "0.05": [
+            -1.6035508275032042,
+            1.224637359380722
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_CD68",
+        "field": "zscore_CD68",
+        "minMax": [
+          -18.306177,
+          8.166343
+        ],
+        "quantiles": {
+          "0.001": [
+            -4.411045831680298,
+            5.269081365585404
+          ],
+          "0.01": [
+            -1.9039944088459015,
+            3.560317673683162
+          ],
+          "0.05": [
+            -1.2561282157897948,
+            1.7197734832763603
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_FOXP3",
+        "field": "zscore_FOXP3",
+        "minMax": [
+          -22.25353,
+          12.811099
+        ],
+        "quantiles": {
+          "0.001": [
+            -7.365806390285492,
+            4.771646368503605
+          ],
+          "0.01": [
+            -2.696362566947937,
+            2.36599481105804
+          ],
+          "0.05": [
+            -1.4550153374671935,
+            1.3052424967288963
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_HLADR",
+        "field": "zscore_HLADR",
+        "minMax": [
+          -16.39677,
+          5.1284857
+        ],
+        "quantiles": {
+          "0.001": [
+            -4.857650044441223,
+            3.47725150060654
+          ],
+          "0.01": [
+            -2.695983738899231,
+            2.547007083892815
+          ],
+          "0.05": [
+            -1.5896780431270598,
+            1.6161709308624255
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_PANCK",
+        "field": "zscore_PANCK",
+        "minMax": [
+          -10.236692,
+          4.103742
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.276671569108963,
+            2.8386323285102866
+          ],
+          "0.01": [
+            -2.2920485734939575,
+            2.2117453122138966
+          ],
+          "0.05": [
+            -1.5621274769306182,
+            1.6233959674835197
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_DAPI",
+        "field": "zscore_clipped_DAPI",
+        "minMax": [
+          -3.0,
+          2.8106823
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            2.243681533336645
+          ],
+          "0.01": [
+            -3.0,
+            1.742367346286772
+          ],
+          "0.05": [
+            -1.7874212622642516,
+            1.2979842126369474
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_CD103",
+        "field": "zscore_clipped_CD103",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            2.3110298030376444
+          ],
+          "0.01": [
+            -2.916562080383301,
+            1.7868942010402642
+          ],
+          "0.05": [
+            -1.7557705163955688,
+            1.3337511122226697
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_CD16",
+        "field": "zscore_clipped_CD16",
+        "minMax": [
+          -3.0,
+          2.94674
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            2.44730153775216
+          ],
+          "0.01": [
+            -2.7366447591781617,
+            1.9880612409114835
+          ],
+          "0.05": [
+            -1.481215476989746,
+            1.5136905848979934
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_CD20",
+        "field": "zscore_clipped_CD20",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            3.0
+          ],
+          "0.01": [
+            -3.0,
+            2.347189548015593
+          ],
+          "0.05": [
+            -1.3008450508117675,
+            1.056397724151611
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_CD3",
+        "field": "zscore_clipped_CD3",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            3.0
+          ],
+          "0.01": [
+            -2.2010427045822145,
+            2.7991959118842917
+          ],
+          "0.05": [
+            -1.3826038002967833,
+            1.8108118116855612
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_CD31",
+        "field": "zscore_clipped_CD31",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            3.0
+          ],
+          "0.01": [
+            -2.482265200614929,
+            2.179576377868651
+          ],
+          "0.05": [
+            -1.4914707422256466,
+            1.4740860223770138
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_CD4",
+        "field": "zscore_clipped_CD4",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            3.0
+          ],
+          "0.01": [
+            -2.1801689004898073,
+            2.4468382930755554
+          ],
+          "0.05": [
+            -1.2896744847297668,
+            1.6270000994205471
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_CD45",
+        "field": "zscore_clipped_CD45",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            3.0
+          ],
+          "0.01": [
+            -2.5604669141769407,
+            2.3437938308715793
+          ],
+          "0.05": [
+            -1.6059506654739377,
+            1.5899865567684157
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_CD56",
+        "field": "zscore_clipped_CD56",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            2.3024573690891805
+          ],
+          "0.01": [
+            -2.7791679787635806,
+            1.664669164419174
+          ],
+          "0.05": [
+            -1.6035508275032042,
+            1.224637359380722
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_CD68",
+        "field": "zscore_clipped_CD68",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            3.0
+          ],
+          "0.01": [
+            -1.9039944088459015,
+            3.0
+          ],
+          "0.05": [
+            -1.2561282157897948,
+            1.7197734832763603
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_FOXP3",
+        "field": "zscore_clipped_FOXP3",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            3.0
+          ],
+          "0.01": [
+            -2.696362566947937,
+            2.36599481105804
+          ],
+          "0.05": [
+            -1.4550153374671935,
+            1.3052424967288963
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_HLADR",
+        "field": "zscore_clipped_HLADR",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            3.0
+          ],
+          "0.01": [
+            -2.695983738899231,
+            2.547007083892815
+          ],
+          "0.05": [
+            -1.5896780431270598,
+            1.6161709308624255
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "zscore_clipped_PANCK",
+        "field": "zscore_clipped_PANCK",
+        "minMax": [
+          -3.0,
+          3.0
+        ],
+        "quantiles": {
+          "0.001": [
+            -3.0,
+            2.8386323285102866
+          ],
+          "0.01": [
+            -2.2920485734939575,
+            2.2117453122138966
+          ],
+          "0.05": [
+            -1.5621274769306182,
+            1.6233959674835197
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "x",
+        "field": "x",
+        "minMax": [
+          1.886076,
+          9327.5
+        ],
+        "quantiles": {
+          "0.001": [
+            6.696372318267822,
+            9207.53417089844
+          ],
+          "0.01": [
+            47.659339904785156,
+            8286.685009765622
+          ],
+          "0.05": [
+            246.41313629150392,
+            5763.7626953125
+          ]
+        }
+      },
+      {
+        "datatype": "double",
+        "name": "y",
+        "field": "y",
+        "minMax": [
+          1.490566,
+          9299.408
+        ],
+        "quantiles": {
+          "0.001": [
+            7.000134428024292,
+            9214.45047265627
+          ],
+          "0.01": [
+            53.333322525024414,
+            8429.982519531248
+          ],
+          "0.05": [
+            268.84517974853514,
+            6783.773510742187
+          ]
+        }
+      }
+    ],
+    "size": 447042,
+    "regions": {
+      "position_fields": [
+        "x",
+        "y"
+      ],
+      "region_field": "sample_id",
+      "default_color": "leiden",
+      "scale_unit": "\u00b5m",
+      "scale": 0.325,
+      "all_regions": {
+        "Rechallenge-NonLesioned_SAMPLE_8_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 7479,
+            "max_x": 3818
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/Rechallenge-NonLesioned_SAMPLE_8_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/Rechallenge-NonLesioned_SAMPLE_8_ROI_1.ome.tiff"
+          }
+        },
+        "DNAonedose-NonLesioned_SAMPLE_15_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 5664,
+            "max_x": 5653
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/DNAonedose-NonLesioned_SAMPLE_15_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/DNAonedose-NonLesioned_SAMPLE_15_ROI_1.ome.tiff"
+          }
+        },
+        "ViralVector-NonLesioned_SAMPLE_2_ROI_2": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3813,
+            "max_x": 3819
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/ViralVector-NonLesioned_SAMPLE_2_ROI_2_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/ViralVector-NonLesioned_SAMPLE_2_ROI_2.ome.tiff"
+          }
+        },
+        "mRNAlowdose-NonLesioned_SAMPLE_10_ROI_2": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 7477,
+            "max_x": 3809
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/mRNAlowdose-NonLesioned_SAMPLE_10_ROI_2_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/mRNAlowdose-NonLesioned_SAMPLE_10_ROI_2.ome.tiff"
+          }
+        },
+        "mRNAlowdose-Lesioned_SAMPLE_10_ROI_2": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 9304,
+            "max_x": 5647
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/mRNAlowdose-Lesioned_SAMPLE_10_ROI_2_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/mRNAlowdose-Lesioned_SAMPLE_10_ROI_2.ome.tiff"
+          }
+        },
+        "Unvaccinated-NonLesioned_SAMPLE_3_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3818,
+            "max_x": 7463
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/Unvaccinated-NonLesioned_SAMPLE_3_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/Unvaccinated-NonLesioned_SAMPLE_3_ROI_1.ome.tiff"
+          }
+        },
+        "DNAonedose-Lesioned_SAMPLE_15_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 7498,
+            "max_x": 3814
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/DNAonedose-Lesioned_SAMPLE_15_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/DNAonedose-Lesioned_SAMPLE_15_ROI_1.ome.tiff"
+          }
+        },
+        "mRNAlowdose-NonLesioned_SAMPLE_10_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3809,
+            "max_x": 5659
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/mRNAlowdose-NonLesioned_SAMPLE_10_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/mRNAlowdose-NonLesioned_SAMPLE_10_ROI_1.ome.tiff"
+          }
+        },
+        "Unvaccinated-Lesioned_SAMPLE_4_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3816,
+            "max_x": 3813
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/Unvaccinated-Lesioned_SAMPLE_4_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/Unvaccinated-Lesioned_SAMPLE_4_ROI_1.ome.tiff"
+          }
+        },
+        "DNAonedose-NonLesioned_SAMPLE_15_ROI_2": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3824,
+            "max_x": 5649
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/DNAonedose-NonLesioned_SAMPLE_15_ROI_2_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/DNAonedose-NonLesioned_SAMPLE_15_ROI_2.ome.tiff"
+          }
+        },
+        "DNAtwodose-Lesioned_SAMPLE_14_ROI_2": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3815,
+            "max_x": 3815
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/DNAtwodose-Lesioned_SAMPLE_14_ROI_2_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/DNAtwodose-Lesioned_SAMPLE_14_ROI_2.ome.tiff"
+          }
+        },
+        "mRNAlowdose-Lesioned_SAMPLE_10_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 5675,
+            "max_x": 9331
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/mRNAlowdose-Lesioned_SAMPLE_10_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/mRNAlowdose-Lesioned_SAMPLE_10_ROI_1.ome.tiff"
+          }
+        },
+        "Rechallenge-Lesioned_SAMPLE_8_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3816,
+            "max_x": 3817
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/Rechallenge-Lesioned_SAMPLE_8_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/Rechallenge-Lesioned_SAMPLE_8_ROI_1.ome.tiff"
+          }
+        },
+        "DNAtwodose-Lesioned_SAMPLE_14_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3822,
+            "max_x": 3816
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/DNAtwodose-Lesioned_SAMPLE_14_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/DNAtwodose-Lesioned_SAMPLE_14_ROI_1.ome.tiff"
+          }
+        },
+        "mRNAhighdose-Lesioned_SAMPLE_11_ROI_2": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3819,
+            "max_x": 3807
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/mRNAhighdose-Lesioned_SAMPLE_11_ROI_2_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/mRNAhighdose-Lesioned_SAMPLE_11_ROI_2.ome.tiff"
+          }
+        },
+        "mRNAhighdose-Lesioned_SAMPLE_11_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3821,
+            "max_x": 3813
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/mRNAhighdose-Lesioned_SAMPLE_11_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/mRNAhighdose-Lesioned_SAMPLE_11_ROI_1.ome.tiff"
+          }
+        },
+        "ViralVector-Lesioned_SAMPLE_2_ROI_2": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 1983,
+            "max_x": 3819
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/ViralVector-Lesioned_SAMPLE_2_ROI_2_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/ViralVector-Lesioned_SAMPLE_2_ROI_2.ome.tiff"
+          }
+        },
+        "ViralVector-NonLesioned_SAMPLE_2_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3823,
+            "max_x": 5649
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/ViralVector-NonLesioned_SAMPLE_2_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/ViralVector-NonLesioned_SAMPLE_2_ROI_1.ome.tiff"
+          }
+        },
+        "Unvaccinated-Lesioned_SAMPLE_3_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3812,
+            "max_x": 5657
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/Unvaccinated-Lesioned_SAMPLE_3_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/Unvaccinated-Lesioned_SAMPLE_3_ROI_1.ome.tiff"
+          }
+        },
+        "DNAtwodose-NonLesioned_SAMPLE_14_ROI_1": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 3817,
+            "max_x": 3818
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/DNAtwodose-NonLesioned_SAMPLE_14_ROI_1_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/DNAtwodose-NonLesioned_SAMPLE_14_ROI_1.ome.tiff"
+          }
+        },
+        "Unvaccinated-Lesioned_SAMPLE_3_ROI_2": {
+          "roi": {
+            "min_x": 0,
+            "min_y": 0,
+            "max_y": 7489,
+            "max_x": 5657
+          },
+          "images": {},
+          "json": "/users/ndm-dataplatform/yhn084/mdv/cg_run12/json/Unvaccinated-Lesioned_SAMPLE_3_ROI_2_whole-cell_DAPI_AVGMARKER_200_75.tif.s1.json",
+          "viv_image": {
+            "url": "https://vis.cmd.ox.ac.uk/public/cillian/raw_cropped_final/Unvaccinated-Lesioned_SAMPLE_3_ROI_2.ome.tiff"
+          }
+        }
+      },
+      "avivator": {
+        "default_channels": [
+          {
+            "name": "DAPI"
+          }
+        ],
+        "base_url": "images/avivator/"
+      }
+    },
+    "columnGroups": [
+      {
+        "name": "X_pca",
+        "columns": [
+          "X_pca_1",
+          "X_pca_2",
+          "X_pca_3"
+        ]
+      },
+      {
+        "name": "X_pca_harmony",
+        "columns": [
+          "X_pca_harmony_1",
+          "X_pca_harmony_2",
+          "X_pca_harmony_3"
+        ]
+      },
+      {
+        "name": "X_umap",
+        "columns": [
+          "X_umap_1",
+          "X_umap_2",
+          "X_umap_3"
+        ]
+      },
+      {
+        "name": "log2",
+        "columns": [
+          "log2_DAPI",
+          "log2_CD103",
+          "log2_CD16",
+          "log2_CD20",
+          "log2_CD3",
+          "log2_CD31",
+          "log2_CD4",
+          "log2_CD45",
+          "log2_CD56",
+          "log2_CD68",
+          "log2_FOXP3",
+          "log2_HLADR",
+          "log2_PANCK"
+        ]
+      },
+      {
+        "name": "spatial",
+        "columns": [
+          "spatial_X_coord",
+          "spatial_Y_coord"
+        ]
+      },
+      {
+        "name": "zscore",
+        "columns": [
+          "zscore_DAPI",
+          "zscore_CD103",
+          "zscore_CD16",
+          "zscore_CD20",
+          "zscore_CD3",
+          "zscore_CD31",
+          "zscore_CD4",
+          "zscore_CD45",
+          "zscore_CD56",
+          "zscore_CD68",
+          "zscore_FOXP3",
+          "zscore_HLADR",
+          "zscore_PANCK"
+        ]
+      },
+      {
+        "name": "zscore_clipped",
+        "columns": [
+          "zscore_clipped_DAPI",
+          "zscore_clipped_CD103",
+          "zscore_clipped_CD16",
+          "zscore_clipped_CD20",
+          "zscore_clipped_CD3",
+          "zscore_clipped_CD31",
+          "zscore_clipped_CD4",
+          "zscore_clipped_CD45",
+          "zscore_clipped_CD56",
+          "zscore_clipped_CD68",
+          "zscore_clipped_FOXP3",
+          "zscore_clipped_HLADR",
+          "zscore_clipped_PANCK"
+        ]
+      }
+    ]
+  }
+]
