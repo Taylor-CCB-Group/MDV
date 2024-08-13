@@ -1,0 +1,28 @@
+{
+  "all_views": [
+    "default",
+    "MarkersQC",
+    "Rechallenge-NonLesioned_SAMPLE_8_ROI_1",
+    "DNAonedose-NonLesioned_SAMPLE_15_ROI_1",
+    "ViralVector-NonLesioned_SAMPLE_2_ROI_2",
+    "mRNAlowdose-NonLesioned_SAMPLE_10_ROI_2",
+    "mRNAlowdose-Lesioned_SAMPLE_10_ROI_2",
+    "Unvaccinated-NonLesioned_SAMPLE_3_ROI_1",
+    "DNAonedose-Lesioned_SAMPLE_15_ROI_1",
+    "mRNAlowdose-NonLesioned_SAMPLE_10_ROI_1",
+    "Unvaccinated-Lesioned_SAMPLE_4_ROI_1",
+    "DNAonedose-NonLesioned_SAMPLE_15_ROI_2",
+    "DNAtwodose-Lesioned_SAMPLE_14_ROI_2",
+    "mRNAlowdose-Lesioned_SAMPLE_10_ROI_1",
+    "Rechallenge-Lesioned_SAMPLE_8_ROI_1",
+    "DNAtwodose-Lesioned_SAMPLE_14_ROI_1",
+    "mRNAhighdose-Lesioned_SAMPLE_11_ROI_2",
+    "mRNAhighdose-Lesioned_SAMPLE_11_ROI_1",
+    "ViralVector-Lesioned_SAMPLE_2_ROI_2",
+    "ViralVector-NonLesioned_SAMPLE_2_ROI_1",
+    "Unvaccinated-Lesioned_SAMPLE_3_ROI_1",
+    "DNAtwodose-NonLesioned_SAMPLE_14_ROI_1",
+    "Unvaccinated-Lesioned_SAMPLE_3_ROI_2"
+  ],
+  "permission": "edit"
+}
