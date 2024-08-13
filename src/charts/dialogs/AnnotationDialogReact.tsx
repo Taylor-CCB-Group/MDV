@@ -77,22 +77,43 @@ function TagView({dataStore, columnName}: {dataStore: DataStore, columnName: str
 const AnnotationDialogComponent = observer(({dataStore}: {dataStore: DataStore}) => {
     const columns = useMemo(() => dataStore.columns.filter(c => c.datatype === 'multitext').map(c => c.name), [dataStore]);
     const [selectedColumn, setSelectedColumn] = useState<string>();
+    const [isValidName, setIsValidName] = useState(false);
+    const validateInput = (value: string) => {
+        const existingCol = dataStore.columnIndex[value];
+        if (existingCol && existingCol.datatype !== 'multitext') {
+            setIsValidName(false);
+            return false;
+        }
+        setIsValidName(true);
+        return true;
+    }
     return (
     <>
         <Autocomplete
         freeSolo
         options={columns}
         onChange={(_, value) => {
-            setSelectedColumn(value);
+            if (validateInput(value)) setSelectedColumn(value);
         }}
-        renderInput={(params) => (
-            <TextField {...params}
+        onInputChange={({ currentTarget }) => {
+            if (currentTarget instanceof HTMLInputElement) {
+                const { value } = currentTarget;
+                validateInput(value);
+            }
+        }}
+        renderInput={(params) => {
+            const {key, ...p} = params as typeof params & { key: string };
+            return (
+            <TextField key={key} {...p}
+            color={isValidName ? undefined : 'warning'}
             label="Annotation column"
             placeholder="Annotation column name"
             />
-        )}
+        )}}
         />
+        {!isValidName && <p>Incompatible column with that name already exists...</p>}
         {selectedColumn && <TagView dataStore={dataStore} columnName={selectedColumn} />}
+        {!selectedColumn && <h2>Select or add a column above to use for annotations.</h2>}
     </>);
 });
 
