@@ -51,8 +51,8 @@ const areViewStatesEqual = (viewState, otherViewState) => {
  * @ignore
  */
 
-type VivViewerWrapperProps = { views: any, viewStates: any, onViewStateChange?: any, onHover?: any, hoverHooks?: any, layerProps: any, deckProps?: any, randomize?: boolean, useDevicePixels?: boolean }
-type VivViewerWrapperState = { viewStates: any }
+type VivViewerWrapperProps = { views: any, viewStates: any, onViewStateChange?: any, onHover?: any, hoverHooks?: any, layerProps: any, deckProps?: any, randomize?: boolean, useDevicePixels?: boolean, outerContainer?: Element }
+type VivViewerWrapperState = { viewStates: any, deckRef?: React.MutableRefObject<DeckGL>, outerContainer: Element }
 /**
  * @typedef HoverHooks
  * @type {object}
@@ -62,10 +62,12 @@ type VivViewerWrapperState = { viewStates: any }
  */
 class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivViewerWrapperState> {
     constructor(props) {
-        console.warn('using custom VivViewerWrapper via MDVivViewer for testing');
+        console.log('using custom VivViewerWrapper via MDVivViewer - now necessary for fixing mouse events on popouts');
         super(props);
         this.state = {
-            viewStates: {}
+            viewStates: {},
+            deckRef: React.createRef(),
+            outerContainer: props.outerContainer
         };
         const { viewStates } = this.state;
         const { views, viewStates: initialViewStates } = this.props;
@@ -127,7 +129,21 @@ class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivV
 
     componentDidUpdate(prevProps) {
         const { props } = this;
-        const { views } = props;
+        const { views, outerContainer } = props;
+
+        if (outerContainer !== this.state.outerContainer && this.state.deckRef.current) {
+            try {
+                const { eventManager } = this.state.deckRef.current.deck;
+                const { element } = eventManager;
+                // this will always be the same element, but calling setElement again will re-register
+                // drag events on window, which is necessary for popouts.
+                eventManager.setElement(element);
+                this.setState({ outerContainer });
+            } catch (e) {
+                console.error('attempt to reset deck eventManager element failed', e);
+            }
+        }
+
         // Only update state if the previous viewState prop does not match the current one
         // so that people can update viewState
         // eslint-disable-next-line react/destructuring-assignment
@@ -309,6 +325,8 @@ class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivV
         }
         return (
             <DeckGL
+                // MDV: we mess with deck internals via ref to get eventManager to work in popouts
+                ref={this.state.deckRef}
                 // eslint-disable-next-line react/jsx-props-no-spreading
                 {...(deckProps ?? {})}
                 layerFilter={this.layerFilter}
@@ -332,8 +350,8 @@ class MDVivViewerWrapper extends React.PureComponent<VivViewerWrapperProps, VivV
 
 /**
  * This is a wrapper around the VivViewer component from @hms-dbmi/viv
- * *** NOT NECESSARY ANYMORE ***
- * although I may still want to add some types to the regular VivViewer
- * and this can maybe be useful for debugging sometimes.
+ * *** THIS IS NOW ACTUALLY NECESSARY ***
+ * to fix issues with mouse events in popouts.
+ * In future, we may handle more interesting things here to do with layer rendering.
  */
 export default (props: VivViewerWrapperProps) => <MDVivViewerWrapper {...props} />

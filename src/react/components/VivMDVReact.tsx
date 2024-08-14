@@ -1,10 +1,10 @@
 import BaseChart from "../../charts/BaseChart";
 import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
-import { action, makeObservable, observable } from "mobx";
-import { type ROI, type VivConfig, type VivContextType, VivProvider, useViewerStore, useViewerStoreApi, applyDefaultChannelState } from "./avivatorish/state";
+import { action, makeAutoObservable, makeObservable, observable } from "mobx";
+import { type ROI, type VivConfig, type VivContextType, VivProvider, useViewerStore, useViewerStoreApi, applyDefaultChannelState, createVivStores } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
-import type { ColumnName, DataColumn } from "../../charts/charts";
+import type { ColumnName, DataColumn, DataType } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
@@ -12,16 +12,18 @@ import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
 import type { DualContourLegacyConfig } from "../contour_state";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
+import { useChart } from "../context";
 
-function ReactTest() {
-    // to make this look more like Avivator...
-    // we probably don't want OmeTiffProvider to be a thing...
-    // we should use a VivProvider, with hooks that look more like Avivator's
-    // so VivProvider should have whatever is necessary to adapt our config to that
-    // and we'd useLoader() as opposed to useOmeTiff()
-    // ... and hopefully our version of Avivator hooks will have better types ...
+function VivScatterChartRoot() {
+    // to make this look like Avivator...
+    // we use a VivProvider, with hooks that are mofified versions of Avivator's
+    // VivProvider makes the vivStores available to the chart so that the chart can update & use the viewerStore et al.
+    // in a way that is similar to Avivator - with the caveat that use of state in callbacks needs to be done
+    // with saving a reference to e.g. `useViewerStoreApi()` and calling the `setState` method on that
+    // rather than `useViewerStore.setState()`.
+    const { vivStores } = useChart() as VivMdvReact;
     return (
-    <VivProvider>
+    <VivProvider vivStores={vivStores}>
         <MainChart />
     </VivProvider>
     )
@@ -120,10 +122,36 @@ export type VivMdvReactConfig = ScatterPlotConfig & (
     | VivRoiConfig
 ) & { channel: number };
 export type VivMDVReact = VivMdvReact;
+
+
+function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
+    const config = {...scatterDefaults, ...originalConfig};
+    if (!config.channel) config.channel = 0;
+    // in future we might have something like an array of layers with potentially ways of describing parameters...
+    if (!config.contourParameter) config.contourParameter = config.param[2];
+    // === some dead code ===
+    // if (config.type === 'VivMdvRegionReact') {
+    //     // we don't use viv.image_properties, we use viv.channelsStore et al.
+    //     // if (!config.viv.image_properties) config.viv.image_properties = DEFAUlT_CHANNEL_STATE;
+    //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
+    //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
+    // } else if (config.type === 'VivMdvReact') {
+    //     //unused
+    //     if (config.overviewOn === undefined) config.overviewOn = false;
+    //     // if (config.image_properties === undefined) config.image_properties = DEFAUlT_CHANNEL_STATE;
+    //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
+    //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
+    // }
+    
+    // consider adapting `channels` from old format to new format...
+    config.viv = applyDefaultChannelState(config.viv);
+    return config;
+}
+
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog: ColorChannelDialogReactWrapper;
 
-    vivStores?: VivContextType;
+    vivStores: VivContextType;
     get viewerStore() {
         return this.vivStores?.viewerStore;
     }
@@ -131,27 +159,10 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
     constructor(dataStore, div, originalConfig: VivMdvReactConfig & BaseConfig) {
-        const config = {...scatterDefaults, ...originalConfig};
-        if (!config.channel) config.channel = 0;
-        // === some dead code ===
-        // if (config.type === 'VivMdvRegionReact') {
-        //     // we don't use viv.image_properties, we use viv.channelsStore et al.
-        //     // if (!config.viv.image_properties) config.viv.image_properties = DEFAUlT_CHANNEL_STATE;
-        //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
-        //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
-        // } else if (config.type === 'VivMdvReact') {
-        //     //unused
-        //     if (config.overviewOn === undefined) config.overviewOn = false;
-        //     // if (config.image_properties === undefined) config.image_properties = DEFAUlT_CHANNEL_STATE;
-        //     // else config.viv.image_properties = {...DEFAUlT_CHANNEL_STATE, ...config.viv.image_properties};
-        //     // if (config.viv.image_properties) config.viv.image_properties = undefined;
-        // }
-        
-        // consider adapting `channels` from old format to new format...
-        config.viv = applyDefaultChannelState(config.viv);
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
-        super(dataStore, div, config, ReactTest);
+        const config = adaptConfig(originalConfig);
+        super(dataStore, div, config, VivScatterChartRoot);
         this.colorByColumn(config.color_by);
         makeObservable(this, {
             colorBy: observable,
@@ -164,6 +175,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 this.dialogs.push(this.colorDialog);
             }
         });
+        this.vivStores = createVivStores();
     }
     colorBy?: (i: number) => [r: number, g: number, b: number];
     colorByColumn(col?: ColumnName) {
@@ -184,7 +196,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     getSettings() {
         const c = this.config;
         const { tooltip } = c;
-        const cols = this.dataStore.getColumnList() as DataColumn<any>[];
+        const cols = this.dataStore.getColumnList() as DataColumn<DataType>[];
+        const catCols = cols.filter(c => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
         let cats = this.dataStore.getColumnValues(c.param[2]) || [];
@@ -192,6 +205,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             return { t: x }
         });
         cats.push({ t: "None" });
+        const catsValues = observable.array([cats, 't', 't']);
 
         // What I would like is ability to
         // - change selected image at runtime.
@@ -232,7 +246,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     // c.viv.url = v;
                     // ideally, c.region could be enough to also know what json etc is relevant...
                     c.region = v;
-                    // and background_filter.category should be inferred from the region...
+                    // background_filter.category should be inferred from the region...
+                    // (this shouldn't be the responsibility of this function)
                     c.background_filter.category = v;
                 }
             },
@@ -330,26 +345,40 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                 label: "Contour parameter",
                                 // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
                                 current_value: c.contourParameter || c.param[2],
-                                values: [cols, "name", "field"],
+                                values: [catCols, "name", "field"],
                                 func: x => {
-                                    c.contourParameter = c.param[2] = x;
+                                    if (x === c.contourParameter) return;
+                                    // could we change 'cats' and have the dropdowns update?
+                                    // was thinking this might mean a more general refactoring of the settings...
+                                    c.contourParameter = c.param[2] = x; //this isn't causing useParamColumns to update...
+                                    // but maybe it's not necessary if 'cats' is observable... fiddly to get right...
+                                    const newCats = (this.dataStore.getColumnValues(x) || []).map(t => ({ t }));
+                                    newCats.push({ t: "None" });
+                                    catsValues[0] = newCats;
+                                    //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
+                                    //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
+                                    // c.category1 = c.category2 = null;  //maybe we can allow state to be invalid?
+                                    //the dropdowns can set values to null if they're invalid rather than throw error?
+                                    //is that a good idea?
                                 }
                             },
                             {
-                                type: "dropdown",
+                                type: "multidropdown",
                                 label: "Contour Category 1",
                                 current_value: c.category1 || "None",
-                                values: [cats, "t", "t"],
+                                // values: [cats, "t", "t"],
+                                values: catsValues,
                                 func: (x) => {
                                     if (x === "None") x = null;
                                     c.category1 = x;
                                 }
                             },
                             {
-                                type: "dropdown",
+                                type: "multidropdown",
                                 label: "Contour Category 2",
                                 current_value: c.category2 || "None",
-                                values: [cats, "t", "t"],
+                                // values: [cats, "t", "t"],
+                                values: catsValues,
                                 func: (x) => {
                                     if (x === "None") x = null;
                                     c.category2 = x;

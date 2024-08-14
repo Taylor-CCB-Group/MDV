@@ -152,8 +152,13 @@ async function fetchSingleFileOmeTiffOffsets(url) {
         return undefined;
     }
     const offsetsUrl = url.replace(/ome\.tif(f?)/gi, 'offsets.json');
-    const res = await fetch(offsetsUrl);
-    return res.status === 200 ? await res.json() : undefined;
+    try {
+        const res = await fetch(offsetsUrl);//, {mode: 'no-cors'}); todo 2024-08-13: sort out CORS issues
+        return res.status === 200 ? await res.json() : undefined;
+    } catch {
+        console.warn(`Failed to fetch offsets for ${url}`);
+        return undefined;
+    }
 }
 
 /**
@@ -188,6 +193,10 @@ export async function createLoader(
             const source = await loadOmeTiff(urlOrFile, {
                 offsets: maybeOffsets,
                 images: 'all',
+                // todo 2024-08-13: sort out CORS issues
+                // headers: {
+                //     mode: 'no-cors'
+                // }
                 // pool: false
             });
 

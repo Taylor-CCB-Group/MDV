@@ -1,15 +1,15 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo } from "react";
 import { shallow } from 'zustand/shallow';
-import { VivProvider, useChannelsStore, useChannelsStoreApi, useImageSettingsStoreApi, useLoader, useMetadata, useViewerStore } from "./avivatorish/state";
+import { type VivContextType, VivProvider, useChannelsStore, useChannelsStoreApi, useImageSettingsStoreApi, useLoader, useMetadata, useViewerStore } from "./avivatorish/state";
 // some of this is quite bloated - could use dynamic imports for some of the more complex components
 import { Checkbox, FormControl, InputLabel, MenuItem, Select, Slider } from "@mui/material";
 import { PopoverPicker } from "./ColorPicker";
 import { getSingleSelectionStats } from "./avivatorish/utils";
 import { X } from 'lucide-react';
 
-export default function MainVivColorDialog() {
+export default function MainVivColorDialog({ vivStores } : { vivStores: VivContextType }) {
     return (
-        <VivProvider>
+        <VivProvider vivStores={vivStores}>
             <Test />
         </VivProvider>
     )

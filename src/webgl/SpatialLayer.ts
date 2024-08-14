@@ -12,16 +12,6 @@ export type SpatialLayerProps = ScatterplotLayerProps & {
     contourLayers: ReturnType<typeof useContour>[],
 };
 
-function rgb(r: number, g: number, b: number, a=255): [number, number, number, number] {
-    return [r, g, b, a];
-}
-// this is not the way to do it...
-const contourColors = Array.from({ length: 200 }, (_, i) => {
-    const v = i % 20 <= 1 ? 255 : 0;
-    return rgb(v, v, v, v);
-});
-const viridis = [rgb(0, 47, 97), rgb(0, 95, 133), rgb(0, 139, 152), rgb(0, 181, 153), rgb(24, 220, 130), rgb(151, 245, 84), rgb(255, 255, 0)] as const;
-
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     static layerName = 'SpatialLayer';
     static defaultProps = ScatterplotExLayer.defaultProps;

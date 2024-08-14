@@ -169,21 +169,7 @@ export type VivContextType = {
     removeIsChannelLoading: (index: number) => void
   }> //also has some extra methods... setIsChannelLoading, addIsChannelLoading, removeIsChannelLoading
 }
-/**
- * This is somewhat MDV-centric now. As of writing, a chart has a property `vivStores`
- * which means different <VivProvider>s (currently rendering in different react roots, but referring to the same chart
- * ie the chart component itself, and a color-change GUI dialog for it)
- * can share reference to the same stores / act as equivalent contexts
- */
-export function createVivStores(chart: VivMDVReact) {
-  if (chart.vivStores) {
-    console.warn('vivStores already exists for this chart');
-    return;
-  }
-  // get any existing values out of the chart's config...
-  // currently inactive / experimental state - need to review how props are set,
-  // in what way to change these hooks - how much to deviate from Avivator's API
-  // (useImage() needs to be changed along with this)
+export function createVivStores() {
   const channelsStore = createStore(set => ({
     ...DEFAUlT_CHANNEL_STATE,
     // ...chart.config.viv.channelsStore,
@@ -271,11 +257,9 @@ const VivContext = createContext<VivContextType>(null);
  * Separate providers - referring to the same `chart.vivStores` - are used both by the chart
  * itself and by the color-change GUI dialog.
  */
-export const VivProvider = observer(({ children }: PropsWithChildren) => {
-  const vivChart = useChart() as VivMDVReact; //may want to be less MDV-centric here
-  if (!vivChart.vivStores) vivChart.vivStores = createVivStores(vivChart); //<< not very react-y: is this ok?
+export const VivProvider = observer(({ children, vivStores }: PropsWithChildren & { vivStores: VivContextType }) => {
   return (
-    <VivContext.Provider value={vivChart.vivStores}>
+    <VivContext.Provider value={vivStores}>
       {children}
     </VivContext.Provider>
   )

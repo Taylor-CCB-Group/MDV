@@ -1,6 +1,6 @@
-import type { DataColumn } from "@/charts/charts";
-import { useMemo, useCallback } from "react";
-import { useConfig, useParamColumns } from "./hooks";
+import type { CategoricalDataType, DataColumn } from "@/charts/charts";
+import { useMemo } from "react";
+import { useConfig, useNamedColumn, useParamColumns } from "./hooks";
 import { useFilteredIndices } from "./scatter_state";
 import { useChart, useDataStore } from "./context";
 import { useViewerStore } from "./components/avivatorish/state";
@@ -15,22 +15,33 @@ type ContourProps = {
     id: string,
     /** the column */
     parameter: string,
-    category: string,
+    category: string | string[],
     fill: boolean,
     bandwidth: number,
     intensity: number,
     opacity: number,
 }
 
-function useColorRange(contourParameter: DataColumn<any>, category: string) {
+function rgb(r: number, g: number, b: number, a = 255): [number, number, number, number] {
+    return [r, g, b, a];
+}
+// this is not the way to do it...
+const contourColors = Array.from({ length: 200 }, (_, i) => {
+    const v = i % 20 <= 1 ? 255 : 0;
+    return rgb(v, v, v, v);
+});
+const viridis = [rgb(0, 47, 97), rgb(0, 95, 133), rgb(0, 139, 152), rgb(0, 181, 153), rgb(24, 220, 130), rgb(151, 245, 84), rgb(255, 255, 0)] as const;
+
+function useColorRange(contourParameter: DataColumn<CategoricalDataType>, category: string | string[]) {
     const ds = useDataStore();
     const columnColors = useMemo(() => ds.getColumnColors(contourParameter.name, {asArray: true, useValue: true}), [ds, contourParameter]);
     const categoryValueIndex = useMemo(() => {
         if (!contourParameter || !contourParameter.values) return -1;
+        if (Array.isArray(category)) return -1; //we could do something different here... would need more clever color handling on the receiving end
         return contourParameter.values.indexOf(category);
     }, [contourParameter, category]);
     const colorRange = useMemo(() => {
-        if (categoryValueIndex === -1) return [[0, 0, 0, 0]];
+        if (categoryValueIndex === -1) return viridis;
         const color = columnColors[categoryValueIndex];
         // return [[...color, 255], [...color, 255]];
         console.log('color', color, category);
@@ -39,14 +50,20 @@ function useColorRange(contourParameter: DataColumn<any>, category: string) {
     return colorRange;
 }
 
-function useCategoryFilterIndices(contourParameter: DataColumn<any>, category: string) {
+function useCategoryFilterIndices(contourParameter: DataColumn<CategoricalDataType>, category: string | string[]) {
     const data = useFilteredIndices();
     const categoryValueIndex = useMemo(() => {
         if (!contourParameter || !contourParameter.values) return -1;
+        if (Array.isArray(category)) {
+            return category.map(c => contourParameter.values.indexOf(c));
+        }
         return contourParameter.values.indexOf(category);
     }, [contourParameter, category]);
     const filteredIndices = useMemo(() => {
         if (categoryValueIndex === -1) return [];
+        if (Array.isArray(categoryValueIndex)) {
+            return data.filter(i => categoryValueIndex.includes(contourParameter.data[i]));
+        }
         return data.filter(i => contourParameter.data[i] === categoryValueIndex);
     }, [data, categoryValueIndex, contourParameter]);
     return filteredIndices;
@@ -56,7 +73,8 @@ export function useContour(props: ContourProps) {
     const {id, parameter, category, fill, bandwidth, intensity, opacity} = props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
-    const [cx, cy, contourParameter] = useParamColumns();
+    const [cx, cy] = useParamColumns();
+    const contourParameter = useNamedColumn(parameter);
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);
@@ -97,8 +115,8 @@ export function useContour(props: ContourProps) {
  */
 export type DualContourLegacyConfig = {
     contourParameter?: string, //this is param[2] in the original code
-    category1?: string,
-    category2?: string,
+    category1?: string | string[],
+    category2?: string | string[],
     contour_fill: boolean,
     contour_bandwidth: number,
     contour_intensity: number,
