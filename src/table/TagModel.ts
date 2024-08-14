@@ -48,7 +48,8 @@ export default class TagModel {
         this.dataStore = dataStore;
         this.dataModel = new DataModel(dataStore, {autoupdate: true});
         this.dataModel.updateModel();
-        //nb, this will replace any other "tag" listener on model (but the model is local to this object)
+        //nb, this will replace any other "tag" listener on model (- but the model is local to this object)
+        //we could have an instance of this lazily added to the column?
         this.dataModel.addListener("tag", () => {
             this.callListeners();
         });
@@ -80,6 +81,7 @@ export default class TagModel {
         setTag({tag, ...this}, tagValue);
         this.dataModel.updateModel(); //seems necessary after-all
         //^^ not exactly intended design, should test more...
+        this.callListeners();
     }
     getTags() {
         return getTags(this.tagColumn);
