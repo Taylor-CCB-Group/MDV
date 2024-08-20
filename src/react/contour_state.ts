@@ -56,7 +56,7 @@ export function useContour(props: ContourProps) {
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
-    const contourParameter = useNamedColumn(parameter);
+    const { column: contourParameter } = useNamedColumn(parameter);
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);
@@ -72,6 +72,8 @@ export function useContour(props: ContourProps) {
         //not really - we want to pass this into getSublayerProps() so the id is used correctly
         const radiusPixels = 30*bandwidth * 2 ** debounceZoom;
         // console.log('radiusPixels', radiusPixels);
+        // there is an issue of the scaling of these layers e.g. with images that have been resized...
+        // what is different about how we scale these layers vs other scatterplot layer?
         return {
             id,
             data,

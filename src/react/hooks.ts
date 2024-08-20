@@ -76,14 +76,15 @@ export function useParamColumns(): DataColumn<any>[] {
     return columns;
 }
 
-export function useNamedColumn(name: string): DataColumn<any> {
+export function useNamedColumn(name: string): { column: DataColumn<any>, isLoaded: boolean } {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
+    const [isLoaded, setIsLoaded] = useState(false);
+    const column = columnIndex[name];
     useEffect(() => {
-        // todo more proper managing of this so that users of the hook don't have potentially undefined data
-        loadColumn(chart.dataStore.name, name);
+        loadColumn(chart.dataStore.name, name).then(() => setIsLoaded(true));
     }, [name, chart.dataStore]);
-    return columnIndex[name];
+    return { column, isLoaded };
 }
 
 /** If the chart in current context has an associated region, referred to by the key `config.region`, this should return it

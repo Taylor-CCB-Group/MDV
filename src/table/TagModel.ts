@@ -1,3 +1,4 @@
+import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import type { DataColumn } from "../charts/charts";
 import type DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
@@ -43,6 +44,7 @@ export default class TagModel {
     readonly tagColumn: TagColumn;
     readonly dataStore: DataStore;
     readonly dataModel: DataModel;
+    isReady = false;
     private listeners: (()=>void)[] = [];
     constructor(dataStore: DataStore, columnName = '__tags') {
         this.dataStore = dataStore;
@@ -61,6 +63,12 @@ export default class TagModel {
             //dataStore.size * 2 should be right for 'multitext' - wrong for 'text'
             const data = new SharedArrayBuffer(dataStore.size * 2);
             dataStore.addColumn(columnSpec, data);
+            this.isReady = true;
+        } else {
+            loadColumn(dataStore.name, columnName).then((column) => {
+                this.isReady = true;
+                this.callListeners();
+            });
         }
         const col = dataStore.columnIndex[columnName];
         if (col.datatype !== COL_TYPE) throw new Error(`column '${columnName}' is not of type '${COL_TYPE}'`);

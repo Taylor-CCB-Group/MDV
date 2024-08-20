@@ -100,8 +100,8 @@ function TagView({dataStore, columnName}: {dataStore: DataStore, columnName: str
         }
     }, [tagModel]);
 
-    const [tagList, setTagList] = useState(tagModel.getTags());
-    const [tagsInSelection, setTagsInSelection] = useState(tagModel.getTagsInSelection());
+    const [tagList, setTagList] = useState(tagModel.isReady ? tagModel.getTags() : new Set<string>());
+    const [tagsInSelection, setTagsInSelection] = useState(tagModel.isReady ? tagModel.getTagsInSelection() : new Set<string>());
 
     return (
         <>
