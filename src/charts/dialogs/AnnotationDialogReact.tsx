@@ -219,6 +219,10 @@ const AnnotationDialogComponent = observer(({dataStore}: {dataStore: DataStore})
             placeholder="Annotation column name"
             />
         )}}
+        renderOption={(props, text) => {
+            const {key, ...p} = props as typeof props & { key: string };
+            return <li key={key} {...p}>{text}</li>;
+        }}
         />
         {isValidName === "clash" && <p>Incompatible column with that name already exists...</p>}
         {selectedColumn && <TagView dataStore={dataStore} columnName={selectedColumn} />}
