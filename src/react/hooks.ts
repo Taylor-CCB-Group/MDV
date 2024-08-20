@@ -116,8 +116,17 @@ export function useImgUrl(): string {
             const url = new URL(i.url || i.file, avivator.base_url);
             return url.href;
         }
+        // todo - this is a bit of a mess, and should be cleaned up / better documented.
         const url = i.url ? i.url : getProjectURL(avivator.base_url) + i.file;
         return url;
     }, [region, avivator]);
     return url;
+}
+
+/**
+ * Returns a list of `dataSources` that are currently available.
+ * This is `observable` and will update when new data sources are added etc.
+ */
+export function useDataSources() {
+    return window.mdv.chartManager?.dataSources;
 }

@@ -174,6 +174,8 @@ class ChartManager{
             this.addListener("_default",listener)
         }
         makeObservable(this, {
+            dataSources: observable,
+            dsIndex: observable,
             theme: observable,
             setTheme: action
         });
