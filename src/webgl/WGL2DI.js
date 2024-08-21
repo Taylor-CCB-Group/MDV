@@ -636,11 +636,12 @@ class WGL2DI{
         this.circles.color=new Uint8Array(len*3);
         for (let n=0;n<len;n++){
             const p = n*3;
-			const col = config.colorFunc(n);
-            this.circles.color[p]=col[0];
+            // col may be undefined
+			const col = config.colorFunc(n) || [255, 0, 0];
+			this.circles.color[p]=col[0];
             this.circles.color[p+1]=col[1];
             this.circles.color[p+2]=col[2];
-            const pb= this._getRGBFromIndex(n+1);
+            const pb= this._getRGBFromIndex(n+1) || [255, 0, 0];
             this.circles.pick_color[p]=pb[0];
             this.circles.pick_color[p+1]=pb[1];
             this.circles.pick_color[p+2]=pb[2]

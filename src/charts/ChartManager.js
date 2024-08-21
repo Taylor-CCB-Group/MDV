@@ -1634,6 +1634,8 @@ class ChartManager{
         },div)
         try {
             // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
+            // when it goes wrong, it can cause problems outside the creation of this chart
+            // - other charts wanting to use similar neededCols end up not having data?
             await this._getColumnsAsync(dataSource, neededCols);
             this._addChart(dataSource, config, div, notify);
         } catch (error) {
@@ -1641,11 +1643,15 @@ class ChartManager{
             const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
                 type: "warning"
             });
-            console.log(error);
+            console.error(error);
             const idiv = this.infoAlerts[id].div;
             idiv.onclick = () => idiv.remove();
-            div.remove();
-            throw new Error(error); //probably not a great way to handle this
+            // div.remove();
+            const debugNode = createEl('div', {styles: {position: 'absolute', backdropFilter: 'blur(10px)'}}, div.lastChild);
+            debugNode.innerHTML = `<div><h2>Error creating chart</h2><pre>${error.stack}</pre></div>`;
+            debugNode.onclick = () => debugNode.remove();
+            //not rethrowing doesn't help recovering from missing data in other charts.
+            //throw new Error(error); //probably not a great way to handle this
         }
     }
 
@@ -1696,9 +1702,11 @@ class ChartManager{
 
 
     async _getColumnsAsync(dataSource, columns) {
-        return new Promise((resolve) => {
+        // let's add some error handling here...
+        const result = await new Promise((resolve) => {
             this._getColumnsThen(dataSource, columns, resolve);
         });
+        return result;
     }
 
     _getColumnsThen(dataSource,columns,func){
@@ -1736,7 +1744,7 @@ class ChartManager{
             }
         }
         const reqCols = columns.filter(x=>{
-            //column already loading
+            //column already loading - but what if something went wrong earlier?
             if (this.columnsLoading[dataSource][x]){
                 return false;
             }
