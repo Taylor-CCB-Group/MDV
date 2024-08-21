@@ -10,7 +10,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 import { v4 as uuid } from 'uuid';
-import { Button, Chip, MenuItem, Select } from "@mui/material";
+import { Button, Chip, MenuItem, Select, Slider } from "@mui/material";
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
@@ -46,12 +46,13 @@ const TextBoxComponent = ({ props }: { props: GuiSpec<'text'> }) => (
 const SliderComponent = ({ props }: { props: GuiSpec<'slider'> }) => (
     <>
         <label>{props.label}</label>
-        <input type="range" value={props.current_value}
+        <Slider value={props.current_value}
             min={props.min || 0}
             max={props.max || 1}
-            step={props.step || 0.01}
-            onChange={action(e => {
-                const value = Number.parseFloat(e.target.value);
+            step={props.step || 0.01} //todo - infer default step from min/max
+            onChange={action((_, value) => {
+                // const value = Number.parseFloat(e.target.value);
+                if (Array.isArray(value)) throw "slider callback should have multiple values";
                 props.current_value = value;
                 if (props.func) props.func(value);
             })} />
@@ -304,14 +305,16 @@ const RadioButtonComponent = ({ props }: { props: GuiSpec<'radiobuttons'> }) => 
 const DoubleSliderComponent = ({ props }: { props: GuiSpec<'doubleslider'> }) => (
     <>
         <label>{props.label}</label>
-        <input type="range" value={props.current_value[0]} onChange={action(e => {
-            const v = props.current_value[0] = Number.parseFloat(e.target.value);
-            if (props.func) props.func([v, props.current_value[1]]);
-        })} />
-        <input type="range" value={props.current_value[1]} onChange={action(e => {
-            const v = props.current_value[1] = Number.parseFloat(e.target.value);
-            if (props.func) props.func([props.current_value[0], v]);
-        })} />
+        <Slider
+        value={props.current_value} 
+        min={props.min || 0}
+        max={props.max || 1}
+        onChange={action((_, value) => {
+            if (!Array.isArray(value)) throw "doubleslider callback should have multiple values";
+            props.current_value = value as [number, number];
+            if (props.func) props.func(value as [number, number]);
+        })}
+        />
     </>
 );
 
