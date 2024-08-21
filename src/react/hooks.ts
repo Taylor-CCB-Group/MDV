@@ -57,6 +57,7 @@ export function useChartID(): string {
 
 /** Get the document the chart is currently assigned to, which changes when popped-out.
  * Used for mouse events etc that were previously on `window` to allow dragging out of the chart itself.
+ * @deprecated - use `useOuterContainer` instead.
  */
 export function useChartDoc() {
     const chart = useChart();
@@ -201,7 +202,21 @@ export function useImgUrl(): string {
     const url = useMemo(() => {
         // if (config.imageURL) return config.imageURL; //deprecated
         const i = region.viv_image;
-        return i.url ? i.url : getProjectURL(avivator.base_url) + i.file;
+        if (avivator.base_url?.startsWith("http")) {
+            const url = new URL(i.url || i.file, avivator.base_url);
+            return url.href;
+        }
+        // todo - this is a bit of a mess, and should be cleaned up / better documented.
+        const url = i.url ? i.url : getProjectURL(avivator.base_url) + i.file;
+        return url;
     }, [region, avivator]);
     return url;
+}
+
+/**
+ * Returns a list of `dataSources` that are currently available.
+ * This is `observable` and will update when new data sources are added etc.
+ */
+export function useDataSources() {
+    return window.mdv.chartManager?.dataSources;
 }
