@@ -11,7 +11,6 @@ import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 // this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
 import FileUploadDialogReact from './dialogs/FileUploadDialogWrapper';
-import TagModel from '../table/TagModel';
 
 //default charts 
 import "./HistogramChart.js";
@@ -1467,14 +1466,11 @@ class ChartManager{
                 this.layoutMenus[ds.name].show(e);
             }
         },ds.menuBar);
-        let tagModel;
-        function getTagModel() {
-            if (!tagModel) tagModel = new TagModel(ds.dataStore);
-            return tagModel;
-        }
+        //previously we shared a TagModel between invocations of the annotation dialog
+        //but they should be able to change columns - not sure if the sharing had any benefits
         this.addMenuIcon(ds.name,"fas fa-tags", "Tag Annotation", ()=> {
             //todo - check whether we have a reason for hacky import here
-            new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, getTagModel());
+            new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore);
         });
 
         if (dataStore.links){

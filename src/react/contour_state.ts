@@ -1,8 +1,7 @@
 import type { CategoricalDataType, DataColumn } from "@/charts/charts";
 import { useMemo } from "react";
-import { useConfig, useNamedColumn, useParamColumns } from "./hooks";
-import { useFilteredIndices } from "./scatter_state";
-import { useChart, useDataStore } from "./context";
+import { useCategoryFilterIndices, useConfig, useNamedColumn, useParamColumns } from "./hooks";
+import { useDataStore } from "./context";
 import { useViewerStore } from "./components/avivatorish/state";
 import { useDebounce } from "use-debounce";
 
@@ -50,31 +49,14 @@ function useColorRange(contourParameter: DataColumn<CategoricalDataType>, catego
     return colorRange;
 }
 
-function useCategoryFilterIndices(contourParameter: DataColumn<CategoricalDataType>, category: string | string[]) {
-    const data = useFilteredIndices();
-    const categoryValueIndex = useMemo(() => {
-        if (!contourParameter || !contourParameter.values) return -1;
-        if (Array.isArray(category)) {
-            return category.map(c => contourParameter.values.indexOf(c));
-        }
-        return contourParameter.values.indexOf(category);
-    }, [contourParameter, category]);
-    const filteredIndices = useMemo(() => {
-        if (categoryValueIndex === -1) return [];
-        if (Array.isArray(categoryValueIndex)) {
-            return data.filter(i => categoryValueIndex.includes(contourParameter.data[i]));
-        }
-        return data.filter(i => contourParameter.data[i] === categoryValueIndex);
-    }, [data, categoryValueIndex, contourParameter]);
-    return filteredIndices;
-}
+// this should be moved elsewhere - category_state.ts? or hooks.ts - as long as HMR works
 
 export function useContour(props: ContourProps) {
     const {id, parameter, category, fill, bandwidth, intensity, opacity} = props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
-    const contourParameter = useNamedColumn(parameter);
+    const { column: contourParameter } = useNamedColumn(parameter);
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);
@@ -90,6 +72,8 @@ export function useContour(props: ContourProps) {
         //not really - we want to pass this into getSublayerProps() so the id is used correctly
         const radiusPixels = 30*bandwidth * 2 ** debounceZoom;
         // console.log('radiusPixels', radiusPixels);
+        // there is an issue of the scaling of these layers e.g. with images that have been resized...
+        // what is different about how we scale these layers vs other scatterplot layer?
         return {
             id,
             data,

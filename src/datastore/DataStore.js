@@ -68,15 +68,14 @@ class DataStore{
         //for react / mobx... makeAutoObservable causes problems with webworker.postMessage:
         // `DOMException: Failed to execute 'postMessage' on 'Worker': [object Array] could not be cloned.`
         // because it adds a mobx proxy to the array, which can't be cloned...
-        // so for now, rather than using makeAutoObservable, we'll just manually add the mobx stuff we need:
+        // so for now, rather than using makeAutoObservable, we'll just manually add the mobx stuff we need:        
         makeObservable(this, {
             _filteredIndicesPromise: observable,
             _callListeners: action,
-        }); 
+        });
         
         
         // for re-usable filteredIndices
-        // todo mobx action
         this.addListener('invalidateFilteredIndicesCache', action(() => {
             //if (this._filteredIndicesPromise) this._filteredIndicesPromise.cancel(); // relevant? any test-cases to consider?
             this._filteredIndicesPromise = null;

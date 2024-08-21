@@ -7,7 +7,7 @@ import ControlCameraOutlinedIcon from '@mui/icons-material/ControlCameraOutlined
 import StraightenIcon from '@mui/icons-material/Straighten';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMetadata, useViewerStore } from "./avivatorish/state";
-import { useFilteredIndices, useRegionScale, type useScatterplotLayer } from "../scatter_state";
+import { useRegionScale, type useScatterplotLayer } from "../scatter_state";
 import { useChart } from "../context";
 import { useMeasure, useRange } from "../spatial_context";
 import type RangeDimension from "../../datastore/RangeDimension";

@@ -39,10 +39,17 @@ function processArrayBuffer(data,columns,size){
 				arr_len=size*bytes;
 			}
 		}
-        else if (column.datatype==="multitext"){
-            arrayType=Uint16Array;
-            bytes=column.stringLength*2; //stringLength is 'undefined' when text16 version of multitext is saved by client. there is no 'values' key at all.
-            arr_len=size*column.stringLength;
+        else if (column.datatype === "multitext") {
+            arrayType = Uint16Array;
+            if (!column.stringLength) {
+                // this seems to be the actual logic needed, at least for tag data saved by the client
+                bytes = 2;
+                arr_len = size;
+            } else {
+                // not sure if/when this applies...
+                bytes = column.stringLength*2; //stringLength is 'undefined' when text16 version of multitext is saved by client. there is no 'values' key at all.
+                arr_len = size*column.stringLength;
+            }
         }
         else if (column.datatype==="text16"){
             arrayType=Uint16Array;
@@ -74,8 +81,8 @@ function processArrayBuffer(data,columns,size){
             }
             dataList.push({data:sab,field:column.field});
         }
-        else{
-            const len  = size*bytes;
+        else {
+            const len = size * bytes;
             //get the data from the arraybuffer into a SharedArrayBuffer
             //unfortunately cannot be copied directly-  have to via a typed Array
 			const arr = new arrayType(data,offset,arr_len);
