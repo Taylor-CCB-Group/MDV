@@ -10,7 +10,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion"
 import { v4 as uuid } from 'uuid';
-import { Chip, MenuItem, Select } from "@mui/material";
+import { Button, Chip, MenuItem, Select } from "@mui/material";
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
@@ -317,9 +317,12 @@ const DoubleSliderComponent = ({ props }: { props: GuiSpec<'doubleslider'> }) =>
 
 const ButtonComponent = ({ props }: { props: GuiSpec<'button'> }) => (
     <>
-        <button type="button" onClick={action(e => {
+        <label>{props.label}</label>
+        <Button variant="contained"
+        onClick={() => {
             if (props.func) props.func(undefined);
-        })}>{props.label}</button>
+        }}
+        >{props.label}</Button>
     </>
 );
 
