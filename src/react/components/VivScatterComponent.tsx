@@ -129,7 +129,6 @@ const Main = observer(() => {
             vsRef.current = scatterProps.viewState;
         }
     }, [scatterProps.viewState, viewerStore.setState]);
-    // TODO get viv working in popouts (seems to be some spurious feature-detection, should be fixed with new version of viv)
     const layerConfig = useMemo(() => ({
         loader: ome,
         selections,
@@ -145,7 +144,7 @@ const Main = observer(() => {
         style: {
             zIndex: '-1',
         },
-        //todo multiple layers, figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
+        //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
         layers: [
             jsonLayer,
             scatterplotLayer, rectLayer, 
