@@ -173,8 +173,9 @@ class ChartManager{
             this.addListener("_default",listener)
         }
         makeObservable(this, {
-            dataSources: observable,
-            dsIndex: observable,
+            // making these observable caused bugs - in particular, when we got to 'state_saved', ds.contentDiv was undefined
+            // dataSources: observable,
+            // dsIndex: observable,
             theme: observable,
             setTheme: action
         });
@@ -225,7 +226,6 @@ class ChartManager{
                     position:"bottom-right"
                 },
                 func:()=>{
-                    //not saving tag data? did it ever?
                     const state = this.getState();
                     this._callListeners("state_saved",state)
                 }
