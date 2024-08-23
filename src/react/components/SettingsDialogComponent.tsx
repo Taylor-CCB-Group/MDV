@@ -356,6 +356,10 @@ const Components: Record<GuiSpecType, React.FC<{ props: GuiSpec<GuiSpecType> }>>
     'slider': observer(SliderComponent),
     'spinner': observer(SpinnerComponent),
     'dropdown': observer(DropdownComponent), //todo also use Autocomplete for this
+    // consider having component specifically for column/category selection
+    // the column selection can make use of column groups
+    // category selection can have some logic for multitext / tags
+    // both can have the ability to reactively update their options based on the current data
     // 'multidropdown': observer(DropdownComponent),
     'multidropdown': observer(DropdownAutocompleteComponent),
     'check': observer(CheckboxComponent),
