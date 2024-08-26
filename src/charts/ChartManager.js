@@ -126,6 +126,10 @@ function listenPreferredColorScheme(callback) {
 class ChartManager{
 
     constructor(div,dataSources,dataLoader,config={},listener=null){
+        if (!window.isSecureContext) {
+            alert("This application requires a secure context (https / localhost)");
+            throw new Error("This application requires a secure context (https / localhost)");
+        }
         // manage global singleton
         if (!window.mdv) {
             window.mdv = {};
