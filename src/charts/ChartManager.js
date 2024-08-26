@@ -126,10 +126,11 @@ function listenPreferredColorScheme(callback) {
 */
 class ChartManager {
 
-    constructor(div, dataSources, dataLoader, config = {}, listener = null) {
-
-
-
+    constructor(div,dataSources,dataLoader,config={},listener=null){
+        if (!window.isSecureContext) {
+            alert("This application requires a secure context (https / localhost)");
+            throw new Error("This application requires a secure context (https / localhost)");
+        }
         // manage global singleton
         if (!window.mdv) {
             window.mdv = {};
@@ -183,6 +184,13 @@ class ChartManager {
         if (listener) {
             this.addListener("_default", listener)
         }
+        makeObservable(this, {
+            // making these observable caused bugs - in particular, when we got to 'state_saved', ds.contentDiv was undefined
+            // dataSources: observable,
+            // dsIndex: observable,
+            theme: observable,
+            setTheme: action
+        });
         //we may want to move this, for now I don't think it's doing any harm and avoids changes to multiple index files:
         connectIPC(this);
         this.transactions = {};
@@ -229,8 +237,7 @@ class ChartManager {
                     text: "Save View",
                     position: "bottom-right"
                 },
-                func: () => {
-                    //not saving tag data? did it ever?
+                func:()=>{
                     const state = this.getState();
                     this._callListeners("state_saved", state)
                 }

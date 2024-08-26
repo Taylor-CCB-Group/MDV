@@ -215,7 +215,8 @@ export function useImgUrl(): string {
 
 /**
  * Returns a list of `dataSources` that are currently available.
- * This is `observable` and will update when new data sources are added etc.
+ * This is *not* `observable` because we had bugs when we did that. then we'd need to be very careful about using `action` when modifying it,
+ * which will require more careful consideration (as of this writing it's mostly ChartManager._init() that mutates dataSources).
  */
 export function useDataSources() {
     return window.mdv.chartManager?.dataSources;
