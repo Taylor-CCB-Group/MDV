@@ -30,7 +30,7 @@ const TextComponent = ({ props }: { props: GuiSpec<'text'> }) => (
     </>
 );
 
-const TextBoxComponent = ({ props }: { props: GuiSpec<'text'> }) => (
+const TextBoxComponent = ({ props }: { props: GuiSpec<'textbox'> }) => (
     <>
         <label>{props.label}</label>
         <div />
@@ -350,7 +350,9 @@ const FolderComponent = ({ props }: { props: GuiSpec<'folder'> }) => {
     )
 }
 
-const Components: Record<GuiSpecType, React.FC<{ props: GuiSpec<GuiSpecType> }>> = {
+const Components: {
+    [K in GuiSpecType]: React.FC<{props: GuiSpec<K>}>;
+} = {
     'text': observer(TextComponent),
     'textbox': observer(TextBoxComponent),
     'slider': observer(SliderComponent),
@@ -380,7 +382,8 @@ const ErrorComponent = ({ props }: { props: GuiSpec<GuiSpecType> }) => {
 }
 
 const AbstractComponent = observer(({ props }: { props: GuiSpec<GuiSpecType> }) => {
-    const Component = Components[props.type];
+    // would like to lose this `as` cast - maybe a newer/future typescript might manage it better?
+    const Component = Components[props.type] as React.FC<{ props: typeof props }>;
     return (
         <div className="grid grid-cols-2 p-1 justify-items-start">
             <ErrorBoundary fallback={<ErrorComponent props={props} />}>
@@ -393,6 +396,9 @@ const AbstractComponent = observer(({ props }: { props: GuiSpec<GuiSpecType> }) 
 export default observer(({ chart }: { chart: Chart }) => {
     
     const settings = useMemo(() => {
+        // is the id just for a key in this component, or should the type passed to the component recognise it?
+        // for now, I don't think there's a benefit to including it in the type.
+        // FolderComponent also makes keys in a similar way that is again only relevant locally I think.
         const settings = chart.getSettings().map(setting => ({ setting, id: uuid() }));
         const wrap = { settings };
         makeAutoObservable(wrap);
