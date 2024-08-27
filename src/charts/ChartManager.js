@@ -157,12 +157,6 @@ class ChartManager {
         this.dsIndex = {};
         this.columnsLoading = {};
 
-        // Observers for datasource edit
-        makeObservable(this, {
-            dataSources: observable,
-            addOrUpdateImageDataSource: action,
-        });
-
         for (const d of dataSources) {
             const ds = {
                 name: d.name,
@@ -614,116 +608,6 @@ class ChartManager {
             }
         }
     }
-
-    addOrUpdateImageDataSource(imageData, datasourceName) {
-        const dataSourceName = datasourceName ?? 'ImageMetadata';
-        let ds = this.dsIndex[dataSourceName];
-
-        if (!ds) {
-            // Create a new data source if it doesn't exist
-            const config = {
-                name: dataSourceName,
-                size: 0,  // Start with 0 rows
-                columns: [
-                    { name: 'ImageID', field: 'ImageID', datatype: 'text' },
-                    { name: 'ImageName', field: 'ImageName', datatype: 'text' },
-                    { name: 'AcquisitionDate', field: 'AcquisitionDate', datatype: 'text' },
-                    { name: 'SizeX', field: 'SizeX', datatype: 'integer' },
-                    { name: 'SizeY', field: 'SizeY', datatype: 'integer' },
-                    { name: 'SizeC', field: 'SizeC', datatype: 'integer' },
-                    { name: 'PhysicalSizeX', field: 'PhysicalSizeX', datatype: 'double' },
-                    { name: 'PhysicalSizeY', field: 'PhysicalSizeY', datatype: 'double' },
-                    { name: 'Channels', field: 'Channels', datatype: 'text' },
-                ]
-            };
-    
-            const newDataStore = new DataStore(0, config, this.dataLoader);
-    
-            ds = {
-                name: dataSourceName,
-                dataStore: newDataStore,
-                color: themes[this.theme].background_color,
-                custom: {}
-            };
-    
-            this.dataSources.push(ds);
-            this.dsIndex[dataSourceName] = ds;
-            this._addDSListeners(ds);
-            this.columnsLoading[dataSourceName] = {};
-        }
-    
-        // Prepare the data to be added
-        const newRow = {
-            ImageID: imageData.ID,
-            ImageName: imageData.Name,
-            AcquisitionDate: imageData.AquisitionDate || '',
-            SizeX: imageData.Pixels.SizeX,
-            SizeY: imageData.Pixels.SizeY,
-            SizeC: imageData.Pixels.SizeC,
-            PhysicalSizeX: imageData.Pixels.PhysicalSizeX,
-            PhysicalSizeY: imageData.Pixels.PhysicalSizeY,
-            Channels: JSON.stringify(imageData.Pixels.Channels.map(c => c.Name)),
-        };
-    
-        // Add the new row to the dataStore
-        const currentSize = ds.dataStore.size;
-        ds.dataStore.size += 1;
-        ds.dataStore.filterSize += 1;
-    
-        for (const [field, value] of Object.entries(newRow)) {
-            if (!ds.dataStore.columnIndex[field]) {
-                console.error(`Column ${field} not found in datastore`);
-                continue;
-            }
-    
-            let data;
-            const column = ds.dataStore.columnIndex[field];
-            
-            if (column.datatype === 'text') {
-                if (!column.values) column.values = [];
-                const index = column.values.indexOf(value);
-                if (index === -1) {
-                    column.values.push(value);
-                    data = new Uint8Array(1);
-                    data[0] = column.values.length - 1;
-                } else {
-                    data = new Uint8Array(1);
-                    data[0] = index;
-                }
-            } else if (column.datatype === 'integer' || column.datatype === 'double') {
-                data = new Float32Array(1);
-                data[0] = value;
-            } else {
-                console.warn(`Unsupported datatype ${column.datatype} for column ${field}`);
-                continue;
-            }
-    
-            try {
-                ds.dataStore.appendColumnData(field, data, currentSize + 1);
-            } catch (error) {
-                console.error(`Error appending data for column ${field}:`, error);
-            }
-        }
-    
-        // Update filter array
-        const newFilterBuffer = new SharedArrayBuffer(ds.dataStore.size);
-        const newFilterArray = new Uint8Array(newFilterBuffer);
-        newFilterArray.set(ds.dataStore.filterArray);
-        ds.dataStore.filterBuffer = newFilterBuffer;
-        ds.dataStore.filterArray = newFilterArray;
-    
-        // Notify any listeners or trigger updates
-        ds.dataStore._callListeners("data_added", ds.dataStore.size);
-        this._notifyDataSourceUpdated(ds);
-    }
-
-    _notifyDataSourceUpdated(dataSource) {
-        // Implement any necessary update logic here
-        // For example, you might want to update charts or trigger a re-render
-        console.log(`Data source ${dataSource.name} updated`);
-        // You could emit an event or call a callback here
-    }
-
 
     //sync color columns
     _sync_colors(columns, from, to) {
