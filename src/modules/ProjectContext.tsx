@@ -3,6 +3,7 @@ import React, { type PropsWithChildren, createContext, useContext, useState } fr
 type ProjectInfo = {
     root: string;
     staticFolder: boolean;
+    projectName: string;
 }
 
 const ProjectContext = createContext<ProjectInfo>(null);
