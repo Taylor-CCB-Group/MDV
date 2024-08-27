@@ -1,5 +1,5 @@
 import type React from "react";
-import { useState, useEffect, useMemo, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
+import { useState, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { observer } from 'mobx-react-lite';
 
@@ -7,20 +7,12 @@ import axios from 'axios';
 import { useProject } from "../../modules/ProjectContext";
 import { ColumnPreview } from "./ColumnPreview"
 
-import { useViewerStore, useViewerStoreApi, useChannelsStoreApi, type VivContextType } from '../../react/components/avivatorish/state';
+import { useViewerStoreApi, useChannelsStoreApi, type VivContextType } from '../../react/components/avivatorish/state';
 import { createLoader } from '../../react/components/avivatorish/utils';
-import { FILL_PIXEL_VALUE } from '../../react/components/avivatorish/constants';
 import { unstable_batchedUpdates } from 'react-dom';
 
 import { TiffPreview } from "./TiffPreview";
 import { TiffMetadataTable } from "./TiffMetadataTable"
-
-import { useChart } from '../../react/context';
-
-
-import type { OME_TIFF } from '../../react/components/avivatorish/state';
-import { SpatialAnnotationProvider, useRange } from "../../react/spatial_context";
-import { VivScatter } from '../../react/components/VivScatterComponent'
 import TiffVisualization from './TiffVisualization';
 
 import { DatasourceDropdown } from './DatasourceDropdown';
@@ -253,7 +245,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
   //const viewerStore = vivStores.viewerStore;
 
-  const { root } = useProject();
+  const { root, projectName } = useProject();
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
@@ -261,6 +253,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
   const handleSelect = (value: string) => {
     setSelectedOption(value);
+    setDatasourceName(value);
     console.log('Selected:', value);
   };
 
@@ -324,8 +317,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
         });
         dispatch({ type: "SET_FILE_TYPE", payload: "csv" });
       } else if (fileExtension === 'tiff' || fileExtension === 'tif') {
-
-
+        
         const dataSources = window.mdv.chartManager?.dataSources ?? [];
         const namesArray = dataSources.map(dataSource => dataSource.name);
 
@@ -529,8 +521,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
 
     } else if (fileExtension === 'tiff') {
-      window.mdv.chartManager?.addOrUpdateImageDataSource(state.tiffMetadata, selectedOption)
-      endpoint = ""
+      formData.append("project_name", projectName);
+      endpoint = "upload"
     }
 
     const config = {
@@ -550,6 +542,28 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
       if (response.status === 200) {
         dispatch({ type: "SET_IS_UPLOADING", payload: false });
         dispatch({ type: "SET_SUCCESS", payload: true });
+
+        // Perform second request if the file is TIFF
+        if (fileExtension === 'tiff') {
+          try {
+            const metadataResponse = await axios.post(`${root}/add_or_update_image_datasource`, {
+              tiffMetadata: state.tiffMetadata,
+              datasourceName: datasourceName,
+            });
+            console.log('Metadata updated successfully', metadataResponse.data);
+            window.mdv.chartManager?.saveState();
+          } catch (metadataError) {
+            console.error('Error updating metadata:', metadataError);
+            dispatch({
+              type: "SET_ERROR",
+              payload: {
+                message: "Failed to update metadata.",
+                traceback: metadataError.message,
+              },
+            });
+          }
+        }
+
       } else {
         console.error(`Failed to confirm: Server responded with status ${response.status}`);
         dispatch({ type: "SET_IS_UPLOADING", payload: false });
