@@ -918,6 +918,11 @@ class ChartManager {
         })
     }
 
+    saveState() {
+        const state = this.getState();
+        this._callListeners("state_saved", state);
+    }
+
     showSaveViewDialog(action) {
         new CustomDialog({
             title: "Save View",
