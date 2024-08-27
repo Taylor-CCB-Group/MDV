@@ -5,21 +5,24 @@ interface TiffChartWrapperProps {
   metadata: any;
   file: File;
   config: any;
+  onFullscreenChange: (isFullscreen: boolean) => void;
 }
 
-const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = observer(({ metadata, file, config, children }) => {
+const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = observer(({ metadata, file, config, children, onFullscreenChange }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [oldSize, setOldSize] = useState<[number, number] | null>(null);
   const contentDivRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && oldSize) {
-        // Restore the old size when exiting fullscreen
+      const newFullscreenState = !!document.fullscreenElement;
+      setIsFullscreen(newFullscreenState);
+      onFullscreenChange(newFullscreenState);
+      
+      if (!newFullscreenState && oldSize) {
         setSize(oldSize[0], oldSize[1]);
         setOldSize(null);
       }
-      setIsFullscreen(!!document.fullscreenElement);
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -27,7 +30,7 @@ const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = obs
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, [oldSize]);
+  }, [oldSize, onFullscreenChange]);
 
   const setSize = (width: number, height: number) => {
     if (contentDivRef.current) {

@@ -9,6 +9,7 @@ import TiffChartWrapper from './TiffChartWrapper';
 const TiffVisualization = observer(({ metadata, file }: { metadata: OME_TIFF['metadata']; file: File; }) => {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const viewerStore = useViewerStoreApi();
 
@@ -41,6 +42,10 @@ const TiffVisualization = observer(({ metadata, file }: { metadata: OME_TIFF['me
   const source = useViewerStore(store => store.source);
   useImage(source);
 
+  const handleFullscreenChange = (fullscreenState: boolean) => {
+    setIsFullscreen(fullscreenState);
+  };
+
   if (isLoading) {
     return <div>Loading TIFF data...</div>;
   }
@@ -51,9 +56,14 @@ const TiffVisualization = observer(({ metadata, file }: { metadata: OME_TIFF['me
   };
 
   return (
-    <TiffChartWrapper metadata={metadata} file={file} config={config}>
+    <TiffChartWrapper 
+      metadata={metadata} 
+      file={file} 
+      config={config} 
+      onFullscreenChange={handleFullscreenChange}
+    >
       <div className="flex items-center justify-center">
-        <SimpleTiffViewer width={400} height={400} />
+        <SimpleTiffViewer width={200} height={200} isFullscreen={isFullscreen} />
       </div>
     </TiffChartWrapper>
   );
