@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface DropdownProps {
   options: string[];
@@ -6,7 +6,16 @@ interface DropdownProps {
 }
 
 export const DatasourceDropdown: React.FC<DropdownProps> = ({ options, onSelect }) => {
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  // Initialize selectedOption with the first option in the array (if it exists)
+  const [selectedOption, setSelectedOption] = useState<string | null>(options.length > 0 ? options[0] : null);
+
+  useEffect(() => {
+    // When options change, set the selected option to the first value of options array
+    if (options.length > 0 && selectedOption === null) {
+      setSelectedOption(options[0]);
+      onSelect(options[0]);
+    }
+  }, [options, selectedOption, onSelect]);
 
   const handleSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const value = event.target.value;
@@ -16,11 +25,9 @@ export const DatasourceDropdown: React.FC<DropdownProps> = ({ options, onSelect 
 
   return (
     <div className="w-full max-w-xs mx-auto">
-      
       <p className="text-lg text-gray-700 dark:text-white my-1">
-      <strong>Select Datasource:</strong>
+        <strong>Select Datasource:</strong>
       </p>
-      
       <select
         value={selectedOption || ''}
         onChange={handleSelect}
