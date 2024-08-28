@@ -5,25 +5,32 @@
 
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
-export type DataType = 'integer' | 'double' | 'text' | 'text16' | 'unique' | 'multitext' | 'int32';
-export type CategoricalDataType = 'text' | 'text16' | 'multitext';
+export type DataType =
+    | "integer"
+    | "double"
+    | "text"
+    | "text16"
+    | "unique"
+    | "multitext"
+    | "int32";
+export type CategoricalDataType = "text" | "text16" | "multitext";
 
 type DataStructureTypes = {
-    'integer': Uint32Array;
-    'double': Float32Array; //why is it called 'double'???
-    'text': Uint8Array;
-    'text16': Uint16Array;
-    'multitext': Uint16Array;
-    'unique': Uint8Array; //not sure about this either.
-}
+    integer: Uint32Array;
+    double: Float32Array; //why is it called 'double'???
+    text: Uint8Array;
+    text16: Uint16Array;
+    multitext: Uint16Array;
+    unique: Uint8Array; //not sure about this either.
+};
 type DataValuesTypes = {
-    'integer': undefined;
-    'double': undefined;
-    'text': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
-    'text16': string[];
-    'multitext': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
-    'unique': string[];
-}
+    integer: undefined;
+    double: undefined;
+    text: string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
+    text16: string[];
+    multitext: string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
+    unique: string[];
+};
 // even if they're just aliases, these could be useful for documentation / clarity
 export type ColumnName = string;
 export type DataSourceName = string;
@@ -35,8 +42,7 @@ export type DataColumn<T extends DataType> = {
     datatype: T;
     data: DataStructureTypes[T];
     values: DataValuesTypes[T];
-}
-
+};
 
 // export type DataStore = {
 //     size: number;
@@ -57,53 +63,59 @@ export type DataSource = {
     regions?: Record<string, any>;
 };
 
-
-type DropdownMappedValue<T extends string, V extends string> = { [P in T]: string } & { [P in V]: string };
+type DropdownMappedValue<T extends string, V extends string> = {
+    [P in T]: string;
+} & { [P in V]: string };
 /** tuple of `[object[], textKey, valueKey]` where `textKey` and `valueKey` are string properties of the object. */
 type DropdownMappedValues<T extends string, V extends string> = [
-    Array<DropdownMappedValue<T, V>>, T, V
+    Array<DropdownMappedValue<T, V>>,
+    T,
+    V,
 ];
 /** `'values'` for a dropdown are either a one-element array (with the element being a string array used for both 'text' and 'value'),
  * or a tuple of [object[], textKey, valueKey] where `textKey` and `valueKey` are properties of the object that will be used for 'text'
  * and 'value' respectively.
  */
-export type DropDownValues = DropdownMappedValues<string, string> | [Array<string>];
-export type GuiValueTypes = { //is the premise of this correct? technically, could we have a dropdown of numbers?
-    "dropdown": string;
-    "multidropdown": string | string[]; 
-    "check": boolean;
-    "text": string;
-    "textbox": string;
-    "radiobuttons": string;
-    "slider": number;
-    "spinner": number;
-    "button": undefined;
-    "doubleslider": [number, number];
-    "folder": GuiSpec[];
-}
+export type DropDownValues =
+    | DropdownMappedValues<string, string>
+    | [Array<string>];
+export type GuiValueTypes = {
+    //is the premise of this correct? technically, could we have a dropdown of numbers?
+    dropdown: string;
+    multidropdown: string | string[];
+    check: boolean;
+    text: string;
+    textbox: string;
+    radiobuttons: string;
+    slider: number;
+    spinner: number;
+    button: undefined;
+    doubleslider: [number, number];
+    folder: GuiSpec[];
+};
 export type GuiSpecType = keyof GuiValueTypes;
 export type GuiSpec<T extends GuiSpecType> = {
-    type: T; 
+    type: T;
     label: string;
     name: string;
     current_value?: GuiValueTypes[T];
     func?: (v: GuiValueTypes[T]) => void;
-    values?: T extends ('dropdown' | 'multidropdown') ? DropDownValues : never;
+    values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
     // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
-    choices?: T extends 'radiobuttons' ? [string, string][] : never;
+    choices?: T extends "radiobuttons" ? [string, string][] : never;
     min?: number;
     max?: number;
     step?: number;
     defaultVal?: GuiValueTypes[T];
-}
+};
 // todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
 export type ExtraControl<T extends GuiSpecType> = {
     type: T;
     name: string;
     label: string;
-    values?: Array<{name: string, value: string}>;
+    values?: Array<{ name: string; value: string }>;
     defaultVal?: GuiValueTypes[T];
-}
+};
 // const a: GuiSpec<'dropdown'> = {
 //     type: 'dropdown',
 //     label: 'label',
@@ -125,7 +137,6 @@ interface DataStore {
     getFilteredIndices: () => Promise<Uint32Array>;
 }
 
-
 export type Chart = {
     getDiv: () => HTMLElement;
     remove: () => void;
@@ -133,8 +144,8 @@ export type Chart = {
     setSize: (x?: number, y?: number) => void;
     changeBaseDocument: (doc: Document) => void;
     getSettings: () => GuiSpec[];
-    removeLayout?:()=> void;
-    config:any;
+    removeLayout?: () => void;
+    config: any;
     dataStore: DataStore;
     popoutIcon: HTMLElement;
 } & BaseChart;
@@ -143,7 +154,7 @@ export type ChartState = {
     chart: Chart;
     win?: Window;
     dataSource: DataSource;
-}    
+};
 
 export type DataSourceSpec = {
     name: DataSourceName;
@@ -155,7 +166,12 @@ export type ChartManager = {
     charts: Record<string, ChartState>;
     dataSources: DataSourceSpec[];
     dsIndex: Record<string, DataSourceSpec>;
-    addMenuIcon: (dataSourceName: DataSourceName, iconClass: string, text: string, func: ()=>void) => HTMLElement;
+    addMenuIcon: (
+        dataSourceName: DataSourceName,
+        iconClass: string,
+        text: string,
+        func: () => void,
+    ) => HTMLElement;
     /** probably not something we really want to use publicly like this */
     _popOutChart: (chart: Chart) => void;
 };

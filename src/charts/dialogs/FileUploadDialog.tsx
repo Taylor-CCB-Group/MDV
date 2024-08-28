@@ -1,5 +1,11 @@
 import type React from "react";
-import { useState, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
+import {
+    useState,
+    useCallback,
+    useReducer,
+    type PropsWithChildren,
+    forwardRef,
+} from "react";
 import { useDropzone } from "react-dropzone";
 import { observer } from 'mobx-react-lite';
 
@@ -18,79 +24,93 @@ import TiffVisualization from './TiffVisualization';
 import { DatasourceDropdown } from './DatasourceDropdown';
 
 // Use dynamic import for the worker
-const CsvWorker = new Worker(new URL('./csvWorker.ts', import.meta.url), { type: 'module' });
+const CsvWorker = new Worker(new URL("./csvWorker.ts", import.meta.url), {
+    type: "module",
+});
 
 const Container = ({ children }: PropsWithChildren) => {
-  return (
-    <div className="flex flex-col content-center items-center h-max dark:bg-black-800 dark:text-white">
-      {children}
-    </div>
-  );
+    return (
+        <div className="flex flex-col content-center items-center h-max dark:bg-black-800 dark:text-white">
+            {children}
+        </div>
+    );
 };
 
 const StatusContainer = ({ children }: PropsWithChildren) => {
-  return (
-    <div className="flex flex-col justify-center items-center w-full h-150 dark:bg-#333">
-      {children}
-    </div>
-  );
+    return (
+        <div className="flex flex-col justify-center items-center w-full h-150 dark:bg-#333">
+            {children}
+        </div>
+    );
 };
 
 const SuccessContainer = ({ children }) => (
-  <div className="flex flex-col items-center justify-center bg-[#f0f8ff] shadow-md border border-[#e0e0e0] m-4 dark:bg-black dark:border-gray-600">
-    {children}
-  </div>
+    <div className="flex flex-col items-center justify-center bg-[#f0f8ff] shadow-md border border-[#e0e0e0] m-4 dark:bg-black dark:border-gray-600">
+        {children}
+    </div>
 );
 
 const SuccessHeading = ({ children }) => (
-  <h1 className="text-[#333] mb-1 dark:text-white">{children}</h1>
+    <h1 className="text-[#333] mb-1 dark:text-white">{children}</h1>
 );
 
 const SuccessText = ({ children }) => (
-  <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">{children}</p>
+    <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">
+        {children}
+    </p>
 );
 
-const DropzoneContainer = forwardRef(({ isDragOver, children, ...props }: any, ref) => (
-  <div
-    {...props}
-    ref={ref}
-    className={`p-4 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? 'bg-gray-300 dark:bg-slate-800' : 'bg-white dark:bg-black'} min-w-[90%]`}
-  >
-    {children}
-  </div>
-));
+const DropzoneContainer = forwardRef(
+    ({ isDragOver, children, ...props }: any, ref) => (
+        <div
+            {...props}
+            ref={ref}
+            className={`p-4 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]`}
+        >
+            {children}
+        </div>
+    ),
+);
 
 const FileInputLabel = ({ children, ...props }) => (
-  <label {...props} className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500">
-    {children}
-  </label>
+    <label
+        {...props}
+        className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500"
+    >
+        {children}
+    </label>
 );
 
 const Spinner = () => {
-  return <div className="w-16 h-16 border-8 mt-10 border-blue-500 border-dashed rounded-full animate-spin" style={{
-    borderColor: "blue transparent blue transparent"
-  }} />;
+    return (
+        <div
+            className="w-16 h-16 border-8 mt-10 border-blue-500 border-dashed rounded-full animate-spin"
+            style={{
+                borderColor: "blue transparent blue transparent",
+            }}
+        />
+    );
 };
 
 const colorStyles = {
-  blue: {
-    bgColor: "bg-blue-600",
-    hoverColor: "hover:bg-blue-700",
-    darkBgColor: "dark:bg-blue-800",
-    darkHoverColor: "dark:bg-blue-900",
-  },
-  red: {
-    bgColor: "bg-red-600",
-    hoverColor: "hover:bg-red-700",
-    darkBgColor: "dark:bg-red-800",
-    darkHoverColor: "dark:bg-red-900",
-  },
-  green: {
-    bgColor: "bg-green-600",
-    hoverColor: "hover:bg-green-700",
-    darkBgColor: "dark:bg-green-800",
-    darkHoverColor: "dark:bg-green-900",
-  },
+    blue: {
+        bgColor: "bg-blue-600",
+        hoverColor: "hover:bg-blue-700",
+        darkBgColor: "dark:bg-blue-800",
+        darkHoverColor: "dark:bg-blue-900",
+    },
+    red: {
+        bgColor: "bg-red-600",
+        hoverColor: "hover:bg-red-700",
+        darkBgColor: "dark:bg-red-800",
+        darkHoverColor: "dark:bg-red-900",
+    },
+    green: {
+        bgColor: "bg-green-600",
+        hoverColor: "hover:bg-green-700",
+        darkBgColor: "dark:bg-green-800",
+        darkHoverColor: "dark:bg-green-900",
+    },
   gray: {
     bgColor: "bg-gray-600",
     hoverColor: "hover:bg-gray-700",
@@ -100,109 +120,118 @@ const colorStyles = {
 };
 
 const Button = ({
-  onClick,
-  color = "blue",
-  disabled = false,
-  size = "px-5 py-2.5",
-  marginTop = "mt-2.5",
-  children
+    onClick,
+    color = "blue",
+    disabled = false,
+    size = "px-5 py-2.5",
+    marginTop = "mt-2.5",
+    children,
 }) => {
-  const { bgColor, hoverColor, darkBgColor, darkHoverColor } = colorStyles[color] || colorStyles.blue;
+    const { bgColor, hoverColor, darkBgColor, darkHoverColor } =
+        colorStyles[color] || colorStyles.blue;
 
-  return (
-    <button type="button"
-      onClick={onClick}
-      className={`${size} ${marginTop} ${bgColor} ${hoverColor} ${darkBgColor} ${darkHoverColor} text-white rounded self-center cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-500 disabled:opacity-70`}
-      disabled={disabled}
-    >
-      {children}
-    </button>
-  );
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`${size} ${marginTop} ${bgColor} ${hoverColor} ${darkBgColor} ${darkHoverColor} text-white rounded self-center cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-500 disabled:opacity-70`}
+            disabled={disabled}
+        >
+            {children}
+        </button>
+    );
 };
 
 const ProgressBar = ({ value, max }) => (
-  <progress className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded" value={value} max={max} />
+    <progress
+        className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded"
+        value={value}
+        max={max}
+    />
 );
 
 const Message = ({ children }) => (
-  <p className="text-lg font-bold text-[#333] dark:text-white text-center">{children}</p>
+    <p className="text-lg font-bold text-[#333] dark:text-white text-center">
+        {children}
+    </p>
 );
 
 const FileSummary = ({ children }) => (
-  <div className="max-w-[400px] w-[90%] text-center mb-5">
-    {children}
-  </div>
+    <div className="max-w-[400px] w-[90%] text-center mb-5">{children}</div>
 );
 
 const FileSummaryHeading = ({ children }) => (
-  <h1 className="text-gray-800 dark:text-white mb-3">{children}</h1>
-)
+    <h1 className="text-gray-800 dark:text-white mb-3">{children}</h1>
+);
 
 const FileSummaryText = ({ children }) => (
-  <p className="text-lg text-gray-700 dark:text-white my-1">{children}</p>
+    <p className="text-lg text-gray-700 dark:text-white my-1">{children}</p>
 );
 
 const ErrorContainer = ({ children }) => (
-  <div className="bg-[#fff0f0] text-[#d8000c] border border-[#ffbaba] p-5 my-5 rounded shadow-sm text-left w-[90%] max-w-[600px]">
-    {children}
-  </div>
+    <div className="bg-[#fff0f0] text-[#d8000c] border border-[#ffbaba] p-5 my-5 rounded shadow-sm text-left w-[90%] max-w-[600px]">
+        {children}
+    </div>
 );
 
 const DynamicText = ({ text, className = "" }) => (
-  <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
-    <p className={`text-center m-0 font-bold text-sm sm:text-lg md:text-xl ${className}`}>
-      {text}
-    </p>
-  </div>
+    <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
+        <p
+            className={`text-center m-0 font-bold text-sm sm:text-lg md:text-xl ${className}`}
+        >
+            {text}
+        </p>
+    </div>
 );
 
 const ErrorHeading = ({ children }) => (
-  <h4 className="mt-0 text-lg font-bold">
-    {children}
-  </h4>
+    <h4 className="mt-0 text-lg font-bold">{children}</h4>
 );
 
 const FileInput = ({ value, onChange, isDisabled }) => (
-  <div className="pr-4">
-    <label htmlFor="datasourceName" className="text-center m-0 font-bold text-sm sm:text-lg md:text-xl">
-      Datasource name:
-    </label>
-    <input
-      id="datasourceName"
-      type="text"
-      value={value}
-      onChange={onChange}
-      className="p-2 border rounded focus:outline-none focus:ring focus:border-blue-300 dark:text-gray-300 dark:bg-gray-800 w-full"
-      placeholder="Enter datasource name"
-      disabled={isDisabled}
-    />
-  </div>
+    <div className="pr-4">
+        <label
+            htmlFor="datasourceName"
+            className="text-center m-0 font-bold text-sm sm:text-lg md:text-xl"
+        >
+            Datasource name:
+        </label>
+        <input
+            id="datasourceName"
+            type="text"
+            value={value}
+            onChange={onChange}
+            className="p-2 border rounded focus:outline-none focus:ring focus:border-blue-300 dark:text-gray-300 dark:bg-gray-800 w-full"
+            placeholder="Enter datasource name"
+            disabled={isDisabled}
+        />
+    </div>
 );
 
 // Reducer function
 const reducer = (state, action) => {
-  switch (action.type) {
-    case "SET_SELECTED_FILES":
-      return { ...state, selectedFiles: action.payload };
-    case "SET_IS_UPLOADING":
-      return { ...state, isUploading: action.payload };
-    case "SET_IS_INSERTING":
-      return { ...state, isInserting: action.payload };
-    case "SET_SUCCESS":
-      return { ...state, success: action.payload };
-    case "SET_ERROR":
-      return { ...state, error: action.payload };
-    case "SET_IS_VALIDATING":
-      return { ...state, isValidating: action.payload };
-    case "SET_VALIDATION_RESULT":
-      return { ...state, validationResult: action.payload };
-    case "SET_FILE_TYPE":
+    switch (action.type) {
+        case "SET_SELECTED_FILES":
+            return { ...state, selectedFiles: action.payload };
+        case "SET_IS_UPLOADING":
+            return { ...state, isUploading: action.payload };
+        case "SET_IS_INSERTING":
+            return { ...state, isInserting: action.payload };
+        case "SET_SUCCESS":
+            return { ...state, success: action.payload };
+        case "SET_ERROR":
+            return { ...state, error: action.payload };
+        case "SET_IS_VALIDATING":
+            return { ...state, isValidating: action.payload };
+        case "SET_VALIDATION_RESULT":
+            return { ...state, validationResult: action.payload };
+        case "SET_FILE_TYPE":
       return { ...state, fileType: action.payload };
     case "SET_TIFF_METADATA":
       return { ...state, tiffMetadata: action.payload };
     default:
-      return state;
-  }
+            return state;
+    }
 };
 
 // Constants
@@ -211,41 +240,44 @@ const UPLOAD_DURATION = 3000;
 const UPLOAD_STEP = 100 / (UPLOAD_DURATION / UPLOAD_INTERVAL);
 
 interface FileUploadDialogComponentProps {
-  onClose: () => void;
-  onResize: (width: number, height: number) => void; // Add this prop
+    onClose: () => void;
+    onResize: (width: number, height: number) => void; // Add this prop
 }
 
 // Custom hook for file upload progress
 const useFileUploadProgress = () => {
-  const [progress, setProgress] = useState(0);
+    const [progress, setProgress] = useState(0);
 
-  const startProgress = useCallback(() => {
-    setProgress(0);
-    const interval = setInterval(() => {
-      setProgress((prevProgress) => {
-        const updatedProgress = prevProgress + UPLOAD_STEP;
-        if (updatedProgress >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return updatedProgress;
-      });
-    }, UPLOAD_INTERVAL);
-  }, []);
+    const startProgress = useCallback(() => {
+        setProgress(0);
+        const interval = setInterval(() => {
+            setProgress((prevProgress) => {
+                const updatedProgress = prevProgress + UPLOAD_STEP;
+                if (updatedProgress >= 100) {
+                    clearInterval(interval);
+                    return 100;
+                }
+                return updatedProgress;
+            });
+        }, UPLOAD_INTERVAL);
+    }, []);
 
-  const resetProgress = useCallback(() => {
-    setProgress(0);
-  }, []);
+    const resetProgress = useCallback(() => {
+        setProgress(0);
+    }, []);
 
-  return { progress, setProgress, startProgress, resetProgress };
+    return { progress, setProgress, startProgress, resetProgress };
 };
 
-const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ onClose, onResize }) => {
+const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
+    onClose,
+    onResize,
+}) => {
 
 
   //const viewerStore = vivStores.viewerStore;
 
-  const { root, projectName } = useProject();
+    const { root, projectName } = useProject();
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
@@ -257,49 +289,49 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     console.log('Selected:', value);
   };
 
-  const [datasourceName, setDatasourceName] = useState("");
+    const [datasourceName, setDatasourceName] = useState("");
 
-  const [showMetadata, setShowMetadata] = useState(true);
+    const [showMetadata, setShowMetadata] = useState(true);
 
   const toggleView = () => {
     setShowMetadata(prevState => !prevState);
   };
 
   const [csvSummary, setCsvSummary] = useState({
-    datasourceName: "",
-    fileName: "",
-    fileSize: "",
-    rowCount: 0,
-    columnCount: 0
-  });
+        datasourceName: "",
+        fileName: "",
+        fileSize: "",
+        rowCount: 0,
+        columnCount: 0,
+    });
 
   const [tiffSummary, settiffSummary] = useState({
     fileName: "",
     fileSize: "",
   });
 
-  const [columnNames, setColumnNames] = useState<string[]>([]);
-  const [columnTypes, setColumnTypes] = useState<string[]>([]);
-  const [secondRowValues, setSecondRowValues] = useState<string[]>([]);
+    const [columnNames, setColumnNames] = useState<string[]>([]);
+    const [columnTypes, setColumnTypes] = useState<string[]>([]);
+    const [secondRowValues, setSecondRowValues] = useState<string[]>([]);
 
   // TIFF
   const channelsStore = useChannelsStoreApi();
 
-  const [state, dispatch] = useReducer(reducer, {
-    selectedFiles: [],
-    isUploading: false,
-    isInserting: false,
-    isValidating: false,
-    validationResult: null,
-    success: false,
-    error: null,
+    const [state, dispatch] = useReducer(reducer, {
+        selectedFiles: [],
+        isUploading: false,
+        isInserting: false,
+        isValidating: false,
+        validationResult: null,
+        success: false,
+        error: null,
     fileType: null,
     tiffMetadata: null,
-  });
+    });
 
   const viewerStore = useViewerStoreApi();
 
-  const { progress, resetProgress, setProgress } = useFileUploadProgress();
+    const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     dispatch({ type: "SET_SELECTED_FILES", payload: acceptedFiles });
@@ -421,28 +453,44 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
   const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
 
-  const getTextWidth = (canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, text: string) => {
-    context.font = getComputedStyle(document.body).fontSize + ' Arial';
-    return context.measureText(text).width;
-  };
+    const getTextWidth = (
+        canvas: HTMLCanvasElement,
+        context: CanvasRenderingContext2D,
+        text: string,
+    ) => {
+        context.font = getComputedStyle(document.body).fontSize + " Arial";
+        return context.measureText(text).width;
+    };
 
-  // Function to calculate the maximum total width needed for the ColumnPreview component
-  const calculateTotalWidth = (columnNames: string[], columnTypes: string[], secondRowValues: string[]) => {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
+    // Function to calculate the maximum total width needed for the ColumnPreview component
+    const calculateTotalWidth = (
+        columnNames: string[],
+        columnTypes: string[],
+        secondRowValues: string[],
+    ) => {
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
 
-    let maxColumnNameWidth = 0;
-    let maxColumnTypeWidth = 0;
-    let maxColumnSecondRowWidth = 0;
+        let maxColumnNameWidth = 0;
+        let maxColumnTypeWidth = 0;
+        let maxColumnSecondRowWidth = 0;
 
-    // Calculate the maximum width of column names
-    maxColumnNameWidth = Math.max(...columnNames.map(name => getTextWidth(canvas, context, name)));
+        // Calculate the maximum width of column names
+        maxColumnNameWidth = Math.max(
+            ...columnNames.map((name) => getTextWidth(canvas, context, name)),
+        );
 
-    // Calculate the maximum width of column types
-    maxColumnTypeWidth = Math.max(...columnTypes.map(type => getTextWidth(canvas, context, type)));
+        // Calculate the maximum width of column types
+        maxColumnTypeWidth = Math.max(
+            ...columnTypes.map((type) => getTextWidth(canvas, context, type)),
+        );
 
-    // Calculate the maximum width of second row values
-    maxColumnSecondRowWidth = Math.max(...secondRowValues.map(value => getTextWidth(canvas, context, value)));
+        // Calculate the maximum width of second row values
+        maxColumnSecondRowWidth = Math.max(
+            ...secondRowValues.map((value) =>
+                getTextWidth(canvas, context, value),
+            ),
+        );
 
     // Calculate the total width needed for the ColumnPreview component
     const totalWidth = maxColumnNameWidth + maxColumnTypeWidth + maxColumnSecondRowWidth + 32; // Add padding
@@ -450,49 +498,63 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     return Math.max(500, totalWidth);
   };
 
-  const handleValidateClick = () => {
-    const file = state.selectedFiles[0];
-    if (file) {
-      dispatch({ type: "SET_IS_VALIDATING", payload: true });
+    const handleValidateClick = () => {
+        const file = state.selectedFiles[0];
+        if (file) {
+            dispatch({ type: "SET_IS_VALIDATING", payload: true });
 
       const fileExtension = file.name.split('.').pop().toLowerCase();
       if (fileExtension === 'csv') {
-        CsvWorker.postMessage(file);
-        CsvWorker.onmessage = (event: MessageEvent) => {
-          const { columnNames, columnTypes, secondRowValues, rowCount, columnCount, error } = event.data;
-          if (error) {
-            dispatch({
-              type: "SET_ERROR",
-              payload: {
-                message: "Validation failed.",
-                traceback: error
-              }
-            });
-            dispatch({ type: "SET_IS_VALIDATING", payload: false });
-          } else {
-            setColumnNames(columnNames);
-            setColumnTypes(columnTypes);
-            setSecondRowValues(secondRowValues);
-            setCsvSummary((prevCsvSummary) => ({
-              ...prevCsvSummary,
-              rowCount,
-              columnCount
-            }));
+              CsvWorker.postMessage(file);
+              CsvWorker.onmessage = (event: MessageEvent) => {
+                  const {
+                    columnNames,
+                    columnTypes,
+                    secondRowValues,
+                    rowCount,
+                    columnCount,
+                    error,
+                } = event.data;
+                  if (error) {
+                      dispatch({
+                          type: "SET_ERROR",
+                          payload: {
+                              message: "Validation failed.",
+                              traceback: error,
+                          },
+                      });
+                      dispatch({ type: "SET_IS_VALIDATING", payload: false });
+                  } else {
+                      setColumnNames(columnNames);
+                      setColumnTypes(columnTypes);
+                      setSecondRowValues(secondRowValues);
+                      setCsvSummary((prevCsvSummary) => ({
+                          ...prevCsvSummary,
+                          rowCount,
+                          columnCount,
+                      }));
 
-            // Calculate the total width needed for the ColumnPreview component
-            const totalWidth = calculateTotalWidth(columnNames, columnTypes, secondRowValues);
-            onResize(totalWidth, 730);
-            dispatch({ type: "SET_IS_VALIDATING", payload: false });
-            dispatch({ type: "SET_VALIDATION_RESULT", payload: { columnNames, columnTypes } });
-          }
-        };
+                      // Calculate the total width needed for the ColumnPreview component
+                      const totalWidth = calculateTotalWidth(
+                        columnNames,
+                        columnTypes,
+                        secondRowValues,
+                    );
+                      onResize(totalWidth, 730);
+                      dispatch({ type: "SET_IS_VALIDATING", payload: false });
+                      dispatch({
+                        type: "SET_VALIDATION_RESULT",
+                        payload: { columnNames, columnTypes },
+                    });
+                  }
+              };
       } else if (fileExtension === 'tiff') {
         onResize(1032, 580);
         dispatch({ type: "SET_IS_VALIDATING", payload: false });
         dispatch({ type: "SET_VALIDATION_RESULT", payload: { columnNames, columnTypes } });
       }
-    }
-  };
+        }
+    };
 
   const handleUploadClick = async () => {
     console.log("Uploading file...");
@@ -503,8 +565,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     }
 
     const fileExtension = state.selectedFiles[0].name.split('.').pop().toLowerCase();
-    dispatch({ type: "SET_IS_UPLOADING", payload: true });
-    resetProgress();
+        dispatch({ type: "SET_IS_UPLOADING", payload: true });
+        resetProgress();
 
     const formData = new FormData();
     formData.append("file", state.selectedFiles[0]);
@@ -525,19 +587,25 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
       endpoint = "upload"
     }
 
-    const config = {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      onUploadProgress: (progressEvent) => {
-        const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-        setProgress(percentComplete); // Update the progress as the file uploads
-      }
-    };
+        const config = {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+            onUploadProgress: (progressEvent) => {
+                const percentComplete = Math.round(
+                    (progressEvent.loaded * 100) / progressEvent.total,
+                );
+                setProgress(percentComplete); // Update the progress as the file uploads
+            },
+        };
 
-    try {
-      const response = await axios.post(`${root}/${endpoint}`, formData, config);
-      console.log('File uploaded successfully', response.data);
+        try {
+            const response = await axios.post(
+                `${root}/add_datasource`,
+                formData,
+                config,
+            );
+            console.log("File uploaded successfully", response.data);
 
       if (response.status === 200) {
         dispatch({ type: "SET_IS_UPLOADING", payload: false });
@@ -589,11 +657,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     }
   };
 
-  const handleClose = async () => {
-    dispatch({ type: "SET_FILE_SUMMARY", payload: null });
-    onResize(450, 320);
-    onClose();
-  };
+    const handleClose = async () => {
+        dispatch({ type: "SET_FILE_SUMMARY", payload: null });
+        onResize(450, 320);
+        onClose();
+    };
 
   return (
     <Container>

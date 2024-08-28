@@ -1,30 +1,35 @@
 import { autorun, makeAutoObservable } from "mobx";
 import BaseChart from "../../charts/BaseChart";
 import { createMdvPortal } from "@/react/react_utils";
-import type DataStore from '../../datastore/DataStore'
+import type DataStore from "../../datastore/DataStore";
 import { ChartProvider } from "../context";
 import { createEl } from "../../utilities/ElementsTyped";
 import type { Chart, DataSource } from "../../charts/charts";
 import { toPng, toSvg } from "html-to-image";
 
 function Fallback() {
-    return <>
-        <h2>BaseReactChart</h2>
-        <p>BaseReactChart is a base class for charts that use React.</p>
-        <p>As of this writing, in order to implement a new React-based chart,
-            make a class that extends BaseReactChart, and make it call the super constructor
-            with an argument for the (mobx observable) function that does the react rendering.</p>
-        <p>See `react.md` for more detail...</p>
-    </>
+    return (
+        <>
+            <h2>BaseReactChart</h2>
+            <p>BaseReactChart is a base class for charts that use React.</p>
+            <p>
+                As of this writing, in order to implement a new React-based
+                chart, make a class that extends BaseReactChart, and make it
+                call the super constructor with an argument for the (mobx
+                observable) function that does the react rendering.
+            </p>
+            <p>See `react.md` for more detail...</p>
+        </>
+    );
 }
 
 export type BaseConfig = {
-    id: string,
-    size: [x: number, y: number],
-    title: string,
-    legend: string,
-    type: string,
-    param: string[];// | string,
+    id: string;
+    size: [x: number, y: number];
+    title: string;
+    legend: string;
+    type: string;
+    param: string[]; // | string,
 };
 type TComponent<T extends BaseConfig> = () => JSX.Element;
 
@@ -53,17 +58,22 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     reactEl: HTMLDivElement;
     ComponentFn: TComponent<T & BaseConfig>;
     private titleReactionDisposer: ReturnType<typeof autorun>;
-    protected constructor(dataStore: DataStore, div: string | HTMLDivElement, config: T & BaseConfig, ReactComponentFunction: TComponent<T & BaseConfig> = Fallback) {
+    protected constructor(
+        dataStore: DataStore,
+        div: string | HTMLDivElement,
+        config: T & BaseConfig,
+        ReactComponentFunction: TComponent<T & BaseConfig> = Fallback,
+    ) {
         super(dataStore, div, config);
         config = this.config; //original config will be copied by super, before doing things like adding id to it...
         makeAutoObservable(config);
-        Object.defineProperty(this, 'config', {
+        Object.defineProperty(this, "config", {
             get: () => config,
             set: (v) => {
                 config = v; // re-assigning config ref in this closure is not really relevant now;
                 //we are using makeAutoObservable and not referring to config directly...
                 makeAutoObservable(config);
-            }
+            },
         });
         this.titleReactionDisposer = autorun(() => {
             this.setTitle(config.title);
@@ -77,22 +87,28 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         // any mobx state, so we can't just hide it in the base class.
         // (although maybe we could design a hook that hides it?)
         // const Observed = observer(ReactComponentFunction);
-        this.reactEl = createEl('div', { className: 'react-chart' }, this.contentDiv); //other things may still be added to contentDiv outside react (e.g. legend)
+        this.reactEl = createEl(
+            "div",
+            { className: "react-chart" },
+            this.contentDiv,
+        ); //other things may still be added to contentDiv outside react (e.g. legend)
         this.ComponentFn = ReactComponentFunction;
         this.mountReact();
     }
     private mountReact() {
         const ReactComponentFunction = this.ComponentFn;
-        this.root = createMdvPortal((
+        this.root = createMdvPortal(
             <ChartProvider chart={this}>
                 <ReactComponentFunction />
-            </ChartProvider>
-        ), this.reactEl, this);
+            </ChartProvider>,
+            this.reactEl,
+            this,
+        );
     }
     //todo: implement this
     // getImage(callback: (imgCa: string) => void, type: "svg" | "png" = "png"): void {
     //     // "Charts should have a `getImage()` method that takes a function and a type, either 'svg' or 'png'.
-    //     // The callback should pass a serialized svg string in the case of svg, or 
+    //     // The callback should pass a serialized svg string in the case of svg, or
     //     // a canvas element in the case of a png. (??)
     //     // if (type === "png") toPng(this.reactEl).then(callback);
     //     // if (type === "svg") toSvg(this.reactEl).then(callback);

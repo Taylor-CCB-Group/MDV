@@ -9,34 +9,48 @@ export default function popoutChart(chart: Chart) {
     if (div.gridstackPopoutCallback) div.gridstackPopoutCallback();
     removeResizable(div);
     removeDraggable(div);
-    const popoutWindow = window.open('', chart.config.title, 'width=800,height=600');
-    popoutWindow.document.body.style.overflow = 'hidden';
+    const popoutWindow = window.open(
+        "",
+        chart.config.title,
+        "width=800,height=600",
+    );
+    popoutWindow.document.body.style.overflow = "hidden";
 
     // Function to add a stylesheet or style element to the popout window
-    const addStyleElement = (styleElement: HTMLStyleElement | HTMLLinkElement) => {
+    const addStyleElement = (
+        styleElement: HTMLStyleElement | HTMLLinkElement,
+    ) => {
         if (styleElement instanceof HTMLLinkElement) {
-            const newLink = popoutWindow.document.createElement('link');
-            newLink.rel = 'stylesheet';
+            const newLink = popoutWindow.document.createElement("link");
+            newLink.rel = "stylesheet";
             newLink.href = styleElement.href;
             popoutWindow.document.head.appendChild(newLink);
         } else if (styleElement instanceof HTMLStyleElement) {
-            const newStyle = popoutWindow.document.createElement('style');
+            const newStyle = popoutWindow.document.createElement("style");
             newStyle.innerHTML = styleElement.innerHTML;
             popoutWindow.document.head.appendChild(newStyle);
         }
     };
 
     // Initial copy of all existing styles
-    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach((styleElement) => {
+    Array.from(
+        document.querySelectorAll('link[rel="stylesheet"], style'),
+    ).forEach((styleElement) => {
         addStyleElement(styleElement as HTMLStyleElement | HTMLLinkElement);
     });
 
     // Observe the main window's head for new stylesheets and style elements
-    const observer = new MutationObserver(mutations => {
-        mutations.forEach(mutation => {
-            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                mutation.addedNodes.forEach(node => {
-                    if (node instanceof HTMLLinkElement || node instanceof HTMLStyleElement) {
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (
+                mutation.type === "childList" &&
+                mutation.addedNodes.length > 0
+            ) {
+                mutation.addedNodes.forEach((node) => {
+                    if (
+                        node instanceof HTMLLinkElement ||
+                        node instanceof HTMLStyleElement
+                    ) {
                         addStyleElement(node);
                     }
                 });
@@ -55,14 +69,14 @@ export default function popoutChart(chart: Chart) {
     const popStyles = pushSetStyles(chart);
 
     const body = popoutWindow.document.body;
-    popoutWindow.addEventListener('resize', () => {
+    popoutWindow.addEventListener("resize", () => {
         chart.setSize(body.clientWidth, body.clientHeight);
     });
 
     // I don't think we use this win property much, but it's here for consistency
     // with previous implementation & comments
     chartManager.charts[chart.config.id].win = popoutWindow;
-    popoutWindow.addEventListener('beforeunload', () => {
+    popoutWindow.addEventListener("beforeunload", () => {
         popStyles();
         originalParent.appendChild(div);
         chartManager._makeChartRD(chart);
@@ -70,7 +84,7 @@ export default function popoutChart(chart: Chart) {
         chart.changeBaseDocument(document);
         observer.disconnect();
     });
-    mainWindow.addEventListener('unload', () => {
+    mainWindow.addEventListener("unload", () => {
         popoutWindow.close();
     });
     return popoutWindow;
@@ -86,11 +100,11 @@ function pushSetStyles(chart: Chart) {
         left: div.style.left,
         iconDisplay: chart.popoutIcon.style.display,
     };
-    div.style.height = '100vh';
-    div.style.width = '100vw';
-    div.style.top = '0';
-    div.style.left = '0';
-    chart.popoutIcon.style.display = 'none';
+    div.style.height = "100vh";
+    div.style.width = "100vw";
+    div.style.top = "0";
+    div.style.left = "0";
+    chart.popoutIcon.style.display = "none";
     return () => {
         chart.popoutIcon.style.display = styles.iconDisplay;
         div.style.height = styles.height;
@@ -98,5 +112,5 @@ function pushSetStyles(chart: Chart) {
         div.style.top = styles.top;
         div.style.left = styles.left;
         chart.setSize();
-    }
+    };
 }

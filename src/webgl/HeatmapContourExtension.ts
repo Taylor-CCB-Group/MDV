@@ -1,10 +1,14 @@
-import type { LayersList, UpdateParameters, _ConstructorOf } from "@deck.gl/core/typed";
+import type {
+    LayersList,
+    UpdateParameters,
+    _ConstructorOf,
+} from "@deck.gl/core/typed";
 import { LayerExtension } from "deck.gl";
 import { HeatmapLayer, type Layer } from "deck.gl/typed";
-import heatmapPresentationFS from './shaders/heatmap-presentation-layer-fragment.glsl?raw';
+import heatmapPresentationFS from "./shaders/heatmap-presentation-layer-fragment.glsl?raw";
 
 // original weights-fs glsl shader
-/*glsl*/`
+/*glsl*/ `
 varying vec4 weightsTexture;
 // Epanechnikov function, keeping for reference
 // float epanechnikovKDE(float u) {
@@ -25,7 +29,7 @@ void main()
 `;
 
 // shader code executed on the GPU for drawing the aggregated heatmap
-/*glsl*/`
+/*glsl*/ `
 #version 100
 
 #define SHADER_TYPE_FRAGMENT
@@ -150,10 +154,9 @@ void main(void) {
     linearColor.a *= opacity;
     gl_FragColor = linearColor;
 }
-`
+`;
 
-
-const contourDecl = /*glsl*/`
+const contourDecl = /*glsl*/ `
 //---- HeatmapContourExtension decl
 
 //uniforms for tweakable parameters
@@ -161,47 +164,48 @@ const contourDecl = /*glsl*/`
 //function for contouring
 
 //--------------------
-`
+`;
 
-const contourFilterColor = /*glsl*/`
+const contourFilterColor = /*glsl*/ `
 //---- HeatmapContourExtension
 // gl_FragColor = DECKGL_FILTER_COLOR(gl_FragColor, geometry);
 // instead of getLinearColor, we want to apply a contouring function to weight...
 // but for now, let's get this code injected and verify what scope we're in
 
 //--------------------
-`
-
+`;
 
 export default class HeatmapContourExtension extends LayerExtension {
     static get componentName(): string {
-        return 'HeatmapContourExtension';
+        return "HeatmapContourExtension";
     }
     getShaders() {
         return {
             inject: {
-                'fs:#decl': contourDecl,
-                'fs:DECKGL_FILTER_COLOR': contourFilterColor,
-            }
-        }
+                "fs:#decl": contourDecl,
+                "fs:DECKGL_FILTER_COLOR": contourFilterColor,
+            },
+        };
     }
 }
 type ExtraContourProps = { contourOpacity: number };
 
-
 /** Original HeatmapLayer doesn't seem to apply extensions...
  * To be fair, there is some ambiguity
  * as there's more than one shader they could be applied to.
- * 
+ *
  * Anyway, this is an attempt to make HeatmapLayer work such that
  * when our HeatmapContourExtension is applied, it will be used.
  * It may well not be a complete or sustainable solution.
- * 
+ *
  * Also note we likely want to have a different version that changes
- * other aspects of how the heatmap is rendered 
+ * other aspects of how the heatmap is rendered
  * - i.e. with a kernel in screen pixels vs coordinates.
  */
-export class ExtendableHeatmapLayer extends HeatmapLayer<Uint32Array, ExtraContourProps> {
+export class ExtendableHeatmapLayer extends HeatmapLayer<
+    Uint32Array,
+    ExtraContourProps
+> {
     getShaders(type) {
         // type is just used as `type === 'max-weights-transform'`
         // not to distinguish e.g. between weights transform and color rendering.
@@ -229,26 +233,35 @@ export class ExtendableHeatmapLayer extends HeatmapLayer<Uint32Array, ExtraConto
     //     return layer;
     // }
     // biome-ignore lint/complexity/noBannedTypes: banned types are the least of our worries here
-    protected getSubLayerClass<T extends Layer<{}>>(subLayerId: string, DefaultLayerClass: _ConstructorOf<T>): _ConstructorOf<T> {
+    protected getSubLayerClass<T extends Layer<{}>>(
+        subLayerId: string,
+        DefaultLayerClass: _ConstructorOf<T>,
+    ): _ConstructorOf<T> {
         const theClass = super.getSubLayerClass(subLayerId, DefaultLayerClass);
-        if (subLayerId === 'triangle') {
+        if (subLayerId === "triangle") {
             if (!theClass.prototype.__originalGetShaders__) {
-                console.log(">>> saving original getShaders()... this should only happen once...");
-                theClass.prototype.__originalGetShaders__ = theClass.prototype.getShaders;
+                console.log(
+                    ">>> saving original getShaders()... this should only happen once...",
+                );
+                theClass.prototype.__originalGetShaders__ =
+                    theClass.prototype.getShaders;
                 const originalDraw = theClass.prototype.draw;
                 //changed name of texture to weightTexture, now the shader compiles with version 300 es
                 //(although it then doesn't render anything?)
                 theClass.prototype.draw = function (opts) {
                     opts.uniforms.weightTexture = (this.props as any).texture;
                     return originalDraw.call(this, opts);
-                }
+                };
             }
-            const originalGetShaders = theClass.prototype.__originalGetShaders__;
+            const originalGetShaders =
+                theClass.prototype.__originalGetShaders__;
             const myTriangleFS = heatmapPresentationFS;
             //thought we could get away without doing this every time we update the shader code...
             //but moving the shader to a separate module isn't enough to get this to work
             if (theClass.prototype.__lastShader !== myTriangleFS) {
-                console.log(">>> applying new getShaders() to TriangleLayer prototype...");
+                console.log(
+                    ">>> applying new getShaders() to TriangleLayer prototype...",
+                );
                 theClass.prototype.__lastShader = myTriangleFS;
                 theClass.prototype.getShaders = () => {
                     console.log(">>> getShaders called...");
@@ -258,7 +271,7 @@ export class ExtendableHeatmapLayer extends HeatmapLayer<Uint32Array, ExtraConto
                     shaders.fs = myTriangleFS;
                     shaders.vs = `#version 300 es\n${shaders.vs}`;
                     return shaders;
-                }
+                };
             }
             // // I need to get a property from the HeatmapLayer props into the sublayer...
             // if (!theClass.prototype.__originalUpdateState__) {
@@ -281,4 +294,3 @@ export class ExtendableHeatmapLayer extends HeatmapLayer<Uint32Array, ExtraConto
         return theClass;
     }
 }
-

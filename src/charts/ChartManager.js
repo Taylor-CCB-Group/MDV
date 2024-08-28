@@ -1,4 +1,14 @@
-import { createEl, makeDraggable, makeResizable, MDVProgress, removeDraggable, removeResizable, createMenuIcon, splitPane, createFilterElement } from "../utilities/Elements";
+import {
+    createEl,
+    makeDraggable,
+    makeResizable,
+    MDVProgress,
+    removeDraggable,
+    removeResizable,
+    createMenuIcon,
+    splitPane,
+    createFilterElement,
+} from "../utilities/Elements";
 import BaseChart from "./BaseChart.js";
 import DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
@@ -10,11 +20,9 @@ import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
 import GridStackManager, { positionChart } from "./GridstackManager"; //nb, '.ts' unadvised in import paths... should be '.js' but not configured webpack well enough.
 // this is added as a side-effect of import HmrHack elsewhere in the code, then we get the actual class from BaseDialog.experiment
-import FileUploadDialogReact from './dialogs/FileUploadDialogWrapper';
-import TagModel from '../table/TagModel';
-import { makeObservable, observable, action } from 'mobx';
+import FileUploadDialogReact from "./dialogs/FileUploadDialogWrapper";
 
-//default charts 
+//default charts
 import "./HistogramChart.js";
 import "./RowChart.js";
 import "./TableChart.js";
@@ -50,40 +58,41 @@ import connectIPC from "../utilities/InterProcessCommunication";
 import { addChartLink } from "../links/link_utils";
 import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
+import { makeObservable, observable, action } from "mobx";
+import { AddChartDialog } from "./dialogs/AddChartDialog";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
-// followed by multitext/text16 (uint16) then text/unique (uint8) 
+// followed by multitext/text16 (uint16) then text/unique (uint8)
 const column_orders = {
-    "double": 0,
-    "integer": 0,
-    "int32": 0,
-    "multitext": 1,
-    "text16": 1,
-    "text": 2,
-    "unique": 2
-}
+    double: 0,
+    integer: 0,
+    int32: 0,
+    multitext: 1,
+    text16: 1,
+    text: 2,
+    unique: 2,
+};
 
 const themes = {
-    "dark": {
+    dark: {
         title_bar_color: "#222",
         main_panel_color: "black",
         text_color: "white",
-        background_color: "#333"
+        background_color: "#333",
     },
-    "light": {
+    light: {
         title_bar_color: "white",
         main_panel_color: "#f1f1f1",
         text_color: "black",
-        background_color: "#bababa"
-
-    }
-}
+        background_color: "#bababa",
+    },
+};
 
 //https://stackoverflow.com/questions/56393880/how-do-i-detect-dark-mode-using-javascript
 function getPreferredColorScheme() {
     if (window.matchMedia) {
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
             return "dark";
         }
         return "light";
@@ -92,8 +101,12 @@ function getPreferredColorScheme() {
 }
 function listenPreferredColorScheme(callback) {
     if (window.matchMedia) {
-        const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        colorSchemeQuery.addEventListener('change', () => callback(getPreferredColorScheme()));
+        const colorSchemeQuery = window.matchMedia(
+            "(prefers-color-scheme: dark)",
+        );
+        colorSchemeQuery.addEventListener("change", () =>
+            callback(getPreferredColorScheme()),
+        );
     }
 }
 
@@ -125,18 +138,23 @@ function listenPreferredColorScheme(callback) {
 * 
 */
 class ChartManager {
-
-    constructor(div,dataSources,dataLoader,config={},listener=null){
+    constructor(div, dataSources, dataLoader, config = {}, listener = null) {
         if (!window.isSecureContext) {
-            alert("This application requires a secure context (https / localhost)");
-            throw new Error("This application requires a secure context (https / localhost)");
+            alert(
+                "This application requires a secure context (https / localhost)",
+            );
+            throw new Error(
+                "This application requires a secure context (https / localhost)",
+            );
         }
         // manage global singleton
         if (!window.mdv) {
             window.mdv = {};
         }
         if (window.mdv.chartManager) {
-            console.warn("Making another ChartManager... had believed this to be a singleton");
+            console.warn(
+                "Making another ChartManager... had believed this to be a singleton",
+            );
         }
         window.mdv.chartManager = this;
 
@@ -146,7 +164,7 @@ class ChartManager {
         this.setTheme(getPreferredColorScheme());
         //maybe better to stop listening once explicit option has been set
         //or to allow the user to explicitly say 'system default'
-        listenPreferredColorScheme(t => this.setTheme(t));
+        listenPreferredColorScheme((t) => this.setTheme(t));
 
         // each entry in dataSources will contain
         //  dataSource - the actual dataStore object
@@ -156,7 +174,6 @@ class ChartManager {
         this.dataSources = [];
         this.dsIndex = {};
         this.columnsLoading = {};
-
         for (const d of dataSources) {
             const ds = {
                 name: d.name,
@@ -166,129 +183,148 @@ class ChartManager {
                 color: d.color || themes[this.theme].background_color,
                 column_link_to: d.column_link_to,
                 links: d.links,
-                custom: d.custom || {}
-            }
+                custom: d.custom || {},
+            };
             this.dataSources.push(ds);
             this.dsIndex[d.name] = ds;
             this._addDSListeners(ds);
             this.columnsLoading[d.name] = {};
-
-
         }
         if (listener) {
-            this.addListener("_default", listener)
+            this.addListener("_default", listener);
         }
         makeObservable(this, {
             // making these observable caused bugs - in particular, when we got to 'state_saved', ds.contentDiv was undefined
             // dataSources: observable,
             // dsIndex: observable,
             theme: observable,
-            setTheme: action
+            setTheme: action,
         });
         //we may want to move this, for now I don't think it's doing any harm and avoids changes to multiple index files:
         connectIPC(this);
         this.transactions = {};
 
-
-
-
         //set up container and top(main menu)
-        this.containerDiv = typeof div === "string" ? document.getElementById(div) : div;
+        this.containerDiv =
+            typeof div === "string" ? document.getElementById(div) : div;
         this.containerDiv.style.display = "flex";
         this.containerDiv.style.flexDirection = "column";
 
-        this.menuBar = createEl("div", {
-            classes: ["ciview-main-menu-bar"]
-        }, this.containerDiv);
+        this.menuBar = createEl(
+            "div",
+            {
+                classes: ["ciview-main-menu-bar"],
+            },
+            this.containerDiv,
+        );
 
         this.leftMenuBar = createEl("span", {}, this.menuBar);
-        this.rightMenuBar = createEl("span", { styles: { float: "right" } }, this.menuBar);
-
-
+        this.rightMenuBar = createEl(
+            "span",
+            { styles: { float: "right" } },
+            this.menuBar,
+        );
 
         createEl("span", { classes: ["mdv-divider"] }, this.menuBar);
 
         if (config.all_views) {
-
-            this.viewSelect = createEl("select", { style: { maxWidth: '50em' } }, this.menuBar);
+            this.viewSelect = createEl(
+                "select",
+                { style: { maxWidth: "50em" } },
+                this.menuBar,
+            );
             for (const v of config.all_views) {
-                createEl("option", { text: v, value: v }, this.viewSelect)
+                createEl("option", { text: v, value: v }, this.viewSelect);
             }
             createFilterElement(this.viewSelect, this.menuBar);
             this.viewSelect.addEventListener("change", (e) => {
-                if (this.config.show_save_view_dialog && config.permission === "edit") {
-                    this.showSaveViewDialog(() => this.changeView(this.viewSelect.value));
+                if (
+                    this.config.show_save_view_dialog &&
+                    config.permission === "edit"
+                ) {
+                    this.showSaveViewDialog(() =>
+                        this.changeView(this.viewSelect.value),
+                    );
+                } else {
+                    this.changeView(this.viewSelect.value);
                 }
-                else {
-                    this.changeView(this.viewSelect.value)
-                }
-            })
+            });
         }
 
         if (config.permission === "edit") {
-            createMenuIcon("fas fa-save", {
-                tooltip: {
-                    text: "Save View",
-                    position: "bottom-right"
+            createMenuIcon(
+                "fas fa-save",
+                {
+                    tooltip: {
+                        text: "Save View",
+                        position: "bottom-right",
+                    },
+                    func: () => {
+                        const state = this.getState();
+                        this._callListeners("state_saved", state);
+                    },
                 },
-                func:()=>{
-                    const state = this.getState();
-                    this._callListeners("state_saved", state)
-                }
-
-            }, this.menuBar);
+                this.menuBar,
+            );
         }
-
 
         if (config.permission === "edit" && config.all_views) {
-            createMenuIcon("fas fa-plus", {
-                tooltip: {
-                    text: "Create New View",
-                    position: "bottom-right"
+            createMenuIcon(
+                "fas fa-plus",
+                {
+                    tooltip: {
+                        text: "Create New View",
+                        position: "bottom-right",
+                    },
+                    func: () => {
+                        this.showSaveViewDialog(() => this.showAddViewDialog());
+                    },
                 },
-                func: () => {
-                    this.showSaveViewDialog(() => this.showAddViewDialog());
-                }
-
-            }, this.menuBar);
-            createMenuIcon("fas fa-minus", {
-                tooltip: {
-                    text: "Delete Current View",
-                    position: "bottom-right"
+                this.menuBar,
+            );
+            createMenuIcon(
+                "fas fa-minus",
+                {
+                    tooltip: {
+                        text: "Delete Current View",
+                        position: "bottom-right",
+                    },
+                    func: () => {
+                        this.showDeleteViewDialog();
+                    },
                 },
-                func: () => {
-                    this.showDeleteViewDialog();
-                }
-
-            }, this.menuBar);
+                this.menuBar,
+            );
         }
 
-
-
-        const themeButton = createMenuIcon("fas fa-adjust", {
-            tooltip: {
-                text: "Change Theme",
-                position: "bottom-left"
-            },
-            func: (e) => {
-                this.themeMenu.show(e);
-            }
-
-        }, this.rightMenuBar);
-        themeButton.style.margin = "3px";
-
-        if (config.permission === 'edit') {
-            const uploadButton = createMenuIcon("fas fa-upload", {
+        const themeButton = createMenuIcon(
+            "fas fa-adjust",
+            {
                 tooltip: {
-                    text: "Add datasource",
-                    position: "bottom-left"
+                    text: "Change Theme",
+                    position: "bottom-left",
                 },
                 func: (e) => {
-                    // Instead of directly creating FileUploadDialogReact here,
-                    // we'll create a method to handle this
-                    this.openFileUploadDialog();
-                }
-            }, this.menuBar);
+                    this.themeMenu.show(e);
+                },
+            },
+            this.rightMenuBar,
+        );
+        themeButton.style.margin = "3px";
+        if (config.permission === "edit") {
+            const uploadButton = createMenuIcon(
+                "fas fa-upload",
+                {
+                    tooltip: {
+                        text: "Add datasource",
+                        position: "bottom-left",
+                    },
+                    func: (e) => {
+                        new FileUploadDialogReact(); //.open();
+                    },
+                },
+                this.menuBar,
+            );
             uploadButton.style.margin = "3px";
         }
 
@@ -296,20 +332,28 @@ class ChartManager {
             // add a button to take a screenshot of the current view
             // we don't actually want a button like this - I think we probably want to take a screenshot
             // inside 'getState()' and add it to view... but that's a bit of a destructive change.
-            createMenuIcon("fas fa-camera", {
-                tooltip: {
-                    text: "Take Screenshot",
-                    position: "bottom-left"
+            createMenuIcon(
+                "fas fa-camera",
+                {
+                    tooltip: {
+                        text: "Take Screenshot",
+                        position: "bottom-left",
+                    },
+                    func: async () => {
+                        const bounds =
+                            this.containerDiv.getBoundingClientRect();
+                        const aspect = bounds.width / bounds.height;
+                        const dataUrl = await toPng(this.containerDiv, {
+                            canvasWidth: 400,
+                            canvasHeight: 400 / aspect,
+                        });
+                        const img = document.createElement("img");
+                        img.src = dataUrl;
+                        document.body.appendChild(img);
+                    },
                 },
-                func: async () => {
-                    const bounds = this.containerDiv.getBoundingClientRect();
-                    const aspect = bounds.width / bounds.height;
-                    const dataUrl = await toPng(this.containerDiv, { canvasWidth: 400, canvasHeight: 400 / aspect });
-                    const img = document.createElement('img');
-                    img.src = dataUrl;
-                    document.body.appendChild(img);
-                }
-            }, this.menuBar);
+                this.menuBar,
+            );
         }
         // createMenuIcon("fas fa-question",{
         //     tooltip:{
@@ -323,30 +367,33 @@ class ChartManager {
 
         this._setupThemeContextMenu();
 
-        this.contentDiv = createEl("div", {
-            styles: {
-                flex: "1 1 auto",
-                position: "relative"
-            }
-        }, this.containerDiv);
-        this.contentDiv.classList.add('ciview-contentDiv');
+        this.contentDiv = createEl(
+            "div",
+            {
+                styles: {
+                    flex: "1 1 auto",
+                    position: "relative",
+                },
+            },
+            this.containerDiv,
+        );
+        this.contentDiv.classList.add("ciview-contentDiv");
 
         this.gridStack = new GridStackManager(this);
 
         //each entry in charts will contain
         //  chart - the actual chart
         //  win - the popout window it is in (or null)
-        //  dataSource - the data source associated with it 
+        //  dataSource - the data source associated with it
         this.charts = {};
 
-
         this.config = config;
-        const c = this.config
+        const c = this.config;
         c.chart_color = c.chart_color || "white";
 
         //load any files first
 
-        this.dataLoader = dataLoader.function;// || async function defaultDataLoaderFunction() { console.warn(`ceci n'est pas une dataLoader`) };
+        this.dataLoader = dataLoader.function; // || async function defaultDataLoaderFunction() { console.warn(`ceci n'est pas une dataLoader`) };
         this.viewLoader = dataLoader.viewLoader;
 
         this.layoutMenus = {};
@@ -357,12 +404,11 @@ class ChartManager {
                 this.loadFile(item, () => {
                     this.filesToLoad--;
                     if (this.filesToLoad === 0) {
-                        this._loadView(config, dataLoader, true)
+                        this._loadView(config, dataLoader, true);
                     }
                 });
             }
-        }
-        else {
+        } else {
             this._loadView(config, dataLoader, true);
         }
 
@@ -373,19 +419,31 @@ class ChartManager {
                 for (const ods in links) {
                     const _ods = this.dsIndex[ods].dataStore;
                     if (!_ods) {
-                        console.warn(`datasource ${ds.name} has link to non-existent datasource ${ods}`);
+                        console.warn(
+                            `datasource ${ds.name} has link to non-existent datasource ${ods}`,
+                        );
                         return;
                     }
                     // pjt: could there be cases where we want more than one of a given type of link between two data sources?
                     // if so, we can support that by making these functions undertand how to interpret the links object appropriately.
                     if (links[ods].interactions) {
-                        this._addInteractionLinks(ds.dataStore, _ods, links[ods].interactions);
+                        this._addInteractionLinks(
+                            ds.dataStore,
+                            _ods,
+                            links[ods].interactions,
+                        );
                     }
                     if (links[ods].valueset) {
-                        this._addValuesetLink(ds.dataStore, _ods, links[ods].valueset);
+                        this._addValuesetLink(
+                            ds.dataStore,
+                            _ods,
+                            links[ods].valueset,
+                        );
                     }
                     if (links[ods].column_pointer) {
-                        console.warn("experimental column_pointer links not currently supported");
+                        console.warn(
+                            "experimental column_pointer links not currently supported",
+                        );
                         // this._addColumnPointerLink(ds.dataStore, _ods,links[ods].column_pointer);
                     }
                 }
@@ -406,37 +464,70 @@ class ChartManager {
         const isTextLike = srcCol.values && destCol.values;
         Promise.all([
             this._getColumnsAsync(ds.name, [link.source_column]),
-            this._getColumnsAsync(ods.name, [link.dest_column])
+            this._getColumnsAsync(ods.name, [link.dest_column]),
         ]).then(() => {
-            ds.addListener(`${ds.name}-${ods.name}_valueset`, async (type, data) => {
-                // if the current view doesn't use the ods, don't bother filtering
-                if (!this.viewData.dataSources[ods.name]) return;
-                if (type === "filtered") {
-                    //`data` may be a (Range)Dimension (which has a `filterArray` property),
-                    //or 'undefined', or a string like "all_removed", or who knows what else...
-                    if (!data || typeof data === "string" || !data.filterArray) {
-                        valuesetFilter.removeFilter();
-                        return;
+            ds.addListener(
+                `${ds.name}-${ods.name}_valueset`,
+                async (type, data) => {
+                    // if the current view doesn't use the ods, don't bother filtering
+                    if (!this.viewData.dataSources[ods.name]) return;
+                    if (type === "filtered") {
+                        //`data` may be a (Range)Dimension (which has a `filterArray` property),
+                        //or 'undefined', or a string like "all_removed", or who knows what else...
+                        if (
+                            !data ||
+                            typeof data === "string" ||
+                            !data.filterArray
+                        ) {
+                            valuesetFilter.removeFilter();
+                            return;
+                        }
+                        await this._getColumnsAsync(ds.name, [
+                            link.source_column,
+                        ]);
+                        const resultSet = await data.getValueSet(
+                            link.source_column,
+                        );
+                        await this._getColumnsAsync(ods.name, [
+                            link.dest_column,
+                        ]);
+                        valuesetFilter.filter(
+                            "filterValueset",
+                            [link.dest_column],
+                            resultSet,
+                        );
+                    } else if (type === "data_highlighted") {
+                        await this._getColumnsAsync(ds.name, [
+                            link.source_column,
+                        ]);
+                        await this._getColumnsAsync(ods.name, [
+                            link.dest_column,
+                        ]);
+                        const { indexes } = data;
+                        if (isTextLike) {
+                            // given a set of indexes into the source column, get the corresponding values
+                            // the result should be a set of strings, and "filterValueset" will be responsible
+                            // for filtering the destination column based on those strings
+                            const resultSet = new Set(
+                                indexes.map(
+                                    (i) => srcCol.values[srcCol.data[i]],
+                                ),
+                            );
+                            valuesetFilter.filter(
+                                "filterValueset",
+                                [link.dest_column],
+                                resultSet,
+                            );
+                        } else {
+                            valuesetFilter.filter(
+                                "filterValueset",
+                                [link.dest_column],
+                                new Set(indexes),
+                            );
+                        }
                     }
-                    await this._getColumnsAsync(ds.name, [link.source_column]);
-                    const resultSet = await data.getValueSet(link.source_column);
-                    await this._getColumnsAsync(ods.name, [link.dest_column]);
-                    valuesetFilter.filter("filterValueset", [link.dest_column], resultSet);
-                } else if (type === "data_highlighted") {
-                    await this._getColumnsAsync(ds.name, [link.source_column]);
-                    await this._getColumnsAsync(ods.name, [link.dest_column]);
-                    const { indexes } = data;
-                    if (isTextLike) {
-                        // given a set of indexes into the source column, get the corresponding values
-                        // the result should be a set of strings, and "filterValueset" will be responsible
-                        // for filtering the destination column based on those strings
-                        const resultSet = new Set(indexes.map(i => srcCol.values[srcCol.data[i]]));
-                        valuesetFilter.filter("filterValueset", [link.dest_column], resultSet);
-                    } else {
-                        valuesetFilter.filter("filterValueset", [link.dest_column], new Set(indexes));
-                    }
-                }
-            });
+                },
+            );
         });
     }
 
@@ -455,69 +546,102 @@ class ChartManager {
         // if (!targetChart) throw new Error(`No chart with id ${link.target_chart} found`);
 
         const isTextLike = srcCol.values; // perhaps 'unique' should also be considered text-like / valid?
-        if (!isTextLike) throw new Error("Only text-like columns are supported for column pointer links");
-        ds.addListener(`${ds.name}-${ods.name}_column_pointer`, async (type, data) => { //don't think we need mobx action as autoObservable is used
-            if (type === "data_highlighted") {
-                const targetChart = this.charts[link.target_chart]?.chart;
-                if (!targetChart) {
-                    console.log(`No chart with id ${link.target_chart} found - bypassing column pointer link`);
-                    return;
+        if (!isTextLike)
+            throw new Error(
+                "Only text-like columns are supported for column pointer links",
+            );
+        ds.addListener(
+            `${ds.name}-${ods.name}_column_pointer`,
+            async (type, data) => {
+                //don't think we need mobx action as autoObservable is used
+                if (type === "data_highlighted") {
+                    const targetChart = this.charts[link.target_chart]?.chart;
+                    if (!targetChart) {
+                        console.log(
+                            `No chart with id ${link.target_chart} found - bypassing column pointer link`,
+                        );
+                        return;
+                    }
+                    await this._getColumnsAsync(ds.name, [link.source_column]);
+                    // data probably looks something like `{indexes: Array(1), source: undefined, data: null, dataStore: DataStore}`
+                    const { indexes } = data;
+                    const newValue = srcCol.values[srcCol.data[indexes[0]]];
+                    targetChart.config[link.target_property] = newValue;
+                    targetChart.setTitle(newValue); //could be optional - or use some kind of template?
+                    if (link.target_property === "color_by") {
+                        targetChart.colorByColumn(newValue);
+                    }
                 }
-                await this._getColumnsAsync(ds.name, [link.source_column]);
-                // data probably looks something like `{indexes: Array(1), source: undefined, data: null, dataStore: DataStore}`
-                const { indexes } = data;
-                const newValue = srcCol.values[srcCol.data[indexes[0]]];
-                targetChart.config[link.target_property] = newValue;
-                targetChart.setTitle(newValue); //could be optional - or use some kind of template?
-                if (link.target_property === "color_by") {
-                    targetChart.colorByColumn(newValue);
-                }
-            }
-        });
+            },
+        );
     }
 
     _addInteractionLinks(ds, ods, links) {
         const interactionFilter = ods.getDimension("category_dimension");
-        const icols = links.interaction_columns
+        const icols = links.interaction_columns;
         const c1 = icols[0];
         const c2 = icols[1];
         const pc = links.pivot_column;
         //sync the colors of the matching columns
         ds.syncColumnColors.push({
-            dataSource: ods.name, columns: [
+            dataSource: ods.name,
+            columns: [
                 { link_to: icols[2], col: icols[0] },
                 { link_to: icols[2], col: icols[1] },
-                { link_to: pc, col: pc }
-            ]
+                { link_to: pc, col: pc },
+            ],
         });
-        ds.addListener(`${ds.name}-${ods.name}_interaction`, async (type, data) => {
-            if (type === "data_highlighted") {
-                //get the two interacting items plus pivot
-                await this._getColumnsAsync(ds.name, [c1, c2, pc]);
-                const info = ds.getRowAsObject(data.indexes[0], [c1, c2, pc]);
-                //get pivot from the other datasource
-                await this._getColumnsAsync(ods.name, [icols[2]]);
-                //filter the two interacting items
-                //would be nice if this could be maybe async / lazy / different ways of composing filters?
+        ds.addListener(
+            `${ds.name}-${ods.name}_interaction`,
+            async (type, data) => {
+                if (type === "data_highlighted") {
+                    //get the two interacting items plus pivot
+                    await this._getColumnsAsync(ds.name, [c1, c2, pc]);
+                    const info = ds.getRowAsObject(data.indexes[0], [
+                        c1,
+                        c2,
+                        pc,
+                    ]);
+                    //get pivot from the other datasource
+                    await this._getColumnsAsync(ods.name, [icols[2]]);
+                    //filter the two interacting items
+                    //would be nice if this could be maybe async / lazy / different ways of composing filters?
 
-                const args = [info[c1], info[c2]];
-                args.operand = "and"; //force multitext to use "and"
+                    const args = [info[c1], info[c2]];
+                    args.operand = "and"; //force multitext to use "and"
 
-                interactionFilter.filter("filterCategories", [icols[2]], args);
-                //show the region if not already displayed
-                if (links.is_single_region && ods.regions && this.dsPanes[ods.name]) {
-                    if (!this.getAllCharts(ods.name).find(x => x.config.region === info[pc])) {
-                        const conf = {
-                            type: "image_scatter_plot"
+                    interactionFilter.filter(
+                        "filterCategories",
+                        [icols[2]],
+                        args,
+                    );
+                    //show the region if not already displayed
+                    if (
+                        links.is_single_region &&
+                        ods.regions &&
+                        this.dsPanes[ods.name]
+                    ) {
+                        if (
+                            !this.getAllCharts(ods.name).find(
+                                (x) => x.config.region === info[pc],
+                            )
+                        ) {
+                            const conf = {
+                                type: "image_scatter_plot",
+                            };
+                            //add the default parameters
+                            BaseChart.types["image_scatter_plot"].init(
+                                conf,
+                                ods,
+                                { region: info[pc] },
+                            );
+                            //add the chart
+                            this.addChart(ods.name, conf);
                         }
-                        //add the default parameters
-                        BaseChart.types["image_scatter_plot"].init(conf, ods, { region: info[pc] });
-                        //add the chart
-                        this.addChart(ods.name, conf);
                     }
                 }
-            }
-        });
+            },
+        );
     }
 
     _setUpChangeLayoutMenu(ds) {
@@ -527,19 +651,19 @@ class ChartManager {
                 {
                     text: "Absolute",
                     ghosted: lo === "absolute",
-                    func: () => this.changeLayout("absolute", ds)
+                    func: () => this.changeLayout("absolute", ds),
                 },
                 {
                     text: "Grid Stack",
                     ghosted: lo === "gridstack",
-                    func: () => this.changeLayout("gridstack", ds)
-                }
-            ]
-        })
+                    func: () => this.changeLayout("gridstack", ds),
+                },
+            ];
+        });
     }
 
     changeLayout(type, ds) {
-        const view = this.viewData.dataSources[ds.name]
+        const view = this.viewData.dataSources[ds.name];
         const current = view.layout || "absolute";
         if (type === current) {
             return;
@@ -547,10 +671,8 @@ class ChartManager {
         //remove existing layouts on charts
         if (current === "gridstack") {
             this.gridStack.destroy(ds);
-
-        }
-        else if (current === "absolute") {
-            this.getAllCharts(ds.name).forEach(x => {
+        } else if (current === "absolute") {
+            this.getAllCharts(ds.name).forEach((x) => {
                 const div = x.getDiv();
                 removeResizable(div);
                 removeDraggable(div);
@@ -559,34 +681,30 @@ class ChartManager {
         //add new ones
         view.layout = type;
         if (type === "absolute") {
-            this.getAllCharts(ds.name).forEach(x => this._makeChartRD(x, ds));
-        }
-        else if (type === "gridstack") {
-            this.getAllCharts(ds.name).forEach(chart => {
+            this.getAllCharts(ds.name).forEach((x) => this._makeChartRD(x, ds));
+        } else if (type === "gridstack") {
+            this.getAllCharts(ds.name).forEach((chart) => {
                 this.gridStack.manageChart(chart, ds, this._inInit);
             });
         }
     }
 
     _setupThemeContextMenu() {
-
         this.themeMenu = new ContextMenu(() => {
             const mItems = [];
             for (const t in themes) {
-                mItems.push(this.__getMenuItem(t))
-
+                mItems.push(this.__getMenuItem(t));
             }
             return mItems;
-
-        })
+        });
     }
 
     __getMenuItem(theme) {
         return {
             text: theme,
             ghosted: this.theme === theme,
-            func: () => this.setTheme(theme)
-        }
+            func: () => this.setTheme(theme),
+        };
     }
 
     setTheme(theme) {
@@ -594,9 +712,9 @@ class ChartManager {
         // there could be graphics rendering of other sorts as well...
         // nothing I can see at the moment that responds to theme.
         this.theme = theme;
-        document.getElementsByTagName('html')[0].className = theme;
+        document.getElementsByTagName("html")[0].className = theme;
         //only chart this is required for is the genome browser
-        //it uses canvas and thus has to redraw the canavas which is 
+        //it uses canvas and thus has to redraw the canavas which is
         //just a png so won't be effected by css changes
         if (!this.charts) {
             return;
@@ -612,23 +730,24 @@ class ChartManager {
     //sync color columns
     _sync_colors(columns, from, to) {
         for (const item of columns) {
-
             const from_col = from.columnIndex[item.link_to];
             const to_col = to.columnIndex[item.col];
             const newColors = new Array(to_col.values);
-            const colors = from.getColumnColors(item.link_to)
+            const colors = from.getColumnColors(item.link_to);
             //"cannot read properties of undefined (reading 'length')"
             //seems to be related to from_col being type 'integer' when it should be 'text'
             if (!from_col.values || !to_col.values) {
                 //todo display a 'toast' error...
-                console.error(`failed to _sync_colors '${item.link_to}', '${item.col}' - expected 'text' or similar columns`);
+                console.error(
+                    `failed to _sync_colors '${item.link_to}', '${item.col}' - expected 'text' or similar columns`,
+                );
                 continue;
             }
             for (let i = 0; i < from_col.values.length; i++) {
                 const val = from_col.values[i];
                 const index = to_col.values.indexOf(val);
                 if (index !== -1) {
-                    newColors[index] = colors[i]
+                    newColors[index] = colors[i];
                 }
             }
             to_col.colors = newColors;
@@ -636,10 +755,10 @@ class ChartManager {
     }
 
     _initiateOffsets(dataSource) {
-        const ds = dataSource.dataStore
+        const ds = dataSource.dataStore;
         const o = ds.offsets;
         const p = o.param;
-        //need to make sure all columns are loaded 
+        //need to make sure all columns are loaded
         const cols = [p[0], p[1], o.groups];
         if (o.background_filter) {
             cols.push(o.background_filter);
@@ -650,22 +769,22 @@ class ChartManager {
             ds.updateColumnOffsets();
             //update rotation and update
             ds.updateColumnOffsets(null, true, true);
-        })
+        });
     }
 
-    //load the view metadata or use initialCharts then call _init to load the view 
+    //load the view metadata or use initialCharts then call _init to load the view
     _loadView(config, dataLoader, firstTime = false) {
         //load view, then initialize
         if (config.all_views) {
             this.currentView = config.initial_view || config.all_views[0];
-            this.viewSelect.value = this.currentView
-            dataLoader.viewLoader(this.currentView).then(data => {
+            this.viewSelect.value = this.currentView;
+            dataLoader.viewLoader(this.currentView).then((data) => {
                 this._init(data, firstTime);
-            })
+            });
         }
         //only one view hard coded in config
         else {
-            this._init(config.only_view, firstTime)
+            this._init(config.only_view, firstTime);
         }
     }
 
@@ -677,19 +796,15 @@ class ChartManager {
     }
 
     async _init(view, firstTime = false) {
-
-
-        //no initial view just make one with all available 
+        //no initial view just make one with all available
         //DataSources but no charts
         if (!view) {
-            const dts = {}
+            const dts = {};
             for (const ds in this.dsIndex) {
-                dts[ds] = { layout: "gridstack" }
+                dts[ds] = { layout: "gridstack" };
             }
             this.viewData = { dataSources: dts, initialCharts: {} };
-
-        }
-        else {
+        } else {
             //legacy data (which only has initialCharts)
             //need to add which DataSources to display
             if (!view.dataSources) {
@@ -699,9 +814,7 @@ class ChartManager {
                 }
             }
             this.viewData = view;
-
         }
-
 
         for (const ds of this.dataSources) {
             ds.contentDiv = undefined;
@@ -721,7 +834,10 @@ class ChartManager {
         this.dsPanes = {};
 
         //add all the appropriate panes (one per datasource)
-        const panes = splitPane(this.contentDiv, { number: dsToView.length, sizes: widths });
+        const panes = splitPane(this.contentDiv, {
+            number: dsToView.length,
+            sizes: widths,
+        });
         //thinking about adding an optional index to the view so we can control the order
         for (let n = 0; n < dsToView.length; n++) {
             const p = panes[n];
@@ -732,33 +848,44 @@ class ChartManager {
             this.dsPanes[ds.name] = p;
             this.columnsLoading[ds.name] = {};
             ds.charts = [];
-            ds.menuBar = createEl("div", {
-                classes: ["ciview-menu-bar"]
-            }, p);
-            const d = createEl("div", {
-                styles: {
-                    flex: "1 1 auto",
-                    position: "relative",
-                    overflow: "auto",
-                    height: "100px"
-
-                }
-            }, p);
+            ds.menuBar = createEl(
+                "div",
+                {
+                    classes: ["ciview-menu-bar"],
+                },
+                p,
+            );
+            const d = createEl(
+                "div",
+                {
+                    styles: {
+                        flex: "1 1 auto",
+                        position: "relative",
+                        overflow: "auto",
+                        height: "100px",
+                    },
+                },
+                p,
+            );
             this._setUpMenu(ds);
             // might move styles from here into .css
-            ds.contentDiv = createEl("div", {
-                styles: {
-                    //flex:"1 1 auto",
-                    position: "relative",
-                    height: "100%"
+            ds.contentDiv = createEl(
+                "div",
+                {
+                    styles: {
+                        //flex:"1 1 auto",
+                        position: "relative",
+                        height: "100%",
 
-                    //overflow:"auto",
-                    // background:col
-                }
-            }, d);
+                        //overflow:"auto",
+                        // background:col
+                    },
+                },
+                d,
+            );
             ds.contentDiv.classList.add("ciview-contentDiv");
             this._setUpChangeLayoutMenu(ds);
-            //need to add 
+            //need to add
         }
 
         //any first time initiation
@@ -767,28 +894,38 @@ class ChartManager {
                 const ds = d.dataStore;
                 //initiate offsets if any
                 if (ds.offsets) {
-                    this._initiateOffsets(d)
+                    this._initiateOffsets(d);
                 }
                 //sync any columns
                 //phasing out
                 //todo ^^ PJT this 'phasing out' comment was written a year ago as of 24-01-15...
                 //and this code can cause problems.
                 if (d.column_link_to) {
-                    this._sync_colors(d.column_link_to.columns, this.dsIndex[d.column_link_to.dataSource].dataStore, ds);
+                    this._sync_colors(
+                        d.column_link_to.columns,
+                        this.dsIndex[d.column_link_to.dataSource].dataStore,
+                        ds,
+                    );
                 }
                 for (const scc of ds.syncColumnColors) {
                     try {
-                        this._sync_colors(scc.columns, this.dsIndex[scc.dataSource].dataStore, ds);
+                        this._sync_colors(
+                            scc.columns,
+                            this.dsIndex[scc.dataSource].dataStore,
+                            ds,
+                        );
                     } catch (error) {
-                        console.warn(`error syncing colors for '${ds.name}' and '${scc.dataSource}'`)
+                        console.warn(
+                            `error syncing colors for '${ds.name}' and '${scc.dataSource}'`,
+                        );
                     }
                 }
             }
         }
 
-        //need to create a set to create track of 
+        //need to create a set to create track of
         //charts loaded
-        const charts = view ? view.initialCharts || {} : {}
+        const charts = view ? view.initialCharts || {} : {};
         this._toLoadCharts = new Set();
         for (const ds in charts) {
             for (const ch of charts[ds]) {
@@ -825,13 +962,11 @@ class ChartManager {
     _addDSListeners(ds) {
         ds.dataStore.addListener("l1", (type, data) => {
             if (type === "column_removed") {
-                this._columnRemoved(ds, data)
-            }
-            else if (type === "data_highlighted") {
+                this._columnRemoved(ds, data);
+            } else if (type === "data_highlighted") {
                 data.dataStore = ds.dataStore;
                 this._callListeners(type, data);
-            }
-            else if (type === "filtered") {
+            } else if (type === "filtered") {
                 if (!this.progressBars[ds.name]) {
                     return;
                 }
@@ -839,9 +974,9 @@ class ChartManager {
                 const n2 = ds.dataStore.filterSize;
                 this.progressBars[ds.name].setValue(n2);
                 this.progressBars[ds.name].setText(n2);
-                this._callListeners(type, data)
+                this._callListeners(type, data);
             }
-        })
+        });
     }
 
     showAddViewDialog() {
@@ -849,78 +984,80 @@ class ChartManager {
             {
                 type: "checkbox",
                 id: "clone-view",
-                label: "Clone current view"
+                label: "Clone current view",
             },
             {
                 type: "text",
                 id: "name",
-                label: "name"
-            }
-
+                label: "name",
+            },
         ];
         if (this.dataSources.length > 1) {
             for (const ds of this.dataSources) {
                 controls.push({
                     type: "checkbox",
                     id: ds.name,
-                    label: `Include ${ds.name}`
-
-
-                })
-
+                    label: `Include ${ds.name}`,
+                });
             }
         }
         new CustomDialog({
             title: "Add New View",
             controls: controls,
-            buttons: [{
-                text: "Create New View",
-                method: (vals) => {
-                    //create new view option
-                    createEl("option", { text: vals["name"], value: vals["name"] }, this.viewSelect);
-                    this.viewSelect.value = vals["name"];
-                    this.currentView = vals["name"];
-                    if (!vals["clone-view"]) {
-                        //remove all charts and links
-                        for (const ds in this.viewData.dataSources) {
-                            if (this.viewData.dataSources[ds].layout === "gridstack") {
-                                this.gridStack.destroy(this.dsIndex[ds])
-                            }
-                        }
-                        this.removeAllCharts();
-                        this.viewData.links = [];
-                        const state = this.getState();
-                        state.view.initialCharts = {};
-                        state.view.dataSources = {};
-                        //only one datasource
-                        if (this.dataSources.length === 1) {
-                            state.view.initialCharts[this.dataSources[0].name] = [];
-                            state.view.dataSources[this.dataSources[0].name] = {};
-                        }
-                        else {
-                            for (const ds in this.dsIndex) {
-                                if (vals[ds]) {
-                                    state.view.initialCharts[ds] = [];
-                                    state.view.dataSources[ds] = {};
+            buttons: [
+                {
+                    text: "Create New View",
+                    method: (vals) => {
+                        //create new view option
+                        createEl(
+                            "option",
+                            { text: vals["name"], value: vals["name"] },
+                            this.viewSelect,
+                        );
+                        this.viewSelect.value = vals["name"];
+                        this.currentView = vals["name"];
+                        if (!vals["clone-view"]) {
+                            //remove all charts and links
+                            for (const ds in this.viewData.dataSources) {
+                                if (
+                                    this.viewData.dataSources[ds].layout ===
+                                    "gridstack"
+                                ) {
+                                    this.gridStack.destroy(this.dsIndex[ds]);
                                 }
                             }
+                            this.removeAllCharts();
+                            this.viewData.links = [];
+                            const state = this.getState();
+                            state.view.initialCharts = {};
+                            state.view.dataSources = {};
+                            //only one datasource
+                            if (this.dataSources.length === 1) {
+                                state.view.initialCharts[
+                                    this.dataSources[0].name
+                                ] = [];
+                                state.view.dataSources[
+                                    this.dataSources[0].name
+                                ] = {};
+                            } else {
+                                for (const ds in this.dsIndex) {
+                                    if (vals[ds]) {
+                                        state.view.initialCharts[ds] = [];
+                                        state.view.dataSources[ds] = {};
+                                    }
+                                }
+                            }
+                            this._callListeners("state_saved", state);
+                            this.contentDiv.innerHTML = "";
+                            this._init(state.view);
+                        } else {
+                            const state = this.getState();
+                            this._callListeners("state_saved", state);
                         }
-                        this._callListeners("state_saved", state);
-                        this.contentDiv.innerHTML = "";
-                        this._init(state.view)
-                    }
-                    else {
-                        const state = this.getState();
-                        this._callListeners("state_saved", state);
-                    }
-                }
-            }]
-        })
-    }
-
-    saveState() {
-        const state = this.getState();
-        this._callListeners("state_saved", state);
+                    },
+                },
+            ],
+        });
     }
 
     showSaveViewDialog(action) {
@@ -934,16 +1071,16 @@ class ChartManager {
                         const state = this.getState();
                         this._callListeners("state_saved", state);
                         action();
-                    }
+                    },
                 },
                 {
                     text: "NO",
                     method: () => {
                         action();
-                    }
-                }
-            ]
-        })
+                    },
+                },
+            ],
+        });
     }
 
     showDeleteViewDialog() {
@@ -955,35 +1092,35 @@ class ChartManager {
                     text: "YES",
                     method: () => {
                         this.deleteCurrentView();
-                    }
+                    },
                 },
                 {
                     text: "NO",
-                    method: () => {
-                    }
-                }
-            ]
-        })
+                    method: () => {},
+                },
+            ],
+        });
     }
-
 
     changeView(view) {
         for (const ds in this.viewData.dataSources) {
             if (this.viewData.dataSources[ds].layout === "gridstack") {
-                this.gridStack.destroy(this.dsIndex[ds])
+                this.gridStack.destroy(this.dsIndex[ds]);
             }
         }
         this.removeAllCharts();
         this.contentDiv.innerHTML = "";
         this.currentView = view;
-        this.viewLoader(view).then(data => {
+        this.viewLoader(view).then((data) => {
             this._init(data);
-        })
+        });
     }
 
     deleteCurrentView() {
         //remove the view choice and change view to the next one
-        const opt = this.viewSelect.querySelector(`option[value='${this.viewSelect.value}']`);
+        const opt = this.viewSelect.querySelector(
+            `option[value='${this.viewSelect.value}']`,
+        );
         opt.remove();
         const state = this.getState();
         //want to delete view and update any listeners
@@ -1026,7 +1163,7 @@ class ChartManager {
         const p = config.param;
 
         if (!p) {
-            //no 'parameters', 
+            //no 'parameters',
             //*but there could be other config entries / methods that refer to columns*
             // return [];
         } else if (typeof p === "string") {
@@ -1039,11 +1176,9 @@ class ChartManager {
         if (config.color_by) {
             if (config.color_by.column) {
                 set.add(config.color_by.column.field);
-            }
-            else {
+            } else {
                 set.add(config.color_by);
             }
-
         }
         if (config.tooltip) {
             if (config.tooltip.column) {
@@ -1057,12 +1192,12 @@ class ChartManager {
         //are there any config entries that refer to column(s)
         const t = BaseChart.types[config.type];
         if (t.configEntriesUsingColumns) {
-            t.configEntriesUsingColumns.forEach(x => {
+            t.configEntriesUsingColumns.forEach((x) => {
                 let e = config[x];
                 if (e) {
                     e = Array.isArray(e) ? e : [e];
                     for (const i of e) {
-                        set.add(i)
+                        set.add(i);
                     }
                 }
             });
@@ -1071,18 +1206,18 @@ class ChartManager {
     }
 
     /**
-    * Loads data from a remote file -the file must have headers (keys in the
-    * case of json) which which match a columns field/id 
-    * @param {object} info A config describing the file - 
-    * @param {string} info.type - either csv,tsv ot json
-    * @param {string} info.dataSource - the name of the datasource to load the data into
-    * @param {string} info.url  - the url of the file
-    * @param {function} [callback]  - a function to run once the data has loaded
-    */
+     * Loads data from a remote file -the file must have headers (keys in the
+     * case of json) which which match a columns field/id
+     * @param {object} info A config describing the file -
+     * @param {string} info.type - either csv,tsv ot json
+     * @param {string} info.dataSource - the name of the datasource to load the data into
+     * @param {string} info.url  - the url of the file
+     * @param {function} [callback]  - a function to run once the data has loaded
+     */
     loadFile(info, callback) {
-        const meths = { csv: csv, json: json, tsv: tsv }
-        const iid = this.createInfoAlert("loading file", { spinner: true })
-        meths[info.type](info.url).then(data => {
+        const meths = { csv: csv, json: json, tsv: tsv };
+        const iid = this.createInfoAlert("loading file", { spinner: true });
+        meths[info.type](info.url).then((data) => {
             const cols = {};
             const dataSource = info.dataSource;
             const ds = this.dsIndex[dataSource].dataStore;
@@ -1095,8 +1230,11 @@ class ChartManager {
             }
             for (let i = 0; i < data.length; i++) {
                 const row = data[i];
-                if (i + 1 % 100 === 0) {
-                    this.updateInfoAlert(iid, `processed ${i}/${data.length} rows`);
+                if (i + (1 % 100) === 0) {
+                    this.updateInfoAlert(
+                        iid,
+                        `processed ${i}/${data.length} rows`,
+                    );
                 }
                 for (const col in cols) {
                     cols[col].push(row[col]);
@@ -1106,15 +1244,17 @@ class ChartManager {
             for (const col in cols) {
                 ds.setColumnData(col, cols[col]);
                 proc++;
-                this.updateInfoAlert(iid, `processed ${proc}/${all_cols.length} columns`);
+                this.updateInfoAlert(
+                    iid,
+                    `processed ${proc}/${all_cols.length} columns`,
+                );
             }
-            this.updateInfoAlert(iid, "complete", { duration: 2000 })
+            this.updateInfoAlert(iid, "complete", { duration: 2000 });
             if (callback) {
                 callback();
             }
-        })
+        });
     }
-
 
     _getUpdatedColumns(dataStore) {
         const dc = dataStore.dirtyColumns;
@@ -1122,15 +1262,15 @@ class ChartManager {
             columns: [],
             added: [],
             removed: [],
-            colors_changed: []
-        }
+            colors_changed: [],
+        };
         for (const c in dc.added) {
             const td = getMd(c);
             rv.columns.push(td);
-            rv.added.push(c)
+            rv.added.push(c);
         }
         for (const r in dc.removed) {
-            rv.removed.push(r)
+            rv.removed.push(r);
         }
 
         for (const c in dc.data_changed) {
@@ -1143,8 +1283,8 @@ class ChartManager {
         for (const cc in dc.colors_changed) {
             rv.colors_changed.push({
                 column: cc,
-                colors: dataStore.columnIndex[cc].colors
-            })
+                colors: dataStore.columnIndex[cc].colors,
+            });
         }
 
         return rv;
@@ -1157,17 +1297,14 @@ class ChartManager {
                 name: cl.name,
                 editable: true,
                 field: cl.field,
-
-            }
+            };
             const arr = new Array(cl.data.length);
             for (let i = 0; i < cl.data.length; i++) {
-                arr[i] = cl.data[i]
+                arr[i] = cl.data[i];
             }
-            return { metadata: md, data: arr }
-
+            return { metadata: md, data: arr };
         }
     }
-
 
     getState() {
         const initialCharts = {};
@@ -1179,9 +1316,9 @@ class ChartManager {
                 initialCharts[ds.name] = [];
                 const w = this.dsPanes[ds.name].style.width;
                 const re2 = /calc\((.+)\%.+/;
-                this.viewData.dataSources[ds.name].panelWidth = Number.parseFloat(w.match(re2)[1]);
+                this.viewData.dataSources[ds.name].panelWidth =
+                    Number.parseFloat(w.match(re2)[1]);
             }
-
 
             updatedColumns[ds.name] = this._getUpdatedColumns(ds.dataStore);
             const dstore = ds.dataStore;
@@ -1201,29 +1338,34 @@ class ChartManager {
             const div = chart.getDiv();
             const d = this.viewData.dataSources[chInfo.dataSource.name];
             if (d.layout === "gridstack") {
-                config.gsposition = [Number.parseInt(div.getAttribute("gs-x")), Number.parseInt(div.getAttribute("gs-y"))];
-                config.gssize = [Number.parseInt(div.getAttribute("gs-w")), Number.parseInt(div.getAttribute("gs-h"))];
-
-            }
-            else {
+                config.gsposition = [
+                    Number.parseInt(div.getAttribute("gs-x")),
+                    Number.parseInt(div.getAttribute("gs-y")),
+                ];
+                config.gssize = [
+                    Number.parseInt(div.getAttribute("gs-w")),
+                    Number.parseInt(div.getAttribute("gs-h")),
+                ];
+            } else {
                 config.position = [div.offsetLeft, div.offsetTop];
             }
 
             initialCharts[chInfo.dataSource.name].push(config);
-
         }
 
-        const view = JSON.parse(JSON.stringify(this.viewData))
+        const view = JSON.parse(JSON.stringify(this.viewData));
         view.initialCharts = initialCharts;
-        const all_views = this.viewSelect ? Array.from(this.viewSelect.children, x => x.value) : null;
+        const all_views = this.viewSelect
+            ? Array.from(this.viewSelect.children, (x) => x.value)
+            : null;
 
         return {
             view: view,
             currentView: this.currentView,
             all_views: all_views,
             updatedColumns: updatedColumns,
-            metadata: metadata
-        }
+            metadata: metadata,
+        };
     }
 
     setAllColumnsClean() {
@@ -1232,61 +1374,79 @@ class ChartManager {
         }
     }
 
-
     /** Displays a dialog
-    * @param {Object} config extra settings
-    */
+     * @param {Object} config extra settings
+     */
 
     showCustomDialog(config) {
         new CustomDialog(config);
     }
 
     /**Adds a menu icon to either the main menubar or a datasource menubar
-   * @param {string} dataSource The name of data source or _main if adding
-   * an icon to the main (top) toolbar
-   * @param {string} icon The class name(s) of the icon
-   * @param {string} text Text that will be displayed in a tooltip
-   * @param {function} func The function that will be called when the icon is pressed
-   */
+     * @param {string} dataSource The name of data source or _main if adding
+     * an icon to the main (top) toolbar
+     * @param {string} icon The class name(s) of the icon
+     * @param {string} text Text that will be displayed in a tooltip
+     * @param {function} func The function that will be called when the icon is pressed
+     */
     addMenuIcon(dataSource, icon, text, func) {
         const pos = dataSource === "_main" ? "bottom-right" : "bottom";
-        const el = dataSource === "_main" ? this.leftMenuBar : this.dsIndex[dataSource].menuBar
-        return createMenuIcon(icon, {
-            tooltip: {
-                text: text,
-                position: pos
+        const el =
+            dataSource === "_main"
+                ? this.leftMenuBar
+                : this.dsIndex[dataSource].menuBar;
+        return createMenuIcon(
+            icon,
+            {
+                tooltip: {
+                    text: text,
+                    position: pos,
+                },
+                func: func,
             },
-            func: func
-        }, el);
+            el,
+        );
     }
 
     createInfoAlert(msg, config = {}) {
         const id = getRandomString();
         const len = Object.keys(this.infoAlerts).length;
-        config.type = config.type || "info"
-        const div = createEl("div", {
-            classes: ["ciview-info-alert", `ciview-alert-${config.type}`],
-            styles: {
-                right: "10px",
-                top: `${50 + (len * 40)}px`,
+        config.type = config.type || "info";
+        const div = createEl(
+            "div",
+            {
+                classes: ["ciview-info-alert", `ciview-alert-${config.type}`],
+                styles: {
+                    right: "10px",
+                    top: `${50 + len * 40}px`,
+                },
             },
-
-        }, this.containerDiv);
+            this.containerDiv,
+        );
         let spinner = null;
         const text = createEl("span", { text: msg }, div);
         if (config.spinner) {
-            spinner = createEl("i", {
-                classes: ["fas", "fa-spinner", "fa-spin", "ciview-info-alert-spin"]
-            }, div);
+            spinner = createEl(
+                "i",
+                {
+                    classes: [
+                        "fas",
+                        "fa-spinner",
+                        "fa-spin",
+                        "ciview-info-alert-spin",
+                    ],
+                },
+                div,
+            );
         }
         this.infoAlerts[id] = {
             div: div,
             text: text,
             spinner: spinner,
-            type: config.type
+            type: config.type,
         };
         if (config.duration) {
-            this.removeInfoAlert(id, config.duration)
+            this.removeInfoAlert(id, config.duration);
         }
         return id;
     }
@@ -1327,16 +1487,15 @@ class ChartManager {
         this.infoAlerts = {};
     }
 
-
     /**
-    * Loads data for specified columns into the appropriate dataStore
-    * @param {string[]} columns An array of column fields/ids 
-    * @param {string} dataSource The name of the dataSource
-    * @param {function} callback A function which will be run once all the
-    * columns are loaded
-    * @param {integer} [split=10]  the number of columns to send with each request 
-    * @param {integer} [threads=2]  the number of concurrent requests
-    */
+     * Loads data for specified columns into the appropriate dataStore
+     * @param {string[]} columns An array of column fields/ids
+     * @param {string} dataSource The name of the dataSource
+     * @param {function} callback A function which will be run once all the
+     * columns are loaded
+     * @param {integer} [split=10]  the number of columns to send with each request
+     * @param {integer} [threads=2]  the number of concurrent requests
+     */
     loadColumnSet(columns, dataSource, callback, split = 10, threads = 2) {
         const id = getRandomString();
         const lc = this.config.dataloading || {};
@@ -1349,8 +1508,8 @@ class ChartManager {
             failedColumns: [],
             nextColumn: 0,
             columnsLoaded: 0,
-            id: id
-        }
+            id: id,
+        };
         let col_list = [];
         const t = this.transactions[id];
         for (const col of columns) {
@@ -1365,14 +1524,16 @@ class ChartManager {
             t.columns.push(col_list);
             col_list = [];
         }
-        t.alertID = this.createInfoAlert(`Loading Columns:0/${columns.length}`, { spinner: true });
+        t.alertID = this.createInfoAlert(
+            `Loading Columns:0/${columns.length}`,
+            { spinner: true },
+        );
         const max = Math.min(t.columns.length, threads);
 
         for (let n = 0; n < max; n++) {
-            this._loadColumnData(t, dataSource)
+            this._loadColumnData(t, dataSource);
         }
     }
-
 
     _loadColumnData(trans, dataSource) {
         const dataStore = this.dsIndex[dataSource].dataStore;
@@ -1384,182 +1545,235 @@ class ChartManager {
         }
         //float32 columns need to be at the beginning of the byte stream
         //as you can't create an array from  an arry buffer starting at
-        //a byte position not divisible by 4 
+        //a byte position not divisible by 4
         columns.sort((a, b) => {
             return column_orders[a.datatype] - column_orders[b.datatype];
-        })
+        });
 
         //"this.dataLoader is not a function" with e.g. "cell_types"
-        this.dataLoader(columns, dataSource, dataStore.size).then(resp => {
-            for (const col of resp) {
-                dataStore.setColumnData(col.field, col.data);
-            }
-            trans.columnsLoaded++;
-        }).catch(error => {
-            console.log(error);
-            trans.columnsLoaded++;
-            trans.failedColumns.push(columns);
-
-        }).finally(() => {
-            const total = trans.columns.length;
-            const loaded = trans.columnsLoaded;
-            let all_loaded = loaded * col_list.length;
-            for (const col of col_list) {
-                delete this.columnsLoading[dataSource][col];
-            }
-            all_loaded = all_loaded > trans.totalColumns ? trans.totalColumns : all_loaded;
-            this.updateInfoAlert(trans.alertID, `Loading Columns:${all_loaded}/${trans.totalColumns}`);
-            if (loaded >= total) {
-                this.updateInfoAlert(trans.alertID, `Loaded ${total} column${total === 1 ? "" : "s"}`, { duration: 2000 });
-                trans.callback(trans.failedColumns);
-                delete this.transactions[trans.id];
-            }
-            if (trans.nextColumn < total) {
-                this._loadColumnData(trans, dataSource)
-            }
-        })
+        this.dataLoader(columns, dataSource, dataStore.size)
+            .then((resp) => {
+                for (const col of resp) {
+                    dataStore.setColumnData(col.field, col.data);
+                }
+                trans.columnsLoaded++;
+            })
+            .catch((error) => {
+                console.log(error);
+                trans.columnsLoaded++;
+                trans.failedColumns.push(columns);
+            })
+            .finally(() => {
+                const total = trans.columns.length;
+                const loaded = trans.columnsLoaded;
+                let all_loaded = loaded * col_list.length;
+                for (const col of col_list) {
+                    delete this.columnsLoading[dataSource][col];
+                }
+                all_loaded =
+                    all_loaded > trans.totalColumns
+                        ? trans.totalColumns
+                        : all_loaded;
+                this.updateInfoAlert(
+                    trans.alertID,
+                    `Loading Columns:${all_loaded}/${trans.totalColumns}`,
+                );
+                if (loaded >= total) {
+                    this.updateInfoAlert(
+                        trans.alertID,
+                        `Loaded ${total} column${total === 1 ? "" : "s"}`,
+                        { duration: 2000 },
+                    );
+                    trans.callback(trans.failedColumns);
+                    delete this.transactions[trans.id];
+                }
+                if (trans.nextColumn < total) {
+                    this._loadColumnData(trans, dataSource);
+                }
+            });
     }
-
 
     _addLinkIcon(ds, ds_to, link) {
-        createMenuIcon("fas fa-plus-square", {
-            tooltip: {
-                text: `Add ${link.name}`,
-                position: "bottom-right"
+        createMenuIcon(
+            "fas fa-plus-square",
+            {
+                tooltip: {
+                    text: `Add ${link.name}`,
+                    position: "bottom-right",
+                },
+                func: () => {
+                    new AddColumnsFromRowsDialog(ds, ds_to, link, this);
+                },
             },
-            func: () => {
-                new AddColumnsFromRowsDialog(ds, ds_to, link, this);
-            }
-        }, ds.menuBar);
-
+            ds.menuBar,
+        );
     }
-
 
     _setUpMenu(ds) {
         const dataStore = ds.dataStore;
-        createMenuIcon("fas fa-chart-bar", {
-            tooltip: {
-                text: "Add Chart",
-                position: "bottom-right"
+        createMenuIcon(
+            "fas fa-chart-bar",
+            {
+                tooltip: {
+                    text: "Add Chart",
+                    position: "bottom-right",
+                },
+                func: () => {
+                    new AddChartDialog(ds, (config) =>
+                        this.addChart(ds.name, config, true),
+                    );
+                },
             },
-            func: () => {
-                new AddChartDialog(ds, config => this.addChart(ds.name, config, true))
-            }
-        }, ds.menuBar);
-
-        createMenuIcon("fas fa-sync-alt", {
-            tooltip: {
-                text: "Reset All Filters",
-                position: "bottom-right"
-            },
-            func: () => {
-                dataStore.removeAllFilters();
-            }
-        }, ds.menuBar
+            ds.menuBar,
         );
-        createMenuIcon("fas fa-palette", {
-            tooltip: {
-                text: "Change Color Scheme",
-                position: "bottom-right"
+
+        createMenuIcon(
+            "fas fa-sync-alt",
+            {
+                tooltip: {
+                    text: "Reset All Filters",
+                    position: "bottom-right",
+                },
+                func: () => {
+                    dataStore.removeAllFilters();
+                },
             },
-            func: () => {
-                try { new ColorChooser(this, ds); }
-                catch (error) {
-                    console.error('error making ColorChooser', error);
-                    this.createInfoAlert("Error making color chooser", {
-                        type: "warning", duration: 2000
-                    });
-                }
-            }
-        }, ds.menuBar);
-        createMenuIcon("fas fa-th", {
-            tooltip: {
-                text: "Change layout",
-                position: "bottom-right"
+            ds.menuBar,
+        );
+        createMenuIcon(
+            "fas fa-palette",
+            {
+                tooltip: {
+                    text: "Change Color Scheme",
+                    position: "bottom-right",
+                },
+                func: () => {
+                    try {
+                        new ColorChooser(this, ds);
+                    } catch (error) {
+                        console.error("error making ColorChooser", error);
+                        this.createInfoAlert("Error making color chooser", {
+                            type: "warning",
+                            duration: 2000,
+                        });
+                    }
+                },
             },
-            func: (e) => {
-                this.layoutMenus[ds.name].show(e);
-            }
-        }, ds.menuBar);
-        let tagModel;
-        function getTagModel() {
-            if (!tagModel) tagModel = new TagModel(ds.dataStore);
-            return tagModel;
-        }
+            ds.menuBar,
+        );
+        createMenuIcon(
+            "fas fa-th",
+            {
+                tooltip: {
+                    text: "Change layout",
+                    position: "bottom-right",
+                },
+                func: (e) => {
+                    this.layoutMenus[ds.name].show(e);
+                },
+            },
+            ds.menuBar,
+        );
+        //previously we shared a TagModel between invocations of the annotation dialog
+        //but they should be able to change columns - not sure if the sharing had any benefits
         this.addMenuIcon(ds.name, "fas fa-tags", "Tag Annotation", () => {
             //todo - check whether we have a reason for hacky import here
-            new BaseDialog.experiment['AnnotationDialogReact'](ds.dataStore, getTagModel());
+            new BaseDialog.experiment["AnnotationDialogReact"](ds.dataStore);
         });
 
         if (dataStore.links) {
             for (const ods in dataStore.links) {
                 const link = dataStore.links[ods];
                 if (link.rows_as_columns) {
-                    this._addLinkIcon(ds, this.dsIndex[ods], link.rows_as_columns)
+                    this._addLinkIcon(
+                        ds,
+                        this.dsIndex[ods],
+                        link.rows_as_columns,
+                    );
                 }
             }
         }
-        const idiv = createEl("div", {
-            styles: {
-                float: "right",
-                lineHeight: "1.0"
-            }
-        }, ds.menuBar);
-        createEl("span", {
-            text: ds.name,
-            styles: {
-                verticalAlign: "top",
-                fontSize: "16px",
-                marginRight: "4px"
-            }
-        }, idiv);
+        const idiv = createEl(
+            "div",
+            {
+                styles: {
+                    float: "right",
+                    lineHeight: "1.0",
+                },
+            },
+            ds.menuBar,
+        );
+        createEl(
+            "span",
+            {
+                text: ds.name,
+                styles: {
+                    verticalAlign: "top",
+                    fontSize: "16px",
+                    marginRight: "4px",
+                },
+            },
+            idiv,
+        );
         const size = ds.dataStore.size;
-        ds.filterBar = createEl("progress", {
-            value: size
-        }, ds.menBar)
-        const pb = createEl("div", {
-            styles: {
-                width: "100px",
-                display: "inline-block",
-                marginTop: "2px"
-            }
-        }, idiv);
+        ds.filterBar = createEl(
+            "progress",
+            {
+                value: size,
+            },
+            ds.menBar,
+        );
+        const pb = createEl(
+            "div",
+            {
+                styles: {
+                    width: "100px",
+                    display: "inline-block",
+                    marginTop: "2px",
+                },
+            },
+            idiv,
+        );
         const pbConf = {
             max: size,
             value: size,
-            text: `${size}`
-        }
+            text: `${size}`,
+        };
         this.progressBars[ds.name] = new MDVProgress(pb, pbConf);
         this._addFullscreenIcon(ds);
     }
 
     _addFullscreenIcon(ds) {
-        createMenuIcon("fas fa-expand", {
-            tooltip: {
-                text: "Full Screen",
-                position: "bottom-right"
+        createMenuIcon(
+            "fas fa-expand",
+            {
+                tooltip: {
+                    text: "Full Screen",
+                    position: "bottom-right",
+                },
+                func: () => {
+                    //nb, not sure best way to access the actual div I want here
+                    //this could easily break if the layout structure changes
+                    // ds.contentDiv.parentElement.requestFullscreen();
+                    ds.menuBar.parentElement.requestFullscreen();
+                },
             },
-            func: () => {
-                //nb, not sure best way to access the actual div I want here
-                //this could easily break if the layout structure changes
-                // ds.contentDiv.parentElement.requestFullscreen();
-                ds.menuBar.parentElement.requestFullscreen();
-            }
-        }, ds.menuBar);
+            ds.menuBar,
+        );
     }
 
     /**
      * Adds a listener to the ChartManager.
-     * 
+     *
      * Note that the signature is different from what might be expected (this is an MDV pattern that may be reviewed in future):
      * The first argument is a string that identifies the listener (not an event type to listen for).
      * Subsequent calls to addListener with the same id will overwrite the previous listener (which could lead to
      * unexpected behaviour, for example if a corresponding `removeListener()` call is made).
      * The second argument is a function that will be called when the listener is triggered - all registered listeners will be called
      * for any event.
-     * @param {string} id 
-     * @param {function} func Callback function. 
-     * First argument is the type of event (`"state_saved" | "view_loaded" | "chart_added" | "chart_removed"`), 
+     * @param {string} id
+     * @param {function} func Callback function.
+     * First argument is the type of event (`"state_saved" | "view_loaded" | "chart_added" | "chart_removed"`),
      * second is the `ChartManager` instance, third is the data.
      */
     addListener(id, func) {
@@ -1568,7 +1782,7 @@ class ChartManager {
 
     /**
      * Removes a listener from the ChartManager.
-     * @param {string} id 
+     * @param {string} id
      */
     removeListener(id) {
         delete this.listeners[id];
@@ -1580,16 +1794,19 @@ class ChartManager {
     }
 
     /**
-    * Adds a chart to the app. Returns asyncronously when needed columns have loaded and the chart has been added 
-    * (will reject if there is an error)
-    * @param {string} dataSource The name of the chart's data source 
-    * @param {any} config The chart's config
-    * @param {boolean} [notify=false] If true any listeners will be informed that 
-    * a chart has been loaded
-    */
+     * Adds a chart to the app. Returns asyncronously when needed columns have loaded and the chart has been added
+     * (will reject if there is an error)
+     * @param {string} dataSource The name of the chart's data source
+     * @param {any} config The chart's config
+     * @param {boolean} [notify=false] If true any listeners will be informed that
+     * a chart has been loaded
+     */
     async addChart(dataSource, config, notify = false) {
         if (!BaseChart.types[config.type]) {
-            this.createInfoAlert(`Tried to add unknown chart type '${config.type}'`, { type: 'danger', duration: 2000 });
+            this.createInfoAlert(
+                `Tried to add unknown chart type '${config.type}'`,
+                { type: "danger", duration: 2000 },
+            );
             throw `Unknown chart type ${config.type}`;
         }
         //check if columns need loading
@@ -1598,8 +1815,14 @@ class ChartManager {
         if (config.location) {
             const l = config.location;
             const b = 5;
-            config.size = [l.width * 90 + l.width * b - b, l.height * 40 + l.height * b - b];
-            config.position = [(l.x + 1) * b + l.x * 90, (l.y + 1) * b + l.y * 40];
+            config.size = [
+                l.width * 90 + l.width * b - b,
+                l.height * 40 + l.height * b - b,
+            ];
+            config.position = [
+                (l.x + 1) * b + l.x * 90,
+                (l.y + 1) * b + l.y * 40,
+            ];
         }
         //**convert legacy data***********
         const ds = this.dsIndex[dataSource];
@@ -1610,79 +1833,102 @@ class ChartManager {
         //MJS this is very messy - create divs in (hopefully) the right location and add chart when data loaded
         //ideally create the chart with a waiting icon and  update it when the data has loaded
         //However, no way of creating charts at the moment without data - charts need separate init method?
-        const div = createEl("div", {
-            styles: {
-                position: "absolute",
-                width: `${width}px`,
-                height: `${height}px`,
-                left: `${left}px`,
-                top: `${top}px`,
-                background: t.main_panel_color,
-                zIndex: 2,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-            }
-        }, ds.contentDiv);
-        createEl("i", {
-            classes: ["fas", "fa-circle-notch", "fa-spin"],
-
-            styles: {
-                fontSize: "30px",
-                color: t.text_color
-            }
-        }, div);
-        createEl("div", {
-            styles: {
-                position: "absolute",
-                overflow: "hide",
-                textAlign: "center",
-                top: "3px",
-                color: t.text_color,
-                textOverflow: "ellipsis",
-                wordBreak: "break-all",
-                fontSize: "16px"
-
+        const div = createEl(
+            "div",
+            {
+                styles: {
+                    position: "absolute",
+                    width: `${width}px`,
+                    height: `${height}px`,
+                    left: `${left}px`,
+                    top: `${top}px`,
+                    background: t.main_panel_color,
+                    zIndex: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                },
             },
-            text: config.title
-        }, div)
+            ds.contentDiv,
+        );
+        createEl(
+            "i",
+            {
+                classes: ["fas", "fa-circle-notch", "fa-spin"],
+
+                styles: {
+                    fontSize: "30px",
+                    color: t.text_color,
+                },
+            },
+            div,
+        );
+        createEl(
+            "div",
+            {
+                styles: {
+                    position: "absolute",
+                    overflow: "hide",
+                    textAlign: "center",
+                    top: "3px",
+                    color: t.text_color,
+                    textOverflow: "ellipsis",
+                    wordBreak: "break-all",
+                    fontSize: "16px",
+                },
+                text: config.title,
+            },
+            div,
+        );
         try {
             // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
+            // when it goes wrong, it can cause problems outside the creation of this chart
+            // - other charts wanting to use similar neededCols end up not having data?
             await this._getColumnsAsync(dataSource, neededCols);
             this._addChart(dataSource, config, div, notify);
         } catch (error) {
             this.clearInfoAlerts();
-            const id = this.createInfoAlert(`Error creating chart with columns [${neededCols.join(', ')}]: '${error}'`, {
-                type: "warning"
-            });
-            console.log(error);
+            const id = this.createInfoAlert(
+                `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
+                {
+                    type: "warning",
+                },
+            );
+            console.error(error);
             const idiv = this.infoAlerts[id].div;
             idiv.onclick = () => idiv.remove();
-            div.remove();
-            throw new Error(error); //probably not a great way to handle this
+            // div.remove();
+            const debugNode = createEl(
+                "div",
+                {
+                    styles: {
+                        position: "absolute",
+                        backdropFilter: "blur(10px)",
+                    },
+                },
+                div.lastChild,
+            );
+            debugNode.innerHTML = `<div><h2>Error creating chart</h2><pre>${error.stack}</pre></div>`;
+            debugNode.onclick = () => debugNode.remove();
+            //not rethrowing doesn't help recovering from missing data in other charts.
+            //throw new Error(error); //probably not a great way to handle this
         }
     }
 
-    openFileUploadDialog() {
-        const chartManager = this;
-        class FileUploadDialogWithContext extends FileUploadDialogReact {
-            constructor() {
-                super();
-                this.chartManager = chartManager;
-            }
-        }
-        new FileUploadDialogWithContext();
-    }
-
-
-    _getColumnsFromOtherSource(dataSource, otherDataSource, columns, indexCol, func) {
+    _getColumnsFromOtherSource(
+        dataSource,
+        otherDataSource,
+        columns,
+        indexCol,
+        func,
+    ) {
         this._getColumnsThen(otherDataSource, columns.concat(indexCol), () => {
             const ds = this.dsIndex[dataSource].dataStore;
             const ods = this.dsIndex[otherDataSource].dataStore;
             const oindex = ods.getColumnIndex(indexCol);
-            const ic = ds.columnIndex[indexCol]
-            const index = ic.values.map(x => oindex[x]);
-            const colInfo = columns.map(x => {
+            const ic = ds.columnIndex[indexCol];
+            const index = ic.values.map((x) => oindex[x]);
+            const colInfo = columns.map((x) => {
                 const c1 = ds.columnIndex[x];
                 const c2 = ods.columnIndex[x];
                 if (c2.values) {
@@ -1695,35 +1941,38 @@ class ChartManager {
                     c1.quantiles = c2.quantiles;
                 }
 
-                const buf = new SharedArrayBuffer(ds.size * (c1.datatype === "text" ? 1 : 4));
-                const arrType = c1.datatype === "text" ? Uint8Array : Float32Array;
+                const buf = new SharedArrayBuffer(
+                    ds.size * (c1.datatype === "text" ? 1 : 4),
+                );
+                const arrType =
+                    c1.datatype === "text" ? Uint8Array : Float32Array;
                 return {
                     col: x,
                     data: buf,
                     arr: new arrType(buf),
-                    odata: c2.data
-                }
+                    odata: c2.data,
+                };
             });
             for (let n = 0; n < ds.size; n++) {
                 const i = index[ic.data[n]];
                 for (const c of colInfo) {
-                    c.arr[n] = c.odata[i]
+                    c.arr[n] = c.odata[i];
                 }
             }
 
             for (const c of colInfo) {
-                ds.setColumnData(c.col, c.data)
+                ds.setColumnData(c.col, c.data);
             }
             func();
-        })
-
+        });
     }
 
-
     async _getColumnsAsync(dataSource, columns) {
-        return new Promise((resolve) => {
+        // let's add some error handling here...
+        const result = await new Promise((resolve) => {
             this._getColumnsThen(dataSource, columns, resolve);
         });
+        return result;
     }
 
     _getColumnsThen(dataSource, columns, func) {
@@ -1737,12 +1986,10 @@ class ChartManager {
                     const otherCols = [];
                     const thisCols = [];
                     for (const c of columns) {
-
                         if (link.columns.indexOf(c) === -1) {
-                            thisCols.push(c)
-                        }
-                        else if (!dStore.columnIndex[c].data) {
-                            otherCols.push(c)
+                            thisCols.push(c);
+                        } else if (!dStore.columnIndex[c].data) {
+                            otherCols.push(c);
                         }
                     }
                     //get the other datasource's columns first
@@ -1750,18 +1997,27 @@ class ChartManager {
                         //get index column
                         this._getColumnsThen(dataSource, [link.index], () => {
                             //then get all the other columns
-                            this._getColumnsFromOtherSource(dataSource, ods,
-                                otherCols, link.index, () => {
-                                    this._getColumnsThen(dataSource, thisCols, func)
-                                })
-                        })
+                            this._getColumnsFromOtherSource(
+                                dataSource,
+                                ods,
+                                otherCols,
+                                link.index,
+                                () => {
+                                    this._getColumnsThen(
+                                        dataSource,
+                                        thisCols,
+                                        func,
+                                    );
+                                },
+                            );
+                        });
                         return;
                     }
                 }
             }
         }
-        const reqCols = columns.filter(x => {
-            //column already loading
+        const reqCols = columns.filter((x) => {
+            //column already loading - but what if something went wrong earlier?
             if (this.columnsLoading[dataSource][x]) {
                 return false;
             }
@@ -1775,7 +2031,7 @@ class ChartManager {
             return !col.data;
         });
 
-        //No columns needed 
+        //No columns needed
         //but columns requested by other actions may still be loading
         if (reqCols.length === 0) {
             this._haveColumnsLoaded(columns, dataSource, func);
@@ -1784,7 +2040,7 @@ class ChartManager {
         else {
             this.loadColumnSet(reqCols, dataSource, () => {
                 this._haveColumnsLoaded(columns, dataSource, func);
-            })
+            });
         }
     }
 
@@ -1806,10 +2062,11 @@ class ChartManager {
         chart[newMethod] = chart[method];
         //if original method is called check whether column has data
         chart[method] = (column) => {
-            this._getColumnsThen(dataSource, [column], () => chart[newMethod](column));
-        }
+            this._getColumnsThen(dataSource, [column], () =>
+                chart[newMethod](column),
+            );
+        };
     }
-
 
     //supercedes previous method - more genric
     //method must be specified in the method UsingColumns in types of dictionary
@@ -1822,13 +2079,15 @@ class ChartManager {
             //column not needed
             if (arguments[0] == null) {
                 chart[newMethod](...arguments);
+            } else {
+                const cols = Array.isArray(arguments[0])
+                    ? arguments[0]
+                    : [arguments[0]];
+                this._getColumnsThen(dataSource, cols, () =>
+                    chart[newMethod](...arguments),
+                );
             }
-            else {
-                const cols = Array.isArray(arguments[0]) ? arguments[0] : [arguments[0]];
-                this._getColumnsThen(dataSource, cols, () => chart[newMethod](...arguments));
-            }
-
-        }
+        };
     }
 
     //check all columns have loaded - if not recursive call after
@@ -1843,11 +2102,10 @@ class ChartManager {
             }
         }
         func();
-
     }
 
     _addChart(dataSource, config, div, notify = false) {
-        //**convert legacy data*********** 
+        //**convert legacy data***********
         const ds = this.dsIndex[dataSource];
         div.innerHTML = "";
         div.style.display = "";
@@ -1857,15 +2115,20 @@ class ChartManager {
         const chart = new chartType.class(ds.dataStore, div, config);
         this.charts[chart.config.id] = {
             chart: chart,
-            dataSource: ds
-        }
+            dataSource: ds,
+        };
         this._makeChartRD(chart, ds);
-        chart.popoutIcon = chart.addMenuIcon("fas fa-external-link-alt", "popout", {
-            func: () => {
-                this._popOutChart(chart);
-            }
-        });
-        chart.addMenuIcon("fas fa-times", "remove chart")
+        chart.popoutIcon = chart.addMenuIcon(
+            "fas fa-external-link-alt",
+            "popout",
+            {
+                func: () => {
+                    this._popOutChart(chart);
+                },
+            },
+        );
+        chart
+            .addMenuIcon("fas fa-times", "remove chart")
             .addEventListener("click", () => {
                 chart.remove();
                 div.remove();
@@ -1873,10 +2136,6 @@ class ChartManager {
                 this._removeLinks(chart);
                 this._callListeners("chart_removed", chart);
             });
-
-
-
-
 
         //need to decorate any method that uses column data as data may
         //have to be loaded before method can execute
@@ -1887,27 +2146,42 @@ class ChartManager {
             this._decorateColumnMethod("setToolTipColumn", chart, dataSource);
         }
         if (chart.setBackgroundFilter) {
-            this._decorateColumnMethod("setBackgroundFilter", chart, dataSource);
+            this._decorateColumnMethod(
+                "setBackgroundFilter",
+                chart,
+                dataSource,
+            );
         }
         if (chart.changeContourParameter) {
-            this._decorateColumnMethod("changeContourParameter", chart, dataSource);
+            this._decorateColumnMethod(
+                "changeContourParameter",
+                chart,
+                dataSource,
+            );
         }
 
-        //new preferred way to decorate column methods 
+        //new preferred way to decorate column methods
         if (chartType.methodsUsingColumns) {
             for (const meth of chartType.methodsUsingColumns) {
                 this.__decorateColumnMethod(meth, chart, dataSource);
             }
         }
 
-
         if (chart.setupLinks) {
             //phasing out
             if (ds.index_link_to) {
-                this._giveChartAccess(chart, this.dsIndex[ds.index_link_to.dataSource].dataStore, ds.index_link_to.index);
+                this._giveChartAccess(
+                    chart,
+                    this.dsIndex[ds.index_link_to.dataSource].dataStore,
+                    ds.index_link_to.index,
+                );
             }
             for (const lnk of ds.dataStore.accessOtherDataStore) {
-                this._giveChartAccess(chart, this.dsIndex[lnk.dataSource].dataStore, lnk.index);
+                this._giveChartAccess(
+                    chart,
+                    this.dsIndex[lnk.dataSource].dataStore,
+                    lnk.index,
+                );
             }
         }
 
@@ -1916,9 +2190,13 @@ class ChartManager {
         if (cll && chart.createColumnLinks) {
             const func = (columns, callback) => {
                 //make sure index is loaded before use
-                this._getColumnsThen(cll.dataSource, columns, callback)
-            }
-            chart.createColumnLinks(this.dsIndex[cll.dataSource].dataStore, cll.columns, func);
+                this._getColumnsThen(cll.dataSource, columns, callback);
+            };
+            chart.createColumnLinks(
+                this.dsIndex[cll.dataSource].dataStore,
+                cll.columns,
+                func,
+            );
         }
 
         if (notify) {
@@ -1934,7 +2212,7 @@ class ChartManager {
                         this._setUpLink(l);
                     }
                 }
-                this._callListeners("view_loaded", this.currentView)
+                this._callListeners("view_loaded", this.currentView);
             }
         }
         return chart;
@@ -1947,7 +2225,7 @@ class ChartManager {
             columns.push(index); //pjt: might just push `undefined`?
             await this._getColumnsAsync(dataSource.name, columns);
             callback();
-        }
+        };
         chart.setupLinks(dataSource, index, getDataFunction);
     }
 
@@ -1960,7 +2238,9 @@ class ChartManager {
             // some other types of link may be interpreted within chart code (e.g. react effect does "view_state")
             case "color_by_column":
                 link.set_color = true;
-                console.warn('legacy color_by_column link type - use chart_columnval_link with set_color=true instead');
+                console.warn(
+                    "legacy color_by_column link type - use chart_columnval_link with set_color=true instead",
+                );
                 addChartLink(link, this);
                 break;
             case "chart_columnval_link":
@@ -1994,7 +2274,11 @@ class ChartManager {
                     }
                 }
             } catch (error) {
-                console.error(`Error removing links for chart '${cid}'`, error, link);
+                console.error(
+                    `Error removing links for chart '${cid}'`,
+                    error,
+                    link,
+                );
             }
         }
         for (const i of linksToRemove) {
@@ -2008,13 +2292,11 @@ class ChartManager {
             case "color_by_column":
             case "chart_columnval_link": {
                 const chart = this.charts[link.source_chart].chart;
-                chart.removeListener(link.id)
+                chart.removeListener(link.id);
             }
         }
-        this.viewData.links.splice(linkIndex, 1)
+        this.viewData.links.splice(linkIndex, 1);
     }
-
-
 
     removeAllCharts(dataSources) {
         const allCharts = [];
@@ -2028,11 +2310,9 @@ class ChartManager {
         for (const ci of allCharts) {
             if (ci[1]) {
                 ci[1].close();
-
             }
-            ci[0].remove()
-            ci[0].div.remove()
-
+            ci[0].remove();
+            ci[0].div.remove();
         }
         this.charts = {};
     }
@@ -2043,13 +2323,11 @@ class ChartManager {
         for (const c of charts) {
             const filter = c.getFilter();
             if (filter) {
-                fs.push(filter)
+                fs.push(filter);
             }
         }
         return fs;
     }
-
-
 
     getChart(id) {
         const cinfo = this.charts[id];
@@ -2061,15 +2339,15 @@ class ChartManager {
 
     /**
      * Get all the charts for a data sorce
-     * @param {string} dataSource - The name of the data source 
+     * @param {string} dataSource - The name of the data source
      * @returns {Array} - An array of chart objects
      */
     getAllCharts(dataSource) {
-        const charts = []
+        const charts = [];
         for (const id in this.charts) {
             const ch = this.charts[id];
             if (ch.dataSource.name === dataSource) {
-                charts.push(ch.chart)
+                charts.push(ch.chart);
             }
         }
         return charts;
@@ -2091,25 +2369,26 @@ class ChartManager {
                 rowSize = 0;
                 left = margin;
                 top += size[1] + margin;
-
             }
-
         }
     }
 
     addButton(text, callback, tooltip) {
-        createEl("button", {
-            classes: ["ciview-button"],
-            text: text,
-            styles: {
-                position: "fixed",
-                bottom: "40px",
-                right: "40px",
-                fontSize: "18px",
-                zIndex: 100
-            }
-        }, this.contentDiv)
-            .addEventListener("click", () => callback())
+        createEl(
+            "button",
+            {
+                classes: ["ciview-button"],
+                text: text,
+                styles: {
+                    position: "fixed",
+                    bottom: "40px",
+                    right: "40px",
+                    fontSize: "18px",
+                    zIndex: 100,
+                },
+            },
+            this.contentDiv,
+        ).addEventListener("click", () => callback());
     }
 
     _popOutChart(chart) {
@@ -2118,7 +2397,7 @@ class ChartManager {
 
     _sendAllChartsToBack(ds) {
         for (const id in this.charts) {
-            const c = this.charts[id]
+            const c = this.charts[id];
             if (ds === c.dataSource) {
                 c.chart.div.style.zIndex = "";
             }
@@ -2128,7 +2407,11 @@ class ChartManager {
     _makeChartRD(chart, ds) {
         //if (!ds) console.error(`_makeChartRD called without ds - resize / drag etc may not work properly`);
         //^^ actually doesn't make much difference to non-gridStack in practice.
-        if (ds && this.gridStack && this.viewData.dataSources[ds.name].layout === "gridstack") {
+        if (
+            ds &&
+            this.gridStack &&
+            this.viewData.dataSources[ds.name].layout === "gridstack"
+        ) {
             this.gridStack.manageChart(chart, ds, this._inInit);
             return;
         }
@@ -2139,377 +2422,16 @@ class ChartManager {
             ondragstart: (e) => {
                 this._sendAllChartsToBack(ds);
                 div.style.zIndex = 2;
-            }
+            },
         });
         makeResizable(div, {
             onResizeStart: () => {
                 this._sendAllChartsToBack(ds);
                 div.style.zIndex = 2;
             },
-            onresizeend: (width, height) => chart.setSize(width, height)
-        })
-    }
-}
-
-/**
-* Creates a dialog for the user to choose multiple columns
-* @param {DataStore} dataStore - the dataStore the columns will be chosen from
-* @param {function} callback - A function called when the user has selected the columns  
-* The callback is provided with a list of chosen column fields(ids)
-* @param {string} [filter=all] - The type of column the use can choose
-*/
-
-class ChooseColumnDialog extends BaseDialog {
-    constructor(dataStore, callback, filter = "all") {
-        const config = {
-            footer: true,
-            width: 250,
-            maxHeight: 500,
-            title: "Select Columns",
-            buttons: [{ text: "OK", method: "getColumns" }]
-        }
-        super(config, { dataStore: dataStore, callback: callback, filter: filter });
-    }
-    init(content) {
-        this.ds = content.dataStore;
-        const gd = createEl("div", { styles: { padding: "8px" } });
-        const rName = getRandomString();
-        createEl("div", { text: "Groups" }, this.dialog);
-
-        const cgs = Object.keys(this.ds.columnGroups);
-        cgs.unshift("All")
-        for (const group of cgs) {
-            const d = createEl("span", { styles: { display: "inline-block", whiteSpace: "nowrap", marginRight: "5px" } }, gd);
-            createEl("span", { text: group }, d)
-            createEl("input", {
-                type: "radio",
-                value: group,
-                name: rName
-            }, d)
-                .addEventListener("click", e => {
-                    this.checkAllInGroup(e.target.value);
-                })
-        }
-        this.dialog.append(gd);
-        createEl("div", { text: "Select Individual Columns" }, this.dialog);
-        const cd = createEl("div", { style: { padding: "8px" } });
-        const cols = this.ds.getColumnList(content.filter);
-        this.checks = [];
-        this.callback = content.callback;
-        //todo let this work with createFilterElement? <-- desperately needed in ad-car... hacking something together for now
-        const filter = createEl('input', {
-            placeholder: 'Search columns',
-            type: 'text',
-        }, cd);
-        filter.addEventListener('input', (e) => {
-            const val = e.target.value.toLowerCase().split(" ");
-            for (const check of this.checks) {
-                const f = val.some(v => !check[1].toLowerCase().includes(v));
-                check[0].parentElement.style.display = f ? 'none' : '';
-            }
+            onresizeend: (width, height) => chart.setSize(width, height),
         });
-        for (const col of cols) {
-            const d = createEl("div", {
-                styles: {//display:"inline-block",
-                    whiteSpace: "nowrap",
-                    // marginRight:"5px"
-                }
-            }, cd);
-            //createEl("span",{text:col.name},d);
-            const cb = createEl("input", {
-                type: "checkbox"
-            }, d);
-            this.checks.push([cb, col.field]);
-            createEl("span", { text: col.name }, d);
-        }
-        this.dialog.append(cd);
-    }
-    checkAllInGroup(group) {
-        if (group === "All") {
-            for (const check of this.checks) {
-                check[0].checked = true;
-            }
-        }
-        else {
-            const cols = this.ds.columnGroups[group].columns;
-            for (const check of this.checks) {
-                check[0].checked = cols.indexOf(check[1]) !== -1
-            }
-
-        }
-
-    }
-
-    getColumns() {
-        const cols = [];
-        for (const check of this.checks) {
-            if (check[0].checked) {
-                cols.push(check[1]);
-            }
-        }
-        this.callback(cols);
-        this.close();
-    }
-}
-
-
-
-
-/**
-* Creates a dialog for the user to choose a chart and its associated parameters. When chosen the
-* supplied callback will be invoked with the config of the chosen chart.
-* @param {DataStore} dataStore - the dataStore the chart will be created from.
-* @param {function} callback - A function called when the user has selected the chart and 
-* its parameters. The callback is provided with the config of the chosen chart
-*/
-class AddChartDialog extends BaseDialog {
-    constructor(dataSource, callback) {
-        const config = {
-            title: "Add Chart",
-            columns: 2,
-            footer: true,
-            width: 380
-        }
-        super(config, { dataSource: dataSource, callback: callback });
-
-    }
-    init(content) {
-        this.extraControls = {};
-        const types = [];
-        this.dataSource = content.dataSource;
-        this.dataStore = content.dataSource.dataStore;
-        for (const type in BaseChart.types) {
-            const t = BaseChart.types[type];
-            //check to see if chart has any requirements
-
-            if (t.required) {
-                if (typeof t.required === "function") {
-                    if (!t.required(this.dataStore)) {
-                        continue;
-                    }
-                }
-                //is an array of parameters required in the datasource
-                else {
-                    let allow = true;
-                    for (const r of t.required) {
-                        if (!this.dataStore[r]) {
-                            allow = false
-                        }
-                    }
-                    if (!allow) {
-                        continue;
-                    }
-                }
-            }
-            if (t.allow_user_add === false) {
-                continue;
-            }
-            types.push({
-                name: t.name,
-                type: type,
-            });
-        }
-
-        types.sort((a, b) => a.name.localeCompare(b.name));
-        this.defaultType = types[0].type;
-
-        createEl("div", {
-            text: "Chart Type", //a11y - should be a label
-            classes: ["ciview-title-div"]
-        }, this.columns[0]);
-
-        this.chartType = createEl("select", {
-            styles: {
-                maxWidth: "200px"
-            }
-        }, this.columns[0]);
-        for (const item of types) {
-            createEl("option", {
-                text: item.name,
-                value: item.type
-            }, this.chartType)
-        }
-        // createEl("div",{},this.columns[0]).append(this.chartType);
-
-        this.chartType.addEventListener("change", (e) => {
-            this.setParamDiv(this.chartType.value, content.dataStore);
-        });
-
-        createEl("div", {
-            text: "Title",
-            classes: ["ciview-title-div"]
-        }, this.columns[0]);
-
-        this.chartName = createEl("input", {}, this.columns[0]);
-
-        createEl("div", {
-            text: "Description",
-            classes: ["ciview-title-div"]
-        }, this.columns[0]);
-        this.chartDescription = createEl("textarea", { styles: { height: "100px" } }, this.columns[0]);
-
-        this.columnsHeading = createEl("div", {
-            text: "Columns",
-            classes: ["ciview-title-div"]
-        }, this.columns[1]);
-        this.paramDiv = createEl("div", {}, this.columns[1]);
-        this.setParamDiv(types[0].type, content.dataStore);
-
-        createEl("button", {
-            text: "Add",
-            classes: ["ciview-button"]
-        }, this.footer).addEventListener("click", () => this.submit(content.callback));
-    }
-
-    submit(callback) {
-        const config = {
-            title: this.chartName.value,
-            legend: this.chartDescription.value,
-            type: this.chartType.value,
-            param: this.paramSelects.map((x) => x.value),
-            // options: this.options ? Object.fromEntries(this.options) : undefined,
-        }
-        const ed = {};
-        for (const name in this.extraControls) {
-            const c = this.extraControls[name];
-            ed[name] = c.type === 'checkbox' ? c.checked : c.value;
-            //mjs: sometimes its not as simple as this and more complex alterations
-            //to the config are required based on the user input the dataSore's config
-            config[name] = ed[name]; // pjt: is there a reason we didn't do this before?
-        }
-        if (this.multiColumns) {
-            config.param = config.param.concat(this.multiColumns)
-        }
-        console.log('config from add chart dialog', config);
-        const t = BaseChart.types[this.chartType.value];
-
-        if (t.init) {
-            t.init(config, this.dataSource.dataStore, ed)
-        }
-        callback(config);
-        this.chartName.value = "";
-        this.chartDescription.value = "";
-        /// pjt I find this annoying... not sure why we didn't close the div before
-        /// but otherwise, would rather not reset these (can be handy when testing stuff)
-        // this.chartType.value= this.defaultType;
-        // this.setParamDiv(this.defaultType)
-        this.close();
-    }
-
-    _addMultiColumnSelect(holder, filter) {
-        //get default values
-        const ps = this.dataStore.getColumnList(filter);
-        let text = "";
-        if (ps.length > 1) {
-            text = `${ps[0].name},... (1)`
-            this.multiColumns = [ps[0].field];
-        }
-        const dd = createEl("span", { text: text }, holder);
-        createEl("i", { classes: ["fas", "fa-plus"] }, holder)
-        holder.style.cursor = "pointer";
-        holder.addEventListener("click", () => {
-            new ChooseColumnDialog(this.dataStore, cols => {
-                this.multiColumns = cols;
-                let text = "";
-                if (cols.length > 0) {
-                    const max = cols.length < 3 ? cols.length : 3;
-                    const arr = []
-                    for (let n = 0; n < max; n++) {
-                        arr.push(this.dataStore.getColumnName(cols[n]));
-                    }
-                    text = arr.join(",");
-                    if (cols.length > 3) {
-                        text += ",...."
-                    }
-                    text += `(${cols.length})`;
-                    dd.textContent = text;
-                }
-
-            }, filter);
-        });
-    }
-
-    setParamDiv(type) {
-        this.paramDiv.innerHTML = "";
-        const params = BaseChart.types[type].params;
-        this.paramSelects = [];
-        this.columnsHeading.style.display = params?.length ? "" : "none";
-        if (params) {
-            for (const p of params) {
-                const d = createEl("div", { styles: { padding: "4px" } }, this.paramDiv)
-                const sp = createEl("div", { text: `${p.name}:` }, d);
-                const holder = createEl("div", {}, this.paramDiv);
-                if (!(Array.isArray(p.type)) && p.type.startsWith("_multi")) {
-                    this._addMultiColumnSelect(holder, p.type.split(":")[1])
-                }
-                else {
-                    this.multiColumns = null;
-                    const dd = createEl("select", {
-                        styles: {
-                            maxWidth: "200px"
-                        }
-                    }, holder);
-                    const ps = this.dataStore.getColumnList(p.type);
-                    const sgs = {}
-                    for (const ds of this.dataStore.subgroupDataSources) {
-                        sgs[ds] = createEl("optgroup", { label: ds });
-                    }
-                    for (const item of ps) {
-                        const ele = item.subgroup ? sgs[item.subgroup.dataSource] : dd;
-                        createEl("option", { text: item.name, value: item.field }, ele);
-                    }
-                    for (const ds of this.dataStore.subgroupDataSources) {
-                        dd.append(sgs[ds]);
-                    }
-                    createFilterElement(dd, holder);
-                    this.paramSelects.push(dd);
-                }
-            }
-        }
-        const t = BaseChart.types[this.chartType.value];
-        this.extraControls = {};
-        if (t.extra_controls) {
-            const controls = t.extra_controls(this.dataSource.dataStore);
-            const parentDiv = this.paramDiv;
-            for (const c of controls) {
-                createEl("div", {
-                    text: c.label,
-                    classes: ["ciview-title-div"]
-                }, parentDiv);
-                // could this logic be shared with SettingsDialog? <<
-                if (c.type === "dropdown") {
-                    const sel = createEl("select", {
-                        styles: {
-                            maxWidth: "200px"
-                        }
-                    }, parentDiv);
-                    createFilterElement(sel, parentDiv);
-                    for (const item of c.values) {
-                        const option = createEl("option", { text: item.name, value: item.value }, sel);
-                        if (item.value === c.defaultVal) {
-                            option.selected = true;
-                        }
-                    }
-                    this.extraControls[c.name] = sel;
-                } else if (c.type === 'string') {
-                    const el = createEl("input", { value: c.defaultVal }, parentDiv);
-                    this.extraControls[c.name] = el;
-                    //el.onchange // not using callback, value will be read on submit().
-                } else if (c.type === 'textbox') {
-                    const el = createEl("textarea", { value: c.defaultVal, styles: { height: '300px' } }, parentDiv);
-                    this.extraControls[c.name] = el;
-                    //el.onchange // not using callback, value will be read on submit().
-                } else if (c.type === 'checkbox' || c.type === 'check') {
-                    const el = createEl("input", { type: 'checkbox' }, parentDiv);
-                    el.checked = c.defaultVal;
-                    this.extraControls[c.name] = el;
-                    //el.onchange // not using callback, value will be read on submit().
-                }
-            }
-
-        }
     }
 }
 
 export default ChartManager;
-export { AddChartDialog, ChooseColumnDialog };
