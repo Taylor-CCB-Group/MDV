@@ -352,9 +352,9 @@ const RadioButtonComponent = ({
                     <span key={id}>
                         <span className="m-1">{v[0]}</span>
                         <input
-                            // biome-ignore lint/suspicious/noDoubleEquals: number == string is ok here
                             type="radio"
                             value={v[1]}
+                            // biome-ignore lint/suspicious/noDoubleEquals: number == string is ok here
                             checked={v[1] == props.current_value}
                             onChange={action((e) => {
                                 props.current_value = e.currentTarget.value;
