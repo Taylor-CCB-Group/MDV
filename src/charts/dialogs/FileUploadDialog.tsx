@@ -13,7 +13,7 @@ import axios from 'axios';
 import { useProject } from "../../modules/ProjectContext";
 import { ColumnPreview } from "./ColumnPreview"
 
-import { useViewerStoreApi, useChannelsStoreApi, type VivContextType } from '../../react/components/avivatorish/state';
+import { useViewerStoreApi, useChannelsStoreApi } from '../../react/components/avivatorish/state';
 import { createLoader } from '../../react/components/avivatorish/utils';
 import { unstable_batchedUpdates } from 'react-dom';
 
