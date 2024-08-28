@@ -139,7 +139,7 @@ export type VivConfig = {
     channelsStore?: Partial<ChannelsState>;
     imageSettingsStore?: Partial<ImageState>;
     //>>>?
-    url: string;
+    // url: string;
 };
 
 export type ROI = {
