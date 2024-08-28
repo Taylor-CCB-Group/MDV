@@ -12,17 +12,19 @@ class FileUploadDialogReact extends BaseDialog {
                 width: 450,
                 height: 320,
             },
-            null
+            null,
         );
         this.outer.classList.add("fileUploadDialog");
         if (this.dialog) {
             this.root = createMdvPortal(
                 <FileUploadDialogComponent
                     onClose={() => this.close()}
-                    onResize={(width: number, height: number) => this.resizeDialog(width, height)} // Pass the resize callback
+                    onResize={(width: number, height: number) =>
+                        this.resizeDialog(width, height)
+                    } // Pass the resize callback
                 />,
                 this.dialog,
-                this
+                this,
             );
         } else {
             console.error("Dialog element not found");

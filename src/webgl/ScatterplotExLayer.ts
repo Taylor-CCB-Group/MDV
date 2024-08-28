@@ -1,4 +1,4 @@
-import { ScatterplotLayer } from 'deck.gl/typed';
+import { ScatterplotLayer } from "deck.gl/typed";
 
 /** don't think we can prepend '#version 300 es' in LayerExtension,
  * so we use this as a hack */

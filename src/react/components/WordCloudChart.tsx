@@ -6,17 +6,19 @@ import { useChartID } from "../hooks";
 
 function ReactTest() {
     const parent = useChart();
-    const {dataStore} = parent;
+    const { dataStore } = parent;
     const id = useChartID();
     const [filterSize, setFilterSize] = useState(dataStore.filterSize);
     const [dim] = useState(dataStore.getDimension("catcol_dimension"));
-    const [words, setWords] = useState(['hello', 'world']);
+    const [words, setWords] = useState(["hello", "world"]);
     const [text, setText] = useState(parent.config.text);
     // biome-ignore lint/correctness/useExhaustiveDependencies: print a warning about potential bugs - if we use this, we should fix it.
     useEffect(() => {
-        console.warn('WordCloudChart effect liable to be buggy');
+        console.warn("WordCloudChart effect liable to be buggy");
         dataStore.addListener(id, () => setFilterSize(dataStore.filterSize));
-        parent.addListener("text", (type, data) => setText(`${data} ${parent.config.wordSize}`));
+        parent.addListener("text", (type, data) =>
+            setText(`${data} ${parent.config.wordSize}`),
+        );
         const colNameWords = parent.config.param[0];
         const colNameSize = parent.config.param[1];
 
@@ -30,14 +32,18 @@ function ReactTest() {
         //     const size = sizeVals[sizeCol.data[i]];
         //     console.log(word, size || `no size for ${i}`);
         // }
-        dataStore.getRowAsObject()
+        dataStore.getRowAsObject();
         setWords(wordsVals);
         console.log(sizeVals);
 
         if (dim?.getAverages) {
-            dim.getAverages(data => {
-                console.log(data);
-            }, [colNameSize], {})
+            dim.getAverages(
+                (data) => {
+                    console.log(data);
+                },
+                [colNameSize],
+                {},
+            );
         } else {
             console.log("no averages");
         }
@@ -56,15 +62,16 @@ function ReactTest() {
         return () => {
             dataStore.removeListener(id);
             parent.removeListener("text");
-        }
+        };
     }, [dataStore, dim, text]);
     return (
-        <div style={{padding: '0.3em', overflow: 'auto', color: 'white'}}>
-        <h2>Words:</h2>
-        This component served as an earlier test for React charts, and is not currently used...
-        it might make sense to develop it a bit further, as a way to test out the new architecture.
-        But there are higher priorities.
-        <pre>{JSON.stringify(words, null, 2)}</pre>
+        <div style={{ padding: "0.3em", overflow: "auto", color: "white" }}>
+            <h2>Words:</h2>
+            This component served as an earlier test for React charts, and is
+            not currently used... it might make sense to develop it a bit
+            further, as a way to test out the new architecture. But there are
+            higher priorities.
+            <pre>{JSON.stringify(words, null, 2)}</pre>
         </div>
     );
 }
@@ -76,7 +83,12 @@ class ReactWordCloudChart extends BaseReactChart<WordCloudConfig> {
     constructor(dataStore, div, config) {
         super(dataStore, div, config, ReactTest);
     }
-    getSettings(): { type: string; label: string; current_value: any; func: (v: any) => void; }[] {
+    getSettings(): {
+        type: string;
+        label: string;
+        current_value: any;
+        func: (v: any) => void;
+    }[] {
         const c = this.config;
         const settings = super.getSettings();
         return settings.concat([
@@ -86,10 +98,10 @@ class ReactWordCloudChart extends BaseReactChart<WordCloudConfig> {
                 current_value: c.wordSize || 100,
                 min: 10,
                 max: 100,
-                func: x => {
+                func: (x) => {
                     c.wordSize = x;
-                }
-            }
+                },
+            },
         ]);
     }
     remove(): void {
@@ -99,7 +111,7 @@ class ReactWordCloudChart extends BaseReactChart<WordCloudConfig> {
 }
 
 BaseChart.types["WordCloud2"] = {
-    "class": ReactWordCloudChart,
+    class: ReactWordCloudChart,
     name: "WordCloud (React)",
     params: [
         {
@@ -109,11 +121,11 @@ BaseChart.types["WordCloud2"] = {
         {
             type: ["text", "multitext"],
             name: "word size",
-        }
+        },
     ],
     init: (config, dataSource, extraControls) => {
         config.wordSize = 20;
-    }
+    },
 };
 
 // we rely on the side-effect of this import to register the chart type
