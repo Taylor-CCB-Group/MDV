@@ -1,4 +1,4 @@
-import { parse, ParseResult } from "papaparse";
+import { parse, type ParseResult } from "papaparse";
 
 interface PreviewData {
     columnNames: string[];

@@ -431,8 +431,8 @@ class CellRadialChart extends SVGChart {
             .attr("d", (d) => {
                 level_radii[d.depth] = d.y;
                 if (d.depth > 1) {
-                    // biome-ignore lint/style/useTemplate: clearer to have this on several lines
                     return (
+                        // biome-ignore lint/style/useTemplate: clearer to have this on several lines
                         "M" +
                         project(d.x, d.y) +
                         "C" +
