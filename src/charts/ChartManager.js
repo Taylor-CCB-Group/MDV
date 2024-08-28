@@ -1306,6 +1306,11 @@ class ChartManager {
         }
     }
 
+    saveState() {
+        const state = this.getState();
+        this._callListeners("state_saved", state);
+    }
+
     getState() {
         const initialCharts = {};
         const updatedColumns = {};
