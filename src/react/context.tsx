@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type { BaseReactChart } from "./components/BaseReactChart";
 import type DataStore from "../datastore/DataStore";
+import type { VivConfig } from "./components/avivatorish/state";
 
 const ChartContext = createContext<BaseReactChart<any>>(undefined);
 const DataStoreContext = createContext<DataStore>(undefined);
@@ -29,4 +30,9 @@ export function useDataStore() {
     const dataStore = useContext(DataStoreContext);
     if (!dataStore) throw new Error("no data store context");
     return dataStore;
+}
+export function useVivConfig(): VivConfig {
+    const chart = useContext(ChartContext);
+    if (!chart) return { viewerStore: {}, channelsStore: {}, imageSettingsStore: {} };
+    return chart.config.viv as VivConfig;
 }

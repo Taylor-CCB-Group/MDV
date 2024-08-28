@@ -13,7 +13,6 @@ import {
     useChannelsStoreApi,
     useImageSettingsStoreApi,
 } from "./state";
-import type { VivConfig } from "./state";
 import {
     createLoader,
     buildDefaultSelection,
@@ -23,38 +22,36 @@ import {
     isInterleaved,
 } from "./utils";
 import { COLOR_PALLETE, FILL_PIXEL_VALUE } from "./constants";
-import { useConfig } from "@/react/hooks";
+import { useVivConfig } from "@/react/context";
 
 export const useSavedVivConfig = () => {
-    console.warn("Disabled useSavedVivConfig");
-    return () => {}
-    // const c = useConfig<{ viv: VivConfig }>().viv;
-    // const { viewerStore, channelsStore, imageSettingsStore } = c;
-    // const viewerStoreApi = useViewerStoreApi();
-    // const channelsStoreApi = useChannelsStoreApi();
-    // const imageSettingsStoreApi = useImageSettingsStoreApi();
-    // const applyConfig = useCallback(() => {
-    //     viewerStoreApi.setState((state) => {
-    //         const newState = { ...state, ...viewerStore };
-    //         return newState;
-    //     });
-    //     channelsStoreApi.setState((state) => {
-    //         const newState = { ...state, ...channelsStore };
-    //         return newState;
-    //     });
-    //     imageSettingsStoreApi.setState((state) => {
-    //         const newState = { ...state, ...imageSettingsStore };
-    //         return newState;
-    //     });
-    // }, [
-    //     viewerStore,
-    //     channelsStore,
-    //     imageSettingsStore,
-    //     channelsStoreApi.setState,
-    //     viewerStoreApi.setState,
-    //     imageSettingsStoreApi.setState,
-    // ]);
-    // return applyConfig;
+    const c = useVivConfig();
+    const { viewerStore, channelsStore, imageSettingsStore } = c;
+    const viewerStoreApi = useViewerStoreApi();
+    const channelsStoreApi = useChannelsStoreApi();
+    const imageSettingsStoreApi = useImageSettingsStoreApi();
+    const applyConfig = useCallback(() => {
+        viewerStoreApi.setState((state) => {
+            const newState = { ...state, ...viewerStore };
+            return newState;
+        });
+        channelsStoreApi.setState((state) => {
+            const newState = { ...state, ...channelsStore };
+            return newState;
+        });
+        imageSettingsStoreApi.setState((state) => {
+            const newState = { ...state, ...imageSettingsStore };
+            return newState;
+        });
+    }, [
+        viewerStore,
+        channelsStore,
+        imageSettingsStore,
+        channelsStoreApi.setState,
+        viewerStoreApi.setState,
+        imageSettingsStoreApi.setState,
+    ]);
+    return applyConfig;
 };
 
 export const useImage = (
