@@ -20,6 +20,7 @@ import { unstable_batchedUpdates } from 'react-dom';
 import { TiffPreview } from "./TiffPreview";
 import { TiffMetadataTable } from "./TiffMetadataTable"
 import TiffVisualization from './TiffVisualization';
+import { DatasourceDropdown } from "./DatasourceDropdown";
 
 
 // Use dynamic import for the worker
