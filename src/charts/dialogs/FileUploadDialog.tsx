@@ -21,7 +21,6 @@ import { TiffPreview } from "./TiffPreview";
 import { TiffMetadataTable } from "./TiffMetadataTable"
 import TiffVisualization from './TiffVisualization';
 
-import { DatasourceDropdown } from './DatasourceDropdown';
 
 // Use dynamic import for the worker
 const CsvWorker = new Worker(new URL("./csvWorker.ts", import.meta.url), {
@@ -277,7 +276,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
 
   //const viewerStore = vivStores.viewerStore;
 
-  const { root, projectName } = useProject();
+  const { root, projectName, chartManager } = useProject();
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
@@ -619,7 +618,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
               datasourceName: datasourceName,
             });
             console.log('Metadata updated successfully', metadataResponse.data);
-            window.mdv.chartManager?.saveState();
+            chartManager.saveState();
           } catch (metadataError) {
             console.error('Error updating metadata:', metadataError);
             dispatch({
