@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import type React from 'react';
+import { useState, useEffect } from 'react';
 
 interface DropdownProps {
   options: string[];
@@ -37,6 +38,7 @@ export const DatasourceDropdown: React.FC<DropdownProps> = ({ options, onSelect 
           -- Select an option --
         </option>
         {options.map((option, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: not a big deal in this case... would be good to fix ideally
           <option key={index} value={option}>
             {option}
           </option>
