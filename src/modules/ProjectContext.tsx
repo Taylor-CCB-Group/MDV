@@ -1,8 +1,10 @@
+import type ChartManager from '@/charts/ChartManager';
 import React, { type PropsWithChildren, createContext, useContext, useState } from 'react';
 
 type ProjectInfo = {
     root: string;
     staticFolder: boolean;
+    chartManager: ChartManager;
 }
 
 const ProjectContext = createContext<ProjectInfo>(null);
@@ -21,13 +23,15 @@ export const ProjectProvider = ({ children }: PropsWithChildren) => {
     // todo - get these from e.g. state.json instead?
     const staticFolder = urlParams.get('static') !== null;
     const projectName = dir.split("/").pop();
+    const { chartManager } = window.mdv;
 
     const [projectConfig, setProjectConfig] = useState({
         flaskURL,
         dir,
         root,
         staticFolder,
-        projectName
+        projectName,
+        chartManager,
     });
 
     return (
