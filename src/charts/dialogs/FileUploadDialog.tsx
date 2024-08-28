@@ -699,7 +699,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
         </>
       ) : state.isValidating ? (
         <StatusContainer>
-          <Message>{"Validating the CSV file, please wait..."}</Message>
+          <Message>{"Validating data, please wait..."}</Message>
           <Spinner />
         </StatusContainer>
       ) : state.validationResult ? (
