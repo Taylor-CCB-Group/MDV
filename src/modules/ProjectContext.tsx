@@ -10,6 +10,7 @@ type ProjectInfo = {
     root: string;
     staticFolder: boolean;
     chartManager: ChartManager;
+    projectName: string;
 };
 
 const ProjectContext = createContext<ProjectInfo>(null);
