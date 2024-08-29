@@ -59,10 +59,7 @@ def create_flask_app(config_name=None):
             # Routes registration and application setup
             print("Registering the blueprint (register_app)")
             ProjectBlueprint.register_app(app)
-            print("Serving projects from database")
-            serve_projects_from_db(app)
-            print("Starting - create_projects_from_filesystem")
-            serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+            
 
     except OperationalError as oe:
         print(f"OperationalError: {oe}")
@@ -425,6 +422,12 @@ def register_routes(app):
 
 # Create the app object at the module level
 app = create_flask_app()
+
+with app.app_context():
+    print("Serving projects from database")
+    serve_projects_from_db(app)
+    print("Starting - create_projects_from_filesystem")
+    serve_projects_from_filesystem(app, app.config['projects_base_dir'])
 
 if __name__ == '__main__':
     print("In main..")
