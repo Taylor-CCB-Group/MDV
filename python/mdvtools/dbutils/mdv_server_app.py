@@ -18,7 +18,7 @@ from mdvtools.dbutils.dbservice import ProjectService, FileService
 
 
 def create_flask_app(config_name=None):
-    """**Create and configure the Flask app."""
+    """*Create and configure the Flask app."""
     app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
     app.after_request(add_safe_headers)
 
