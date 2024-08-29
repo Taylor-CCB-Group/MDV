@@ -423,12 +423,12 @@ def register_routes(app):
     print("Start- create_projects_from_filesystem")
     serve_projects_from_filesystem(app.config['projects_base_dir']) """
 
-
+app = create_flask_app()
 
 if __name__ == '__main__':
     print("In main..")
     #wait_for_database()
-    app = create_flask_app()
+    
     app.run(host='0.0.0.0', debug=True, port=5055)
     
     
