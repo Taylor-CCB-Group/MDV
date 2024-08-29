@@ -312,7 +312,7 @@ def register_routes(app):
 
         print("Route registered: /")
 
-        @app.route('/carroll/projects')
+        @app.route('/projects')
         def get_projects():
             print('/projects queried...')
             try:
