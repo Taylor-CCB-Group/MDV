@@ -35,7 +35,7 @@ const Projects = () => {
     const [filter, setFilter] = useState<string | null>(null);
     useEffect(() => {
         (async () => {
-            const response = await fetch('/projects');
+            const response = await fetch('/carroll/projects');
             const data = await response.json();
             setProjects(data);
         })();
