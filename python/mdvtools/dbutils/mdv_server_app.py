@@ -425,6 +425,7 @@ def register_routes(app):
     print("Start- create_projects_from_filesystem")
     serve_projects_from_filesystem(app.config['projects_base_dir']) """
 
+# Create the app object at the module level
 app = create_flask_app()
 
 if __name__ == '__main__':
