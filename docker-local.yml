@@ -1,34 +1,33 @@
 services:
-  
-  frontend:
+  mdv_app:
     build:
       context: .
       dockerfile: Dockerfile-local
-    #image: jayeshire/mdv-frontend:1.23
-    networks:
-      - default
+    #image: jayeshire/mdv-frontend:latest
     ports:
       - "5055:5055"
     volumes:
       - mdv-data:/app/mdv
+      - /Users/jayesh/secrets/db_user:/run/secrets/db_user:ro
+      - /Users/jayesh/secrets/db_password:/run/secrets/db_password:ro
+      - /Users/jayesh/secrets/db_name:/run/secrets/db_name:ro 
     depends_on:
-      - database
-
-  database:
+      - mdv_db
+    
+    
+  mdv_db:
     image: postgres:latest
-    networks:
-      - default
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: mydatabase
     volumes:
       - postgres-data:/var/lib/postgresql/data
-
+      - /Users/jayesh/secrets/db_user:/run/secrets/db_user:ro
+      - /Users/jayesh/secrets/db_password:/run/secrets/db_password:ro
+      - /Users/jayesh/secrets/db_name:/run/secrets/db_name:ro
+    environment:
+      POSTGRES_USER_FILE: /run/secrets/db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB_FILE: /run/secrets/db_name
+    
+    
 volumes:
   postgres-data:
-  mdv-data:
-
-networks:
-  default:
-    driver: bridge
+  mdv-data:    
