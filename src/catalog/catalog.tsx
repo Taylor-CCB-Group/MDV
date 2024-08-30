@@ -15,16 +15,24 @@ type ProjectMetadata = {
 const ProjectTile = ({ name, id }: ProjectMetadata) => {
     return (
         <div className="container w-32 h-32 p-5 outline rounded-xl">
-            <a href={`/project/${id}`}>
+            <a href={`/carroll/project/${id}`}>
                 {name}
             </a>
-            {import.meta.env.DEV && (<a href={`http://localhost:5170?dir=/project/${id}`}>
-            <BugPlay />
-            </a>)}
-            <button type="button" className='text-red-500' onClick={async () => {
-                await fetch(`/delete_project/${id}`, { method: 'DELETE' });
-                window.location.reload(); //probably should use react-router-dom or generally consider flow here.
-            }}>Delete</button>
+            {import.meta.env.DEV && (
+                <a href={`http://localhost:5170?dir=/carroll/project/${id}`}>
+                    <BugPlay />
+                </a>
+            )}
+            <button 
+                type="button" 
+                className='text-red-500' 
+                onClick={async () => {
+                    await fetch(`/carroll/delete_project/${id}`, { method: 'DELETE' });
+                    window.location.reload(); // probably should use react-router-dom or generally consider flow here.
+                }}
+            >
+                Delete
+            </button>
         </div>
     );
 }
@@ -33,20 +41,31 @@ const Projects = () => {
     const [projects, setProjects] = useState<ProjectMetadata[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<string | null>(null);
+
     useEffect(() => {
         (async () => {
-            const response = await fetch('/projects');
+            const response = await fetch('/carroll/projects');
+            if (!response.ok) {
+                setError('Failed to fetch projects');
+                return;
+            }
             const data = await response.json();
             setProjects(data);
         })();
     }, []);
+
     const filteredProjects = filter ? projects.filter(p => p.name.includes(filter)) : projects;
+
     return (
         <div className='p-10 outline-dashed rounded-3xl'>
             Filter:
-            <input type='text' placeholder='Search projects...' 
-            className='p-2 m-8 bg-slate-100 rounded-xl'
-            onChange={e => setFilter(e.target.value)} value={filter} />
+            <input 
+                type='text' 
+                placeholder='Search projects...' 
+                className='p-2 m-8 bg-slate-100 rounded-xl'
+                onChange={e => setFilter(e.target.value)} 
+                value={filter} 
+            />
             <div className='grid grid-flow-row grid-cols-8 w-full items-center gap-4'>
                 {filteredProjects.map(p => <ProjectTile key={p.id} name={p.name} id={p.id} />)}
                 {error && <div className='bg-red-500'>{error}</div>}
@@ -54,7 +73,6 @@ const Projects = () => {
         </div>
     )
 }
-
 
 export default function App() {
     return (

@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
+import type { RollupOptions } from 'rollup';
 import * as path from 'node:path';
 
 const flaskURL = "http://127.0.0.1:5051";
@@ -21,21 +21,17 @@ let hasWarned2 = false;
 function getRollupOptions(): RollupOptions {
     const build = process.env.build as 'production' | 'dev_pt' | 'desktop' | 'desktop_pt';
     if (build === 'production') {
-        // somewhat equivalent to original webpack production build - not the current 'production' with new features.
         return {
             input: process.env.nofont ? 'src/modules/basic_index_nf.js' : 'src/modules/basic_index.js',
             output: {
                 entryFileNames: 'js/mdv.js',
                 assetFileNames: (assetInfo) => {
-                    //todo: match webpack behaviour with assetsDir / css-loader.
                     if (assetInfo.name.includes('index.css')) return 'assets/mdv.css';
                     return 'img/[name][extname]';
                 },
             }
         }
     } if (build === 'desktop_pt') {
-        // currently there are different versions of entrypoint, this is the one with react etc.
-        // used for Flask...
         return {
             input: {
                 'mdv': 'src/modules/static_index.ts',
@@ -53,9 +49,6 @@ function getRollupOptions(): RollupOptions {
             }
         }
     } if (build === 'dev_pt') {
-        // version of vite build used for netlify deploy preview & devserver, using default 'index.html' entrypoint
-        // (which as of writing refers to same static_index.ts as desktop_pt)
-        // nb, localhost:5170/catalog_dev.html works on devserver without needing to change this.
         return {}
     } if (build === 'desktop') {
         return {
@@ -71,11 +64,7 @@ function getRollupOptions(): RollupOptions {
         }
     }
     if (process.env.VITE_ENTRYPOINT) {
-        // If you want a custom entrypoint - in particular, in order to have a custom DataLoader for interfacing
-        // with another backend, you can specify it with VITE_ENTRYPOINT environment variable, e.g.
-        // `VITE_ENTRYPOINT=path/to/my_index.js npx vite build --outDir path/to/output`
-        // (nb, we may change the logic in this config...)
-        const {name} = path.parse(process.env.VITE_ENTRYPOINT);
+        const { name } = path.parse(process.env.VITE_ENTRYPOINT);
         return {
             input: process.env.VITE_ENTRYPOINT,
             output: {
@@ -105,31 +94,35 @@ export default defineConfig(env => { return {
         strictPort: true,
         proxy: {
             // these routes are proxied to flask server in 'single project' mode
-            '^/(get_|images|tracks|save).*': {
+            '^/carroll/(get_|images|tracks|save).*': {
                 target: flaskURL,
                 changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/carroll/, ''), // Rewrite path to remove /carroll prefix
             },
-            '^/project/.*/\?': { //this works with ?dir=/project/project_name
+            '^/carroll/project/.*/\\?': { //this works with ?dir=/project/project_name
                 target: flaskURL,
                 changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/carroll/, ''), // Rewrite path to remove /carroll prefix
             },
-            //will fail if url has search params <-- ?
-            //will cause problems if we have json files that don't want to be proxied
-            '^/.*\\.(json|b|gz)$': {
+            '^/carroll/.*\\.(json|b|gz)$': {
                 target: flaskURL,
                 changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/carroll/, ''), // Rewrite path to remove /carroll prefix
             },
-            '/projects': {
+            '/carroll/projects': {
                 target: flaskURL,
                 changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/carroll/, ''), // Rewrite path to remove /carroll prefix
             },
-            '/create_project': {
+            '/carroll/create_project': {
                 target: flaskURL,
                 changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/carroll/, ''), // Rewrite path to remove /carroll prefix
             },
-            '/delete_project': {
+            '/carroll/delete_project': {
                 target: flaskURL,
                 changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/carroll/, ''), // Rewrite path to remove /carroll prefix
             },
         }
     },
