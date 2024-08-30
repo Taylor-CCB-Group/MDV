@@ -39,6 +39,7 @@ const Projects = () => {
     const [projects, setProjects] = useState<ProjectMetadata[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<string | null>(null);
+
     useEffect(() => {
         (async () => {
             const response = await fetch("projects");
