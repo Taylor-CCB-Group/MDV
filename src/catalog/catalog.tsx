@@ -25,7 +25,7 @@ const ProjectTile = ({ name, id }: ProjectMetadata) => {
                 type="button"
                 className="text-red-500"
                 onClick={async () => {
-                    await fetch(`/delete_project/${id}`, { method: "DELETE" });
+                    await fetch(`delete_project/${id}`, { method: "DELETE" });
                     window.location.reload(); //probably should use react-router-dom or generally consider flow here.
                 }}
             >
@@ -41,7 +41,7 @@ const Projects = () => {
     const [filter, setFilter] = useState<string | null>(null);
     useEffect(() => {
         (async () => {
-            const response = await fetch("/projects");
+            const response = await fetch("projects");
             const data = await response.json();
             setProjects(data);
         })();
