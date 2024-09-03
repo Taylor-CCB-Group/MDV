@@ -1,18 +1,22 @@
-import { type Layer, LayerExtension, type UpdateParameters } from "deck.gl/typed";
+import {
+    type Layer,
+    LayerExtension,
+    type UpdateParameters,
+} from "deck.gl/typed";
 
 export type ContrastProps = {
-    contrast: number[],
-    brightness: number[],
-}
+    contrast: number[];
+    brightness: number[];
+};
 
 export default class VivContrastExtension extends LayerExtension<ContrastProps> {
     static get componentName(): string {
-        return 'VivContrastExtension';
+        return "VivContrastExtension";
     }
     getShaders(this: Layer<ContrastProps>, extension: this) {
         return {
             inject: {
-                'fs:#decl': /*glsl*/`///----- VivContrastExtension decl
+                "fs:#decl": /*glsl*/ `///----- VivContrastExtension decl
                 uniform float contrast[6];
                 uniform float brightness[6];
 
@@ -34,7 +38,7 @@ export default class VivContrastExtension extends LayerExtension<ContrastProps> 
                 }
                 ///---- end VivContrastExtension
                 `,
-                'fs:DECKGL_PROCESS_INTENSITY': /*glsl*/`///----- VivContrastExtension DECKGL_PROCESS_INTENSITY
+                "fs:DECKGL_PROCESS_INTENSITY": /*glsl*/ `///----- VivContrastExtension DECKGL_PROCESS_INTENSITY
                 intensity = apply_contrast_limits(intensity, contrastLimits);
                 intensity = clamp(intensity, 0., 1.);
                 intensity = applyBrightnessContrast(intensity, channelIndex);
@@ -44,10 +48,14 @@ export default class VivContrastExtension extends LayerExtension<ContrastProps> 
                 // //---- VivContrastExtension DECKGL_MUTATE_COLOR
                 // // contrast adjustment
                 // `
-            }
-        }
+            },
+        };
     }
-    updateState(this: Layer<ContrastProps>, params: UpdateParameters<Layer<ContrastProps>>, extension: this): void {
+    updateState(
+        this: Layer<ContrastProps>,
+        params: UpdateParameters<Layer<ContrastProps>>,
+        extension: this,
+    ): void {
         const { props } = params;
         const { contrast, brightness } = props;
         // should be arrays of 6... probably in imageSettingsStore.
@@ -61,9 +69,14 @@ export default class VivContrastExtension extends LayerExtension<ContrastProps> 
                 contrastA[i] = contrast[i] ?? 1;
                 brightnessA[i] = brightness[i] ?? 0;
             }
-            for (const model of this.getModels()) model.setUniforms({ contrast: contrastA, brightness: brightnessA });
+            for (const model of this.getModels())
+                model.setUniforms({
+                    contrast: contrastA,
+                    brightness: brightnessA,
+                });
             return;
         }
-        for (const model of this.getModels()) model.setUniforms({ contrast, brightness });
+        for (const model of this.getModels())
+            model.setUniforms({ contrast, brightness });
     }
 }

@@ -1,9 +1,9 @@
 //import BaseChart from "@/charts/BaseChart";
-import JsonView from 'react18-json-view'
-import 'react18-json-view/src/style.css'
+import JsonView from "react18-json-view";
+import "react18-json-view/src/style.css";
 // If dark mode is needed, import `dark.css`.
-import 'react18-json-view/src/dark.css'
-import { useState } from 'react';
+import "react18-json-view/src/dark.css";
+import { useState } from "react";
 
 type JSONObject = { [key: string]: any };
 
@@ -14,17 +14,21 @@ type JSONObject = { [key: string]: any };
  * credit ChatGPT for the code (copilot failed) */
 function filterJSON(obj: JSONObject, filter: string): JSONObject {
     if (!filter) return obj;
-    const filterArray = filter.toLowerCase().split(' ');
+    const filterArray = filter.toLowerCase().split(" ");
 
     function matchesFilter(value: string, path: string[]): boolean {
-        const combinedString = path.concat(value).join(' ').toLowerCase();
-        return filterArray.every(f => combinedString.includes(f));
+        const combinedString = path.concat(value).join(" ").toLowerCase();
+        return filterArray.every((f) => combinedString.includes(f));
     }
 
-    function recursiveFilter(current: JSONObject, path: string[]): JSONObject | null {
-        if (typeof current === 'string') {
+    function recursiveFilter(
+        current: JSONObject,
+        path: string[],
+    ): JSONObject | null {
+        if (typeof current === "string") {
             return matchesFilter(current, path) ? current : null;
-        }if (typeof current === 'object' && current !== null) {
+        }
+        if (typeof current === "object" && current !== null) {
             const filteredObj: JSONObject = {};
             let childMatch = false;
 
@@ -35,7 +39,7 @@ function filterJSON(obj: JSONObject, filter: string): JSONObject {
                     childMatch = true;
                 }
             }
-            if (childMatch || matchesFilter('', path)) {
+            if (childMatch || matchesFilter("", path)) {
                 return filteredObj;
             }
         }
@@ -45,14 +49,18 @@ function filterJSON(obj: JSONObject, filter: string): JSONObject {
     return recursiveFilter(obj, []) || {};
 }
 
-
-export default function ({json, header}: {json: any, header?: string}) {
-    const [filter, setFilter] = useState('');
+export default function ({ json, header }: { json: any; header?: string }) {
+    const [filter, setFilter] = useState("");
     const filteredJson = filterJSON(json, filter);
     return (
-        <div className='max-h-[90vh] overflow-auto'>
+        <div className="max-h-[90vh] overflow-auto">
             {header && <h2>{header}</h2>}
-            <input type='text' value={filter} onChange={e => setFilter(e.target.value)} placeholder='Filter...' />
+            <input
+                type="text"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Filter..."
+            />
             <JsonView src={filteredJson} />
         </div>
     );

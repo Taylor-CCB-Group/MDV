@@ -1,9 +1,17 @@
-import React, { type PropsWithChildren, createContext, useContext, useState } from 'react';
+import type ChartManager from "@/charts/ChartManager";
+import React, {
+    type PropsWithChildren,
+    createContext,
+    useContext,
+    useState,
+} from "react";
 
 type ProjectInfo = {
     root: string;
     staticFolder: boolean;
-}
+    chartManager: ChartManager;
+    projectName: string;
+};
 
 const ProjectContext = createContext<ProjectInfo>(null);
 
@@ -12,22 +20,24 @@ export const ProjectProvider = ({ children }: PropsWithChildren) => {
     const { origin, pathname } = window.location;
     const flaskURL = origin + pathname;
     const urlParams = new URLSearchParams(window.location.search);
-    const dir = urlParams.get('dir') || flaskURL;
+    const dir = urlParams.get("dir") || flaskURL;
 
     const getRoot = (dir: string) => {
         return dir.endsWith("/") ? dir.substring(0, dir.length - 1) : dir;
     };
     const root = getRoot(dir);
     // todo - get these from e.g. state.json instead?
-    const staticFolder = urlParams.get('static') !== null;
+    const staticFolder = urlParams.get("static") !== null;
     const projectName = dir.split("/").pop();
+    const { chartManager } = window.mdv;
 
     const [projectConfig, setProjectConfig] = useState({
         flaskURL,
         dir,
         root,
         staticFolder,
-        projectName
+        projectName,
+        chartManager,
     });
 
     return (

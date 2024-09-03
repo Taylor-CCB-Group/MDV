@@ -3,7 +3,9 @@ import React from "react";
 
 async function loadWdyr() {
     console.log("Development mode...");
-    const { default: whyDidYouRender } = await import("@welldone-software/why-did-you-render");
+    const { default: whyDidYouRender } = await import(
+        "@welldone-software/why-did-you-render"
+    );
     console.log("Enabling whyDidYouRender...");
     whyDidYouRender(React, {
         trackAllPureComponents: true,
@@ -12,8 +14,8 @@ async function loadWdyr() {
         logOwnerReasons: true,
         include: [/.*/],
     });
-};
+}
 const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('wdyr')) {
+if (urlParams.get("wdyr")) {
     loadWdyr();
 }

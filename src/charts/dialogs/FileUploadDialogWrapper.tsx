@@ -1,6 +1,7 @@
 import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "../../utilities/Dialog";
 import FileUploadDialogComponent from "./FileUploadDialog";
+import { VivProvider, createVivStores } from '../../react/components/avivatorish/state';
 
 class FileUploadDialogReact extends BaseDialog {
     root: ReturnType<typeof createMdvPortal>;
@@ -12,17 +13,19 @@ class FileUploadDialogReact extends BaseDialog {
                 width: 450,
                 height: 320,
             },
-            null
+            null,
         );
         this.outer.classList.add("fileUploadDialog");
         if (this.dialog) {
+            const vivStores = createVivStores();
             this.root = createMdvPortal(
-                <FileUploadDialogComponent
-                    onClose={() => this.close()}
-                    onResize={(width: number, height: number) => this.resizeDialog(width, height)} // Pass the resize callback
-                />,
-                this.dialog,
-                this
+                <VivProvider vivStores={vivStores}>
+                    <FileUploadDialogComponent
+                        onClose={() => this.close()}
+                        onResize={(width: number, height: number) => this.resizeDialog(width, height)}
+                    />
+                </VivProvider>,
+                this.dialog
             );
         } else {
             console.error("Dialog element not found");
@@ -43,6 +46,7 @@ class FileUploadDialogReact extends BaseDialog {
         }
     }
 }
+
 
 BaseDialog.experiment["FileUploadDialogReact"] = FileUploadDialogReact;
 
