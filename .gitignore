@@ -39,3 +39,4 @@ data/
 
 .idea
 xvenv/
+secrets/
