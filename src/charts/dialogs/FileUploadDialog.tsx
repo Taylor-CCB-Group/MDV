@@ -188,7 +188,7 @@ const ErrorHeading = ({ children }) => (
   <h4 className="mt-0 text-lg font-bold">{children}</h4>
 );
 
-const FileInput = ({ value, onChange, isDisabled }) => (
+const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
   <div className="pr-4">
     <label
       htmlFor="datasourceName"
@@ -570,7 +570,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
 
     const formData = new FormData();
     formData.append("file", state.selectedFiles[0]);
-    let endpoint;
+    // let endpoint: "add_datasource" | "upload" | null = null;
 
     if (fileExtension === 'csv') {
 
@@ -578,13 +578,13 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
       // formData.append("view", "TRUE");
       // formData.append("backend", "TRUE");
       formData.append("replace", '');
-      endpoint = "add_datasource"
+      // endpoint = "add_datasource"
 
 
 
     } else if (fileExtension === 'tiff') {
       formData.append("project_name", projectName);
-      endpoint = "upload"
+      // endpoint = "upload"
     }
 
     const config = {
@@ -793,7 +793,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
           <div className="w-full flex items-center pl-4 pr-4">
-            <FileInput
+            <DatasourceNameInput
               value={datasourceName}
               onChange={handleDatasourceNameChange}
               isDisabled={state.selectedFiles.length === 0}
