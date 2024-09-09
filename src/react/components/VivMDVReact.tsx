@@ -18,10 +18,10 @@ import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
 import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
-import type { DualContourLegacyConfig } from "../contour_state";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
+import { scatterDefaults, type CategoryFilter, type ScatterPlotConfig } from "../scatter_state";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -55,53 +55,6 @@ const MainChart = observer(() => {
     return !isViewerLoading && <VivScatter />;
 });
 
-export type TooltipConfig = {
-    tooltip: {
-        show: boolean;
-        column?: ColumnName;
-    };
-};
-type CategoryFilter = {
-    column: ColumnName;
-    category: string | string[];
-    // consider properties like 'invert' or 'exclude', or 'color'...
-};
-//viewState should be persisted... maybe a way of saving different snapshots?
-//could we infer or something to avoid having to repeat this?
-export type ScatterPlotConfig = {
-    course_radius: number;
-    radius: number;
-    opacity: number;
-    color_by: ColumnName;
-    color_legend: {
-        display: boolean;
-        // todo: add more options here...
-    };
-    category_filters: Array<CategoryFilter>;
-    //on_filter: "hide" | "grey", //todo
-    zoom_on_filter: boolean;
-    point_shape: "circle" | "square" | "gaussian";
-} & TooltipConfig &
-    DualContourLegacyConfig;
-const scatterDefaults: ScatterPlotConfig = {
-    course_radius: 1,
-    radius: 10,
-    opacity: 1,
-    color_by: null,
-    color_legend: {
-        display: false,
-    },
-    tooltip: {
-        show: false,
-    },
-    category_filters: [],
-    zoom_on_filter: false,
-    point_shape: "circle",
-    contour_fill: false,
-    contour_bandwidth: 0.1,
-    contour_intensity: 1,
-    contour_opacity: 0.5,
-};
 export type VivRoiConfig = {
     // making this 'type' very specific will let us infer the rest of the type, i.e.
     // `if (config.type === 'VivMdvRegionReact')` will narrow the type to VivScatterConfig
@@ -530,7 +483,7 @@ BaseChart.types["VivMdvRegionReact"] = {
         config.radius = scatterDefaults.radius;
     },
     class: VivMdvReact,
-    name: "Viv Scatter Plot (react)",
+    name: "Spatial data viewer",
 };
 
 export type VivMdvReactType = typeof VivMdvReact;
