@@ -8,9 +8,9 @@ services:
       - "5055:5055"
     volumes:
       - mdv-data:/app/mdv
-      - /Users/jayesh/secrets/db_user:/run/secrets/db_user:ro
-      - /Users/jayesh/secrets/db_password:/run/secrets/db_password:ro
-      - /Users/jayesh/secrets/db_name:/run/secrets/db_name:ro 
+      - ./secrets/db_user:/run/secrets/db_user:ro
+      - ./secrets/db_password:/run/secrets/db_password:ro
+      - ./secrets/db_name:/run/secrets/db_name:ro 
     depends_on:
       - mdv_db
     
@@ -19,9 +19,9 @@ services:
     image: postgres:latest
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - /Users/jayesh/secrets/db_user:/run/secrets/db_user:ro
-      - /Users/jayesh/secrets/db_password:/run/secrets/db_password:ro
-      - /Users/jayesh/secrets/db_name:/run/secrets/db_name:ro
+      - ./secrets/db_user:/run/secrets/db_user:ro
+      - ./secrets/db_password:/run/secrets/db_password:ro
+      - ./secrets/db_name:/run/secrets/db_name:ro
     environment:
       POSTGRES_USER_FILE: /run/secrets/db_user
       POSTGRES_PASSWORD_FILE: /run/secrets/db_password

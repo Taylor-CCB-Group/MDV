@@ -23,7 +23,7 @@ if errorlevel 1 (
 REM Function to download and run docker-compose
 :run_docker_compose
 echo Setting DOCKER_COMPOSE_URL environment variable...
-set DOCKER_COMPOSE_URL=https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/jh-dev/docker-compose.yml
+set DOCKER_COMPOSE_URL=https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/jh-dev/docker-local.yml
 echo Downloading docker-compose.yml from %DOCKER_COMPOSE_URL%...
 curl -fsSL -o docker-compose.yml %DOCKER_COMPOSE_URL%
 if errorlevel 1 (
