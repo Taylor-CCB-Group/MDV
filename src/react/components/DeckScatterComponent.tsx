@@ -1,4 +1,5 @@
 import DeckGL from "@deck.gl/react/typed";
+import { OrthographicView } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
 import { useChartSize, useFilteredIndices, useParamColumns } from "../hooks";
 import { ScatterplotLayer } from "@deck.gl/layers/typed";
@@ -7,19 +8,10 @@ import { COORDINATE_SYSTEM } from "deck.gl/typed";
 // import { useScatterplotLayer } from "../scatter_state";
 
 export default observer(function DeckScatterComponent() {
-    // todo make this non-viv compatible
-    // const scatterProps = useScatterplotLayer();
-    // const { scatterplotLayer, getTooltip } = scatterProps;
     const [width, height] = useChartSize();
     const [cx, cy] = useParamColumns();
-    // const data = useFilteredIndices(); //this fails because of internal assumptions about backgroung_filter etc
-    const data = useMemo(() => {
-        const data = new Uint32Array(cx.data.length);
-        for (let i = 0; i < data.length; i++) {
-            data[i] = i;
-        }
-        return data;
-    }, [cx.data]);
+    const data = useFilteredIndices();
+    // const data = useMemo(() => ({ length: cx.data.length }), [cx.data.length]);
     const scatterplotLayer = new ScatterplotLayer({
         id: "scatterplot-layer",
         data,
@@ -27,20 +19,28 @@ export default observer(function DeckScatterComponent() {
         opacity: 0.8,
         stroked: false,
         filled: true,
-        radiusScale: 6,
-        radiusMinPixels: 1,
+        radiusScale: 10,
+        radiusMinPixels: 0.1,
         radiusMaxPixels: 100,
         lineWidthMinPixels: 1,
-        getPosition: (i, {target}) => {
-            target[0] = cx.data[i];
-            target[1] = cy.data[i];
+        getPosition: (index, {target}) => {
+            target[0] = cx.data[index];
+            target[1] = cy.data[index];
             return target as [number, number];
         },
         getRadius: (d) => 1,
         getFillColor: [0, 140, 240],
         getLineColor: [0, 0, 0],
-        coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+        // coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
     });
+    const [viewState, setViewState] = useState<any>({
+        width,
+        height,
+        target: [0, 0, 0],
+        zoom: 0,
+        minZoom: -50,
+    });
+
     const [midX, midY, rangeX, rangeY] = useMemo(() => {
         if (data.length === 0) return [0, 0, 1, 1];
         //there is also cx.minMax, cy.minMax - but not for filtered indices
@@ -61,26 +61,34 @@ export default observer(function DeckScatterComponent() {
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
         }
+        setViewState({
+            ...viewState,
+            target: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
+            zoom: Math.log2(Math.min(width/(maxX - minX), height/(maxY - minY))) - 0.1,
+        });
         return [(minX + maxX) / 2, (minY + maxY) / 2, maxX - minX, maxY - minY];
     }, [data, cx, cy]);
-    const zoom = 4;
-    const [viewState, setViewState] = useState<any>({
+
+    // we need an OrthographicView to prevent wrapping etc...
+    const view = useMemo(() => new OrthographicView({
+        id: "scatterplot-view",
+        controller: true,
         width,
         height,
-        target: [midX, midY, 0],
-        longitude: 0,
-        latitude: 0,
-        zoom,
-        minZoom: -50,
-    });
+        x: 0,
+        y: 0,
+    }), [width, height]);
 
     return (
+        <>
         <DeckGL 
             layers={[scatterplotLayer]}
             useDevicePixels={true}
             controller={true}
             viewState={viewState}
+            views={view}
             onViewStateChange={v => setViewState(v.viewState)}
         />
+        </>
     );
 });
