@@ -130,8 +130,14 @@ export function useFilteredIndices() {
     useEffect(() => {
         // return
         let cancelled = false;
-        if (!filterColumn) return;
         const indexPromise = dataStore.getFilteredIndices();
+        if (!filterColumn) {
+            indexPromise.then((indices) => {
+                if (cancelled) return;
+                setFilteredIndices(indices);
+            });
+            return;
+        }
         //todo maybe make more use of deck.gl category filters once we update to new version
         const catFilters = [
             config.background_filter,
