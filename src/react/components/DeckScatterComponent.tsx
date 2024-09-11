@@ -5,6 +5,7 @@ import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "..
 import { ScatterplotLayer } from "@deck.gl/layers/typed";
 import { useEffect, useId, useMemo, useState } from "react";
 import type { ScatterPlotConfig } from "../scatter_state";
+import { useChart } from "../context";
 // import { useScatterplotLayer } from "../scatter_state";
 
 export default observer(function DeckScatterComponent() {
@@ -13,9 +14,11 @@ export default observer(function DeckScatterComponent() {
     const [cx, cy] = useParamColumns();
     const data = useFilteredIndices();
     const config = useConfig<ScatterPlotConfig>(); //wtf why aren't we getting updated config?
-    // opacity works?
     const { opacity, radius, course_radius } = config;
     const radiusScale = (radius || 1) * Number.parseFloat(course_radius as any || "10");
+    const chart = useChart();
+    const colorBy = (chart as any).colorBy;
+
 
     const scatterplotLayer = new ScatterplotLayer({
         id: `scatterplot-layer-${id}`,
@@ -34,9 +37,11 @@ export default observer(function DeckScatterComponent() {
             return target as [number, number];
         },
         getRadius: (d) => 1,
-        getFillColor: [0, 140, 240],
+        getFillColor: colorBy ?? [255, 255, 255],
         getLineColor: [0, 0, 0],
-        // coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+        updateTriggers: {
+            getFillColor: colorBy,
+        }
     });
     const [viewState, setViewState] = useState<any>({
         width,
@@ -46,6 +51,7 @@ export default observer(function DeckScatterComponent() {
         minZoom: -50,
     });
 
+    //this should be factored out into a hook
     useEffect(() => {
         if (data.length === 0) return;// [0, 0, 1, 1];
         //there is also cx.minMax, cy.minMax - but not for filtered indices
