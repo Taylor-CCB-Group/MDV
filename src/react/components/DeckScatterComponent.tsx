@@ -1,26 +1,31 @@
 import DeckGL from "@deck.gl/react/typed";
 import { OrthographicView } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
-import { useChartSize, useFilteredIndices, useParamColumns } from "../hooks";
+import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
 import { ScatterplotLayer } from "@deck.gl/layers/typed";
-import { useMemo, useState } from "react";
-import { COORDINATE_SYSTEM } from "deck.gl/typed";
+import { useEffect, useId, useMemo, useState } from "react";
+import type { ScatterPlotConfig } from "../scatter_state";
 // import { useScatterplotLayer } from "../scatter_state";
 
 export default observer(function DeckScatterComponent() {
+    const id = useId();
     const [width, height] = useChartSize();
     const [cx, cy] = useParamColumns();
     const data = useFilteredIndices();
-    // const data = useMemo(() => ({ length: cx.data.length }), [cx.data.length]);
+    const config = useConfig<ScatterPlotConfig>(); //wtf why aren't we getting updated config?
+    // opacity works?
+    const { opacity, radius, course_radius } = config;
+    const radiusScale = (radius || 1) * Number.parseFloat(course_radius as any || "10");
+
     const scatterplotLayer = new ScatterplotLayer({
-        id: "scatterplot-layer",
+        id: `scatterplot-layer-${id}`,
         data,
         pickable: false,
-        opacity: 0.8,
+        opacity,
         stroked: false,
         filled: true,
-        radiusScale: 10,
-        radiusMinPixels: 0.1,
+        radiusScale,
+        radiusMinPixels: 0.5,
         radiusMaxPixels: 100,
         lineWidthMinPixels: 1,
         getPosition: (index, {target}) => {
@@ -41,8 +46,8 @@ export default observer(function DeckScatterComponent() {
         minZoom: -50,
     });
 
-    const [midX, midY, rangeX, rangeY] = useMemo(() => {
-        if (data.length === 0) return [0, 0, 1, 1];
+    useEffect(() => {
+        if (data.length === 0) return;// [0, 0, 1, 1];
         //there is also cx.minMax, cy.minMax - but not for filtered indices
         let minX = Number.POSITIVE_INFINITY;
         let maxX = Number.NEGATIVE_INFINITY;
@@ -62,12 +67,13 @@ export default observer(function DeckScatterComponent() {
             if (y > maxY) maxY = y;
         }
         setViewState({
-            ...viewState,
+            width,
+            height,
             target: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
             zoom: Math.log2(Math.min(width/(maxX - minX), height/(maxY - minY))) - 0.1,
         });
-        return [(minX + maxX) / 2, (minY + maxY) / 2, maxX - minX, maxY - minY];
-    }, [data, cx, cy]);
+        //return [(minX + maxX) / 2, (minY + maxY) / 2, maxX - minX, maxY - minY];
+    }, [data, cx, cy, width, height]);
 
     // we need an OrthographicView to prevent wrapping etc...
     const view = useMemo(() => new OrthographicView({
