@@ -29,14 +29,15 @@ const Tools = {
         name: "Rectangle",
         ToolIcon: PhotoSizeSelectSmallOutlinedIcon, //todo something better...
     },
-    polygon: {
-        name: "Polygon",
-        ToolIcon: PolylineOutlinedIcon,
-    },
-    freehand: {
-        name: "Freehand",
-        ToolIcon: EditOutlinedIcon,
-    },
+    // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
+    // polygon: {
+    //     name: "Polygon",
+    //     ToolIcon: PolylineOutlinedIcon,
+    // },
+    // freehand: {
+    //     name: "Freehand",
+    //     ToolIcon: EditOutlinedIcon,
+    // },
     transform: {
         name: "Transform",
         ToolIcon: ControlCameraOutlinedIcon,

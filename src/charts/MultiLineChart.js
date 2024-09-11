@@ -5,7 +5,6 @@ import { select } from "d3-selection";
 import { scaleBand, scaleLinear } from "d3-scale";
 import { axisLeft } from "d3-axis";
 import BaseChart from "./BaseChart";
-import { ClipSpace } from "@luma.gl/core";
 
 class MultiLineChart extends SVGChart {
     constructor(dataStore, div, config) {
