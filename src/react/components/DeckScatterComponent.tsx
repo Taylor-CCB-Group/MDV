@@ -13,9 +13,9 @@ export default observer(function DeckScatterComponent() {
     const [width, height] = useChartSize();
     const [cx, cy] = useParamColumns();
     const data = useFilteredIndices();
-    const config = useConfig<ScatterPlotConfig>(); //wtf why aren't we getting updated config?
+    const config = useConfig<ScatterPlotConfig>();
     const { opacity, radius, course_radius } = config;
-    const radiusScale = (radius || 1) * Number.parseFloat(course_radius as any || "10");
+    const radiusScale = radius * course_radius;
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
 
@@ -23,20 +23,16 @@ export default observer(function DeckScatterComponent() {
     const scatterplotLayer = new ScatterplotLayer({
         id: `scatterplot-layer-${id}`,
         data,
-        pickable: false,
+        pickable: true,
         opacity,
         stroked: false,
         filled: true,
         radiusScale,
-        radiusMinPixels: 0.5,
-        radiusMaxPixels: 100,
-        lineWidthMinPixels: 1,
         getPosition: (index, {target}) => {
             target[0] = cx.data[index];
             target[1] = cy.data[index];
             return target as [number, number];
         },
-        getRadius: (d) => 1,
         getFillColor: colorBy ?? [255, 255, 255],
         getLineColor: [0, 0, 0],
         updateTriggers: {
