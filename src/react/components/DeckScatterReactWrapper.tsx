@@ -51,7 +51,7 @@ class DeckScatterReact extends BaseReactChart<ScatterPlotConfig> {
         const c = this.config;
         const { tooltip } = c;
         const cols = this.dataStore.getColumnList() as DataColumn<DataType>[];
-        const catCols = cols.filter((c) => c.datatype.match(/text/i));
+        //const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
 
@@ -144,6 +144,27 @@ BaseChart.types["DeckScatter"] = {
             name: "y axis",
         },
     ]
+};
+BaseChart.types["DeckScatter3D"] = {
+    name: "3D Scatter Plot (new)",
+    class: DeckScatterReact,
+    params: [
+        {
+            type: "number",
+            name: "x axis",
+        },
+        {
+            type: "number",
+            name: "y axis",
+        },
+        {
+            type: "number",
+            name: "z axis",
+        },
+    ],
+    init: (config: ScatterPlotConfig) => {
+        config.dimension = "3d";
+    }
 };
 
 export type VivMdvReactType = typeof DeckScatterReact;
