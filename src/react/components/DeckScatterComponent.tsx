@@ -42,6 +42,9 @@ export default observer(function DeckScatterComponent() {
             getFillColor: colorBy,
         },
         billboard: true,
+        parameters: {
+            depthTest: false,
+        }
     });
     const [viewState, setViewState] = useState<any>({
         width,
