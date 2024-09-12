@@ -1120,6 +1120,7 @@ class DataStore {
     }
 
     /**
+     * @deprecated use dataExportUtils `getExportCsvStream` instead
      * Gets a text file blob of the data which can be downloaded
      * @param {string[]} columns A list of column fields/ids to create the file with
      * @param {string|int[]} rows a value of 'filtered'  will only add filtered rows,
@@ -1133,11 +1134,15 @@ class DataStore {
         if (typeof rows !== "string") {
             indexes = rows;
         }
+
         const arr = [];
-        const cols = [];
         const headers = ["index"].concat(columns);
         const len = indexes ? indexes.length : this.size;
+
         arr.push(headers.join(delimiter));
+        const chunkSize = 10000; // You can adjust this depending on performance
+        const dataChunks = [];
+
         for (let i = 0; i < len; i++) {
             let index = i;
             if (indexes) {
@@ -1150,8 +1155,20 @@ class DataStore {
             const o = this.getRowAsObject(index, columns);
             const line = [i].concat(columns.map((x) => o[x]));
             arr.push(line.join(delimiter));
+
+            // Flush the data in chunks (doesn't help much, see getExportCsvStream for something more scalable)
+            if (arr.length >= chunkSize) {
+                dataChunks.push(arr.join(newline));
+                arr.length = 0; // Reset the array
+            }
         }
-        return new Blob([arr.join(newline)], { type: "text/plain" });
+
+        if (arr.length > 0) {
+            dataChunks.push(arr.join(newline)); // Add the final chunk
+        }
+
+        // Join all the chunks into a single blob
+        return new Blob([dataChunks.join(newline)], { type: "text/plain" });
     }
 
     /**

@@ -184,12 +184,12 @@ class TableChart extends BaseChart {
         return config;
     }
 
-    downloadData() {
-        const blob = this.dataModel.getDataAsBlob();
+    async downloadData() {
+        const blob = await this.dataModel.getDataAsBlob();
         const save = createEl(
             "a",
             {
-                download: "data",
+                download: this.dataStore.name,
                 target: "_blank",
                 href: window.URL.createObjectURL(blob),
             },

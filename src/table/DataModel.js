@@ -1,3 +1,5 @@
+import { getExportCsvStream } from "@/datastore/dataExportUtils";
+
 class DataModel {
     constructor(dataStore, config = {}) {
         this.dataStore = dataStore;
@@ -96,13 +98,16 @@ class DataModel {
         this.dataStore.removeColumn(col, true, true);
     }
 
-    getDataAsBlob(delimiter = "\t", newline = "\n") {
-        return this.dataStore.getDataAsBlob(
-            this.columns,
-            this.data,
-            delimiter,
-            newline,
-        );
+    async getDataAsBlob(delimiter = "\t", newline = "\n") {
+        // return this.dataStore.getDataAsBlob(
+        //     this.columns,
+        //     this.data,
+        //     delimiter,
+        //     newline,
+        // );
+        const stream = await getExportCsvStream(this, delimiter, newline);
+        const response = new Response(stream);
+        return await response.blob();
     }
 
     getValueSuggestion(val, column) {
