@@ -1,11 +1,9 @@
 import { CompositeLayer, type Layer, type LayersList } from "deck.gl/typed";
 import type { LayerContext, ScatterplotLayerProps } from "deck.gl/typed";
 import { ScatterplotExLayer } from "./ScatterplotExLayer";
-import { Framebuffer } from "@luma.gl/core";
-import { ScatterDensityExension } from "./ScatterDeckExtension";
-import HeatmapContourExtension, {
-    ExtendableHeatmapLayer,
-} from "./HeatmapContourExtension";
+// import { Framebuffer } from "@luma.gl/core";
+// import { ScatterDensityExension } from "./ScatterDeckExtension";
+import { ExtendableHeatmapLayer } from "./HeatmapContourExtension";
 import type { useContour } from "@/react/contour_state";
 
 export type SpatialLayerProps = ScatterplotLayerProps & {
