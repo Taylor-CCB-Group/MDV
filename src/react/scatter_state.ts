@@ -48,6 +48,7 @@ export type ScatterPlotConfig = {
     //on_filter: "hide" | "grey", //todo
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
+    dimension: "2d" | "3d";
 } & TooltipConfig &
     DualContourLegacyConfig;
 export const scatterDefaults: ScatterPlotConfig = {
@@ -68,6 +69,7 @@ export const scatterDefaults: ScatterPlotConfig = {
     contour_bandwidth: 0.1,
     contour_intensity: 1,
     contour_opacity: 0.5,
+    dimension: "2d",
 };
 
 
