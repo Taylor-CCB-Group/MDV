@@ -3,7 +3,8 @@ import JsonView from "react18-json-view";
 import "react18-json-view/src/style.css";
 // If dark mode is needed, import `dark.css`.
 import "react18-json-view/src/dark.css";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useDebounce } from "use-debounce";
 
 type JSONObject = { [key: string]: any };
 
@@ -59,7 +60,11 @@ function filterJSON(obj: JSONObject, filter: string): JSONObject {
 
 export default function ({ json, header }: { json: any; header?: string }) {
     const [filter, setFilter] = useState("");
-    const filteredJson = filterJSON(json, filter);
+    const [debouncedFilter] = useDebounce(filter, 300); //why is this returning a tuple?
+    const filteredJson = useMemo(
+        () => filterJSON(json, debouncedFilter),
+        [json, debouncedFilter]
+    );
     return (
         <div className="max-h-[90vh] overflow-auto">
             {header && <h2>{header}</h2>}
