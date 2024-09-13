@@ -36,7 +36,7 @@ class SelectionDialog extends BaseChart {
                 },
                 div,
             );
-            if (col.datatype === "text" || col.datatype === "multitext") {
+            if (col.datatype.match(/text/)) {
                 this.addTextFilter(col, div);
             } else if (
                 col.datatype === "integer" ||
@@ -211,7 +211,7 @@ class SelectionDialog extends BaseChart {
     filterCategories(col, notify = true) {
         const f = this.config.filters[col];
         const type = this.dataStore.columnIndex[col].datatype;
-        if (type === "text") {
+        if (type === "text" || type === "text16") {
             if (!f.category || f.category.length === 0) {
                 this.dims[col].removeFilter();
             } else {
