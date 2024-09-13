@@ -244,6 +244,26 @@ def create_app(
             success = False
 
         return jsonify({"success": success})
+    
+    @project_bp.route("/add_or_update_image_datasource", methods=["POST"])
+    def add_or_update_image_datasource():
+        try:
+            # Extract data from the request
+            data = request.json
+            tiff_metadata = data.get('tiffMetadata')
+            datasource_name = data.get('datasourceName')
+
+            if not tiff_metadata or not datasource_name:
+                return jsonify({"status": "error", "message": "Missing required fields"}), 400
+
+            # Call the method in the project class to add or update image datasource
+            success = project.add_or_update_image_datasource(tiff_metadata, datasource_name)
+            if success:
+                return jsonify({"status": "success", "message": "Image datasource updated successfully"}), 200
+            else:
+                return jsonify({"status": "error", "message": "Failed to update image datasource"}), 500
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
 
     @project_bp.route("/add_datasource", methods=["POST"])
     def add_datasource():
