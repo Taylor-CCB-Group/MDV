@@ -3,7 +3,7 @@
 
 ![logo](images/mdv_logo.png)
 
-Multi Dimensional Viewer (MDV) is web based application for analyzing, annotating and sharing multi-dimensional data from different modalities.  It is inspired by [dc charts](https://dc-js.github.io/dc.js/) and [crossfilter](https://square.github.io/crossfilter/), but is performant with over 10 million data items due to the use of web workers, shared array buffers and native arrays.  
+The Multi-Dimensional Viewer (MDV) is a web-based application designed to help users analyse, annotate, and share multi-dimensional data from various sources (e.g., biological, statistical, etc.). MDV supports fast, interactive analysis even with large datasets (up to 10 million data items), thanks to its use of web workers, shared array buffers, and native arrays.
 &nbsp;
 
 ![summary](images/summary.png)
@@ -50,23 +50,18 @@ For development, or running the current version from the repository:
 
 ## Running On Local Machine
 
-If you have large amounts of data or projects you may wish to install MDV locally. MDV is written JavaScript designed to be embedded in a web page (https://mdv.molbiol.ox.ac.uk/). However in the python directory of this repository, there are some python scripts to format data to a specific file structure and compiled JavaScript that can display that format. There is also a lightweight server that runs locally to display projects
+If you’re working with large datasets or want more control over your projects, you can install MDV locally. MDV is written in JavaScript designed to be embedded in a web page (https://mdv.molbiol.ox.ac.uk/). However in the python directory of this repository, there are some python scripts to format data to a specific file structure and compiled JavaScript that can display that format. There is also a lightweight server that runs locally to display projects
 
 ### Installation
 
 #### From a GitHub release version
-
-Download and unzip, this should be able to work without requiring node to be installed etc.
-
--- this needs better documentation, and I might want to make a new release soon...
-
-#### For development / using latest features
 
 Clone the repository
 
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
 cd MDV
+# if you want do include the latest stable branch also do
 git checkout pjt-dev
 ```
 
@@ -118,10 +113,8 @@ This example will build and run a project based on the `pbmc3k_processed` datase
 python python/mdvtools/test_projects/scanpy_pbmc3k.py
 ```
 
-...homework: make a script (or notebook) that runs example
-
-### Displaying example data (old doc)
-download the  data
+### Displaying example data (a subset from the original MDV publication)
+Download the data.
 
 https://zenodo.org/record/6513508/files/hyp_example_data.zip?download=1
 
@@ -149,7 +142,6 @@ This will open a browser window at http://localhost:5000/ but you will need to g
 
 ## Running on a server
 
-
 The default data storage is an hdf5 file which is a compressed files that allows random read/write access to the data. However, it cannot be accessed directly but requires some kind of wrapper e.g. h5py. Hence access via http calls directly is not possible and backend code is required to display an MDV project in a web page. However, it can be converted to simple continuous compressed blocks of data for each column and a json index . This allows direct access via an http request with a range header:-
 
 ```python
@@ -162,8 +154,6 @@ The function also creates a simple home page for the project (index.html), which
 ```
 https://myserver.com/path/to/myapp
 ```
-
-
 
 ## Development
 
