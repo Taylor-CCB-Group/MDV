@@ -61,25 +61,27 @@ Clone the repository
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
 cd MDV
-# if you want do include the latest stable branch also do
-git checkout pjt-dev
 ```
 
-Then, from the MDV folder:
-
-Install front-end dependencies
+Then, when in the MDV folder install front-end dependencies
 
 ```
 npm i
 ```
 
-Setup Python virtual environment and build the front-end that it will use. On Unix-like systems, there is an npm script that will do this automatically, as long as you have Python 3.12 installed and [Poetry is available in your PATH](https://python-poetry.org/docs/#installation):
+## MacOS / Linux
 
+### Recommendations
+We recommend installing 
+- Python 3.12+
+- Poetry
+
+This will allow the environment to managed and updated in one step
 ```
 npm run python-setup
 ```
 
-This will be equivalent to the following:
+Alternatively you can do:
 
 ```
 python -m venv venv
@@ -89,23 +91,25 @@ poetry install --with dev
 npm run build-flask-vite
 ```
 
-On Windows systems, the `source venv/bin/activate` will not work - activating the environment is done by running `venv/Scripts/activate.bat`.
+## Windows
 
-If you don't want to use `poetry`, or wish to manage your own virtual environment, you can install `mdvtools` with `pip` (using `editable` flag for development):
+```
+python -m venv venv
+source venv/Scripts/activate.bat
+cd python
+poetry install --with dev
+npm run build-flask-vite
+```
+
+## Non Poetry installation ( MacOS/ Linux / Windows )
+
+If you don't want to use Poetry, or wish to manage your own virtual environment, you can install `mdvtools` with `pip` (using `editable` flag for development):
 
 ```
 pip install -e python
 ```
 
-**or**, if you are happy with `poetry` but want to manage the virtual environment yourself:
-
-```
-cd python
-poetry install --with dev
-```
-
 ### Running a test project
-
 
 This example will build and run a project based on the `pbmc3k_processed` dataset from `scanpy`:
 
@@ -113,12 +117,13 @@ This example will build and run a project based on the `pbmc3k_processed` datase
 python python/mdvtools/test_projects/scanpy_pbmc3k.py
 ```
 
-### Displaying example data (a subset from the original MDV publication)
+### Displaying a subset of the data from the original MDV publication (Single cell spatial analysis reveals inflammatory foci of immature neutrophil and CD8 T cells in COVID-19 lungs)
+
 Download the data.
 
 https://zenodo.org/record/6513508/files/hyp_example_data.zip?download=1
 
-Then cd to the python directory
+Then cd to the python directory in mdv
 
 ```
 cd path/to/mdv/python
