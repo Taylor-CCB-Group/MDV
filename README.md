@@ -67,6 +67,7 @@ Then, when in the MDV folder install front-end dependencies
 
 ```
 npm i
+npm run build-flask-vite
 ```
 
 ## MacOS / Linux
