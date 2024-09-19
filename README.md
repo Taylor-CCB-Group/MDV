@@ -44,7 +44,7 @@ For running a release version:
 For development, or running the current version from the repository:
 
 * git
-* node.js
+* npm and node.js (https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
 * python (>=3.10, 3.12 is most tested/supported)
 * poetry (for managing python dependencies - optional, but recommended especially for contributing to the Python code)
 
@@ -57,6 +57,8 @@ If you’re working with large datasets or want more control over your projects,
 #### From a GitHub release version
 
 Clone the repository
+
+Run these comands from Powershell (Windows) or a Terminal (MaxOS/Linux):
 
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
