@@ -56,59 +56,35 @@ If you’re working with large datasets or want more control over your projects,
 
 #### From a GitHub release version
 
-Clone the repository
-
-Run these comands from Powershell (Windows) or a Terminal (MaxOS/Linux):
+Run these comands from Powershell (Windows) or a Terminal (MaxOS/Linux) to clone the repository:
 
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
 cd MDV
 ```
 
-Then, when in the MDV folder install front-end dependencies
+Now you are in the MDV folder install front-end dependencies:
 
 ```
 npm i
 npm run build-flask-vite
 ```
 
+Now install Python libaries 
+
 ## MacOS / Linux
-
-### Recommendations
-We recommend installing 
-- Python 3.12+
-- Poetry
-
-This will allow the environment to managed and updated in one step
-```
-npm run python-setup
-```
-
-Alternatively you can do:
 
 ```
 python -m venv venv
 source venv/bin/activate
-cd python
-poetry install --with dev
-npm run build-flask-vite
+pip install -e python
 ```
 
 ## Windows
 
 ```
 python -m venv venv
-source venv/Scripts/activate.bat
-cd python
-poetry install --with dev
-npm run build-flask-vite
-```
-
-## Non Poetry installation ( MacOS/ Linux / Windows )
-
-If you don't want to use Poetry, or wish to manage your own virtual environment, you can install `mdvtools` with `pip` (using `editable` flag for development):
-
-```
+venv/Scripts/activate.bat
 pip install -e python
 ```
 
