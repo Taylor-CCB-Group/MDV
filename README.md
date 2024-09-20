@@ -96,6 +96,17 @@ This example will build and run a project based on the `pbmc3k_processed` datase
 python python/mdvtools/test_projects/scanpy_pbmc3k.py
 ```
 
+Note: This will open a internet browser on your machine at the URL "localhost:5052". Depending on how your machine's firewall is configured you may see an error saying the port is blocked. You can either allow this port to be used or edit the last line of the script to use a port that is unused e.g.
+```
+p.serve(port=8080)  
+```
+
+When the above script is run and the page is loaded you will see something like this:
+
+![image](https://github.com/user-attachments/assets/db22272e-37f4-497b-a914-ee415508ca45)
+
+You can now add Charts (scatterplots, rowcharts etc) and Views (contains the charts) to allow visualisation and querying of the data.
+
 ### Displaying a subset of the data from the original MDV publication (Single cell spatial analysis reveals inflammatory foci of immature neutrophil and CD8 T cells in COVID-19 lungs)
 
 Download the data.
