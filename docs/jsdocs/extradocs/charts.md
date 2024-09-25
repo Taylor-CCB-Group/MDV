@@ -2,6 +2,8 @@
 
 ## GenomeBrowser
 
+In order to make the genome_browser chart available in your project, you need to call the `MDVProject.add_genome_browser` method in the python code that configures the project.
+
 * **type** - genome_browser
 
 * **param** - the columns the describe a genomic location e.g. chr, start and finish

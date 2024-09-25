@@ -1,0 +1,16 @@
+{
+    "exclude": [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/docsenv/**",
+        "**/venv/**",
+        "**/docs/**",
+    ],
+    "entryPoints": [
+        "src/",
+    ],
+    "entryPointStrategy": "expand",
+    "watch": true,
+    "out": "docs/typedoc",
+}

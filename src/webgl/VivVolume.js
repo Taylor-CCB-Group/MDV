@@ -1,20 +1,26 @@
 import BaseChart from "../charts/BaseChart.js";
 import { ColorChannelDialog } from "../charts/VivScatterPlot.js";
 import { createEl } from "../utilities/Elements.js";
-import VivViewer from '../webgl/VivViewer.js';
+import VivViewerMDV from "../webgl/VivViewerMDV.js";
 
 class VivVolume extends BaseChart {
     constructor(dataStore, div, config) {
         super(dataStore, div, config);
         this.setupScatterplot();
         this.afterAppCreation();
-        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener("click", ()=>{
-            if (this.dialog) {
-                this.dialog.close();
-                this.dialog = null;
-            }
-            else this.dialog = new ColorChannelDialog(this.viv,this.__doc__);
-        });
+        this.addMenuIcon("fas fa-palette", "Alter Channels").addEventListener(
+            "click",
+            () => {
+                if (this.dialog) {
+                    this.dialog.close();
+                    this.dialog = null;
+                } else
+                    this.dialog = new ColorChannelDialog(
+                        this.viv,
+                        this.__doc__,
+                    );
+            },
+        );
     }
     setSize(x, y) {
         super.setSize(x, y);
@@ -25,32 +31,39 @@ class VivVolume extends BaseChart {
     }
     //could just be in constructor in this case.
     afterAppCreation() {
-        const {width, height} = this._getContentDimensions();
-        this.vivCanvas = createEl("canvas", {
-            width, height, 
-            styles: {
-                position: "absolute"
-            }
-        }, this.contentDiv);
-        console.log('config in VivVolume', this.config);
+        const { width, height } = this._getContentDimensions();
+        this.vivCanvas = createEl(
+            "canvas",
+            {
+                width,
+                height,
+                styles: {
+                    position: "absolute",
+                },
+            },
+            this.contentDiv,
+        );
+        console.log("config in VivVolume", this.config);
         const vivConfig = {
             ///...
             url: this.config.options.url, //'/data/t1-head-imj.ome.tiff',
             use3d: true,
             scatterData: this.scatterData,
-            getScatterFillColor: () => [100, 0, 0]
-        }
+            getScatterFillColor: () => [100, 0, 0],
+        };
         // not really what we want... basically ignored with use3d.
         const iv = {
-            x_scale: 1, y_scale: 1, offset: 0
-        }
-        // we may not necessarily want to re-use VivViewer?
+            x_scale: 1,
+            y_scale: 1,
+            offset: 0,
+        };
+        // we may not necessarily want to re-use VivViewerMDV?
         // although some common features with channels etc.
-        this.viv = new VivViewer(this.vivCanvas, vivConfig, iv);
+        this.viv = new VivViewerMDV(this.vivCanvas, vivConfig, iv);
     }
 
     setupScatterplot() {
-        const {dataStore, config} = this;
+        const { dataStore, config } = this;
         if (config.param.length === 0) return;
         //we'll need all the methods for handling data filtering etc...
         const ix = config.param[0];
@@ -63,18 +76,25 @@ class VivVolume extends BaseChart {
         const catCol = dataStore.getRawColumn(icat);
         // seems suboptimal. even if this was better, underlying deck.gl scatterplot data could maybe be Float32Array or something?
         // might consider a custom layer, storying data in texture?
-        const indices = new Array(xCol.length).fill().map((_, i) => dataStore.filterArray[i] ? -1 : i).filter(v=> v>-1);
-        this.scatterData = new Array(dataStore.filterSize).fill().map((_, j) => {
-            const i = indices[j];
-            const x = xCol[i];
-            const y = yCol[i];
-            const z = zCol[i];
-            const cat = catCol[i];
-            const position = [x, y, z];
-            return {
-                position, cat, i
-            }
-        });
+        const indices = new Array(xCol.length)
+            .fill()
+            .map((_, i) => (dataStore.filterArray[i] ? -1 : i))
+            .filter((v) => v > -1);
+        this.scatterData = new Array(dataStore.filterSize)
+            .fill()
+            .map((_, j) => {
+                const i = indices[j];
+                const x = xCol[i];
+                const y = yCol[i];
+                const z = zCol[i];
+                const cat = catCol[i];
+                const position = [x, y, z];
+                return {
+                    position,
+                    cat,
+                    i,
+                };
+            });
         config.scatterData = this.scatterData;
     }
     _update() {
@@ -87,15 +107,15 @@ class VivVolume extends BaseChart {
         super.onDataFiltered(dim);
         this._update();
     }
-    onDataAdded(data){
+    onDataAdded(data) {
         super.onDataAdded(data);
         this._update();
     }
-    onDataChanged(data){
+    onDataChanged(data) {
         super.onDataChanged(data);
         this._update();
     }
-    onDataHighlighted(data){
+    onDataHighlighted(data) {
         // super.onDataHighlighted(data); doesn't exist
         this._update();
     }
@@ -115,8 +135,8 @@ class VivVolume extends BaseChart {
         if (!this.scatterData) return {};
         return {
             colorby: "all",
-            has_default_color: true
-        }
+            has_default_color: true,
+        };
     }
     getSettings() {
         return [
@@ -124,35 +144,38 @@ class VivVolume extends BaseChart {
             {
                 type: "doubleslider",
                 label: "clip X",
-                min: 0, max: 1,
+                min: 0,
+                max: 1,
                 current_value: this.viv.clipX,
                 continuous: true,
-                func: (min, max) => this.viv.setClipX(min, max)
+                func: (min, max) => this.viv.setClipX(min, max),
             },
             {
                 type: "doubleslider",
                 label: "clip Y",
-                min: 0, max: 1,
+                min: 0,
+                max: 1,
                 continuous: true,
                 current_value: this.viv.clipY,
-                func: (min, max) => this.viv.setClipY(min, max)
+                func: (min, max) => this.viv.setClipY(min, max),
             },
             {
                 type: "doubleslider",
                 label: "clip Z",
-                min: 0, max: 1,
+                min: 0,
+                max: 1,
                 continuous: true,
                 current_value: this.viv.clipZ,
-                func: (min, max) => this.viv.setClipZ(min, max)
+                func: (min, max) => this.viv.setClipZ(min, max),
             },
             {
                 type: "button",
                 label: "Recenter camera",
                 func: () => {
-                    this.viv.recenterCamera()
-                }
+                    this.viv.recenterCamera();
+                },
             },
-        ]
+        ];
     }
     remove() {
         this.viv.deck?.finalize();
@@ -165,46 +188,47 @@ const nameOption = {
     type: "string",
     name: "url",
     label: "ome.tiff volume url",
-    defaultVal: "/data/t1-head-imj.ome.tiff"
+    defaultVal: "/data/t1-head-imj.ome.tiff",
 };
 
 const commonOptions = {
     init: (config, dataSource, extraControls) => {
-        const {url} = extraControls;
-        config.options = {url};
+        const { url } = extraControls;
+        config.options = { url };
     },
     extra_controls: (dataSource) => {
         return [nameOption];
-    }
+    },
 };
 
 BaseChart.types["viv_volume_scatter_view"] = {
     name: "Viv Volume with Scatterplot",
     class: VivVolume,
-    params: [{
-        type: "number",
-        name: "X axis"
-    },
-    {
-        type: "number",
-        name: "Y axis"
-    },
-    {
-        type: "number",
-        name: "Z axis"
-    },
-    {
-        type: "text",
-        name: "Category Column"
-    }
+    params: [
+        {
+            type: "number",
+            name: "X axis",
+        },
+        {
+            type: "number",
+            name: "Y axis",
+        },
+        {
+            type: "number",
+            name: "Z axis",
+        },
+        {
+            type: "text",
+            name: "Category Column",
+        },
     ],
-    ...commonOptions
+    ...commonOptions,
     // options: [nameOption]
-}
+};
 BaseChart.types["viv_volume_view"] = {
     name: "Viv Volume View",
     class: VivVolume,
     params: [],
-    ...commonOptions
+    ...commonOptions,
     // options: [nameOption]
-}
+};

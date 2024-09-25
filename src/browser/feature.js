@@ -28,6 +28,7 @@ import {Utils} from "./utils.js";
 import {igvxhr,unbgzf} from "./igvxhr.js";
 import {loadBamIndex} from "./bam.js";
 import {BWSource} from "./bigwig.js";
+import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 
 const MAX_GZIP_BLOCK_SIZE = (1 << 16);
 
@@ -294,7 +295,9 @@ class FeatureFileReader{
             this.filename = config.localFile.name;
         }
         else {
-            this.url = config.url;
+            //this should be tested in any build configs not used by Peter...
+            //probably will change how we do this at some point
+            this.url = getProjectURL(config.url, false);
             this.indexURL = config.indexURL;
             this.headURL = config.headURL || this.filename;
 
@@ -338,6 +341,7 @@ class FeatureFileReader{
         var idxFile = this.indexURL;
         if (this.filename.endsWith(".gz")) {
             if (!idxFile) idxFile = this.url + ".tbi";
+            // idxFile = getProjectURL(idxFile);
             return loadBamIndex(idxFile, this.config, true);
         }
         else {
@@ -538,7 +542,8 @@ class FeatureFileReader{
                             igvxhr.loadStringFromFile(self.localFile, options).then(success);
                         }
                         else {
-                            igvxhr.loadString(self.url, options).then(success).catch(reject);
+                            const url = self.url; //getProjectURL(self.url);
+                            igvxhr.loadString(url, options).then(success).catch(reject);
                         }
                     }
                     else {

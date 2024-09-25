@@ -3,33 +3,46 @@
 // - general shape of data structures NB - in many cases this can be inferred from JS, so I may remove these again...
 //   partly just using them as a form of documentation / notes-to-self.
 
-import DataStore from "../datastore/DataStore";
-
-export type DataType = 'integer' | 'double' | 'text' | 'unique' | 'multitext' | 'int32';
+import type DataStore from "../datastore/DataStore";
+import type BaseChart from "./BaseChart";
+export type DataType =
+    | "integer"
+    | "double"
+    | "text"
+    | "text16"
+    | "unique"
+    | "multitext"
+    | "int32";
+export type CategoricalDataType = "text" | "text16" | "multitext";
 
 type DataStructureTypes = {
-    'integer': Uint32Array;
-    'double': Float32Array; //why is it called 'double'???
-    'text': Uint8Array;
-    'multitext': Uint16Array;
-    'unique': Uint8Array; //not sure about this either.
-}
+    integer: Uint32Array;
+    double: Float32Array; //why is it called 'double'???
+    text: Uint8Array;
+    text16: Uint16Array;
+    multitext: Uint16Array;
+    unique: Uint8Array; //not sure about this either.
+};
 type DataValuesTypes = {
-    'integer': undefined;
-    'double': undefined;
-    'text': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
-    'multitext': string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
-    'unique': string[];
-}
+    integer: undefined;
+    double: undefined;
+    text: string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
+    text16: string[];
+    multitext: string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
+    unique: string[];
+};
+// even if they're just aliases, these could be useful for documentation / clarity
+export type ColumnName = string;
+export type DataSourceName = string;
+export type FieldName = string;
 
 export type DataColumn<T extends DataType> = {
-    name: string;
-    field: string;
+    name: ColumnName;
+    field: FieldName;
     datatype: T;
     data: DataStructureTypes[T];
     values: DataValuesTypes[T];
-}
-
+};
 
 // export type DataStore = {
 //     size: number;
@@ -41,42 +54,124 @@ export type DataColumn<T extends DataType> = {
 //     columnsWithData: string[];
 // };
 export type DataSource = {
-    name: string;
+    name: DataSourceName;
     charts: Chart[];
     dataStore: DataStore;
     contentDiv: HTMLDivElement;
     menuBar: HTMLDivElement;
+    images?: Record<string, any>;
+    regions?: Record<string, any>;
 };
 
+type DropdownMappedValue<T extends string, V extends string> = {
+    [P in T]: string;
+} & { [P in V]: string };
+/** tuple of `[object[], textKey, valueKey]` where `textKey` and `valueKey` are string properties of the object. */
+type DropdownMappedValues<T extends string, V extends string> = [
+    Array<DropdownMappedValue<T, V>>,
+    T,
+    V,
+];
+/** `'values'` for a dropdown are either a one-element array (with the element being a string array used for both 'text' and 'value'),
+ * or a tuple of [object[], textKey, valueKey] where `textKey` and `valueKey` are properties of the object that will be used for 'text'
+ * and 'value' respectively.
+ */
+export type DropDownValues =
+    | DropdownMappedValues<string, string>
+    | [Array<string>];
 export type GuiValueTypes = {
-    "dropdown": string;
-    "check": boolean;
-    "text": string;
-    "radiobuttons": any;
-    "slider": number;
-    "button": undefined; //never?
-    "doubleslider": [number, number];
-}
-
-export type GuiSpec<T extends keyof GuiValueTypes> = {
-    type: T; 
+    //is the premise of this correct? technically, could we have a dropdown of numbers?
+    dropdown: string;
+    multidropdown: string | string[];
+    check: boolean;
+    text: string;
+    textbox: string;
+    radiobuttons: string;
+    slider: number;
+    spinner: number;
+    button: undefined;
+    doubleslider: [number, number];
+    folder: GuiSpec[];
+};
+export type GuiSpecType = keyof GuiValueTypes;
+export type GuiSpec<T extends GuiSpecType> = {
+    type: T;
     label: string;
-    current_value: GuiValueTypes[T];
-    func: (v: GuiValueTypes[T]) => void;
-    values?: GuiValueTypes[T][];
+    name: string;
+    current_value?: GuiValueTypes[T];
+    func?: (v: GuiValueTypes[T]) => void;
+    values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
+    // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
+    choices?: T extends "radiobuttons" ? [string, string][] : never;
+    min?: number;
+    max?: number;
+    step?: number;
+    defaultVal?: GuiValueTypes[T];
+};
+// todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
+export type ExtraControl<T extends GuiSpecType> = {
+    type: T;
+    name: string;
+    label: string;
+    values?: Array<{ name: string; value: string }>;
+    defaultVal?: GuiValueTypes[T];
+};
+// const a: GuiSpec<'dropdown'> = {
+//     type: 'dropdown',
+//     label: 'label',
+//     name: 'name',
+//     current_value: 'current_value',
+//     func: (v) => {},
+//     values: [[
+//         {a: '0a', b: '0b'},
+//         {a: '1a', b: '1b'},
+//     ], 'a', 'b']
+// }
+// a.values[0].map(x => x.a);
+// ^^ still not well-typed... `x` is `any`.
+// biome-ignore lint/suspicious/noRedeclare: I should probably fix this...
+interface DataStore {
+    getLoadedColumns: () => FieldName[];
+    getColumnName: (col: FieldName) => ColumnName | null;
+    getColumnList: () => DataColumn[];
+    getFilteredIndices: () => Promise<Uint32Array>;
 }
 
 export type Chart = {
-    getDiv: () => HTMLDivElement;
+    getDiv: () => HTMLElement;
     remove: () => void;
     addMenuIcon: (classes: string, info: string) => HTMLElement;
     setSize: (x?: number, y?: number) => void;
     changeBaseDocument: (doc: Document) => void;
-    getSettings: () => GuiSpec<any>[];
-    removeLayout:()=> void;
-    config:any;
+    getSettings: () => GuiSpec[];
+    removeLayout?: () => void;
+    config: any;
+    dataStore: DataStore;
+    popoutIcon: HTMLElement;
+} & BaseChart;
+
+export type ChartState = {
+    chart: Chart;
+    win?: Window;
+    dataSource: DataSource;
+};
+
+export type DataSourceSpec = {
+    name: DataSourceName;
+    dataStore: DataStore;
+    //links etc TBD
 };
 
 export type ChartManager = {
-    addMenuIcon: (dataSourceName: string, iconClass: string, text: string, func: ()=>void) => HTMLElement;
+    charts: Record<string, ChartState>;
+    dataSources: DataSourceSpec[];
+    dsIndex: Record<string, DataSourceSpec>;
+    addMenuIcon: (
+        dataSourceName: DataSourceName,
+        iconClass: string,
+        text: string,
+        func: () => void,
+    ) => HTMLElement;
+    /** probably not something we really want to use publicly like this */
+    _popOutChart: (chart: Chart) => void;
 };

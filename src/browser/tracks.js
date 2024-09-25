@@ -272,6 +272,8 @@ class MLVTrack{
 		if (!cl){
 			throw new Error("Track type "+ config.type+" not recognised")
 		}
+        // pjt: nb, simple bed FeatureSource is not used anywhere and we have no way of loading simple bed files
+        // config.type = "bed" is used for tabix indexed bed files
 		return new cl["class"](config);
 
 	}
@@ -315,33 +317,26 @@ class RulerTrack extends MLVTrack{
 
     drawFeatures(options) {
 
-        var fontStyle,
-            ctx = options.context,
-            range,
-            ts,
-            spacing,
-            nTick,
-            x;
+        const ctx = options.context;
+        const fontStyle = { textAlign: 'center', font: '10px PT Sans', fillStyle: options.textColor, strokeStyle: options.textColor };
 
-        fontStyle = { textAlign: 'center', font: '10px PT Sans', fillStyle: options.textColor, strokeStyle: options.textColor };
-
-        range = Math.floor(1100 * options.bpPerPixel);
-        ts = RulerTrack.findSpacing(range);
-        spacing = ts.majorTick;
+        const range = Math.floor(1100 * options.bpPerPixel);
+        const ts = RulerTrack.findSpacing(range);
+        const spacing = ts.majorTick;
 
         // Find starting point closest to the current origin
-        nTick = Math.floor(options.bpStart / spacing) - 1;
-        x = 0;
+        let nTick = Math.floor(options.bpStart / spacing) - 1;
+        let x = 0;
 		let y_pos=options.top+this.height;
         //canvas.setProperties({textAlign: 'center'});
         Graphics.setProperties(ctx, fontStyle );
+        const shim = 2;
         while (x < options.pixelWidth) {
 
-            var l = Math.floor(nTick * spacing),
-                shim = 2;
+            const l = Math.floor(nTick * spacing);
 
             x = Math.round(((l - 1) - options.bpStart + 0.5) / options.bpPerPixel);
-            var chrPosition = formatNumber(l / ts.unitMultiplier, 0) + " " + ts.majorUnit;
+            const chrPosition = formatNumber(l / ts.unitMultiplier, 0) + " " + ts.majorUnit;
 
             if (nTick % 1 == 0) {
                 Graphics.fillText(ctx, chrPosition, x, y_pos - 15);
@@ -358,7 +353,7 @@ class RulerTrack extends MLVTrack{
             //decimal  - the number of decimals after the digit from 0 to 3
             //-- Returns the passed number as a string in the xxx,xxx.xx format.
             //anynum = eval(obj.value);
-            var divider = 10;
+            let divider = 10;
             switch (decimal) {
                 case 0:
                     divider = 1;
@@ -373,17 +368,17 @@ class RulerTrack extends MLVTrack{
                     divider = 1000;
             }
 
-            var workNum = Math.abs((Math.round(anynum * divider) / divider));
+            const workNum = Math.abs((Math.round(anynum * divider) / divider));
 
-            var workStr = "" + workNum
+            let workStr = "" + workNum
 
             if (workStr.indexOf(".") == -1) {
                 workStr += "."
             }
 
-            var dStr = workStr.substr(0, workStr.indexOf("."));
-            var dNum = dStr - 0
-            var pStr = workStr.substr(workStr.indexOf("."))
+            let dStr = workStr.substring(0, workStr.indexOf("."));
+            const dNum = dStr - 0
+            let pStr = workStr.substring(workStr.indexOf("."))
 
             while (pStr.length - 1 < decimal) {
                 pStr += "0"
@@ -402,7 +397,7 @@ class RulerTrack extends MLVTrack{
                 dLen = dStr.length
                 dStr = parseInt("" + (dNum / 1000000)) + "," + dStr.substring(dLen - 7, dLen)
             }
-            var retval = dStr + pStr
+            let retval = dStr + pStr
             //-- Put numbers in parentheses if negative.
             if (anynum < 0) {
                 retval = "(" + retval + ")";
@@ -845,12 +840,20 @@ class MLVWigTrack extends MLVTrack{
 	_setFeatureSource(){
 		this.feature_source=new BWSource(this.config);	
 	}
-    getSettings(panel){
-        const s= super.getSettings(panel);
-        return s;
+    getSettings(panel) {
+        return [
+            ...super.getSettings(panel),
+            {
+                type: "check",
+                label: "Show data range",
+                value: this.config.showDataRange,
+                func: v => {
+                    this.setConfigAttribute("showDataRange", v);
+                    panel.update();
+                }
+            }
+        ]
     }
-
-
 
 	drawScale(pixel_height,ctx,defaultColor){
 		if (this.config.scale_link_to && this.config.group){
@@ -891,7 +894,7 @@ class MLVWigTrack extends MLVTrack{
 	drawFeatures(options) {
 		let self = this,
 	    features = options.features,
-	    color=self.config.color,
+	    color=this.config.color,
 	    ctx = options.context,
 	    bpPerPixel = options.bpPerPixel,
 	    bpStart = options.bpStart,
@@ -899,181 +902,184 @@ class MLVWigTrack extends MLVTrack{
 	    pixelHeight =options.pixelHeight,
 	    y_offset=options.top,
 	    bpEnd = bpStart + pixelWidth * bpPerPixel + 1,
-	    featureValueMinimum,
-	    featureValueMaximum,
-	    featureValueRange,
-	    $dataRangeTrackLabel,
-	    str,
-	    min,
-	    max;
+	    featureValueRange;
 	    if (this.config.group){
-	    		pixelHeight=options.height;
+            pixelHeight=options.height;
 	    }
 	    else {
 	    	pixelHeight=this.config.height;	
 	    }
-	          
 	    if (!color){
 	    	color="black";       
 	    }
-	    self.prev_coords={x:0,y:0};
+	    this.prev_coords={x:0,y:0};
 		
-	    if (features) {
-	    	if (self.scale_link_to){
-	    		let t = self.scale_link_to.config;
-	            if (t){
-	            	self.config.scale=t.scale;
-	                self.max_y=self.scale_link_to.max_y;
-	                self.min_y=self.scale_link_to.min_y;
-	            }
-	       }
-	       else if(self.set_scale){
-	       		self.min_y=self.set_scale.min;
-	       		self.max_y=self.set_scale.max;
-	       }
-	       else if ( (self.max_y === undefined && self.config.scale==="automatic") || self.config.scale==="dynamic"){
-	                var s = autoscale(features);
-	                self.min_y = s.min;
-	                self.max_y = s.max;
-	            }
-	            else if (self.config.scale==="fixed") {
-	                self.min_y = self.config.min_y;
-	                self.max_y=self.config.max_y;
-	            }
-	          
-	            featureValueRange = self.max_y - self.min_y;
+        if (features) {
+            if (this.scale_link_to) {
+                let t = this.scale_link_to.config;
+                if (t) {
+                    this.config.scale = t.scale;
+                    this.max_y = this.scale_link_to.max_y;
+                    this.min_y = this.scale_link_to.min_y;
+                }
+            }
+            else if (this.set_scale) {
+                this.min_y = this.set_scale.min;
+                this.max_y = this.set_scale.max;
+            }
+            else if ((this.max_y === undefined && this.config.scale === "automatic") || this.config.scale === "dynamic") {
+                var s = autoscale(features);
+                this.min_y = s.min;
+                this.max_y = s.max;
+            }
+            else if (this.config.scale === "fixed") {
+                this.min_y = this.config.min_y;
+                this.max_y = this.config.max_y;
+            }
 
-	            //$dataRangeTrackLabel = $(this.trackView.trackDiv).find('.igv-data-range-track-label');
-	            //
-	            //min = (Math.floor(track.dataRange.min) === track.dataRange.min) ? track.dataRange.min : track.dataRange.min.toFixed(2);
-	            //max = (Math.floor(track.dataRange.max) === track.dataRange.max) ? track.dataRange.max : track.dataRange.max.toFixed(2);
-	            //str = '[' + min + ' - ' + max + ']';
-	            //
-	            //$dataRangeTrackLabel.text(str);
-	            let prev_x=0;
-	            let prev_y=0;
-	            ctx.globalAlpha   = this.config.opacity?this.config.opacity:1;
-	         
-	            if (self.is_line){  
-	                let y = (1.0 - self.config.value / featureValueRange)*pixelHeight;
-	                Graphics.strokeLine(ctx,0,y,pixelWidth,y,{"strokeStyle":self.config.color,"lineWidth":self.config.width?self.config.width:1});
-	             }
-	         
-	            else{
-	            	features.forEach(renderFeature);
-	            }
-	       
-	            ctx.globalAlpha=1
-	             if (self.config.threshold){
-	             	    let y = y_offset+(1.0 - self.config.threshold/ featureValueRange)*pixelHeight;
-	             	    Graphics.strokeLine(ctx,0,y,pixelWidth,y,{"strokeStyle":"black","lineWidth":1});
-	                 }
-	        }
-	         
-	        function renderFeature(feature, index, featureList) {
+            featureValueRange = this.max_y - this.min_y;
 
-	            var yUnitless,
-	                heightUnitLess,
-	                x,
-	                y,
-	                width,
-	                height,
-	                rectEnd,
-	                rectBaseline;
+            //$dataRangeTrackLabel = $(this.trackView.trackDiv).find('.igv-data-range-track-label');
+            //
+            //min = (Math.floor(track.dataRange.min) === track.dataRange.min) ? track.dataRange.min : track.dataRange.min.toFixed(2);
+            //max = (Math.floor(track.dataRange.max) === track.dataRange.max) ? track.dataRange.max : track.dataRange.max.toFixed(2);
+            //str = '[' + min + ' - ' + max + ']';
+            //
+            //$dataRangeTrackLabel.text(str);
+            let prev_x = 0;
+            let prev_y = 0;
+            ctx.globalAlpha = this.config.opacity ? this.config.opacity : 1;
 
-	            if (feature.end < bpStart) return;
-	            if (feature.start > bpEnd) return;
-	              if (feature.end===feature.start){
-	            	feature.start-=1;
-	            }
-	          
-              
-	            x = Math.floor((feature.start - bpStart) / bpPerPixel);
-	            
-	            rectEnd = Math.floor((feature.end - bpStart) / bpPerPixel);
-	            width = Math.max(0, rectEnd - x);
-	          
+            if (this.is_line) {
+                let y = (1.0 - this.config.value / featureValueRange) * pixelHeight;
+                Graphics.strokeLine(ctx, 0, y, pixelWidth, y, { "strokeStyle": this.config.color, "lineWidth": this.config.width ? this.config.width : 1 });
+            }
 
-	          
+            else {
+                // pass on any error message from feature source...
+                if (!Array.isArray(features)) {
+                    throw features;
+                }
+                features.forEach(renderFeature);
+                if (this.config.showDataRange) {
+                    ctx.save();
+                    features.forEach(f => {
+                        f.valueBak = f.value;
+                        f.value = f.minVal;
+                    });
+                    ctx.globalAlpha *= 0.4;
+                    features.forEach(renderFeature);
+                    features.forEach(f => f.value = f.maxVal);
+                    features.forEach(renderFeature);
+                    features.forEach(f => f.value = f.valueBak);
+                    ctx.restore();
+                }
+            }
 
-	            //height = ((feature.value - featureValueMinimum) / featureValueRange) * pixelHeight;
-	            //rectBaseline = pixelHeight - height;
-	            //canvas.fillRect(rectOrigin, rectBaseline, rectWidth, rectHeight, {fillStyle: track.color});
+            ctx.globalAlpha = 1
+            if (this.config.threshold) {
+                let y = y_offset + (1.0 - this.config.threshold / featureValueRange) * pixelHeight;
+                Graphics.strokeLine(ctx, 0, y, pixelWidth, y, { "strokeStyle": "black", "lineWidth": 1 });
+            }
+        }
+        function renderFeature(feature) {
 
-	            if (signsDiffer(self.min_y, self.max_y)) {
+            let yUnitless,
+                heightUnitLess,
+                x,
+                y,
+                width,
+                height,
+                rectEnd;
 
-	                if (feature.value < 0) {
-	                    yUnitless = self.max_y/ featureValueRange;
-	                    heightUnitLess = -feature.value / featureValueRange;
-	                } else {
-	                    yUnitless = ((self.max_y - feature.value) / featureValueRange);
-	                    heightUnitLess = feature.value / featureValueRange;
-	                }
+            if (feature.end < bpStart) return;
+            if (feature.start > bpEnd) return;
+                if (feature.end===feature.start){
+                feature.start-=1;
+            }
+            
+            
+            x = Math.floor((feature.start - bpStart) / bpPerPixel);
+            
+            rectEnd = Math.floor((feature.end - bpStart) / bpPerPixel);
+            width = Math.max(0, rectEnd - x);
 
-	            }
-	            else if (self.min_y < 0) {
-	                yUnitless = 0;
-	                heightUnitLess = -feature.value / featureValueRange;
-	            }
-	            else {
-	                yUnitless = 1.0 - ((feature.value-self.min_y) / featureValueRange);
-	                heightUnitLess = (feature.value+self.min_y) / featureValueRange;
-	            }
+            //height = ((feature.value - featureValueMinimum) / featureValueRange) * pixelHeight;
+            //rectBaseline = pixelHeight - height;
+            //canvas.fillRect(rectOrigin, rectBaseline, rectWidth, rectHeight, {fillStyle: track.color});
+            // feature.value = .... think about doing something to anti-alias.
+            if (signsDiffer(self.min_y, self.max_y)) {
 
-	           	y = (yUnitless*pixelHeight)+y_offset;
-	            y=y<y_offset?y_offset:y;
-	            height=heightUnitLess * pixelHeight;
-	            height=height>pixelHeight?pixelHeight:height
+                if (feature.value < 0) {
+                    yUnitless = self.max_y/ featureValueRange;
+                    heightUnitLess = -feature.value / featureValueRange;
+                } else {
+                    yUnitless = ((self.max_y - feature.value) / featureValueRange);
+                    heightUnitLess = feature.value / featureValueRange;
+                }
 
-	            //canvas.fillRect(x, yUnitless * pixelHeight, width, heightUnitLess * pixelHeight, { fillStyle: igv.randomRGB(64, 255) });
-	            if (self.config.display==='line'){
-	                 if (self.prev_coords.x){
-	                    Graphics.strokeLine(ctx,x,y,self.prev_coords.x,self.prev_coords.y,{"strokeStyle":color,"lineWidth":3});
+            }
+            else if (self.min_y < 0) {
+                yUnitless = 0;
+                heightUnitLess = -feature.value / featureValueRange;
+            }
+            else {
+                yUnitless = 1.0 - ((feature.value-self.min_y) / featureValueRange);
+                heightUnitLess = (feature.value+self.min_y) / featureValueRange;
+            }
 
-	                }
-	                self.prev_coords.x=x;
-	                self.prev_coords.y=y;
-	            }
-	            else{
-                    //phase data
-                    const ph = self.config.phase_data;
-                    if(ph){
-                        const pos = (bpPerPixel*x)+bpStart;
-                        if (pos >ph.st && pos <ph.en){
-                            const pro = ph.ratio*height;
-                            Graphics.fillRect(ctx, x, y, width, pro, {fillStyle: "blue"});
-                            Graphics.fillRect(ctx, x, y+pro, width, height-pro, {fillStyle: "red"});
-                        }
-                        else{
-                            Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
-                        }
+            y = (yUnitless*pixelHeight)+y_offset;
+            y=y<y_offset?y_offset:y;
+            height=heightUnitLess * pixelHeight;
+            height=height>pixelHeight?pixelHeight:height
+
+            //canvas.fillRect(x, yUnitless * pixelHeight, width, heightUnitLess * pixelHeight, { fillStyle: igv.randomRGB(64, 255) });
+            if (self.config.display==='line'){
+                if (self.prev_coords.x) {
+                    Graphics.strokeLine(ctx,x,y,self.prev_coords.x,self.prev_coords.y,{"strokeStyle":color,"lineWidth":3});
+                }
+                self.prev_coords.x = x;
+                self.prev_coords.y = y;
+            }
+            else{
+                //phase data
+                const ph = self.config.phase_data;
+                if(ph){
+                    const pos = (bpPerPixel*x)+bpStart;
+                    if (pos >ph.st && pos <ph.en){
+                        const pro = ph.ratio*height;
+                        Graphics.fillRect(ctx, x, y, width, pro, {fillStyle: "blue"});
+                        Graphics.fillRect(ctx, x, y+pro, width, height-pro, {fillStyle: "red"});
                     }
                     else{
-	            	    Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
+                        Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
                     }
-	            }           
-	        }
-	        function autoscale(features) {
-        		var min = 0,
-            	max = -Number.MAX_VALUE;
-        		features.forEach(function (f) {
-            		min = Math.min(min, f.value);
-           			max = Math.max(max, f.value);
-        		});
-        		return {min: min, max: max};
-    		}
+                }
+                else{
+                    Graphics.fillRect(ctx, x, y, width, height, {fillStyle: color});
+                }
+            }           
+        }
+        function autoscale(features) {
+            let min = Number.MAX_VALUE, max = -Number.MAX_VALUE;
+            if (!Array.isArray(features)) {
+                console.warn('features is not an array');
+                return {min: 0, max: 100};
+            }
+            features.forEach(function (f) {
+                min = Math.min(min, f.value);
+                max = Math.max(max, f.value);
+            });
+            return {min: min, max: max};
+        }
 
-    		function signsDiffer(a, b) {
-        		return (a > 0 && b < 0 || a < 0 && b > 0);
-    		}
-    		this.top=y_offset;
-    		this.bottom=y_offset+pixelHeight;
-    		
-    		return this.bottom;
-    		
-    		
-
-	    
+        function signsDiffer(a, b) {
+            return (a > 0 && b < 0 || a < 0 && b > 0);
+        }
+        this.top=y_offset;
+        this.bottom=y_offset+pixelHeight;
+        
+        return this.bottom;
 	}
 }
 
@@ -1136,7 +1142,6 @@ class SequenceTrack extends MLVTrack{
 
 
     drawFeatures(options) {
-
         var sequence = options.features,
             ctx = options.context,
             bpPerPixel = options.bpPerPixel,
@@ -1149,16 +1154,14 @@ class SequenceTrack extends MLVTrack{
         let y_pos2=y_pos1+5;
 
         if (sequence) {
-
             len = sequence.length;
             w = 1 / bpPerPixel;
 
             y = y_pos1+this.height / 2;
             for (pos = bpStart; pos <= bpEnd; pos++) {
-
                 offset = pos - bpStart;
                 if (offset < len) {
-//                            var b = sequence.charAt(offset);
+                    // var b = sequence.charAt(offset);
                     b = sequence[offset];
                     p0 = Math.floor(offset * w);
                     p1 = Math.floor((offset + 1) * w);
@@ -1177,11 +1180,9 @@ class SequenceTrack extends MLVTrack{
                     if (!c) c = "gray";
 
                     if (bpPerPixel >0.18) {
-
                         Graphics.fillRect(ctx, p0, y_pos1, p1 - p0, 10, {fillStyle: c});
                     }
                     else {
-
                         Graphics.strokeText(ctx, b, pc, y, {
                             strokeStyle: c,
                             font: 'normal 10px Arial',
@@ -1191,8 +1192,7 @@ class SequenceTrack extends MLVTrack{
                 }
             }
         }
-      return y_pos1+10;
-
+        return y_pos1+10;
     }
 
 }

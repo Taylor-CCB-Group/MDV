@@ -1,8 +1,9 @@
-import {marked} from "marked";
-import purify from 'dompurify';
+import { marked } from "marked";
+import purify from "dompurify";
 
-function renderText(text){
+function renderText(text) {
+    if (!text) return "";
     return purify.sanitize(marked.parse(text));
 }
 
-export default renderText
+export default renderText;

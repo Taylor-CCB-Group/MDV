@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDV Desktop Index</title>
+    <style>
+        .projects {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #query-form {
+            margin-top: 20px;
+            text-align: center;
+        }
+        #query-select {
+            width: 300px;
+            height: 40px;
+            font-size: 16px;
+        }
+        #execute-button {
+            width: 150px;
+            height: 40px;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+        #results {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MDV Desktop Index</h1>
+    <div class="projects">
+        <!-- Projects will be populated here by JavaScript -->
+    </div>
+
+    <!-- Predefined Query Dropdown -->
+    <form id="query-form">
+        <label for="query-select">Choose a query:</label>
+        <select id="query-select">
+            <option value="list_projects">List the projects</option>
+            <option value="list_files">List the files</option>
+            <!-- Add more options as needed -->
+        </select>
+        <button id="execute-button" type="submit">Execute</button>
+    </form>
+
+    <div id="results"></div>
+
+    <script>
+        // Fetch and display the projects
+        (async function() {
+            const response = await fetch('/projects');
+            const data = await response.json();
+            console.log(data);
+            const container = document.querySelector('.projects');
+            for (const p of data) {
+                const link = document.createElement('a');
+                link.href = `/project/${p}`;
+                link.innerText = p;
+                container.appendChild(link);
+            }
+        })();
+
+        // Handle query form submission
+        document.getElementById('query-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const selectedQuery = document.getElementById('query-select').value;
+            console.log('Selected query:', selectedQuery);
+            fetch('/execute_query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query_type: selectedQuery })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Response data:', data);
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = '';
+                if (data.error) {
+                    resultsDiv.textContent = data.error;
+                } else if (data.data) {
+                    const table = document.createElement('table');
+                    const thead = document.createElement('thead');
+                    const tbody = document.createElement('tbody');
+
+                    // Table header
+                    const headerRow = document.createElement('tr');
+                    const columnNames = Object.keys(data.data[0]);
+                    columnNames.forEach(columnName => {
+                        const th = document.createElement('th');
+                        th.textContent = columnName;
+                        headerRow.appendChild(th);
+                    });
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+
+                    // Table body
+                    data.data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        columnNames.forEach(columnName => {
+                            const td = document.createElement('td');
+                            td.textContent = row[columnName];
+                            tr.appendChild(td);
+                        });
+                        tbody.appendChild(tr);
+                    });
+                    table.appendChild(tbody);
+                    resultsDiv.appendChild(table);
+                } else {
+                    resultsDiv.textContent = 'Query executed successfully';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.textContent = 'An error occurred while executing the query.';
+            });
+        });
+    </script>    
+</body>
+</html>

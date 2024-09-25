@@ -18,7 +18,7 @@ For each new chart type, an entry should be added to `BaseChart.types['ChartName
 
 ## State management
 
-`useConfig()` can be used to return `config` object that can be used to store mutable state. This is a `Proxy` that will trigger re-rendering of the component when it is mutated. This is the recommended way to store state that is specific to a particular chart instance.
+`useConfig()` can be used to return `config` object that can be used to store mutable state. This is a `Proxy` that will trigger re-rendering of the component when it is mutated. This is the recommended way to store state that is specific to a particular chart instance and that will be persisted when 'save view' is called. For volatile sate, we are using `useState()` and Zustand (with the React context API).
 
 ### Implementation details
 
@@ -39,7 +39,16 @@ There will be non-zero overhead to the additional wrapping by MobX of various th
 
 ## HMR
 
-We cheat a bit to get HMR working - and it is quite sensitive to not working if things aren't done in a very particular, non-obvious way.
+HMR - Hot Module Reloading - is a feature of Vite that allows changes to code to be reflected in the running application without the need to refresh the page. This is particularly useful when working on React components, as it allows us to see changes in the UI without losing state. However, it is not without its limitations - and it can be easy to break it in subtle ways.
+
+In order for HMR to work without requiring a broad refactor of the code, there are some particular characteristics to be aware of.
+
+Vite (or other bundlers) will maintain a graph of dependencies between modules, and when a module changes, it will re-evaluate it, and any other modules that depend on it. If in that process any encountered module cannot be hot-reloaded, then the page will be refreshed. That means that regressions can be easily introduced by changing the way that modules are imported and exported - for instance, `hooks.ts` had been working fine (in the sense that any changes were reflected at runtime), but at some point adding an import from it to `context.ts` meant that it could no longer be hot-reloaded, and code-paths that previously worked would now cause the page to refresh.
+
+### Avoiding refreshes
+
+This is generally fine, but there are some cases where it can be problematic. For example, if a module exports a class, and that class is used to create an instance, then changing the code for that class will not be reflected in the instance, as it will have already been created with the old code. It is still possible in some cases to make new instances of the class with the updated code (for example, by adding a new version of the same chart with the "Add Chart" dialog).
+
 
 See `VivMDVReact` for a concrete example of how to do this.
 

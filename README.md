@@ -3,8 +3,9 @@
 
 ![logo](images/mdv_logo.png)
 
-Multi Dimensional Viewer (MDV) is web based application for analyzing, annotating and sharing multi-dimensional data from different modalities.  It is inspired by [dc charts](https://dc-js.github.io/dc.js/) and [crossfilter](https://square.github.io/crossfilter/), but is performant with over 10 million data items due to the use of web workers, shared array buffers and native arrays.  
+The Multi-Dimensional Viewer (MDV) is a web-based application designed to help users analyse, annotate, and share multi-dimensional data from various sources (e.g., biological, statistical, etc.). MDV supports fast, interactive analysis even with large datasets (up to 10 million data items), thanks to its use of web workers, shared array buffers, and native arrays.
 &nbsp;
+
 ![summary](images/summary.png)
 
 ## Key Features
@@ -27,47 +28,95 @@ Multi Dimensional Viewer (MDV) is web based application for analyzing, annotatin
 
 * Data can added and/or modified by the user
 
-* Diverse range of data sources (API calls,static files) can be used by implementing custom data loaders 
+* Diverse range of data sources (API calls, static files) can be used by implementing custom data loaders 
 
 * Runs in a web browser (installation not required for uploading and viewing data)
 
-
-## Running On Local Machine
-
-If you have large amounts of data or projects you may wish to install MDV locally. MDV is written JavaScript designed to be embedded in a web page (https://mdv.molbiol.ox.ac.uk/). However in the python directory of this repository, there are some python scripts to format data to a specific file structure and compiled JavaScript that can display that format. There is also a lightweight server that runs locally to display projects
-
-### Installation
-
-Download and unzip the repository
-
-https://github.com/Taylor-CCB-Group/MDV/archive/refs/heads/main.zip
-
-or clone it
-```
-git clone https://github.com/Taylor-CCB-Group/MDV.git
-```
-
-
 ### System Requirements
+
+For running a release version:
 
 * A modern browser
 * python (3.6 or above)
 * only 4GB of ram is required even for large datasets (~10 000 000 items) as data is lazily loaded as raw bytes
+* `htslib` is required only for Genome Browser functionality.
 
-### Displaying example data
-download the  data
+For development, or running the current version from the repository:
+
+* git
+* npm and node.js (https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+* python (>=3.10, 3.12 is most tested/supported)
+* poetry (for managing python dependencies - optional, but recommended especially for contributing to the Python code)
+
+## Running On Local Machine
+
+If you’re working with large datasets or want more control over your projects, you can install MDV locally. MDV is written in JavaScript designed to be embedded in a web page (https://mdv.molbiol.ox.ac.uk/). However in the python directory of this repository, there are some python scripts to format data to a specific file structure and compiled JavaScript that can display that format. There is also a lightweight server that runs locally to display projects
+
+### Installation
+
+#### From a GitHub release version
+
+Run these comands from Powershell (Windows) or a Terminal (MaxOS/Linux) to clone the repository:
+
+```
+git clone https://github.com/Taylor-CCB-Group/MDV.git
+cd MDV
+```
+
+Now you are in the MDV folder install front-end dependencies:
+
+```
+npm i
+npm run build-flask-vite
+```
+
+Now install Python libaries 
+
+## MacOS / Linux
+
+```
+python -m venv venv
+source venv/bin/activate
+pip install -e python
+```
+
+## Windows
+
+```
+python -m venv venv
+venv/Scripts/activate.bat
+pip install -e python
+```
+
+### Running a test project
+
+This example will build and run a project based on the `pbmc3k_processed` dataset from `scanpy`:
+
+```
+python python/mdvtools/test_projects/scanpy_pbmc3k.py
+```
+
+Note: This will open a internet browser on your machine at the URL "localhost:5052". Depending on how your machine's firewall is configured you may see an error saying the port is blocked. You can either allow this port to be used or edit the last line of the script to use a port that is unused e.g.
+```
+p.serve(port=8080)  
+```
+
+When the above script is run and the page is loaded you will see something like this:
+
+![image](https://github.com/user-attachments/assets/db22272e-37f4-497b-a914-ee415508ca45)
+
+You can now add Charts (scatterplots, rowcharts etc) and Views (contains the charts) to allow visualisation and querying of the data.
+
+### Displaying a subset of the data from the original MDV publication (Single cell spatial analysis reveals inflammatory foci of immature neutrophil and CD8 T cells in COVID-19 lungs)
+
+Download the data.
 
 https://zenodo.org/record/6513508/files/hyp_example_data.zip?download=1
 
-Then cd to the python directory
+Then cd to the python directory in mdv
+
 ```
 cd path/to/mdv/python
-```
-
-Install `mdv` (using `editable` flag for development):
-
-```
-pip install -e .
 ```
 
 Open a python shell
@@ -84,10 +133,9 @@ p.serve()
 ```
 
 This will open a browser window at http://localhost:5000/ but you will need to go to
-[http://127.0.0.1:5000](http://127.0.0.1:5000) to avoid permissions errors.
+[http://127.0.0.1:5000](http://127.0.0.1:5000) to avoid permissions errors. Note that this will fail if the front-end code has not been built after checking out the repository - `npm run build-flask-vite` to update it, or use a release version which should have the necessary build output already present in `python/templates/static`.
 
 ## Running on a server
-
 
 The default data storage is an hdf5 file which is a compressed files that allows random read/write access to the data. However, it cannot be accessed directly but requires some kind of wrapper e.g. h5py. Hence access via http calls directly is not possible and backend code is required to display an MDV project in a web page. However, it can be converted to simple continuous compressed blocks of data for each column and a json index . This allows direct access via an http request with a range header:-
 
@@ -102,12 +150,30 @@ The function also creates a simple home page for the project (index.html), which
 https://myserver.com/path/to/myapp
 ```
 
-
-
 ## Development
 
 * clone the repository
 * npm install
+
+### Git blame without formatting commits
+
+The `.git-blame-ignore-revs` file is used to ignore commits when running `git blame`. This is useful for ignoring formatting commits when trying to find the original author of a line of code. To use it, run:
+
+```bash
+git config -e
+```
+
+And add the following lines:
+
+```toml
+[blame]
+	ignoreRevsFile = ".git-blame-ignore-revs"
+	markIgnoredLines = true
+```
+
+Mark ignored lines will prepend a `?` to the blame commit hashes for indirectly blamed lines.
+
+### note - this documentation is somewhat deprecated - [for dev-branch](#dev-branch)
 
 You can run a project in development mode, which allows you do debug the JavaScript code and make changes, which will be reflected in the browser.
 
@@ -116,17 +182,19 @@ To use a project that has been converted into a static webpage (`convert_to_stat
 ```
 webpack serve --env dev=folder:/path/to/myproject
 ```
-Or you can use data that is being served from a project. Run `serve()` on a project, which by default will start a server on local host at port 5000, and then start the development server
+Or you can use data that is being served from a project. Run `serve()` on a project, which by default will start a server on local host at port 5050, and then start the development server
 
 ```
-webpack serve --env dev=http://127.0.0.1:5000
+webpack serve --env dev=http://127.0.0.1:5050
 ```
 In both cases the server will be running at localhost:8080
 
 ### Building the App
 ```
-webpack --env build=desktop
+npm run build-flask-vite
 ```
+
+#### note - this documentation is somewhat deprecated - [for dev-branch](#dev-branch)
 
 This will build JavaScript that is is suitable for use with the 'static' project format and the lightweight inbuilt server in the python module. It puts the JavaScript files and assets in python/mdvtools/static/js and python/mdvtools/static/img respectively. When a static project is created, these files are copied over to the project's folder so that it can run independently.
 
@@ -153,12 +221,52 @@ webpack --env build=production mode=development \
 
 The 'pjt-dev' branch is currently being used for development. It is automatically deployed to https://mdv-dev.netlify.app/ when a commit is made to the branch.
 
-The index page is designed to load simple static data from another server, at a URL indicated by the `dir` parameter, for example:
+This documentation, and some aspects of how things are arranged, should be considered a work in progress.
 
-`https://mdv-dev.netlify.app/?dir=https://mdvstatic.netlify.app/ytrap2`
+The index page can load data either served by the `mdvtools` module, or with static data from another server (specified with a `static` flag in the URL). In either case, a `dir` parameter is used to specify the location of the data.
+
+For example, the following URL will load data from a static server in the current dev deployment:
+
+[`https://mdv-dev.netlify.app/?static&dir=https://mdvstatic.netlify.app/ytrap2`](https://mdv-dev.netlify.app/?static&dir=https://mdvstatic.netlify.app/ytrap2)
+
 
 This will look for files `datasources.json` etc. as generated by python at the URL `https://mdvstatic.netlify.app/ytrap2`. A server running on localhost can also be used to serve this static data, as long as it sets appropriate CORS headers. At no point will any data loaded into the system in this way be uploaded to any server.
 
-There is an experimental Python script `csv_to_static.py` takes data in CSV format and generates the files needed for this static data mode. It currently assumes that there will also be a folder `images` - the operation of this script along with other associated ones may change in future and should not be considered stable in its current form.
+To work on developing the JS client code in this branch, we are using Vite rather than WebPack, and the dev server can be run with `npm run dev`. The `index.html` file is intended to be usable without requiring a custom JS entrypoint for a given project, although if desired, other configurations options are available.
 
-To work on developing the JS client code in this branch, we are starting to use Vite rather than WebPack, and the dev server can be run with `npm run dev`. The `index.html` file is intended to be usable without requiring a custom JS entrypoint for a given project.
+This server runs on `localhost:5170` and behaves similarly to the Netlify deployment, but with Hot-Module-Reloading of compatible parts of the client code, and the ability to proxy to a local `mdvtools.mdv_desktop` server, which is intended as a simple way to have multiple local projects running in the same development environment.
+
+The same project running in a local dev-server can be accessed at `http://localhost:5170/?static&dir=https://mdvstatic.netlify.app/ytrap2`.
+
+### `mdvtools` servers
+
+With the `mdvtools` module installed in a Python environment, there are two servers that can be run to serve MDV projects locally. They can be used either as main entrypoints, invoked from the command line, or from within other scripts.
+
+There is a helper npm script `npm run python-setup` that will create a virtual environment and install the `mdvtools` module. This doesn't currently work on Windows, but the `mdvtools` module can be installed manually with `pip install -e .` in the `python` directory.
+
+#### `mdvproject`
+
+```bash
+(venv) $ python -m mdvtools.mdvproject /path/to/project
+```
+
+This will start a server that serves the project at `http://localhost:5050/`, and automatically open it in the default browser.
+
+#### `mdv_desktop`
+
+```bash
+(venv) $ python -m mdvtools.mdv_desktop
+```
+
+Starts a server that serves projects from a `~/mdv/` directory. This is intended to be a simple way to run multiple projects in the same development environment without needing to restart etc, and is not intended for production use. It will also read a `config.json` file in the `mdv` directory which currently only contains a list of locations for other projects outside of the `mdv` directory - for instance, on an external volume.
+
+This is currently hard-coded to run on port `5051`, and can be used with or without the Vite dev-server (running without the dev-server requires an initial `npm run build-flask-vite` to build the JS used in Flask templates).
+
+### Vite configuration
+
+The Vite configuration is found in `vite.config.mts`, and will behave differently depending on environment variables.
+
+#### `build` environment variable: `'production' | 'dev_pt' | 'desktop' | 'desktop_pt'`
+
+As of this writing, the ones ending `_pt` generally relate to builds using newer dev-branch features, while `production` and `desktop` mirror legacy WebPack configurations.
+
