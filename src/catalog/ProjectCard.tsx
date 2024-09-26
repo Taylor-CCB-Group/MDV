@@ -5,8 +5,6 @@ import {
     Info,
     Settings,
     Share,
-    Edit,
-    Delete,
     Image as ImageIcon,
 } from "@mui/icons-material";
 import {
@@ -19,7 +17,6 @@ import {
     MenuItem,
     ListItemIcon,
     ListItemText,
-    Box,
 } from "@mui/material";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
@@ -29,14 +26,13 @@ interface ProjectCardProps {
     id: string;
     name: string;
     type: "Editable" | "Read-Only";
-    lastModified?: string;
-    imageUrl?: string;
+    lastModified: string;
     createdAt: string;
     owner: string;
     collaborators: string[];
     numberOfStructures: string;
     numberOfImages: string;
-    onDelete?: (id: string) => void;
+    onDelete: (id: string) => Promise<void>;
     onRename?: (id: string, newName: string) => void;
     onChangeType?: (id: string, newType: "Editable" | "Read-Only") => void;
     onAddCollaborator?: (email: string) => void;
@@ -46,17 +42,16 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     id,
     name,
     type,
-    lastModified = "Not available",
-    imageUrl,
+    lastModified,
     createdAt,
     owner,
     collaborators,
     numberOfStructures,
     numberOfImages,
-    onDelete = () => {},
-    onRename = () => {},
-    onChangeType = () => {},
-    onAddCollaborator = () => {},
+    onDelete,
+    onRename,
+    onChangeType,
+    onAddCollaborator,
 }) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
@@ -64,11 +59,19 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
     const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+        event.stopPropagation();
         setAnchorEl(event.currentTarget);
     };
 
     const handleMenuClose = () => {
         setAnchorEl(null);
+    };
+
+    const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
+        // Prevent navigation if clicking on the menu button or its children
+        if (!(event.target as HTMLElement).closest('.menu-button')) {
+            window.location.href = `http://localhost:5170?dir=/project/${id}`;
+        }
     };
 
     return (
@@ -79,10 +82,52 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 display: "flex",
                 flexDirection: "column",
                 position: "relative",
+                cursor: "pointer",
             }}
+            onClick={handleCardClick}
         >
-            {/* Options Button */}
+            <CardMedia
+                component="div"
+                sx={{
+                    flexGrow: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    bgcolor: "grey.200",
+                }}
+            >
+                <ImageIcon sx={{ fontSize: 80, color: "text.secondary" }} />
+            </CardMedia>
+
+            <CardContent
+                sx={{
+                    padding: "16px",
+                    paddingBottom: "12px !important",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-end",
+                }}
+            >
+                <Typography
+                    gutterBottom
+                    variant="h6"
+                    component="div"
+                    noWrap
+                    sx={{ marginBottom: "4px" }}
+                >
+                    {name}
+                </Typography>
+                <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ marginBottom: "0" }}
+                >
+                    Last modified: {lastModified}
+                </Typography>
+            </CardContent>
+
             <IconButton
+                className="menu-button"
                 aria-label="project options"
                 onClick={handleMenuOpen}
                 sx={{
@@ -91,76 +136,20 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     right: 8,
                     bgcolor: "background.paper",
                     "&:hover": { bgcolor: "action.hover" },
+                    zIndex: 1,
                 }}
             >
                 <MoreVert />
             </IconButton>
 
-            {/* Image */}
-            <CardMedia
-                component="div"
-                sx={{
-                    aspectRatio: "1 / 1", // Ensures the media section is also square
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    bgcolor: "grey.200",
-                }}
-            >
-                {imageUrl ? (
-                    <img
-                        src={imageUrl}
-                        alt={name}
-                        style={{
-                            maxHeight: "100%",
-                            maxWidth: "100%",
-                            objectFit: "contain",
-                        }}
-                    />
-                ) : (
-                    <ImageIcon sx={{ fontSize: 80, color: "text.secondary" }} />
-                )}
-            </CardMedia>
-
-            {/* Project Details */}
-            <CardContent
-                sx={{
-                    padding: "16px", // Default padding
-                    paddingBottom: "12px", // Override the bottom padding applied by MUI
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "flex-end",
-                    "&:last-child": {
-                        paddingBottom: "12px", // Ensure no padding at the bottom for the last child
-                    },
-                }}
-            >
-                <Typography
-                    gutterBottom
-                    variant="h6"
-                    component="div"
-                    noWrap
-                    sx={{ marginBottom: "4px" }} // Adjust the margin between the text and the bottom
-                >
-                    {name}
-                </Typography>
-                <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ marginBottom: "0" }} // Remove bottom margin to reduce space
-                >
-                    Last modified: {lastModified}
-                </Typography>
-            </CardContent>
-
-            {/* Menu */}
             <Menu
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
                 onClose={handleMenuClose}
             >
                 <MenuItem
-                    onClick={() => {
+                    onClick={(e) => {
+                        e.stopPropagation();
                         setIsInfoModalOpen(true);
                         handleMenuClose();
                     }}
@@ -171,7 +160,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     <ListItemText>Project Info</ListItemText>
                 </MenuItem>
                 <MenuItem
-                    onClick={() => {
+                    onClick={(e) => {
+                        e.stopPropagation();
                         setIsSettingsModalOpen(true);
                         handleMenuClose();
                     }}
@@ -182,7 +172,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     <ListItemText>Project Settings</ListItemText>
                 </MenuItem>
                 <MenuItem
-                    onClick={() => {
+                    onClick={(e) => {
+                        e.stopPropagation();
                         setIsShareModalOpen(true);
                         handleMenuClose();
                     }}
@@ -194,7 +185,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 </MenuItem>
             </Menu>
 
-            {/* Modals */}
             <ProjectInfoModal
                 open={isInfoModalOpen}
                 onClose={() => setIsInfoModalOpen(false)}
