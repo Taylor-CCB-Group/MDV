@@ -1,5 +1,4 @@
-import type React from "react";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState } from "react";
 import {
     Add,
     Search,
@@ -28,26 +27,22 @@ import {
     ThemeProvider,
     createTheme,
     ButtonBase,
+    CircularProgress,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ProjectCard from "./ProjectCard";
-interface Project {
-    id: string;
-    name: string;
-    type: "Editable" | "Read-Only";
-    lastModified: string;
-}
+import useProjects from "./useProjects";
 
 const theme = createTheme({
     palette: {
         primary: {
-            main: "#2c3e50", // A deep, muted blue
+            main: "#2c3e50",
         },
         secondary: {
-            main: "#34495e", // A slightly lighter shade for contrast
+            main: "#34495e",
         },
         background: {
-            default: "#ecf0f1", // A light gray background
+            default: "#ecf0f1",
             paper: "#ffffff",
         },
         text: {
@@ -83,101 +78,56 @@ const theme = createTheme({
     },
 });
 
-type SortOption = "lastModified" | "name";
-
 const Dashboard: React.FC = () => {
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [filter, setFilter] = useState("");
+    const {
+        projects,
+        isLoading,
+        error,
+        fetchProjects,
+        createProject,
+        deleteProject,
+        setFilter,
+        setSortBy,
+        setSortOrder,
+        sortBy,
+    } = useProjects();
+
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newProjectName, setNewProjectName] = useState("");
     const [projectType, setProjectType] = useState<"Editable" | "Read-Only">(
         "Editable",
     );
-    const [sortBy, setSortBy] = useState<SortOption>("lastModified");
-    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-    useEffect(() => {
-        // Mocked project data
-        setProjects([
-            {
-                id: "1",
-                name: "Project A",
-                type: "Editable",
-                lastModified: "Apr 1, 2024",
-            },
-            {
-                id: "2",
-                name: "Project B",
-                type: "Read-Only",
-                lastModified: "Apr 2, 2024",
-            },
-            {
-                id: "3",
-                name: "Project C",
-                type: "Editable",
-                lastModified: "Apr 3, 2024",
-            },
-        ]);
-    }, []);
+    React.useEffect(() => {
+        fetchProjects();
+    }, [fetchProjects]);
 
-    const filteredAndSortedProjects = useMemo(() => {
-        const result = projects.filter((p) =>
-            p.name.toLowerCase().includes(filter.toLowerCase()),
-        );
-
-        result.sort((a, b) => {
-            if (sortBy === "name") {
-                return sortOrder === "asc"
-                    ? a.name.localeCompare(b.name)
-                    : b.name.localeCompare(a.name);
-            }
-            return sortOrder === "asc"
-                ? new Date(a.lastModified).getTime() -
-                      new Date(b.lastModified).getTime()
-                : new Date(b.lastModified).getTime() -
-                      new Date(a.lastModified).getTime();
-        });
-
-        return result;
-    }, [projects, filter, sortBy, sortOrder]);
-
-    const handleCreateProject = useCallback(() => {
+    const handleCreateProject = async () => {
         if (newProjectName.trim()) {
-            const newProject = {
-                id: Date.now().toString(),
-                name: newProjectName.trim(),
-                type: projectType,
-                lastModified: new Date().toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                }),
-            };
-            setProjects((prevProjects) => [...prevProjects, newProject]);
-            setNewProjectName("");
-            setProjectType("Editable");
-            setIsModalOpen(false);
+            try {
+                const newProject = await createProject(newProjectName.trim());
+                setNewProjectName("");
+                setIsModalOpen(false);
+                // Redirect to the new project page
+                window.location.href = `/project/${newProject.id}`;
+            } catch (error) {
+                console.error("Failed to create project:", error);
+                alert("Failed to create project. Please try again.");
+            }
         }
-    }, [newProjectName, projectType]);
-
-    const handleDeleteProject = useCallback((id: string) => {
-        setProjects((prevProjects) => prevProjects.filter((p) => p.id !== id));
-    }, []);
-
-    const handleSort = (option: SortOption) => {
-        if (sortBy === option) {
-            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-        } else {
-            setSortBy(option);
-            setSortOrder("desc");
-        }
-        setIsDropdownOpen(false); // Close the dropdown after selection
     };
 
-    const toggleDropdown = () => {
+    const handleSort = (option: "lastModified" | "name") => {
+        setSortBy(option);
+        setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+        setIsDropdownOpen(false);
+    };
+
+    const toggleDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
+        setAnchorEl(event.currentTarget);
         setIsDropdownOpen(!isDropdownOpen);
     };
 
@@ -221,7 +171,6 @@ const Dashboard: React.FC = () => {
                                 sx={{ ml: 1, flex: 1 }}
                                 placeholder="Search projects"
                                 inputProps={{ "aria-label": "search projects" }}
-                                value={filter}
                                 onChange={(e) => setFilter(e.target.value)}
                             />
                             <IconButton
@@ -237,12 +186,9 @@ const Dashboard: React.FC = () => {
 
                 <Container maxWidth="lg" sx={{ mt: 4 }}>
                     <Grid container spacing={3} sx={{ mb: 4 }}>
-                        {/* Create new project card */}
                         <Grid item xs={12} sm={6} md={3}>
                             <ButtonBase
-                                onClick={() => {
-                                    setIsModalOpen(true); // Handle the create new project action
-                                }}
+                                onClick={() => setIsModalOpen(true)}
                                 sx={{
                                     width: "100%",
                                     display: "block",
@@ -274,7 +220,6 @@ const Dashboard: React.FC = () => {
                             </ButtonBase>
                         </Grid>
 
-                        {/* Create from template card */}
                         <Grid item xs={12} sm={6} md={3}>
                             <ButtonBase
                                 onClick={() => {
@@ -311,12 +256,9 @@ const Dashboard: React.FC = () => {
                             </ButtonBase>
                         </Grid>
 
-                        {/* Create from template card 2*/}
                         <Grid item xs={12} sm={6} md={3}>
                             <ButtonBase
-                                onClick={() => {
-                                    // Handle the create from template action
-                                }}
+                                onClick={() => {}}
                                 sx={{
                                     width: "100%",
                                     display: "block",
@@ -359,30 +301,27 @@ const Dashboard: React.FC = () => {
                     >
                         <Typography variant="h5">Recent Projects</Typography>
                         <Paper
-                            elevation={1} // Reduced elevation for less conspicuousness
+                            elevation={1}
                             sx={{
-                                padding: "8px", // Small padding for internal spacing
+                                padding: "8px",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                borderRadius: "4px", // Minimal border radius for a cleaner look
-                                width: "205px", // Fixed width to ensure consistency
-                                height: "50px", // Fixed height for uniformity
-                                bgcolor: "background.paper", // Use background color to blend with the UI
+                                borderRadius: "4px",
+                                width: "205px",
+                                height: "50px",
+                                bgcolor: "background.paper",
                             }}
                         >
                             <Button
                                 endIcon={<ExpandMore />}
-                                onClick={(event) => {
-                                    setAnchorEl(event.currentTarget);
-                                    setIsDropdownOpen(true);
-                                }}
+                                onClick={toggleDropdown}
                                 sx={{
                                     textTransform: "none",
-                                    width: "100%", // Ensures the button takes full width
-                                    height: "100%", // Ensures the button takes full height
+                                    width: "100%",
+                                    height: "100%",
                                     display: "flex",
-                                    justifyContent: "center", // Center the text
+                                    justifyContent: "center",
                                 }}
                             >
                                 Sort by:{" "}
@@ -399,46 +338,45 @@ const Dashboard: React.FC = () => {
                             <MenuItem
                                 onClick={() => handleSort("lastModified")}
                             >
-                                Last modified{" "}
-                                {sortBy === "lastModified" &&
-                                    (sortOrder === "asc" ? "↑" : "↓")}
+                                Last modified
                             </MenuItem>
                             <MenuItem onClick={() => handleSort("name")}>
-                                Name{" "}
-                                {sortBy === "name" &&
-                                    (sortOrder === "asc" ? "↑" : "↓")}
+                                Name
                             </MenuItem>
                         </Menu>
                     </Box>
 
                     <Divider sx={{ mb: 2 }} />
 
-                    <Grid container spacing={4}>
-                        {filteredAndSortedProjects.map((project) => (
-                            <Grid
-                                item
-                                key={project.id}
-                                xs={12}
-                                sm={6}
-                                md={4}
-                                lg={3}
-                            >
-                                <ProjectCard
-                                    createdAt={"Jan 1, 2024"}
-                                    owner={"Ben"}
-                                    collaborators={[
-                                        "lorem@gmail.com",
-                                        "ipsum@gmail.com",
-                                        "dolor@gmail.com",
-                                    ]}
-                                    numberOfStructures={"32"}
-                                    numberOfImages={"64"}
-                                    {...project}
-                                    onDelete={handleDeleteProject}
-                                />
-                            </Grid>
-                        ))}
-                    </Grid>
+                    {isLoading ? (
+                        <CircularProgress />
+                    ) : error ? (
+                        <Typography color="error">{error}</Typography>
+                    ) : (
+                        <Grid container spacing={4}>
+                            {projects.map((project) => (
+                                <Grid
+                                    item
+                                    key={project.id}
+                                    xs={12}
+                                    sm={6}
+                                    md={4}
+                                    lg={3}
+                                >
+                                    <ProjectCard
+                                        {...project}
+                                        onDelete={deleteProject}
+                                        onRename={(id, newName) => {
+                                        }}
+                                        onChangeType={(id, newType) => {
+                                        }}
+                                        onAddCollaborator={(email) => {
+                                        }}
+                                    />
+                                </Grid>
+                            ))}
+                        </Grid>
+                    )}
                 </Container>
             </Box>
         </ThemeProvider>
