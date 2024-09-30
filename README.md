@@ -44,7 +44,7 @@ For running a release version:
 For development, or running the current version from the repository:
 
 * git
-* node.js
+* npm and node.js (https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
 * python (>=3.10, 3.12 is most tested/supported)
 * poetry (for managing python dependencies - optional, but recommended especially for contributing to the Python code)
 
@@ -56,56 +56,39 @@ If you’re working with large datasets or want more control over your projects,
 
 #### From a GitHub release version
 
-Clone the repository
+Run these comands from Powershell (Windows) or a Terminal (MaxOS/Linux) to clone the repository:
 
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
 cd MDV
-# if you want do include the latest stable branch also do
-git checkout pjt-dev
 ```
 
-Then, from the MDV folder:
-
-Install front-end dependencies
+Now you are in the MDV folder install front-end dependencies:
 
 ```
 npm i
+npm run build-flask-vite
 ```
 
-Setup Python virtual environment and build the front-end that it will use. On Unix-like systems, there is an npm script that will do this automatically, as long as you have Python 3.12 installed and [Poetry is available in your PATH](https://python-poetry.org/docs/#installation):
+Now install Python libaries 
 
-```
-npm run python-setup
-```
-
-This will be equivalent to the following:
+## MacOS / Linux
 
 ```
 python -m venv venv
 source venv/bin/activate
-cd python
-poetry install --with dev
-npm run build-flask-vite
-```
-
-On Windows systems, the `source venv/bin/activate` will not work - activating the environment is done by running `venv/Scripts/activate.bat`.
-
-If you don't want to use `poetry`, or wish to manage your own virtual environment, you can install `mdvtools` with `pip` (using `editable` flag for development):
-
-```
 pip install -e python
 ```
 
-**or**, if you are happy with `poetry` but want to manage the virtual environment yourself:
+## Windows
 
 ```
-cd python
-poetry install --with dev
+python -m venv venv
+venv/Scripts/activate.bat
+pip install -e python
 ```
 
 ### Running a test project
-
 
 This example will build and run a project based on the `pbmc3k_processed` dataset from `scanpy`:
 
@@ -113,12 +96,24 @@ This example will build and run a project based on the `pbmc3k_processed` datase
 python python/mdvtools/test_projects/scanpy_pbmc3k.py
 ```
 
-### Displaying example data (a subset from the original MDV publication)
+Note: This will open a internet browser on your machine at the URL "localhost:5052". Depending on how your machine's firewall is configured you may see an error saying the port is blocked. You can either allow this port to be used or edit the last line of the script to use a port that is unused e.g.
+```
+p.serve(port=8080)  
+```
+
+When the above script is run and the page is loaded you will see something like this:
+
+![image](https://github.com/user-attachments/assets/db22272e-37f4-497b-a914-ee415508ca45)
+
+You can now add Charts (scatterplots, rowcharts etc) and Views (contains the charts) to allow visualisation and querying of the data.
+
+### Displaying a subset of the data from the original MDV publication (Single cell spatial analysis reveals inflammatory foci of immature neutrophil and CD8 T cells in COVID-19 lungs)
+
 Download the data.
 
 https://zenodo.org/record/6513508/files/hyp_example_data.zip?download=1
 
-Then cd to the python directory
+Then cd to the python directory in mdv
 
 ```
 cd path/to/mdv/python
