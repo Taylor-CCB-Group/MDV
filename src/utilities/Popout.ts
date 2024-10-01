@@ -106,15 +106,12 @@ function pushSetStyles(chart: Chart) {
         width: div.style.width,
         top: div.style.top,
         left: div.style.left,
-        iconDisplay: chart.popoutIcon.style.display,
     };
     div.style.height = "100vh";
     div.style.width = "100vw";
     div.style.top = "0";
     div.style.left = "0";
-    chart.popoutIcon.style.display = "none";
     return () => {
-        chart.popoutIcon.style.display = styles.iconDisplay;
         div.style.height = styles.height;
         div.style.width = styles.width;
         div.style.top = styles.top;
