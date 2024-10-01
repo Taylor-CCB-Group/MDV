@@ -250,11 +250,13 @@ def create_app(
         try:
             # Extract data from the request
             data = request.json
+            if not data:
+                return jsonify({"status": "error", "message": "Request must contain JSON data with tiffMetadata & datasourceName"}), 400
             tiff_metadata = data.get('tiffMetadata')
             datasource_name = data.get('datasourceName')
 
             if not tiff_metadata or not datasource_name:
-                return jsonify({"status": "error", "message": "Missing required fields"}), 400
+                return jsonify({"status": "error", "message": "Request must contain JSON data with tiffMetadata & datasourceName"}), 400
 
             # Call the method in the project class to add or update image datasource
             success = project.add_or_update_image_datasource(tiff_metadata, datasource_name)
