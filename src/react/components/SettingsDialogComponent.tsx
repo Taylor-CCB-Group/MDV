@@ -94,29 +94,36 @@ function DropdownAutocompleteComponent({
     // todo review 'virtualization' for large lists
     const id = useId();
     const multiple = props.type === "multidropdown";
-    if (!multiple)
-        console.warn(
-            "DropdownAutocompleteComoponet with non-multi dropdown is WIP",
-        );
-
     // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
     const useObjectKeys = props.values.length === 3;
-    const [valueObjectArray, textKey, valueKey] = props.values;
+    const [_valueObjectArray, labelKey, valueKey] = props.values;
 
     //todo handle multitext / tags properly.
 
-    // todo think about how this relates to different type logic with {text, value, original}
+    // todo think about how this relates to different type logic with {label, value, original}
     // const validVals = useObjectKeys ? valueObjectArray.map(item => item[valueKey]) : valueObjectArray;
 
-    const toOption = (original) => {
-        const text: string = useObjectKeys ? original[textKey] : original;
+    const toOption = useCallback((original) => {
+        const label: string = useObjectKeys ? original[labelKey] : original;
         // is value really always a string?
         const value: string = useObjectKeys ? original[valueKey] : original;
         // const id: string = uuid();
-        return { text, value, original };
-    };
+        return { label, value, original };
+    }, [useObjectKeys, labelKey, valueKey]);
     type OptionType = ReturnType<typeof toOption>;
-    const options = props.values[0].map(toOption);
+    const options = useMemo(() => props.values[0].map(toOption), [props.values, toOption]);
+    // bit of a faff with sometimes getting a one-item array, sometimes a single item...
+    const getSingleOption = useCallback(
+        (option: OptionType | OptionType[]) => {
+            const a = Array.isArray(option);
+            if (a && option.length > 1) {
+                console.warn("ideally we shouldn't have to deal with arrays at all here, but we only expect one value when we do");
+            }
+            return (Array.isArray(option) ? option[0] : option)},
+    []);
+    const single = getSingleOption;
+    const label = useCallback((option: OptionType | OptionType[]) => single(option).label, [single]);
+    const val = useCallback((option: OptionType | OptionType[]) => single(option).value, [single]);
 
     // ------
     // deal with cases where the options have changed (e.g. values from a different column)
@@ -124,10 +131,11 @@ function DropdownAutocompleteComponent({
     // ------
     // if 'multiple' is true, make sure we get an array even if one / zero values selected.
     // second half of ternary will either be the existing array if 'multiple', or the single value otherwise.
-    const v =
+    const v = useMemo(() => (
         multiple && !Array.isArray(props.current_value)
             ? [props.current_value]
-            : props.current_value;
+            : props.current_value
+    ), [props.current_value, multiple]);
     // check that and maybe provide a bit of a type guard
     if (multiple !== Array.isArray(v))
         throw "logical inconsistency - 'multidropdown' value should be coerced to array by now";
@@ -139,9 +147,10 @@ function DropdownAutocompleteComponent({
     const allValid = isArray ? v.every(validVal) : validVal(v);
     const okValue = allValid ? v : isArray ? v.filter(validVal) : null;
     //map from 'value' string to option object
-    const okOption = Array.isArray(okValue)
+    const okOption = (Array.isArray(okValue)
         ? okValue.map((v) => options.find((o) => o.value === v))
-        : [options.find((o) => o.value === v)];
+        : [options.find((o) => o.value === v)])
+        // : options.find((o) => o.value === v); //not-multiple...
 
     return (
         <>
@@ -155,10 +164,11 @@ function DropdownAutocompleteComponent({
                 id={id}
                 options={options}
                 disableCloseOnSelect={multiple}
-                getOptionLabel={(option) => option.text}
+                getOptionLabel={label}
                 value={okOption}
                 onChange={action((_, value: OptionType) => {
-                    //added type annotation because mobx seems to fluff the inference
+                    //added type annotation above because mobx seems to fluff the inference to `never`
+                    if (value === null) return;
                     if (Array.isArray(value)) {
                         // && valueA.length > 1) {
                         const selected = Array.from(value).map(
@@ -171,7 +181,7 @@ function DropdownAutocompleteComponent({
                     props.current_value = value.value;
                     if (props.func) props.func(value.value);
                 })}
-                // isOptionEqualToValue={(option, value) => option.original === value.original}
+                isOptionEqualToValue={(option, value) => single(option).original === single(value).original}
                 renderOption={(props, option, { selected }) => {
                     // we could potentially render something richer here - like color swatches or icons
                     // if we had a richer sense of the data in context
@@ -189,12 +199,12 @@ function DropdownAutocompleteComponent({
                                     style={{ marginRight: 8 }}
                                     checked={selected}
                                 />
-                                {option.text}
+                                {label(option)}
                             </li>
                         );
                     return (
                         <li key={key} {...optionProps}>
-                            {option.text}
+                            {label(option)}
                         </li>
                     );
                 }}
@@ -204,8 +214,8 @@ function DropdownAutocompleteComponent({
                     return tagValue.map((option, index) => (
                         <Chip
                             {...getTagProps({ index })}
-                            key={option.value}
-                            label={option.text}
+                            key={val(option)}
+                            label={label(option)}
                         />
                     ));
                 }}
