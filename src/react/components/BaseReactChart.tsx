@@ -40,9 +40,10 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  * that any BaseChart methods called from outside will appropriately affect the component state.
  *
  * Internally, this class uses mobx to make the config object observable, and creates a React root with the given
- * `ReactComponentFunction`. Use of MobX is intended to be hidden by this abstraction - but if we change to a
+ * `ReactComponentFunction`. Use of MobX was originally intended to be hidden by this abstraction - but if we change to a
  * different state management system, it will have implications for downstream components that expect to react to
- * changes in the config object.
+ * changes in the config object. Any component that needs to react to changes in the config object should be wrapped in
+ * an `observer()` call.
  *
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
