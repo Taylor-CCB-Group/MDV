@@ -6,13 +6,21 @@ export default function popoutChart(chart: Chart) {
     const mainWindow = window;
     const div = chart.getDiv();
     const originalParent = div.parentElement;
+    const wtop = window.screenTop ? window.screenTop : window.screenY;
+    const wleft = window.screenLeft ? window.screenLeft : window.screenX;
+    const { width, height, left, top } = div.getBoundingClientRect();
+    const w = Math.floor(Math.max(100, width));
+    const h = Math.floor(Math.max(100, height));
+    const l = Math.floor(left + wleft);
+    const t = Math.floor(top + wtop);
     if (div.gridstackPopoutCallback) div.gridstackPopoutCallback();
     removeResizable(div);
     removeDraggable(div);
     const popoutWindow = window.open(
         "",
         chart.config.title,
-        "width=800,height=600",
+        // "width=800,height=600",
+        `width=${w},height=${h},left=${l},top=${t}`,
     );
     popoutWindow.document.body.style.overflow = "hidden";
 
