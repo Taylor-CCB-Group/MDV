@@ -436,7 +436,7 @@ const Components: {
     textbox: observer(TextBoxComponent),
     slider: observer(SliderComponent),
     spinner: observer(SpinnerComponent),
-    dropdown: observer(DropdownComponent), //todo also use Autocomplete for this
+    dropdown: observer(DropdownAutocompleteComponent),
     // consider having component specifically for column/category selection
     // the column selection can make use of column groups
     // category selection can have some logic for multitext / tags
