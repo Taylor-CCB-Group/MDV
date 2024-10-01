@@ -3,7 +3,7 @@
 
 ![logo](images/mdv_logo.png)
 
-Multi Dimensional Viewer (MDV) is web based application for analyzing, annotating and sharing multi-dimensional data from different modalities.  It is inspired by [dc charts](https://dc-js.github.io/dc.js/) and [crossfilter](https://square.github.io/crossfilter/), but is performant with over 10 million data items due to the use of web workers, shared array buffers and native arrays.  
+The Multi-Dimensional Viewer (MDV) is a web-based application designed to help users analyse, annotate, and share multi-dimensional data from various sources (e.g., biological, statistical, etc.). MDV supports fast, interactive analysis even with large datasets (up to 10 million data items), thanks to its use of web workers, shared array buffers, and native arrays.
 &nbsp;
 
 ![summary](images/summary.png)
@@ -44,73 +44,51 @@ For running a release version:
 For development, or running the current version from the repository:
 
 * git
-* node.js
+* npm and node.js (https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
 * python (>=3.10, 3.12 is most tested/supported)
 * poetry (for managing python dependencies - optional, but recommended especially for contributing to the Python code)
 
 ## Running On Local Machine
 
-If you have large amounts of data or projects you may wish to install MDV locally. MDV is written JavaScript designed to be embedded in a web page (https://mdv.molbiol.ox.ac.uk/). However in the python directory of this repository, there are some python scripts to format data to a specific file structure and compiled JavaScript that can display that format. There is also a lightweight server that runs locally to display projects
+If you’re working with large datasets or want more control over your projects, you can install MDV locally. MDV is written in JavaScript designed to be embedded in a web page (https://mdv.molbiol.ox.ac.uk/). However in the python directory of this repository, there are some python scripts to format data to a specific file structure and compiled JavaScript that can display that format. There is also a lightweight server that runs locally to display projects
 
 ### Installation
 
 #### From a GitHub release version
 
-Download and unzip, this should be able to work without requiring node to be installed etc.
-
--- this needs better documentation, and I might want to make a new release soon...
-
-#### For development / using latest features
-
-Clone the repository
+Run these comands from Powershell (Windows) or a Terminal (MaxOS/Linux) to clone the repository:
 
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
 cd MDV
-git checkout pjt-dev
 ```
 
-Then, from the MDV folder:
-
-Install front-end dependencies
+Now you are in the MDV folder install front-end dependencies:
 
 ```
 npm i
+npm run build-flask-vite
 ```
 
-Setup Python virtual environment and build the front-end that it will use. On Unix-like systems, there is an npm script that will do this automatically, as long as you have Python 3.12 installed and [Poetry is available in your PATH](https://python-poetry.org/docs/#installation):
+Now install Python libaries 
 
-```
-npm run python-setup
-```
-
-This will be equivalent to the following:
+## MacOS / Linux
 
 ```
 python -m venv venv
 source venv/bin/activate
-cd python
-poetry install --with dev
-npm run build-flask-vite
-```
-
-On Windows systems, the `source venv/bin/activate` will not work - activating the environment is done by running `venv/Scripts/activate.bat`.
-
-If you don't want to use `poetry`, or wish to manage your own virtual environment, you can install `mdvtools` with `pip` (using `editable` flag for development):
-
-```
 pip install -e python
 ```
 
-**or**, if you are happy with `poetry` but want to manage the virtual environment yourself:
+## Windows
 
 ```
-cd python
-poetry install --with dev
+python -m venv venv
+venv/Scripts/activate.bat
+pip install -e python
 ```
 
 ### Running a test project
-
 
 This example will build and run a project based on the `pbmc3k_processed` dataset from `scanpy`:
 
@@ -118,14 +96,24 @@ This example will build and run a project based on the `pbmc3k_processed` datase
 python python/mdvtools/test_projects/scanpy_pbmc3k.py
 ```
 
-...homework: make a script (or notebook) that runs example
+Note: This will open a internet browser on your machine at the URL "localhost:5052". Depending on how your machine's firewall is configured you may see an error saying the port is blocked. You can either allow this port to be used or edit the last line of the script to use a port that is unused e.g.
+```
+p.serve(port=8080)  
+```
 
-### Displaying example data (old doc)
-download the  data
+When the above script is run and the page is loaded you will see something like this:
+
+![image](https://github.com/user-attachments/assets/db22272e-37f4-497b-a914-ee415508ca45)
+
+You can now add Charts (scatterplots, rowcharts etc) and Views (contains the charts) to allow visualisation and querying of the data.
+
+### Displaying a subset of the data from the original MDV publication (Single cell spatial analysis reveals inflammatory foci of immature neutrophil and CD8 T cells in COVID-19 lungs)
+
+Download the data.
 
 https://zenodo.org/record/6513508/files/hyp_example_data.zip?download=1
 
-Then cd to the python directory
+Then cd to the python directory in mdv
 
 ```
 cd path/to/mdv/python
@@ -149,7 +137,6 @@ This will open a browser window at http://localhost:5000/ but you will need to g
 
 ## Running on a server
 
-
 The default data storage is an hdf5 file which is a compressed files that allows random read/write access to the data. However, it cannot be accessed directly but requires some kind of wrapper e.g. h5py. Hence access via http calls directly is not possible and backend code is required to display an MDV project in a web page. However, it can be converted to simple continuous compressed blocks of data for each column and a json index . This allows direct access via an http request with a range header:-
 
 ```python
@@ -162,8 +149,6 @@ The function also creates a simple home page for the project (index.html), which
 ```
 https://myserver.com/path/to/myapp
 ```
-
-
 
 ## Development
 
