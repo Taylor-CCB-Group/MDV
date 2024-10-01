@@ -24,7 +24,6 @@ python/mdvtools/dbutils/__pycache__
 python/mdvtools/tests/temp/*
 python/mdvtools/test_projects/cache/*
 python/mdvtools/static/*
-python/mdvtools/template/page.html
 .ipynb_checkpoints
 
 python/dist/
@@ -40,3 +39,4 @@ data/
 
 .idea
 xvenv/
+secrets/

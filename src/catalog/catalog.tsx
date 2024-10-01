@@ -15,7 +15,7 @@ type ProjectMetadata = {
 const ProjectTile = ({ name, id }: ProjectMetadata) => {
     return (
         <div className="container w-32 h-32 p-5 outline rounded-xl">
-            <a href={`project/${id}`}>{name}</a>
+            <a href={`project/${id}/`}>{name}</a>
             {import.meta.env.DEV && (
                 <a href={`http://localhost:5170?dir=/project/${id}`}>
                     <BugPlay />
@@ -39,6 +39,7 @@ const Projects = () => {
     const [projects, setProjects] = useState<ProjectMetadata[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<string | null>(null);
+
     useEffect(() => {
         (async () => {
             const response = await fetch("projects");
