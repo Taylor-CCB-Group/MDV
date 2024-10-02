@@ -31,7 +31,9 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ProjectCard from "./ProjectCard";
-import useProjects from "./useProjects";
+import useProjects from "./hooks/useProjects";
+import UserProfile from "./UserProfile";
+import mdvLogo from "./assets/mdv_logo.png";
 
 const theme = createTheme({
     palette: {
@@ -142,22 +144,16 @@ const Dashboard: React.FC = () => {
             >
                 <AppBar position="static" color="default" elevation={0}>
                     <Toolbar>
-                        <IconButton
-                            size="large"
-                            edge="start"
-                            color="inherit"
-                            aria-label="menu"
-                            sx={{ mr: 2 }}
-                        >
-                            <MenuIcon />
-                        </IconButton>
-                        <Typography
-                            variant="h6"
-                            component="div"
-                            sx={{ flexGrow: 1 }}
-                        >
-                            MDV Projects
-                        </Typography>
+                        <Box
+                            component="img"
+                            sx={{
+                                height: 40,
+                                mr: 2,
+                            }}
+                            alt="MDV Projects Logo"
+                            src={mdvLogo}
+                        />
+                        <Box sx={{ flexGrow: 1 }} />
                         <Paper
                             component="form"
                             sx={{
@@ -165,6 +161,7 @@ const Dashboard: React.FC = () => {
                                 display: "flex",
                                 alignItems: "center",
                                 width: 400,
+                                mr: 2, // Add margin to the right
                             }}
                         >
                             <InputBase
@@ -181,6 +178,7 @@ const Dashboard: React.FC = () => {
                                 <Search />
                             </IconButton>
                         </Paper>
+                        <UserProfile />
                     </Toolbar>
                 </AppBar>
 
@@ -366,12 +364,9 @@ const Dashboard: React.FC = () => {
                                     <ProjectCard
                                         {...project}
                                         onDelete={deleteProject}
-                                        onRename={(id, newName) => {
-                                        }}
-                                        onChangeType={(id, newType) => {
-                                        }}
-                                        onAddCollaborator={(email) => {
-                                        }}
+                                        onRename={(id, newName) => {}}
+                                        onChangeType={(id, newType) => {}}
+                                        onAddCollaborator={(email) => {}}
                                     />
                                 </Grid>
                             ))}
