@@ -1,5 +1,5 @@
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     MoreVert,
     Info,
@@ -57,7 +57,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [shouldNavigate, setShouldNavigate] = useState(false);
 
+    useEffect(() => {
+        if (shouldNavigate) {
+            window.location.href = `http://localhost:5170?dir=/project/${id}`;
+        }
+    }, [shouldNavigate, id]);
+    
     const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
         setAnchorEl(event.currentTarget);
@@ -68,10 +75,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     };
 
     const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
-        // Prevent navigation if clicking on the menu button or its children
-        if (!(event.target as HTMLElement).closest('.menu-button')) {
-            window.location.href = `http://localhost:5170?dir=/project/${id}`;
-        }
+        setShouldNavigate(true);
     };
 
     return (
@@ -82,49 +86,57 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 display: "flex",
                 flexDirection: "column",
                 position: "relative",
-                cursor: "pointer",
             }}
-            onClick={handleCardClick}
         >
-            <CardMedia
-                component="div"
-                sx={{
+            <div 
+                onClick={handleCardClick}
+                style={{
+                    cursor: "pointer",
                     flexGrow: 1,
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    bgcolor: "grey.200",
-                }}
-            >
-                <ImageIcon sx={{ fontSize: 80, color: "text.secondary" }} />
-            </CardMedia>
-
-            <CardContent
-                sx={{
-                    padding: "16px",
-                    paddingBottom: "12px !important",
-                    display: "flex",
                     flexDirection: "column",
-                    justifyContent: "flex-end",
                 }}
             >
-                <Typography
-                    gutterBottom
-                    variant="h6"
+                <CardMedia
                     component="div"
-                    noWrap
-                    sx={{ marginBottom: "4px" }}
+                    sx={{
+                        flexGrow: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        bgcolor: "grey.200",
+                    }}
                 >
-                    {name}
-                </Typography>
-                <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ marginBottom: "0" }}
+                    <ImageIcon sx={{ fontSize: 80, color: "text.secondary" }} />
+                </CardMedia>
+
+                <CardContent
+                    sx={{
+                        padding: "16px",
+                        paddingBottom: "12px !important",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "flex-end",
+                    }}
                 >
-                    Last modified: {lastModified}
-                </Typography>
-            </CardContent>
+                    <Typography
+                        gutterBottom
+                        variant="h6"
+                        component="div"
+                        noWrap
+                        sx={{ marginBottom: "4px" }}
+                    >
+                        {name}
+                    </Typography>
+                    <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ marginBottom: "0" }}
+                    >
+                        Last modified: {lastModified}
+                    </Typography>
+                </CardContent>
+            </div>
 
             <IconButton
                 className="menu-button"
@@ -146,10 +158,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
                 onClose={handleMenuClose}
+                onClick={(e) => e.stopPropagation()}
             >
                 <MenuItem
-                    onClick={(e) => {
-                        e.stopPropagation();
+                    onClick={() => {
                         setIsInfoModalOpen(true);
                         handleMenuClose();
                     }}
@@ -160,8 +172,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     <ListItemText>Project Info</ListItemText>
                 </MenuItem>
                 <MenuItem
-                    onClick={(e) => {
-                        e.stopPropagation();
+                    onClick={() => {
                         setIsSettingsModalOpen(true);
                         handleMenuClose();
                     }}
@@ -172,8 +183,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     <ListItemText>Project Settings</ListItemText>
                 </MenuItem>
                 <MenuItem
-                    onClick={(e) => {
-                        e.stopPropagation();
+                    onClick={() => {
                         setIsShareModalOpen(true);
                         handleMenuClose();
                     }}
