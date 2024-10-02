@@ -14,6 +14,7 @@ export type DataType =
     | "multitext"
     | "int32";
 export type CategoricalDataType = "text" | "text16" | "multitext";
+export type NumberDataType = "integer" | "double" | "int32";
 
 type DataStructureTypes = {
     integer: Uint32Array;
@@ -23,25 +24,26 @@ type DataStructureTypes = {
     multitext: Uint16Array;
     unique: Uint8Array; //not sure about this either.
 };
-type DataValuesTypes = {
-    integer: undefined;
-    double: undefined;
-    text: string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
-    text16: string[];
-    multitext: string[]; //would be better if this was `Set<string>`? maybe not, want indexOf
-    unique: string[];
-};
 // even if they're just aliases, these could be useful for documentation / clarity
 export type ColumnName = string;
 export type DataSourceName = string;
 export type FieldName = string;
+
+type Quantiles = {
+    "0.001": [number, number];
+    "0.01": [number, number];
+    "0.05": [number, number];
+};
 
 export type DataColumn<T extends DataType> = {
     name: ColumnName;
     field: FieldName;
     datatype: T;
     data: DataStructureTypes[T];
-    values: DataValuesTypes[T];
+    values: T extends CategoricalDataType ? string[] : never; //probably wrong for 'unique'
+    minMax: T extends NumberDataType ? [number, number] : never;
+    quantiles: T extends NumberDataType ? Quantiles : never;
+    getValue: (i: number) => T extends CategoricalDataType ? string : number;
 };
 
 // export type DataStore = {
