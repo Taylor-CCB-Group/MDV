@@ -3,7 +3,7 @@ import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
 
@@ -256,4 +256,30 @@ export function useImgUrl(): string {
  */
 export function useDataSources() {
     return window.mdv.chartManager?.dataSources;
+}
+
+export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
+    const ds = useDataStore();
+    // it might be good to have something better for isTextLike, some tests for this...
+    const isTextLike = column.values !== undefined;
+    const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
+    const dim = useMemo(() => {
+        const dim = ds.getDimension(dimension_type);
+        return dim;
+    }, [ds, dimension_type]);
+    useEffect(() => {
+        // cleanup when component unmounts
+        return () => dim.removeFilter();
+    });
+    return dim;
+}
+export function useRangeFilter(column: DataColumn<NumberDataType>) {
+    const filter = useDimensionFilter(column);
+    const [min, setMin] = useState(column.minMax[0]);
+    const [max, setMax] = useState(column.minMax[1]);
+    useEffect(() => {
+        // filter.removeFilter();
+        filter.filter("filterRange", [column.name], { min, max }, true);
+    }, [column, filter, min, max]);
+    return { min, setMin, max, setMax };
 }
