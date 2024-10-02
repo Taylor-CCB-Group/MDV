@@ -162,11 +162,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
-    constructor(
-        dataStore,
-        div,
-        originalConfig: VivMdvReactConfig & BaseConfig,
-    ) {
+    constructor(dataStore, div, originalConfig) {
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
         const config = adaptConfig(originalConfig);
