@@ -1,7 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
 import { useChart, useDataStore } from "./context";
-import type { OME_TIFF } from "./components/avivatorish/state";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
