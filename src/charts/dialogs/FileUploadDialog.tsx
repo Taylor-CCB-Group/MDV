@@ -157,7 +157,7 @@ const Message = ({ children }) => (
 );
 
 const FileSummary = ({ children }) => (
-  <div className="max-w-[400px] w-[90%] text-center mb-5">{children}</div>
+  <div className="max-w-[800px] w-[100%] text-center mb-5">{children}</div>
 );
 
 const FileSummaryHeading = ({ children }) => (
@@ -189,23 +189,21 @@ const ErrorHeading = ({ children }) => (
 );
 
 const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
-  <div className="pr-4">
-    <label
-      htmlFor="datasourceName"
-      className="text-center m-0 font-bold text-sm sm:text-lg md:text-xl"
-    >
-      Datasource name:
+<div className="flex-left items-center space-x-2 pr-4">
+<label className="text-lg text-gray-700 dark:text-white my-1">
+    <strong>Datasouce Name:</strong> 
     </label>
-    <input
-      id="datasourceName"
-      type="text"
-      value={value}
-      onChange={onChange}
-      className="p-2 border rounded focus:outline-none focus:ring focus:border-blue-300 dark:text-gray-300 dark:bg-gray-800 w-full"
-      placeholder="Enter datasource name"
-      disabled={isDisabled}
-    />
-  </div>
+  <input
+    id="datasourceName"
+    type="text"
+    value={value}
+    onChange={onChange}
+    className="p-2 border rounded focus:outline-none focus:ring focus:border-blue-300 dark:text-gray-300 dark:bg-gray-800 flex-grow"
+    placeholder="Enter datasource name"
+    disabled={isDisabled}
+  />
+</div>
+
 );
 
 // Reducer function
@@ -275,8 +273,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
 }) => {
 
 
-  //const viewerStore = vivStores.viewerStore;
-
   const { root, projectName, chartManager } = useProject();
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -334,10 +330,12 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
   const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    dispatch({ type: "SET_SELECTED_FILES", payload: acceptedFiles });
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
+      dispatch({ type: "SET_SELECTED_FILES", payload: acceptedFiles });
       const fileExtension = file.name.split('.').pop().toLowerCase();
+  
+      // Common logic for both CSV and TIFF files
       if (fileExtension === 'csv') {
         const newDatasourceName = file.name;
         setDatasourceName(newDatasourceName);
@@ -349,10 +347,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
         });
         dispatch({ type: "SET_FILE_TYPE", payload: "csv" });
       } else if (fileExtension === 'tiff' || fileExtension === 'tif') {
-
         const dataSources = window.mdv.chartManager?.dataSources ?? [];
         const namesArray = dataSources.map(dataSource => dataSource.name);
-
+  
         // Update state with the new array, triggering re-render
         setUpdatedNamesArray([...namesArray, "new datasource"]);
         settiffSummary({
@@ -360,12 +357,64 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
           fileName: file.name,
           fileSize: (file.size / (1024 * 1024)).toFixed(2)
         });
-
         dispatch({ type: "SET_FILE_TYPE", payload: "tiff" });
         handleSubmitFile(acceptedFiles);
       }
+  
+      // Start validation after dispatching file type
+      dispatch({ type: "SET_IS_VALIDATING", payload: true });
+  
+      if (fileExtension === 'csv') {
+        CsvWorker.postMessage(file);
+        CsvWorker.onmessage = (event: MessageEvent) => {
+          const {
+            columnNames,
+            columnTypes,
+            secondRowValues,
+            rowCount,
+            columnCount,
+            error,
+          } = event.data;
+          if (error) {
+            dispatch({
+              type: "SET_ERROR",
+              payload: {
+                message: "Validation failed.",
+                traceback: error,
+              },
+            });
+            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+          } else {
+            setColumnNames(columnNames);
+            setColumnTypes(columnTypes);
+            setSecondRowValues(secondRowValues);
+            setCsvSummary((prevCsvSummary) => ({
+              ...prevCsvSummary,
+              rowCount,
+              columnCount,
+            }));
+  
+            const totalWidth = calculateTotalWidth(
+              columnNames,
+              columnTypes,
+              secondRowValues
+            );
+            onResize(totalWidth, 745);
+            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+            dispatch({
+              type: "SET_VALIDATION_RESULT",
+              payload: { columnNames, columnTypes },
+            });
+          }
+        };
+      } else if (fileExtension === 'tiff') {
+        onResize(1032, 580);
+        dispatch({ type: "SET_IS_VALIDATING", payload: false });
+        dispatch({ type: "SET_VALIDATION_RESULT", payload: { columnNames, columnTypes } });
+      }
     }
-  }, [csvSummary]);
+  }, [csvSummary, tiffSummary]);
+  
 
   const handleSubmitFile = useCallback(async (files: File[]) => {
     let newSource;
@@ -495,65 +544,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
     // Calculate the total width needed for the ColumnPreview component
     const totalWidth = maxColumnNameWidth + maxColumnTypeWidth + maxColumnSecondRowWidth + 32; // Add padding
     canvas.remove();
-    return Math.max(500, totalWidth);
-  };
-
-  const handleValidateClick = () => {
-    const file = state.selectedFiles[0];
-    if (file) {
-      dispatch({ type: "SET_IS_VALIDATING", payload: true });
-
-      const fileExtension = file.name.split('.').pop().toLowerCase();
-      if (fileExtension === 'csv') {
-        CsvWorker.postMessage(file);
-        CsvWorker.onmessage = (event: MessageEvent) => {
-          const {
-            columnNames,
-            columnTypes,
-            secondRowValues,
-            rowCount,
-            columnCount,
-            error,
-          } = event.data;
-          if (error) {
-            dispatch({
-              type: "SET_ERROR",
-              payload: {
-                message: "Validation failed.",
-                traceback: error,
-              },
-            });
-            dispatch({ type: "SET_IS_VALIDATING", payload: false });
-          } else {
-            setColumnNames(columnNames);
-            setColumnTypes(columnTypes);
-            setSecondRowValues(secondRowValues);
-            setCsvSummary((prevCsvSummary) => ({
-              ...prevCsvSummary,
-              rowCount,
-              columnCount,
-            }));
-
-            // Calculate the total width needed for the ColumnPreview component
-            const totalWidth = calculateTotalWidth(
-              columnNames,
-              columnTypes,
-              secondRowValues,
-            );
-            onResize(totalWidth, 730);
-            dispatch({ type: "SET_IS_VALIDATING", payload: false });
-            dispatch({
-              type: "SET_VALIDATION_RESULT",
-              payload: { columnNames, columnTypes },
-            });
-          }
-        };
-      } else if (fileExtension === 'tiff') {
-        onResize(1032, 580);
-        dispatch({ type: "SET_IS_VALIDATING", payload: false });
-        dispatch({ type: "SET_VALIDATION_RESULT", payload: { columnNames, columnTypes } });
-      }
-    }
+    return Math.max(800, totalWidth);
   };
 
   const handleUploadClick = async () => {
@@ -570,7 +561,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
 
     const formData = new FormData();
     formData.append("file", state.selectedFiles[0]);
-    // let endpoint: "add_datasource" | "upload" | null = null;
+    let endpoint: "add_datasource" | "upload" | null = null;
 
     if (fileExtension === 'csv') {
 
@@ -578,7 +569,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
       // formData.append("view", "TRUE");
       // formData.append("backend", "TRUE");
       formData.append("replace", '');
-      // endpoint = "add_datasource"
+      endpoint = "add_datasource"
 
 
 
@@ -710,7 +701,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
               <FileSummary>
                 <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
                 <FileSummaryText>
-                  <strong>{"Datasource name"}</strong> {csvSummary.datasourceName}
+                  <DatasourceNameInput
+              value={datasourceName}
+              onChange={handleDatasourceNameChange}
+              isDisabled={state.selectedFiles.length === 0}
+            />
                 </FileSummaryText>
                 <FileSummaryText>
                   <strong>{"File name"}</strong> {csvSummary.fileName}
@@ -726,6 +721,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
                 </FileSummaryText>
               </FileSummary>
               <ColumnPreview columnNames={columnNames} columnTypes={columnTypes} secondRowValues={secondRowValues} />
+
               <div className="flex justify-center items-center gap-6 mt-4">
                 <Button marginTop="mt-1" onClick={handleUploadClick}>{"Upload"}</Button>
                 <Button color="red" size="px-6 py-2.5" marginTop="mt-1" onClick={handleClose}>{"Cancel"}</Button>
@@ -792,21 +788,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
-          <div className="w-full flex items-center pl-4 pr-4">
-            <DatasourceNameInput
-              value={datasourceName}
-              onChange={handleDatasourceNameChange}
-              isDisabled={state.selectedFiles.length === 0}
-            />
-            <Button onClick={handleValidateClick}
-              disabled={(state.selectedFiles.length === 0 || state.isUploading)}
-              marginTop="mt-5"
-              size="px-6 py-0.5"
-              color="blue"
-            >
-              {"Validate File"}
-            </Button>
-          </div>
         </>
       )}
     </Container>
