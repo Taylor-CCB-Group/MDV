@@ -1,20 +1,70 @@
 import { useDimensionFilter, useParamColumns, useRangeFilter } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Slider } from "@mui/material";
-import { useEffect, useState } from "react";
+import { Autocomplete, Checkbox, Chip, Slider, TextField } from "@mui/material";
+import { useCallback, useEffect, useState } from "react";
+
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
+
+const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
+const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
 const TextComponent = ({column} : {column: DataColumn<CategoricalDataType>}) => {
     const dim = useDimensionFilter(column);
-    const [value, setValue] = useState("");
+    const { values } = column;
+    const [value, setValue] = useState<string[]>([]);
     useEffect(() => {
-        // dim.filter("filterCategories", [column.name], [value], true);
-        dim.removeFilter();
+        dim.filter("filterCategories", [column.name], value, true);
     }, [dim, value, column.name]);
+    const toggleOption = useCallback((option: string) => {
+        if (value.includes(option)) {
+            setValue(value.filter((v) => v !== option));
+            return;
+        }
+        setValue([...value, option]);
+    }, [value]);
     return (
-        <div className="bg-red-500">
-            WIP...
-            <input type="text" value={value} onChange={(e) => setValue(e.target.value)} />
-        </div>
+        <Autocomplete 
+            multiple
+            options={values}
+            value={value}
+            // onChange={(_, newValue) => setValue(newValue)}
+            renderInput={(props) => {
+                const { key, ...p } = props as typeof props & {
+                    key: string;
+                }; //questionable mui types?
+                return <TextField key={key} {...p} />;
+            }}
+            renderOption={(props, option) => {
+                const { key, ...optionProps } = props as typeof props & {
+                    key: string;
+                }; //questionable mui types?
+                return (
+                    <li
+                        key={key}
+                        {...optionProps}
+                        onClick={() => toggleOption(option)}
+                    >
+                        <Checkbox
+                            icon={icon}
+                            checkedIcon={checkedIcon}
+                            style={{ marginRight: 8 }}
+                            checked={value.includes(option)}
+                            onClick={() => toggleOption(option)}
+                        />
+                        {option}
+                    </li>
+                );
+            }}
+            renderTags={(value, getTagProps) => {
+                //seems to be a material-ui bug with not properly handling key / props...
+                //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
+                return value.map((option, index) => {
+                    const { key, ...tagValues } = getTagProps({ index });
+                    return <Chip key={key} {...tagValues} label={option} />;
+                });
+            }}
+        />
     );
 }
 
@@ -74,7 +124,7 @@ function AbstractComponent<T extends DataType>({column} : {column: DataColumn<T>
 
 export default function SelectionDialogComponent() {
     const cols = useParamColumns();
-    
+    ///XXX we should be able to save back to config - and use it better!!!
     return (
         <div className="p-5">
         {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
