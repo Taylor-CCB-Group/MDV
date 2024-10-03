@@ -259,6 +259,94 @@ class MDVProject:
         print(f"Added image set {name} to {ds} datasource")
         self.set_datasource_metadata(ds_metadata)
 
+    def add_or_update_image_datasource(self, tiff_metadata, datasource_name):
+        """Add or update an image datasource in datasources.json"""
+        try:
+            # Load current datasources
+            datasources = self.datasources
+            
+            # Check if the datasource exists
+            datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
+            
+            if datasource:
+                # Update the existing datasource and check the result
+                update_success = self.update_datasource(datasource, tiff_metadata)
+                if not update_success:
+                    print(f"Failed to update datasource '{datasource_name}'.")
+                    return False
+            else:
+                # Create a new datasource
+                # Uncomment and implement the following line if needed
+                # creation_success = self.create_new_datasource(tiff_metadata, datasource_name)
+                print(f"Datasource '{datasource_name}' does not exist and creation is not implemented yet.")
+                return False
+
+            return True
+        except Exception as e:
+            print(f"Error updating or adding datasource '{datasource_name}': {e}")
+            return False
+
+
+    def update_datasource(self, datasource, tiff_metadata):
+        """Update an existing datasource with new image metadata."""
+        try:
+            # Extract image metadata from tiff_metadata
+            width = tiff_metadata['OME']['Image']['Pixels']['SizeX']
+            height = tiff_metadata['OME']['Image']['Pixels']['SizeY']
+            scale = tiff_metadata['OME']['Image']['Pixels']['PhysicalSizeX']
+            scale_unit = tiff_metadata['OME']['Image']['Pixels'].get('PhysicalSizeUnit', 'µm')  # Default to µm if not present
+
+            # Ensure datasource has a 'regions' field
+            if "regions" not in datasource:
+                datasource["regions"] = {"all_regions": {}}
+            
+            # Determine region name
+            region_name = tiff_metadata.get('name', 'unknown')  # Default to 'unknown' if not present in metadata
+            
+            # Define new region with metadata
+            new_region = {
+                "roi": {
+                    "min_x": 0,
+                    "min_y": 0,
+                    "max_x": width,
+                    "max_y": height
+                },
+                "images": {},
+                "json": f"json/{region_name}.tif.s1.json",
+                "viv_image": {
+                    "file": f"{region_name}.tiff",
+                    "linked_file": True
+                },
+                'width': width,  # Adding width
+                'height': height,  # Adding height
+                'scale': scale,  # Adding scale
+                'scale_unit': scale_unit  # Adding scale_unit
+            }
+
+            image_metadata = {
+                'path': tiff_metadata['path']
+            }
+
+            # Update or add the region in the datasource
+            datasource["regions"]["all_regions"][region_name] = new_region
+            datasource['size'] = len(datasource['regions']['all_regions'])
+
+            # Save the updated datasource
+            self.set_datasource_metadata(datasource)
+
+            # Update views and images
+            self.add_viv_viewer(region_name, [{'name': 'DAPI'}])
+            self.add_viv_images(region_name, image_metadata, link_images=True)
+
+            print(f"Datasource '{datasource.get('name', 'unknown')}' updated successfully.")
+            return True
+        except Exception as e:
+            print(f"Error updating datasource '{datasource.get('name', 'unknown')}': {e}")
+            return False
+    
+    
+        
+
     def get_image(self, path: str):
         """Gets the filename of an image."""
         # assume path is of the form <ds>/<name>/<filename>

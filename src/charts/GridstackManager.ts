@@ -229,7 +229,7 @@ export default class GridStackManager {
         function revertModifications() {
             grid.removeWidget(div, true); //doesn't remove listeners from handle...
             //// leaving listeners as a bug for now.
-            lockButton.remove();
+            // lockButton.remove();
             chart.remove = oldRemove;
             chart.changeBaseDocument = oldChangeBase;
         }
