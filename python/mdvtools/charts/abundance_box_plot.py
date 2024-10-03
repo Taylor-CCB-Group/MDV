@@ -1,5 +1,6 @@
 from mdvtools.charts.base_plot import BasePlot
 
+
 class AbundanceBoxPlot(BasePlot):
     def __init__(self, title, params, size, position, id=None):
         super().__init__(title, "custom_box_plot", params, size, position, id)
@@ -26,15 +27,9 @@ class AbundanceBoxPlot(BasePlot):
         self.plot_data["tooltip"] = {"show": show}
 
     def set_x_axis(self, axis_labels, axis_title):
-        self.plot_data["x_axis"] = {
-            "labels": axis_labels,
-            "title": axis_title
-        }
+        self.plot_data["x_axis"] = {"labels": axis_labels, "title": axis_title}
 
     def set_y_axis(self, axis_labels, axis_title):
-        self.plot_data["y_axis"] = {
-            "labels": axis_labels,
-            "title": axis_title
-        }
+        self.plot_data["y_axis"] = {"labels": axis_labels, "title": axis_title}
 
     # Any additional methods specific to abundance box plots can be added here

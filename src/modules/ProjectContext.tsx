@@ -1,33 +1,47 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import type ChartManager from "@/charts/ChartManager";
+import React, {
+    type PropsWithChildren,
+    createContext,
+    useContext,
+    useState,
+} from "react";
 
-const ProjectContext = createContext(null);
+type ProjectInfo = {
+    root: string;
+    staticFolder: boolean;
+    chartManager: ChartManager;
+    projectName: string;
+};
 
-export const ProjectProvider = ({ children }) => {
+const ProjectContext = createContext<ProjectInfo>(null);
+
+export const ProjectProvider = ({ children }: PropsWithChildren) => {
     // Derive initial state from window.location and URL parameters
     const { origin, pathname } = window.location;
     const flaskURL = origin + pathname;
     const urlParams = new URLSearchParams(window.location.search);
-    const isPopout = urlParams.get('popout') === "true";
-    const dir = urlParams.get('dir') || (isPopout ? '' : flaskURL);
+    const dir = urlParams.get("dir") || flaskURL;
 
-    const getRoot = (dir) => {
+    const getRoot = (dir: string) => {
         return dir.endsWith("/") ? dir.substring(0, dir.length - 1) : dir;
     };
     const root = getRoot(dir);
-    const staticFolder = urlParams.get('static') !== null;
+    // todo - get these from e.g. state.json instead?
+    const staticFolder = urlParams.get("static") !== null;
     const projectName = dir.split("/").pop();
+    const { chartManager } = window.mdv;
 
     const [projectConfig, setProjectConfig] = useState({
         flaskURL,
-        isPopout,
         dir,
         root,
         staticFolder,
-        projectName
+        projectName,
+        chartManager,
     });
 
     return (
-        <ProjectContext.Provider value={{ ...projectConfig, setProjectConfig }}>
+        <ProjectContext.Provider value={{ ...projectConfig }}>
             {children}
         </ProjectContext.Provider>
     );

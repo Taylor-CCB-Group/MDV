@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useState, useMemo, useId } from "react";
+import { useState, useMemo, useId, useCallback, useEffect } from "react";
 import type { Chart, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -8,125 +8,334 @@ import {
     AccordionContent,
     AccordionItem,
     AccordionTrigger,
-} from "@/components/ui/accordion"
+} from "@/components/ui/accordion";
+import { v4 as uuid } from "uuid";
+import { Button, Chip, MenuItem, Select, Slider } from "@mui/material";
+import Checkbox from "@mui/material/Checkbox";
+import TextField from "@mui/material/TextField";
+import Autocomplete from "@mui/material/Autocomplete";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
 
-const TextComponent = function({props}: {props: GuiSpec<'text'>}) {
-    return (
-        <>
-            <label>{props.label}</label>
-            <input type="text" value={props.current_value} onChange={action(e => {
+const TextComponent = ({ props }: { props: GuiSpec<"text"> }) => (
+    <>
+        <label>{props.label}</label>
+        <input
+            type="text"
+            value={props.current_value}
+            onChange={action((e) => {
                 props.current_value = e.target.value;
                 if (props.func) props.func(e.target.value);
-            })} 
+            })}
             className="w-full"
-            />
-        </>
-    )
-};
+        />
+    </>
+);
 
-const TextBoxComponent = function({props}: {props: GuiSpec<'text'>}) {
-    return (
-        <>
-            <label>{props.label}</label>
-            <div />
-            <textarea value={props.current_value} onChange={action(e => {
+const TextBoxComponent = ({ props }: { props: GuiSpec<"textbox"> }) => (
+    <>
+        <label>{props.label}</label>
+        <div />
+        <textarea
+            value={props.current_value}
+            onChange={action((e) => {
                 props.current_value = e.target.value;
                 if (props.func) props.func(e.target.value);
-            })} 
+            })}
             className="w-full col-span-2"
-            />
-        </>
-    )
-};
+        />
+    </>
+);
 
-const SliderComponent = function({props}: {props: GuiSpec<'slider'>}) {
-    return (
-        <>
-            <label>{props.label}</label>
-            <input type="range" value={props.current_value} 
+const SliderComponent = ({ props }: { props: GuiSpec<"slider"> }) => (
+    <>
+        <label>{props.label}</label>
+        <Slider
+            value={props.current_value}
             min={props.min || 0}
             max={props.max || 1}
-            step={props.step || 0.01}
-            onChange={action(e => {
-                const value = parseFloat(e.target.value);
+            step={props.step || 0.01} //todo - infer default step from min/max
+            onChange={action((_, value) => {
+                // const value = Number.parseFloat(e.target.value);
+                if (Array.isArray(value))
+                    throw "slider callback should have multiple values";
                 props.current_value = value;
                 if (props.func) props.func(value);
-            })} />
-        </>
-    )
-};
+            })}
+        />
+    </>
+);
 
-const SpinnerComponent = function({props}: {props: GuiSpec<'spinner'>}) {
-    return (
-        <>
-            <label>{props.label}</label>
-            <input type="number"
-            value={props.current_value} 
+const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
+    <>
+        <label>{props.label}</label>
+        <input
+            type="number"
+            value={props.current_value}
             min={props.min || 0}
             max={props.max || null}
             step={props.step || 1}
-            onChange={action(e => {
-                const value = props.current_value = parseInt(e.target.value);
+            onChange={action((e) => {
+                const value = (props.current_value = Number.parseInt(
+                    e.target.value,
+                ));
                 if (props.func) props.func(value);
-            })} />
+            })}
+        />
+    </>
+);
+
+const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
+const checkedIcon = <CheckBoxIcon fontSize="small" />;
+
+function DropdownAutocompleteComponent({
+    props,
+}: { props: GuiSpec<"dropdown" | "multidropdown"> }) {
+    // todo review 'virtualization' for large lists
+    const id = useId();
+    const multiple = props.type === "multidropdown";
+    // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
+    const useObjectKeys = props.values.length === 3;
+    const [_valueObjectArray, labelKey, valueKey] = props.values;
+
+    //todo handle multitext / tags properly.
+
+    // todo think about how this relates to different type logic with {label, value, original}
+    // const validVals = useObjectKeys ? valueObjectArray.map(item => item[valueKey]) : valueObjectArray;
+
+    const toOption = useCallback((original) => {
+        const label: string = useObjectKeys ? original[labelKey] : original;
+        // is value really always a string?
+        const value: string = useObjectKeys ? original[valueKey] : original;
+        // const id: string = uuid();
+        return { label, value, original };
+    }, [useObjectKeys, labelKey, valueKey]);
+    type OptionType = ReturnType<typeof toOption>;
+    const options = useMemo(() => props.values[0].map(toOption), [props.values, toOption]);
+    // bit of a faff with sometimes getting a one-item array, sometimes a single item...
+    const getSingleOption = useCallback(
+        (option: OptionType | OptionType[]) => {
+            const a = Array.isArray(option);
+            if (a && option.length > 1) {
+                console.warn("ideally we shouldn't have to deal with arrays at all here, but we only expect one value when we do");
+            }
+            return (Array.isArray(option) ? option[0] : option)},
+    []);
+    const single = getSingleOption;
+    const label = useCallback((option: OptionType | OptionType[]) => single(option).label, [single]);
+    const val = useCallback((option: OptionType | OptionType[]) => single(option).value, [single]);
+
+    // ------
+    // deal with cases where the options have changed (e.g. values from a different column)
+    // and may be incompatible with props.current_value
+    // ------
+    // if 'multiple' is true, make sure we get an array even if one / zero values selected.
+    // second half of ternary will either be the existing array if 'multiple', or the single value otherwise.
+    const v = useMemo(() => (
+        multiple && !Array.isArray(props.current_value)
+            ? [props.current_value]
+            : props.current_value
+    ), [props.current_value, multiple]);
+    // check that and maybe provide a bit of a type guard
+    if (multiple !== Array.isArray(v))
+        throw "logical inconsistency - 'multidropdown' value should be coerced to array by now";
+    const validVal = useCallback(
+        (v: string) => options.some((item) => item.value === v),
+        [options],
+    );
+    const isArray = Array.isArray(v);
+    const allValid = isArray ? v.every(validVal) : validVal(v);
+    const okValue = allValid ? v : isArray ? v.filter(validVal) : null;
+    //map from 'value' string to option object
+    const okOption = (Array.isArray(okValue)
+        ? okValue.map((v) => options.find((o) => o.value === v))
+        : [options.find((o) => o.value === v)])
+        // : options.find((o) => o.value === v); //not-multiple...
+
+    return (
+        <>
+            <label className="align-middle" htmlFor={id}>
+                {props.label}
+            </label>
+            <Autocomplete
+                className="w-full"
+                multiple={multiple}
+                size="small"
+                id={id}
+                options={options}
+                disableCloseOnSelect={multiple}
+                getOptionLabel={label}
+                value={okOption}
+                onChange={action((_, value: OptionType) => {
+                    //added type annotation above because mobx seems to fluff the inference to `never`
+                    if (value === null) return;
+                    if (Array.isArray(value)) {
+                        // && valueA.length > 1) {
+                        const selected = Array.from(value).map(
+                            (a: OptionType) => a.value,
+                        );
+                        props.current_value = selected;
+                        if (props.func) props.func(selected);
+                        return;
+                    }
+                    props.current_value = value.value;
+                    if (props.func) props.func(value.value);
+                })}
+                isOptionEqualToValue={(option, value) => single(option).original === single(value).original}
+                renderOption={(props, option, { selected }) => {
+                    // we could potentially render something richer here - like color swatches or icons
+                    // if we had a richer sense of the data in context
+                    // ^^ e.g. if we had a `GuiSpec<'category'>` it could have it's own internal logic for
+                    // managing internal state, and also use a richer component here.
+                    const { key, ...optionProps } = props as typeof props & {
+                        key: string;
+                    }; //questionable mui types?
+                    if (multiple)
+                        return (
+                            <li key={key} {...optionProps}>
+                                <Checkbox
+                                    icon={icon}
+                                    checkedIcon={checkedIcon}
+                                    style={{ marginRight: 8 }}
+                                    checked={selected}
+                                />
+                                {label(option)}
+                            </li>
+                        );
+                    return (
+                        <li key={key} {...optionProps}>
+                            {label(option)}
+                        </li>
+                    );
+                }}
+                renderTags={(tagValue, getTagProps) => {
+                    //seems to be a material-ui bug with not properly handling key / props...
+                    //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
+                    return tagValue.map((option, index) => (
+                        <Chip
+                            {...getTagProps({ index })}
+                            key={val(option)}
+                            label={label(option)}
+                        />
+                    ));
+                }}
+                renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        // label="Checkboxes"
+                        // placeholder={props.label}
+                    />
+                )}
+            />
         </>
-    )
+    );
 }
 
-const DropdownComponent = function({props}: {props: GuiSpec<'dropdown' | 'multidropdown'>}) {
+const DropdownComponent = ({
+    props,
+}: { props: GuiSpec<"dropdown" | "multidropdown"> }) => {
     const id = useId();
-    const [filter, setFilter] = useState('');
-    const filterArray = filter.toLowerCase().split(' ');
-    // const textFilter = (item: string | DropdownMappedValue<string, string>) => {
-    //     if (typeof item === 'string') return filter.some(f => !item.toLowerCase().includes(f));
-    //     const exclude = filter.some(f => !item.toString().toLowerCase().includes(f));
-    //     return true;
-    // }
-    if (!props.values) return <>DropdownComponent: no values</>;
-    const v = props.type === 'multidropdown' && !Array.isArray(props.current_value) ? [props.current_value] : props.current_value;
+    const [filter, setFilter] = useState("");
+    const filterArray = filter.toLowerCase().split(" ");
+    const multiple = props.type === "multidropdown";
+    const v =
+        multiple && !Array.isArray(props.current_value)
+            ? [props.current_value]
+            : props.current_value;
+    // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
+    const useObjectKeys = props.values.length === 3;
+    const [valueObjectArray, textKey, valueKey] = props.values;
+    // for some reason I can't get this to work with useMemo, but it's not particularly heavy - we also don't memoize the children of the dropdown...
+    // so if we do find this is expensive, we can definitely optimize better.
+    // we just want a string array to filter on to avoid throwing error e.g. if we have a current_value that's not in the dropdown because category changed.
+    //todo handle multitext / tags properly.
+    const validVals = useObjectKeys
+        ? valueObjectArray.map((item) => item[valueKey])
+        : valueObjectArray;
+
+    const validVal = useCallback(
+        (v: string) => validVals.some((item) => item === v),
+        [validVals],
+    );
+    const isArray = Array.isArray(v);
+    const allValid = isArray ? v.every(validVal) : validVal(v);
+    const okValue = allValid ? v : isArray ? v.filter(validVal) : null; //not ok after changing category?
+
+    // type E = SelectChangeEvent<string | string[]>;
+    type E = { target: { value: string | string[] } }; // material-ui vs native types are different, but compatible enough to use this here
+    const handleChange = action((e: E) => {
+        const {
+            target: { value },
+        } = e;
+        if (multiple && Array.isArray(value) && value.length > 1) {
+            const selected = Array.from(value); // .map(o => o.value);
+            props.current_value = selected;
+            if (props.func) props.func(selected);
+            return;
+        }
+        props.current_value = value;
+        if (props.func) props.func(value);
+    });
+
     return (
         <>
             <label htmlFor={id}>{props.label}</label>
-            <select 
-            id={id}
-            multiple={props.type === 'multidropdown'}
-            value={v}
-            className="w-full"
-            onChange={action(e => {
-                props.current_value = e.target.value;
-                if (props.func) props.func(e.target.value);
-            })}>
-                {props.values[0].map((item, i) => {
-                    const s = props;
-                    const text = s.values.length > 1 ? item[s.values[1]] : item;
-                    const value = s.values.length > 1 ? item[s.values[2]] : item;
-                    if (filterArray.some(f => !text.toLowerCase().includes(f))) return null;
-                    return <option key={i} value={value}>{text}</option>
+            <Select
+                size="small"
+                id={id}
+                multiple={multiple}
+                value={okValue}
+                className="w-full"
+                onChange={handleChange}
+            >
+                {props.values[0].map((item) => {
+                    const text = useObjectKeys ? item[textKey] : item;
+                    const value = useObjectKeys ? item[valueKey] : item;
+                    const id = uuid();
+                    if (
+                        filterArray.some((f) => !text.toLowerCase().includes(f))
+                    )
+                        return null;
+                    return (
+                        <MenuItem key={id} value={value}>
+                            {text}
+                        </MenuItem>
+                    );
                 })}
-            </select>
-            <div></div>
-            <input type="text" value={filter} placeholder="Filter options..." 
-            onChange={(e => setFilter(e.target.value))} 
-            className="m-1 pl-1 justify-self-center"
+            </Select>
+            <div />
+            <input
+                type="text"
+                value={filter}
+                placeholder="Filter options..."
+                onChange={(e) => setFilter(e.target.value)}
+                className="m-1 pl-1 justify-self-center"
             />
         </>
-    )
+    );
 };
 
-const CheckboxComponent = function({props}: {props: GuiSpec<'check'>}) {
-    return (
-        <>
-            <label>{props.label}</label>
-            <input type="checkbox" checked={props.current_value} onChange={action(e => {
+const CheckboxComponent = ({ props }: { props: GuiSpec<"check"> }) => (
+    <>
+        <label>{props.label}</label>
+        <input
+            type="checkbox"
+            checked={props.current_value}
+            onChange={action((e) => {
                 props.current_value = e.target.checked;
                 if (props.func) props.func(e.target.checked);
-            })}/>
-        </>
-    )
-};
+            })}
+        />
+    </>
+);
 
-const RadioButtonComponent = function({props}: {props: GuiSpec<'radiobuttons'>}) {
-    const id = useId();
+const RadioButtonComponent = ({
+    props,
+}: { props: GuiSpec<"radiobuttons"> }) => {
+    const choices = useMemo(
+        () => props.choices.map((v) => ({ v, id: uuid() })),
+        [props.choices],
+    );
     return (
         <>
             <label>{props.label}</label>
@@ -149,110 +358,159 @@ const RadioButtonComponent = function({props}: {props: GuiSpec<'radiobuttons'>})
                 })}
             </RadioGroup> */}
             <div className="ciview-radio-group">
-                {props.choices.map((v, i) => (
-                    <>
-                        <span 
-                        className="m-1"
-                        key={i + id}
-                        >
-                            {v[0]}
-                        </span>
-                        <input key={i + id + 'input'}
-                        type="radio" value={v[1]} checked={v[1] === props.current_value} onChange={action(e => {
-                            props.current_value = e.currentTarget.value;
-                            if (props.func) props.func(e.currentTarget.value);
-                        })}/>
-                    </>
+                {choices.map(({ v, id }) => (
+                    <span key={id}>
+                        <span className="m-1">{v[0]}</span>
+                        <input
+                            type="radio"
+                            value={v[1]}
+                            // biome-ignore lint/suspicious/noDoubleEquals: number == string is ok here
+                            checked={v[1] == props.current_value}
+                            onChange={action((e) => {
+                                props.current_value = e.currentTarget.value;
+                                if (props.func)
+                                    props.func(e.currentTarget.value);
+                            })}
+                        />
+                    </span>
                 ))}
             </div>
         </>
-    )
+    );
 };
 
-const DoubleSliderComponent = function({props}: {props: GuiSpec<'doubleslider'>}) {
-    return (
-        <>
-            <label>{props.label}</label>
-            <input type="range" value={props.current_value[0]} onChange={action(e => {
-                const v = props.current_value[0] = parseFloat(e.target.value);
-                if (props.func) props.func([v, props.current_value[1]]);
-            })} />
-            <input type="range" value={props.current_value[1]} onChange={action(e => {
-                const v = props.current_value[1] = parseFloat(e.target.value);
-                if (props.func) props.func([props.current_value[0], v]);
-            })} />
-        </>
-    )
-};
+const DoubleSliderComponent = ({
+    props,
+}: { props: GuiSpec<"doubleslider"> }) => (
+    <>
+        <label>{props.label}</label>
+        <Slider
+            value={props.current_value}
+            min={props.min || 0}
+            max={props.max || 1}
+            onChange={action((_, value) => {
+                if (!Array.isArray(value))
+                    throw "doubleslider callback should have multiple values";
+                props.current_value = value as [number, number];
+                if (props.func) props.func(value as [number, number]);
+            })}
+        />
+    </>
+);
 
-const ButtonComponent = function({props}: {props: GuiSpec<'button'>}) {
-    return (
-        <>
-            <button onClick={action(e => {
+const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
+    <>
+        <label>{props.label}</label>
+        <Button
+            variant="contained"
+            onClick={() => {
                 if (props.func) props.func(undefined);
-            })}>{props.label}</button>
-        </>
-    )
-};
+            }}
+        >
+            {props.label}
+        </Button>
+    </>
+);
 
-const FolderComponent = function({props}: {props: GuiSpec<'folder'>}) {
+const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
+    // add uuid to each setting to avoid key collisions
+    const settings = useMemo(
+        () => props.current_value.map((setting) => ({ setting, id: uuid() })),
+        [props.current_value],
+    );
+    if (settings.length === 0) return null;
     return (
-        <Accordion type='single' collapsible className="w-full col-span-2">
+        <Accordion
+            type="single"
+            collapsible
+            className="w-full col-span-2"
+            //expand by default
+            defaultValue={props.label}
+        >
             <AccordionItem value={props.label}>
                 <AccordionTrigger>{props.label}</AccordionTrigger>
                 <AccordionContent>
-                    {props.current_value.map((setting, i) => <AbstractComponent key={i} props={setting} />)}
+                    {settings.map(({ setting, id }) => (
+                        <AbstractComponent key={id} props={setting} />
+                    ))}
                 </AccordionContent>
             </AccordionItem>
         </Accordion>
-    )
-}
+    );
+};
 
-const Components: Record<GuiSpecType, React.FC<{props: GuiSpec<GuiSpecType>}>> = {
-    'text': observer(TextComponent),
-    'textbox': observer(TextBoxComponent),
-    'slider': observer(SliderComponent),
-    'spinner': observer(SpinnerComponent),
-    'dropdown': observer(DropdownComponent),
-    'multidropdown': observer(DropdownComponent),
-    'check': observer(CheckboxComponent),
-    'radiobuttons': observer(RadioButtonComponent),
-    'doubleslider': observer(DoubleSliderComponent),
-    'button': observer(ButtonComponent),
-    'folder': observer(FolderComponent),
+const Components: {
+    [K in GuiSpecType]: React.FC<{ props: GuiSpec<K> }>;
+} = {
+    text: observer(TextComponent),
+    textbox: observer(TextBoxComponent),
+    slider: observer(SliderComponent),
+    spinner: observer(SpinnerComponent),
+    dropdown: observer(DropdownAutocompleteComponent),
+    // consider having component specifically for column/category selection
+    // the column selection can make use of column groups
+    // category selection can have some logic for multitext / tags
+    // both can have the ability to reactively update their options based on the current data
+    // 'multidropdown': observer(DropdownComponent),
+    multidropdown: observer(DropdownAutocompleteComponent),
+    check: observer(CheckboxComponent),
+    radiobuttons: observer(RadioButtonComponent),
+    doubleslider: observer(DoubleSliderComponent),
+    button: observer(ButtonComponent),
+    folder: observer(FolderComponent),
 } as const;
 
-const ErrorComponent = function({props}: {props: GuiSpec<GuiSpecType>}) {
+const ErrorComponent = ({ props }: { props: GuiSpec<GuiSpecType> }) => {
     const [expanded, setExpanded] = useState(false);
     return (
-        <div className="border-red-500 border-2 border-solid" onClick={e => setExpanded(!expanded)}>
+        <div
+            className="border-red-500 border-2 border-solid"
+            onClick={() => setExpanded(!expanded)}
+        >
             <h2>Error...</h2>
-            <pre>{JSON.stringify(props, null, 2).substring(0, expanded ? undefined : 100)}</pre>
+            <pre>
+                {JSON.stringify(props, null, 2).substring(
+                    0,
+                    expanded ? undefined : 100,
+                )}
+            </pre>
         </div>
-    )
-}
+    );
+};
 
-const AbstractComponent = observer(function({props}: {props: GuiSpec<GuiSpecType>}) {
-    const Component = Components[props.type];
-    return (
-        <div className="grid grid-cols-2 p-1 justify-items-start">
-            <ErrorBoundary fallback={<ErrorComponent props={props} />}>
-                <Component props={props} />
-            </ErrorBoundary>
-        </div>
-    )
-})
+const AbstractComponent = observer(
+    ({ props }: { props: GuiSpec<GuiSpecType> }) => {
+        // would like to lose this `as` cast - maybe a newer/future typescript might manage it better?
+        const Component = Components[props.type] as React.FC<{
+            props: typeof props;
+        }>;
+        return (
+            <div className="grid grid-cols-2 p-1 justify-items-start">
+                <ErrorBoundary fallback={<ErrorComponent props={props} />}>
+                    <Component props={props} />
+                </ErrorBoundary>
+            </div>
+        );
+    },
+);
 
-export default observer(function({chart}: {chart: Chart}) {
+export default observer(({ chart }: { chart: Chart }) => {
     const settings = useMemo(() => {
-        const settings = chart.getSettings();
-        const wrap = {settings};
+        // is the id just for a key in this component, or should the type passed to the component recognise it?
+        // for now, I don't think there's a benefit to including it in the type.
+        // FolderComponent also makes keys in a similar way that is again only relevant locally I think.
+        const settings = chart
+            .getSettings()
+            .map((setting) => ({ setting, id: uuid() }));
+        const wrap = { settings };
         makeAutoObservable(wrap);
         return wrap.settings;
     }, [chart]);
     return (
         <div className="w-full">
-            {settings.map((setting, i) => <AbstractComponent key={i} props={setting} />)}
+            {settings.map(({ setting, id }) => (
+                <AbstractComponent key={id} props={setting} />
+            ))}
         </div>
-    )
-})
+    );
+});

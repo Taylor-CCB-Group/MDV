@@ -1,31 +1,31 @@
-import { getProjectURL } from '../dataloaders/DataLoaderUtil';
-import DataStore from '../datastore/DataStore';
-import { DataModel } from '../table/DataModel';
-import { createEl } from '../utilities/Elements';
+import { getProjectURL } from "../dataloaders/DataLoaderUtil";
+import type DataStore from "../datastore/DataStore";
+import type { DataModel } from "../table/DataModel";
+import { createEl } from "../utilities/Elements";
 
 export type ImageArrayConfig = {
-    base_url: string,
-    image_type: string,
-    image_key: string,
-    width: number,
-    height: number,
-    cancel?: boolean,
-}
+    base_url: string;
+    image_type: string;
+    image_key: string;
+    width: number;
+    height: number;
+    cancel?: boolean;
+};
 
 export type ImageArrayEntry = {
     // image: HTMLImageElement,
-    zIndex: number,
+    zIndex: number;
     /** use in shader to scale uv coordinates */
-    aspectRatio: number,
-    url: string,
-}
+    aspectRatio: number;
+    url: string;
+};
 
 /**
- * @class ImageArray 
+ * @class ImageArray
  * @description
  * ImageArray is a class that holds a collection of images as a texture array, such that many images can be efficiently rendered
  * without requiring a lot of draw calls / GL state updates.
- * 
+ *
  * Current design is brute-force, loading all images at once, little other logic.
  * Will fall over and die if you try to use more than "Max Array Texture Layers" (usually 2048) images.
  */
@@ -37,16 +37,21 @@ export class ImageArray {
     logEl: HTMLElement;
     dataView: DataModel;
     onProgress: (n: number) => void;
-    constructor(dataStore, canvas: HTMLCanvasElement, dataView: DataModel, config: ImageArrayConfig) {
+    constructor(
+        dataStore,
+        canvas: HTMLCanvasElement,
+        dataView: DataModel,
+        config: ImageArrayConfig,
+    ) {
         this.textures = new Map();
         this.texturesByIndex = new Map();
-        
+
         this.dataView = dataView;
 
         const gl = canvas.getContext("webgl2");
         this.gl = gl;
         this.texture = gl.createTexture();
-        this.logEl = createEl('div', {}, canvas.parentElement);
+        this.logEl = createEl("div", {}, canvas.parentElement);
         this.logEl.style.color = "white";
         this.loadImageColumn(dataStore, gl, config);
     }
@@ -59,9 +64,13 @@ export class ImageArray {
     }
     drawProgress(n = 0) {
         // this.logEl.textContent = `Loading images: ${Math.round(n * 100)}%`;
-        this.onProgress && this.onProgress(n);
+        this.onProgress?.(n);
     }
-    loadImageColumn(ds: DataStore, gl: WebGL2RenderingContext, config: ImageArrayConfig) {
+    loadImageColumn(
+        ds: DataStore,
+        gl: WebGL2RenderingContext,
+        config: ImageArrayConfig,
+    ) {
         // how about also passing a cancellation token or something?
         const { image_type, image_key, width, height } = config;
         const base_url = getProjectURL(config.base_url);
@@ -71,18 +80,41 @@ export class ImageArray {
         gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
         const mipLevels = Math.floor(Math.log2(width));
 
-        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(
+            gl.TEXTURE_2D_ARRAY,
+            gl.TEXTURE_MIN_FILTER,
+            gl.LINEAR_MIPMAP_LINEAR,
+        );
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(
+            gl.TEXTURE_2D_ARRAY,
+            gl.TEXTURE_WRAP_S,
+            gl.CLAMP_TO_EDGE,
+        );
+        gl.texParameteri(
+            gl.TEXTURE_2D_ARRAY,
+            gl.TEXTURE_WRAP_T,
+            gl.CLAMP_TO_EDGE,
+        );
 
-        const isUnique = col.datatype === 'unique';
-        const numImages: number = isUnique ? col.data.length / col.stringLength : (col.values?.length || col.data.length);
+        const isUnique = col.datatype === "unique";
+        const numImages: number = isUnique
+            ? col.data.length / col.stringLength
+            : col.values?.length || col.data.length;
 
-        gl.texStorage3D(gl.TEXTURE_2D_ARRAY, mipLevels, gl.RGBA8, width, height, numImages);
+        gl.texStorage3D(
+            gl.TEXTURE_2D_ARRAY,
+            mipLevels,
+            gl.RGBA8,
+            width,
+            height,
+            numImages,
+        );
         const memUsage = (width * height * 4 * numImages) / 1024 / 1024;
         //consider showing this in the UI ('i' for info?)
-        console.log(`Allocated ${memUsage.toFixed(2)}MB for image array (not accounting for mipmaps)`);
+        console.log(
+            `Allocated ${memUsage.toFixed(2)}MB for image array (not accounting for mipmaps)`,
+        );
         let nLoaded = 0;
         function getTextArray(): string[] {
             if (!isUnique) {
@@ -103,7 +135,7 @@ export class ImageArray {
             // XXX: still not working --- need to better grasp how DataModel works
             // this.dataView.updateModel();
             // -> would be better to map over col.values in the first place?
-            const imageName = d;//col.values[d];//this.dataView.getItemField(d, image_key);
+            const imageName = d; //col.values[d];//this.dataView.getItemField(d, image_key);
             if (this.textures.has(imageName)) {
                 this.texturesByIndex.set(i, this.textures.get(imageName));
                 nLoaded++;
@@ -124,24 +156,43 @@ export class ImageArray {
                 gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
                 // TODO consider changing how aspect ratio works to allow for non-square texture
                 entry.aspectRatio = image.width / image.height; // mutating entry won't prompt re-computing vertex buffers...
-                const resizedImage = resizeImage(image, width, height)//, this.logEl);
-                gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, zIndex, width, height, 1, gl.RGBA, gl.UNSIGNED_BYTE, resizedImage);
+                const resizedImage = resizeImage(image, width, height); //, this.logEl);
+                gl.texSubImage3D(
+                    gl.TEXTURE_2D_ARRAY,
+                    0,
+                    0,
+                    0,
+                    zIndex,
+                    width,
+                    height,
+                    1,
+                    gl.RGBA,
+                    gl.UNSIGNED_BYTE,
+                    resizedImage,
+                );
                 const error = gl.getError();
                 if (error !== gl.NO_ERROR) {
-                    console.error(`glError ${error} loading image #${zIndex} '${url}'`);
+                    console.error(
+                        `glError ${error} loading image #${zIndex} '${url}'`,
+                    );
                 }
                 gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
                 this.drawProgress(nLoaded++ / numImages);
-            }
+            };
             image.onerror = () => {
                 console.error(`Error loading image #${zIndex} '${url}'`);
-            }
+            };
         });
     }
 }
 
-function resizeImage(image: HTMLImageElement, width: number, height: number, logEl?: HTMLDivElement) {
-    const canvas = document.createElement('canvas');
+function resizeImage(
+    image: HTMLImageElement,
+    width: number,
+    height: number,
+    logEl?: HTMLDivElement,
+) {
+    const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");

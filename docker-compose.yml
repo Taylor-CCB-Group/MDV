@@ -1,28 +1,46 @@
-version: '3.8'
-
 services:
   
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    # todo: configure dev vs dockerhub etc
-    # image: jayeshire/mdv-frontend:latest
+  mdv_app:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: jayeshire/mdv-frontend:latest
     ports:
       - "5055:5055"
+    volumes:
+     #- ./python:/app/python
+     #- ./mdv:/app/mdv
+     - mdv-data:/app/mdv 
     depends_on:
-      - database
+      - mdv_db
+    secrets:
+      - db_user
+      - db_password
+      - db_name 
 
-  database:
+  mdv_db:
     image: postgres:latest
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: mydatabase
-    ports:
-      - "5432:5432"
+    #ports:
+    #  - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER_FILE: /run/secrets/db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB_FILE: /run/secrets/db_name
+    secrets:
+      - db_user
+      - db_password
+      - db_name
+
+secrets:
+  db_user:
+    external: true
+  db_password:
+    external: true
+  db_name:
+    external: true
 
 volumes:
   postgres-data:
+  mdv-data:

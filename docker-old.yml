@@ -1,0 +1,34 @@
+services:
+  
+  frontend:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: jayeshire/mdv-frontend:1.23
+    networks:
+      - default
+    ports:
+      - "5055:5055"
+    volumes:
+      - mdv-data:/app/mdv
+    depends_on:
+      - database
+
+  database:
+    image: postgres:latest
+    networks:
+      - default
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mydatabase
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
+  mdv-data:
+
+networks:
+  default:
+    driver: bridge

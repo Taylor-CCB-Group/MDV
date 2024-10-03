@@ -18,7 +18,7 @@ classifiers = [
 python = ">=3.10,<3.13"
 anndata = "^0.9.1"
 fasteners = "^0.18"
-Flask = "^2.2.5"
+Flask = "3.0.3"
 Flask-SocketIO = "^5.3.6"
 h5py = "^3.10.0"
 mudata = "^0.2.3"
@@ -65,6 +65,7 @@ optional = true
 [tool.poetry.group.backend.dependencies]
 flask-sqlalchemy = "^3.1.1"
 psycopg2 = "^2.9.9"
+gunicorn = "^22.0.0"
 
 [tool.pyright]
 venvPath = "../venv/"

@@ -1,11 +1,32 @@
-import React, { useState, useCallback, useReducer, type PropsWithChildren, forwardRef } from "react";
+import type React from "react";
+import {
+  useState,
+  useCallback,
+  useReducer,
+  type PropsWithChildren,
+  forwardRef,
+} from "react";
 import { useDropzone } from "react-dropzone";
+import { observer } from 'mobx-react-lite';
+
 import axios from 'axios';
 import { useProject } from "../../modules/ProjectContext";
 import { ColumnPreview } from "./ColumnPreview"
 
+import { useViewerStoreApi, useChannelsStoreApi } from '../../react/components/avivatorish/state';
+import { createLoader } from '../../react/components/avivatorish/utils';
+import { unstable_batchedUpdates } from 'react-dom';
+
+import { TiffPreview } from "./TiffPreview";
+import { TiffMetadataTable } from "./TiffMetadataTable"
+import TiffVisualization from './TiffVisualization';
+import { DatasourceDropdown } from "./DatasourceDropdown";
+
+
 // Use dynamic import for the worker
-const CsvWorker = new Worker(new URL('./csvWorker.ts', import.meta.url), { type: 'module' });
+const CsvWorker = new Worker(new URL("./csvWorker.ts", import.meta.url), {
+  type: "module",
+});
 
 const Container = ({ children }: PropsWithChildren) => {
   return (
@@ -34,29 +55,41 @@ const SuccessHeading = ({ children }) => (
 );
 
 const SuccessText = ({ children }) => (
-  <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">{children}</p>
+  <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">
+    {children}
+  </p>
 );
 
-const DropzoneContainer = forwardRef(({ isDragOver, children, ...props }: any, ref) => (
-  <div
-    {...props}
-    ref={ref}
-    className={`p-4 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? 'bg-gray-300 dark:bg-slate-800' : 'bg-white dark:bg-black'} min-w-[90%]`}
-  >
-    {children}
-  </div>
-));
+const DropzoneContainer = forwardRef(
+  ({ isDragOver, children, ...props }: any, ref) => (
+    <div
+      {...props}
+      ref={ref}
+      className={`p-4 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]`}
+    >
+      {children}
+    </div>
+  ),
+);
 
 const FileInputLabel = ({ children, ...props }) => (
-  <label {...props} className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500">
+  <label
+    {...props}
+    className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500"
+  >
     {children}
   </label>
 );
 
 const Spinner = () => {
-  return <div className="w-16 h-16 border-8 mt-10 border-blue-500 border-dashed rounded-full animate-spin" style={{
-    borderColor: "blue transparent blue transparent"
-  }}></div>;
+  return (
+    <div
+      className="w-16 h-16 border-8 mt-10 border-blue-500 border-dashed rounded-full animate-spin"
+      style={{
+        borderColor: "blue transparent blue transparent",
+      }}
+    />
+  );
 };
 
 const colorStyles = {
@@ -78,6 +111,12 @@ const colorStyles = {
     darkBgColor: "dark:bg-green-800",
     darkHoverColor: "dark:bg-green-900",
   },
+  gray: {
+    bgColor: "bg-gray-600",
+    hoverColor: "hover:bg-gray-700",
+    darkBgColor: "dark:bg-gray-800",
+    darkHoverColor: "dark:bg-gray-900",
+  },
 };
 
 const Button = ({
@@ -86,12 +125,14 @@ const Button = ({
   disabled = false,
   size = "px-5 py-2.5",
   marginTop = "mt-2.5",
-  children
+  children,
 }) => {
-  const { bgColor, hoverColor, darkBgColor, darkHoverColor } = colorStyles[color] || colorStyles.blue;
+  const { bgColor, hoverColor, darkBgColor, darkHoverColor } =
+    colorStyles[color] || colorStyles.blue;
 
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`${size} ${marginTop} ${bgColor} ${hoverColor} ${darkBgColor} ${darkHoverColor} text-white rounded self-center cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-500 disabled:opacity-70`}
       disabled={disabled}
@@ -102,22 +143,26 @@ const Button = ({
 };
 
 const ProgressBar = ({ value, max }) => (
-  <progress className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded" value={value} max={max}></progress>
+  <progress
+    className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded"
+    value={value}
+    max={max}
+  />
 );
 
 const Message = ({ children }) => (
-  <p className="text-lg font-bold text-[#333] dark:text-white text-center">{children}</p>
+  <p className="text-lg font-bold text-[#333] dark:text-white text-center">
+    {children}
+  </p>
 );
 
 const FileSummary = ({ children }) => (
-  <div className="max-w-[400px] w-[90%] text-center mb-5">
-    {children}
-  </div>
+  <div className="max-w-[400px] w-[90%] text-center mb-5">{children}</div>
 );
 
 const FileSummaryHeading = ({ children }) => (
   <h1 className="text-gray-800 dark:text-white mb-3">{children}</h1>
-)
+);
 
 const FileSummaryText = ({ children }) => (
   <p className="text-lg text-gray-700 dark:text-white my-1">{children}</p>
@@ -131,16 +176,36 @@ const ErrorContainer = ({ children }) => (
 
 const DynamicText = ({ text, className = "" }) => (
   <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
-    <p className={`text-center m-0 font-bold text-sm sm:text-lg md:text-xl ${className}`}>
+    <p
+      className={`text-center m-0 font-bold text-sm sm:text-lg md:text-xl ${className}`}
+    >
       {text}
     </p>
   </div>
 );
 
 const ErrorHeading = ({ children }) => (
-  <h4 className="mt-0 text-lg font-bold">
-    {children}
-  </h4>
+  <h4 className="mt-0 text-lg font-bold">{children}</h4>
+);
+
+const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
+  <div className="pr-4">
+    <label
+      htmlFor="datasourceName"
+      className="text-center m-0 font-bold text-sm sm:text-lg md:text-xl"
+    >
+      Datasource name:
+    </label>
+    <input
+      id="datasourceName"
+      type="text"
+      value={value}
+      onChange={onChange}
+      className="p-2 border rounded focus:outline-none focus:ring focus:border-blue-300 dark:text-gray-300 dark:bg-gray-800 w-full"
+      placeholder="Enter datasource name"
+      disabled={isDisabled}
+    />
+  </div>
 );
 
 // Reducer function
@@ -160,6 +225,10 @@ const reducer = (state, action) => {
       return { ...state, isValidating: action.payload };
     case "SET_VALIDATION_RESULT":
       return { ...state, validationResult: action.payload };
+    case "SET_FILE_TYPE":
+      return { ...state, fileType: action.payload };
+    case "SET_TIFF_METADATA":
+      return { ...state, tiffMetadata: action.payload };
     default:
       return state;
   }
@@ -200,19 +269,53 @@ const useFileUploadProgress = () => {
   return { progress, setProgress, startProgress, resetProgress };
 };
 
-const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ onClose, onResize }) => {
-  const { root } = useProject();
+const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
+  onClose,
+  onResize,
+}) => {
 
-  const [summary, setSummary] = useState({
+
+  //const viewerStore = vivStores.viewerStore;
+
+  const { root, projectName, chartManager } = useProject();
+
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+
+  const [updatedNamesArray, setUpdatedNamesArray] = useState<string[]>([]);
+
+  const handleSelect = (value: string) => {
+    setSelectedOption(value);
+    setDatasourceName(value);
+    console.log('Selected:', value);
+  };
+
+  const [datasourceName, setDatasourceName] = useState("");
+
+  const [showMetadata, setShowMetadata] = useState(true);
+
+  const toggleView = () => {
+    setShowMetadata(prevState => !prevState);
+  };
+
+  const [csvSummary, setCsvSummary] = useState({
+    datasourceName: "",
     fileName: "",
     fileSize: "",
     rowCount: 0,
-    columnCount: 0
+    columnCount: 0,
+  });
+
+  const [tiffSummary, settiffSummary] = useState({
+    fileName: "",
+    fileSize: "",
   });
 
   const [columnNames, setColumnNames] = useState<string[]>([]);
   const [columnTypes, setColumnTypes] = useState<string[]>([]);
   const [secondRowValues, setSecondRowValues] = useState<string[]>([]);
+
+  // TIFF
+  const channelsStore = useChannelsStoreApi();
 
   const [state, dispatch] = useReducer(reducer, {
     selectedFiles: [],
@@ -222,7 +325,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     validationResult: null,
     success: false,
     error: null,
+    fileType: null,
+    tiffMetadata: null,
   });
+
+  const viewerStore = useViewerStoreApi();
 
   const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
@@ -230,91 +337,301 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
     dispatch({ type: "SET_SELECTED_FILES", payload: acceptedFiles });
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
-      setSummary({
-        ...summary,
-        fileName: file.name,
-        fileSize: (file.size / (1024 * 1024)).toFixed(2) // Convert to MB
-      });
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      if (fileExtension === 'csv') {
+        const newDatasourceName = file.name;
+        setDatasourceName(newDatasourceName);
+        setCsvSummary({
+          ...csvSummary,
+          datasourceName: newDatasourceName,
+          fileName: file.name,
+          fileSize: (file.size / (1024 * 1024)).toFixed(2)
+        });
+        dispatch({ type: "SET_FILE_TYPE", payload: "csv" });
+      } else if (fileExtension === 'tiff' || fileExtension === 'tif') {
+
+        const dataSources = window.mdv.chartManager?.dataSources ?? [];
+        const namesArray = dataSources.map(dataSource => dataSource.name);
+
+        // Update state with the new array, triggering re-render
+        setUpdatedNamesArray([...namesArray, "new datasource"]);
+        settiffSummary({
+          ...tiffSummary,
+          fileName: file.name,
+          fileSize: (file.size / (1024 * 1024)).toFixed(2)
+        });
+
+        dispatch({ type: "SET_FILE_TYPE", payload: "tiff" });
+        handleSubmitFile(acceptedFiles);
+      }
     }
-  }, []);
+  }, [csvSummary]);
+
+  const handleSubmitFile = useCallback(async (files: File[]) => {
+    let newSource;
+    if (files.length === 1) {
+      newSource = {
+        urlOrFile: files[0],
+        description: files[0].name
+      };
+    } else {
+      newSource = {
+        urlOrFile: files,
+        description: 'data.zarr'
+      };
+    }
+
+    viewerStore.setState({ isChannelLoading: [true] });
+    viewerStore.setState({ isViewerLoading: true });
+
+    try {
+      const newLoader = await createLoader(
+        newSource.urlOrFile,
+        () => { }, // placeholder for toggleIsOffsetsSnackbarOn
+        (message) => viewerStore.setState({ loaderErrorSnackbar: { on: true, message } })
+      );
+
+      let nextMeta;
+      let nextLoader;
+      if (Array.isArray(newLoader)) {
+        if (newLoader.length > 1) {
+          nextMeta = newLoader.map(l => l.metadata);
+          nextLoader = newLoader.map(l => l.data);
+        } else {
+          nextMeta = newLoader[0].metadata;
+          nextLoader = newLoader[0].data;
+        }
+      } else {
+        nextMeta = newLoader.metadata;
+        nextLoader = newLoader.data;
+      }
+
+      if (nextLoader) {
+        console.log('Metadata (in JSON-like form) for current file being viewed: ', nextMeta);
+
+        unstable_batchedUpdates(() => {
+          channelsStore.setState({ loader: nextLoader });
+          viewerStore.setState({ metadata: nextMeta });
+        });
+
+        dispatch({ type: "SET_TIFF_METADATA", payload: nextMeta });
+      }
+    } catch (error) {
+      console.error('Error loading file:', error);
+      dispatch({
+        type: "SET_ERROR",
+        payload: {
+          message: "Error loading TIFF file.",
+          traceback: error.message
+        }
+      });
+    } finally {
+      viewerStore.setState({ isChannelLoading: [false] });
+      viewerStore.setState({ isViewerLoading: false });
+    }
+  }, [viewerStore, channelsStore]);
+
+  const handleDatasourceNameChange = (event) => {
+    const { value } = event.target;
+    setDatasourceName(value); // Update the state with the new value
+    setCsvSummary((prevCsvSummary) => ({
+      ...prevCsvSummary,
+      datasourceName: value, // Update datasourceName in the summary object
+    }));
+  };
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     accept: {
-      'text/csv': ['.csv']
+      'text/csv': ['.csv'],
+      'image/tiff': ['.tiff', '.tif']
     }
   });
-  const rejectionMessage = fileRejections.length > 0 ? "Only CSV files can be selected" : "Drag and drop files here or click the button below to upload";
+  const rejectionMessage = fileRejections.length > 0
+    ? "Only CSV and TIFF files can be selected"
+    : "Drag and drop files here or click the button below to upload";
+
   const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
+
+  const getTextWidth = (
+    canvas: HTMLCanvasElement,
+    context: CanvasRenderingContext2D,
+    text: string,
+  ) => {
+    context.font = getComputedStyle(document.body).fontSize + " Arial";
+    return context.measureText(text).width;
+  };
+
+  // Function to calculate the maximum total width needed for the ColumnPreview component
+  const calculateTotalWidth = (
+    columnNames: string[],
+    columnTypes: string[],
+    secondRowValues: string[],
+  ) => {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    let maxColumnNameWidth = 0;
+    let maxColumnTypeWidth = 0;
+    let maxColumnSecondRowWidth = 0;
+
+    // Calculate the maximum width of column names
+    maxColumnNameWidth = Math.max(
+      ...columnNames.map((name) => getTextWidth(canvas, context, name)),
+    );
+
+    // Calculate the maximum width of column types
+    maxColumnTypeWidth = Math.max(
+      ...columnTypes.map((type) => getTextWidth(canvas, context, type)),
+    );
+
+    // Calculate the maximum width of second row values
+    maxColumnSecondRowWidth = Math.max(
+      ...secondRowValues.map((value) =>
+        getTextWidth(canvas, context, value),
+      ),
+    );
+
+    // Calculate the total width needed for the ColumnPreview component
+    const totalWidth = maxColumnNameWidth + maxColumnTypeWidth + maxColumnSecondRowWidth + 32; // Add padding
+    canvas.remove();
+    return Math.max(500, totalWidth);
+  };
 
   const handleValidateClick = () => {
     const file = state.selectedFiles[0];
     if (file) {
       dispatch({ type: "SET_IS_VALIDATING", payload: true });
-      CsvWorker.postMessage(file);
-      CsvWorker.onmessage = (event: MessageEvent) => {
-        const { columnNames, columnTypes, secondRowValues, rowCount, columnCount, error } = event.data;
-        if (error) {
-          dispatch({
-            type: "SET_ERROR",
-            payload: {
-              message: "Validation failed.",
-              traceback: error
-            }
-          });
-          dispatch({ type: "SET_IS_VALIDATING", payload: false });
-        } else {
-          setColumnNames(columnNames);
-          setColumnTypes(columnTypes);
-          setSecondRowValues(secondRowValues);
-          setSummary((prevSummary) => ({
-            ...prevSummary,
+
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      if (fileExtension === 'csv') {
+        CsvWorker.postMessage(file);
+        CsvWorker.onmessage = (event: MessageEvent) => {
+          const {
+            columnNames,
+            columnTypes,
+            secondRowValues,
             rowCount,
-            columnCount
-          }));
-          onResize(600, 630);
-          dispatch({ type: "SET_IS_VALIDATING", payload: false });
-          dispatch({ type: "SET_VALIDATION_RESULT", payload: { columnNames, columnTypes } });
-        }
-      };
+            columnCount,
+            error,
+          } = event.data;
+          if (error) {
+            dispatch({
+              type: "SET_ERROR",
+              payload: {
+                message: "Validation failed.",
+                traceback: error,
+              },
+            });
+            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+          } else {
+            setColumnNames(columnNames);
+            setColumnTypes(columnTypes);
+            setSecondRowValues(secondRowValues);
+            setCsvSummary((prevCsvSummary) => ({
+              ...prevCsvSummary,
+              rowCount,
+              columnCount,
+            }));
+
+            // Calculate the total width needed for the ColumnPreview component
+            const totalWidth = calculateTotalWidth(
+              columnNames,
+              columnTypes,
+              secondRowValues,
+            );
+            onResize(totalWidth, 730);
+            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+            dispatch({
+              type: "SET_VALIDATION_RESULT",
+              payload: { columnNames, columnTypes },
+            });
+          }
+        };
+      } else if (fileExtension === 'tiff') {
+        onResize(1032, 580);
+        dispatch({ type: "SET_IS_VALIDATING", payload: false });
+        dispatch({ type: "SET_VALIDATION_RESULT", payload: { columnNames, columnTypes } });
+      }
     }
   };
 
   const handleUploadClick = async () => {
     console.log("Uploading file...");
+
     if (!state.selectedFiles.length) {
       dispatch({ type: "SET_ERROR", payload: "noFilesSelected" });
       return;
     }
 
+    const fileExtension = state.selectedFiles[0].name.split('.').pop().toLowerCase();
     dispatch({ type: "SET_IS_UPLOADING", payload: true });
     resetProgress();
 
     const formData = new FormData();
     formData.append("file", state.selectedFiles[0]);
-    formData.append("name", state.selectedFiles[0].name);
-    // formData.append("view", "TRUE");
-    // formData.append("backend", "TRUE");
-    formData.append("replace", '');
+    // let endpoint: "add_datasource" | "upload" | null = null;
 
+    if (fileExtension === 'csv') {
+
+      formData.append("name", datasourceName);
+      // formData.append("view", "TRUE");
+      // formData.append("backend", "TRUE");
+      formData.append("replace", '');
+      // endpoint = "add_datasource"
+
+
+
+    } else if (fileExtension === 'tiff') {
+      formData.append("project_name", projectName);
+      // endpoint = "upload"
+    }
 
     const config = {
       headers: {
-        'Content-Type': 'multipart/form-data'
+        "Content-Type": "multipart/form-data",
       },
-      onUploadProgress: function (progressEvent) {
-        const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      onUploadProgress: (progressEvent) => {
+        const percentComplete = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total,
+        );
         setProgress(percentComplete); // Update the progress as the file uploads
-      }
+      },
     };
 
     try {
-      const response = await axios.post(`${root}/add_datasource`, formData, config);
-      console.log('File uploaded successfully', response.data);
+      const response = await axios.post(
+        `${root}/add_datasource`,
+        formData,
+        config,
+      );
+      console.log("File uploaded successfully", response.data);
 
       if (response.status === 200) {
         dispatch({ type: "SET_IS_UPLOADING", payload: false });
         dispatch({ type: "SET_SUCCESS", payload: true });
+
+        // Perform second request if the file is TIFF
+        if (fileExtension === 'tiff') {
+          try {
+            const metadataResponse = await axios.post(`${root}/add_or_update_image_datasource`, {
+              tiffMetadata: state.tiffMetadata,
+              datasourceName: datasourceName,
+            });
+            console.log('Metadata updated successfully', metadataResponse.data);
+            chartManager.saveState();
+          } catch (metadataError) {
+            console.error('Error updating metadata:', metadataError);
+            dispatch({
+              type: "SET_ERROR",
+              payload: {
+                message: "Failed to update metadata.",
+                traceback: metadataError.message,
+              },
+            });
+          }
+        }
+
       } else {
         console.error(`Failed to confirm: Server responded with status ${response.status}`);
         dispatch({ type: "SET_IS_UPLOADING", payload: false });
@@ -342,7 +659,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
 
   const handleClose = async () => {
     dispatch({ type: "SET_FILE_SUMMARY", payload: null });
-    onResize(450, 295);
+    onResize(450, 320);
     onClose();
   };
 
@@ -383,33 +700,86 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
         </>
       ) : state.isValidating ? (
         <StatusContainer>
-          <Message>{"Validating the CSV file, please wait..."}</Message>
+          <Message>{"Validating data, please wait..."}</Message>
           <Spinner />
         </StatusContainer>
       ) : state.validationResult ? (
         <>
-          <FileSummary>
-            <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
-            <FileSummaryText>
-              <strong>{"File name"}</strong> {summary.fileName}
-            </FileSummaryText>
-            <FileSummaryText>
-              <strong>{"Number of rows"}</strong> {summary.rowCount}
-            </FileSummaryText>
-            <FileSummaryText>
-              <strong>{"Number of columns"}</strong> {summary.columnCount}
-            </FileSummaryText>
-            <FileSummaryText>
-              <strong>{"File size"}</strong> {summary.fileSize} MB
-            </FileSummaryText>
-          </FileSummary>
+          {state.fileType === "csv" && (
+            <>
+              <FileSummary>
+                <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
+                <FileSummaryText>
+                  <strong>{"Datasource name"}</strong> {csvSummary.datasourceName}
+                </FileSummaryText>
+                <FileSummaryText>
+                  <strong>{"File name"}</strong> {csvSummary.fileName}
+                </FileSummaryText>
+                <FileSummaryText>
+                  <strong>{"Number of rows"}</strong> {csvSummary.rowCount}
+                </FileSummaryText>
+                <FileSummaryText>
+                  <strong>{"Number of columns"}</strong> {csvSummary.columnCount}
+                </FileSummaryText>
+                <FileSummaryText>
+                  <strong>{"File size"}</strong> {csvSummary.fileSize} MB
+                </FileSummaryText>
+              </FileSummary>
+              <ColumnPreview columnNames={columnNames} columnTypes={columnTypes} secondRowValues={secondRowValues} />
+              <div className="flex justify-center items-center gap-6 mt-4">
+                <Button marginTop="mt-1" onClick={handleUploadClick}>{"Upload"}</Button>
+                <Button color="red" size="px-6 py-2.5" marginTop="mt-1" onClick={handleClose}>{"Cancel"}</Button>
+              </div>
+            </>
+          )}
 
 
-          <ColumnPreview columnNames={columnNames} columnTypes={columnTypes} secondRowValues={secondRowValues} />
-          <div className="flex justify-center items-center gap-6 mt-4">
-            <Button marginTop="mt-1" onClick={handleUploadClick}>{"Upload"}</Button>
-            <Button color="red" size="px-6 py-2.5" marginTop="mt-1" onClick={handleClose}>{"Cancel"}</Button>
-          </div>
+          {state.fileType === "tiff" && state.tiffMetadata && (
+            <>
+              <div className="h-full w-full flex">
+                <div className="w-1/3 flex flex-col">
+                  <div className="flex items-center justify-center">
+                    <div className="flex items-start justify-start pt-5 pl-4">
+                      <FileSummary>
+                        <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
+                        <FileSummaryText>
+                          <strong>{"File name:"}</strong> {tiffSummary.fileName}
+                        </FileSummaryText>
+                        <FileSummaryText>
+                          <strong>{"File size:"}</strong> {tiffSummary.fileSize} MB
+                        </FileSummaryText>
+                        <DatasourceDropdown options={updatedNamesArray} onSelect={handleSelect} />
+
+                      </FileSummary>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <div className="flex flex-col items-center justify-center ">
+                      <FileSummaryText>
+                        <strong>Image Preview:</strong>
+                      </FileSummaryText>
+                      <TiffVisualization
+                        metadata={state.tiffMetadata}
+                        file={state.selectedFiles[0]}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="w-2/3">
+                  <div className="flex items-start justify-start h-[70%] min-h-[420px]">
+                    {showMetadata ? <TiffMetadataTable metadata={state.tiffMetadata} /> : <TiffPreview metadata={state.tiffMetadata} />}
+                  </div>
+                  <div className="flex justify-between items-center ml-4 mr-2 mt-12">
+                    <Button color="gray" size="px-6 py-2.5" marginTop="mt-1" onClick={toggleView}>{showMetadata ? "View Metadata as XML" : "View Metadata as Table"}</Button>
+                    <div className="flex space-x-4 ml-auto">
+                      <Button marginTop="mt-6" onClick={handleUploadClick}>{"Upload"}</Button>
+                      <Button color="red" size="px-6 py-2.5" marginTop="mt-6" onClick={handleClose}>{"Cancel"}</Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </>
       ) : (
         <>
@@ -418,21 +788,29 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({ o
             {isDragActive ? (
               <DynamicText text={"Drop files here..."} />
             ) : (
-              <DynamicText text={state.selectedFiles.length > 0 ? "Selected file: " + state.selectedFiles[0].name : rejectionMessage} className={rejectionMessageStyle} />
+              <DynamicText text={state.selectedFiles.length > 0 ? `Selected file: ${state.selectedFiles[0].name}` : rejectionMessage} className={rejectionMessageStyle} />
             )}
             <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
           </DropzoneContainer>
-          <Button onClick={handleValidateClick}
-            disabled={(state.selectedFiles.length === 0 || state.isUploading)}
-            marginTop="mt-5"
-            color="blue"
-          >
-            {"Validate File"}
-          </Button>
+          <div className="w-full flex items-center pl-4 pr-4">
+            <DatasourceNameInput
+              value={datasourceName}
+              onChange={handleDatasourceNameChange}
+              isDisabled={state.selectedFiles.length === 0}
+            />
+            <Button onClick={handleValidateClick}
+              disabled={(state.selectedFiles.length === 0 || state.isUploading)}
+              marginTop="mt-5"
+              size="px-6 py-0.5"
+              color="blue"
+            >
+              {"Validate File"}
+            </Button>
+          </div>
         </>
       )}
     </Container>
   );
 };
 
-export default FileUploadDialogComponent; 
+export default observer(FileUploadDialogComponent);; 

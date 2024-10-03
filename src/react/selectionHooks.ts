@@ -12,10 +12,10 @@ export function useHighlightedIndex() {
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
 
     useEffect(() => {
-        console.log('useHighlightedIndex effect');
-        chart.onDataHighlighted = ({indexes}) => {
+        console.log("useHighlightedIndex effect");
+        chart.onDataHighlighted = ({ indexes }) => {
             setHighlightedIndex(indexes[0]);
-        }
+        };
     }, [chart]);
 
     return highlightedIndex;

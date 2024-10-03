@@ -1,5 +1,6 @@
 from mdvtools.charts.base_plot import BasePlot
 
+
 class MultiLinePlot(BasePlot):
     def __init__(self, title, params, size, position, id=None):
         super().__init__(title, "multi_line_chart", params, size, position, id)
@@ -12,7 +13,7 @@ class MultiLinePlot(BasePlot):
             "label": label,
             "size": size,
             "textSize": textsize,
-            "tickFont": tickfont
+            "tickFont": tickfont,
         }
 
     def set_y_axis(self, label, size, textsize, tickfont):
@@ -20,7 +21,7 @@ class MultiLinePlot(BasePlot):
             "label": label,
             "size": size,
             "textSize": textsize,
-            "tickFont": tickfont
+            "tickFont": tickfont,
         }
 
     def set_bandwidth(self, band_width):
@@ -33,7 +34,4 @@ class MultiLinePlot(BasePlot):
         self.plot_data["scaletrim"] = scaletrim
 
     def set_color_legend(self, display, pos):
-        self.plot_data["color_legend"] = {
-            "display": display,
-            "pos": pos
-        }
+        self.plot_data["color_legend"] = {"display": display, "pos": pos}

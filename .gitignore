@@ -24,7 +24,6 @@ python/mdvtools/dbutils/__pycache__
 python/mdvtools/tests/temp/*
 python/mdvtools/test_projects/cache/*
 python/mdvtools/static/*
-python/mdvtools/template/page.html
 .ipynb_checkpoints
 
 python/dist/
@@ -34,6 +33,7 @@ docs/maindocs/_build/
 docs/maindocs/autoapi/
 
 venv/
+venv
 docsenv/
 data/
 
@@ -42,3 +42,5 @@ xvenv/
 
 LLM/cache
 LLM/key.json
+secrets/
+

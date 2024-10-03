@@ -26,6 +26,4 @@ import { guessRgb, useWindowSize, getSingleSelectionStats } from '../../utils';
 import { COLOR_PALLETE, GLOBAL_SLIDER_DIMENSION_FIELDS } from '../../constants';
 */
 
-export default function VivController() {
-    
-}
+export default function VivController() {}

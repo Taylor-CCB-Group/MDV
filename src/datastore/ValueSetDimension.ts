@@ -5,9 +5,6 @@ import Dimension from "./Dimension";
  * A dimension that includes values from a given Set.
  */
 class ValueSetDimension extends Dimension {
-    constructor(parent: DataStore) {
-        super(parent);
-    }
     /**
      * Filter the dimension to only include values from the given set.
      * @paraam {Set} valueSet
@@ -22,7 +19,7 @@ class ValueSetDimension extends Dimension {
         const col = parent.columnIndex[column];
         if (col.values) {
             const newSet = new Set();
-            valueSet.forEach(v => {
+            valueSet.forEach((v) => {
                 const i = col.values.indexOf(v);
                 if (i !== -1) {
                     newSet.add(i);
@@ -30,8 +27,8 @@ class ValueSetDimension extends Dimension {
             });
             valueSet = newSet;
         }
-        const predicate = i => valueSet.has(col.data[i]);
-        return this.filterPredicate({predicate}, columns);
+        const predicate = (i) => valueSet.has(col.data[i]);
+        return this.filterPredicate({ predicate }, columns);
     }
 }
 Dimension.types["valueset_dimension"] = ValueSetDimension;

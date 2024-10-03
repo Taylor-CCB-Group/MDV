@@ -2,6 +2,7 @@
 
 from mdvtools.charts.base_plot import BasePlot
 
+
 class WordcloudPlot(BasePlot):
     def __init__(self, title, param, wordSize, size, position, id=None):
         super().__init__(title, "row_chart", [param], size, position, id)
