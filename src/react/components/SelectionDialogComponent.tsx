@@ -16,6 +16,7 @@ const TextComponent = ({column} : {column: DataColumn<CategoricalDataType>}) => 
     useEffect(() => {
         dim.filter("filterCategories", [column.name], value, true);
     }, [dim, value, column.name]);
+    const [hasFocus, setHasFocus] = useState(false);
     const toggleOption = useCallback((option: string) => {
         if (value.includes(option)) {
             setValue(value.filter((v) => v !== option));
@@ -23,17 +24,32 @@ const TextComponent = ({column} : {column: DataColumn<CategoricalDataType>}) => 
         }
         setValue([...value, option]);
     }, [value]);
+    const selectAll = useCallback(() => {
+        setValue([...values]);
+    }, [values]);
+    const toggleSelection = useCallback(() => {
+        const newValues = values.filter((v) => !value.includes(v));
+        setValue(newValues);
+    }, [value, values]);
+
     return (
         <Autocomplete 
             multiple
+            size="small"
             options={values}
             value={value}
-            // onChange={(_, newValue) => setValue(newValue)}
+            onChange={(_, newValue) => setValue(newValue)}
+            onFocus={() => setHasFocus(true)}
+            onBlur={() => setHasFocus(false)}
             renderInput={(props) => {
                 const { key, ...p } = props as typeof props & {
                     key: string;
                 }; //questionable mui types?
-                return <TextField key={key} {...p} />;
+                return <>
+                    {hasFocus && <Button onClick={selectAll}>All</Button>}
+                    {hasFocus && <Button onClick={toggleSelection}>Toggle</Button>}
+                    <TextField key={key} {...p} />
+                </>
             }}
             renderOption={(props, option) => {
                 const { key, ...optionProps } = props as typeof props & {
@@ -59,10 +75,19 @@ const TextComponent = ({column} : {column: DataColumn<CategoricalDataType>}) => 
             renderTags={(value, getTagProps) => {
                 //seems to be a material-ui bug with not properly handling key / props...
                 //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
-                return value.map((option, index) => {
+                const chips = value.map((option, index) => {
                     const { key, ...tagValues } = getTagProps({ index });
                     return <Chip key={key} {...tagValues} label={option} />;
                 });
+                //checking against length of chips is not ideal
+                //similar to MultiSelect.js config.maxShow (default 4)
+                //consider 'maxChars' perhaps so that we respond to the actual amount of text
+                //or I suppose we could have some CSS container query or something...
+                if (chips.length > 8) {
+                    return <div>{chips.length} selected</div>
+                }
+                //todo improve styling - bad from UX perspective at the moment when it overflows.
+                return <div className="max-h-32 overflow-auto">{chips}</div>;
             }}
         />
     );
