@@ -59,7 +59,7 @@ const useProjects = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: projectName,
+          id: projectName, // will be ignored with real backend, but currently used in mdv_desktop
         }),
       });
 
