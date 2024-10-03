@@ -113,7 +113,8 @@ const Dashboard: React.FC = () => {
             try {
                 const newProject = await createProject(newProjectName.trim());
                 // Redirect to the new project page
-                window.location.href = `/project/${newProject.id}`;
+                // note that we may not be hosted in the root of the domain, so we should use relative paths
+                window.location.href = `project/${newProject.id}`;
             } catch (error) {
                 console.error("Failed to create project:", error);
                 alert("Failed to create project. Please try again.");

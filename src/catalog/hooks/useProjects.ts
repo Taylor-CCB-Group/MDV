@@ -53,7 +53,7 @@ const useProjects = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("/create_project", {
+      const response = await fetch("create_project", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
