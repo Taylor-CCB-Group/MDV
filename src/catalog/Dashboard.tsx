@@ -96,7 +96,6 @@ const Dashboard: React.FC = () => {
 
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [newProjectName, setNewProjectName] = useState("");
     const [projectType, setProjectType] = useState<"Editable" | "Read-Only">(
         "Editable",
     );
@@ -108,10 +107,13 @@ const Dashboard: React.FC = () => {
     }, [fetchProjects]);
 
     const handleCreateProject = async () => {
+        // in future we should change the signature of createProject to not need the project name...
+        // mdv_server_app will ignore it anyway... but for now I'm making it so in dev server we can enter the project name with a prompt...
+        const newProjectName = import.meta.env.DEV ? prompt("Enter project name") : "<<UNUSED>>";
         if (newProjectName.trim()) {
             try {
                 const newProject = await createProject(newProjectName.trim());
-                setNewProjectName("");
+                // setNewProjectName("");
                 setIsModalOpen(false);
                 // Redirect to the new project page
                 window.location.href = `/project/${newProject.id}`;
@@ -200,6 +202,7 @@ const Dashboard: React.FC = () => {
                                         flexDirection: "column",
                                         alignItems: "center",
                                     }}
+                                    onClick={() => handleCreateProject()}
                                 >
                                     <Add
                                         sx={{
