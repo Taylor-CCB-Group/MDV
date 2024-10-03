@@ -95,7 +95,6 @@ const Dashboard: React.FC = () => {
     } = useProjects();
 
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-    const [isModalOpen, setIsModalOpen] = useState(false);
     const [projectType, setProjectType] = useState<"Editable" | "Read-Only">(
         "Editable",
     );
@@ -113,8 +112,6 @@ const Dashboard: React.FC = () => {
         if (newProjectName.trim()) {
             try {
                 const newProject = await createProject(newProjectName.trim());
-                // setNewProjectName("");
-                setIsModalOpen(false);
                 // Redirect to the new project page
                 window.location.href = `/project/${newProject.id}`;
             } catch (error) {
@@ -188,7 +185,6 @@ const Dashboard: React.FC = () => {
                     <Grid container spacing={3} sx={{ mb: 4 }}>
                         <Grid item xs={12} sm={6} md={3}>
                             <ButtonBase
-                                onClick={() => setIsModalOpen(true)}
                                 sx={{
                                     width: "100%",
                                     display: "block",
