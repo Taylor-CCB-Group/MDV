@@ -27,7 +27,7 @@ def main():
     """Main function to create the project and serve it."""
     # Constants
     project_path = os.path.expanduser('~/mdv/project')
-    data_path = '/Users/mariak/Documents/MDVmk/MDV/python/mdvtools/data/data_genes.csv'
+    data_path = "path_to_data"
     view_name = "default"
     
     # Create project
@@ -42,14 +42,14 @@ def main():
     # BoxPlot parameters
     title = "Box Plot Example"
     params_pairs = [["highly_variable", "mean"], ["highly_variable", "dispersions_norm"], ["highly_variable", "mean_counts"]] 
-    size = [792, 472]
+    size = [350, 350]
     initial_position = [10, 10]
 
     list_boxplot_charts_json = []
     
     # Create the multiple plots, convert them all to the json format and add them all to a list for integration to MDV
     for i in range(0, len(params_pairs)):
-        plot = create_box_plot(title, params_pairs[i], size, [x + y for x, y in zip(initial_position, [k * i for k in [0, 180]])])
+        plot = create_box_plot(title, params_pairs[i], size, [x + y for x, y in zip(initial_position, [k * i for k in [0, 360]])])
     
         # Convert plot to JSON and set view
         boxplot_charts_json = convert_plot_to_json(plot)
@@ -60,3 +60,6 @@ def main():
     project.set_view(view_name, boxplot_view)
     project.set_editable(True)
     project.serve()
+
+if __name__ == "__main__":
+    main()

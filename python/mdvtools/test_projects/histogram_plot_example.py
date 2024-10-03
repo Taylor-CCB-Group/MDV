@@ -33,7 +33,7 @@ def main():
     """Main function to create the project and serve it."""
     # Constants
     project_path = os.path.expanduser('~/mdv/project')
-    data_path = '/Users/mariak/Documents/MDVmk/MDV/python/mdvtools/data/data_genes.csv'
+    data_path = "path_to_data"
     view_name = "default"
     
     # Create project

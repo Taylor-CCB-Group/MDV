@@ -64,3 +64,6 @@ def main():
     project.set_view(view_name, dotplot_view)
     project.set_editable(True)
     project.serve()
+
+if __name__ == "__main__":
+    main()
