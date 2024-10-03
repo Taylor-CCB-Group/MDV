@@ -83,17 +83,18 @@ const NumberComponent = ({column} : {column: DataColumn<NumberDataType>}) => {
     return (
         <div>
             <Slider 
+            size="small"
             value={[min, max]}
             min={column.minMax[0]}
             max={column.minMax[1]}
-            onChangeCommitted={(_, newValue) => {
+            onChange={(_, newValue) => {
                 setMin(newValue[0]);
                 setMax(newValue[1]);
             }}
             />
             <div>
-                <input className="" type="number" value={min} onChange={(e) => setMin(Number(e.target.value))} />
-                <input className="float-right" type="number" value={max} onChange={(e) => setMax(Number(e.target.value))} />
+                <TextField size="small" className="max-w-20" type="number" value={min} onChange={(e) => setMin(Number(e.target.value))} />
+                <TextField size="small" className="max-w-20 float-right" type="number" value={max} onChange={(e) => setMax(Number(e.target.value))} />
             </div>
         </div>
     );
