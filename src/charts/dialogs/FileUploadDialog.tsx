@@ -21,7 +21,7 @@ import { TiffPreview } from "./TiffPreview";
 import { TiffMetadataTable } from "./TiffMetadataTable"
 import TiffVisualization from './TiffVisualization';
 import { DatasourceDropdown } from "./DatasourceDropdown";
-
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 // Use dynamic import for the worker
 const CsvWorker = new Worker(new URL("./csvWorker.ts", import.meta.url), {
@@ -65,7 +65,7 @@ const DropzoneContainer = forwardRef(
     <div
       {...props}
       ref={ref}
-      className={`p-4 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]`}
+      className={`p-4 mt-2 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]`}
     >
       {children}
     </div>
@@ -177,7 +177,7 @@ const ErrorContainer = ({ children }) => (
 const DynamicText = ({ text, className = "" }) => (
   <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
     <p
-      className={`text-center m-0 font-bold text-sm sm:text-lg md:text-xl ${className}`}
+      className={`text-center m-0 font-bold text-sm sm:text-lg md:text-m ${className}`}
     >
       {text}
     </p>
@@ -778,17 +778,26 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
           )}
         </>
       ) : (
-        <>
-          <DropzoneContainer {...getRootProps()} isDragOver={isDragActive} aria-label={"dropzoneLabel"}>
-            <input {...getInputProps()} />
-            {isDragActive ? (
-              <DynamicText text={"Drop files here..."} />
-            ) : (
-              <DynamicText text={state.selectedFiles.length > 0 ? `Selected file: ${state.selectedFiles[0].name}` : rejectionMessage} className={rejectionMessageStyle} />
-            )}
-            <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
-          </DropzoneContainer>
-        </>
+<>
+  <DropzoneContainer {...getRootProps()} isDragOver={isDragActive} aria-label={"dropzoneLabel"}>
+    <input {...getInputProps()} />
+    <div className="flex flex-col items-center justify-center space-y-0">
+      <CloudUploadIcon className="text-gray-400" style={{ fontSize: '5rem' }} />
+      {isDragActive ? (
+        <DynamicText text={"Drop files here..."} className="text-sm" />
+      ) : (
+        <DynamicText
+          text={state.selectedFiles.length > 0 ? `Selected file: ${state.selectedFiles[0].name}` : rejectionMessage}
+          className={`${rejectionMessageStyle} text-sm`}
+        />
+      )}
+      <FileInputLabel htmlFor="fileInput" className="text-sm">
+        {"Choose File"}
+      </FileInputLabel>
+    </div>
+  </DropzoneContainer>
+</>
+
       )}
     </Container>
   );
