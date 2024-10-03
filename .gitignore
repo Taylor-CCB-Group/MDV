@@ -40,3 +40,5 @@ data/
 
 .idea
 xvenv/
+
+LLM/key.json
