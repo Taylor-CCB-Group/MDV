@@ -1,21 +1,41 @@
-import { useDimensionFilter, useParamColumns, useRangeFilter } from "../hooks";
+import { useConfig, useDimensionFilter, useParamColumns, useRangeFilter } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Autocomplete, Checkbox, Chip, Slider, TextField } from "@mui/material";
+import { Autocomplete, Button, Checkbox, Chip, Slider, TextField } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import type { SelectionDialogConfig, CategoryFilter } from "./SelectionDialogReact";
+import { observer } from "mobx-react-lite";
+import { action } from "mobx";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
-const TextComponent = ({column} : {column: DataColumn<CategoricalDataType>}) => {
+type P<K extends DataType> = {
+    column: DataColumn<K>;
+    // filter not passed in as a possibly null prop...
+    // each component will extract it from the config.filters object, and write it back there.
+    // mobx will handle the reactivity, and it should get serialized appropriately.
+    // filter?: K extends CategoricalDataType ? CategoryFilter : [number, number];
+};
+
+
+const TextComponent = ({column} : P<CategoricalDataType>) => {
     const dim = useDimensionFilter(column);
+    const filters = useConfig<SelectionDialogConfig>().filters;
     const { values } = column;
-    const [value, setValue] = useState<string[]>([]);
+    const filter = filters[column.field] as CategoryFilter | null;
+    const value = filter?.category || [];
+    const setValue = useCallback((newValue: string[]) => {
+        const newFilter = filter || { category: [] };
+        newFilter.category = newValue;
+        action(() => filters[column.field] = newFilter)();
+    }, [filters, column.field, filter]);
+    // react to changes in value and update the filter
     useEffect(() => {
-        dim.filter("filterCategories", [column.name], value, true);
-    }, [dim, value, column.name]);
+        dim.filter("filterCategories", [column.field], value, true);
+    }, [dim, column.field, value]);
     const [hasFocus, setHasFocus] = useState(false);
     const toggleOption = useCallback((option: string) => {
         if (value.includes(option)) {
@@ -23,15 +43,14 @@ const TextComponent = ({column} : {column: DataColumn<CategoricalDataType>}) => 
             return;
         }
         setValue([...value, option]);
-    }, [value]);
+    }, [setValue, value]);
     const selectAll = useCallback(() => {
         setValue([...values]);
-    }, [values]);
+    }, [values, setValue]);
     const toggleSelection = useCallback(() => {
         const newValues = values.filter((v) => !value.includes(v));
         setValue(newValues);
-    }, [value, values]);
-
+    }, [values, value, setValue]);
     return (
         <Autocomplete 
             multiple
@@ -94,17 +113,26 @@ const TextComponent = ({column} : {column: DataColumn<CategoricalDataType>}) => 
 }
 
 const UniqueComponent = ({column} : {column: DataColumn<"unique">}) => {
+    //todo...
     return (
         <div>
-            <h2>Unique:</h2>
-            {column.name} : {column.datatype}
+            <TextField size="small" />
         </div>
     );
 }
 
 const NumberComponent = ({column} : {column: DataColumn<NumberDataType>}) => {
+    const filters = useConfig<SelectionDialogConfig>().filters;
     const { min, setMin, max, setMax } = useRangeFilter(column);
-
+    // we need to recognise serialised values from the config object...
+    // maybe the hook with useState isn't ideal here...
+    useEffect(() => {
+        if (filters[column.field] && Array.isArray(filters[column.field])) {
+            const [min, max] = filters[column.field] as [number, number];
+            setMin(min);
+            setMax(max);
+        }
+    }, [filters, column.field, setMin, setMax]);
     return (
         <div>
             <Slider 
@@ -115,6 +143,7 @@ const NumberComponent = ({column} : {column: DataColumn<NumberDataType>}) => {
             onChange={(_, newValue) => {
                 setMin(newValue[0]);
                 setMax(newValue[1]);
+                action(() => filters[column.field] = [newValue[0], newValue[1]])();
             }}
             />
             <div>
@@ -126,19 +155,19 @@ const NumberComponent = ({column} : {column: DataColumn<NumberDataType>}) => {
 }
 
 const Components: {
-    [K in DataType]: React.FC<{column: DataColumn<K>}>;
+    [K in DataType]: React.FC<P<K>>;
 } = {
-    integer: NumberComponent,
-    double: NumberComponent,
-    int32: NumberComponent,
-    text: TextComponent,
-    text16: TextComponent,
-    multitext: TextComponent,
-    unique: UniqueComponent,
+    integer: observer(NumberComponent),
+    double: observer(NumberComponent),
+    int32: observer(NumberComponent),
+    text: observer(TextComponent),
+    text16: observer(TextComponent),
+    multitext: observer(TextComponent),
+    unique: observer(UniqueComponent),
 }
 
-function AbstractComponent<T extends DataType>({column} : {column: DataColumn<T>}) {
-    const Component = Components[column.datatype] as React.FC<{column: DataColumn<T>}>;
+function AbstractComponent<K extends DataType>({column} : P<K>) {
+    const Component = Components[column.datatype] as React.FC<P<K>>;
     return (
         <div>
             <h2>{column.name}</h2>
