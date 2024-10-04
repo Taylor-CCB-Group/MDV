@@ -1,12 +1,12 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from project_service import ProjectService, FileService
+from mdvtools.dbutils.dbservice import ProjectService, FileService
 from mdvtools.dbutils.dbmodels import Project, File
 from datetime import datetime
 
 class TestProjectService(unittest.TestCase):
     
-    @patch('project_service.Project.query')
+    @patch('mdvtools.dbutils.dbmodels.Project.query')
     def test_get_active_projects_success(self, mock_query):
         mock_query.filter_by.return_value.all.return_value = [MagicMock(), MagicMock()]
         result = ProjectService.get_active_projects()
