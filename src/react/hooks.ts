@@ -277,9 +277,11 @@ export function useRangeFilter(column: DataColumn<NumberDataType>) {
     const filter = useDimensionFilter(column);
     const [min, setMin] = useState(column.minMax[0]);
     const [max, setMax] = useState(column.minMax[1]);
+    const isInteger = column.datatype.match(/int/);
+    const step = isInteger ? 1 : 0.01;
     useEffect(() => {
         // filter.removeFilter();
         filter.filter("filterRange", [column.name], { min, max }, true);
     }, [column, filter, min, max]);
-    return { min, setMin, max, setMax };
+    return { min, setMin, max, setMax, step };
 }

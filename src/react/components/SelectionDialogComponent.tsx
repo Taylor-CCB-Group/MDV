@@ -123,7 +123,7 @@ const UniqueComponent = ({column} : {column: DataColumn<"unique">}) => {
 
 const NumberComponent = ({column} : {column: DataColumn<NumberDataType>}) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
-    const { min, setMin, max, setMax } = useRangeFilter(column);
+    const { min, setMin, max, setMax, step } = useRangeFilter(column);
     // we need to recognise serialised values from the config object...
     // maybe the hook with useState isn't ideal here...
     useEffect(() => {
@@ -140,6 +140,7 @@ const NumberComponent = ({column} : {column: DataColumn<NumberDataType>}) => {
             value={[min, max]}
             min={column.minMax[0]}
             max={column.minMax[1]}
+            step={step}
             onChange={(_, newValue) => {
                 setMin(newValue[0]);
                 setMax(newValue[1]);
@@ -179,7 +180,6 @@ function AbstractComponent<K extends DataType>({column} : P<K>) {
 
 export default function SelectionDialogComponent() {
     const cols = useParamColumns();
-    ///XXX we should be able to save back to config - and use it better!!!
     return (
         <div className="p-5">
         {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
