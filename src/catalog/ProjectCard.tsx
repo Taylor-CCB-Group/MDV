@@ -61,7 +61,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 
     useEffect(() => {
         if (shouldNavigate) {
-            window.location.href = `http://localhost:5170?dir=/project/${id}`;
+            // window.location.href = import.meta.env.DEV ? `http://localhost:5170?dir=/project/${id}` : `project/${id}/`;
+            window.location.href = `project/${id}`;
         }
     }, [shouldNavigate, id]);
     
