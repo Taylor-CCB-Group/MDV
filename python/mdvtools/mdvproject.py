@@ -259,7 +259,7 @@ class MDVProject:
         print(f"Added image set {name} to {ds} datasource")
         self.set_datasource_metadata(ds_metadata)
 
-    def add_or_update_image_datasource(self, tiff_metadata, datasource_name):
+    def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file):
         """Add or update an image datasource in datasources.json"""
         try:
             # Load current datasources
@@ -278,12 +278,43 @@ class MDVProject:
                 # Create a new datasource
                 # Uncomment and implement the following line if needed
                 # creation_success = self.create_new_datasource(tiff_metadata, datasource_name)
-                print(f"Datasource '{datasource_name}' does not exist and creation is not implemented yet.")
+                print(f"Datasource '{datasource_name}' does not exist")
+                return False
+            
+            # Upload the TIFF file only if the datasource update was successful
+            upload_success = self.upload_image_file(file)
+            if not upload_success:
+                print(f"Failed to upload TIFF file for datasource '{datasource_name}'.")
                 return False
 
+            # If both update and upload succeed, return True
             return True
         except Exception as e:
             print(f"Error updating or adding datasource '{datasource_name}': {e}")
+            return False
+        
+    def upload_image_file(self, file):
+        """Upload the TIFF file to the imagefolder, saving it with the original filename."""
+        try:
+            # Define the target folder inside imagefolder (e.g., /images/avivator)
+            target_folder = os.path.join(self.imagefolder, 'avivator')
+            
+            # Ensure the target folder exists
+            if not os.path.exists(target_folder):
+                os.makedirs(target_folder)
+
+            # Get the original filename from the file
+            original_filename = file.filename  # This will give you the name of the uploaded file
+
+            # Create the full file path inside /images/avivator
+            file_path = os.path.join(target_folder, original_filename)
+
+            # Save the file to the /images/avivator folder
+            file.save(file_path)
+            print(f"File uploaded successfully to {file_path}")
+            return True
+        except Exception as e:
+            print(f"Error uploading file: {e}")
             return False
 
 
