@@ -270,7 +270,7 @@ export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
     useEffect(() => {
         // cleanup when component unmounts
         return () => dim.removeFilter();
-    });
+    }, [dim.removeFilter]);
     return dim;
 }
 export function useRangeFilter(column: DataColumn<NumberDataType>) {
