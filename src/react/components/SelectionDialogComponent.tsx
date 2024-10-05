@@ -29,8 +29,10 @@ const TextComponent = ({column} : P<CategoricalDataType>) => {
     const value = filter?.category || [];
     const setValue = useCallback((newValue: string[]) => {
         const newFilter = filter || { category: [] };
-        newFilter.category = newValue;
-        action(() => filters[column.field] = newFilter)();
+        action(() => {
+            newFilter.category = newValue;
+            filters[column.field] = newFilter;
+        })();
     }, [filters, column.field, filter]);
     // react to changes in value and update the filter
     useEffect(() => {
