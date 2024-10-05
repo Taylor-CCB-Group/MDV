@@ -5,6 +5,7 @@ import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
 import type { CategoricalDataType, DataColumn } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
+import type { BaseConfig } from "./components/BaseReactChart";
 
 /**
  * Get the chart's config.
@@ -16,7 +17,7 @@ import type { VivRoiConfig } from "./components/VivMDVReact";
  */
 export function useConfig<T>() {
     const { config } = useChart();
-    return config as T; //todo: strict/inferred typing
+    return config as T & BaseConfig; //todo: strict/inferred typing
 }
 
 export function useChartSize() {
