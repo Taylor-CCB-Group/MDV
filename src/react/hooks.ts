@@ -1,12 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { loadOmeTiff, getChannelStats } from "@hms-dbmi/viv";
 import { useChart, useDataStore } from "./context";
-import type { OME_TIFF } from "./components/avivatorish/state";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
 import type { CategoricalDataType, DataColumn } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
+import type { BaseConfig } from "./components/BaseReactChart";
 
 /**
  * Get the chart's config.
@@ -18,7 +17,7 @@ import type { VivRoiConfig } from "./components/VivMDVReact";
  */
 export function useConfig<T>() {
     const { config } = useChart();
-    return config as T; //todo: strict/inferred typing
+    return config as T & BaseConfig; //todo: strict/inferred typing
 }
 
 export function useChartSize() {

@@ -834,7 +834,10 @@ class BaseChart {
 
     setTitle(title) {
         this.title.textContent = title;
-        this.config.title = title;
+        // avoid issue with mobx autorun mutating this when reacting to config.title change
+        if (this.config.title !== title) {
+            this.config.title = title;
+        }
     }
 
     getImageFromSVG(svg, callback) {

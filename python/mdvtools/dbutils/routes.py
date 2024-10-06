@@ -8,7 +8,6 @@ from datetime import datetime
 import os
 
 
-
 def register_global_routes(app, db, project_dir):
     
     @app.route('/')

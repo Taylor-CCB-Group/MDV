@@ -1,4 +1,5 @@
 import { autorun, makeAutoObservable } from "mobx";
+import type { IReactionDisposer, IAutorunOptions } from "mobx";
 import BaseChart from "../../charts/BaseChart";
 import { createMdvPortal } from "@/react/react_utils";
 import type DataStore from "../../datastore/DataStore";
@@ -40,9 +41,10 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  * that any BaseChart methods called from outside will appropriately affect the component state.
  *
  * Internally, this class uses mobx to make the config object observable, and creates a React root with the given
- * `ReactComponentFunction`. Use of MobX is intended to be hidden by this abstraction - but if we change to a
+ * `ReactComponentFunction`. Use of MobX was originally intended to be hidden by this abstraction - but if we change to a
  * different state management system, it will have implications for downstream components that expect to react to
- * changes in the config object.
+ * changes in the config object. Any component that needs to react to changes in the config object should be wrapped in
+ * an `observer()` call.
  *
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
@@ -57,7 +59,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
     root: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
     ComponentFn: TComponent<T & BaseConfig>;
-    private titleReactionDisposer: ReturnType<typeof autorun>;
+    private reactionDisposers: IReactionDisposer[] = [];
     protected constructor(
         dataStore: DataStore,
         div: string | HTMLDivElement,
@@ -75,7 +77,12 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
                 makeAutoObservable(config);
             },
         });
-        this.titleReactionDisposer = autorun(() => {
+        this.mobxAutorun(() => {
+            // setTitle also sets config.title - which is what we're observing here...
+            // so we got warnings about setTitle mutating config.title 'outside an action' (at least it didn't go into infinite loop).
+            // perhaps title.textContent could be a computed value and we may not need this autorun at all...
+            // this.title.textContent = config.title;
+            // we can now safely call this.setTitle() without warnings as it avoids unnecessary config.title changes.
             this.setTitle(config.title);
         });
         // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
@@ -94,6 +101,17 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         ); //other things may still be added to contentDiv outside react (e.g. legend)
         this.ComponentFn = ReactComponentFunction;
         this.mountReact();
+    }
+    /**
+     * On rare occasions where you need to run a function that depends on mobx state, outside of a React component.
+     * This is a convenience method for creating a mobx autorun reaction that will be dispsed when the chart is removed.
+     * @param fn - The function to run
+     * @param opts - Options for the autorun. 
+     * According to the docs you can pass an `equals` option to specify a mobx comparer... 
+     * but it isn't in IAutorunOptions type, and it doesn't seem to be in the code either.
+     */
+    mobxAutorun(fn: () => void, opts?: IAutorunOptions) {
+        this.reactionDisposers.push(autorun(fn, opts));
     }
     private mountReact() {
         const ReactComponentFunction = this.ComponentFn;
@@ -121,6 +139,8 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart {
         // **is there any React teardown we should be considering?**
         this.root.unmount();
         super.remove();
-        this.titleReactionDisposer();
+        for (const disposer of this.reactionDisposers) {
+            disposer();
+        }
     }
 }
