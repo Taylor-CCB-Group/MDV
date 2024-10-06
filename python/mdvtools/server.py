@@ -248,24 +248,37 @@ def create_app(
     @project_bp.route("/add_or_update_image_datasource", methods=["POST"])
     def add_or_update_image_datasource():
         try:
-            # Extract data from the request
-            data = request.json
-            if not data:
-                return "Request must contain JSON data with tiffMetadata & datasourceName", 400
-            tiff_metadata = data.get('tiffMetadata')
-            datasource_name = data.get('datasourceName')
+            # Check if request has a file part
+            if 'file' not in request.files:
+                return "No file part in the request", 400
 
-            if not tiff_metadata or not datasource_name:
-                return "Request must contain JSON data with tiffMetadata & datasourceName", 400
+            # Get the file from the request
+            file = request.files['file']
+            
+            # Get the text fields from the request form
+            datasource_name = request.form.get('datasourceName') # ""
+            tiff_metadata = request.form.get('tiffMetadata')
 
-            # Call the method in the project class to add or update image datasource
-            success = project.add_or_update_image_datasource(tiff_metadata, datasource_name)
+            # Validate the presence of required fields
+            if not file or not tiff_metadata:
+                return jsonify({"status": "error", "message": "Missing file, tiffMetadata, or datasourceName"}), 400
+
+            # If tiff_metadata is sent as JSON string, deserialize it
+            try:
+                tiff_metadata = json.loads(tiff_metadata)
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Invalid JSON format for tiffMetadata: {e}"}), 400
+
+            # Call your method to add or update the image datasource
+            success = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file, project.id)
+
             if success:
-                return "Image datasource updated successfully", 200
+                return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully"}), 200
             else:
                 return "Failed to update image datasource", 500
         except Exception as e:
-            return str(e), 500
+            return jsonify({"status": "error", "message": str(e)}), 500
+
 
     @project_bp.route("/add_datasource", methods=["POST"])
     def add_datasource():

@@ -20,6 +20,7 @@ from typing import Optional, NewType, List, Union, Any
 from .charts.view import View
 import time
 import copy
+from mdvtools.dbutils.dbservice import ProjectService, FileService
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -259,7 +260,7 @@ class MDVProject:
         print(f"Added image set {name} to {ds} datasource")
         self.set_datasource_metadata(ds_metadata)
 
-    def add_or_update_image_datasource(self, tiff_metadata, datasource_name):
+    def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file, project_id):
         """Add or update an image datasource in datasources.json"""
         try:
             # Load current datasources
@@ -272,36 +273,92 @@ class MDVProject:
                 # Update the existing datasource and check the result
                 update_success = self.update_datasource(datasource, tiff_metadata)
                 if not update_success:
+                    error_message = "update_datasource failed"
                     print(f"Failed to update datasource '{datasource_name}'.")
                     return False
             else:
                 # Create a new datasource
                 # Uncomment and implement the following line if needed
                 # creation_success = self.create_new_datasource(tiff_metadata, datasource_name)
-                print(f"Datasource '{datasource_name}' does not exist and creation is not implemented yet.")
+                print(f"Datasource '{datasource_name}' does not exist")
+                return False
+            
+            # Upload the TIFF file only if the datasource update was successful
+            upload_success = self.upload_image_file(file, project_id)
+            if not upload_success:
+                print(f"Failed to upload TIFF file for datasource '{datasource_name}'.")
                 return False
 
+            # If both update and upload succeed, return True
+            #file_path = ''
+            #db_update_success = FileService.add_or_update_file_in_project(
+            #    file_name=file.filename,
+            #    file_path=file.filename,  # Assuming 'file_path' is the filename in this example, adjust as necessary
+            #    project_id=project_id
+            #)
             return True
         except Exception as e:
             print(f"Error updating or adding datasource '{datasource_name}': {e}")
+            return False
+        
+    def upload_image_file(self, file, project_id):
+        """Upload the TIFF file to the imagefolder, saving it with the original filename."""
+        try:
+            # Define the target folder inside imagefolder (e.g., /images/avivator)
+            target_folder = os.path.join(self.imagefolder, 'avivator')
+            print(target_folder)
+            # Ensure the target folder exists
+            if not os.path.exists(target_folder):
+                os.makedirs(target_folder)
+
+            # Get the original filename from the file
+            original_filename = file.filename  # This will give you the name of the uploaded file
+
+            # Create the full file path inside /images/avivator
+            file_path = os.path.join(target_folder, original_filename)
+
+            # Save the file to the /images/avivator folder
+            file.save(file_path)
+            print(f"File uploaded successfully to {file_path}")
+
+            # Update the database with the file information
+            db_file = FileService.add_or_update_file_in_project(
+                file_name=original_filename,
+                file_path=file_path,  # The full path where the file was saved
+                project_id=project_id
+            )
+
+            # Check if the file was successfully added or updated in the database
+            if db_file is None:
+                raise ValueError(f"Failed to add file '{original_filename}' to the database.")
+            else:
+                print(f"Added file to DB: {db_file}")
+
+            return True
+        except Exception as e:
+            print(f"Error uploading file: {e}")
             return False
 
 
     def update_datasource(self, datasource, tiff_metadata):
         """Update an existing datasource with new image metadata."""
         try:
-            # Extract image metadata from tiff_metadata
-            width = tiff_metadata['OME']['Image']['Pixels']['SizeX']
-            height = tiff_metadata['OME']['Image']['Pixels']['SizeY']
-            scale = tiff_metadata['OME']['Image']['Pixels']['PhysicalSizeX']
-            scale_unit = tiff_metadata['OME']['Image']['Pixels'].get('PhysicalSizeUnit', 'µm')  # Default to µm if not present
+            print("*****1")
+            
+            # Corrected path to access size and scale information
+            pixels_data = tiff_metadata['Pixels']
+            width = pixels_data['SizeX']
+            height = pixels_data['SizeY']
+            scale = pixels_data['PhysicalSizeX']
+            scale_unit = pixels_data.get('PhysicalSizeXUnit', 'µm')  # Default to µm if not present
 
+            print("*****2")
             # Ensure datasource has a 'regions' field
             if "regions" not in datasource:
                 datasource["regions"] = {"all_regions": {}}
             
             # Determine region name
-            region_name = tiff_metadata.get('name', 'unknown')  # Default to 'unknown' if not present in metadata
+            region_name = tiff_metadata.get('Name', 'unknown')  # Use 'Name' from metadata or 'unknown'
             
             # Define new region with metadata
             new_region = {
@@ -324,25 +381,27 @@ class MDVProject:
             }
 
             image_metadata = {
-                'path': tiff_metadata['path']
+                'path': tiff_metadata.get('path', '')  # Use the 'path' key if it exists, or default to ''
             }
 
             # Update or add the region in the datasource
             datasource["regions"]["all_regions"][region_name] = new_region
             datasource['size'] = len(datasource['regions']['all_regions'])
 
+            print("*****3")
             # Save the updated datasource
             self.set_datasource_metadata(datasource)
-
+            print("*****4")
             # Update views and images
-            self.add_viv_viewer(region_name, [{'name': 'DAPI'}])
-            self.add_viv_images(region_name, image_metadata, link_images=True)
+            #self.add_viv_viewer(region_name, [{'name': 'DAPI'}])
+            #self.add_viv_images(region_name, image_metadata, link_images=True)
 
             print(f"Datasource '{datasource.get('name', 'unknown')}' updated successfully.")
             return True
         except Exception as e:
             print(f"Error updating datasource '{datasource.get('name', 'unknown')}': {e}")
             return False
+
     
     
         
