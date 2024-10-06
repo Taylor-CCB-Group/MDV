@@ -388,7 +388,7 @@ class MDVProject:
             datasource["regions"]["all_regions"][region_name] = new_region
             datasource['size'] = len(datasource['regions']['all_regions'])
 
-            print("*****33")
+            print("*****3")
             # Save the updated datasource
             self.set_datasource_metadata(datasource)
             print("*****4")
