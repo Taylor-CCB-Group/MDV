@@ -590,85 +590,88 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
         return;
     }
 
-    const fileExtension = state.selectedFiles[0].name
-        .split(".")
-        .pop()
-        ?.toLowerCase();
-    dispatch({ type: "SET_IS_UPLOADING", payload: true });
-    resetProgress();
+        const fileExtension = state.selectedFiles[0].name
+            .split(".")
+            .pop()
+            ?.toLowerCase();
+        dispatch({ type: "SET_IS_UPLOADING", payload: true });
+        resetProgress();
 
-    const config = {
-        headers: {
-            "Content-Type": "multipart/form-data",
-        },
-        onUploadProgress: (progressEvent) => {
-            const percentComplete = Math.round(
-                (progressEvent.loaded * 100) / progressEvent.total,
-            );
-            setProgress(percentComplete);
-        },
-    };
+        const config = {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+            onUploadProgress: (progressEvent) => {
+                const percentComplete = Math.round(
+                    (progressEvent.loaded * 100) / progressEvent.total,
+                );
+                setProgress(percentComplete);
+            },
+        };
 
-    try {
-        let response;
-        if (fileExtension === "tiff") {
-            const formData = new FormData();
-            formData.append("file", state.selectedFiles[0]);
-            formData.append("tiffMetadata", JSON.stringify(state.tiffMetadata));
-            formData.append("datasourceName", datasourceName);
-
-            response = await axios.post(
-                `${root}/add_or_update_image_datasource`,
-                formData,
-                config,
-            );
-        } else {
-            const formData = new FormData();
-            formData.append("file", state.selectedFiles[0]);
-            formData.append("name", datasourceName);
-            formData.append("replace", "");
-
-            response = await axios.post(
-                `${root}/add_datasource`,
-                formData,
-                config,
-            );
-        }
-
-        console.log("File uploaded successfully", response.data);
-        if (response.status === 200) {
-            dispatch({ type: "SET_IS_UPLOADING", payload: false });
-            dispatch({ type: "SET_SUCCESS", payload: true });
-
+        try {
+            let response;
             if (fileExtension === "tiff") {
-                chartManager.saveState();
+                const formData = new FormData();
+                formData.append("file", state.selectedFiles[0]);
+                formData.append(
+                    "tiffMetadata",
+                    JSON.stringify(state.tiffMetadata),
+                );
+                formData.append("datasourceName", datasourceName);
+
+                response = await axios.post(
+                    `${root}/add_or_update_image_datasource`,
+                    formData,
+                    config,
+                );
+            } else {
+                const formData = new FormData();
+                formData.append("file", state.selectedFiles[0]);
+                formData.append("name", datasourceName);
+                formData.append("replace", "");
+
+                response = await axios.post(
+                    `${root}/add_datasource`,
+                    formData,
+                    config,
+                );
             }
-        } else {
-            console.error(
-                `Failed to confirm: Server responded with status ${response.status}`,
-            );
+
+            console.log("File uploaded successfully", response.data);
+            if (response.status === 200) {
+                dispatch({ type: "SET_IS_UPLOADING", payload: false });
+                dispatch({ type: "SET_SUCCESS", payload: true });
+
+                if (fileExtension === "tiff") {
+                    chartManager.saveState();
+                }
+            } else {
+                console.error(
+                    `Failed to confirm: Server responded with status ${response.status}`,
+                );
+                dispatch({ type: "SET_IS_UPLOADING", payload: false });
+                dispatch({
+                    type: "SET_ERROR",
+                    payload: {
+                        message: `Confirmation failed with status: ${response.status}`,
+                        status: response.status,
+                        traceback: "Server responded with non-200 status",
+                    },
+                });
+            }
+        } catch (error) {
+            console.error("Error uploading file:", error);
             dispatch({ type: "SET_IS_UPLOADING", payload: false });
             dispatch({
                 type: "SET_ERROR",
                 payload: {
-                    message: `Confirmation failed with status: ${response.status}`,
-                    status: response.status,
-                    traceback: "Server responded with non-200 status",
+                    message: "Upload failed due to a network error.",
+                    traceback: error.message,
                 },
             });
         }
-    } catch (error) {
-        console.error("Error uploading file:", error);
-        dispatch({ type: "SET_IS_UPLOADING", payload: false });
-        dispatch({
-            type: "SET_ERROR",
-            payload: {
-                message: "Upload failed due to a network error.",
-                traceback: error.message,
-            },
-        });
-    }
-  };
+    };
 
     const handleClose = async () => {
         dispatch({ type: "SET_FILE_SUMMARY", payload: null });
