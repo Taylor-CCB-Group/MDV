@@ -283,9 +283,9 @@ def create_app(
     @project_bp.route("/add_datasource", methods=["POST"])
     def add_datasource():
         # we shouldn't be passing "backend" in request.form, the logic should only be on server
-        if backend:
-            response = add_datasource_backend(project)
-            return response
+        #if backend:
+        #    response = add_datasource_backend(project)
+        #    return response
 
         if (
             "permission" not in project.state
