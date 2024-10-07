@@ -11,13 +11,11 @@ export const DatasourceDropdown: React.FC<DropdownProps> = ({
     onSelect,
 }) => {
     // Initialize selectedOption with the first option in the array (if it exists)
-    const [selectedOption, setSelectedOption] = useState<string | null>(
-        options.length > 0 ? options[0] : null,
-    );
+    const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
     useEffect(() => {
-        // When options change, set the selected option to the first value of options array
-        if (options.length > 0 && selectedOption === null) {
+        // When the component mounts or when options change, select the first option
+        if (options.length > 0 && selectedOption !== options[0]) {
             setSelectedOption(options[0]);
             onSelect(options[0]);
         }
