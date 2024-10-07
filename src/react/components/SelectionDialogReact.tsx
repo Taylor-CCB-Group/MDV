@@ -1,6 +1,8 @@
+import { action } from "mobx";
 import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart, type BaseConfig } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
+import { observer } from "mobx-react-lite";
 
 export type CategoryFilter = { category: string[], operand?: "or" | "and" };
 
@@ -25,13 +27,20 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
             }
         }
         // makeAutoObservable(config); //super will do this 
-        super(dataStore, div, config, SelectionDialogComponent);
-        console.log("todo add reset button & associated logic in SelectionDialogReact");
+        //nb, considered `this.mobxAutorun` for showing/hiding reset button, but we use a hook.
+        super(dataStore, div, config, observer(SelectionDialogComponent));
+    }
+    removeFilter(): void {
+        action(() => {
+            for (const key in this.config.filters) {
+                this.config.filters[key] = null;
+            }
+        })();
     }
 }
 
 BaseChart.types["selection_dialog_experimental"] = {
-    name: "Selection Dialog (Experimental)",
+    name: "Selection Dialog",
     class: SelectionDialogReact,
     params: [
         {
@@ -40,3 +49,4 @@ BaseChart.types["selection_dialog_experimental"] = {
         },
     ],
 }
+// BaseChart.types["selection_dialog_experimental"] = BaseChart.types["selection_dialog"];
