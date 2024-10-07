@@ -283,9 +283,10 @@ def create_app(
     @project_bp.route("/add_datasource", methods=["POST"])
     def add_datasource():
         # we shouldn't be passing "backend" in request.form, the logic should only be on server
-        if backend:
-            response = add_datasource_backend(project)
-            return response
+        #if backend:
+        #    print("$$$$")
+        #    response = add_datasource_backend(project)
+        #    return response
 
         if (
             "permission" not in project.state
@@ -405,7 +406,7 @@ def add_datasource_backend(project):
             supplied_columns_only=supplied_only,
             replace_data=replace,
         )
-
+        print("$$$$$11111")
         # database operations
         file_set = [project.h5file, project.datasourcesfile]
         if view:
@@ -431,6 +432,8 @@ def add_datasource_backend(project):
                 db.session.add(new_file)
 
         db.session.commit()
+
+        print("$$$$2222")
         return jsonify(
             {
                 "message": f'File Validation Status: Success. Successfully added csv as a new datasource and files {file_set} have been modified under project "{name}"'
