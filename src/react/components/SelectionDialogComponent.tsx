@@ -13,7 +13,7 @@ import { useChart } from "../context";
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
-type P<K extends DataType> = {
+type Props<K extends DataType> = {
     column: DataColumn<K>;
     // filter not passed in as a possibly null prop...
     // each component will extract it from the config.filters object, and write it back there.
@@ -22,7 +22,7 @@ type P<K extends DataType> = {
 };
 
 
-const TextComponent = ({column} : P<CategoricalDataType>) => {
+const TextComponent = ({column} : Props<CategoricalDataType>) => {
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { values } = column;
@@ -119,11 +119,11 @@ const TextComponent = ({column} : P<CategoricalDataType>) => {
     );
 }
 
-const UniqueComponent = ({column} : P<"unique">) => {
-    //todo...
+const UniqueComponent = ({column} : Props<"unique">) => {
+    //todo...this is also not handled by original version.
     return (
         <div>
-            <TextField size="small" />
+            Filtering of unique values not yet implemented.
         </div>
     );
 }
@@ -146,7 +146,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     return { value, step };
 }
 
-const NumberComponent = ({column} : P<NumberDataType>) => {
+const NumberComponent = ({column} : Props<NumberDataType>) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { value, step } = useRangeFilter(column);
     const setValue = useCallback((newValue: [number, number]) => {
@@ -175,7 +175,7 @@ const NumberComponent = ({column} : P<NumberDataType>) => {
 }
 
 const Components: {
-    [K in DataType]: React.FC<P<K>>;
+    [K in DataType]: React.FC<Props<K>>;
 } = {
     integer: observer(NumberComponent),
     double: observer(NumberComponent),
@@ -186,8 +186,8 @@ const Components: {
     unique: observer(UniqueComponent),
 }
 
-const AbstractComponent = observer(function AbstractComponent<K extends DataType>({column} : P<K>) {
-    const Component = Components[column.datatype] as React.FC<P<K>>;
+const AbstractComponent = observer(function AbstractComponent<K extends DataType>({column} : Props<K>) {
+    const Component = Components[column.datatype] as React.FC<Props<K>>;
     //todo: consider reset (& delete / active toggle?) for each filter
     const filters = useConfig<SelectionDialogConfig>().filters;
     const hasFilter = filters[column.field] !== null;
@@ -217,6 +217,8 @@ function useResetButton() {
 export default function SelectionDialogComponent() {
     const cols = useParamColumns();
     useResetButton();
+    // todo ability to dynamically add or remove columns
+    // maybe arranged in a hierarchy with a tree view?
     return (
         <div className="p-3">
         {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
