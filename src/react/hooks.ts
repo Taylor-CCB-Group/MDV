@@ -258,6 +258,10 @@ export function useDataSources() {
     return window.mdv.chartManager?.dataSources;
 }
 
+/**
+ * Gets a {Dimension} object for filtering a column in the current data store context
+ * and removes the filter when the component unmounts.
+ */
 export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
     const ds = useDataStore();
     // it might be good to have something better for isTextLike, some tests for this...
@@ -272,16 +276,4 @@ export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
         return () => dim.removeFilter();
     }, [dim.removeFilter]);
     return dim;
-}
-export function useRangeFilter(column: DataColumn<NumberDataType>) {
-    const filter = useDimensionFilter(column);
-    const [min, setMin] = useState(column.minMax[0]);
-    const [max, setMax] = useState(column.minMax[1]);
-    const isInteger = column.datatype.match(/int/);
-    const step = isInteger ? 1 : 0.01;
-    useEffect(() => {
-        // filter.removeFilter();
-        filter.filter("filterRange", [column.name], { min, max }, true);
-    }, [column, filter, min, max]);
-    return { min, setMin, max, setMax, step };
 }

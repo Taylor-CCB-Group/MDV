@@ -1,4 +1,4 @@
-import { useConfig, useDimensionFilter, useParamColumns, useRangeFilter } from "../hooks";
+import { useConfig, useDimensionFilter, useParamColumns } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Autocomplete, Button, Checkbox, Chip, Slider, TextField } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
@@ -8,6 +8,7 @@ import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import type { SelectionDialogConfig, CategoryFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
 import { action } from "mobx";
+import { useChart } from "../context";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -36,8 +37,12 @@ const TextComponent = ({column} : P<CategoricalDataType>) => {
     }, [filters, column.field, filter]);
     // react to changes in value and update the filter
     useEffect(() => {
+        if (filter === null) {
+            dim.removeFilter();
+            return;
+        }
         dim.filter("filterCategories", [column.field], value, true);
-    }, [dim, column.field, value]);
+    }, [dim, column.field, value, filter]);
     const [hasFocus, setHasFocus] = useState(false);
     const toggleOption = useCallback((option: string) => {
         if (value.includes(option)) {
@@ -114,7 +119,7 @@ const TextComponent = ({column} : P<CategoricalDataType>) => {
     );
 }
 
-const UniqueComponent = ({column} : {column: DataColumn<"unique">}) => {
+const UniqueComponent = ({column} : P<"unique">) => {
     //todo...
     return (
         <div>
@@ -123,35 +128,47 @@ const UniqueComponent = ({column} : {column: DataColumn<"unique">}) => {
     );
 }
 
-const NumberComponent = ({column} : {column: DataColumn<NumberDataType>}) => {
+/**
+ * This was exposed as a more general-purpose hook with useState, but moved to here to handle
+ * state with mobx in the config.filters object.
+ */
+function useRangeFilter(column: DataColumn<NumberDataType>) {
+    const filter = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
-    const { min, setMin, max, setMax, step } = useRangeFilter(column);
-    // we need to recognise serialised values from the config object...
-    // maybe the hook with useState isn't ideal here...
+    const value = (filters[column.field] || column.minMax) as [number, number];
+    const isInteger = column.datatype.match(/int/);
+    const step = isInteger ? 1 : 0.01;
     useEffect(() => {
-        if (filters[column.field] && Array.isArray(filters[column.field])) {
-            const [min, max] = filters[column.field] as [number, number];
-            setMin(min);
-            setMax(max);
-        }
-    }, [filters, column.field, setMin, setMax]);
+        // filter.removeFilter();
+        const [min, max] = value;
+        filter.filter("filterRange", [column.name], { min, max }, true);
+    }, [column, filter, value]);
+    return { value, step };
+}
+
+const NumberComponent = ({column} : P<NumberDataType>) => {
+    const filters = useConfig<SelectionDialogConfig>().filters;
+    const { value, step } = useRangeFilter(column);
+    const setValue = useCallback((newValue: [number, number]) => {
+        action(() => filters[column.field] = newValue)();
+    }, [filters, column.field]);
     return (
         <div>
             <Slider 
             size="small"
-            value={[min, max]}
+            value={value}
             min={column.minMax[0]}
             max={column.minMax[1]}
             step={step}
-            onChange={(_, newValue) => {
-                setMin(newValue[0]);
-                setMax(newValue[1]);
-                action(() => filters[column.field] = [newValue[0], newValue[1]])();
-            }}
+            onChange={(_, newValue) => setValue(newValue as [number, number]) }
             />
             <div>
-                <TextField size="small" className="max-w-20" type="number" value={min} onChange={(e) => setMin(Number(e.target.value))} />
-                <TextField size="small" className="max-w-20 float-right" type="number" value={max} onChange={(e) => setMax(Number(e.target.value))} />
+                <TextField size="small" className="max-w-20" type="number" 
+                value={value[0]} 
+                onChange={(e) => setValue([Number(e.target.value), value[1]])} />
+                <TextField size="small" className="max-w-20 float-right" type="number" 
+                value={value[1]} 
+                onChange={(e) => setValue([value[0], Number(e.target.value)])} />
             </div>
         </div>
     );
@@ -165,25 +182,43 @@ const Components: {
     int32: observer(NumberComponent),
     text: observer(TextComponent),
     text16: observer(TextComponent),
-    multitext: observer(TextComponent),
+    multitext: observer(TextComponent), //should have different behaviour in the future
     unique: observer(UniqueComponent),
 }
 
-function AbstractComponent<K extends DataType>({column} : P<K>) {
+const AbstractComponent = observer(function AbstractComponent<K extends DataType>({column} : P<K>) {
     const Component = Components[column.datatype] as React.FC<P<K>>;
+    //todo: consider reset (& delete / active toggle?) for each filter
+    const filters = useConfig<SelectionDialogConfig>().filters;
+    const hasFilter = filters[column.field] !== null;
+    const clearFilter = action(() => filters[column.field] = null);
     return (
         <div>
-            <h2>{column.name}</h2>
+            <h3>{column.name}</h3>
+            {hasFilter && <Button onClick={clearFilter}>Clear</Button>}
             <Component column={column} />
         </div>
     );
-}
+});
 
+/**
+ * This will control the behaviour of the reset menuIcon in the chart header - not rendered with react.
+ */
+function useResetButton() {
+    const chart = useChart();
+    const filters = useConfig<SelectionDialogConfig>().filters;
+    const hasFilter = Object.values(filters).some((f) => f !== null);
+    useEffect(() => {
+        console.log("hasFilter changed (in hook): ", hasFilter);
+        chart.resetButton.style.display = hasFilter ? "inline" : "none";
+    }, [hasFilter, chart.resetButton]);
+}
 
 export default function SelectionDialogComponent() {
     const cols = useParamColumns();
+    useResetButton();
     return (
-        <div className="p-5">
+        <div className="p-3">
         {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );
