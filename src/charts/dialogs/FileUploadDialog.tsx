@@ -168,7 +168,17 @@ const FileSummaryHeading = ({ children }) => (
 );
 
 const FileSummaryText = ({ children }) => (
-    <p className="text-lg text-gray-700 dark:text-white my-1">{children}</p>
+    <>
+        {typeof children === 'string' ? (
+            <p className="text-lg text-gray-700 dark:text-white my-1">
+                {children}
+            </p>
+        ) : (
+            <div className="text-lg text-gray-700 dark:text-white my-1">
+                {children}
+            </div>
+        )}
+    </>
 );
 
 const ErrorContainer = ({ children }) => (
