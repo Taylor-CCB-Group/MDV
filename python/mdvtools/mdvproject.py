@@ -883,28 +883,32 @@ class MDVProject:
         gr = h5.create_group(name)
         size = len(dataframe)
         dodgy_columns = []
+        print("!!!!3")
         if not columns:
             # we could set columns to an empty list, but it's probably better to throw an error
             # seems unlikely a user would want to add a datasource with no columns
             raise AttributeError("no columns to add")
         for col in columns:
             try:
+                print("!!!!4")
+                print(col)
                 add_column_to_group(
                     col, dataframe[col["field"]], gr, size, self.skip_column_clean
                 )
             except Exception as e:
+                print("!!!!5")
                 dodgy_columns.append(col["field"])
                 warnings.warn(
                     f"cannot add column '{col['field']}' to datasource '{name}':\n{repr(e)}"
                 )
-        print("!!!!3")
+        print("!!!!6")
         h5.close()
         columns = [x for x in columns if x["field"] not in dodgy_columns]
         # add the metadata
         ds = None
         ds = {"name": name, "columns": columns, "size": size}
         self.set_datasource_metadata(ds)
-        print("!!!!4")
+        print("!!!!7")
         # add it to the view
         if add_to_view:
             v = self.get_view(add_to_view)
@@ -912,7 +916,7 @@ class MDVProject:
                 v = {"initialCharts": {}}
             v["initialCharts"][name] = []
             self.set_view(add_to_view, v)
-        print("!!!!5")
+        print("!!!!8")
         return dodgy_columns
 
     def insert_link(self, datasource, linkto, linktype, data):
@@ -1635,6 +1639,8 @@ def add_column_to_group(
         or col["datatype"] == "unique"
         or col["datatype"] == "text16"
     ):
+        
+        print("-----1/1")
         if data.dtype == "category":
             data = data.cat.add_categories("ND")
             data = data.fillna("ND")
@@ -1642,6 +1648,8 @@ def add_column_to_group(
             # may need to double-check this...
             data = data.fillna("NaN")
         values = data.value_counts()
+
+        print("-----1/2")
         if len(values) < 65537 and col["datatype"] != "unique":
             t8 = len(values) < 257
             col["datatype"] = "text" if t8 else "text16"
@@ -1659,12 +1667,16 @@ def add_column_to_group(
             col["values"] = [str(x) for x in col["values"]]
 
         else:
+            print("-----1/3")
             max_len = max(data.str.len())
             utf8_type = h5py.string_dtype("utf-8", int(max_len))
             col["datatype"] = "unique"
             col["stringLength"] = max_len
             group.create_dataset(col["field"], length, data=data, dtype=utf8_type)
+        print("-----1/4")
+
     elif col["datatype"] == "multitext":
+        print("-----2/1")
         delim = col.get("delimiter", ",")
         value_set: set[str] = set()
         maxv = 0
@@ -1676,7 +1688,7 @@ def add_column_to_group(
             vs = v.split(delim)
             value_set.update([x.strip() for x in vs])
             maxv = max(maxv, len(vs))
-
+        print("-----2/2")
         if "" in value_set:
             value_set.remove("")
         ndata = numpy.empty(shape=(length * maxv,), dtype=numpy.uint16)
@@ -1702,8 +1714,9 @@ def add_column_to_group(
         group.create_dataset(
             col["field"], length * maxv, data=ndata, dtype=numpy.uint16
         )
-
+        print("-----2/3")
     else:
+        print("-----3/1")
         dt = numpy.int32 if col["datatype"] == "int32" else numpy.float32
         clean = (
             data
@@ -1712,8 +1725,10 @@ def add_column_to_group(
         )  # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
+        print("-----3/2")
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
         # remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
+        print("-----3/3")
         na = numpy.array(ds)
         na = na[numpy.isfinite(na)]
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
@@ -1724,7 +1739,7 @@ def add_column_to_group(
                 numpy.percentile(na, 100 * q),
                 numpy.percentile(na, 100 * (1 - q)),
             ]
-
+        print("-----3/4")
 
 def get_column_info(columns, dataframe, supplied_columns_only):
     if columns:
