@@ -252,6 +252,7 @@ def create_app(
             if 'file' not in request.files:
                 return "No file part in the request", 400
 
+            print("@@@@1")
             # Get the file from the request
             file = request.files['file']
             
@@ -259,23 +260,26 @@ def create_app(
             datasource_name = request.form.get('datasourceName') # ""
             tiff_metadata = request.form.get('tiffMetadata')
 
+            print("@@@@2")
+
             # Validate the presence of required fields
             if not file or not tiff_metadata:
-                return jsonify({"status": "error", "message": "Missing file, tiffMetadata, or datasourceName"}), 400
+                return "Missing file or tiffMetadata", 400
 
             # If tiff_metadata is sent as JSON string, deserialize it
             try:
                 tiff_metadata = json.loads(tiff_metadata)
             except Exception as e:
                 return jsonify({"status": "error", "message": f"Invalid JSON format for tiffMetadata: {e}"}), 400
+            print("@@@@3")
+            
+            # Call the method to add or update the image datasource
+            project.add_or_update_image_datasource(tiff_metadata, datasource_name, file, project.id)
+            
+            print("@@@@4")
+            # If no exception is raised, the operation was successful
+            return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully"}), 200
 
-            # Call your method to add or update the image datasource
-            success = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file, project.id)
-
-            if success:
-                return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully"}), 200
-            else:
-                return "Failed to update image datasource", 500
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -295,6 +299,9 @@ def create_app(
         success = True
         try:
             name = request.form["name"]
+
+            print("%%%%1")
+
             if not name:
                 return "Request must contain 'name'", 400
             # xxx - not how column metadata should be passed, todo fix
@@ -322,6 +329,8 @@ def create_app(
             file.seek(0)
             # will this work? can we return progress to the client?
             df = pd.read_csv(file.stream)
+            print("%%%%2")
+            print("df is ready, calling project.add_datasource")
             project.add_datasource(
                 name,
                 df,
@@ -330,7 +339,8 @@ def create_app(
                 supplied_columns_only=supplied_only,
                 replace_data=replace,
             )
-
+            print("%%%%3")
+            print("added df - project.add_datasource completed")
         except Exception as e:
             # success = False
             return str(e), 400

@@ -76,8 +76,6 @@ class FileService:
                     existing_file.name = file_name
                     existing_file.update_timestamp = datetime.now()
                     print(f"Updated file name in DB: {existing_file}")
-                db.session.commit()
-                return existing_file
             else:
                 # Add new file to the database
                 new_file = File(
@@ -88,13 +86,15 @@ class FileService:
                     update_timestamp=datetime.now()
                 )
                 db.session.add(new_file)
-                db.session.commit()
                 print(f"Added new file to DB: {new_file}")
-                return new_file
+
+            # Commit the transaction after adding/updating
+            db.session.commit()
+
         except Exception as e:
-            print(f"Error adding or updating file in project: {e}")
+            print(f"Error in FileService.add_or_update_file_in_project: Failed to add or update file '{file_name}' for project ID '{project_id}': {str(e)}")
             db.session.rollback()  # Rollback session on error
-            return None
+            raise
         
     @staticmethod
     def get_file_by_path_and_project(file_path, project_id):
