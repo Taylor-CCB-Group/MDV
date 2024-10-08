@@ -286,7 +286,7 @@ class MDVProject:
             else:
                 is_new_datasource = True
                 new_datasource_name = "default" if not datasource_name else datasource_name
-                print("@@@@@@@new_datasource_name")
+                print("@@@@@@@@new_datasource_name")
                 print(f"datasource_name received: {datasource_name}")
                 print(f"new_datasource_name set to: {new_datasource_name}")
                 self.update_datasource(new_datasource_name, tiff_metadata)
