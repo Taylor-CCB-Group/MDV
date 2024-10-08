@@ -262,87 +262,139 @@ class MDVProject:
 
     def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file, project_id):
         """Add or update an image datasource in datasources.json"""
-        try:
-            # Load current datasources
-            datasources = self.datasources
-            
-            # Check if the datasource exists
-            datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
-            
-            if datasource:
-                # Update the existing datasource and check the result
-                update_success = self.update_datasource(datasource, tiff_metadata)
-                if not update_success:
-                    error_message = "update_datasource failed"
-                    print(f"Failed to update datasource '{datasource_name}'.")
-                    return False
-            else:
-                # Create a new datasource
-                # Uncomment and implement the following line if needed
-                # creation_success = self.create_new_datasource(tiff_metadata, datasource_name)
-                print(f"Datasource '{datasource_name}' does not exist")
-                return False
-            
-            # Upload the TIFF file only if the datasource update was successful
-            upload_success = self.upload_image_file(file, project_id)
-            if not upload_success:
-                print(f"Failed to upload TIFF file for datasource '{datasource_name}'.")
-                return False
-
-            # If both update and upload succeed, return True
-            #file_path = ''
-            #db_update_success = FileService.add_or_update_file_in_project(
-            #    file_name=file.filename,
-            #    file_path=file.filename,  # Assuming 'file_path' is the filename in this example, adjust as necessary
-            #    project_id=project_id
-            #)
-            return True
-        except Exception as e:
-            print(f"Error updating or adding datasource '{datasource_name}': {e}")
-            return False
+        # Load current datasources
+        datasources = self.datasources
+        # Check if the datasource exists
+        datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
+        datasource_backup = None
         
-    def upload_image_file(self, file, project_id):
-        """Upload the TIFF file to the imagefolder, saving it with the original filename."""
+        is_new_datasource = False
+
+        target_folder = os.path.join(self.imagefolder, 'avivator')
+        if not os.path.exists(target_folder):
+            os.makedirs(target_folder)
+        original_filename = file.filename
+        upload_file_path = os.path.join(target_folder, original_filename)
+        
         try:
-            # Define the target folder inside imagefolder (e.g., /images/avivator)
-            target_folder = os.path.join(self.imagefolder, 'avivator')
-            print(target_folder)
-            # Ensure the target folder exists
-            if not os.path.exists(target_folder):
-                os.makedirs(target_folder)
-
-            # Get the original filename from the file
-            original_filename = file.filename  # This will give you the name of the uploaded file
-
-            # Create the full file path inside /images/avivator
-            file_path = os.path.join(target_folder, original_filename)
-
-            # Save the file to the /images/avivator folder
-            file.save(file_path)
-            print(f"File uploaded successfully to {file_path}")
-
-            # Update the database with the file information
-            db_file = FileService.add_or_update_file_in_project(
-                file_name=original_filename,
-                file_path=file_path,  # The full path where the file was saved
+            
+            # Step 1: Update or create datasource
+            if datasource:
+                 # Create a backup of the existing datasource before updating
+                datasource_backup = datasource.copy()
+                self.update_datasource(datasource, tiff_metadata)
+            else:
+                is_new_datasource = True
+                new_datasource_name = "default" if not datasource_name else datasource_name
+                print("@@@@@@@new_datasource_name")
+                print(f"datasource_name received: {datasource_name}")
+                print(f"new_datasource_name set to: {new_datasource_name}")
+                self.update_datasource(new_datasource_name, tiff_metadata)
+            
+            # Step 2: Upload the image
+            
+            self.upload_image_file(file, upload_file_path)
+            
+            # Step 3: Add database entry (exception will propagate up if it fails)
+            FileService.add_or_update_file_in_project(
+                file_name=file.filename,
+                file_path=file.filename,  # Adjust as necessary for actual file path
                 project_id=project_id
             )
+            
+            # Print success message
+            print(f"Datasource '{datasource_name}' updated, file uploaded, and database entry created successfully.")
 
-            # Check if the file was successfully added or updated in the database
-            if db_file is None:
-                raise ValueError(f"Failed to add file '{original_filename}' to the database.")
-            else:
-                print(f"Added file to DB: {db_file}")
-
-            return True
         except Exception as e:
-            print(f"Error uploading file: {e}")
-            return False
+            print(f"Error in MDVProject.add_or_update_image_datasource: {e}")
+            
+            # Attempt rollback actions
+            try:
+                # Rollback the file upload
+                if os.path.exists(upload_file_path):  # Check the existence of the file at the upload path
+                    print("Reverting file upload...")
+                    self.delete_uploaded_image(upload_file_path) 
+                
+                # Rollback datasource creation if it was new
+                if is_new_datasource:
+                    print("Reverting datasource creation...")
+                    self.delete_datasource(datasource_name)
+                elif datasource:
+                    print("Reverting datasource update...")
+                    self.restore_datasource(datasource_backup)  # This method may need to be implemented for updates
+            except Exception as rollback_error:
+                print(f"Error during rollback in MDVProject.add_or_update_image_datasource: {rollback_error}")
+            
+            # Re-raise the original exception for the caller to handle
+            raise
+        
+    def upload_image_file(self, file, upload_file_path):
+        """Upload the TIFF file to the imagefolder, saving it with the original filename."""
+        try:
+            # Save the file to the /images/avivator folder
+            file.save(upload_file_path)
+            print(f"File uploaded successfully to {upload_file_path}")
 
+        except Exception as e:
+            print(f"Error in MDVProject.upload_image_file: Failed to upload file to '{upload_file_path}': {e}")
+            raise
+    
+    def delete_uploaded_image(self, file_path):
+        """Delete the uploaded image file at the specified path."""
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"Deleted uploaded image at: {file_path}")
+            else:
+                print(f"File does not exist at: {file_path}")
+        except Exception as e:
+            print(f"Error in MDVProject.delete_uploaded_image: Error deleting file at {file_path}: {e}")
+            raise 
+    
+    def restore_datasource(self, datasource_backup):
+        """Restore the datasource from the backup."""
+        try:
+            # Find the existing datasource by name
+            existing_datasource = next(
+                (ds for ds in self.datasources if ds["name"] == datasource_backup["name"]), 
+                None
+            )
+
+            if existing_datasource:
+                # Overwrite the existing datasource with the backup values
+                existing_datasource.update(datasource_backup)  
+                print(f"Restored datasource '{datasource_backup['name']}' from backup.")
+
+                # Save the updated datasources to the JSON file
+                self.datasources = self.datasources  # This will call the setter and save the data
+            else:
+                print(f"Warning: Could not find datasource '{datasource_backup['name']}' to restore.")
+        
+        except Exception as e:
+            print(f"Error in MDVProject.restore_datasource: {str(e)}")
+            raise
+    
 
     def update_datasource(self, datasource, tiff_metadata):
         """Update an existing datasource with new image metadata."""
         try:
+            # Find the existing datasource by name
+            existing_datasource = next((ds for ds in self.datasources if ds["name"] == datasource), None)
+
+            # If the datasource doesn't exist, create a new one
+            if existing_datasource is None:
+                datasource = {
+                    "name": datasource,
+                    "columns": [],            # Initialize empty columns
+                    "size": 0,                # Start size at 0
+                    "links": {},              # Initialize empty links
+                    "regions": {              # Initialize regions as an empty dictionary
+                        "all_regions": {}
+                    }
+                }
+                self.datasources.append(datasource)  # Add the new datasource to the list
+                print(f"Created new datasource '{datasource}'.")
+            
             print("*****1")
             
             # Corrected path to access size and scale information
@@ -397,15 +449,12 @@ class MDVProject:
             #self.add_viv_images(region_name, image_metadata, link_images=True)
 
             print(f"Datasource '{datasource.get('name', 'unknown')}' updated successfully.")
-            return True
-        except Exception as e:
-            print(f"Error updating datasource '{datasource.get('name', 'unknown')}': {e}")
-            return False
-
-    
-    
         
+        except Exception as e:
+            print(f"Error in MDVProject.update_datasource :  Error updating datasource '{datasource}': {e}")
+            raise
 
+    
     def get_image(self, path: str):
         """Gets the filename of an image."""
         # assume path is of the form <ds>/<name>/<filename>
@@ -819,6 +868,7 @@ class MDVProject:
             ds = self.get_datasource_metadata(name)
         except Exception:
             ds = None
+        print("!!!!1")
         if ds:
             # delete the datasource
             if replace_data:
@@ -827,6 +877,7 @@ class MDVProject:
                 raise FileExistsError(
                     f"Trying to create {name} datasource, which already exits"
                 )
+        print("!!!!2")
         # create the h5 group
         h5 = self._get_h5_handle()
         gr = h5.create_group(name)
@@ -846,13 +897,14 @@ class MDVProject:
                 warnings.warn(
                     f"cannot add column '{col['field']}' to datasource '{name}':\n{repr(e)}"
                 )
-
+        print("!!!!3")
         h5.close()
         columns = [x for x in columns if x["field"] not in dodgy_columns]
         # add the metadata
         ds = None
         ds = {"name": name, "columns": columns, "size": size}
         self.set_datasource_metadata(ds)
+        print("!!!!4")
         # add it to the view
         if add_to_view:
             v = self.get_view(add_to_view)
@@ -860,6 +912,7 @@ class MDVProject:
                 v = {"initialCharts": {}}
             v["initialCharts"][name] = []
             self.set_view(add_to_view, v)
+        print("!!!!5")
         return dodgy_columns
 
     def insert_link(self, datasource, linkto, linktype, data):

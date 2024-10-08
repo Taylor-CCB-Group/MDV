@@ -206,15 +206,18 @@ def serve_projects_from_db(app):
                             full_file_path = os.path.join(root, file_name)
 
                             # Use the utility function to add or update the file in the database
-                            updated_file = FileService.add_or_update_file_in_project(
-                                file_name=file_name,
-                                file_path=full_file_path,
-                                project_id=project.id
-                            )
-                            if updated_file is None:
-                                print(f"Failed to add or update file '{file_name}' in the database.")
-                            else:
-                                print(f"Processed file in DB: {updated_file}")
+                            try:
+                                # Attempt to add or update the file in the database
+                                FileService.add_or_update_file_in_project(
+                                    file_name=file_name,
+                                    file_path=full_file_path,
+                                    project_id=project.id
+                                )
+                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
+
+                            except RuntimeError as file_error:
+                                print(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+
 
                 except Exception as e:
                     print(f"Error serving project '{project.path}': {e}")
@@ -277,17 +280,18 @@ def serve_projects_from_filesystem(app, base_dir):
                             full_file_path = os.path.join(root, file_name)
                             
                             # Use the full file path when adding or updating the file in the database
-                            new_file = FileService.add_or_update_file_in_project(
-                                file_name=file_name,
-                                file_path=full_file_path,
-                                project_id=new_project.id
-                            )
-                            
-                            if new_file is None:
-                                raise ValueError(f"Failed to add file '{file_name}' to the database.")
-                            else:
-                                print(f"Added file to DB: {new_file}")
+                            # Use the utility function to add or update the file in the database
+                            try:
+                                # Attempt to add or update the file in the database
+                                FileService.add_or_update_file_in_project(
+                                    file_name=file_name,
+                                    file_path=full_file_path,
+                                    project_id=new_project.id
+                                )
+                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
 
+                            except RuntimeError as file_error:
+                                print(f"Failed to add or update file '{file_name}' in the database: {file_error}")
 
                 except Exception as e:
                     print(f"In create_projects_from_filesystem: Error creating project at path '{project_path}': {e}")
