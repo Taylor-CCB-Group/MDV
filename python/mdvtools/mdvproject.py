@@ -1688,7 +1688,7 @@ def add_column_to_group(
             vs = v.split(delim)
             value_set.update([x.strip() for x in vs])
             maxv = max(maxv, len(vs))
-        print("-----2/2")
+        print("------2/2")
         if "" in value_set:
             value_set.remove("")
         ndata = numpy.empty(shape=(length * maxv,), dtype=numpy.uint16)
