@@ -168,7 +168,17 @@ const FileSummaryHeading = ({ children }) => (
 );
 
 const FileSummaryText = ({ children }) => (
-    <p className="text-lg text-gray-700 dark:text-white my-1">{children}</p>
+    <>
+        {typeof children === 'string' ? (
+            <p className="text-lg text-gray-700 dark:text-white my-1">
+                {children}
+            </p>
+        ) : (
+            <div className="text-lg text-gray-700 dark:text-white my-1">
+                {children}
+            </div>
+        )}
+    </>
 );
 
 const ErrorContainer = ({ children }) => (
@@ -583,35 +593,19 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
         return Math.max(800, totalWidth);
     };
 
-    const handleUploadClick = async () => {
-        console.log("Uploading file...");
-
-        if (!state.selectedFiles.length) {
-            dispatch({ type: "SET_ERROR", payload: "noFilesSelected" });
-            return;
-        }
+  const handleUploadClick = async () => {
+    console.log("Uploading file...");
+    if (!state.selectedFiles.length) {
+        dispatch({ type: "SET_ERROR", payload: "noFilesSelected" });
+        return;
+    }
 
         const fileExtension = state.selectedFiles[0].name
             .split(".")
             .pop()
-            .toLowerCase();
+            ?.toLowerCase();
         dispatch({ type: "SET_IS_UPLOADING", payload: true });
         resetProgress();
-
-        const formData = new FormData();
-        formData.append("file", state.selectedFiles[0]);
-        let endpoint: "add_datasource" | "upload" | null = null;
-
-        if (fileExtension === "csv") {
-            formData.append("name", datasourceName);
-            // formData.append("view", "TRUE");
-            // formData.append("backend", "TRUE");
-            formData.append("replace", "");
-            endpoint = "add_datasource";
-        } else if (fileExtension === "tiff") {
-            formData.append("project_name", projectName);
-            // endpoint = "upload"
-        }
 
         const config = {
             headers: {
@@ -621,50 +615,46 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
                 const percentComplete = Math.round(
                     (progressEvent.loaded * 100) / progressEvent.total,
                 );
-                setProgress(percentComplete); // Update the progress as the file uploads
+                setProgress(percentComplete);
             },
         };
 
         try {
-            const response = await axios.post(
-                `${root}/add_datasource`,
-                formData,
-                config,
-            );
-            console.log("File uploaded successfully", response.data);
+            let response;
+            if (fileExtension === "tiff") {
+                const formData = new FormData();
+                formData.append("file", state.selectedFiles[0]);
+                formData.append(
+                    "tiffMetadata",
+                    JSON.stringify(state.tiffMetadata),
+                );
+                formData.append("datasourceName", datasourceName);
 
+                response = await axios.post(
+                    `${root}/add_or_update_image_datasource`,
+                    formData,
+                    config,
+                );
+            } else {
+                const formData = new FormData();
+                formData.append("file", state.selectedFiles[0]);
+                formData.append("name", datasourceName);
+                formData.append("replace", "");
+
+                response = await axios.post(
+                    `${root}/add_datasource`,
+                    formData,
+                    config,
+                );
+            }
+
+            console.log("File uploaded successfully", response.data);
             if (response.status === 200) {
                 dispatch({ type: "SET_IS_UPLOADING", payload: false });
                 dispatch({ type: "SET_SUCCESS", payload: true });
 
-                // Perform second request if the file is TIFF
                 if (fileExtension === "tiff") {
-                    try {
-                        const metadataResponse = await axios.post(
-                            `${root}/add_or_update_image_datasource`,
-                            {
-                                tiffMetadata: state.tiffMetadata,
-                                datasourceName: datasourceName,
-                            },
-                        );
-                        console.log(
-                            "Metadata updated successfully",
-                            metadataResponse.data,
-                        );
-                        chartManager.saveState();
-                    } catch (metadataError) {
-                        console.error(
-                            "Error updating metadata:",
-                            metadataError,
-                        );
-                        dispatch({
-                            type: "SET_ERROR",
-                            payload: {
-                                message: "Failed to update metadata.",
-                                traceback: metadataError.message,
-                            },
-                        });
-                    }
+                    chartManager.saveState();
                 }
             } else {
                 console.error(
