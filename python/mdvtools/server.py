@@ -314,7 +314,8 @@ def create_app(
             # I'm not sure we really want to add to default view by default - could mess up existing views in a project with multiple datasources
             # but probably ok for now (famous last words)
             view = request.form["view"] if "view" in request.form else "default"
-            replace = True if "replace" in request.form else False
+            # replace = True if "replace" in request.form else False
+            replace = False
             if not replace and name in [ds["name"] for ds in project.datasources]:
                 return (
                     f"Datasource '{name}' already exists, and 'replace' was not set in request",

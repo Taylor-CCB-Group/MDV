@@ -53,7 +53,7 @@ class MDVProject:
         dir: str,
         id: Optional[str] = None,
         delete_existing=False,
-        skip_column_clean=False,
+        skip_column_clean=True,
     ):
         self.skip_column_clean = (
             skip_column_clean  # signficant speedup for large datasets
@@ -839,85 +839,95 @@ class MDVProject:
         """Adds a pandas dataframe to the project. Each column's datatype, will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
         metadata, which will override the names/types deduced from the dataframe.
-
+        
         Args:
             name (string): The name of datasource
             dataframe (dataframe|str): Either a pandas dataframe or the path of a text file
             columns (list, optional) : A list of objects containing the column name and datatype.
-                e.g. [{"name":"column_1","datatype":"double"},]. If you want the column to have a
-                different label, the object requires a field (the column name in the dataframe) and
-                a name (the label seen by the user) e.g. {"field":"column_1","datatype":"double","name":"My Column 1"}
-                In the case of "multitext" columns, you can also supply a "separator" field, otherwise it will
-                default to a comma. <<< check this >>>
-            supplied_columns_only(bool, optional): If True, only the the subset of columns in the columns argument
-                will be added to the datasource. Default is False
-            replace_data(bool, optional): If True, the existing datasource will be overwritten, Default is False,
-                in which case, trying to add a datasource which already exists, will throw an error.
-            add_to_view (string, optional): The datasource will be added to the specified view. The view will
-                be created if it does not exist. The default is 'default'. If None, then it will not be added to
-                a view.
+            supplied_columns_only (bool, optional): If True, only the the subset of columns in the columns argument
+            replace_data (bool, optional): If True, the existing datasource will be overwritten, Default is False,
+            add_to_view (string, optional): The datasource will be added to the specified view.
             separator (str, optional): If a path to text file is supplied, then this should be the file's delimiter.
-                Defaults to a tab.
         """
-        if isinstance(dataframe, str):
-            dataframe = pandas.read_csv(dataframe, sep=separator)
-        # get the columns to add
-        columns = get_column_info(columns, dataframe, supplied_columns_only)
-        # does the datasource exist
+        dodgy_columns = []  # To hold any columns that can't be added
+        gr = None  # Initialize the group variable
+        h5 = None
+        
         try:
-            ds = self.get_datasource_metadata(name)
-        except Exception:
-            ds = None
-        print("!!!!1")
-        if ds:
-            # delete the datasource
-            if replace_data:
-                self.delete_datasource(name)
-            else:
-                raise FileExistsError(
-                    f"Trying to create {name} datasource, which already exits"
-                )
-        print("!!!!2")
-        # create the h5 group
-        h5 = self._get_h5_handle()
-        gr = h5.create_group(name)
-        size = len(dataframe)
-        dodgy_columns = []
-        print("!!!!3")
-        if not columns:
-            # we could set columns to an empty list, but it's probably better to throw an error
-            # seems unlikely a user would want to add a datasource with no columns
-            raise AttributeError("no columns to add")
-        for col in columns:
+            if isinstance(dataframe, str):
+                dataframe = pandas.read_csv(dataframe, sep=separator)
+            
+            # Get columns to add
+            columns = get_column_info(columns, dataframe, supplied_columns_only)
+            
+            # Check if the datasource already exists
             try:
-                print("!!!!4")
-                print(col)
-                add_column_to_group(
-                    col, dataframe[col["field"]], gr, size, self.skip_column_clean
-                )
+                ds = self.get_datasource_metadata(name)
+            except Exception:
+                ds = None
+
+            if ds:
+                # Delete the existing datasource if replace_data is True
+                if replace_data:
+                    self.delete_datasource(name)
+                else:
+                    raise FileExistsError(
+                        f"Attempt to create datasource '{name}' failed because it already exists."
+                    )
+            
+            # Open HDF5 file and handle group creation
+            try:
+                h5 = self._get_h5_handle()
+                
+                # Print current groups for visibility
+                for group_name in h5.keys():
+                    print(group_name)
+                    
+                # Check for and delete existing group with this name
+                if name in h5:
+                    del h5[name]
+                    print(f"Deleted existing group '{name}' in HDF5 file.")
+                
+                gr = h5.create_group(name)
             except Exception as e:
-                print("!!!!5")
-                dodgy_columns.append(col["field"])
-                warnings.warn(
-                    f"cannot add column '{col['field']}' to datasource '{name}':\n{repr(e)}"
-                )
-        print("!!!!6")
-        h5.close()
-        columns = [x for x in columns if x["field"] not in dodgy_columns]
-        # add the metadata
-        ds = None
-        ds = {"name": name, "columns": columns, "size": size}
-        self.set_datasource_metadata(ds)
-        print("!!!!7")
-        # add it to the view
-        if add_to_view:
-            v = self.get_view(add_to_view)
-            if not v:
-                v = {"initialCharts": {}}
-            v["initialCharts"][name] = []
-            self.set_view(add_to_view, v)
-        print("!!!!8")
-        return dodgy_columns
+                raise RuntimeError(f"Error managing HDF5 groups for datasource '{name}': {e}")
+            
+            # Verify columns are provided
+            if not columns:
+                raise AttributeError("No columns to add. Please provide valid columns metadata.")
+            
+            # Add columns to the HDF5 group
+            dodgy_columns = []
+            for col in columns:
+                try:
+                    add_column_to_group(col, dataframe[col["field"]], gr, len(dataframe), self.skip_column_clean)
+                except Exception as e:
+                    dodgy_columns.append(col["field"])
+                    warnings.warn(
+                        f"Failed to add column '{col['field']}' to datasource '{name}': {repr(e)}"
+                    )
+            
+            h5.close()  # Close HDF5 file
+            columns = [x for x in columns if x["field"] not in dodgy_columns]
+            
+            # Update datasource metadata
+            ds = {"name": name, "columns": columns, "size": len(dataframe)}
+            self.set_datasource_metadata(ds)
+            
+            # Add to view if specified
+            if add_to_view:
+                v = self.get_view(add_to_view)
+                if not v:
+                    v = {"initialCharts": {}}
+                v["initialCharts"][name] = []
+                self.set_view(add_to_view, v)
+            print(f"In MDVProject.add_datasource: Added datasource successfully '{name}'")
+            return dodgy_columns
+
+        except Exception as e:
+            print(f"Error in MDVProject.add_datasource : Error adding datasource '{name}': {e}")
+            raise  # Re-raise the exception to propagate it to the caller
+
 
     def insert_link(self, datasource, linkto, linktype, data):
         """
