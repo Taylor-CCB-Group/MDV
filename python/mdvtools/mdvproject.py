@@ -286,7 +286,7 @@ class MDVProject:
             else:
                 is_new_datasource = True
                 new_datasource_name = "default" if not datasource_name else datasource_name
-                print("@@@@@@@@new_datasource_name")
+                print("@@@@@ ew_datasource_name")
                 print(f"datasource_name received: {datasource_name}")
                 print(f"new_datasource_name set to: {new_datasource_name}")
                 self.update_datasource(new_datasource_name, tiff_metadata)
@@ -438,7 +438,7 @@ class MDVProject:
 
             # Update or add the region in the datasource
             datasource["regions"]["all_regions"][region_name] = new_region
-            datasource['size'] = len(datasource['regions']['all_regions'])
+            #datasource['size'] = len(datasource['regions']['all_regions'])
 
             print("*****3")
             # Save the updated datasource
