@@ -381,34 +381,42 @@ class MDVProject:
             # Find the existing datasource by name
             existing_datasource = next((ds for ds in self.datasources if ds["name"] == datasource), None)
 
+            print("*****1")
+            #datasources empty template
             # If the datasource doesn't exist, create a new one
             if existing_datasource is None:
-                datasource = {
-                    "name": datasource,
-                    "columns": [],            # Initialize empty columns
-                    "size": 0,                # Start size at 0
-                    "links": {},              # Initialize empty links
-                    "regions": {              # Initialize regions as an empty dictionary
-                        "all_regions": {}
-                    }
-                }
+                datasource = self.create_datasource_template(datasource)
                 self.datasources.append(datasource)  # Add the new datasource to the list
                 print(f"Created new datasource '{datasource}'.")
             
-            print("*****1")
+            print("*****2")
+            #datasources-> regions section
+            # Ensure datasource has a 'regions' field
+            if "regions" not in datasource:
+               datasource["regions"] = {}
             
+
+            print("*****3")
             # Corrected path to access size and scale information
             pixels_data = tiff_metadata['Pixels']
             width = pixels_data['SizeX']
             height = pixels_data['SizeY']
-            scale = pixels_data['PhysicalSizeX']
+            scale = pixels_data.get('PhysicalSizeX', 1.0)
             scale_unit = pixels_data.get('PhysicalSizeXUnit', 'µm')  # Default to µm if not present
 
-            print("*****2")
-            # Ensure datasource has a 'regions' field
-            if "regions" not in datasource:
-                datasource["regions"] = {"all_regions": {}}
+            # Call ensure_regions_fields to ensure the required fields and values are set
+            datasource['regions'] = self.ensure_regions_fields(
+                datasource['regions'],  # Existing regions dictionary
+                scale_unit=scale_unit,  # Pass the scale unit
+                scale=scale             # Pass the scale
+            )
             
+            # Check if 'avivator' field is present, if not call add_viv_viewer
+            if "avivator" not in datasource['regions']:
+                self.add_viv_viewer(datasource, [{'name': 'DAPI'}])
+
+            print("*****4")
+            #datasources-> regions -> all_regions section
             # Determine region name
             region_name = tiff_metadata.get('Name', 'unknown')  # Use 'Name' from metadata or 'unknown'
             
@@ -425,34 +433,70 @@ class MDVProject:
                 "viv_image": {
                     "file": f"{region_name}.tiff",
                     "linked_file": True
-                },
-                'width': width,  # Adding width
-                'height': height,  # Adding height
-                'scale': scale,  # Adding scale
-                'scale_unit': scale_unit  # Adding scale_unit
-            }
-
-            image_metadata = {
-                'path': tiff_metadata.get('path', '')  # Use the 'path' key if it exists, or default to ''
+                }
             }
 
             # Update or add the region in the datasource
             datasource["regions"]["all_regions"][region_name] = new_region
             #datasource['size'] = len(datasource['regions']['all_regions'])
 
-            print("*****3")
+            print("*****5")
             # Save the updated datasource
             self.set_datasource_metadata(datasource)
-            print("*****4")
+            
             # Update views and images
-            #self.add_viv_viewer(region_name, [{'name': 'DAPI'}])
+            
             #self.add_viv_images(region_name, image_metadata, link_images=True)
-
+            print("*****6")
             print(f"Datasource '{datasource.get('name', 'unknown')}' updated successfully.")
         
         except Exception as e:
             print(f"Error in MDVProject.update_datasource :  Error updating datasource '{datasource}': {e}")
             raise
+    
+    def create_datasource_template(self, datasource_name: str) -> dict:
+        """Create a new datasource template with the basic structure."""
+        try:
+            template = {
+                "name": datasource_name,
+                "columns": [],          # Initialize empty columns
+                "size": 0,              # Start size at 0
+                "regions": {            # Initialize regions as an empty dictionary
+                    "all_regions": {}
+                },
+                "columnGroups": []
+            }
+            print(f"Created new datasource template '{datasource_name}'.")
+            return template
+        
+        except Exception as e:
+            print(f"In MDVProject.create_datasource_template: Error creating datasource template '{datasource_name}': {e}")
+            raise  # Re-raises the caught exception
+
+    def ensure_regions_fields(self, 
+                          regions, 
+                          position_fields=['x', 'y'], 
+                          region_field='sample_id', 
+                          default_color='leiden', 
+                          scale_unit='µm', 
+                          scale=1.0):
+        try:
+            # Initialize regions structure if needed
+            if "all_regions" not in regions:
+                regions["all_regions"] = {}
+
+            # Ensure that required fields exist with default values
+            regions["position_fields"] = regions.get("position_fields", position_fields)
+            regions["region_field"] = regions.get("region_field", region_field)
+            regions["default_color"] = regions.get("default_color", default_color)
+            regions["scale_unit"] = regions.get("scale_unit", scale_unit)
+            regions["scale"] = regions.get("scale", scale)
+            
+            return regions
+        
+        except Exception as e:
+            print(f"In MDVProject.ensure_regions_fields: Error in ensure_regions_fields: {e}")
+            raise  # Re-raises the caught exception
 
     
     def get_image(self, path: str):
@@ -1405,21 +1449,33 @@ class MDVProject:
         self.set_datasource_metadata(md)
 
     def add_viv_viewer(self, datasource, default_channels):
-        md = self.get_datasource_metadata(datasource)
-        reg = md.get("regions")
-        if not reg:
-            raise AttributeError(
-                f"Adding viv viewer to {datasource}, which does not contain regions"
-            )
-        imdir = join(self.dir, "images", "avivator")
-        if not exists(imdir):
-            os.makedirs(imdir)
+        """Add a Viv viewer to the specified datasource with default channels."""
+        try:
+            md = self.get_datasource_metadata(datasource)
+            reg = md.get("regions")
+            if not reg:
+                raise AttributeError(
+                    f"Adding viv viewer to {datasource}, which does not contain regions"
+                )
 
-        reg["avivator"] = {
-            "default_channels": default_channels,
-            "base_url": "images/avivator/",
-        }
-        self.set_datasource_metadata(md)
+            # Create the directory for storing images if it doesn't exist
+            imdir = join(self.dir, "images", "avivator")
+            if not exists(imdir):
+                os.makedirs(imdir)
+
+            # Add avivator configuration to the regions
+            reg["avivator"] = {
+                "default_channels": default_channels,
+                "base_url": "images/avivator/",
+            }
+            
+            # Save the updated metadata
+            self.set_datasource_metadata(md)
+
+        except Exception as e:
+            print(f"Error in MDVProject.add_viv_viewer: {e}")
+            raise  # Re-raise the exception after logging
+
 
     def add_viv_images(self, datasource, data, link_images=True):
         md = self.get_datasource_metadata(datasource)
