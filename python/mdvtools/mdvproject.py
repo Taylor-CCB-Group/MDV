@@ -425,7 +425,7 @@ class MDVProject:
             )
             
             
-            print("*****4")
+            print("******4")
             #datasources-> regions -> all_regions-> new entry section
             # Determine region name
             full_name = tiff_metadata.get('Name', 'unknown')
