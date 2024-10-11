@@ -58,7 +58,7 @@ void main(void) {
 
   vec4 linearColor = getLinearColor(weight);
   // todo allow for multiple contours, with different properties
-  float c = smoothContour(weight);
+  float c = smoothContour(weight) * contourOpacity;
   vec4 fullColor = texture(colorTexture, vec2(1.0, 0.5)); //should be a uniform
   //fullColor = vec4(1.);
   linearColor = mix(linearColor, fullColor, c);
