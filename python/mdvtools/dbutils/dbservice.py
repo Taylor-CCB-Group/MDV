@@ -10,8 +10,8 @@ class ProjectService:
         try:
             return Project.query.filter_by(is_deleted=False).all()
         except Exception as e:
-            print(f"Error querying active projects: {e}")
-            return []
+            print(f"Error in dbservice: Error querying active projects: {e}")
+            raise
 
     @staticmethod
     #  Routes -> /create_project
@@ -24,8 +24,8 @@ class ProjectService:
                 next_id += 1
             return next_id
         except Exception as e:
-            print(f"Error getting next project ID: {e}")
-            return None
+            print(f"Error in dbservice: Error getting next project ID: {e}")
+            raise
 
     @staticmethod
     #  Routes -> /create_project
@@ -36,8 +36,9 @@ class ProjectService:
             db.session.commit()
             return new_project
         except Exception as e:
-            print(f"Error creating project: {e}")
-            return None
+            print(f"Error in dbservice: Error creating project: {e}")
+            db.session.rollback()
+            raise
         
     @staticmethod
     #  Routes -> /delete_project
@@ -45,8 +46,8 @@ class ProjectService:
         try:
             return Project.query.get(id)
         except Exception as e:
-            print(f"Error querying project by id: {e}")
-            return None
+            print(f"Error in dbservice: Error querying project by id-No project found with id: {e}")
+            raise
 
     @staticmethod
     #  Routes -> /delete_project
@@ -58,10 +59,13 @@ class ProjectService:
                 project.deleted_timestamp = datetime.now()
                 db.session.commit()
                 return True
-            return False
+            else:
+                print(f"Attempted to soft delete non-existing project with id: {id}")
+                return False
         except Exception as e:
-            print(f"Error soft deleting project: {e}")
-            return False
+            print(f"Error in dbservice: Error soft deleting project: {e}")
+            db.session.rollback()
+            raise
         
 class FileService:
     @staticmethod

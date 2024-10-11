@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import shutil
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from flask import Flask, render_template, jsonify
@@ -329,30 +330,37 @@ def register_routes(app):
                 # Return the list of projects with their IDs and names
                 return jsonify([{"id": p.id, "name": p.name} for p in projects])
             except Exception as e:
-                print(f"Error retrieving projects: {e}")
+                print(f"In register_routes - /projects : Error retrieving projects: {e}")
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /projects")
 
         @app.route("/create_project", methods=["POST"])
         def create_project():
+            project_path = None
+            next_id = None
             try:
                 print("Creating project")
                 
                 # Get the next available ID
                 next_id = ProjectService.get_next_project_id()
                 if next_id is None:
-                    print("Error: Failed to determine next project ID from db")
+                    print("In register_routes: Error- Failed to determine next project ID from db")
                     return jsonify({"status": "error", "message": "Failed to determine next project ID from db"}), 500
 
                 # Create the project directory path
                 project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
 
                 # Create and serve the MDVProject
-                print("Creating and serving the new project")
-                p = MDVProject(project_path)
-                p.set_editable(True)
-                p.serve(app=app, open_browser=False, backend=True)
+                # Create and serve the MDVProject
+                try:
+                    print("Creating and serving the new project")
+                    p = MDVProject(project_path)
+                    p.set_editable(True)
+                    p.serve(app=app, open_browser=False, backend=True)
+                except Exception as e:
+                    print(f"In register_routes: Error serving MDVProject: {e}")
+                    return jsonify({"status": "error", "message": "Failed to serve MDVProject"}), 500
 
                 # Create a new Project record in the database with the path
                 print("Adding new project to the database")
@@ -360,18 +368,31 @@ def register_routes(app):
 
                 if new_project:
                     return jsonify({"id": new_project.id, "name": new_project.name, "status": "success"})
-                else:
-                    print("Error: Failed to add new project to db")
-                    return jsonify({"status": "error", "message": "Failed to add new project to db"}), 500
+                
 
             except Exception as e:
-                print(f"Error creating project: {e}")
+                print(f"In register_routes - /create_project : Error creating project: {e}")
+                print("started rollabck")
+                # Rollback: Clean up the projects filesystem directory if it was created
+                if project_path and os.path.exists(project_path):
+                    try:
+                        shutil.rmtree(project_path)
+                        print("In register_routes -/create_project : Rolled back project directory creation as db entry is not added")
+                    except Exception as cleanup_error:
+                        print(f"In register_routes -/create_project : Error during rollback cleanup: {cleanup_error}")
+
+                # Optional: Remove project routes from Flask app if needed
+                if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
+                    del ProjectBlueprint.blueprints[str(next_id)]
+                    print(f"In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
+                
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /create_project")
 
         @app.route("/delete_project/<project_id>", methods=["DELETE"])
         def delete_project(project_id: int):
+            project_removed_from_blueprints = False
             try:
                 print(f"Deleting project '{project_id}'")
                 
@@ -379,13 +400,14 @@ def register_routes(app):
                 project = ProjectService.get_project_by_id(project_id)
 
                 if project is None:
-                    print(f"Error: Project with ID {project_id} not found in database")
+                    print(f"In register_routes - /delete_project Error: Project with ID {project_id} not found in database")
                     return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
 
                 # Remove the project from the ProjectBlueprint.blueprints dictionary
                 if str(project_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(project_id)]
-                    print(f"Removed project '{project_id}' from ProjectBlueprint.blueprints")
+                    project_removed_from_blueprints = True  # Mark as removed
+                    print(f"In register_routes - /delete_project : Removed project '{project_id}' from ProjectBlueprint.blueprints")
                 
                 # Soft delete the project
                 delete_status = ProjectService.soft_delete_project(project_id)
@@ -393,11 +415,16 @@ def register_routes(app):
                 if delete_status:
                     return jsonify({"status": "success"})
                 else:
-                    print("Error: Failed to soft delete project in db")
+                    print("In register_routes - /delete_project Error: Failed to soft delete project in db")
                     return jsonify({"status": "error", "message": "Failed to soft delete project in db"}), 500
 
             except Exception as e:
-                print(f"Error deleting project '{project_id}': {e}")
+                print(f"In register_routes - /delete_project: Error deleting project '{project_id}': {e}")
+                print("started rollabck")
+                # Rollback logic: restore the project in blueprints if it was removed
+                if project_removed_from_blueprints:
+                    ProjectBlueprint.blueprints[str(project_id)] = project  # Restore the project
+                    print(f"Restored project '{project_id}' back to ProjectBlueprint.blueprints due to exception")
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /delete_project/<project_id>")
