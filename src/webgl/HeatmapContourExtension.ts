@@ -2,9 +2,9 @@ import type {
     LayersList,
     UpdateParameters,
     _ConstructorOf,
-} from "@deck.gl/core/typed";
-import { LayerExtension } from "deck.gl";
-import { HeatmapLayer, type Layer } from "deck.gl/typed";
+} from "@deck.gl/core/";
+import { LayerExtension, type Layer } from "@deck.gl/core";
+import { HeatmapLayer } from "@deck.gl/aggregation-layers";
 import heatmapPresentationFS from "./shaders/heatmap-presentation-layer-fragment.glsl?raw";
 
 // original weights-fs glsl shader
@@ -206,17 +206,10 @@ export class ExtendableHeatmapLayer extends HeatmapLayer<
     Uint32Array,
     ExtraContourProps
 > {
-    getShaders(type) {
-        // type is just used as `type === 'max-weights-transform'`
-        // not to distinguish e.g. between weights transform and color rendering.
-        // this only lets us apply the extension to weights transform shader,
-        // which is not what we want...
-        // we want to replace getLinearColor() with a contouring function
-        const shaders = super.getShaders(type);
-        shaders.vs = `#version 300 es\n${shaders.vs}`;
-        shaders._fs = `#version 300 es\n${shaders._fs}`;
-        return shaders;
+    static get componentName(): string {
+        return "ExtendableHeatmapLayer";
     }
+    
     // updateState(opts: UpdateParameters<this>): void {
     //     super.updateState(opts);
     //     const { props } = opts;
@@ -249,7 +242,10 @@ export class ExtendableHeatmapLayer extends HeatmapLayer<
                 //changed name of texture to weightTexture, now the shader compiles with version 300 es
                 //(although it then doesn't render anything?)
                 theClass.prototype.draw = function (opts) {
-                    opts.uniforms.weightTexture = (this.props as any).texture;
+                    //opts.uniforms.weightTexture = (this.props as any).texture;
+                    const { model } = this.state;
+                    // model.setUniforms({ weightTexture: this.props.weightsTexture });
+                    model.setBindings({ weightTexture: this.props.weightsTexture });
                     return originalDraw.call(this, opts);
                 };
             }
@@ -269,7 +265,7 @@ export class ExtendableHeatmapLayer extends HeatmapLayer<
                     //will we get the new updated shader code without needing to mangle the prototype every time?
                     //no, probably closed on the the old module version when HMR happens
                     shaders.fs = myTriangleFS;
-                    shaders.vs = `#version 300 es\n${shaders.vs}`;
+                    // shaders.vs = `#version 300 es\n${shaders.vs}`;
                     return shaders;
                 };
             }

@@ -3,7 +3,7 @@ import {
     type LayerContext,
     LayerExtension,
     type UpdateParameters,
-} from "deck.gl/typed";
+} from "@deck.gl/core";
 import type { ImageArray } from "./ImageArray";
 
 type ImageArrayExtensionProps = { imageArray: ImageArray; saturation: number };
@@ -112,10 +112,11 @@ export class ImageArrayDeckExtension<
         const { texture } = params.props.imageArray;
         const { saturation } = params.props;
         for (const model of this.getModels()) {
-            const gl = model.gl as WebGL2RenderingContext;
-            gl.activeTexture(gl.TEXTURE10);
-            gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
-            model.setUniforms({ imageArray: 10, saturation });
+            // todo
+            // const gl = model.device as WebGL2RenderingContext;
+            // gl.activeTexture(gl.TEXTURE10);
+            // gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+            // model.setUniforms({ imageArray: 10, saturation });
         }
     }
 }

@@ -2,7 +2,7 @@ import {
     type Layer,
     LayerExtension,
     type UpdateParameters,
-} from "deck.gl/typed";
+} from "@deck.gl/core";
 
 export type ContrastProps = {
     contrast: number[];

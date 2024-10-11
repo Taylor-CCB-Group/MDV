@@ -1,9 +1,7 @@
-import { CompositeLayer, type Layer, type LayersList } from "deck.gl/typed";
-import type { LayerContext, ScatterplotLayerProps } from "deck.gl/typed";
-import { ScatterplotExLayer } from "./ScatterplotExLayer";
-import { Framebuffer } from "@luma.gl/core";
-import { ScatterDensityExension } from "./ScatterDeckExtension";
-import HeatmapContourExtension, {
+import { CompositeLayer, type Layer, type LayersList } from "@deck.gl/core";
+import type { LayerContext } from "@deck.gl/core";
+import { type ScatterplotLayerProps, ScatterplotLayer } from "@deck.gl/layers";
+import {
     ExtendableHeatmapLayer,
 } from "./HeatmapContourExtension";
 import type { useContour } from "@/react/contour_state";
@@ -15,7 +13,7 @@ export type SpatialLayerProps = ScatterplotLayerProps & {
 
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     static layerName = "SpatialLayer";
-    static defaultProps = ScatterplotExLayer.defaultProps;
+    static defaultProps = ScatterplotLayer.defaultProps;
     // biome-ignore lint/complexity/noUselessConstructor: tsc error if we remove this?
     constructor(props: SpatialLayerProps) {
         super(props);
@@ -30,7 +28,7 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     renderLayers(): Layer<SpatialLayerProps> | LayersList {
         // order matters here, we should make a ui where we can easily control it
         return [
-            new ScatterplotExLayer(
+            new ScatterplotLayer(
                 this.getSubLayerProps({
                     ...this.props,
                     // ...this.props was not including `data`, so we need to add it manually
