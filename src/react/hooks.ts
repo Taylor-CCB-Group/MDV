@@ -3,7 +3,7 @@ import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import type { CategoricalDataType, DataColumn } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
 
@@ -66,7 +66,7 @@ export function useChartDoc() {
     return chart.__doc__;
 }
 
-export function useParamColumns(): DataColumn<any>[] {
+export function useParamColumns(): DataColumn<DataType>[] {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
     const columns = useMemo(() => {
