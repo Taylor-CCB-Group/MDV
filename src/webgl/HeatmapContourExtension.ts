@@ -1,125 +1,105 @@
-import type {
-    LayersList,
-    UpdateParameters,
-    _ConstructorOf,
-} from "@deck.gl/core/";
-import { LayerExtension, type Layer } from "@deck.gl/core";
-import { HeatmapLayer } from "@deck.gl/aggregation-layers";
+import { LayerExtension, Layer } from "@deck.gl/core";
+import type { Buffer, Device, Texture } from '@luma.gl/core';
+import { Model } from '@luma.gl/engine';
+import { type LayerContext, project32 } from '@deck.gl/core';
+import type { _ConstructorOf } from "@deck.gl/core/";
+
 import heatmapPresentationFS from "./shaders/heatmap-presentation-layer-fragment.glsl?raw";
+
 import { log } from '@luma.gl/core';
 // log.enable();
 log.level = 0;
 
-const contourDecl = /*glsl*/ `
-//---- HeatmapContourExtension decl
-
-//uniforms for tweakable parameters
-
-//function for contouring
-
-//--------------------
-`;
-
-const contourFilterColor = /*glsl*/ `
-//---- HeatmapContourExtension
-// gl_FragColor = DECKGL_FILTER_COLOR(gl_FragColor, geometry);
-// instead of getLinearColor, we want to apply a contouring function to weight...
-// but for now, let's get this code injected and verify what scope we're in
-
-//--------------------
-`;
-
-export default class HeatmapContourExtension extends LayerExtension {
-    static get componentName(): string {
-        return "HeatmapContourExtension";
-    }
-    getShaders() {
-        return {
-            inject: {
-                "fs:#decl": contourDecl,
-                "fs:DECKGL_FILTER_COLOR": contourFilterColor,
-            },
-        };
-    }
-}
 type ExtraContourProps = { contourOpacity: number };
 
-/** Original HeatmapLayer doesn't seem to apply extensions...
- * To be fair, there is some ambiguity
- * as there's more than one shader they could be applied to.
- *
- * Anyway, this is an attempt to make HeatmapLayer work such that
- * when our HeatmapContourExtension is applied, it will be used.
- * It may well not be a complete or sustainable solution.
- *
- * Also note we likely want to have a different version that changes
- * other aspects of how the heatmap is rendered
- * - i.e. with a kernel in screen pixels vs coordinates.
- */
-export class ExtendableHeatmapLayer extends HeatmapLayer<
-    Uint32Array,
-    ExtraContourProps
-> {
-    static get componentName(): string {
-        return "ExtendableHeatmapLayer";
+// ---------- copied from deck.gl triangle-layer
+const triangleVs = /*glsl*/ `#version 300 es
+#define SHADER_NAME heatp-map-layer-vertex-shader
+uniform sampler2D maxTexture;
+uniform float intensity;
+uniform vec2 colorDomain;
+uniform float threshold;
+uniform float aggregationMode;
+in vec3 positions;
+in vec2 texCoords;
+out vec2 vTexCoords;
+out float vIntensityMin;
+out float vIntensityMax;
+void main(void) {
+    gl_Position = project_position_to_clipspace(positions, vec3(0.0), vec3(0.0));
+    vTexCoords = texCoords;
+    vec4 maxTexture = texture(maxTexture, vec2(0.5));
+    float maxValue = aggregationMode < 0.5 ? maxTexture.r : maxTexture.g;
+    float minValue = maxValue * threshold;
+    if (colorDomain[1] > 0.) {
+        maxValue = colorDomain[1];
+        minValue = colorDomain[0];
     }
-    
-    // todo investigate pass `_subLayerProps: { triangle: { contourOpacity: number, type: MyTriangleClass } }` 
-    // https://deck.gl/docs/api-reference/core/composite-layer#_sublayerprops
-    protected getSubLayerProps(sublayerProps?: { [propName: string]: any; id?: string; updateTriggers?: Record<string, any>; }) {
-        const mainProps = this.props;
-        const props = super.getSubLayerProps(sublayerProps);
-        if (sublayerProps.id === 'triangle-layer') {
-            props.contourOpacity = mainProps.contourOpacity;
-        }
-        return props;
+    vIntensityMax = intensity / maxValue;
+    vIntensityMin = intensity / minValue;
+}`;
+
+
+type _TriangleLayerProps = {
+    data: { attributes: { positions: Buffer; texCoords: Buffer } };
+    colorDomain: number[];
+    aggregationMode: string;
+    threshold: number;
+    intensity: number;
+    vertexCount: number;
+    colorTexture: Texture;
+    maxTexture: Texture;
+    weightsTexture: Texture;
+};
+
+export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraContourProps> {
+    static layerName = 'TriangleLayerContours';
+
+    declare state: {
+        model: Model;
+        positions: Buffer;
+        texCoords: Buffer;
+    };
+
+    getShaders() {
+        return { vs: triangleVs, fs: heatmapPresentationFS, modules: [project32] };
     }
-    // biome-ignore lint/complexity/noBannedTypes: banned types are the least of our worries here
-    protected getSubLayerClass<T extends Layer<{}>>(
-        subLayerId: string,
-        DefaultLayerClass: _ConstructorOf<T>,
-    ): _ConstructorOf<T> {
-        const theClass = super.getSubLayerClass(subLayerId, DefaultLayerClass);
-        if (subLayerId === "triangle") { // maybe cleaner just to have our own class in this case rather than mangling the prototype
-            // return TriangleLayerEx as any; // could have props._subLayerProps to override
-            if (!theClass.prototype.__originalGetShaders__) {
-                console.log(
-                    ">>> saving original getShaders()... this should only happen once...",
-                );
-                theClass.prototype.__originalGetShaders__ =
-                    theClass.prototype.getShaders;
-                const originalDraw = theClass.prototype.draw;
-                //changed name of texture to weightTexture, now the shader compiles with version 300 es
-                //should we be applying binding this in updateState rather than draw?
-                theClass.prototype.draw = function (opts) {
-                    //opts.uniforms.weightTexture = (this.props as any).texture;
-                    const { model } = this.state;
-                    const { props } = this;
-                    model.setUniforms({ contourOpacity: props.contourOpacity });
-                    model.setBindings({ weightTexture: this.props.weightsTexture });
-                    return originalDraw.call(this, opts);
-                };
-            }
-            const originalGetShaders =
-                theClass.prototype.__originalGetShaders__;
-            const myTriangleFS = heatmapPresentationFS;
-            //thought we could get away without doing this every time we update the shader code...
-            //but moving the shader to a separate module isn't enough to get this to work
-            if (theClass.prototype.__lastShader !== myTriangleFS) {
-                console.log(
-                    ">>> applying new getShaders() to TriangleLayer prototype...",
-                );
-                theClass.prototype.__lastShader = myTriangleFS;
-                theClass.prototype.getShaders = () => {
-                    console.log(">>> getShaders called...");
-                    const shaders = originalGetShaders.call(this);
-                    //will we get the new updated shader code without needing to mangle the prototype every time?
-                    //no, probably closed on the the old module version when HMR happens
-                    shaders.fs = myTriangleFS;
-                    return shaders;
-                };
-            }
-        }
-        return theClass;
+
+    initializeState({ device }: LayerContext): void {
+        this.setState({ model: this._getModel(device) });
+    }
+
+    _getModel(device: Device): Model {
+        const { vertexCount, data, weightsTexture, maxTexture, colorTexture } = this.props;
+
+        return new Model(device, {
+            ...this.getShaders(),
+            id: this.props.id,
+            bindings: { weightsTexture, maxTexture, colorTexture },
+            attributes: data.attributes,
+            bufferLayout: [
+                { name: 'positions', format: 'float32x3' },
+                { name: 'texCoords', format: 'float32x2' }
+            ],
+            topology: 'triangle-fan-webgl',
+            vertexCount
+        });
+    }
+
+    draw({ uniforms }): void {
+        const { model } = this.state;
+        const { intensity, threshold, aggregationMode, colorDomain, contourOpacity } = this.props;
+        model.setUniforms({
+            ...uniforms,
+            intensity,
+            threshold,
+            aggregationMode,
+            colorDomain,
+            contourOpacity
+        });
+        model.draw(this.context.renderPass);
     }
 }
+
+// ---------- copied from deck.gl triangle-layer
+

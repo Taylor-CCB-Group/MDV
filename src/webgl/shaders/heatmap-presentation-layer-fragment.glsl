@@ -4,7 +4,7 @@
 precision highp float;
 out vec4 fragColor;
 uniform float opacity;
-uniform sampler2D weightTexture; //using name 'texture' caused indirect glsl compiler errors with version 300 es(?)
+uniform sampler2D weightsTexture; //using name 'texture' caused indirect glsl compiler errors with version 300 es(?)
 uniform sampler2D colorTexture;
 uniform float aggregationMode;
 
@@ -45,7 +45,7 @@ vec4 getLinearColor(float value) {
 
 
 void main(void) {
-  vec4 weights = texture(weightTexture, vTexCoords);
+  vec4 weights = texture(weightsTexture, vTexCoords);
   float weight = weights.r;
 
   if (aggregationMode > 0.5) {

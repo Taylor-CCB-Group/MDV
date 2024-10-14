@@ -1,10 +1,9 @@
 import { CompositeLayer, type Layer, type LayersList } from "@deck.gl/core";
 import type { LayerContext } from "@deck.gl/core";
 import { type ScatterplotLayerProps, ScatterplotLayer } from "@deck.gl/layers";
-import {
-    ExtendableHeatmapLayer,
-} from "./HeatmapContourExtension";
+import { TriangleLayerContours } from "./HeatmapContourExtension";
 import type { useContour } from "@/react/contour_state";
+import { HeatmapLayer } from "deck.gl";
 
 export type SpatialLayerProps = ScatterplotLayerProps & {
     //pending typing that allows for other kinds of layers etc
@@ -44,12 +43,21 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
             // consider trying to render density map at lower resolution, then upscaling on debounce.
             ...this.props.contourLayers
                 .filter((l) => l)
-                .map(
-                    (props) =>
-                        new ExtendableHeatmapLayer(
-                            this.getSubLayerProps(props),
-                        ),
-                ),
+                .map((props) => {
+                    const p = this.getSubLayerProps(props);
+                    // todo: maybe encapsulate this in a different way
+                    return new HeatmapLayer({
+                        ...p,
+                        _subLayerProps: {
+                            'triangle': {
+                                type: TriangleLayerContours,
+                            },
+                            'triangle-layer': {
+                                contourOpacity: p.contourOpacity,
+                            },
+                        }
+                    });
+                }),
         ];
     }
 }
