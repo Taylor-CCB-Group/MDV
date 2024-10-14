@@ -89,9 +89,8 @@ export class ImageArrayDeckExtension<
             },
         };
     }
-    // biome-ignore lint/complexity/noBannedTypes: hope to fix, not before viv/deck.gl update
     initializeState(
-        this: Layer<{}>,
+        this: Layer<ImageArrayExtensionProps>,
         context: LayerContext,
         extension: this,
     ): void {
@@ -103,20 +102,27 @@ export class ImageArrayDeckExtension<
                 defaultValue: 1,
             },
         });
+        this.props.saturation
     }
-    // biome-ignore lint/complexity/noBannedTypes: hope to fix, not before viv/deck.gl update
     updateState(
-        this: Layer<{}>,
+        this: Layer<ImageArrayExtensionProps>,
         params: UpdateParameters<Layer<ImageArrayExtensionProps>>,
     ) {
-        const { texture } = params.props.imageArray;
+        // const { texture } = params.props.imageArray;
         const { saturation } = params.props;
         for (const model of this.getModels()) {
-            // todo
-            // const gl = model.device as WebGL2RenderingContext;
+            const device = model.device;
+            // todo clean this up
+            if (!(device.type === "webgl")) throw new Error("non-webgl device not implemented");
+            params.props.imageArray.wrapLumaTexture(device);
+            const { lumaTexture } = params.props.imageArray;
+            // const gl = (device as any).gl as WebGL2RenderingContext;
             // gl.activeTexture(gl.TEXTURE10);
             // gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
-            // model.setUniforms({ imageArray: 10, saturation });
+            model.setUniforms({ saturation });
+            model.setBindings({
+                imageArray: lumaTexture,
+            })
         }
     }
 }
