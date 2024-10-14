@@ -63,6 +63,8 @@
     "d3-geo": "^3.0.1",
     "d3-sankey": "^0.12.3",
     "deck.gl": "~9.0.33",
+    "@deck.gl-community/editable-layers": "^9.0.3",
+    "@deck.gl-community/layers": "^9.0.3",
     "docdash": "^2.0.0",
     "dompurify": "^2.4.1",
     "dotenv": "^16.0.3",
