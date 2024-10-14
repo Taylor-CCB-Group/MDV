@@ -1,6 +1,6 @@
 import * as React from "react";
 import DeckGL from "@deck.gl/react";
-// import { getVivId } from '@vivjs/views';
+// import { getVivId } from '@vivjs-experimental/views';
 // No need to use the ES6 or React variants.
 import equal from "fast-deep-equal";
 export function getVivId(id) {
@@ -381,7 +381,7 @@ class MDVivViewerWrapper extends React.PureComponent<
 }
 
 /**
- * This is a wrapper around the VivViewer component from @hms-dbmi/viv
+ * This is a wrapper around the VivViewer component from @vivjs-experimental/viv
  * *** THIS IS NOW ACTUALLY NECESSARY ***
  * to fix issues with mouse events in popouts.
  * In future, we may handle more interesting things here to do with layer rendering.

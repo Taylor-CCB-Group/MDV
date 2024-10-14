@@ -2,8 +2,7 @@ import {
     getDefaultInitialViewState,
     ColorPaletteExtension,
     DetailView,
-    VivViewer,
-} from "@hms-dbmi/viv";
+} from "@vivjs-experimental/viv";
 import { observer } from "mobx-react-lite";
 import { useState, useLayoutEffect, useMemo, useEffect, useRef } from "react";
 import { shallow } from "zustand/shallow";
@@ -20,7 +19,7 @@ import {
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
 import { SpatialAnnotationProvider, useRange } from "../spatial_context";
-import { GeoJsonLayer, PolygonLayer } from "deck.gl/typed";
+import { GeoJsonLayer, PolygonLayer } from "@deck.gl/layers";
 import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
