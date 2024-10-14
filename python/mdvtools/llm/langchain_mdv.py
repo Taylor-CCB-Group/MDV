@@ -1,4 +1,5 @@
 import time
+import logging
 from contextlib import contextmanager
 
 # Code Generation using Retrieval Augmented Generation + LangChain
@@ -23,12 +24,29 @@ from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import prepare_code
 from .code_execution import execute_code
 
+#logging.basicConfig(filename="timing_results.log", level=logging.INFO)
+
+# create logger
+logger = logging.getLogger('timing_results')
+logger.setLevel(logging.DEBUG)
+
+# create file handler and set level to INFO
+file_handler = logging.FileHandler('timing_results.log')
+file_handler.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+
+
 @contextmanager
 def time_block(name):
     start_time = time.time()  # Setup: Start timing
     yield  # This is where the code inside the `with` block runs
     end_time = time.time()  # Teardown: After `with` block is done
-    print(f"Block '{name}' took {end_time - start_time:.4f} seconds")
+    duration = end_time - start_time
+    message = f"Block '{name}' took {duration:.4f} seconds"
+    # Only log the message if it contains 'Block'
+    logger.info(message)
+    print(f"Block '{name}' took {duration:.4f} seconds")
+
 
 # sometimes this tries to draw with matplotlib... which causes an error that we can't catch
 # we don't control the code that's being run by the agent...
@@ -132,6 +150,7 @@ class ProjectChat():
                 return "This agent is not ready to answer questions"
             full_prompt = prompt_data + "\nQuestion: " + question
             print(full_prompt)
+            logger.info(f"Question asked by user: {question}")
         try:
             with time_block("b9b: Pandas agent invoking"):
                 response = self.agent.invoke(full_prompt) 
@@ -181,8 +200,6 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project', 
     #user_question = "Create a heatmap plot of the localisation status vs the UTR length"
     if user_question is None:
         user_question = input("What would you like to ask the LLM?")
-
-    logging.basicConfig(user_question)
 
     path_to_data = os.path.join(mypath, "sample_data/data_cells.csv")
     df = pd.read_csv(path_to_data)
