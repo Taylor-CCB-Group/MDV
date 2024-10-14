@@ -64,6 +64,8 @@ export class ExtendableHeatmapLayer extends HeatmapLayer<
         return "ExtendableHeatmapLayer";
     }
     
+    // todo investigate pass `_subLayerProps: { triangle: { contourOpacity: number, type: MyTriangleClass } }` 
+    // https://deck.gl/docs/api-reference/core/composite-layer#_sublayerprops
     protected getSubLayerProps(sublayerProps?: { [propName: string]: any; id?: string; updateTriggers?: Record<string, any>; }) {
         const mainProps = this.props;
         const props = super.getSubLayerProps(sublayerProps);
