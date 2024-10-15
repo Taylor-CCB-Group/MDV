@@ -1,5 +1,5 @@
 import DeckGL from "@deck.gl/react";
-import { OrthographicView, OrbitView } from '@deck.gl/core';
+import { OrthographicView, OrbitView, type OrthographicViewState, type OrbitViewState } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
 import { ScatterplotLayer } from "@deck.gl/layers";
@@ -23,7 +23,7 @@ export default observer(function DeckScatterComponent() {
     const colorBy = (chart as any).colorBy;
 
 
-    const scatterplotLayer = new ScatterplotLayer({
+    const scatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatterplot-layer-${id}`,
         data,
         pickable: true,
@@ -46,10 +46,8 @@ export default observer(function DeckScatterComponent() {
         parameters: {
             depthTest: false,
         }
-    });
-    const [viewState, setViewState] = useState<any>({
-        width,
-        height,
+    }), [data, cx, cy, cz, colorBy, opacity, radiusScale, id]);
+    const [viewState, setViewState] = useState<OrthographicViewState | OrbitViewState>({
         target: [0, 0, 0],
         zoom: 0,
         minZoom: -50,
@@ -78,8 +76,6 @@ export default observer(function DeckScatterComponent() {
             if (y > maxY) maxY = y;
         }
         setViewState({
-            width,
-            height,
             target: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
             zoom: Math.log2(Math.min(width/(maxX - minX), height/(maxY - minY))) - 0.1,
         });
