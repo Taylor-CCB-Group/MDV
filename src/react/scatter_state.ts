@@ -19,7 +19,58 @@ import {
     ScatterDensityExension,
 } from "../webgl/ScatterDeckExtension";
 import { useHighlightedIndex } from "./selectionHooks";
-import { useLegacyDualContour } from "./contour_state";
+import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
+import type { ColumnName } from "@/charts/charts";
+
+export type TooltipConfig = {
+    tooltip: {
+        show: boolean;
+        column?: ColumnName;
+    };
+};
+export type CategoryFilter = {
+    column: ColumnName;
+    category: string | string[];
+    // consider properties like 'invert' or 'exclude', or 'color'...
+};
+//viewState should be persisted... maybe a way of saving different snapshots?
+//could we infer or something to avoid having to repeat this?
+export type ScatterPlotConfig = {
+    course_radius: number;
+    radius: number;
+    opacity: number;
+    color_by: ColumnName;
+    color_legend: {
+        display: boolean;
+        // todo: add more options here...
+    };
+    category_filters: Array<CategoryFilter>;
+    //on_filter: "hide" | "grey", //todo
+    zoom_on_filter: boolean;
+    point_shape: "circle" | "square" | "gaussian";
+} & TooltipConfig &
+    DualContourLegacyConfig;
+export const scatterDefaults: ScatterPlotConfig = {
+    course_radius: 1,
+    radius: 10,
+    opacity: 1,
+    color_by: null,
+    color_legend: {
+        display: false,
+    },
+    tooltip: {
+        show: false,
+    },
+    category_filters: [],
+    zoom_on_filter: false,
+    point_shape: "circle",
+    contour_fill: false,
+    contour_bandwidth: 0.1,
+    contour_intensity: 1,
+    contour_opacity: 0.5,
+};
+
+
 
 export function useRegionScale() {
     const metadata = useMetadata();
