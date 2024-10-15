@@ -1,8 +1,8 @@
-import DeckGL from "@deck.gl/react/typed";
+import DeckGL from "@deck.gl/react";
 import { OrthographicView, OrbitView } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
-import { ScatterplotLayer } from "@deck.gl/layers/typed";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import { useEffect, useId, useMemo, useState } from "react";
 import type { ScatterPlotConfig } from "../scatter_state";
 import { useChart } from "../context";
