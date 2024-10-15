@@ -16,8 +16,9 @@ export default observer(function DeckScatterComponent() {
     const data = useFilteredIndices();
     const config = useConfig<ScatterPlotConfig>();
     const { opacity, radius, course_radius, dimension } = config;
-    const is2d = dimension === "2d";
-    const radiusScale = radius * course_radius * (is2d ? 1 : 0.01);
+    // const is2d = dimension === "2d";
+    //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
+    const radiusScale = radius * course_radius * 0.01;// * (is2d ? 1 : 0.01);
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
 
@@ -111,6 +112,7 @@ export default observer(function DeckScatterComponent() {
             useDevicePixels={true}
             // controller={true}
             viewState={viewState}
+            // initialViewState={viewState} //consider not using react state for this
             views={view}
             onViewStateChange={v => setViewState(v.viewState)}            
         />
