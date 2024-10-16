@@ -88,6 +88,7 @@ const Dashboard: React.FC = () => {
         fetchProjects,
         createProject,
         deleteProject,
+        renameProject,
         setFilter,
         setSortBy,
         setSortOrder,
@@ -364,7 +365,7 @@ const Dashboard: React.FC = () => {
                                     <ProjectCard
                                         {...project}
                                         onDelete={deleteProject}
-                                        onRename={(id, newName) => {}}
+                                        onRename={renameProject}
                                         onChangeType={(id, newType) => {}}
                                         onAddCollaborator={(email) => {}}
                                     />
