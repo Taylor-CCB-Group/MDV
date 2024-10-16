@@ -22,6 +22,8 @@ python/build
 python/data
 python/mdvtools/dbutils/__pycache__
 python/mdvtools/llm/key.json
+python/mdvtools/llm/temp_code_3.py
+python/mdvtools/llm/timing_results.log
 python/mdvtools/tests/temp/*
 python/mdvtools/test_projects/cache/*
 python/mdvtools/static/*
@@ -44,3 +46,5 @@ xvenv/
 
 LLM/cache
 LLM/key.json
+
+timing_results.log

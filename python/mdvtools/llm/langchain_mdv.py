@@ -34,7 +34,7 @@ logger.setLevel(logging.DEBUG)
 file_handler = logging.FileHandler('timing_results.log')
 file_handler.setLevel(logging.INFO)
 logger.addHandler(file_handler)
-
+logger.info(time.asctime())
 
 @contextmanager
 def time_block(name):
@@ -42,9 +42,8 @@ def time_block(name):
     yield  # This is where the code inside the `with` block runs
     end_time = time.time()  # Teardown: After `with` block is done
     duration = end_time - start_time
-    message = f"Block '{name}' took {duration:.4f} seconds"
     # Only log the message if it contains 'Block'
-    logger.info(message)
+    logger.info(f"Block '{name}' took {duration:.4f} seconds")
     print(f"Block '{name}' took {duration:.4f} seconds")
 
 
