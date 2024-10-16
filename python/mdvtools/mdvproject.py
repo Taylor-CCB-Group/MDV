@@ -310,6 +310,8 @@ class MDVProject:
             )
             
             print("^^^ Step 4")
+            ProjectService.set_project_update_timestamp(project_id)
+            print("^^^ Step 5")
             # Print success message
             print(f"Datasource '{datasource_name}' updated, TIFF file uploaded, and database entry created successfully.")
 
@@ -894,13 +896,14 @@ class MDVProject:
 
     def add_datasource(
         self,
+        project_id: str,
         name: str,
         dataframe: pandas.DataFrame | str,
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
         add_to_view: Optional[str] = "default",
-        separator="\t",
+        separator="\t"
     ) -> list[dict[str, str]]:
         """Adds a pandas dataframe to the project. Each column's datatype, will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
@@ -996,6 +999,10 @@ class MDVProject:
                 self.set_view(add_to_view, v)
             
             print("£££6")
+
+            # Update the project's update timestamp using the dedicated method
+            ProjectService.set_project_update_timestamp(project_id)
+            print("£££7")
             print(f"In MDVProject.add_datasource: Added datasource successfully '{name}'")
             return dodgy_columns
 

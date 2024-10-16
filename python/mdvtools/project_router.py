@@ -1,7 +1,9 @@
-from flask import Flask, Response
-from typing import Dict, Any, Callable
+from flask import Flask, Response, jsonify
+from typing import Dict, Any, Callable, Tuple
 import re
 from urllib.parse import urlparse
+from datetime import datetime, timedelta
+from mdvtools.dbutils.dbservice import ProjectService
 
 """
 This should work as a drop-in replacement for `Blueprint` in the context
@@ -11,6 +13,8 @@ of a Flask app that can add (and remove) MDVProjects dynamically at runtime.
 
 class ProjectBlueprint:
     blueprints: Dict[str, "ProjectBlueprint"] = {}
+    # Class-level constant for the timestamp update interval
+    TIMESTAMP_UPDATE_INTERVAL = timedelta(hours=1)
 
     @staticmethod
     def register_app(app: Flask) -> None:
@@ -26,10 +30,12 @@ class ProjectBlueprint:
             It will look up the project_id in ProjectBlueprint.blueprints and call the method with the given subpath.
             The ProjectBlueprint instance is responsible for routing the request to the correct method etc.
             """
+            
             if project_id in ProjectBlueprint.blueprints:
                 try:
                     return ProjectBlueprint.blueprints[project_id].dispatch_request(
-                        subpath
+                        subpath,
+                        project_id
                     )
                 except Exception as e:
                     return {"status": "error", "message": str(e)}
@@ -38,7 +44,7 @@ class ProjectBlueprint:
     def __init__(self, name: str, _ignored: str, url_prefix: str) -> None:
         self.name = name
         self.url_prefix = url_prefix  # i.e. /project/<project_id>/
-        self.routes: Dict[re.Pattern[str], Callable] = {}
+        self.routes: Dict[re.Pattern[str], Tuple[Callable, Dict[str, Any]]] = {}
         ProjectBlueprint.blueprints[name] = self
 
     def route(self, rule: str, **options: Any) -> Callable:
@@ -52,12 +58,14 @@ class ProjectBlueprint:
             # would be nice to re-use logic from Flask's routing, but it's a bit complex to use out of context
             # from werkzeug.routing import Rule
             rule_re = re.compile(re.sub(r"<.*?>", "(.*)", f"^{rule}$"))
-            self.routes[rule_re] = f
+            # rather than just add the callable f, we add (f, permissionsFlags)
+            # where permissionsFlags are something passed in options
+            self.routes[rule_re] = (f, options)
             return f
 
         return decorator
 
-    def dispatch_request(self, subpath: str) -> Response:
+    def dispatch_request(self, subpath: str, project_id) -> Response:
         """We need to parse `subpath` so that we can route in a compatible way:
         Currently, we have regex patterns as keys in self.routes that match the subpath, with groups for
         any dynamic parts, so '/tracks/<path:path>' becomes '/tracks/(.*)'. If we get a request for '/tracks/mytrack',
@@ -73,9 +81,47 @@ class ProjectBlueprint:
         # and pass 'mytrack' to the method
 
         # find the item in self.routes that matches the subpath
+        print("**********************************")
+        print(subpath, project_id)
         subpath = f"/{urlparse(subpath).path}"
-        for rule, method in self.routes.items():
+        for rule, (method, options) in self.routes.items():
             match = rule.match(subpath)
             if match:
+                
+                # Update the accessed timestamp only if the last update was more than TIMESTAMP_UPDATE_INTERVAL ago
+                project = ProjectService.get_project_by_id(project_id)
+                if project and (not project.accessed_timestamp or 
+                    datetime.now() - project.accessed_timestamp > self.TIMESTAMP_UPDATE_INTERVAL):
+                    print("****time interval greater than an hour ")
+                    try:
+                        ProjectService.set_project_accessed_timestamp(project_id)
+                        print(f"In dispatch_request: Updated accessed timestamp for project ID {project_id}")
+                    except Exception as e:
+                        print(f"dispatch_request: Error updating accessed timestamp: {e}")
+                        return jsonify({"status": "error", "message": "Failed to update project accessed timestamp"}), 500
+
+                # first determine whether this is allowed
+                # - rather than iterating over (rule, method), we might have
+                # (rule, (method, permissionsFlags))
+                # we can check the request.token (or whatever it is) here...
+                print("options",options)
+                # Check for access level only if specified in options
+                if options and 'access_level' in options:
+                    print("match", match)
+                    #project_id = match.group(0).split('/')[2]  # Extract project_id from matched route
+                    project = ProjectService.get_project_by_id(project_id)  # Fetch the project
+                    
+                    if project is None:
+                        print("In dispatch_request: Error - project doesnt exist")
+                        return jsonify({"status": "error", "message": f"Project with ID {project_id} not found"}), 404
+
+                    required_access_level = options['access_level']  # Get required access level
+                    print("@@@@@@@@@@@", required_access_level)
+                    if required_access_level == 'editable':
+                        print("!!!!!!!!", project)
+                        if project.access_level != 'editable':
+                            return jsonify({"status": "error", "message": "This project is read-only and cannot be modified."}), 403
+                
                 return method(*match.groups())
+            
         raise ValueError(f"no matching route for {subpath}")

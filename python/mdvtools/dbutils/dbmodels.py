@@ -28,7 +28,7 @@ class Project(db.Model):
     created_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     is_deleted = db.Column(db.Boolean, nullable=False, default=False)
     deleted_timestamp = db.Column(db.DateTime, nullable=True)
-    update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     accessed_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     owner = db.Column(db.Integer)
     type = db.Column(db.Text)
@@ -39,6 +39,7 @@ class Project(db.Model):
     genome = db.Column(db.String, db.ForeignKey('genomes.name'))
     parent = db.Column(db.Integer)
     description = db.Column(db.Text)
+    access_level = db.Column(db.String(50), nullable=False, default='editable')  # Default access level
     users = db.relationship('UserProject', backref='project', lazy=True)
     files = db.relationship('File', backref='project', lazy=True)
 
@@ -56,6 +57,7 @@ class File(db.Model):
     upload_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
     update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    #project = db.relationship('Project', backref=db.backref('files', lazy=True))
     
 class UserProject(db.Model):
     __tablename__ = 'user_projects'
@@ -149,13 +151,16 @@ db.Index('idx_genes_name', GeneSet.name)
 db.Index('idx_views_table_name', ViewSet.table_name)
 db.Index('idx_views_name', ViewSet.name)
 
+"""
 @db.event.listens_for(File, 'after_insert')
 @db.event.listens_for(File, 'after_update')
 @db.event.listens_for(File, 'after_delete')
 def update_project_timestamp(mapper, connection, target):
     try:
         # Ensure target.project is the correct way to access the associated Project
+        print("--------Event Listener on File")
         project = target.project
+        print(project)
         if project:
             # Update the project's timestamp
             project.update_timestamp = datetime.now()
@@ -167,4 +172,4 @@ def update_project_timestamp(mapper, connection, target):
         print(f"Error updating project timestamp: {e}")
         db.session.rollback()  # Rollback in case of an error
 
-
+"""
