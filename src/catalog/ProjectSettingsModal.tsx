@@ -21,9 +21,9 @@ interface ProjectSettingsModalProps {
     name: string;
     type: "Editable" | "Read-Only";
     open: boolean;
-    onRename: (id: string, newName: string) => void;
+    onRename: (id: string, newName: string) => Promise<void>;
     onChangeType: (id: string, newType: "Editable" | "Read-Only") => Promise<void>;
-    onDelete: (id: string) => void;
+    onDelete: (id: string) => Promise<void>;
     onClose: () => void;
 }
 
