@@ -6,29 +6,43 @@ import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 import DeckScatterComponent from "./DeckScatterComponent";
+import type { OrthographicViewState, OrbitViewState } from "deck.gl";
 
 const MainChart = observer(() => {
     return <DeckScatterComponent />;
 });
 
 
-class DeckScatterReact extends BaseReactChart<ScatterPlotConfig> {
+export type DeckScatterConfig = ScatterPlotConfig & {
+    viewState: OrthographicViewState | OrbitViewState;
+}
+const defaultViewState = {
+        viewState: {
+        target: [0, 0, 0],
+        zoom: 0,
+        minZoom: -50,
+    }
+}
+
+class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
+    pendingRecenter = false;
     constructor(
         dataStore,
         div,
-        originalConfig: ScatterPlotConfig & BaseConfig,
+        originalConfig: DeckScatterConfig & BaseConfig,
     ) {
         // config.tooltip = config.tooltip || { show: false, column: config.param[0] }; //todo fix this
-        // config.opacity = config.opacity || scatterDefaults.opacity; // todo establish a better method for defaults
-        const config = { ...scatterDefaults, ...originalConfig };
+        const config = { ...scatterDefaults, ...defaultViewState, ...originalConfig };
         super(dataStore, div, config, MainChart);
+        if (!originalConfig.viewState) this.pendingRecenter = true;
         this.colorByColumn(config.color_by);
         makeObservable(this, {
             colorBy: observable,
             colorByColumn: action,
             colorByDefault: action,
+            pendingRecenter: observable,
         });
     }
     colorBy?: (i: number) => [r: number, g: number, b: number];
@@ -45,6 +59,22 @@ class DeckScatterReact extends BaseReactChart<ScatterPlotConfig> {
         return {
             colorby: "all",
         };
+    }
+
+    getConfig() {
+        const c = super.getConfig() as DeckScatterConfig;
+        // if we serialize the viewState, we get copies of things like `transition` properties
+        // that don't de-serialize properly, so we explicity extract the properties we want
+        const viewState = {
+            target: c.viewState.target,
+            zoom: c.viewState.zoom,
+        }
+        if (c.dimension === "3d") {
+            const v = c.viewState as OrbitViewState;
+            viewState["rotationOrbit"] = v.rotationOrbit;
+            viewState["rotationX"] = v.rotationX;
+        }
+        return { ...c, viewState };
     }
 
     getSettings() {
@@ -127,6 +157,18 @@ class DeckScatterReact extends BaseReactChart<ScatterPlotConfig> {
                     c.zoom_on_filter = x;
                 },
             },
+            {
+                type: "button",
+                label: "Center Plot",
+                current_value: null,
+                func: () => {
+                    // what should we do to trigger a re-center?
+                    // we also want some logic so that this will happen when a new chart is loaded
+                    // we don't really want it to be a serialized property... so we have observable state
+                    // that isn't in the config, but is in the chart.
+                    this.pendingRecenter = true;
+                },
+            }
         ]);
     }
 }

@@ -1,61 +1,27 @@
 import DeckGL from "@deck.gl/react";
-import { OrthographicView, OrbitView, type OrthographicViewState, type OrbitViewState } from '@deck.gl/core';
+import { OrthographicView, OrbitView } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
 import { ScatterplotLayer } from "@deck.gl/layers";
-import { useEffect, useId, useMemo, useState } from "react";
-import type { ScatterPlotConfig } from "../scatter_state";
+import { useEffect, useId, useMemo } from "react";
 import { useChart } from "../context";
-// import { OrbitView } from "deck.gl/typed";
-// import { useScatterplotLayer } from "../scatter_state";
+import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
+import { action } from "mobx";
+import type { OrbitViewState } from "@deck.gl/core";
 
-export default observer(function DeckScatterComponent() {
-    const id = useId();
+
+/** todo this should be common for viv / scatter_state, pending refactor */
+function useZoomOnFilter() {
     const [width, height] = useChartSize();
     const [cx, cy, cz] = useParamColumns();
     const data = useFilteredIndices();
-    const config = useConfig<ScatterPlotConfig>();
-    const { opacity, radius, course_radius, dimension } = config;
-    // const is2d = dimension === "2d";
-    //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
-    const radiusScale = radius * course_radius * 0.01;// * (is2d ? 1 : 0.01);
-    const chart = useChart();
-    const colorBy = (chart as any).colorBy;
-
-
-    const scatterplotLayer = useMemo(() => new ScatterplotLayer({
-        id: `scatterplot-layer-${id}`,
-        data,
-        pickable: true,
-        opacity,
-        stroked: false,
-        filled: true,
-        radiusScale,
-        getPosition: (index, {target}) => {
-            target[0] = cx.data[index];
-            target[1] = cy.data[index];
-            if (cz) target[2] = cz.data[index];
-            return target as [number, number];
-        },
-        getFillColor: colorBy ?? [255, 255, 255],
-        getLineColor: [0, 0, 0],
-        updateTriggers: {
-            getFillColor: colorBy,
-        },
-        billboard: true,
-        parameters: {
-            depthTest: false,
-        }
-    }), [data, cx, cy, cz, colorBy, opacity, radiusScale, id]);
-    const [viewState, setViewState] = useState<OrthographicViewState | OrbitViewState>({
-        target: [0, 0, 0],
-        zoom: 0,
-        minZoom: -50,
-    });
-
-    //this should be factored out into a hook
+    const config = useConfig<DeckScatterConfig>();
+    const chart = useChart() as any;
+    const { pendingRecenter } = chart;
     useEffect(() => {
+        if (chart.ignoreStateUpdate) return;
         if (data.length === 0) return;// [0, 0, 1, 1];
+        if (!pendingRecenter && !config.zoom_on_filter) return;
         //there is also cx.minMax, cy.minMax - but not for filtered indices
         let minX = Number.POSITIVE_INFINITY;
         let maxX = Number.NEGATIVE_INFINITY;
@@ -75,12 +41,74 @@ export default observer(function DeckScatterComponent() {
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
         }
-        setViewState({
-            target: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
-            zoom: Math.log2(Math.min(width/(maxX - minX), height/(maxY - minY))) - 0.1,
-        });
+        // setViewState(
+        action(() => {
+            chart.ignoreStateUpdate = true;
+            chart.pendingRecenter = false;
+            const oldViewState = config.viewState;
+            config.viewState = {
+                target: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
+                zoom: Math.log2(Math.min(width / (maxX - minX), height / (maxY - minY))) - 0.1,
+            };
+            if (config.dimension === "3d") {
+                // a bit clunktastic, might make more fancy typescript-y way to do this
+                // (thanks copilot for the word clunktastic - maybe a little strong)
+                const vs = oldViewState as OrbitViewState;
+                const newVs = config.viewState as OrbitViewState;
+                if (vs) {
+                    newVs.rotationOrbit = vs.rotationOrbit || 0;
+                    newVs.rotationX = vs.rotationX || 0;
+                }
+            }
+
+            chart.ignoreStateUpdate = false;
+        })();
         //return [(minX + maxX) / 2, (minY + maxY) / 2, maxX - minX, maxY - minY];
-    }, [data, cx, cy, width, height]);
+    }, [data, cx, cy, width, height, config, pendingRecenter, chart]);
+}
+
+
+
+export default observer(function DeckScatterComponent() {
+    const id = useId();
+    const [width, height] = useChartSize();
+    const [cx, cy, cz] = useParamColumns();
+    const data = useFilteredIndices();
+    const config = useConfig<DeckScatterConfig>();
+    const { opacity, radius, course_radius, viewState } = config;
+    // const is2d = dimension === "2d";
+    //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
+    const radiusScale = radius * course_radius * 0.01;// * (is2d ? 1 : 0.01);
+    const chart = useChart();
+    const colorBy = (chart as any).colorBy;
+
+    useZoomOnFilter();
+
+
+    const scatterplotLayer = useMemo(() => new ScatterplotLayer({
+        id: `scatterplot-layer-${id}`,
+        data,
+        pickable: true,
+        opacity,
+        stroked: false,
+        filled: true,
+        radiusScale,
+        getPosition: (index, {target}) => {
+            target[0] = cx.data[index];
+            target[1] = cy.data[index];
+            if (cz) target[2] = cz.data[index];
+            return target as [number, number];
+        },
+        getFillColor: colorBy ?? [61, 126, 180],
+        getLineColor: [0, 0, 0],
+        updateTriggers: {
+            getFillColor: colorBy,
+        },
+        billboard: true,
+        parameters: {
+            depthTest: false,
+        }
+    }), [data, cx, cy, cz, colorBy, opacity, radiusScale, id]);
 
     // we need an OrthographicView to prevent wrapping etc...
     const view = useMemo(() => {
@@ -110,7 +138,7 @@ export default observer(function DeckScatterComponent() {
             viewState={viewState}
             // initialViewState={viewState} //consider not using react state for this
             views={view}
-            onViewStateChange={v => setViewState(v.viewState)}            
+            onViewStateChange={v => {action(()=>config.viewState = v.viewState)()}}
         />
         </>
     );
