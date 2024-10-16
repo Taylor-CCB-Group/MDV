@@ -4,7 +4,7 @@ import json
 import shutil
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
 # import random
@@ -326,9 +326,19 @@ def register_routes(app):
             try:
                 # Query the database to get all projects that aren't deleted
                 projects = ProjectService.get_active_projects()
-
-                # Return the list of projects with their IDs and names
-                return jsonify([{"id": p.id, "name": p.name} for p in projects])
+                
+                # Format each project with its id, name, and last modified timestamp as a string
+                project_list = [
+                    {
+                        "id": p.id,
+                        "name": p.name,
+                        "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S')  # Format datetime as string
+                    }
+                    for p in projects
+                ]
+                # Return the list of projects as JSON
+                return jsonify(project_list)
+            
             except Exception as e:
                 print(f"In register_routes - /projects : Error retrieving projects: {e}")
                 return jsonify({"status": "error", "message": str(e)}), 500
@@ -403,6 +413,12 @@ def register_routes(app):
                     print(f"In register_routes - /delete_project Error: Project with ID {project_id} not found in database")
                     return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
 
+                
+                # Check if the project is editable before attempting to delete
+                if project.access_level != 'editable':
+                    print(f"In register_routes - /delete_project Error: Project with ID {project_id} is not editable.")
+                    return jsonify({"status": "error", "message": "This project is not editable and cannot be deleted."}), 403
+
                 # Remove the project from the ProjectBlueprint.blueprints dictionary
                 if str(project_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(project_id)]
@@ -420,14 +436,69 @@ def register_routes(app):
 
             except Exception as e:
                 print(f"In register_routes - /delete_project: Error deleting project '{project_id}': {e}")
-                print("started rollabck")
-                # Rollback logic: restore the project in blueprints if it was removed
-                if project_removed_from_blueprints:
-                    ProjectBlueprint.blueprints[str(project_id)] = project  # Restore the project
-                    print(f"Restored project '{project_id}' back to ProjectBlueprint.blueprints due to exception")
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /delete_project/<project_id>")
+
+        @app.route("/projects/<int:project_id>/rename", methods=["PUT"])
+        def rename_project(project_id: int):
+            # Retrieve the new project name from the multipart/form-data payload
+            new_name = request.form.get("name")
+            
+            if not new_name:
+                return jsonify({"status": "error", "message": "New name not provided"}), 400
+            
+            try:
+                # Check if the project exists
+                project = ProjectService.get_project_by_id(project_id)
+                if project is None:
+                    print(f"In register_routes - /rename_project Error: Project with ID {project_id} not found in database")
+                    return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
+                
+                # Check if the project is editable before attempting to rename
+                if project.access_level != 'editable':
+                    print(f"In register_routes - /rename_project Error: Project with ID {project_id} is not editable.")
+                    return jsonify({"status": "error", "message": "This project is not editable and cannot be renamed."}), 403
+      
+                # Attempt to rename the project
+                rename_status = ProjectService.update_project_name(project_id, new_name)
+
+                if rename_status:
+                    return jsonify({"status": "success", "id": project_id, "new_name": new_name}), 200
+                else:
+                    print(f"In register_routes - /rename_project Error: The project with ID '{project_id}' not found in db")
+                    return jsonify({"status": "error", "message": f"Failed to rename project '{project_id}' in db"}), 500
+
+            except Exception as e:
+                print(f"In register_routes - /rename_project : Error renaming project '{project_id}': {e}")
+                return jsonify({"status": "error", "message": str(e)}), 500
+
+        print("Route registered: /projects/<int:project_id>/rename")
+
+        @app.route("/projects/<int:project_id>/access", methods=["PUT"])
+        def change_project_access(project_id):
+            """API endpoint to change the access level of a project."""
+            try:
+                # Get the new access level from the request
+                new_access_level = request.form.get("type")
+
+                # Validate the new access level
+                if new_access_level not in ["read-only", "editable"]:
+                    return jsonify({"status": "error", "message": "Invalid access level. Must be 'read-only' or 'editable'."}), 400
+
+                # Call the service method to change the access level
+                access_level, message, status_code = ProjectService.change_project_access(project_id, new_access_level)
+
+                if access_level is None:
+                    return jsonify({"status": "error", "message": message}), status_code
+
+                return jsonify({"status": "success", "access_level": access_level}), 200
+
+            except Exception as e:
+                print(f"In register_routes - /access : Unexpected error while changing access level for project '{project_id}': {e}")
+                return jsonify({"status": "error", "message": "An unexpected error occurred."}), 500
+        
+        print("Route registered: /projects/<int:project_id>/access")
 
     except Exception as e:
         print(f"Error registering routes: {e}")

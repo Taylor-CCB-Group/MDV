@@ -234,7 +234,7 @@ def create_app(
             return _send_file(file_name)
         return get_range(file_name, range_header)
 
-    @project_bp.route("/save_state", methods=["POST"])
+    @project_bp.route("/save_state", access_level='editable', methods=["POST"])
     def save_data():
         success = True
         try:
@@ -245,7 +245,7 @@ def create_app(
 
         return jsonify({"success": success})
     
-    @project_bp.route("/add_or_update_image_datasource", methods=["POST"])
+    @project_bp.route("/add_or_update_image_datasource", access_level='editable', methods=["POST"])
     def add_or_update_image_datasource():
         try:
             # Check if request has a file part
@@ -284,7 +284,7 @@ def create_app(
             return jsonify({"status": "error", "message": str(e)}), 500
 
 
-    @project_bp.route("/add_datasource", methods=["POST"])
+    @project_bp.route("/add_datasource", access_level='editable', methods=["POST"])
     def add_datasource():
         # we shouldn't be passing "backend" in request.form, the logic should only be on server
         #if backend:
@@ -333,13 +333,14 @@ def create_app(
             print("%%%%2")
             print("df is ready, calling project.add_datasource")
             project.add_datasource(
+                project.id,
                 name,
                 df,
                 # cols,
                 add_to_view=view,
                 supplied_columns_only=supplied_only,
-                replace_data=replace,
-            )
+                replace_data=replace
+                )
             print("%%%%3")
             print("added df - project.add_datasource completed")
         except Exception as e:

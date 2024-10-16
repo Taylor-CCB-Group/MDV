@@ -66,6 +66,88 @@ class ProjectService:
             print(f"Error in dbservice: Error soft deleting project: {e}")
             db.session.rollback()
             raise
+
+    @staticmethod
+    #  Routes -> /rename_project
+    def update_project_name(project_id, new_name):
+        try:
+            project = Project.query.get(project_id)
+            if project:
+                project.name = new_name
+                # No need to update `update_timestamp` manually
+                project.update_timestamp = datetime.now()
+                project.accessed_timestamp = datetime.now()
+                db.session.commit()
+                return True
+            return False
+        except Exception as e:
+            print(f"Error in dbservice: Error renaming project: {e}")
+            db.session.rollback()
+            raise
+    
+    @staticmethod
+    #  Routes -> /access
+    def change_project_access(project_id, new_access_level):
+        """Change the access level of a project."""
+        try:
+            # Retrieve the project by ID
+            project = ProjectService.get_project_by_id(project_id)
+            if project is None:
+                return None, f"Project with ID {project_id} not found", 404
+
+            # Update the access level
+            project.access_level = new_access_level
+            project.update_timestamp = datetime.now()
+            project.accessed_timestamp = datetime.now()
+            db.session.commit()
+            return project.access_level, "Success", 200
+
+        except Exception as e:
+            print(f"Error in dbservice: Unexpected error in change access level: {e}")
+            db.session.rollback()
+            raise
+
+    @staticmethod
+    # Method to set the project's update timestamp
+    def set_project_update_timestamp(project_id: str):
+        try:
+            # Use get_project_by_id to retrieve the project
+            project = ProjectService.get_project_by_id(project_id)
+            
+            if project is None:
+                print(f"No project found with ID {project_id}")
+                return  # Exit if the project doesn't exist
+
+            # Update the update_timestamp to current datetime
+            project.update_timestamp = datetime.now()
+            db.session.commit()  # Commit the changes to the database
+            print(f"Set project update timestamp for project ID {project_id}")
+
+        except Exception as e:
+            print(f"Error in dbservice: Error setting project update timestamp for ID {project_id}: {e}")
+            db.session.rollback()
+            raise
+    
+    @staticmethod
+    # Method to set the project's accessed timestamp
+    def set_project_accessed_timestamp(project_id: str):
+        try:
+            # Use get_project_by_id to retrieve the project
+            project = ProjectService.get_project_by_id(project_id)
+            
+            if project is None:
+                print(f"No project found with ID {project_id}")
+                return  # Exit if the project doesn't exist
+
+            # Set the accessed_timestamp to the current datetime
+            project.accessed_timestamp = datetime.now()
+            db.session.commit()  # Commit the changes to the database
+            print(f"Set project accessed timestamp for project ID {project_id}")
+
+        except Exception as e:
+            print(f"Error in dbservice: Error setting accessed timestamp for project ID {project_id}: {e}")
+            db.session.rollback()
+            raise
         
 class FileService:
     @staticmethod
