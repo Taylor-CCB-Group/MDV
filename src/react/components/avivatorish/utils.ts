@@ -266,7 +266,8 @@ export async function createLoader(
             console.error(e); // eslint-disable-line
             handleLoaderError(null);
         }
-        return { data: null };
+        throw e; // Re-throw the error to allow the calling component to catch it
+        // return { data: null };
     }
 }
 
