@@ -34,7 +34,7 @@ interface ProjectCardProps {
     numberOfImages: string;
     onDelete: (id: string) => Promise<void>;
     onRename: (id: string, newName: string) => Promise<void>;
-    onChangeType?: (id: string, newType: "Editable" | "Read-Only") => void;
+    onChangeType: (id: string, newType: "Editable" | "Read-Only") => Promise<void>
     onAddCollaborator?: (email: string) => void;
 }
 
