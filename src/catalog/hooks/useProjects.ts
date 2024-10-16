@@ -113,6 +113,36 @@ const useProjects = () => {
     return result;
   }, [projects, filter, sortBy, sortOrder]);
 
+  const renameProject = useCallback(async (id: string, newName: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('name', newName);
+
+      const response = await fetch(`projects/${id}/rename`, {
+        method: 'PUT',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to rename project');
+      }
+
+      setProjects(prevProjects =>
+        prevProjects.map(project =>
+          project.id === id ? { ...project, name: newName } : project
+        )
+      );
+
+    } catch (error) {
+      setError('Error renaming project. Please try again later.');
+      console.error("Error renaming project:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   return {
     projects: filteredAndSortedProjects,
     isLoading,
@@ -120,6 +150,7 @@ const useProjects = () => {
     fetchProjects,
     createProject,
     deleteProject,
+    renameProject,
     setFilter,
     setSortBy,
     setSortOrder,
