@@ -40,3 +40,4 @@ data/
 .idea
 xvenv/
 secrets/
+app_logs/

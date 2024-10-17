@@ -4,7 +4,7 @@ import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
 
 const flaskURL = "http://127.0.0.1:5051";
-
+const port = 5170;
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
 
@@ -101,7 +101,7 @@ export default defineConfig(env => { return {
             "Access-Control-Allow-Methods": "GET",
             "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization",
         },
-        port: 5170,
+        port,
         strictPort: true,
         proxy: {
             // these routes are proxied to flask server in 'single project' mode

@@ -596,7 +596,13 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
   const handleUploadClick = async () => {
     console.log("Uploading file...");
     if (!state.selectedFiles.length) {
-        dispatch({ type: "SET_ERROR", payload: "noFilesSelected" });
+        dispatch({
+            type: "SET_ERROR",
+            payload: {
+                message: "No files selected. Please select a file before uploading.",
+                status: 400,
+            },
+        });
         return;
     }
 
@@ -624,11 +630,23 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
             if (fileExtension === "tiff") {
                 const formData = new FormData();
                 formData.append("file", state.selectedFiles[0]);
-                formData.append(
-                    "tiffMetadata",
-                    JSON.stringify(state.tiffMetadata),
-                );
                 formData.append("datasourceName", datasourceName);
+
+                try {
+                    formData.append("tiffMetadata", JSON.stringify(state.tiffMetadata));
+                } catch (jsonError) {
+                    console.error("Invalid JSON format for tiffMetadata:", jsonError);
+                    dispatch({
+                        type: "SET_ERROR",
+                        payload: {
+                            message: "Invalid JSON format in tiffMetadata. Please check the data.",
+                            status: 400,
+                            traceback: jsonError.message,
+                        },
+                    });
+                    dispatch({ type: "SET_IS_UPLOADING", payload: false });
+                    return;
+                }
 
                 response = await axios.post(
                     `${root}/add_or_update_image_datasource`,
@@ -657,14 +675,12 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
                     chartManager.saveState();
                 }
             } else {
-                console.error(
-                    `Failed to confirm: Server responded with status ${response.status}`,
-                );
+                console.error(`Failed to confirm: Server responded with status ${response.status}`);
                 dispatch({ type: "SET_IS_UPLOADING", payload: false });
                 dispatch({
                     type: "SET_ERROR",
                     payload: {
-                        message: `Confirmation failed with status: ${response.status}`,
+                        message: `File upload completed, but confirmation failed with status: ${response.status}`,
                         status: response.status,
                         traceback: "Server responded with non-200 status",
                     },
@@ -672,14 +688,51 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
             }
         } catch (error) {
             console.error("Error uploading file:", error);
+    
+            // Specific handling for known Axios errors
+            if (axios.isAxiosError(error)) {
+                if (error.response?.status === 400) {
+                    dispatch({
+                        type: "SET_ERROR",
+                        payload: {
+                            message: "Bad Request: The server could not process the uploaded file.",
+                            status: 400,
+                            traceback: error.message,
+                        },
+                    });
+                } else if (error.response?.status === 500) {
+                    dispatch({
+                        type: "SET_ERROR",
+                        payload: {
+                            message: "Server Error: An error occurred while processing the upload.",
+                            status: 500,
+                            traceback: error.message,
+                        },
+                    });
+                } else {
+                    dispatch({
+                        type: "SET_ERROR",
+                        payload: {
+                            message: `Upload failed with status: ${error.response?.status || "unknown"}`,
+                            status: error.response?.status || 500,
+                            traceback: error.message,
+                        },
+                    });
+                }
+            } else {
+                dispatch({
+                    type: "SET_ERROR",
+                    payload: {
+                        message: "Upload failed due to a network error or unknown issue.",
+                        status: 500,
+                        traceback: error.message,
+                    },
+                });
+            }
+    
+            // Clean up and reset state
             dispatch({ type: "SET_IS_UPLOADING", payload: false });
-            dispatch({
-                type: "SET_ERROR",
-                payload: {
-                    message: "Upload failed due to a network error.",
-                    traceback: error.message,
-                },
-            });
+            console.log("Attempting to clean up partially uploaded files...");
         }
     };
 

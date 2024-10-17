@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
     Add,
     Search,
@@ -88,6 +88,8 @@ const Dashboard: React.FC = () => {
         fetchProjects,
         createProject,
         deleteProject,
+        renameProject,
+        changeProjectType,
         setFilter,
         setSortBy,
         setSortOrder,
@@ -122,11 +124,14 @@ const Dashboard: React.FC = () => {
         }
     };
 
-    const handleSort = (option: "lastModified" | "name") => {
-        setSortBy(option);
-        setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    const handleSort = useCallback((newSortBy: "lastModified" | "name") => {
+        // toggle sort order if changing sort option
+        if (newSortBy === sortBy) setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+        // default to ascending order if changing sort option to name, descending order otherwise (most recent first)
+        else setSortOrder(newSortBy === "name" ? "asc" : "desc");
+        setSortBy(newSortBy);
         setIsDropdownOpen(false);
-    };
+    }, [sortBy]);
 
     const toggleDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
         setAnchorEl(event.currentTarget);
@@ -364,8 +369,8 @@ const Dashboard: React.FC = () => {
                                     <ProjectCard
                                         {...project}
                                         onDelete={deleteProject}
-                                        onRename={(id, newName) => {}}
-                                        onChangeType={(id, newType) => {}}
+                                        onRename={renameProject}
+                                        onChangeType={changeProjectType}
                                         onAddCollaborator={(email) => {}}
                                     />
                                 </Grid>
