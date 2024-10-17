@@ -125,8 +125,11 @@ const Dashboard: React.FC = () => {
     };
 
     const handleSort = (option: "lastModified" | "name") => {
+        // toggle sort order if changing sort option
+        if (option === sortBy) setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+        // default to ascending order if changing sort option to name, descending order otherwise (most recent first)
+        else setSortOrder(sortBy === "name" ? "asc" : "desc");
         setSortBy(option);
-        setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
         setIsDropdownOpen(false);
     };
 
