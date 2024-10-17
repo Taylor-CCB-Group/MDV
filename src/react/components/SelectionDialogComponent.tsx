@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import type { SelectionDialogConfig, CategoryFilter } from "./SelectionDialogReact";
+import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
 import { action } from "mobx";
 import { useChart } from "../context";
@@ -21,12 +21,21 @@ type Props<K extends DataType> = {
     // filter?: K extends CategoricalDataType ? CategoryFilter : [number, number];
 };
 
+function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
+    const { datatype, field } = column;
+    const filters = useConfig<SelectionDialogConfig>().filters;
+    const filter = filters[field] as (K extends "multitext" ? MultiTextFilter 
+    : K extends "unique" ? UniqueFilter
+    : K extends CategoricalDataType ? CategoryFilter 
+    : RangeFilter) | null;
+    return filter;
+}
 
 const TextComponent = ({column} : Props<CategoricalDataType>) => {
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { values } = column;
-    const filter = filters[column.field] as CategoryFilter | null;
+    const filter = useFilterConfig(column);
     const value = filter?.category || [];
     const setValue = useCallback((newValue: string[]) => {
         const newFilter = filter || { category: [] };

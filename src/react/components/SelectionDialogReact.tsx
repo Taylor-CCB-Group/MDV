@@ -4,9 +4,11 @@ import { BaseReactChart, type BaseConfig } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
 import { observer } from "mobx-react-lite";
 
-export type CategoryFilter = { category: string[], operand?: "or" | "and" };
-
-export type SelectionDialogFilter = CategoryFilter | [number, number];
+export type CategoryFilter = { category: string[] };
+export type MultiTextFilter = CategoryFilter & { operand: "or" | "and" };
+export type RangeFilter = [number, number];
+export type UniqueFilter = string;
+export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFilter | RangeFilter;
 
 export type SelectionDialogConfig = {
     type: "selection_dialog_experimental";
