@@ -1,3 +1,4 @@
+import type { Device, Texture } from "@luma.gl/core";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import type DataStore from "../datastore/DataStore";
 import type { DataModel } from "../table/DataModel";
@@ -36,6 +37,7 @@ export class ImageArray {
     gl: WebGL2RenderingContext;
     logEl: HTMLElement;
     dataView: DataModel;
+    lumaTexture?: Texture;
     onProgress: (n: number) => void;
     constructor(
         dataStore,
@@ -54,6 +56,14 @@ export class ImageArray {
         this.logEl = createEl("div", {}, canvas.parentElement);
         this.logEl.style.color = "white";
         this.loadImageColumn(dataStore, gl, config);
+    }
+    wrapLumaTexture(device: Device) {
+        if (this.lumaTexture) return;
+        console.warn("wrapping ImageArray texture as luma texture - todo: refactor in future");
+        this.lumaTexture = device.createTexture({
+            dimension: '2d-array',
+        });
+        (this.lumaTexture as any).handle = this.texture;
     }
     getImageAspect(i: number) {
         // return 0.5 + Math.random() // for testing

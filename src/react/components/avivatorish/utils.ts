@@ -11,7 +11,7 @@ import {
     RENDERING_MODES,
     ColorPalette3DExtensions,
     AdditiveColormap3DExtensions,
-} from "@hms-dbmi/viv";
+} from "@vivjs-experimental/viv";
 
 import { GLOBAL_SLIDER_DIMENSION_FIELDS } from "./constants";
 
@@ -266,7 +266,8 @@ export async function createLoader(
             console.error(e); // eslint-disable-line
             handleLoaderError(null);
         }
-        return { data: null };
+        throw e; // Re-throw the error to allow the calling component to catch it
+        // return { data: null };
     }
 }
 

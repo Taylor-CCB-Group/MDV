@@ -1,4 +1,4 @@
-import { LayerExtension } from "deck.gl/typed";
+import { LayerExtension } from "@deck.gl/core";
 
 /**
  * As of this writing, used when we want to draw a scatterplot with square points.
@@ -36,10 +36,10 @@ export class ScatterSquareExtension extends LayerExtension {
                     vec2 uv = abs(unitPosition);
                     float isLine = step(innerUnitRadius, max(uv.x, uv.y));
                     if (_lineWidthPixels <= 0.01) isLine = 0.;
-                    fragmentColor = mix(vFillColor, vLineColor, isLine);
+                    fragColor = mix(vFillColor, vLineColor, isLine);
                 }
                 // make sure picking still works
-                DECKGL_FILTER_COLOR(fragmentColor, geometry);
+                DECKGL_FILTER_COLOR(fragColor, geometry);
                 //---- end ScatterSquareExtension
                 `,
             },
@@ -68,7 +68,7 @@ export class ScatterDensityExension extends LayerExtension {
                 // 2*(1/3)**2 => 0.222...
                 float _a = exp(-(d*d)/(0.222222222));
                 // should have an instance attribute for weight
-                fragmentColor.a = _a * opacity;
+                fragColor.a = _a * opacity;
                 //---- end ScatterDensityExension
                 ////
                 

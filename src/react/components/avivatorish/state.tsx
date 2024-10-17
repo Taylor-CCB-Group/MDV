@@ -1,5 +1,5 @@
 import { type PropsWithChildren, createContext, useContext } from "react";
-import type { loadOmeTiff } from "@hms-dbmi/viv";
+import type { loadOmeTiff } from "@vivjs-experimental/viv";
 import { createStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { observer } from "mobx-react-lite";
@@ -10,7 +10,7 @@ import type { EqFn, Selector, ZustandStore } from "./zustandTypes";
 export type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
 
 // --- copied straight from Avivator's code::: with notes / changes for MDV ---
-import { RENDERING_MODES } from "@hms-dbmi/viv";
+import { RENDERING_MODES } from "@vivjs-experimental/viv";
 
 const capitalize = (string) => string.charAt(0).toUpperCase() + string.slice(1);
 

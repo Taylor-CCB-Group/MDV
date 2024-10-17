@@ -1,5 +1,5 @@
 import { Matrix4 } from "@math.gl/core";
-import type { PickingInfo } from "deck.gl/typed";
+import type { PickingInfo } from "@deck.gl/core";
 import type { ScatterPlotConfig } from "./components/VivMDVReact";
 import { useChart } from "./context";
 import {
@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useMetadata } from "./components/avivatorish/state";
 import type { ViewState } from "./components/VivScatterComponent";
-// import { ScatterplotExLayer } from '@/webgl/ScatterplotExLayer';
 import SpatialLayer from "@/webgl/SpatialLayer";
 import {
     ScatterSquareExtension,
@@ -216,7 +215,7 @@ export function useScatterplotLayer() {
             radiusScale,
             getFillColor: colorBy ?? [255, 255, 255],
             getRadius: 1 / scale,
-            getPosition: (i, { target }) => {
+            getPosition: (i: number, { target }) => {
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
                 target[2] = 0;

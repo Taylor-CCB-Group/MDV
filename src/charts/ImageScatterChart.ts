@@ -1,12 +1,12 @@
 import { DataModel } from "../table/DataModel.js";
-import { Deck } from "@deck.gl/core/typed";
+import { Deck } from "@deck.gl/core";
 import BaseChart from "./BaseChart.js";
 import { createEl } from "../utilities/Elements.js";
 import { ImageArray } from "../webgl/ImageArray";
-//import { ScatterplotLayer } from 'deck.gl/typed'; // -no, using ScatterplotExLayer
 import { ImageArrayDeckExtension } from "../webgl/ImageArrayDeckExtension";
-import { ScatterplotExLayer } from "@/webgl/ScatterplotExLayer.js";
-import { OrthographicView } from "deck.gl/typed";
+// import { ScatterplotExLayer } from "@/webgl/ScatterplotExLayer.js";
+import { ScatterplotLayer } from "@deck.gl/layers";
+import { OrthographicView } from "@deck.gl/core";
 import type Dimension from "../datastore/Dimension.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
@@ -15,7 +15,7 @@ let nextID = 0;
 class ImageScatterChart extends BaseChart {
     canvas: HTMLCanvasElement;
     imageArray: ImageArray;
-    deck: Deck;
+    deck: Deck<OrthographicView>;
     dataModel: DataModel;
     progress = 0;
     billboard = true;
@@ -56,16 +56,16 @@ class ImageScatterChart extends BaseChart {
         };
         const layers = this.updateDeck(); //...
         const view = new OrthographicView({});
-        this.deck = new Deck({
+        this.deck = new Deck<OrthographicView>({
             canvas,
             layers,
-            views: [view],
+            views: view,
             controller: true,
             initialViewState: {
                 // if these are not set, there is an error when first using mouse-wheel to zoom
                 target: [0, 0, 0],
                 zoom: 0, //0 means "one pixel is one unit", 1 scales by 2
-            },
+            }, 
             getTooltip: (info) => {
                 try {
                     const { index, picked } = info;
@@ -126,7 +126,7 @@ class ImageScatterChart extends BaseChart {
 
         const { imageArray, billboard } = this;
         // const {getImageAspect, getImageIndex} = this.imageArray;// need to bind this
-        const layer = new ScatterplotExLayer({
+        const layer = new ScatterplotLayer({
             id: `scatter-${this.id}`,
             data,
             // radiusUnits: 'pixels', //default 'meters', also lineWidthUnits...
