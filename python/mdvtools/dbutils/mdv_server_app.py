@@ -224,7 +224,7 @@ def serve_projects_from_db(app):
                     print(f"Error serving project '{project.path}': {e}")
                     raise
             else:
-                print(f"Error: Project path '{project.path}' does not exist.")
+                print(f"Error : Project path '{project.path}' does not exist.")
                 
     except Exception as e:
         print(f"Error serving projects from database: {e}")
