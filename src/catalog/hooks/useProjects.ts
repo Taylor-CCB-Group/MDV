@@ -113,6 +113,67 @@ const useProjects = () => {
     return result;
   }, [projects, filter, sortBy, sortOrder]);
 
+  const renameProject = useCallback(async (id: string, newName: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('name', newName);
+
+      const response = await fetch(`projects/${id}/rename`, {
+        method: 'PUT',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to rename project');
+      }
+
+      setProjects(prevProjects =>
+        prevProjects.map(project =>
+          project.id === id ? { ...project, name: newName } : project
+        )
+      );
+
+    } catch (error) {
+      setError('Error renaming project. Please try again later.');
+      console.error("Error renaming project:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const changeProjectType = useCallback(async (id: string, newType: "Editable" | "Read-Only") => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('type', newType.toLowerCase());
+
+      const response = await fetch(`projects/${id}/access`, {
+        method: 'PUT',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to change project type');
+      }
+
+      setProjects(prevProjects =>
+        prevProjects.map(project =>
+          project.id === id ? { ...project, type: newType } : project
+        )
+      );
+
+    } catch (error) {
+      setError('Error changing project type. Please try again later.');
+      console.error("Error changing project type:", error);
+      throw error; // Re-throw the error so the calling component can handle it
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   return {
     projects: filteredAndSortedProjects,
     isLoading,
@@ -120,6 +181,8 @@ const useProjects = () => {
     fetchProjects,
     createProject,
     deleteProject,
+    renameProject,
+    changeProjectType,
     setFilter,
     setSortBy,
     setSortOrder,
