@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
     Add,
     Search,
@@ -124,14 +124,14 @@ const Dashboard: React.FC = () => {
         }
     };
 
-    const handleSort = (option: "lastModified" | "name") => {
+    const handleSort = useCallback((newSortBy: "lastModified" | "name") => {
         // toggle sort order if changing sort option
-        if (option === sortBy) setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+        if (newSortBy === sortBy) setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
         // default to ascending order if changing sort option to name, descending order otherwise (most recent first)
-        else setSortOrder(sortBy === "name" ? "asc" : "desc");
-        setSortBy(option);
+        else setSortOrder(newSortBy === "name" ? "asc" : "desc");
+        setSortBy(newSortBy);
         setIsDropdownOpen(false);
-    };
+    }, [sortBy]);
 
     const toggleDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
         setAnchorEl(event.currentTarget);
