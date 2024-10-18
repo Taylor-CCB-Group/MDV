@@ -246,7 +246,7 @@ export default function SelectionDialogComponent() {
     // todo ability to dynamically add or remove columns
     // maybe arranged in a hierarchy with a tree view?
     return (
-        <div className="p-3">
+        <div className="p-3 absolute w-[100%] h-[100%] overflow-auto">
         {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );
