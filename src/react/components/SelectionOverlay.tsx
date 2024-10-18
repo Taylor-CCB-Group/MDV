@@ -68,15 +68,15 @@ const Tools = {
         mode: DrawPolygonByDraggingMode
     },
     transform: {
-        name: "Transform",
+        name: "Modify",
         ToolIcon: ControlCameraOutlinedIcon,
         mode: EditMode
     },
-    measure: {
-        name: "Measure",
-        ToolIcon: StraightenIcon,
-        mode: DrawLineStringMode
-    },
+    // measure: {
+    //     name: "Measure",
+    //     ToolIcon: StraightenIcon,
+    //     mode: DrawLineStringMode
+    // },
 } as const;
 
 type Tool = (typeof Tools)[keyof typeof Tools]["name"];
