@@ -3,9 +3,11 @@ import type RangeDimension from "../datastore/RangeDimension";
 import type { BaseReactChart } from "./components/BaseReactChart";
 import { PolygonLayer } from "@deck.gl/layers";
 import { useScatterplotLayer } from "./scatter_state";
-import { EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
+import { DrawPolygonByDraggingMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
+import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
-import { useChartID } from "./hooks";
+import { useChartID, useRangeDimension } from "./hooks";
+import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -24,6 +26,10 @@ type RangeState = {
     end: P;
     setEnd: (p: P) => void;
     endRef: RefP;
+    selectionFeatureCollection: FeatureCollection;
+    editableLayer: EditableGeoJsonLayer;
+    selectionMode: GeoJsonEditMode;
+    setSelectionMode: (mode: GeoJsonEditMode) => void;
 };
 type MeasureState = {
     startPixels: P;
@@ -39,12 +45,41 @@ type SpatialAnnotationState = {
 // Could more usefully be thought of as SpatialContext?
 const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined);
 
+const getEmptyFeatureCollection = () => ({
+    type: "FeatureCollection",
+    features: []
+} as FeatureCollection);
+
+function useSelectionCoords(selection: FeatureCollection) {
+    const feature = selection.features[0];
+    const coords = useMemo(() => {
+        if (!feature) return [];
+        //these casts are unsafe in a general sense, but should be ok in our editor.
+        const geometry = feature.geometry as Geometry;
+        const raw = geometry.coordinates as Position[][];
+        return raw[0];
+    }, [feature]);
+    return coords as [number, number][];
+}
+
+
 function useCreateRange(chart: BaseReactChart<any>) {
     const ds = chart.dataStore;
     const id = useChartID();
+    const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
+    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new DrawPolygonByDraggingMode());
     // tried simpler `rangeDimesion = useMemo(...)`, but it can lead to non-destroyed rangeDimensions with HMR.
-    const [rangeDimension, setRangeDimension] =
-        useState<RangeDimension>(undefined);
+    const rangeDimension = useRangeDimension();
+    const cols = chart.config.param;
+    const coords = useSelectionCoords(selectionFeatureCollection);
+    useEffect(() => {
+        if (coords.length === 0) {
+            rangeDimension.removeFilter();
+            return;
+        }
+        //rangeDimension.filterPoly(coords, [cols[0], cols[1]]); //this doesn't notify 🙄
+        rangeDimension.filter("filterPoly", [cols[0], cols[1]], coords);
+    }, [coords, cols, rangeDimension]);
     const [start, setStartX] = useState<P>([0, 0]);
     const [end, setEndX] = useState<P>([0, 0]);
     const polygonLayer = useMemo(() => {
@@ -55,7 +90,6 @@ function useCreateRange(chart: BaseReactChart<any>) {
             data,
 
             getPolygon: d => d,
-            // getElevation: d => d.population / d.area / 10,
             getFillColor: [140, 140, 140, 50],
             getLineColor: [255, 255, 255, 200],
             getLineWidth: 1,
@@ -67,9 +101,22 @@ function useCreateRange(chart: BaseReactChart<any>) {
     }, [start, end, id]);
     const editableLayer = useMemo(() => {
         return new EditableGeoJsonLayer({
-            // add listeners that clear selection following conventional selection logic
+            id: `selection_${getVivId(`${id}detail-react`)}`,
+            data: selectionFeatureCollection as any,
+            mode: selectionMode,
+            getFillColor: [140, 140, 140, 50],
+            getLineColor: [255, 255, 255, 200],
+            getLineWidth: 1,
+            lineWidthMinPixels: 1,
+            selectedFeatureIndexes: [0],
+            onEdit: ({ updatedData, editType }) => {
+                // console.log("onEdit", editType, updatedData);
+                const feature = updatedData.features.pop();
+                updatedData.features = [feature];
+                setSelectionFeatureCollection(updatedData);
+            }
         })
-    }, []);
+    }, [selectionFeatureCollection, selectionMode, id]);
     // still not sure I want these refs (- almost certainly not now)
     
     const startRef = useMemo(() => ({ current: start }), [start]);
@@ -84,23 +131,6 @@ function useCreateRange(chart: BaseReactChart<any>) {
         endRef.current = p;
         setEndX(p);
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: review filter hook design
-    useEffect(() => {
-        if (!ds) return;
-        const rd = ds.getDimension("range_dimension") as RangeDimension;
-        chart.removeFilter = () => {
-            //todo this is probably bad, especially in the general case - what if there's more than one filter?
-            rd.removeFilter();
-            setStart([0, 0]);
-            setEnd([0, 0]);
-        };
-        setRangeDimension(rd);
-
-        return () => {
-            chart.removeFilter = () => {}; //let's review this filter hook design
-            rd.destroy();
-        };
-    }, [ds]);
     return {
         polygonLayer,
         editableLayer,
@@ -111,6 +141,9 @@ function useCreateRange(chart: BaseReactChart<any>) {
         end,
         setEnd,
         endRef,
+        selectionFeatureCollection,
+        selectionMode,
+        setSelectionMode
     };
 }
 function useCreateMeasure() {
@@ -156,6 +189,6 @@ export function useSpatialLayers() {
     const { rectRange } = useContext(SpatialAnnotationState);
     const scatterProps = useScatterplotLayer();
     const { scatterplotLayer, getTooltip } = scatterProps;
-    // const layers = [rectRange.polygonLayer, scatterplotLayer];
-    return { getTooltip, scatterProps, rectLayer: rectRange.polygonLayer };
+    // const layers = [rectRange.polygonLayer, scatterplotLayer]; /// should probably be in a CompositeLayer?
+    return { getTooltip, scatterProps, rectLayer: rectRange.polygonLayer, selectionLayer: rectRange.editableLayer };
 }

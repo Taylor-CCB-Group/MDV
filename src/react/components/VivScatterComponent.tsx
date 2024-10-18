@@ -79,7 +79,9 @@ const Main = observer(() => {
     const detailId = `${id}detail-react`;
     const outerContainer = useOuterContainer();
 
-    const { scatterProps, rectLayer } = useSpatialLayers()
+    // what I want to come out of here... n-JSON layers, scatterplot, editable geojson layer, etc.
+    // perhaps as a CompositeLayer.
+    const { scatterProps, rectLayer, selectionLayer } = useSpatialLayers();
     const { scatterplotLayer, getTooltip } = scatterProps;
     const jsonLayer = useJsonLayer();
 
@@ -177,7 +179,7 @@ const Main = observer(() => {
                 zIndex: "-1",
             },
             //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
-            layers: [jsonLayer, scatterplotLayer, rectLayer],
+            layers: [jsonLayer, scatterplotLayer, rectLayer, selectionLayer],
             id: `${id}deck`,
             onAfterRender: () => {
                 scatterProps.onAfterRender();
@@ -189,6 +191,7 @@ const Main = observer(() => {
         [
             scatterplotLayer,
             rectLayer,
+            selectionLayer,
             jsonLayer,
             id,
             getTooltip,
