@@ -154,7 +154,8 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
 });
 
 const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
-    // todo: think about what to do with null config
+    // todo: think about what to do with null config for filter
+    console.log("multitext selection dialog has missing features for 'operand' and other logic");    
     // !!! - uncommenting this stuff makes the entire chart disappear when the filter is removed
     // const config = useFilterConfig(column);
     // const operand = config.operand || "or";
@@ -167,9 +168,22 @@ const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
 });
 
 const UniqueComponent = observer(({ column }: Props<"unique">) => {
-    //todo...this is also not handled by original version.
+    const dim = useDimensionFilter(column);
+    const filters = useConfig<SelectionDialogConfig>().filters;
+    const filter = useFilterConfig(column);
+    useEffect(() => {
+        if (filter === null) {
+            dim.removeFilter();
+            return;
+        }
+        dim.filter("filterUnique", [column.field], filter, true);
+        //return () => dim.removeFilter(); //handled by useDimensionFilter
+    }, [dim, column.field, filter]);
     return (
-        <TextField size="small" disabled placeholder="tbd..." />
+        <TextField size="small" onChange={(e) => {
+            const newFilter = e.target.value;
+            action(() => filters[column.field] = newFilter)();
+        }} />
     );
 });
 

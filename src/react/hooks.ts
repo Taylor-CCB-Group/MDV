@@ -265,7 +265,7 @@ export function useDataSources() {
 export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
     const ds = useDataStore();
     // it might be good to have something better for isTextLike, some tests for this...
-    const isTextLike = column.values !== undefined;
+    const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
     const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
     const dim = useMemo(() => {
         const dim = ds.getDimension(dimension_type);
