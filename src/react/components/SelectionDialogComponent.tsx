@@ -50,7 +50,7 @@ const TextFieldExtended = (props: TextFieldProps & {customEndAdornment?: JSX.Ele
 }
 
 const filterOptions = createFilterOptions<any>({limit: 100});
-const TextComponent = ({column} : Props<CategoricalDataType>) => {
+const TextComponent = observer(({column} : Props<CategoricalDataType>) => {
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { values } = column;
@@ -151,9 +151,9 @@ const TextComponent = ({column} : Props<CategoricalDataType>) => {
             }}
         />
     );
-}
+});
 
-const MultiTextComponent = ({column} : Props<"multitext">) => {
+const MultiTextComponent = observer(({column} : Props<"multitext">) => {
     // todo: think about what to do with null config
     // !!! - uncommenting this stuff makes the entire chart disappear when the filter is removed
     // const config = useFilterConfig(column);
@@ -164,14 +164,14 @@ const MultiTextComponent = ({column} : Props<"multitext">) => {
         <TextComponent column={column} />
         </>
     )
-}
+});
 
-const UniqueComponent = ({column} : Props<"unique">) => {
+const UniqueComponent = observer(({column} : Props<"unique">) => {
     //todo...this is also not handled by original version.
     return (
         <TextField size="small" disabled placeholder="tbd..."/>
     );
-}
+});
 
 /**
  * This was exposed as a more general-purpose hook with useState, but moved to here to handle
@@ -191,7 +191,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     return { value, step };
 }
 
-const NumberComponent = ({column} : Props<NumberDataType>) => {
+const NumberComponent = observer(({column} : Props<NumberDataType>) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { value, step } = useRangeFilter(column);
     const setValue = useCallback((newValue: [number, number]) => {
@@ -217,18 +217,18 @@ const NumberComponent = ({column} : Props<NumberDataType>) => {
             </div>
         </div>
     );
-}
+});
 
 const Components: {
     [K in DataType]: React.FC<Props<K>>;
 } = {
-    integer: observer(NumberComponent),
-    double: observer(NumberComponent),
-    int32: observer(NumberComponent),
-    text: observer(TextComponent),
-    text16: observer(TextComponent),
-    multitext: observer(MultiTextComponent),
-    unique: observer(UniqueComponent),
+    integer: NumberComponent,
+    double: NumberComponent,
+    int32: NumberComponent,
+    text: TextComponent,
+    text16: TextComponent,
+    multitext: MultiTextComponent,
+    unique: UniqueComponent,
 }
 
 const AbstractComponent = observer(function AbstractComponent<K extends DataType>({column} : Props<K>) {
