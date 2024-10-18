@@ -29,56 +29,15 @@ import {
     ButtonBase,
     CircularProgress,
 } from "@mui/material";
+import Brightness4Icon from "@mui/icons-material/Brightness4";
+import Brightness7Icon from "@mui/icons-material/Brightness7";
 import { alpha } from "@mui/material/styles";
 import ProjectCard from "./ProjectCard";
 import useProjects from "./hooks/useProjects";
 import UserProfile from "./UserProfile";
 import mdvLogo from "./assets/mdv_logo.png";
+import { useColorMode } from "@/ThemeProvider";
 
-const theme = createTheme({
-    palette: {
-        primary: {
-            main: "#2c3e50",
-        },
-        secondary: {
-            main: "#34495e",
-        },
-        background: {
-            default: "#ecf0f1",
-            paper: "#ffffff",
-        },
-        text: {
-            primary: "#2c3e50",
-            secondary: "#7f8c8d",
-        },
-    },
-    typography: {
-        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-        h5: {
-            fontWeight: 500,
-        },
-        body1: {
-            fontSize: "0.9rem",
-        },
-    },
-    components: {
-        MuiButton: {
-            styleOverrides: {
-                root: {
-                    textTransform: "none",
-                },
-            },
-        },
-        MuiPaper: {
-            styleOverrides: {
-                root: {
-                    boxShadow:
-                        "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)",
-                },
-            },
-        },
-    },
-});
 
 const Dashboard: React.FC = () => {
     const {
@@ -96,6 +55,7 @@ const Dashboard: React.FC = () => {
         sortBy,
     } = useProjects();
 
+    const { mode, toggleColorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [projectType, setProjectType] = useState<"Editable" | "Read-Only">(
         "Editable",
@@ -139,7 +99,6 @@ const Dashboard: React.FC = () => {
     };
 
     return (
-        <ThemeProvider theme={theme}>
             <Box
                 sx={{
                     flexGrow: 1,
@@ -184,6 +143,17 @@ const Dashboard: React.FC = () => {
                             </IconButton>
                         </Paper>
                         <UserProfile />
+                        <IconButton
+                            sx={{ ml: 1 }}
+                            onClick={toggleColorMode}
+                            color="inherit"
+                        >
+                            {mode === "dark" ? (
+                                <Brightness7Icon />
+                            ) : (
+                                <Brightness4Icon />
+                            )}
+                        </IconButton>
                     </Toolbar>
                 </AppBar>
 
@@ -379,7 +349,6 @@ const Dashboard: React.FC = () => {
                     )}
                 </Container>
             </Box>
-        </ThemeProvider>
     );
 };
 
