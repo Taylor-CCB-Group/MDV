@@ -8,12 +8,9 @@ import StraightenIcon from "@mui/icons-material/Straighten";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useMetadata } from "./avivatorish/state";
 import { useRegionScale, type useScatterplotLayer } from "../scatter_state";
-import { useChart } from "../context";
-import { useMeasure, useRange, useSpatialLayers } from "../spatial_context";
+import { useMeasure, useSpatialLayers } from "../spatial_context";
 import type RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
-import type { VivMDVReact } from "./VivMDVReact";
-import { runInAction } from "mobx";
 import { useChartDoc, useChartSize } from "../hooks";
 import { sizeToMeters } from "./avivatorish/utils";
 import clsx from "clsx";
@@ -89,118 +86,6 @@ type EditorProps = {
     toolActive?: boolean;
     rangeDimension: RangeDimension;
 } & ReturnType<typeof useScatterplotLayer>;
-function RectangleEditor({
-    toolActive = false,
-    scatterplotLayer,
-    rangeDimension,
-    unproject,
-    currentLayerHasRendered,
-}: EditorProps) {
-    const chart = useChart() as VivMDVReact;
-    const doc = useChartDoc();
-    const cols = chart.config.param;
-    // using both ref and state here so we can access the current value in the event handlers
-    // (without needing to recreate them every time the state changes)
-    const { setStart, startRef, setEnd, endRef } = useRange();
-    const { start, end } = useRange();
-    // this is glitchy - not clear whether it was actually working correctly prior to local changes or not
-    // ??? especially bad when measure tool is used first...
-    // biome-ignore lint/correctness/useExhaustiveDependencies: not confident in this code...
-    const updateRange = useCallback(async () => {
-        if (!rangeDimension) return;
-        const s = startRef.current;
-        const t = endRef.current;
-        //need to convert from model coordinates to data coordinates...
-        //seems like this may already be done somewhere?
-        const range1 = [Math.min(s[0], t[0]), Math.max(s[0], t[0])]; //x range
-        const range2 = [Math.min(s[1], t[1]), Math.max(s[1], t[1])]; //y range
-
-        // this was not reflecting the background filter... so we select points that are not part of this region.
-        // there needs to be more of a review of how our filters are evaluated...
-
-        // the signature for this should be `(index: number) => boolean`
-        // This 2D range predicate is responsible for the logic about which data to refer to.
-        // columns argument to filter('filterPredicate', columns, args) is not used in the current implementation.
-        // (unless there's some voodoo that signals to load column data)
-        const data1 = rangeDimension.parent.columnIndex[cols[0]].data;
-        const data2 = rangeDimension.parent.columnIndex[cols[1]].data;
-        const predicate = (i: number) => {
-            //filtered indices already include the filtering we do here...
-            //we need a different strategy for this...
-            // if (!indexSet.has(i)) return true;
-            const v1 = data1[i];
-            const v2 = data2[i];
-            return !(
-                v1 < range1[0] ||
-                v1 > range1[1] ||
-                v2 < range2[0] ||
-                v2 > range2[1] ||
-                Number.isNaN(v1) ||
-                Number.isNaN(v2)
-            );
-        };
-        const args = { range1, range2, predicate };
-
-        //make zoom_on_filter only apply to other charts.
-        const zoom_on_filter = chart.config.zoom_on_filter;
-        runInAction(() => {
-            chart.config.zoom_on_filter = false;
-        });
-
-        rangeDimension.filter("filterPredicate", cols, args);//...review this...
-        //although the filter is sync, the event that checks zoom_on_filter will happen later...
-        //in particular, it runs in an effect that depends on async getFilteredIndices...
-        //this is not a correct way to do this... also still needs testing with viewState link.
-        //may be another place where react query would be useful?
-        // await chart.dataStore.getFilteredIndices();
-        setTimeout(() => {
-            runInAction(() => {
-                chart.config.zoom_on_filter = zoom_on_filter;
-            });
-        }, 500);
-        chart.resetButton.style.display = "inline";
-        // (window as any).r = rangeDimension;
-    }, [rangeDimension, cols, start, end]); //for some reason passing start & end here is improving the behaviour even though we use refs...
-
-    const handleMouseMove = useCallback(
-        (e: MouseEvent) => {
-            if (!toolActive) return;
-            const p = unproject(e);
-            setEnd(p);
-        },
-        [toolActive, unproject, setEnd],
-    );
-    const handleMouseUp = useCallback(
-        (e: MouseEvent) => {
-            handleMouseMove(e);
-            doc.removeEventListener("mouseup", handleMouseUp);
-            doc.removeEventListener("mousemove", handleMouseMove);
-            updateRange();
-        },
-        [updateRange, handleMouseMove, doc],
-    );
-
-    if (!currentLayerHasRendered) return null; //if we pass this, I thought it meant we have internalState, but it seems not...
-    if (!scatterplotLayer.internalState) return null;
-
-    return (
-        <>
-            <div
-                className="absolute top-0 left-0 w-full h-full"
-                onMouseDown={(e) => {
-                    if (!toolActive) return;
-                    const p = unproject(e);
-                    console.log("mouse down", p);
-                    setStart([p[0], p[1]]);
-                    setEnd([p[0], p[1]]);
-                    // setDragging(true); //dragging state is determined by whether the listeners are attached...
-                    doc.addEventListener("mouseup", handleMouseUp);
-                    doc.addEventListener("mousemove", handleMouseMove);
-                }}
-            />
-        </>
-    );
-}
 
 function MeasureTool({ scatterplotLayer, unproject, toolActive }: EditorProps) {
     // click to set start, click to set end, draw line between them.
@@ -403,17 +288,6 @@ export default observer(function SelectionOverlay() {
             />
         ));
     }, [selectedTool]);
-    const { rangeDimension } = useRange();
-    // state: { selectedTool: 'rectangle' | 'circle' | 'polygon' | 'lasso' | 'magic wand' | 'none' }
-    // interaction phases... maybe revert back to pan after making selection
-    // - but there should be interaction with drag handles...
-    // add or remove from selection...
-    // -> transform into Deck coordinates...
-    // later: selection layers...
-    // glitches with settings changes are worse than the frame-behind overlay...
-    // but if we render the overlay as a deck layer, we can avoid this... need to make a store for that.
-    // if (!scatterProps.currentLayerHasRendered) return null;
-    // return null;
     return (
         <>
             <ButtonGroup
@@ -424,59 +298,6 @@ export default observer(function SelectionOverlay() {
             >
                 {toolButtons}
             </ButtonGroup>
-            {/* <div
-                className={`absolute top-0 left-0 w-full h-full z-[1] ${selectedTool === "Pan" ? "pointer-events-none" : "pointer-events-auto"}`}
-                onMouseUp={(e) => {
-                    console.log("mouse up");
-                    // setSelectedTool('Pan');
-                }}
-                onMouseDown={(e) => {
-                    if (selectedTool === "Pan") {
-                        // allow the event to propagate to the deck canvas below
-                        return;
-                    }
-                    e.currentTarget.focus();
-                }}
-                onBlurCapture={(e) => {
-                    console.log("blur capture");
-                }}
-                onBlur={(e) => {
-                    console.log("blur");
-                }}
-                onKeyDownCapture={(e) => {
-                    if (e.key === "Escape" || e.key === " ") {
-                        setSelectedTool("Pan");
-                    }
-                    if (e.key === "r") {
-                        setSelectedTool("Rectangle");
-                    }
-                    if (e.key === "t") {
-                        setSelectedTool("Transform");
-                    }
-                    if (e.key === "m") {
-                        setSelectedTool("Measure");
-                    }
-                }}
-            >
-                <RectangleEditor
-                    toolActive={selectedTool === "Rectangle"}
-                    {...scatterProps}
-                    rangeDimension={rangeDimension}
-                />
-                {selectedTool === "Transform" && (
-                    <TransformEditor
-                        {...scatterProps}
-                        rangeDimension={rangeDimension}
-                    />
-                )}
-                {scatterProps.currentLayerHasRendered && (
-                    <MeasureTool
-                        {...scatterProps}
-                        rangeDimension={rangeDimension}
-                        toolActive={selectedTool === "Measure"}
-                    />
-                )}
-            </div> */}
         </>
     );
 });
