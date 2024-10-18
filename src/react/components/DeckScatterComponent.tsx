@@ -3,18 +3,23 @@ import { OrthographicView, OrbitView } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
 import { ScatterplotLayer } from "@deck.gl/layers";
+import { DataFilterExtension } from "@deck.gl/extensions";
 import { useEffect, useId, useMemo } from "react";
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
 import type { OrbitViewState } from "@deck.gl/core";
+import type { DataColumn } from "@/charts/charts";
 
 
-/** todo this should be common for viv / scatter_state, pending refactor */
-function useZoomOnFilter() {
+/** todo this should be common for viv / scatter_state, pending refactor
+ * there should be hooks getting the range of a filtered column 
+ * so that multiple charts can re-use the computation (but if not used, it's not computed)
+ */
+function useZoomOnFilter(data: Uint32Array) {
     const [width, height] = useChartSize();
     const [cx, cy, cz] = useParamColumns();
-    const data = useFilteredIndices();
+    // const data = useFilteredIndices(); //<< does calling this multiple times mean wasting space?
     const config = useConfig<DeckScatterConfig>();
     const chart = useChart() as any;
     const { pendingRecenter } = chart;
@@ -72,19 +77,20 @@ function useZoomOnFilter() {
 export default observer(function DeckScatterComponent() {
     const id = useId();
     const [width, height] = useChartSize();
-    const [cx, cy, cz] = useParamColumns();
+    const [cx, cy, cz] = useParamColumns() as DataColumn<"double">[];
     const data = useFilteredIndices();
     const config = useConfig<DeckScatterConfig>();
-    const { opacity, radius, course_radius, viewState } = config;
+    const { opacity, radius, course_radius, viewState, on_filter } = config;
     // const is2d = dimension === "2d";
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = radius * course_radius * 0.01;// * (is2d ? 1 : 0.01);
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
 
-    useZoomOnFilter();
-
-
+    useZoomOnFilter(data);
+    
+    const greyOnFilter = on_filter === "grey";
+    
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatterplot-layer-${id}`,
         data,
@@ -110,6 +116,40 @@ export default observer(function DeckScatterComponent() {
         }
     }), [data, cx, cy, cz, colorBy, opacity, radiusScale, id]);
 
+    // not the desired implmentation...
+    const indexSet = useMemo(() => {
+        if (greyOnFilter) {
+            return new Set(data);
+        }
+        return new Set();
+    }, [data, greyOnFilter]);
+
+    const greyScatterplotLayer = useMemo(() => new ScatterplotLayer({
+        id: `scatterplot-layer-grey-${id}`,
+        data: { length: cx.data.length },
+        pickable: true,
+        opacity,
+        stroked: false,
+        filled: true,
+        radiusScale,
+        getPosition: (_, { target, index }) => {
+            target[0] = cx.data[index];
+            target[1] = cy.data[index];
+            if (cz) target[2] = cz.data[index];
+            return target as [number, number];
+        },
+        getFillColor: [200, 200, 200],
+        getLineColor: [0, 0, 0],
+        billboard: true,
+        parameters: {
+            depthTest: false,
+        },
+        // this will be slow, !!!intention is to change this design!!!
+        getFilterValue: (_, { index }) => indexSet.has(index) ? 0 : 1,
+        filterRange: [0.5, 1],
+        extensions: [new DataFilterExtension()],
+    }), [cx, cy, cz, opacity, radiusScale, id, indexSet]);
+
     // we need an OrthographicView to prevent wrapping etc...
     const view = useMemo(() => {
         return config.dimension === "2d" ? new OrthographicView({
@@ -128,11 +168,11 @@ export default observer(function DeckScatterComponent() {
             y: 0,
         });
     }, [width, height, config.dimension, id]);
-
+    const layers = greyOnFilter ? [scatterplotLayer, greyScatterplotLayer] : [scatterplotLayer];
     return (
         <>
         <DeckGL 
-            layers={[scatterplotLayer]}
+            layers={layers}
             useDevicePixels={true}
             // controller={true}
             viewState={viewState}

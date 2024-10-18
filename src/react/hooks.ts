@@ -159,9 +159,6 @@ export function useFilteredIndices() {
     const filterColumn = config.background_filter?.column;
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
-    const [filteredOutIndices, setFilteredOutIndices] = useState(
-        new Uint32Array(),
-    );
     // biome-ignore lint/correctness/useExhaustiveDependencies: shouldn't be ignoring this, but some deps don't tend to change as of now.
     useEffect(() => {
         // return
@@ -243,6 +240,17 @@ export function useFilteredIndices() {
         config.category_filters,
     ]);
     return filteredIndices;
+}
+
+/** this should really understand things like background_filter */
+export function useFilteredOutIndices() {
+    const filteredIndices = useFilteredIndices();
+    const filteredOutIndices = useMemo(() => {
+        const allIndices = new Set(filteredIndices);
+        return Array.from({ length: filteredIndices.length }, (_, i) => i).filter(
+            (i) => !allIndices.has(i),
+        );
+    }, [filteredIndices]);
 }
 
 export function useCategoryFilterIndices(
