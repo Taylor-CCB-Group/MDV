@@ -41,7 +41,7 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
     }
 }
 
-BaseChart.types["selection_dialog_experimental"] = {
+BaseChart.types["selection_dialog"] = {
     name: "Selection Dialog",
     class: SelectionDialogReact,
     params: [
@@ -51,4 +51,4 @@ BaseChart.types["selection_dialog_experimental"] = {
         },
     ],
 }
-// BaseChart.types["selection_dialog_experimental"] = BaseChart.types["selection_dialog"];
+BaseChart.types["selection_dialog_experimental"] = BaseChart.types["selection_dialog"];
