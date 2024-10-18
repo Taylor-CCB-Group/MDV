@@ -80,7 +80,10 @@ function useCreateRange(chart: BaseReactChart<any>) {
             editHandlePointStrokeWidth: 1,
             editHandleIconSizeScale: 1,
             editHandlePointRadiusMaxPixels: 5,
-            getEditHandlePointColor: [0, 0, 0, 255],
+            getEditHandlePointColor: h => { 
+                const intermediate = h.properties.editHandleType === "intermediate";
+                return [0, 0, intermediate ? 200 : 0, 255]
+            },
             lineWidthMinPixels: 1,
             selectedFeatureIndexes: [0],            
             onEdit: ({ updatedData, editType }) => {
