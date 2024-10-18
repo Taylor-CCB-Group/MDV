@@ -273,7 +273,7 @@ export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
     }, [ds, dimension_type]);
     useEffect(() => {
         // cleanup when component unmounts
-        return () => dim.removeFilter();
-    }, [dim.removeFilter]);
+        return () => dim.destroy();
+    }, [dim.destroy]);
     return dim;
 }
