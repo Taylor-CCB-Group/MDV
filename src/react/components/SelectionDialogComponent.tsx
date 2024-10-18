@@ -1,10 +1,11 @@
 import { useConfig, useDimensionFilter, useParamColumns } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Button, Checkbox, Chip, IconButton, Slider, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Button, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import DoneAllIcon from '@mui/icons-material/DoneAll';
 import CachedIcon from '@mui/icons-material/Cached'; 
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
@@ -32,6 +33,20 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
     : K extends CategoricalDataType ? CategoryFilter 
     : RangeFilter) | null;
     return filter;
+}
+
+/** Modified version of TextField that allows a `customEndAdornment`
+ * along with the standard endAdornment passed in `InputProps`.
+ */
+const TextFieldExtended = (props: TextFieldProps & {customEndAdornment?: JSX.Element}) => {
+    const { InputProps, customEndAdornment, ...rest } = props;
+    const inputProps = { 
+        ...InputProps,
+        endAdornment: (
+            <>{customEndAdornment} {InputProps.endAdornment}</>
+        )
+    };
+    return <TextField {...rest} InputProps={inputProps} />;
 }
 
 const filterOptions = createFilterOptions<any>({limit: 100});
@@ -86,9 +101,14 @@ const TextComponent = ({column} : Props<CategoricalDataType>) => {
                     key: string;
                 }; //questionable mui types?
                 return <>
-                    {hasFocus && <Button onClick={selectAll}>All</Button>}
-                    {hasFocus && <Button onClick={toggleSelection}>Toggle</Button>}
-                    <TextField key={key} {...p} />
+                    <TextFieldExtended key={key} {...p}
+                    customEndAdornment={(
+                    <>
+                        <Button onClick={toggleSelection}>Toggle</Button>
+                        <IconButton onClick={selectAll}><DoneAllIcon /></IconButton>
+                    </>
+                    )}
+                    />
                 </>
             }}
             renderOption={(props, option) => {
