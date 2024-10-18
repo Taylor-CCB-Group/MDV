@@ -51,4 +51,4 @@ BaseChart.types["selection_dialog"] = {
         },
     ],
 }
-BaseChart.types["selection_dialog_experimental"] = BaseChart.types["selection_dialog"];
+// BaseChart.types["selection_dialog_experimental"] = BaseChart.types["selection_dialog"];
