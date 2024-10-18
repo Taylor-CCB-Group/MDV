@@ -6,6 +6,7 @@ import { action } from "mobx";
 import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
+import RangeDimension from "@/datastore/RangeDimension";
 
 /**
  * Get the chart's config.
@@ -275,5 +276,16 @@ export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
         // cleanup when component unmounts
         return () => dim.destroy();
     }, [dim.destroy]);
+    return dim;
+}
+export function useRangeDimension() {
+    const ds = useDataStore();
+    const dim = useMemo(() => {
+        const dim = ds.getDimension("range_dimension") as RangeDimension;
+        return dim;
+    }, [ds]);
+    useEffect(() => {
+        return () => dim.removeFilter();
+    }, [dim.removeFilter]);
     return dim;
 }
