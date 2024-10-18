@@ -202,7 +202,7 @@ const Main = observer(() => {
     if (import.meta.env.DEV) trace();
     return (
         <>
-            <SelectionOverlay {...scatterProps} />
+            <SelectionOverlay />
             <MDVivViewer
                 outerContainer={outerContainer}
                 views={[detailView]}

@@ -9,7 +9,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useMetadata } from "./avivatorish/state";
 import { useRegionScale, type useScatterplotLayer } from "../scatter_state";
 import { useChart } from "../context";
-import { useMeasure, useRange } from "../spatial_context";
+import { useMeasure, useRange, useSpatialLayers } from "../spatial_context";
 import type RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
 import type { VivMDVReact } from "./VivMDVReact";
@@ -28,6 +28,7 @@ import {
     CompositeMode,
 } from '@deck.gl-community/editable-layers';
 import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
+import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
 
 class EditMode extends CompositeMode {
     constructor() {
@@ -56,7 +57,7 @@ const Tools = {
     rectangle: {
         name: "Rectangle",
         ToolIcon: PhotoSizeSelectSmallOutlinedIcon, //todo something better...
-        mode: DrawRectangleMode
+        mode: DrawRectangleByDraggingMode
     },
     // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
     polygon: {
@@ -146,7 +147,7 @@ function RectangleEditor({
             chart.config.zoom_on_filter = false;
         });
 
-        rangeDimension.filter("filterPredicate", cols, args);
+        rangeDimension.filter("filterPredicate", cols, args);//...review this...
         //although the filter is sync, the event that checks zoom_on_filter will happen later...
         //in particular, it runs in an effect that depends on async getFilteredIndices...
         //this is not a correct way to do this... also still needs testing with viewState link.
@@ -372,20 +373,27 @@ const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }) => {
     );
 };
 
-export default observer(function SelectionOverlay(
-    scatterProps: ReturnType<typeof useScatterplotLayer>,
-) {
-    //for now, passing down scatterplotLayer so we can use it to unproject screen coordinates,
-    //as we figure out how to knit this together...
-    // this should be coming from spatial_context?
-    const [selectedTool, setSelectedTool] = useState<Tool>("Pan");
+export default observer(function SelectionOverlay() {
+    const { selectionProps } = useSpatialLayers();
+    const { setSelectionMode } = selectionProps;
+    const [selectedTool, setSelectedToolX] = useState<Tool>("Pan");
+    const setSelectedTool = useCallback((tool: Tool) => {
+        // pending refactor
+        const mode = Object.values(Tools).find((t) => t.name === tool)?.mode;
+        if (!mode) {
+            console.error("no mode found for tool", tool);
+            return;
+        }
+        setSelectionMode(new mode());
+        setSelectedToolX(tool);
+    }, [setSelectionMode]);
     // add a row of buttons to the top of the chart
     // rectangle, circle, polygon, lasso, magic wand, etc.
     // (thanks copilot, that may be over-ambitious)
     // It would be good to have a poly-line tool with draggable points, though.
     // Also a brush tool for painting on masks with variable radius.
     const toolButtons = useMemo(() => {
-        return ToolArray.map(({ name, ToolIcon }) => (
+        return ToolArray.map(({ name, ToolIcon, mode }) => (
             <ToolButton
                 key={name}
                 name={name}
@@ -405,6 +413,7 @@ export default observer(function SelectionOverlay(
     // glitches with settings changes are worse than the frame-behind overlay...
     // but if we render the overlay as a deck layer, we can avoid this... need to make a store for that.
     // if (!scatterProps.currentLayerHasRendered) return null;
+    // return null;
     return (
         <>
             <ButtonGroup
@@ -415,7 +424,7 @@ export default observer(function SelectionOverlay(
             >
                 {toolButtons}
             </ButtonGroup>
-            <div
+            {/* <div
                 className={`absolute top-0 left-0 w-full h-full z-[1] ${selectedTool === "Pan" ? "pointer-events-none" : "pointer-events-auto"}`}
                 onMouseUp={(e) => {
                     console.log("mouse up");
@@ -467,7 +476,7 @@ export default observer(function SelectionOverlay(
                         toolActive={selectedTool === "Measure"}
                     />
                 )}
-            </div>
+            </div> */}
         </>
     );
 });

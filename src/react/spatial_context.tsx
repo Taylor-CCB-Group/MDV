@@ -189,11 +189,16 @@ export function useMeasure() {
     return measure;
 }
 
-/** work in progress... should this now be the thing we use? */
+/** work in progress... very much unstable return type etc, but starting to make use 
+ * and hopefully refactor into something coherent soon.
+ */
 export function useSpatialLayers() {
     const { rectRange } = useContext(SpatialAnnotationState);
     const scatterProps = useScatterplotLayer();
     const { scatterplotLayer, getTooltip } = scatterProps;
     // const layers = [rectRange.polygonLayer, scatterplotLayer]; /// should probably be in a CompositeLayer?
-    return { getTooltip, scatterProps, rectLayer: rectRange.polygonLayer, selectionLayer: rectRange.editableLayer };
+    return { 
+        getTooltip, scatterProps, rectLayer: rectRange.polygonLayer, selectionLayer: rectRange.editableLayer,
+        selectionProps: rectRange
+    };
 }
