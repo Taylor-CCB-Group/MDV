@@ -6,7 +6,7 @@ import { type MouseEvent, useCallback, useEffect, useState, useMemo } from "reac
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
-import CachedIcon from '@mui/icons-material/Cached'; 
+import CachedIcon from '@mui/icons-material/Cached';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
@@ -28,19 +28,19 @@ type Props<K extends DataType> = {
 function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
     const { datatype, field } = column;
     const filters = useConfig<SelectionDialogConfig>().filters;
-    const filter = filters[field] as (K extends "multitext" ? MultiTextFilter 
-    : K extends "unique" ? UniqueFilter
-    : K extends CategoricalDataType ? CategoryFilter 
-    : RangeFilter) | null;
+    const filter = filters[field] as (K extends "multitext" ? MultiTextFilter
+        : K extends "unique" ? UniqueFilter
+        : K extends CategoricalDataType ? CategoryFilter
+        : RangeFilter) | null;
     return filter;
 }
 
 /** Modified version of TextField that allows a `customEndAdornment`
  * along with the standard endAdornment passed in `InputProps`.
  */
-const TextFieldExtended = (props: TextFieldProps & {customEndAdornment?: JSX.Element}) => {
+const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: JSX.Element }) => {
     const { InputProps, customEndAdornment, ...rest } = props;
-    const inputProps = { 
+    const inputProps = {
         ...InputProps,
         endAdornment: (
             <>{customEndAdornment} {InputProps.endAdornment}</>
@@ -49,8 +49,8 @@ const TextFieldExtended = (props: TextFieldProps & {customEndAdornment?: JSX.Ele
     return <TextField {...rest} InputProps={inputProps} />;
 }
 
-const filterOptions = createFilterOptions<any>({limit: 100});
-const TextComponent = observer(({column} : Props<CategoricalDataType>) => {
+const filterOptions = createFilterOptions<any>({ limit: 100 });
+const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { values } = column;
@@ -87,7 +87,7 @@ const TextComponent = observer(({column} : Props<CategoricalDataType>) => {
         setValue(newValues);
     }, [values, value, setValue]);
     return (
-        <Autocomplete 
+        <Autocomplete
             multiple
             size="small"
             options={values}
@@ -102,12 +102,12 @@ const TextComponent = observer(({column} : Props<CategoricalDataType>) => {
                 }; //questionable mui types?
                 return <>
                     <TextFieldExtended key={key} {...p}
-                    customEndAdornment={(
-                    <>
-                        <Button onClick={toggleSelection}>Toggle</Button>
-                        <IconButton onClick={selectAll}><DoneAllIcon /></IconButton>
-                    </>
-                    )}
+                        customEndAdornment={(
+                            <>
+                                <Button onClick={toggleSelection}>Toggle</Button>
+                                <IconButton onClick={selectAll}><DoneAllIcon /></IconButton>
+                            </>
+                        )}
                     />
                 </>
             }}
@@ -153,23 +153,23 @@ const TextComponent = observer(({column} : Props<CategoricalDataType>) => {
     );
 });
 
-const MultiTextComponent = observer(({column} : Props<"multitext">) => {
+const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
     // todo: think about what to do with null config
     // !!! - uncommenting this stuff makes the entire chart disappear when the filter is removed
     // const config = useFilterConfig(column);
     // const operand = config.operand || "or";
     return (
         <>
-        {/* operand: {operand} */}
-        <TextComponent column={column} />
+            {/* operand: {operand} */}
+            <TextComponent column={column} />
         </>
     )
 });
 
-const UniqueComponent = observer(({column} : Props<"unique">) => {
+const UniqueComponent = observer(({ column }: Props<"unique">) => {
     //todo...this is also not handled by original version.
     return (
-        <TextField size="small" disabled placeholder="tbd..."/>
+        <TextField size="small" disabled placeholder="tbd..." />
     );
 });
 
@@ -191,7 +191,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     return { value, step };
 }
 
-const NumberComponent = observer(({column} : Props<NumberDataType>) => {
+const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { value, step } = useRangeFilter(column);
     const setValue = useCallback((newValue: [number, number]) => {
@@ -199,21 +199,21 @@ const NumberComponent = observer(({column} : Props<NumberDataType>) => {
     }, [filters, column.field]);
     return (
         <div>
-            <Slider 
-            size="small"
-            value={value}
-            min={column.minMax[0]}
-            max={column.minMax[1]}
-            step={step}
-            onChange={(_, newValue) => setValue(newValue as [number, number]) }
+            <Slider
+                size="small"
+                value={value}
+                min={column.minMax[0]}
+                max={column.minMax[1]}
+                step={step}
+                onChange={(_, newValue) => setValue(newValue as [number, number])}
             />
             <div>
-                <TextField size="small" className="max-w-20" type="number" 
-                value={value[0]} 
-                onChange={(e) => setValue([Number(e.target.value), value[1]])} />
-                <TextField size="small" className="max-w-20 float-right" type="number" 
-                value={value[1]} 
-                onChange={(e) => setValue([value[0], Number(e.target.value)])} />
+                <TextField size="small" className="max-w-20" type="number"
+                    value={value[0]}
+                    onChange={(e) => setValue([Number(e.target.value), value[1]])} />
+                <TextField size="small" className="max-w-20 float-right" type="number"
+                    value={value[1]}
+                    onChange={(e) => setValue([value[0], Number(e.target.value)])} />
             </div>
         </div>
     );
@@ -231,7 +231,7 @@ const Components: {
     unique: UniqueComponent,
 }
 
-const AbstractComponent = observer(function AbstractComponent<K extends DataType>({column} : Props<K>) {
+const AbstractComponent = observer(function AbstractComponent<K extends DataType>({ column }: Props<K>) {
     const Component = Components[column.datatype] as React.FC<Props<K>>;
     //todo: consider reset (& delete / active toggle?) for each filter
     const filters = useConfig<SelectionDialogConfig>().filters;
@@ -242,7 +242,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
             e.stopPropagation();
             filters[column.field] = null;
         }),
-    []); //xxx: don't need deps here because the mobx references are stable?
+        []); //xxx: don't need deps here because the mobx references are stable?
     return (
         <Accordion defaultExpanded={defaultExpanded}>
             <AccordionSummary
@@ -282,7 +282,7 @@ export default function SelectionDialogComponent() {
     // maybe arranged in a hierarchy with a tree view?
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-auto">
-        {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
+            {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );
 }
