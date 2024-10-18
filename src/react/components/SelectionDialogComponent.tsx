@@ -1,6 +1,7 @@
 import { useConfig, useDimensionFilter, useParamColumns } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Button, Checkbox, Chip, IconButton, Slider, TextField, Typography } from "@mui/material";
+import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
@@ -33,6 +34,7 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
     return filter;
 }
 
+const filterOptions = createFilterOptions<any>({limit: 100});
 const TextComponent = ({column} : Props<CategoricalDataType>) => {
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
@@ -75,6 +77,7 @@ const TextComponent = ({column} : Props<CategoricalDataType>) => {
             size="small"
             options={values}
             value={value}
+            filterOptions={filterOptions}
             onChange={(_, newValue) => setValue(newValue)}
             onFocus={() => setHasFocus(true)}
             onBlur={() => setHasFocus(false)}
