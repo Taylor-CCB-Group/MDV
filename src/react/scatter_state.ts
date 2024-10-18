@@ -1,6 +1,5 @@
 import { Matrix4 } from "@math.gl/core";
 import type { PickingInfo } from "@deck.gl/core";
-import type { ScatterPlotConfig } from "./components/VivMDVReact";
 import { useChart } from "./context";
 import {
     useChartID,
@@ -34,7 +33,7 @@ export type CategoryFilter = {
     // consider properties like 'invert' or 'exclude', or 'color'...
 };
 //viewState should be persisted... maybe a way of saving different snapshots?
-//could we infer or something to avoid having to repeat this?
+//now using MobX for this, in a way that's common to viv & non-viv charts
 export type ScatterPlotConfig = {
     course_radius: number;
     radius: number;
@@ -45,7 +44,7 @@ export type ScatterPlotConfig = {
         // todo: add more options here...
     };
     category_filters: Array<CategoryFilter>;
-    //on_filter: "hide" | "grey", //todo
+    on_filter: "hide" | "grey", //todo...
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
     dimension: "2d" | "3d";
@@ -70,6 +69,7 @@ export const scatterDefaults: ScatterPlotConfig = {
     contour_intensity: 1,
     contour_opacity: 0.5,
     dimension: "2d",
+    on_filter: "grey",
 };
 
 
