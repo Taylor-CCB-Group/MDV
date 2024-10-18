@@ -3,7 +3,9 @@ import type RangeDimension from "../datastore/RangeDimension";
 import type { BaseReactChart } from "./components/BaseReactChart";
 import { PolygonLayer } from "@deck.gl/layers";
 import { useScatterplotLayer } from "./scatter_state";
-
+import { EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
+import { getVivId } from "./components/avivatorish/MDVivViewer";
+import { useChartID } from "./hooks";
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -29,9 +31,6 @@ type MeasureState = {
     endPixels: P;
     setEnd: (p: P) => void;
 };
-type PolygonRegion = {
-    coords: P[];
-};
 type SpatialAnnotationState = {
     rectRange: RangeState;
     measure: MeasureState;
@@ -42,29 +41,37 @@ const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined);
 
 function useCreateRange(chart: BaseReactChart<any>) {
     const ds = chart.dataStore;
+    const id = useChartID();
     // tried simpler `rangeDimesion = useMemo(...)`, but it can lead to non-destroyed rangeDimensions with HMR.
     const [rangeDimension, setRangeDimension] =
         useState<RangeDimension>(undefined);
     const [start, setStartX] = useState<P>([0, 0]);
     const [end, setEndX] = useState<P>([0, 0]);
     const polygonLayer = useMemo(() => {
-        const data = [start, [end[0], start[1]], end, [start[0], end[1]]];
+        const data = [[start, [end[0], start[1]], end, [start[0], end[1]]]];
+        const layer_id = `rect_${getVivId(`${id}detail-react`)}`;
         const layer = new PolygonLayer({
-            id: "PolygonLayer", //todo: may want to be viv-like?
+            id: layer_id, //todo: may want to be viv-like? <<
             data,
 
-            // getPolygon: d => d.contour,
+            getPolygon: d => d,
             // getElevation: d => d.population / d.area / 10,
-            getFillColor: [140, 140, 140],
-            getLineColor: [255, 255, 255],
-            getLineWidth: 20,
+            getFillColor: [140, 140, 140, 50],
+            getLineColor: [255, 255, 255, 200],
+            getLineWidth: 1,
             lineWidthMinPixels: 1,
-            fillOpacity: 0.2,
-            pickable: true,
+            // fillOpacity: 0.1, //not working? why is there a prop for it if it doesn't work?
+            // opacity: 0.2,
         });
         return layer;
-    }, [start, end]);
-    // still not sure I want these refs
+    }, [start, end, id]);
+    const editableLayer = useMemo(() => {
+        return new EditableGeoJsonLayer({
+            // add listeners that clear selection following conventional selection logic
+        })
+    }, []);
+    // still not sure I want these refs (- almost certainly not now)
+    
     const startRef = useMemo(() => ({ current: start }), [start]);
     const endRef = useMemo(() => ({ current: end }), [end]);
     const setStart = (p: P) => {
@@ -77,7 +84,7 @@ function useCreateRange(chart: BaseReactChart<any>) {
         endRef.current = p;
         setEndX(p);
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: THIS SHOULD REALLY BE FIXED - we may not want this code at all, anyway.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: review filter hook design
     useEffect(() => {
         if (!ds) return;
         const rd = ds.getDimension("range_dimension") as RangeDimension;
@@ -90,12 +97,13 @@ function useCreateRange(chart: BaseReactChart<any>) {
         setRangeDimension(rd);
 
         return () => {
-            chart.removeFilter = () => {};
+            chart.removeFilter = () => {}; //let's review this filter hook design
             rd.destroy();
         };
     }, [ds]);
     return {
         polygonLayer,
+        editableLayer,
         rangeDimension,
         start,
         setStart,
@@ -111,6 +119,9 @@ function useCreateMeasure() {
     return { startPixels, setStart, endPixels, setEnd };
 }
 function useCreateSpatialAnnotationState(chart: BaseReactChart<any>) {
+    // should we use zustand for this state?
+    // doesn't matter too much as it's just used once by SpatialAnnotationProvider
+    // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
     return { rectRange, measure };
@@ -140,11 +151,11 @@ export function useMeasure() {
     return measure;
 }
 
-/** work in progress... */
+/** work in progress... should this now be the thing we use? */
 export function useSpatialLayers() {
     const { rectRange } = useContext(SpatialAnnotationState);
     const scatterProps = useScatterplotLayer();
     const { scatterplotLayer, getTooltip } = scatterProps;
-    const layers = [rectRange.polygonLayer, scatterplotLayer];
-    return { layers, getTooltip, scatterProps };
+    // const layers = [rectRange.polygonLayer, scatterplotLayer];
+    return { getTooltip, scatterProps, rectLayer: rectRange.polygonLayer };
 }

@@ -5,8 +5,8 @@ import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
 import StraightenIcon from "@mui/icons-material/Straighten";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useMetadata, useViewerStore } from "./avivatorish/state";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useMetadata } from "./avivatorish/state";
 import { useRegionScale, type useScatterplotLayer } from "../scatter_state";
 import { useChart } from "../context";
 import { useMeasure, useRange } from "../spatial_context";
@@ -17,6 +17,33 @@ import { runInAction } from "mobx";
 import { useChartDoc, useChartSize } from "../hooks";
 import { sizeToMeters } from "./avivatorish/utils";
 import clsx from "clsx";
+import {
+    DrawPolygonMode,
+    DrawPolygonByDraggingMode,
+    ModifyMode,
+    DrawRectangleMode, //we need a different version of this that works by dragging
+    DrawLineStringMode,
+    // TransformMode,
+    // TranslateMode,
+    CompositeMode,
+} from '@deck.gl-community/editable-layers';
+import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
+
+class EditMode extends CompositeMode {
+    constructor() {
+        super([
+            new TranslateModeEx(), //works with cartesian / non-GIS coordinates
+            new ModifyMode(),
+        ]);
+    }
+}
+
+//might want to have EdtitMode for this, could be some confusion with this & previous transform mode?
+class PanMode extends CompositeMode {
+    constructor() {
+        super([]);
+    }
+}
 
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
@@ -24,27 +51,33 @@ const Tools = {
     pan: {
         name: "Pan",
         ToolIcon: PanToolOutlinedIcon,
+        mode: PanMode
     },
     rectangle: {
         name: "Rectangle",
         ToolIcon: PhotoSizeSelectSmallOutlinedIcon, //todo something better...
+        mode: DrawRectangleMode
     },
     // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
-    // polygon: {
-    //     name: "Polygon",
-    //     ToolIcon: PolylineOutlinedIcon,
-    // },
-    // freehand: {
-    //     name: "Freehand",
-    //     ToolIcon: EditOutlinedIcon,
-    // },
+    polygon: {
+        name: "Polygon",
+        ToolIcon: PolylineOutlinedIcon,
+        mode: DrawPolygonMode
+    },
+    freehand: {
+        name: "Freehand",
+        ToolIcon: EditOutlinedIcon,
+        mode: DrawPolygonByDraggingMode
+    },
     transform: {
         name: "Transform",
         ToolIcon: ControlCameraOutlinedIcon,
+        mode: EditMode
     },
     measure: {
         name: "Measure",
         ToolIcon: StraightenIcon,
+        mode: DrawLineStringMode
     },
 } as const;
 
@@ -344,6 +377,7 @@ export default observer(function SelectionOverlay(
 ) {
     //for now, passing down scatterplotLayer so we can use it to unproject screen coordinates,
     //as we figure out how to knit this together...
+    // this should be coming from spatial_context?
     const [selectedTool, setSelectedTool] = useState<Tool>("Pan");
     // add a row of buttons to the top of the chart
     // rectangle, circle, polygon, lasso, magic wand, etc.
