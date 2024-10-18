@@ -2,7 +2,7 @@ import { useConfig, useDimensionFilter, useParamColumns } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Button, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
@@ -156,9 +156,7 @@ const TextComponent = ({column} : Props<CategoricalDataType>) => {
 const UniqueComponent = ({column} : Props<"unique">) => {
     //todo...this is also not handled by original version.
     return (
-        <div>
-            Filtering of unique values not yet implemented.
-        </div>
+        <TextField size="small" disabled placeholder="tbd..."/>
     );
 }
 
@@ -225,6 +223,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     //todo: consider reset (& delete / active toggle?) for each filter
     const filters = useConfig<SelectionDialogConfig>().filters;
     const hasFilter = filters[column.field] !== null;
+    const [defaultExpanded] = useState(hasFilter);
     const clearFilter = useCallback(
         action((e: MouseEvent) => {
             e.stopPropagation();
@@ -232,9 +231,9 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
         }),
     []); //xxx: don't need deps here because the mobx references are stable?
     return (
-        <Accordion defaultExpanded={true}>
+        <Accordion defaultExpanded={defaultExpanded}>
             <AccordionSummary
-                expandIcon={<ArrowDropDownIcon />}                
+                expandIcon={<ArrowDropDownIcon />}
             >
                 <div className="flex items-center">
                     <Typography variant="subtitle1">{column.name}</Typography>
