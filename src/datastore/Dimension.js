@@ -46,6 +46,10 @@ class Dimension {
                 localFilter[i] = 0;
             }
         }
+        // xxx: why would we not notify listeners?
+        //I'm a bit dubious about the general pattern 
+        //- using filter(methodName...) for now to be more in line with other things
+        //this.parent._callListeners("filtered", this);
     }
 
     removeFilter(notify = true) {

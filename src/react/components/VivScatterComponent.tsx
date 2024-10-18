@@ -18,8 +18,8 @@ import {
 } from "./avivatorish/state";
 import { useViewStateLink } from "../chartLinkHooks";
 import { useChart } from "../context";
-import { SpatialAnnotationProvider, useRange } from "../spatial_context";
-import { GeoJsonLayer, PolygonLayer } from "@deck.gl/layers";
+import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
+import { GeoJsonLayer } from "@deck.gl/layers";
 import MDVivViewer, { getVivId } from "./avivatorish/MDVivViewer";
 import type { VivRoiConfig } from "./VivMDVReact";
 import { useProject } from "@/modules/ProjectContext";
@@ -37,29 +37,6 @@ export const VivScatter = () => {
             <Main />
         </SpatialAnnotationProvider>
     );
-};
-
-const useRectLayer = () => {
-    const id = useChartID();
-    const { start, end } = useRange();
-    // note: viv is very picky about layer ids
-    const layer_id = `rect_${getVivId(`${id}detail-react`)}`;
-    const polygonLayer = useMemo(() => {
-        const data = [[start, [end[0], start[1]], end, [start[0], end[1]]]];
-        return new PolygonLayer({
-            id: layer_id,
-            data,
-
-            getPolygon: (d) => d,
-            getFillColor: [140, 140, 140, 50],
-            getLineColor: [255, 255, 255, 200],
-            getLineWidth: 1,
-            lineWidthMinPixels: 1,
-            // fillOpacity: 0.1, //not working? why is there a prop for it if it doesn't work?
-            // opacity: 0.2,
-        });
-    }, [start, end, layer_id]);
-    return polygonLayer;
 };
 
 const useJsonLayer = () => {
@@ -102,9 +79,9 @@ const Main = observer(() => {
     const detailId = `${id}detail-react`;
     const outerContainer = useOuterContainer();
 
-    //useSpatialLayers()
-    const rectLayer = useRectLayer();
-    const scatterProps = useScatterplotLayer();
+    // what I want to come out of here... n-JSON layers, scatterplot, editable geojson layer, etc.
+    // perhaps as a CompositeLayer.
+    const { scatterProps, selectionLayer } = useSpatialLayers();
     const { scatterplotLayer, getTooltip } = scatterProps;
     const jsonLayer = useJsonLayer();
 
@@ -202,7 +179,7 @@ const Main = observer(() => {
                 zIndex: "-1",
             },
             //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
-            layers: [jsonLayer, scatterplotLayer, rectLayer],
+            layers: [jsonLayer, scatterplotLayer, selectionLayer],
             id: `${id}deck`,
             onAfterRender: () => {
                 scatterProps.onAfterRender();
@@ -210,10 +187,13 @@ const Main = observer(() => {
             glOptions: {
                 preserveDrawingBuffer: true,
             },
+            controller: {
+                doubleClickZoom: false,
+            }
         }),
         [
             scatterplotLayer,
-            rectLayer,
+            selectionLayer,
             jsonLayer,
             id,
             getTooltip,
@@ -224,7 +204,7 @@ const Main = observer(() => {
     if (import.meta.env.DEV) trace();
     return (
         <>
-            <SelectionOverlay {...scatterProps} />
+            <SelectionOverlay />
             <MDVivViewer
                 outerContainer={outerContainer}
                 views={[detailView]}
