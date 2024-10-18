@@ -68,6 +68,7 @@ function useCreateRange(chart: BaseReactChart<any>) {
         //rangeDimension.filterPoly(coords, [cols[0], cols[1]]); //this doesn't notify 🙄
         rangeDimension.filter("filterPoly", [cols[0], cols[1]], coords);
     }, [coords, cols, rangeDimension]);
+    const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
     const editableLayer = useMemo(() => {
         return new EditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,
@@ -85,15 +86,20 @@ function useCreateRange(chart: BaseReactChart<any>) {
                 return [0, 0, intermediate ? 200 : 0, 255]
             },
             lineWidthMinPixels: 1,
-            selectedFeatureIndexes: [0],            
-            onEdit: ({ updatedData, editType }) => {
+            selectedFeatureIndexes,            
+            onEdit: ({ updatedData }) => {
                 // console.log("onEdit", editType, updatedData);
                 const feature = updatedData.features.pop();
                 updatedData.features = [feature];
                 setSelectionFeatureCollection(updatedData);
-            }
+            },
+            onHover(pickingInfo, event) {
+                if ((pickingInfo as any).featureType === "points") return;
+                // -- try to avoid selecting invisible features etc - refer to notes in aosta prototype
+                setSelectedFeatureIndexes(pickingInfo.index !== -1 ? [pickingInfo.index] : []);
+            },
         })
-    }, [selectionFeatureCollection, selectionMode, id]);
+    }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes]);
     return {
         editableLayer,
         rangeDimension,
