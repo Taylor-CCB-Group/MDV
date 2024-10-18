@@ -107,6 +107,11 @@ function useCreateRange(chart: BaseReactChart<any>) {
             getFillColor: [140, 140, 140, 50],
             getLineColor: [255, 255, 255, 200],
             getLineWidth: 1,
+            getEditHandlePointRadius: 2,
+            editHandlePointStrokeWidth: 1,
+            editHandleIconSizeScale: 1,
+            editHandlePointRadiusMaxPixels: 5,
+            getEditHandlePointColor: [0, 0, 0, 255],
             lineWidthMinPixels: 1,
             selectedFeatureIndexes: [0],
             onEdit: ({ updatedData, editType }) => {
