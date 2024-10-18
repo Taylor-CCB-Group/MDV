@@ -285,7 +285,7 @@ export function useRangeDimension() {
         return dim;
     }, [ds]);
     useEffect(() => {
-        return () => dim.removeFilter();
-    }, [dim.removeFilter]);
+        return () => dim.destroy();
+    }, [dim.destroy]);
     return dim;
 }
