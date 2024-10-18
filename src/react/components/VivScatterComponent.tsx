@@ -187,6 +187,9 @@ const Main = observer(() => {
             glOptions: {
                 preserveDrawingBuffer: true,
             },
+            controller: {
+                doubleClickZoom: false,
+            }
         }),
         [
             scatterplotLayer,
