@@ -153,6 +153,19 @@ const TextComponent = ({column} : Props<CategoricalDataType>) => {
     );
 }
 
+const MultiTextComponent = ({column} : Props<"multitext">) => {
+    // todo: think about what to do with null config
+    // !!! - uncommenting this stuff makes the entire chart disappear when the filter is removed
+    // const config = useFilterConfig(column);
+    // const operand = config.operand || "or";
+    return (
+        <>
+        {/* operand: {operand} */}
+        <TextComponent column={column} />
+        </>
+    )
+}
+
 const UniqueComponent = ({column} : Props<"unique">) => {
     //todo...this is also not handled by original version.
     return (
@@ -214,7 +227,7 @@ const Components: {
     int32: observer(NumberComponent),
     text: observer(TextComponent),
     text16: observer(TextComponent),
-    multitext: observer(TextComponent), //should have different behaviour in the future
+    multitext: observer(MultiTextComponent),
     unique: observer(UniqueComponent),
 }
 
