@@ -7,6 +7,7 @@
         --menu_bar_color: #D6D8DB;
         --border_menu_bar_color: #c9c9c9;
         --primary_background: #ecf0f1;
+        --shadow_color: #888;
         --input_border_color: #222;
         --input_background_color: #222;
         --dlg_background_color: #111;
@@ -22,6 +23,7 @@
         --menu_bar_color: #D6D8DB;
         --border_menu_bar_color: #c9c9c9;
         --primary_background: #ecf0f1;
+        --shadow_color: #888;
         --input_border_color: rgb(230, 230, 230);
         --input_background_color: rgb(230, 230, 230);
         --dlg_background_color: white;
@@ -34,9 +36,10 @@
     --main_panel_color: black;
     --text_color: white;
     --background_color: #252525;
-    --menu_bar_color: #393939;
+    --menu_bar_color: #404040;
     --border_menu_bar_color: #727272;
-    --primary_background: #121212;
+    --primary_background: #353536;
+    --shadow_color: #121212;
     --input_border_color: #222;
     --input_background_color: #222;
     --dlg_background_color: #111;
@@ -50,6 +53,7 @@
     --background_color: #f5f5f5;
     --menu_bar_color: #D6D8DB;
     --primary_background: #ecf0f1;
+    --shadow_color: #888;
     --input_border_color: rgb(230, 230, 230);
     --input_background_color: rgb(230, 230, 230);
     --dlg_background_color: white;
@@ -159,7 +163,7 @@ select, input, textarea {
     display:flex;
     flex-flow:column;
     border-radius:5px;
-    box-shadow: 0 0 1em #888;
+    box-shadow: 0 0 1em var(--shadow_color);
 }
 /*  */
 /* .ciview-chart-panel::-webkit-resizer {
