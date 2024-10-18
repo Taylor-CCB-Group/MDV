@@ -7,7 +7,7 @@ import Dimension from "./Dimension";
 class ValueSetDimension extends Dimension {
     /**
      * Filter the dimension to only include values from the given set.
-     * @paraam {Set} valueSet
+     * @param {Set} valueSet
      * @param {string[]} columns
      */
     filterValueset(valueSet, columns) {
