@@ -6,7 +6,7 @@ import { action } from "mobx";
 import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
-import RangeDimension from "@/datastore/RangeDimension";
+import type RangeDimension from "@/datastore/RangeDimension";
 
 /**
  * Get the chart's config.
