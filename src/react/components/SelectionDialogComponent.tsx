@@ -1,8 +1,10 @@
 import { useConfig, useDimensionFilter, useParamColumns } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Autocomplete, Button, Checkbox, Chip, Slider, TextField } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Button, Checkbox, Chip, IconButton, Slider, TextField, Typography } from "@mui/material";
+import { type MouseEvent, useCallback, useEffect, useState } from "react";
 
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import CachedIcon from '@mui/icons-material/Cached'; 
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
@@ -200,13 +202,28 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     //todo: consider reset (& delete / active toggle?) for each filter
     const filters = useConfig<SelectionDialogConfig>().filters;
     const hasFilter = filters[column.field] !== null;
-    const clearFilter = action(() => filters[column.field] = null);
+    const clearFilter = useCallback(
+        action((e: MouseEvent) => {
+            e.stopPropagation();
+            filters[column.field] = null;
+        }),
+    []); //xxx: don't need deps here because the mobx references are stable?
     return (
-        <div>
-            <h3>{column.name}</h3>
-            {hasFilter && <Button onClick={clearFilter}>Clear</Button>}
-            <Component column={column} />
-        </div>
+        <Accordion defaultExpanded={true}>
+            <AccordionSummary
+                expandIcon={<ArrowDropDownIcon />}                
+            >
+                <div className="flex items-center">
+                    <Typography variant="subtitle1">{column.name}</Typography>
+                    {hasFilter && <IconButton onClick={clearFilter}>
+                        <CachedIcon fontSize="small" />
+                    </IconButton>}
+                </div>
+            </AccordionSummary>
+            <AccordionDetails>
+                <Component column={column} />
+            </AccordionDetails>
+        </Accordion>
     );
 });
 
