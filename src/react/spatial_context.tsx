@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type RangeDimension from "../datastore/RangeDimension";
 import type { BaseReactChart } from "./components/BaseReactChart";
 import { useScatterplotLayer } from "./scatter_state";
-import { DrawPolygonByDraggingMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
+import { CompositeMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useChartID, useRangeDimension } from "./hooks";
@@ -56,7 +56,7 @@ function useSelectionCoords(selection: FeatureCollection) {
 function useCreateRange(chart: BaseReactChart<any>) {
     const id = useChartID();
     const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
-    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new DrawPolygonByDraggingMode());
+    const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
     const rangeDimension = useRangeDimension();
     const cols = chart.config.param;
     const coords = useSelectionCoords(selectionFeatureCollection);
