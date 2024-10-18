@@ -36,31 +36,50 @@ class EditMode extends CompositeMode {
     }
 }
 
-//might want to have EdtitMode for this, could be some confusion with this & previous transform mode?
-class PanMode extends CompositeMode {
+
+class RectangleMode extends CompositeMode {
     constructor() {
-        super([]);
+        super([
+            new DrawRectangleByDraggingMode(),
+            new TranslateModeEx(),
+        ]);
     }
 }
-
+class PolygonMode extends CompositeMode {
+    constructor() {
+        super([
+            new DrawPolygonMode(),
+            new TranslateModeEx(),
+        ]);
+    }
+}
+// todo - figure out weird conflict behaviour with this mode...
+class FreehandMode extends CompositeMode {
+    constructor() {
+        super([
+            new DrawPolygonByDraggingMode(),
+            new TranslateModeEx(),
+        ]);
+    }
+}
 // material-ui icons, or font-awesome icons... or custom in some cases...
 // mui icons are hefty, not sure about this...
 const Tools = {
     pan: {
         name: "Pan",
         ToolIcon: PanToolOutlinedIcon,
-        mode: PanMode
+        mode: TranslateModeEx
     },
     rectangle: {
         name: "Rectangle",
-        ToolIcon: PhotoSizeSelectSmallOutlinedIcon, //todo something better...
-        mode: DrawRectangleByDraggingMode
+        ToolIcon: PhotoSizeSelectSmallOutlinedIcon,
+        mode: RectangleMode
     },
     // todo: add these back in once we have deck EditableGeoJsonLayer etc in place...
     polygon: {
         name: "Polygon",
         ToolIcon: PolylineOutlinedIcon,
-        mode: DrawPolygonMode
+        mode: PolygonMode
     },
     freehand: {
         name: "Freehand",
@@ -269,6 +288,8 @@ export default observer(function SelectionOverlay() {
             console.error("no mode found for tool", tool);
             return;
         }
+        //same composite mode order doesn't work for all tools, so making `mode()` be more explicit for each
+        //setSelectionMode(new CompositeMode([new mode(), new TranslateModeEx()]));
         setSelectionMode(new mode());
         setSelectedToolX(tool);
     }, [setSelectionMode]);
