@@ -171,6 +171,7 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
     const filter = useFilterConfig(column);
+    const [initialValue] = useState(filter);
     useEffect(() => {
         if (filter === null) {
             dim.removeFilter();
@@ -179,10 +180,14 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
         dim.filter("filterUnique", [column.field], filter, true);
         //return () => dim.removeFilter(); //handled by useDimensionFilter
     }, [dim, column.field, filter]);
+    const [localFilter, setLocalFilter] = useState(filter || "");
     return (
-        <TextField size="small" onChange={(e) => {
-            const newFilter = e.target.value;
-            action(() => filters[column.field] = newFilter)();
+        <TextField size="small" defaultValue={initialValue}
+        onChange={(e) => setLocalFilter(e.target.value)}
+        onKeyDown={(e) => {
+            if (e.key === "Enter") {
+                action(() => filters[column.field] = localFilter)();
+            }
         }} />
     );
 });
