@@ -65,7 +65,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     }, [filters, column.field, filter]);
     // react to changes in value and update the filter
     useEffect(() => {
-        if (filter === null) {
+        if (filter === null || filter.category.length === 0) {
             dim.removeFilter();
             return;
         }
@@ -254,7 +254,9 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     const Component = Components[column.datatype] as React.FC<Props<K>>;
     //todo: consider reset (& delete / active toggle?) for each filter
     const filters = useConfig<SelectionDialogConfig>().filters;
-    const hasFilter = filters[column.field] !== null;
+    const f = filters[column.field];
+    // todo: what about category filters with empty array?
+    const hasFilter = (f !== null);
     const [defaultExpanded] = useState(hasFilter);
     const clearFilter = useCallback(
         action((e: MouseEvent) => {
@@ -287,6 +289,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
 function useResetButton() {
     const chart = useChart();
     const filters = useConfig<SelectionDialogConfig>().filters;
+    // todo: what about category filters with empty array?
     const hasFilter = Object.values(filters).some((f) => f !== null);
     useEffect(() => {
         console.log("hasFilter changed (in hook): ", hasFilter);
