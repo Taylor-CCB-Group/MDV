@@ -36,7 +36,7 @@ import "./BoxPlot.js";
 import "./SankeyChart.js";
 import "./MultiLineChart.js";
 import "./DensityScatterPlot";
-import "./SelectionDialog.js";
+// import "./SelectionDialog.js"; //now replaced with SelectionDialogReact (currently imported as a side-effect of import HmrHack)
 import "./StackedRowChart";
 import "./TreeDiagram";
 import "./CellNetworkChart";
