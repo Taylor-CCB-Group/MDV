@@ -248,7 +248,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
             <AccordionSummary
                 expandIcon={<ArrowDropDownIcon />}
             >
-                <div className="flex items-center">
+                <div className="flex items-center h-4">
                     <Typography variant="subtitle1">{column.name}</Typography>
                     {hasFilter && <IconButton onClick={clearFilter}>
                         <CachedIcon fontSize="small" />
