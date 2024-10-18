@@ -345,6 +345,15 @@ class CategoryDimension extends Dimension {
         ]);
     }
 
+    filterUnique(args, columns) {
+        const column = this.parent.columnIndex[columns[0]];
+        const searchVals = args.split(" ");
+        const predicate = (i) => {
+            const v = column.getValue(i);
+            return searchVals.every((s) => v.indexOf(s) !== -1);
+        }
+        return this.filterPredicate({ predicate });
+    }
     destroy() {
         super.destroy();
         this.worker.terminate();

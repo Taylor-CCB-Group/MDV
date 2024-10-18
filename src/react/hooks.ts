@@ -3,7 +3,7 @@ import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
 
@@ -256,4 +256,24 @@ export function useImgUrl(): string {
  */
 export function useDataSources() {
     return window.mdv.chartManager?.dataSources;
+}
+
+/**
+ * Gets a {Dimension} object for filtering a column in the current data store context
+ * and removes the filter when the component unmounts.
+ */
+export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
+    const ds = useDataStore();
+    // it might be good to have something better for isTextLike, some tests for this...
+    const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
+    const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
+    const dim = useMemo(() => {
+        const dim = ds.getDimension(dimension_type);
+        return dim;
+    }, [ds, dimension_type]);
+    useEffect(() => {
+        // cleanup when component unmounts
+        return () => dim.removeFilter();
+    }, [dim.removeFilter]);
+    return dim;
 }
