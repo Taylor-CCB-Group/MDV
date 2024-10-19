@@ -10,6 +10,7 @@ import CachedIcon from '@mui/icons-material/Cached';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
 import { action, runInAction } from "mobx";
@@ -106,8 +107,8 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                     <TextFieldExtended key={key} {...p}
                         customEndAdornment={(
                             <>
-                                <IconButton onClick={toggleSelection}><SwapHorizIcon /></IconButton>
-                                <IconButton onClick={selectAll}><DoneAllIcon /></IconButton>
+                                <IconButton aria-label="toggle selection" onClick={toggleSelection}><SwapHorizIcon /></IconButton>
+                                <IconButton aria-label="select all" onClick={selectAll}><DoneAllIcon /></IconButton>
                             </>
                         )}
                     />
@@ -255,22 +256,54 @@ const Components: {
 const AbstractComponent = observer(function AbstractComponent<K extends DataType>({ column }: Props<K>) {
     const Component = Components[column.datatype] as React.FC<Props<K>>;
     //todo: consider reset (& delete / active toggle?) for each filter
-    const filters = useConfig<SelectionDialogConfig>().filters;
+    const config = useConfig<SelectionDialogConfig>();
+    const { filters } = config;
     const f = filters[column.field];
     // todo: what about category filters with empty array?
     const hasFilter = (f !== null);
     const [defaultExpanded] = useState(hasFilter);
+    const [isHovered, setIsHovered] = useState(false);
     const clearFilter = useCallback(
         action((e: MouseEvent) => {
             e.stopPropagation();
             filters[column.field] = null;
         }),
-        []); //xxx: don't need deps here because the mobx references are stable?
+        []  //xxx: don't need deps here because the mobx references are stable?
+    );
+    const deleteFilter = useCallback((e: MouseEvent) => {
+        e.stopPropagation();
+        runInAction(() => {
+            delete filters[column.field];
+            config.param = config.param.filter((p) => p !== column.field);
+        });
+        console.log('Delete item');
+    }, [filters, column.field, config]);
     return (
-        <Accordion defaultExpanded={defaultExpanded}>
+        <Accordion defaultExpanded={defaultExpanded}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
             <AccordionSummary
                 expandIcon={<ArrowDropDownIcon />}
             >
+                <IconButton
+                    onClick={deleteFilter}
+                    aria-label="delete"
+                    sx={{
+                        position: 'absolute',
+                        right: '-16px',
+                        top: '-16px',
+                        opacity: isHovered ? 1 : 0,
+                        visibility: isHovered ? 'visible' : 'hidden',
+                        transition: 'opacity 0.3s, visibility 0.3s',
+                        '&:focus': {
+                            visibility: 'visible',
+                            opacity: 1, // Ensure it's fully visible when focused
+                        },
+                    }}
+                >
+                    <HighlightOffIcon />
+                </IconButton>
                 <div className="flex items-center h-4">
                     <Typography variant="subtitle1">{column.name}</Typography>
                     {hasFilter && <IconButton onClick={clearFilter}>
@@ -326,8 +359,6 @@ function useResetButton() {
 export default function SelectionDialogComponent() {
     const cols = useParamColumnsExperimental();
     useResetButton();
-    // todo ability to dynamically add or remove columns
-    // maybe arranged in a hierarchy with a tree view?
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
