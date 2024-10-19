@@ -141,12 +141,14 @@
 }
 
 
-.ciview-menu-bar{
-  flex:0 0 auto;
-  padding:3px 20px;
-  background-image: var(--menu-gradient);
+.ciview-menu-bar {
+  flex: 0 0 auto;
+  padding: 5px 25px;
+  background-color: var(--menu_bar_color);
   color: var(--text_color);
-
+  margin-top: 5px; /* Add a top margin */
+  border: 2px solid var(--border_menu_bar_color);
+  box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.2); 
 }
 
 .ciview-ctm-main{
@@ -211,10 +213,11 @@
   z-index: 1100;
   background-color: var(--background_color);
   color: var(--text_color);
-  border: 1px solid #d3d3d3;
+  border: 2px solid var(--border_menu_bar_color);
   overflow:auto;
   display:flex;
   flex-flow:column;
+  box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.2); 
 }
 
 .ciview-dlg-content {
@@ -279,7 +282,7 @@ select, input, textarea {
    }
   .ciview-dlg-close-icon{
       cursor:pointer;
-      color:#eee;
+      color:var(--text_color);
       font-size:20px;
       margin-left:auto;
       position: absolute;
@@ -296,8 +299,8 @@ select, input, textarea {
   .ciview-dlg-header {
     padding: 6px;
     cursor: move;
-    /* background-color: #2196F3; */
-    color: #fff;
+    background-color: var(--menu_bar_color);
+    color: var(--text_color);
     text-overflow: ellipsis;
     overflow:hidden;
     flex:0 0 auto;
