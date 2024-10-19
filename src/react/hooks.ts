@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
@@ -280,12 +280,19 @@ export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
 }
 export function useRangeDimension() {
     const ds = useDataStore();
-    const dim = useMemo(() => {
+    const rangeDimension = useMemo(() => {
         const dim = ds.getDimension("range_dimension") as RangeDimension;
         return dim;
     }, [ds]);
     useEffect(() => {
-        return () => dim.destroy();
-    }, [dim.destroy]);
-    return dim;
+        return () => rangeDimension.destroy();
+    }, [rangeDimension.destroy]);
+    // encapsulating a bit more of the Dimension API here so I'm less likely to forget it.
+    const { param } = useConfig();
+    const cols = useMemo(() => [param[0], param[1]], [param]); //todo: 3d...
+    const filterPoly = useCallback((coords: [number, number][]) => {
+        rangeDimension.filter("filterPoly", cols, coords);
+    }, [rangeDimension, cols]);
+    const removeFilter = useCallback(() => rangeDimension.removeFilter(), [rangeDimension]);
+    return { filterPoly, removeFilter, rangeDimension };
 }
