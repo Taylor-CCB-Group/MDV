@@ -95,6 +95,41 @@ export function useNamedColumn(name: string): {
     return { column, isLoaded };
 }
 
+export function useParamColumnsExperimental(): DataColumn<DataType>[] {
+    const chart = useChart();
+    const { columnIndex } = chart.dataStore;
+    const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
+    // const columns = useMemo(() => {
+    useEffect(() => {
+        const param = chart.config.param;
+        if (!param) {
+            setColumns([]);
+            return;
+        }
+        const cm = window.mdv.chartManager;
+        const dsName = chart.dataStore.name;
+
+        if (typeof chart.config.param === "string") {
+            const col = columnIndex[chart.config.param];
+            // I trust this method about as far as I can throw it...
+            // actually I think it kinda works a bit better with DataStore caching rowDataPromises
+            cm.loadColumnSet([param], dsName, () => {
+                setColumns([col]);
+            });
+            return;
+        }
+
+        // we should make sure they are loaded as well...
+        // (see above comment on trusting this method)
+        cm.loadColumnSet(param, dsName, () => {
+            setColumns(param.map((name) => columnIndex[name]));
+        });
+        return;
+    }, [chart.config.param, columnIndex, chart.dataStore]);
+    return columns;
+}
+
+
 /** If the chart in current context has an associated region, referred to by the key `config.region`, this should return it
  * such that relevant information (like image URL, associated geojson layers...) can be retrieved.
  */
@@ -207,6 +242,9 @@ export function useCategoryFilterIndices(
     contourParameter: DataColumn<CategoricalDataType>,
     category: string | string[],
 ) {
+    //might seem like we should be using a CategoryDimension...
+    //but at the moment that will end up being (often much) slower 
+    //because it always passes through all rows, which this doesn't.
     const data = useFilteredIndices();
     //todo handle multitext / tags properly.
     const categoryValueIndex = useMemo(() => {

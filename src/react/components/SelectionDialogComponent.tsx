@@ -1,4 +1,4 @@
-import { useConfig, useDimensionFilter, useParamColumns } from "../hooks";
+import { useConfig, useDimensionFilter, useParamColumns, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Button, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
@@ -9,10 +9,12 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import CachedIcon from '@mui/icons-material/Cached';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
-import { action } from "mobx";
+import { action, runInAction } from "mobx";
 import { useChart } from "../context";
+import ColumnSelectionComponent from "./ColumnSelectionComponent";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -104,7 +106,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                     <TextFieldExtended key={key} {...p}
                         customEndAdornment={(
                             <>
-                                <Button onClick={toggleSelection}>Toggle</Button>
+                                <IconButton onClick={toggleSelection}><SwapHorizIcon /></IconButton>
                                 <IconButton onClick={selectAll}><DoneAllIcon /></IconButton>
                             </>
                         )}
@@ -283,6 +285,30 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     );
 });
 
+const AddRowComponent = observer(() => {
+    const config = useConfig<SelectionDialogConfig>();
+    const { filters, param } = useConfig<SelectionDialogConfig>();
+    const setSelectedColumn = useCallback((column: string) => {
+        if (!column) return;
+        if (param.includes(column)) return;
+        runInAction(() => {
+            // param.push(column); //doesn't trigger reactivity
+            config.param = [...param, column];
+            filters[column] = null;
+        });
+    }, [filters, param, config]);
+    return (
+        <div className="p-5">
+        <ColumnSelectionComponent 
+        setSelectedColumn={setSelectedColumn} 
+        placeholder="Add a filter column"
+        exclude={param}
+        />
+        </div>
+    )
+})
+
+
 /**
  * This will control the behaviour of the reset menuIcon in the chart header - not rendered with react.
  */
@@ -298,13 +324,14 @@ function useResetButton() {
 }
 
 export default function SelectionDialogComponent() {
-    const cols = useParamColumns();
+    const cols = useParamColumnsExperimental();
     useResetButton();
     // todo ability to dynamically add or remove columns
     // maybe arranged in a hierarchy with a tree view?
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
+            <AddRowComponent />
         </div>
     );
-}
+};
