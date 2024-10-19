@@ -194,7 +194,7 @@ select, input, textarea {
     background-color: var(--background_color);
     flex:0 0 auto;
     font-size:14px;
-    border: 1px solid #dfdfdf; /* Add a subtle border */
+    border: 1px solid rgba(120,120,120, 0.2); /* Add a subtle border */
 }
 
 .ciview-contentDiv {
