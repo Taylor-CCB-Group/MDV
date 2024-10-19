@@ -5,7 +5,7 @@ import { useScatterplotLayer } from "./scatter_state";
 import { CompositeMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
-import { useChartID, useRangeDimension } from "./hooks";
+import { useChartID, useRangeDimension2D } from "./hooks";
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -59,17 +59,26 @@ function useCreateRange(chart: BaseReactChart<any>) {
     const id = useChartID();
     const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
-    const { filterPoly, removeFilter, rangeDimension } = useRangeDimension();
+    const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
+    
+    useEffect(() => {
+        console.log("pending different way of managing resetButton?");
+        chart.removeFilter = () => {
+            setSelectionFeatureCollection(getEmptyFeatureCollection());
+        }
+    });
     useEffect(() => {
         if (coords.length === 0) {
+            chart.resetButton.style.display = "none";
             removeFilter();
             return;
         }
         // todo - consider whether the shape is a simple AABB & apply faster filter if so.
         //rangeDimension.filterPoly(coords, [cols[0], cols[1]]); //this doesn't notify 🙄
+        chart.resetButton.style.display = "inline";
         filterPoly(coords);
-    }, [coords, filterPoly, removeFilter]);
+    }, [coords, filterPoly, removeFilter, chart]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
     const editableLayer = useMemo(() => {
         return new EditableGeoJsonLayer({

@@ -278,7 +278,7 @@ export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
     }, [dim.destroy]);
     return dim;
 }
-export function useRangeDimension() {
+export function useRangeDimension2D() {
     const ds = useDataStore();
     const rangeDimension = useMemo(() => {
         const dim = ds.getDimension("range_dimension") as RangeDimension;
