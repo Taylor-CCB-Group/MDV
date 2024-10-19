@@ -11,7 +11,7 @@ export type UniqueFilter = string;
 export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFilter | RangeFilter;
 
 export type SelectionDialogConfig = {
-    type: "selection_dialog_experimental";
+    type: "selection_dialog";
     filters?: Record<string, SelectionDialogFilter | null>;
 };
 

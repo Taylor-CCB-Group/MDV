@@ -126,6 +126,11 @@ class RangeDimension extends Dimension {
             config,
         ]);
     }
+    getBinsAsync(column, config = {}) {
+        return new Promise((resolve) => {
+            this.getBins(resolve, column, config);
+        });
+    }
 
     destroy() {
         super.destroy();
