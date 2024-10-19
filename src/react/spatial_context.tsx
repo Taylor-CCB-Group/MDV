@@ -45,6 +45,8 @@ function useSelectionCoords(selection: FeatureCollection) {
     const coords = useMemo(() => {
         if (!feature) return [];
         //these casts are unsafe in a general sense, but should be ok in our editor.
+        //?we could set a property in the feature to say when it's simple AABB?
+        //^^ need to be careful about managing that property.
         const geometry = feature.geometry as Geometry;
         const raw = geometry.coordinates as Position[][];
         return raw[0];
@@ -57,17 +59,17 @@ function useCreateRange(chart: BaseReactChart<any>) {
     const id = useChartID();
     const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
-    const rangeDimension = useRangeDimension();
-    const cols = chart.config.param;
+    const { filterPoly, removeFilter, rangeDimension } = useRangeDimension();
     const coords = useSelectionCoords(selectionFeatureCollection);
     useEffect(() => {
         if (coords.length === 0) {
-            rangeDimension.removeFilter();
+            removeFilter();
             return;
         }
+        // todo - consider whether the shape is a simple AABB & apply faster filter if so.
         //rangeDimension.filterPoly(coords, [cols[0], cols[1]]); //this doesn't notify 🙄
-        rangeDimension.filter("filterPoly", [cols[0], cols[1]], coords);
-    }, [coords, cols, rangeDimension]);
+        filterPoly(coords);
+    }, [coords, filterPoly, removeFilter]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
     const editableLayer = useMemo(() => {
         return new EditableGeoJsonLayer({
