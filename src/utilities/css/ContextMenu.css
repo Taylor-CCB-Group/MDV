@@ -147,7 +147,7 @@
   background-color: var(--menu_bar_color);
   color: var(--text_color);
   margin-top: 5px; /* Add a top margin */
-  border: 2px solid var(--border_menu_bar_color);
+  border-bottom: 2px solid var(--border_menu_bar_color);
   box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.2); 
 }
 
