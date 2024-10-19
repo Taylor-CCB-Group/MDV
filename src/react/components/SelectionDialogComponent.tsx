@@ -16,6 +16,7 @@ import { observer } from "mobx-react-lite";
 import { action, runInAction } from "mobx";
 import { useChart } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
+import type RangeDimension from "@/datastore/RangeDimension";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -200,7 +201,7 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
  * state with mobx in the config.filters object.
  */
 function useRangeFilter(column: DataColumn<NumberDataType>) {
-    const filter = useDimensionFilter(column);
+    const filter = useDimensionFilter(column) as RangeDimension;
     const filters = useConfig<SelectionDialogConfig>().filters;
     const value = (filters[column.field] || column.minMax) as [number, number];
     const isInteger = column.datatype.match(/int/);
@@ -210,17 +211,62 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         const [min, max] = value;
         filter.filter("filterRange", [column.name], { min, max }, true);
     }, [column, filter, value]);
-    return { value, step };
+    const [histogram, setHistogram] = useState<number[]>([]);
+    useMemo(() => {
+        filter.getBinsAsync(column.name, {bins: 100}).then((histogram) => {
+            setHistogram(histogram);
+        });
+    }, [filter, column]);
+    return { value, step, histogram };
 }
+
+const Histogram = observer(({ data }: { data: number[] }) => {
+    const prefersDarkMode = window.mdv.chartManager.theme === "dark";
+    const width = 100;
+    const height = 20;
+    const lineColor = prefersDarkMode ? '#fff' : '#000';
+    // Find max value for vertical scaling
+    const maxValue = Math.max(...data);
+
+    // Define the padding and scaling factor
+    const padding = 1;
+    const xStep = 1; // Space between points
+    const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
+
+    // Generate the points for the polyline
+    const points = data
+        .map((value, index) => {
+            const x = padding + index * xStep;
+            const y = height - padding - value * yScale;
+            return `${x},${y}`;
+        })
+        .join(' ');
+
+    return (
+        <svg width={'100%'} height={height} 
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        >
+            {/* Background polyline (the simple line connecting data points) */}
+            <polyline
+                points={points}
+                fill="none"
+                stroke={lineColor}
+                strokeWidth="2"
+            />
+        </svg>
+    );
+});
 
 const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
-    const { value, step } = useRangeFilter(column);
+    const { value, step, histogram } = useRangeFilter(column);
     const setValue = useCallback((newValue: [number, number]) => {
         action(() => filters[column.field] = newValue)();
     }, [filters, column.field]);
     return (
         <div>
+            <Histogram data={histogram} />
             <Slider
                 size="small"
                 value={value}
