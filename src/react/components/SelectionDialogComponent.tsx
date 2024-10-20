@@ -108,8 +108,8 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                     <TextFieldExtended key={key} {...p}
                         customEndAdornment={(
                             <>
-                                <IconButton aria-label="toggle selection" onClick={toggleSelection}><SwapHorizIcon /></IconButton>
-                                <IconButton aria-label="select all" onClick={selectAll}><DoneAllIcon /></IconButton>
+                                <IconButton size="small" aria-label="toggle selection" onClick={toggleSelection}><SwapHorizIcon fontSize="inherit" /></IconButton>
+                                <IconButton size="small" aria-label="select all" onClick={selectAll}><DoneAllIcon fontSize="inherit" /></IconButton>
                             </>
                         )}
                     />
