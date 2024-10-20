@@ -1627,6 +1627,7 @@ class ChartManager {
                     new AddChartDialog(ds, (config) =>
                         this.addChart(ds.name, config, true),
                     );
+                    new BaseDialog.experiment["AddChartDialogReact"](dataStore);
                 },
             },
             ds.menuBar,

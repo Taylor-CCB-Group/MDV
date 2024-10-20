@@ -4,7 +4,7 @@ import type DataStore from "../datastore/DataStore";
 import type { VivConfig } from "./components/avivatorish/state";
 
 const ChartContext = createContext<BaseReactChart<any>>(undefined);
-const DataStoreContext = createContext<DataStore>(undefined);
+export const DataStoreContext = createContext<DataStore>(undefined);
 
 export function ChartProvider({
     chart,
