@@ -1,6 +1,6 @@
-import { useConfig, useDimensionFilter, useParamColumns, useParamColumnsExperimental } from "../hooks";
+import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Button, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo } from "react";
 
@@ -234,13 +234,14 @@ const Histogram = observer(({ data }: { data: number[] }) => {
     const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
 
     // Generate the points for the polyline
-    const points = data
-        .map((value, index) => {
+    // biome-ignore lint/correctness/useExhaustiveDependencies: biome has trouble with closures??
+    const points = useMemo(() => {
+        return data.map((value, index) => {
             const x = padding + index * xStep;
             const y = height - padding - value * yScale;
             return `${x},${y}`;
-        })
-        .join(' ');
+        }).join(' ');
+    }, [data, height, padding, xStep, yScale]);
 
     return (
         <svg width={'100%'} height={height} 
@@ -252,7 +253,10 @@ const Histogram = observer(({ data }: { data: number[] }) => {
                 points={points}
                 fill="none"
                 stroke={lineColor}
-                strokeWidth="2"
+                strokeWidth="1.5"
+                // many thanks to ChatGPT for the following line (and the rest of the component
+                // but this would have been a real pain to figure out on my own)
+                vectorEffect="non-scaling-stroke" // Keeps the stroke width consistent
             />
         </svg>
     );
