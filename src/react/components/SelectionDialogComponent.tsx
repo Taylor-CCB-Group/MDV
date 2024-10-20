@@ -69,7 +69,8 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     }, [filters, column.field, filter]);
     // react to changes in value and update the filter
     useEffect(() => {
-        if (filter === null || filter.category.length === 0) {
+        // filter could be undefined - but we previously checked for null causing component to crash
+        if ((!filter) || (filter.category.length === 0)) {
             dim.removeFilter();
             return;
         }
