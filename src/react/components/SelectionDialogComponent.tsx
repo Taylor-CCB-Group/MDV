@@ -207,21 +207,45 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const value = (filters[column.field] || column.minMax) as [number, number];
     const isInteger = column.datatype.match(/int/);
     const step = isInteger ? 1 : 0.01;
+
+    // Effect to manage the filter state
     useEffect(() => {
-        // filter.removeFilter();
+        if (value[0] === column.minMax[0] && value[1] === column.minMax[1]) {
+            filter.removeFilter();
+            return;
+        }
         const [min, max] = value;
         filter.filter("filterRange", [column.name], { min, max }, true);
     }, [column, filter, value]);
-    const [histogram, setHistogram] = useState<number[]>([]);
-    useMemo(() => {
-        filter.getBinsAsync(column.name, {bins: 100}).then((histogram) => {
-            setHistogram(histogram);
-        });
-    }, [filter, column]);
-    return { value, step, histogram };
-}
 
-const Histogram = observer(({ data }: { data: number[] }) => {
+    const [histogram, setHistogram] = useState<number[]>([]);
+    // this could be a more general utility function - expect to extract soon
+    const queryHistogram = useCallback(async () => {
+        // waste of life trying to use Dimension class.
+        // filter.getBinsAsync(column.name, { bins: 100 }).then((histogram) => {
+        //     setHistogram(histogram);
+        // });
+        const worker = new Worker(new URL("../../datastore/rawHistogramWorker.ts", import.meta.url));
+        worker.onmessage = (event) => {
+            setHistogram(event.data);
+            worker.terminate();
+        };
+        const isInt32 = column.datatype === "int32";
+        const originalData = column.data as Float32Array | Int32Array;
+        const data = new SharedArrayBuffer(originalData.length * 4);
+        new Float32Array(data).set(originalData);
+        worker.postMessage({ data, min: column.minMax[0], max: column.minMax[1], bins: 100, isFloat: isInt32 });
+    }, [column]);
+
+    const [low, high] = value;
+    const [min, max] = column.minMax;
+    const lowFraction = (low - min) / (max - min);
+    const highFraction = (high - min) / (max - min);
+
+    return { value, step, histogram, lowFraction, highFraction, queryHistogram };
+}
+type RangeProps = ReturnType<typeof useRangeFilter>;
+const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryHistogram }: RangeProps) => {
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const width = 100;
     const height = 20;
@@ -230,14 +254,21 @@ const Histogram = observer(({ data }: { data: number[] }) => {
     const maxValue = Math.max(...data);
 
     // Define the padding and scaling factor
-    const padding = 1;
+    const padding = 2;
     const xStep = 1; // Space between points
     const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
+
+    const lowX = lowFraction * width;
+    const highX = highFraction * width;
+
+    useEffect(() => {
+        queryHistogram();
+    }, [queryHistogram]);
 
     // Generate the points for the polyline
     // ??? useMemo was wrong ????
     const points = data.map((value, index) => {
-        const x = padding + index * xStep;
+        const x = index * xStep;
         const y = height - padding - value * yScale;
         return `${x},${y}`;
     }).join(' ');
@@ -246,6 +277,7 @@ const Histogram = observer(({ data }: { data: number[] }) => {
         <svg width={'100%'} height={height} 
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
+        onClick={queryHistogram}
         >
             {/* Background polyline (the simple line connecting data points) */}
             <polyline
@@ -257,19 +289,37 @@ const Histogram = observer(({ data }: { data: number[] }) => {
                 // but this would have been a real pain to figure out on my own)
                 vectorEffect="non-scaling-stroke" // Keeps the stroke width consistent
             />
+            {/* Highlighted range */}
+            <rect
+                x={0}
+                y={0}
+                width={lowX}
+                height={height}
+                fill={prefersDarkMode ? '#333' : '#888'}
+                fillOpacity="0.8"
+            />
+            <rect
+                x={highX}
+                y={0}
+                width={width - highX}
+                height={height}
+                fill={prefersDarkMode ? '#333' : '#888'}
+                fillOpacity="0.8"
+            />
         </svg>
     );
 });
 
 const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
-    const { value, step, histogram } = useRangeFilter(column);
+    const rangeProps = useRangeFilter(column);
+    const { value, step } = rangeProps;
     const setValue = useCallback((newValue: [number, number]) => {
         action(() => filters[column.field] = newValue)();
     }, [filters, column.field]);
     return (
         <div>
-            <Histogram data={histogram} />
+            <Histogram {...rangeProps} />
             <Slider
                 size="small"
                 value={value}

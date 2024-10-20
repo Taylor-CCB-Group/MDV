@@ -127,6 +127,7 @@ class RangeDimension extends Dimension {
         ]);
     }
     getBinsAsync(column, config = {}) {
+        // wasted hours on this, gave up and made a simpler version for unfiltered histogram.
         return new Promise((resolve) => {
             this.getBins(resolve, column, config);
         });
