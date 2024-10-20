@@ -400,32 +400,6 @@ select, input, textarea {
     margin: 0px 2px;
 }
 
-.annotationDialog h2 {
-    font-weight: 400;
-    line-height: 1.2em;
-}
-
-.annotationDialog ul {
-    list-style: none;
-    display: flex;
-    gap: 0.5em;
-    font-size: small;
-}
-
-.annotationDialog li {
-    padding: 0.4em;
-    border-radius: 0.5em;
-    background-color: var(--button_color);
-}
-
-.annotationDialog .allTagged {
-    
-}
-.annotationDialog .someTagged {
-    filter: saturate(20%);
-}
-
-
 .mdv-image-label {
     position:absolute;
     text-align: center;
@@ -434,3 +408,8 @@ select, input, textarea {
 .Dark .mlv-tile-missing {
     filter: invert();
 } */
+.ui-resizable-se {
+    /* not ideal but reduces clashes with other elements / scale-bar */
+    bottom: 0 !important;
+    right: 0 !important;
+}
