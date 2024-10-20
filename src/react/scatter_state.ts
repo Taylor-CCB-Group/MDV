@@ -1,4 +1,4 @@
-import { Matrix4 } from "@math.gl/core";
+import type { Matrix4 } from "@math.gl/core";
 import type { PickingInfo } from "@deck.gl/core";
 import type { ScatterPlotConfig } from "./components/VivMDVReact";
 import { useChart } from "./context";
@@ -40,17 +40,6 @@ export function useRegionScale() {
     return scale;
 }
 
-/** for this to be more useful as a hook will depend on state/context... */
-export function useScatterModelMatrix() {
-    const scale = useRegionScale();
-    const s = 1 / scale;
-    const [modelMatrix, setModelMatrix] = useState(new Matrix4().scale(s));
-    useEffect(() => {
-        const m = new Matrix4().scale(s);
-        setModelMatrix(m);
-    }, [s]);
-    return { modelMatrix, setModelMatrix };
-}
 
 function useZoomOnFilter(modelMatrix: Matrix4) {
     const config = useConfig<ScatterPlotConfig>();
@@ -140,7 +129,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
 
 type Tooltip = (PickingInfo) => string;
 type P = [number, number];
-export function useScatterplotLayer() {
+export function useScatterplotLayer(modelMatrix: Matrix4) {
     const id = useChartID();
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
@@ -192,8 +181,7 @@ export function useScatterplotLayer() {
     );
 
     const scale = useRegionScale();
-    const { modelMatrix, setModelMatrix } = useScatterModelMatrix();
-    const modelMatrixRef = useRef(modelMatrix);
+    // const { modelMatrix, setModelMatrix } = useScatterModelMatrix();
     const viewState = useZoomOnFilter(modelMatrix);
     const { point_shape } = config;
 
@@ -215,6 +203,7 @@ export function useScatterplotLayer() {
             radiusScale,
             getFillColor: colorBy ?? [255, 255, 255],
             getRadius: 1 / scale,
+            // todo review buffer data / accessors / filters...
             getPosition: (i: number, { target }) => {
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
@@ -313,7 +302,6 @@ export function useScatterplotLayer() {
             scatterplotLayer,
             getTooltip,
             modelMatrix,
-            modelMatrixRef,
             viewState,
             currentLayerHasRendered,
             onAfterRender,
