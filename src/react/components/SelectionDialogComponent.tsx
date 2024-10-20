@@ -234,14 +234,12 @@ const Histogram = observer(({ data }: { data: number[] }) => {
     const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
 
     // Generate the points for the polyline
-    // biome-ignore lint/correctness/useExhaustiveDependencies: biome has trouble with closures??
-    const points = useMemo(() => {
-        return data.map((value, index) => {
-            const x = padding + index * xStep;
-            const y = height - padding - value * yScale;
-            return `${x},${y}`;
-        }).join(' ');
-    }, [data, height, padding, xStep, yScale]);
+    // ??? useMemo was wrong ????
+    const points = data.map((value, index) => {
+        const x = padding + index * xStep;
+        const y = height - padding - value * yScale;
+        return `${x},${y}`;
+    }).join(' ');
 
     return (
         <svg width={'100%'} height={height} 
