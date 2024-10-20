@@ -22,8 +22,9 @@ export default observer((props: ColumnSelectionProps) => {
     const columns = useMemo(
         () => dataStore.columns
             .filter((c) => !props.exclude?.includes(c.name))
+            .filter((c) => typeof c.name === "string")
             // .filter((c) => c.datatype === "multitext") //todo datatype prop etc
-            .map((c) => c.name),
+            .map((c) => c.name as string),
         [dataStore, props.exclude],
     );
     return (
