@@ -24,7 +24,7 @@ import {
 import { COLOR_PALLETE, FILL_PIXEL_VALUE } from "./constants";
 import { useVivConfig } from "@/react/context";
 
-export const useSavedVivConfig = () => {
+const useSavedVivConfig = () => {
     const c = useVivConfig();
     const { viewerStore, channelsStore, imageSettingsStore } = c;
     const viewerStoreApi = useViewerStoreApi();

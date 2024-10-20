@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type RangeDimension from "../datastore/RangeDimension";
 import type { BaseReactChart } from "./components/BaseReactChart";
-import { useScatterplotLayer } from "./scatter_state";
+import { useRegionScale, useScatterplotLayer } from "./scatter_state";
+import { Matrix4 } from "@math.gl/core";
 import { CompositeMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
@@ -20,6 +21,7 @@ type RangeState = {
     editableLayer: EditableGeoJsonLayer;
     selectionMode: GeoJsonEditMode;
     setSelectionMode: (mode: GeoJsonEditMode) => void;
+    modelMatrix: Matrix4;
 };
 type MeasureState = {
     startPixels: P;
@@ -54,9 +56,25 @@ function useSelectionCoords(selection: FeatureCollection) {
     return coords as [number, number][];
 }
 
+/** for this to be more useful as a hook will depend on state/context... */
+function useScatterModelMatrix() {
+    const scale = useRegionScale();
+    const s = 1 / scale;
+    const [modelMatrix, setModelMatrix] = useState(new Matrix4().scale(s));
+    useEffect(() => {
+        const m = new Matrix4().scale(s);
+        setModelMatrix(m);
+    }, [s]);
+    return { modelMatrix, setModelMatrix };
+}
+
 
 function useCreateRange(chart: BaseReactChart<any>) {
     const id = useChartID();
+    const { modelMatrix } = useScatterModelMatrix();
+    // consider making selectionFeatureCollection part of config, so it can be persisted
+    // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
+    // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that.
     const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
@@ -116,7 +134,8 @@ function useCreateRange(chart: BaseReactChart<any>) {
         rangeDimension,
         selectionFeatureCollection,
         selectionMode,
-        setSelectionMode
+        setSelectionMode,
+        modelMatrix
     };
 }
 function useCreateMeasure() {
@@ -162,7 +181,7 @@ export function useMeasure() {
  */
 export function useSpatialLayers() {
     const { rectRange } = useContext(SpatialAnnotationState);
-    const scatterProps = useScatterplotLayer();
+    const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
     const { getTooltip } = scatterProps;
     // const layers = [rectRange.polygonLayer, scatterplotLayer]; /// should probably be in a CompositeLayer?
     return { 

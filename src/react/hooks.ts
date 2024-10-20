@@ -7,6 +7,7 @@ import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
 import type RangeDimension from "@/datastore/RangeDimension";
+import { useRegionScale } from "./scatter_state";
 
 /**
  * Get the chart's config.
@@ -318,6 +319,7 @@ export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
 }
 export function useRangeDimension2D() {
     const ds = useDataStore();
+    const s = useRegionScale();
     const rangeDimension = useMemo(() => {
         const dim = ds.getDimension("range_dimension") as RangeDimension;
         return dim;
@@ -329,8 +331,10 @@ export function useRangeDimension2D() {
     const { param } = useConfig();
     const cols = useMemo(() => [param[0], param[1]], [param]); //todo: 3d...
     const filterPoly = useCallback((coords: [number, number][]) => {
-        rangeDimension.filter("filterPoly", cols, coords);
-    }, [rangeDimension, cols]);
+        // const transformed = coords.map((c) => modelMatrix.transformAsPoint(c));
+        const transformed = s === 1 ? coords : coords.map((c) => c.map((v) => v * s));
+        rangeDimension.filter("filterPoly", cols, transformed);
+    }, [rangeDimension, cols, s]);
     const removeFilter = useCallback(() => rangeDimension.removeFilter(), [rangeDimension]);
     return { filterPoly, removeFilter, rangeDimension };
 }

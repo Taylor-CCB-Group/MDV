@@ -4,10 +4,9 @@ import {
     DetailView,
 } from "@vivjs-experimental/viv";
 import { observer } from "mobx-react-lite";
-import { useState, useLayoutEffect, useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { shallow } from "zustand/shallow";
 import { useChartSize, useChartID, useConfig, useRegion } from "../hooks";
-import { useScatterplotLayer } from "../scatter_state";
 import SelectionOverlay from "./SelectionOverlay";
 import {
     useLoader,
@@ -185,6 +184,7 @@ const Main = observer(() => {
                 scatterProps.onAfterRender();
             },
             glOptions: {
+                // no longer working with new deck.gl version?
                 preserveDrawingBuffer: true,
             },
             controller: {
