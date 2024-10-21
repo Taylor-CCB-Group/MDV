@@ -156,9 +156,12 @@ class StackedRowChart extends SVGChart {
                         .attr("height", bheight)
                         .attr("fill", (d) => colors[d.id])
                         .on("mouseover pointermove", (e, d) => {
+                            //d: ['id', 'count', 'pos', 'per', 'perpos']
+                            const per = (d.per * 100).toFixed(0);
+                            const col = this.config.param[1];
                             this.showToolTip(
                                 e,
-                                `${xvalues[d.id]}<br>${d.count}`,
+                                `${col}: ${xvalues[d.id]}<br>count: <em>${d.count}</em><br>percentage: <em>${per}%</em>`,
                             );
                         })
                         .on("mouseleave", () => {
