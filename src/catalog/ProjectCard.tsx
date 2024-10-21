@@ -1,6 +1,7 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
+    DriveFileRenameOutline,
     MoreVert,
     Info,
     Settings,
@@ -21,6 +22,7 @@ import {
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
 import ProjectShareModal from "./ProjectShareModal";
+import ProjectRenameModal from "./ProjectRenameModal"
 
 interface ProjectCardProps {
     id: string;
@@ -57,6 +59,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isRenameModalOpen, setisRenameModalOpen] = useState(false);
     const [shouldNavigate, setShouldNavigate] = useState(false);
 
     useEffect(() => {
@@ -175,6 +178,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 </MenuItem>
                 <MenuItem
                     onClick={() => {
+                        setisRenameModalOpen(true);
+                        handleMenuClose();
+                    }}
+                >
+                    <ListItemIcon>
+                        <DriveFileRenameOutline fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Rename Project</ListItemText>
+                </MenuItem>
+                {/* <MenuItem
+                    onClick={() => {
                         setIsSettingsModalOpen(true);
                         handleMenuClose();
                     }}
@@ -183,7 +197,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         <Settings fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Project Settings</ListItemText>
-                </MenuItem>
+                </MenuItem> */}
                 {/* <MenuItem
                     onClick={() => {
                         setIsShareModalOpen(true);
@@ -225,6 +239,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 onClose={() => setIsShareModalOpen(false)}
                 onAddCollaborator={onAddCollaborator}
                 projectId={id}
+            />
+
+            <ProjectRenameModal
+                id={id}
+                name={name}
+                open={isRenameModalOpen}
+                onRename={onRename}
+                onClose={() => setisRenameModalOpen(false)}
             />
         </Card>
     );
