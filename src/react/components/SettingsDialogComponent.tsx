@@ -10,12 +10,13 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { v4 as uuid } from "uuid";
-import { Button, Chip, MenuItem, Select, Slider } from "@mui/material";
+import { Button, Chip, Dialog, MenuItem, Select, Slider } from "@mui/material";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import JsonView from "react18-json-view";
 
 const TextComponent = ({ props }: { props: GuiSpec<"text"> }) => (
     <>
@@ -460,21 +461,22 @@ const Components: {
     folder: observer(FolderComponent),
 } as const;
 
-const ErrorComponent = ({ props }: { props: GuiSpec<GuiSpecType> }) => {
-    const [expanded, setExpanded] = useState(false);
+const ErrorComponent = ({ props, label }: { props: any, label: string }) => {
+    const [expanded, setExpanded] = useState(true);
     return (
-        <div
+        <>
+        <Dialog open={expanded}
             className="border-red-500 border-2 border-solid"
-            onClick={() => setExpanded(!expanded)}
-        >
-            <h2>Error...</h2>
-            <pre>
-                {JSON.stringify(props, null, 2).substring(
-                    0,
-                    expanded ? undefined : 100,
-                )}
-            </pre>
-        </div>
+            >
+            <h2>Settings Dialog Error...</h2>
+            <JsonView src={props} collapsed={1} />
+            <Button
+                onClick={() => setExpanded(!expanded)}
+                >ok</Button>
+        </Dialog>
+        <label className="text-red-500">Error in component:</label>
+        <label className="text-red-500">{label}</label>
+        </>
     );
 };
 
@@ -484,9 +486,15 @@ const AbstractComponent = observer(
         const Component = Components[props.type] as React.FC<{
             props: typeof props;
         }>;
+        if (!(props.type in Components)) {
+            //todo use zod to validate the props object
+            console.error(`Unknown component type: '${props.type}'`);
+            const errorObj = { props, error: `Unknown component type: ${props.type}` };
+            return <ErrorComponent props={errorObj} label={props.label} />;
+        }
         return (
             <div className="grid grid-cols-2 p-1 justify-items-start">
-                <ErrorBoundary fallback={<ErrorComponent props={props} />}>
+                <ErrorBoundary fallback={<ErrorComponent props={props} label={props.label} />}>
                     <Component props={props} />
                 </ErrorBoundary>
             </div>
