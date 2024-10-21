@@ -438,7 +438,12 @@ class SVGChart extends BaseChart {
                 ]);
             }
         }
-        return settings.concat(arr);
+        return settings.concat([{
+            type: "folder",
+            label: "Axis controls",
+            current_value: arr,
+            func: (x) => {},
+        }]);
     }
 
     _addLegendToSVG(param) {
