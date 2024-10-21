@@ -32,15 +32,15 @@ const shaderCode = /* wgsl */ `
 // struct Histogram {
 //     counts: array<atomic<u32>, BINS> // Declare the array with a fixed size
 // };
+// struct InputData {
+//     data: array<f32> // declare the array type based on isInt32
+// };
 struct Params {
     min: f32,
     binWidth: f32,
     bins: u32
 };
 
-struct InputData {
-    data: array<f32>
-};
 
 
 @group(0) @binding(0) var<uniform> params : Params;
@@ -74,13 +74,17 @@ async function runComputeShader(
     min: number,
     max: number,
     bins: number,
-    dataLength: number
+    dataLength: number,
+    isInt32: boolean
 ): Promise<void> {
     // Create shader module
     const shaderModule = device.createShaderModule({
         code: `
         struct Histogram {
             counts: array<atomic<u32>, ${bins}> // Declare the array with a fixed size
+        };
+        struct InputData {
+            data: array<${isInt32 ? 'i32' : 'f32'}> // declare the array type based on isInt32
         };
 
         ${shaderCode}
@@ -110,6 +114,7 @@ async function runComputeShader(
     });
 
     // Create the uniform buffer for the parameters
+    // todo: think about a nicer abstraction for this
     const paramsBuffer = device.createBuffer({
         size: 12, // 3 * 4 bytes (min, binWidth, bins)
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -174,7 +179,8 @@ async function computeBinsGPU(props: HistogramConfig) {
 
     // Create compute shader (next step)
     // Set up compute pipeline (next step) 
-    await runComputeShader(device, dataBuffer, histBuffer, min, max, bins, dataArray.length / 4);
+    const len = isInt32 ? dataArray.length / 4 : dataArray.length;
+    await runComputeShader(device, dataBuffer, histBuffer, min, max, bins, len, isInt32);
 
     // Read results from GPU and return
     const readBuffer = device.createBuffer({
@@ -190,7 +196,7 @@ async function computeBinsGPU(props: HistogramConfig) {
 
     // Map the result buffer to read
     await readBuffer.mapAsync(GPUMapMode.READ);
-    const resultArray = new Int32Array(readBuffer.getMappedRange());
+    const resultArray = new Uint32Array(readBuffer.getMappedRange());
     return Array.from(resultArray);
 };
 
@@ -199,12 +205,9 @@ self.onmessage = async (event: MessageEvent<HistogramConfig>) => {
     // this logic is ok for MDV columns as of this writing
     // but what about viv raster data for example?
     // TODO GPU chunking of data for large arrays
-    // TODO figure out why
     const [histCpu, histGpu] = await Promise.all([
         computeBinsCPU(event.data),
         computeBinsGPU(event.data),
     ]);
-    // trying to compare the results but this is not behaving as expected
-    // const hist = histCpu.map((val, i) => (val - histGpu[i]));
     self.postMessage({histCpu, histGpu});
 }

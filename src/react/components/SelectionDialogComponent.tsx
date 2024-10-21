@@ -260,6 +260,8 @@ const Histogram = observer(({ histogram: data, histogramGpu, lowFraction, highFr
     const lineColor = prefersDarkMode ? '#fff' : '#000';
     // Find max value for vertical scaling
     const maxValue = Math.max(...data, ...histogramGpu);
+    const maxGpuValue = Math.max(...histogramGpu);
+    console.log("maxValue: ", maxValue, "maxGpuValue: ", maxGpuValue, "ratio", maxGpuValue / maxValue);
 
     // Define the padding and scaling factor
     const padding = 2;
