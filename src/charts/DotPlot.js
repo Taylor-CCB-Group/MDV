@@ -202,6 +202,14 @@ class DotPlot extends SVGChart {
                     .attr("stroke", "black")
                     .on("click", (e, d) => {
                         this.filterCategories(vals[d.cat_id], d.id);
+                    })
+                    .on("mouseover", (e, d) => {
+                        // Object.keys(d):
+                        // ['id', 'total', 'count', 'frac', 'mean', 'cat_id']
+                        this.showToolTip(e, `fraction: <em>${d.frac}</em>`);
+                    })
+                    .on("mouseout", () => {
+                        this.hideToolTip();
                     }),
             )
             .attr("stroke-width", (d) => {
