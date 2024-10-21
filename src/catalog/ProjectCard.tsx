@@ -1,6 +1,7 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
+    Delete as DeleteIcon,
     DriveFileRenameOutline,
     MoreVert,
     Info,
@@ -23,6 +24,7 @@ import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
 import ProjectShareModal from "./ProjectShareModal";
 import ProjectRenameModal from "./ProjectRenameModal"
+import ProjectDeleteModal from "./ProjectDeleteModal"
 
 interface ProjectCardProps {
     id: string;
@@ -60,6 +62,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isRenameModalOpen, setisRenameModalOpen] = useState(false);
+    const [isDeleteModalOpen, setisDeleteModalOpen] = useState(false);
     const [shouldNavigate, setShouldNavigate] = useState(false);
 
     useEffect(() => {
@@ -187,6 +190,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     </ListItemIcon>
                     <ListItemText>Rename Project</ListItemText>
                 </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setisDeleteModalOpen(true);
+                        handleMenuClose();
+                    }}
+                >
+                    <ListItemIcon>
+                        <DeleteIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Delete Project</ListItemText>
+                </MenuItem>
                 {/* <MenuItem
                     onClick={() => {
                         setIsSettingsModalOpen(true);
@@ -247,6 +261,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 open={isRenameModalOpen}
                 onRename={onRename}
                 onClose={() => setisRenameModalOpen(false)}
+            />
+
+            <ProjectDeleteModal
+                id={id}
+                open={isDeleteModalOpen}
+                onDelete={onDelete}
+                onClose={() => setisDeleteModalOpen(false)}
             />
         </Card>
     );
