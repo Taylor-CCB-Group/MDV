@@ -25,7 +25,13 @@ function computeBinsCPU(props: HistogramConfig) {
     return hist;
 }
 
+// WebGPU compute shader code - with help from ChatGPT.
+// thinking about a version adapting to other Dimensions...
+// !inject `struct Histogram` with BINS into the shader code when creating the shader module
 const shaderCode = /* wgsl */ `
+// struct Histogram {
+//     counts: array<atomic<u32>, BINS> // Declare the array with a fixed size
+// };
 struct Params {
     min: f32,
     binWidth: f32,
@@ -36,9 +42,6 @@ struct InputData {
     data: array<f32>
 };
 
-struct Histogram {
-    counts: array<atomic<u32>, 1> // Declare the array with a fixed size
-};
 
 @group(0) @binding(0) var<uniform> params : Params;
 @group(0) @binding(1) var<storage, read> inputData : InputData;
@@ -75,7 +78,13 @@ async function runComputeShader(
 ): Promise<void> {
     // Create shader module
     const shaderModule = device.createShaderModule({
-        code: shaderCode,
+        code: `
+        struct Histogram {
+            counts: array<atomic<u32>, ${bins}> // Declare the array with a fixed size
+        };
+
+        ${shaderCode}
+        `,
     });
 
     // Create bind group layout and pipeline layout
@@ -187,9 +196,15 @@ async function computeBinsGPU(props: HistogramConfig) {
 
 
 self.onmessage = async (event: MessageEvent<HistogramConfig>) => {
-    const { isInt32, data, min, max, bins } = event.data;
     // this logic is ok for MDV columns as of this writing
     // but what about viv raster data for example?
-    const hist = await computeBinsGPU({ isInt32, data, min, max, bins });
-    self.postMessage(hist);
+    // TODO GPU chunking of data for large arrays
+    // TODO figure out why
+    const [histCpu, histGpu] = await Promise.all([
+        computeBinsCPU(event.data),
+        computeBinsGPU(event.data),
+    ]);
+    // trying to compare the results but this is not behaving as expected
+    // const hist = histCpu.map((val, i) => (val - histGpu[i]));
+    self.postMessage({histCpu, histGpu});
 }
