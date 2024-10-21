@@ -205,9 +205,13 @@ self.onmessage = async (event: MessageEvent<HistogramConfig>) => {
     // this logic is ok for MDV columns as of this writing
     // but what about viv raster data for example?
     // TODO GPU chunking of data for large arrays
-    const [histCpu, histGpu] = await Promise.all([
-        computeBinsCPU(event.data),
-        computeBinsGPU(event.data),
-    ]);
-    self.postMessage({histCpu, histGpu});
+    
+    // todo: add options for CPU/GPU mode etc if needed
+    // const [histCpu, histGpu] = await Promise.all([
+    //     computeBinsCPU(event.data),
+    //     computeBinsGPU(event.data),
+    // ]);
+    // self.postMessage({histCpu, histGpu});
+    const hist = await computeBinsGPU(event.data);
+    self.postMessage(hist);
 }
