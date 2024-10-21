@@ -50,9 +50,12 @@ export default observer((props: ColumnSelectionProps) => {
                     const { key, ...p } = props as typeof props & {
                         key: string;
                     };
+                    const { datatype } = dataStore.columnIndex[text];
+                    // todo: consider an optional description prop, which we could show in a tooltip?
                     return (
                         <li key={key} {...p}>
                             {text}
+                            <em className="opacity-40 ml-2">({datatype})</em>
                         </li>
                     );
                 }}

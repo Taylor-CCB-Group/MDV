@@ -404,10 +404,12 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
                     <HighlightOffIcon />
                 </IconButton>
                 <div className="flex items-center h-4">
-                    <Typography variant="subtitle1">{column.name}</Typography>
-                    {hasFilter && <IconButton onClick={clearFilter}>
-                        <CachedIcon fontSize="small" />
-                    </IconButton>}
+                    <Typography variant="subtitle1">{column.name} 
+                        {hasFilter && <IconButton onClick={clearFilter}>
+                            <CachedIcon fontSize="small" />
+                        </IconButton>}
+                        <em className="opacity-40 ml-1">({column.datatype})</em>
+                    </Typography>
                 </div>
             </AccordionSummary>
             <AccordionDetails>
