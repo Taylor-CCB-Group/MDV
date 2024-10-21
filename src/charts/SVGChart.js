@@ -292,7 +292,8 @@ class SVGChart extends BaseChart {
     }
 
     drawYTree(nodeData, number) {
-        const trans = select(this.contentDiv)
+        // trans
+        select(this.contentDiv)
             .transition()
             .duration(400)
             .ease(easeLinear);
@@ -319,7 +320,8 @@ class SVGChart extends BaseChart {
             }
         }
 
-        const links = this.ry_axis_svg
+        // links
+        this.ry_axis_svg
             .selectAll(".tree-link")
             .data(desc.slice(1))
             .join("path")
