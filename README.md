@@ -221,7 +221,7 @@ webpack --env build=production mode=development \
 
 ## Dev branch
 
-The 'pjt-dev' branch is currently being used for development. It is automatically deployed to https://mdv-dev.netlify.app/ when a commit is made to the branch.
+The 'dev' branch is currently being used for development. It is automatically deployed to https://mdv-dev.netlify.app/ when a commit is made to the branch.
 
 This documentation, and some aspects of how things are arranged, should be considered a work in progress.
 
