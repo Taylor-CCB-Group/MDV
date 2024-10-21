@@ -203,7 +203,7 @@ class DotPlot extends SVGChart {
                     .on("click", (e, d) => {
                         this.filterCategories(vals[d.cat_id], d.id);
                     })
-                    .on("mouseover", (e, d) => {
+                    .on("mouseover pointermove", (e, d) => {
                         // ['id', 'total', 'count', 'frac', 'mean', 'cat_id']
                         //const tip = { category: vals[d.cat_id], value: d.id, fraction: d.frac };
                         this.showToolTip(e, `(<em>${d.id}, ${vals[d.cat_id]}</em>)<br>fraction: ${d.frac}`);
