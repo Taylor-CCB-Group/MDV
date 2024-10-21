@@ -81,7 +81,7 @@ class ProjectBlueprint:
         # and pass 'mytrack' to the method
 
         # find the item in self.routes that matches the subpath
-        print("**********************************")
+        print("***********************************")
         print(subpath, project_id)
         subpath = f"/{urlparse(subpath).path}"
         for rule, (method, options) in self.routes.items():
