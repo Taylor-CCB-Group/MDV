@@ -184,7 +184,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     </ListItemIcon>
                     <ListItemText>Project Settings</ListItemText>
                 </MenuItem>
-                <MenuItem
+                {/* <MenuItem
                     onClick={() => {
                         setIsShareModalOpen(true);
                         handleMenuClose();
@@ -194,7 +194,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         <Share fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Share Project</ListItemText>
-                </MenuItem>
+                </MenuItem> */}
             </Menu>
 
             <ProjectInfoModal
