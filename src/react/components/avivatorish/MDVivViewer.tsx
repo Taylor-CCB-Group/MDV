@@ -3,6 +3,7 @@ import DeckGL from "@deck.gl/react";
 // import { getVivId } from '@vivjs-experimental/views';
 // No need to use the ES6 or React variants.
 import equal from "fast-deep-equal";
+import { ScaleBarLayer } from "@vivjs-experimental/viv";
 export function getVivId(id) {
     return `-#${id}#`;
 }
@@ -65,6 +66,7 @@ type VivViewerWrapperProps = {
 };
 type VivViewerWrapperState = {
     viewStates: any;
+    //@ts-expect-error --- issue with new deck.gl - check up on this / review viv PR? ---
     deckRef?: React.MutableRefObject<DeckGL>;
     outerContainer: Element;
 };
@@ -356,6 +358,14 @@ class MDVivViewerWrapper extends React.PureComponent<
             deckGLViews[0] = deckGLViews[randomizedIndex];
             deckGLViews[randomizedIndex] = holdFirstElement;
         }
+        // MDV: make sure the scalebar is on top of other layers
+        // perhaps this should be in _renderLayers(), yolo.
+        const vivLayers = this._renderLayers()[0];
+        const scaleBarLayer = vivLayers.find((layer) => layer instanceof ScaleBarLayer);
+        const otherLayers = vivLayers.filter((layer) => layer !== scaleBarLayer);
+        const layers = deckProps?.layers === undefined
+            ? [vivLayers]
+            : [otherLayers, ...deckProps.layers, scaleBarLayer];
         return (
             <DeckGL
                 // MDV: we mess with deck internals via ref to get eventManager to work in popouts
@@ -363,11 +373,7 @@ class MDVivViewerWrapper extends React.PureComponent<
                 // eslint-disable-next-line react/jsx-props-no-spreading
                 {...(deckProps ?? {})}
                 layerFilter={this.layerFilter}
-                layers={
-                    deckProps?.layers === undefined
-                        ? [...this._renderLayers()]
-                        : [...this._renderLayers(), ...deckProps.layers]
-                }
+                layers={layers}
                 onViewStateChange={this._onViewStateChange}
                 views={deckGLViews}
                 viewState={viewStates}

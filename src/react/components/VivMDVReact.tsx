@@ -350,7 +350,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             },
             {
                 type: "folder",
-                label: "Contour Settings",
+                label: "Density Visualisation",
                 current_value: [
                     {
                         type: "folder",

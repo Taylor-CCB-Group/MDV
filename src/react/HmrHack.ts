@@ -7,6 +7,7 @@ import wc from "./components/WordCloudChart";
 arr.push(wc);
 import hfc from "./components/HighlightedFeatureChart";
 arr.push(hfc);
+import "./components/SelectionDialogReact";
 
 /**
  * Charts are registered with ChartManager by being added to a BaseChart.types object,

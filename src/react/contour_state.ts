@@ -63,7 +63,8 @@ function useColorRange(
     );
     const categoryValueIndex = useMemo(() => {
         if (!contourParameter || !contourParameter.values) return -1;
-        if (Array.isArray(category)) return -1; //we could do something different here... would need more clever color handling on the receiving end
+        //we could do something different here... would need more clever color handling on the receiving end
+        if (Array.isArray(category)) return category.length > 1 ? -1 : contourParameter.values.indexOf(category[0]);
         return contourParameter.values.indexOf(category);
     }, [contourParameter, category]);
     const colorRange = useMemo(() => {
@@ -71,7 +72,10 @@ function useColorRange(
         const color = columnColors[categoryValueIndex];
         // return [[...color, 255], [...color, 255]];
         console.log("color", color, category);
-        return [color];
+        // return [color];
+        // workaround for https://github.com/visgl/deck.gl/issues/9219
+        // always use same length array so it doesn't delete the texture
+        return new Array(viridis.length).fill(color);
     }, [categoryValueIndex, columnColors, category]);
     return colorRange;
 }

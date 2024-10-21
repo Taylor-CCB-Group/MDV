@@ -30,8 +30,8 @@ class RangeDimension extends Dimension {
                 v1 <= range1[1] &&
                 v2 >= range2[0] &&
                 v2 <= range2[1] &&
-                !Number.isNaN(v1) &&
-                !Number.isNaN(v2)
+                !Number.isFinite(v1) &&
+                !Number.isFinite(v2)
             );
         };
         return this.filterPredicate({ predicate }, columns);
@@ -70,8 +70,8 @@ class RangeDimension extends Dimension {
                 x > maxX ||
                 y < minY ||
                 y > maxY ||
-                Number.isNaN(x) ||
-                Number.isNaN(y)
+                !Number.isFinite(x) ||
+                !Number.isFinite(y)
             ) {
                 return false;
             }
@@ -125,6 +125,12 @@ class RangeDimension extends Dimension {
             [col.buffer, col.datatype],
             config,
         ]);
+    }
+    getBinsAsync(column, config = {}) {
+        // wasted hours on this, gave up and made a simpler version for unfiltered histogram.
+        return new Promise((resolve) => {
+            this.getBins(resolve, column, config);
+        });
     }
 
     destroy() {

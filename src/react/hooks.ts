@@ -1,11 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
+import type RangeDimension from "@/datastore/RangeDimension";
+import { useRegionScale } from "./scatter_state";
 
 /**
  * Get the chart's config.
@@ -93,6 +95,41 @@ export function useNamedColumn(name: string): {
     }, [name, chart.dataStore]);
     return { column, isLoaded };
 }
+
+export function useParamColumnsExperimental(): DataColumn<DataType>[] {
+    const chart = useChart();
+    const { columnIndex } = chart.dataStore;
+    const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
+    // const columns = useMemo(() => {
+    useEffect(() => {
+        const param = chart.config.param;
+        if (!param) {
+            setColumns([]);
+            return;
+        }
+        const cm = window.mdv.chartManager;
+        const dsName = chart.dataStore.name;
+
+        if (typeof chart.config.param === "string") {
+            const col = columnIndex[chart.config.param];
+            // I trust this method about as far as I can throw it...
+            // actually I think it kinda works a bit better with DataStore caching rowDataPromises
+            cm.loadColumnSet([param], dsName, () => {
+                setColumns([col]);
+            });
+            return;
+        }
+
+        // we should make sure they are loaded as well...
+        // (see above comment on trusting this method)
+        cm.loadColumnSet(param, dsName, () => {
+            setColumns(param.map((name) => columnIndex[name]));
+        });
+        return;
+    }, [chart.config.param, columnIndex, chart.dataStore]);
+    return columns;
+}
+
 
 /** If the chart in current context has an associated region, referred to by the key `config.region`, this should return it
  * such that relevant information (like image URL, associated geojson layers...) can be retrieved.
@@ -206,6 +243,9 @@ export function useCategoryFilterIndices(
     contourParameter: DataColumn<CategoricalDataType>,
     category: string | string[],
 ) {
+    //might seem like we should be using a CategoryDimension...
+    //but at the moment that will end up being (often much) slower 
+    //because it always passes through all rows, which this doesn't.
     const data = useFilteredIndices();
     //todo handle multitext / tags properly.
     const categoryValueIndex = useMemo(() => {
@@ -256,4 +296,45 @@ export function useImgUrl(): string {
  */
 export function useDataSources() {
     return window.mdv.chartManager?.dataSources;
+}
+
+/**
+ * Gets a {Dimension} object for filtering a column in the current data store context
+ * and removes the filter when the component unmounts.
+ */
+export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
+    const ds = useDataStore();
+    // it might be good to have something better for isTextLike, some tests for this...
+    const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
+    const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
+    const dim = useMemo(() => {
+        const dim = ds.getDimension(dimension_type);
+        return dim;
+    }, [ds, dimension_type]);
+    useEffect(() => {
+        // cleanup when component unmounts
+        return () => dim.destroy();
+    }, [dim.destroy]);
+    return dim;
+}
+export function useRangeDimension2D() {
+    const ds = useDataStore();
+    const s = useRegionScale();
+    const rangeDimension = useMemo(() => {
+        const dim = ds.getDimension("range_dimension") as RangeDimension;
+        return dim;
+    }, [ds]);
+    useEffect(() => {
+        return () => rangeDimension.destroy();
+    }, [rangeDimension.destroy]);
+    // encapsulating a bit more of the Dimension API here so I'm less likely to forget it.
+    const { param } = useConfig();
+    const cols = useMemo(() => [param[0], param[1]], [param]); //todo: 3d...
+    const filterPoly = useCallback((coords: [number, number][]) => {
+        // const transformed = coords.map((c) => modelMatrix.transformAsPoint(c));
+        const transformed = s === 1 ? coords : coords.map((c) => c.map((v) => v * s));
+        rangeDimension.filter("filterPoly", cols, transformed);
+    }, [rangeDimension, cols, s]);
+    const removeFilter = useCallback(() => rangeDimension.removeFilter(), [rangeDimension]);
+    return { filterPoly, removeFilter, rangeDimension };
 }

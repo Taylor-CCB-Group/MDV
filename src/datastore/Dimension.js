@@ -20,9 +20,16 @@ class Dimension {
         const filter = this.parent.filterArray;
         const parent = this.parent;
         const predicate = args.predicate;
+        // could we pass in optional filteredIndices and use those rather than processing entire array?
+        // it's not as simple as resetting the localFilter because of parent.filterSize mutation
+        // if we guarantee that users of a particular Dimension instance always go through this method,
+        // then we can fairly easily add some other properties for it to reference
+        // - this will make things like a/b comparison of predicate vs other versions of filters harder to test.
+        // - suspect preferred approach will be a new strategy for filter evaluation that doesn't attempt to use this class
         const localFilter = this.filterArray;
         for (let i = 0; i < this.parent.size; i++) {
             // try ... catch to handle errors in the predicate
+            // we could probably pass something monadic in args to handle this
             // let value = false;
             // try {
             //     value = !predicate(i);
@@ -46,6 +53,10 @@ class Dimension {
                 localFilter[i] = 0;
             }
         }
+        // xxx: why would we not notify listeners?
+        //I'm a bit dubious about the general pattern 
+        //- using filter(methodName...) for now to be more in line with other things
+        //this.parent._callListeners("filtered", this);
     }
 
     removeFilter(notify = true) {
