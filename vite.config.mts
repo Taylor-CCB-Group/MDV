@@ -7,9 +7,7 @@ const flaskURL = "http://127.0.0.1:5051";
 const port = 5170;
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
-
-let hasWarned1 = false;
-let hasWarned2 = false;
+// maybe also the various build configurations at some point.
 
 /**
  * shim for various different build configurations.
@@ -91,7 +89,26 @@ function getRollupOptions(): RollupOptions {
     throw new Error(`Unknown build type '${build}' and no VITE_ENTRYPOINT specified.`);
 }
 
-export default defineConfig(env => { return {
+// avoiding some repition by defining a proxyOptions object used for all proxied routes.
+const proxyOptions = { target: flaskURL, changeOrigin: true };
+// ... and then this is a bit more concise than 
+const proxy = [
+    '^/(get_|images|tracks|save).*', // these routes are proxied to flask server in 'single project' mode
+    '^/project/.*/\?', //this works with ?dir=/project/id/foo...
+    //will fail if url has search params <-- ? (what will fail?)
+    //will cause problems if we have json files that don't want to be proxied
+    '^/.*\\.(json|b|gz)$',
+    '/projects',
+    '/create_project',
+    '/delete_project',
+// biome-ignore lint/performance/noAccumulatingSpread: don't care about performance in vite config
+].reduce((acc, route) => ({...acc, [route]: proxyOptions}), {});
+// not sure how we should make the root route work with vite devserver...
+// proxy['/'] = {
+//     target: "/catalog_dev.html"
+// };
+
+export default defineConfig(env => ({
     base: "./",
     server: {
         headers: {
@@ -103,35 +120,7 @@ export default defineConfig(env => { return {
         },
         port,
         strictPort: true,
-        proxy: {
-            // these routes are proxied to flask server in 'single project' mode
-            '^/(get_|images|tracks|save).*': {
-                target: flaskURL,
-                changeOrigin: true,
-            },
-            '^/project/.*/\?': { //this works with ?dir=/project/project_name
-                target: flaskURL,
-                changeOrigin: true,
-            },
-            //will fail if url has search params <-- ?
-            //will cause problems if we have json files that don't want to be proxied
-            '^/.*\\.(json|b|gz)$': {
-                target: flaskURL,
-                changeOrigin: true,
-            },
-            '/projects': {
-                target: flaskURL,
-                changeOrigin: true,
-            },
-            '/create_project': {
-                target: flaskURL,
-                changeOrigin: true,
-            },
-            '/delete_project': {
-                target: flaskURL,
-                changeOrigin: true,
-            },
-        }
+        proxy,
     },
     publicDir: 'examples', //used for netlify.toml??... the rest is noise.
     build: {
@@ -139,33 +128,6 @@ export default defineConfig(env => { return {
         rollupOptions: { 
             ...getRollupOptions(),
             external: ['./python/**'],
-            // this is annoying... lots of warnings in console output otherwise...
-            // https://github.com/vitejs/vite/issues/15012#issuecomment-1815854072
-            onLog(level, log, handler) {
-                if (log.cause && (log.cause as any).message === `Can't resolve original location of error.`) {
-                    if (hasWarned1) return;
-                    hasWarned1 = true;
-                    console.warn('Ignoring "Can\'t resolve original location of error." warnings... see comments in vite.config.mts');
-                    return;
-                }
-                // there are still lots of other warnings, particularly from '@loaders.gl'
-                // `"requireFromFile" is not exported by "__vite-browser-external"` etc...
-                // I think to do with parts of that codebase that are have node code that won't be hit at runtime.
-                // Tried to update deck.gl & luma.gl, which are responsible for @loaders.gl being included,
-                // but that leads to other errors...
-                // (I think because of older @deck.gl/core=8.8.27 being a peerDependency of @vivjs).
-                // `RollupError: "_deepEqual" is not exported by "node_modules/@deck.gl/core/dist/esm/index.js", 
-                //  imported by "node_modules/@deck.gl/extensions/dist/esm/collision-filter/collision-filter-effect.js"`
-                // (in the case of that particular issue, the `_deepEqual` seems to have been added to core at the same 
-                // time as collision-filter-effect.js which uses it, but we have an indirect dependency on older version...)
-                if (log.message.includes('@loaders.gl')) {
-                    if (hasWarned2) return;
-                    hasWarned2 = true;
-                    console.warn('Ignoring "@loaders.gl" warnings... see comments in vite.config.mts');
-                    return;
-                }
-                handler(level, log)
-            }
         },
     },
     plugins: [
@@ -181,4 +143,4 @@ export default defineConfig(env => { return {
             "@": path.resolve(__dirname, "./src"),
         }
     }
-}})
+}))
