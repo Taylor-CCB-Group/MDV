@@ -8,6 +8,7 @@ import {
     Settings,
     Share,
     Image as ImageIcon,
+    LockPerson as LockPersonIcon
 } from "@mui/icons-material";
 import {
     Card,
@@ -25,6 +26,7 @@ import ProjectSettingsModal from "./ProjectSettingsModal";
 import ProjectShareModal from "./ProjectShareModal";
 import ProjectRenameModal from "./ProjectRenameModal"
 import ProjectDeleteModal from "./ProjectDeleteModal"
+import ProjectAccessModal from "./ProjectAccessModal"
 
 interface ProjectCardProps {
     id: string;
@@ -63,6 +65,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isRenameModalOpen, setisRenameModalOpen] = useState(false);
     const [isDeleteModalOpen, setisDeleteModalOpen] = useState(false);
+    const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     const [shouldNavigate, setShouldNavigate] = useState(false);
 
     useEffect(() => {
@@ -201,6 +204,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     </ListItemIcon>
                     <ListItemText>Delete Project</ListItemText>
                 </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setIsAccessModalOpen(true);
+                        handleMenuClose();
+                    }}
+                >
+                    <ListItemIcon>
+                        <LockPersonIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Project Access</ListItemText>
+                </MenuItem>
                 {/* <MenuItem
                     onClick={() => {
                         setIsSettingsModalOpen(true);
@@ -268,6 +282,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 open={isDeleteModalOpen}
                 onDelete={onDelete}
                 onClose={() => setisDeleteModalOpen(false)}
+            />
+
+            <ProjectAccessModal
+                id={id}
+                type={type}
+                open={isAccessModalOpen}
+                onChangeType={onChangeType}
+                onClose={() => setIsAccessModalOpen(false)}
             />
         </Card>
     );
