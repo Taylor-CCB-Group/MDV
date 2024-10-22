@@ -63,8 +63,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    const [isRenameModalOpen, setisRenameModalOpen] = useState(false);
-    const [isDeleteModalOpen, setisDeleteModalOpen] = useState(false);
+    const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     const [shouldNavigate, setShouldNavigate] = useState(false);
 
@@ -184,7 +184,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 </MenuItem>
                 <MenuItem
                     onClick={() => {
-                        setisRenameModalOpen(true);
+                        setIsRenameModalOpen(true);
                         handleMenuClose();
                     }}
                 >
@@ -195,7 +195,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 </MenuItem>
                 <MenuItem
                     onClick={() => {
-                        setisDeleteModalOpen(true);
+                        setIsDeleteModalOpen(true);
                         handleMenuClose();
                     }}
                 >
@@ -274,14 +274,14 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 name={name}
                 open={isRenameModalOpen}
                 onRename={onRename}
-                onClose={() => setisRenameModalOpen(false)}
+                onClose={() => setIsRenameModalOpen(false)}
             />
 
             <ProjectDeleteModal
                 id={id}
                 open={isDeleteModalOpen}
                 onDelete={onDelete}
-                onClose={() => setisDeleteModalOpen(false)}
+                onClose={() => setIsDeleteModalOpen(false)}
             />
 
             <ProjectAccessModal
