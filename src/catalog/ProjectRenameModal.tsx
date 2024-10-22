@@ -86,6 +86,9 @@ const ProjectRenameModal: React.FC<ProjectRenameModalProps> = ({
                         width: "100%",
                     }}
                 >
+                    <Button onClick={onClose} color="primary" sx={{ mr: 2 }}>
+                        Cancel
+                    </Button>
                     <Button onClick={handleSave} color="primary">
                         Save Changes
                     </Button>
