@@ -3,12 +3,12 @@ on:
   push:
     branches:
       # FIXME replace this with main after merge to main
-      - dev
+      - pjt-dev
 #      - main
   pull_request:
     branches:
       # FIXME replace this with main after merge to main
-      - dev
+      - pjt-dev
 #      - main
 
 concurrency:
