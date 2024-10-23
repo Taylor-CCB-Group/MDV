@@ -21,6 +21,7 @@ from .charts.view import View
 import time
 import copy
 from mdvtools.dbutils.dbservice import ProjectService, FileService
+from mdvtools.image_view_prototype import create_image_view_prototype
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -283,7 +284,7 @@ class MDVProject:
             if datasource:
                  # Create a backup of the existing datasource before updating
                 datasource_backup = datasource.copy()
-                self.update_datasource(datasource, datasource_name, tiff_metadata)
+                self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id)
             else:
                 print("@@@@@ new_datasource_name")
                 print(f"datasource_name received: {datasource_name}")
@@ -295,7 +296,7 @@ class MDVProject:
                 datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
 
                 print(f"new_datasource_name set to: {datasource_name}")
-                self.update_datasource(datasource, datasource_name, tiff_metadata)
+                self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id)
             
             # Step 2: Upload the image
             print("^^^ Step 2")
@@ -386,7 +387,7 @@ class MDVProject:
             raise
     
 
-    def update_datasource(self, datasource, datasource_name, tiff_metadata):
+    def update_datasource_for_tiff(self, datasource, datasource_name, tiff_metadata, project_id):
         """Update an existing datasource with new image metadata."""
         try:
             # Find the existing datasource by name
@@ -403,6 +404,11 @@ class MDVProject:
                 datasource = self.create_datasource_template(datasource_name)
                 self.datasources.append(datasource)  # Add the new datasource to the list
                 print(f"In MDVProject.update_datasource: Created new datasource template for '{datasource_name}'.")
+                
+                #adding default columns for new empty ds
+                filename = 'mdvtools.dbutils/emptyds.csv'
+                df_default = pandas.read_csv(filename)
+                self.add_datasource(project_id, datasource_name, df_default, add_to_view=None)
             
             print("*****2")
             #datasources-> regions section
@@ -456,11 +462,25 @@ class MDVProject:
             print("*****5")
             # Save the updated datasource
             self.set_datasource_metadata(datasource)
+
+            print("*****6")
+            #add empty default columns
             
-            # Update views and images
+
+            print("*****7")
+            # Update views and image
+            
+            region_view_json = create_image_view_prototype(datasource_name, region_name)
+
+            datasource_name_lower = datasource_name.lower()
+            if datasource_name_lower in ["default", "new datasource"]:
+                view_name = "default"
+            else:
+                view_name = region_name
+            self.set_view(view_name, region_view_json)
             
             #self.add_viv_images(region_name, image_metadata, link_images=True)
-            print("*****6")
+            print("*****8")
             print(f"In MDVProject.update_datasource : Datasource '{datasource_name}' updated successfully.")
         
         except Exception as e:
