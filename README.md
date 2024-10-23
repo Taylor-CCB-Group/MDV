@@ -87,7 +87,7 @@ pip install -e python
 
 ```
 python -m venv venv
-venv/Scripts/activate.bat
+venv/Scripts/activate
 pip install -e python
 ```
 
