@@ -146,7 +146,7 @@ def create_app(
         path = safe_join(project.dir, file + ".json")
         if path is None or not os.path.exists(path):
             return "File not found", 404
-        return send_file(path)
+        return _send_file(path)
 
     # gets the raw byte data and packages it in the correct response
     @project_bp.route("/get_data", methods=["POST"])
