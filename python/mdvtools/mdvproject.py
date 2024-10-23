@@ -477,11 +477,13 @@ class MDVProject:
             
             region_view_json = create_image_view_prototype(datasource_name, region_name)
 
-            datasource_name_lower = datasource_name.lower()
-            if datasource_name_lower in ["default", "new datasource"]:
-                view_name = "default"
+            views = self.views
+
+            if views and "default" in views:
+                view_name = region_name  # If "default" exists, set view_name to region_name
             else:
-                view_name = region_name
+                view_name = "default"
+            
             print(view_name)
             self.set_view(view_name, region_view_json)
             
