@@ -284,7 +284,7 @@ class MDVProject:
             if datasource:
                  # Create a backup of the existing datasource before updating
                 datasource_backup = datasource.copy()
-                self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id)
+                self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id, original_filename)
             else:
                 print("@@@@@ new_datasource_name")
                 print(f"datasource_name received: {datasource_name}")
@@ -296,7 +296,7 @@ class MDVProject:
                 datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
 
                 print(f"new_datasource_name set to: {datasource_name}")
-                self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id)
+                self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id, original_filename)
             
             # Step 2: Upload the image
             print("^^^ Step 2")
@@ -387,7 +387,7 @@ class MDVProject:
             raise
     
 
-    def update_datasource_for_tiff(self, datasource, datasource_name, tiff_metadata, project_id):
+    def update_datasource_for_tiff(self, datasource, datasource_name, tiff_metadata, project_id, region_name: str):
         """Update an existing datasource with new image metadata."""
         try:
             # Find the existing datasource by name
@@ -406,10 +406,15 @@ class MDVProject:
                 print(f"In MDVProject.update_datasource: Created new datasource template for '{datasource_name}'.")
                 
                 #adding default columns for new empty ds
-                filename = 'mdvtools.dbutils/emptyds.csv'
+                filename = 'mdvtools/dbutils/emptyds.csv'
                 df_default = pandas.read_csv(filename)
-                self.add_datasource(project_id, datasource_name, df_default, add_to_view=None)
+                print('>>>> df_default for image view:::')
+                print(df_default)
+                # self.add_datasource(project_id, datasource_name, df_default, add_to_view=None)
+                self.add_datasource(datasource_name, df_default, add_to_view=None)
+                print(f"In MDVProject.update_datasource: Added default columns to new datasource '{datasource_name}'.")
             
+            datasource = self.get_datasource_metadata(datasource_name)
             print("*****2")
             #datasources-> regions section
             # Ensure datasource has a 'regions' field
@@ -436,8 +441,8 @@ class MDVProject:
             print("******4")
             #datasources-> regions -> all_regions-> new entry section
             # Determine region name
-            full_name = tiff_metadata.get('Name', 'unknown')
-            region_name = full_name.split(".ome")[0] if ".ome" in full_name else full_name  # Use 'Name' from metadata or 'unknown'
+            # full_name = tiff_metadata.get('Name', 'unknown')
+            # region_name = full_name.split(".ome")[0] if ".ome" in full_name else full_name  # Use 'Name' from metadata or 'unknown'
             
             # Define new region with metadata
             new_region = {
@@ -448,9 +453,8 @@ class MDVProject:
                     "max_y": height
                 },
                 "images": {},
-                "json": f"json/{region_name}.tif.s1.json",
                 "viv_image": {
-                    "file": f"{region_name}.tiff",
+                    "file": region_name,
                     "linked_file": True
                 }
             }
@@ -916,7 +920,7 @@ class MDVProject:
 
     def add_datasource(
         self,
-        project_id: str,
+        # project_id: str,
         name: str,
         dataframe: pandas.DataFrame | str,
         columns: Optional[list] = None,
@@ -943,7 +947,7 @@ class MDVProject:
         h5 = None
         
         try:
-            print("£££1")
+            print("£££1 - starting add_datasource")
             if isinstance(dataframe, str):
                 dataframe = pandas.read_csv(dataframe, sep=separator)
             
@@ -956,7 +960,7 @@ class MDVProject:
             except Exception:
                 ds = None
 
-            print("£££1")
+            print(f"£££1 - is ds None? {ds}")
 
             if ds:
                 # Delete the existing datasource if replace_data is True
@@ -967,7 +971,7 @@ class MDVProject:
                         f"Attempt to create datasource '{name}' failed because it already exists."
                     )
             
-            print("£££2")
+            print("£££2 - got passed the ds check")
             # Open HDF5 file and handle group creation
             try:
                 h5 = self._get_h5_handle()
@@ -986,7 +990,7 @@ class MDVProject:
             except Exception as e:
                 raise RuntimeError(f"Error managing HDF5 groups for datasource '{name}': {e}")
             
-            print("£££3")
+            print("£££3 - created h5 group without error")
             # Verify columns are provided
             if not columns:
                 raise AttributeError("No columns to add. Please provide valid columns metadata.")
@@ -995,18 +999,22 @@ class MDVProject:
             dodgy_columns = []
             for col in columns:
                 try:
+                    print(f"- adding column '{col['field']}' to datasource '{name}'")
                     add_column_to_group(col, dataframe[col["field"]], gr, len(dataframe), self.skip_column_clean)
                 except Exception as e:
+                    print(f" ++++++ DODGY COLUMN: {col['field']}")
                     dodgy_columns.append(col["field"])
                     warnings.warn(
                         f"Failed to add column '{col['field']}' to datasource '{name}': {repr(e)}"
                     )
-            print("£££4")
+            print("£££4 ")
             h5.close()  # Close HDF5 file
             columns = [x for x in columns if x["field"] not in dodgy_columns]
+            print(f" - non-dodgy columns: {columns}")
             
             # Update datasource metadata
             ds = {"name": name, "columns": columns, "size": len(dataframe)}
+            print(f'--- setting datasource metadata: {ds}')
             self.set_datasource_metadata(ds)
             
             print("£££5")
@@ -1021,7 +1029,7 @@ class MDVProject:
             print("£££6")
 
             # Update the project's update timestamp using the dedicated method
-            ProjectService.set_project_update_timestamp(project_id)
+            # ProjectService.set_project_update_timestamp(project_id)
             print("£££7")
             print(f"In MDVProject.add_datasource: Added datasource successfully '{name}'")
             return dodgy_columns
