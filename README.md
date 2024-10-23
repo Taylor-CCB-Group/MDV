@@ -59,7 +59,7 @@ If you’re working with large datasets or want more control over your projects,
 
 #### From a GitHub release version
 
-Run these comands from Powershell (Windows) or a Terminal (MaxOS/Linux) to clone the repository:
+Run these comands from Powershell (Windows as administrator) or a Terminal (MaxOS/Linux) to clone the repository:
 
 ```
 git clone https://github.com/Taylor-CCB-Group/MDV.git
