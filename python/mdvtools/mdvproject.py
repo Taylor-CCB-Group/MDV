@@ -412,9 +412,10 @@ class MDVProject:
                 print(df_default)
                 # self.add_datasource(project_id, datasource_name, df_default, add_to_view=None)
                 self.add_datasource(datasource_name, df_default, add_to_view=None)
+                datasource = self.get_datasource_metadata(datasource_name)
                 print(f"In MDVProject.update_datasource: Added default columns to new datasource '{datasource_name}'.")
             
-            datasource = self.get_datasource_metadata(datasource_name)
+            
             print("*****2")
             #datasources-> regions section
             # Ensure datasource has a 'regions' field
@@ -481,6 +482,7 @@ class MDVProject:
                 view_name = "default"
             else:
                 view_name = region_name
+            print(view_name)
             self.set_view(view_name, region_view_json)
             
             #self.add_viv_images(region_name, image_metadata, link_images=True)
@@ -1288,6 +1290,9 @@ class MDVProject:
         """Sets the view with the given name to the supplied view data.
         If the view is None, then the view will be deleted.
         """
+        print("In set_view")
+        print(name)
+        
         views = self.views
         # update or add the view
         if view:

@@ -85,6 +85,7 @@ json_string = '''
 
 # Function to replace image_name and ds_name
 def create_image_view_prototype(new_ds_name, new_image_name):
+    print("In create_image_view_prototype")
     updated_json_str = json_string.replace(default_image_name, new_image_name).replace(default_ds, new_ds_name)
     
     # Parse the updated string back into a JSON object
@@ -93,10 +94,10 @@ def create_image_view_prototype(new_ds_name, new_image_name):
     return updated_json_obj
 
 # Example usage
-new_ds_name = "new_cells"
-new_image_name = "Vaccinated-Sample_32_ROI_2"
+#new_ds_name = "new_cells"
 
-updated_json = create_image_view_prototype(new_ds_name, new_image_name)
+#new_image_name = "Vaccinated-Sample_32_ROI_2"
+#updated_json = create_image_view_prototype(new_ds_name, new_image_name)
 
 # Print the updated JSON object
-print(json.dumps(updated_json, indent=4))
+#print(json.dumps(updated_json, indent=4))
