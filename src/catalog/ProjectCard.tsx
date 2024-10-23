@@ -1,11 +1,14 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
+    Delete as DeleteIcon,
+    DriveFileRenameOutline,
     MoreVert,
     Info,
     Settings,
     Share,
     Image as ImageIcon,
+    LockPerson as LockPersonIcon
 } from "@mui/icons-material";
 import {
     Card,
@@ -21,6 +24,9 @@ import {
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
 import ProjectShareModal from "./ProjectShareModal";
+import ProjectRenameModal from "./ProjectRenameModal"
+import ProjectDeleteModal from "./ProjectDeleteModal"
+import ProjectAccessModal from "./ProjectAccessModal"
 
 interface ProjectCardProps {
     id: string;
@@ -57,6 +63,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
     const [shouldNavigate, setShouldNavigate] = useState(false);
 
     useEffect(() => {
@@ -175,6 +184,39 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 </MenuItem>
                 <MenuItem
                     onClick={() => {
+                        setIsRenameModalOpen(true);
+                        handleMenuClose();
+                    }}
+                >
+                    <ListItemIcon>
+                        <DriveFileRenameOutline fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Rename Project</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setIsDeleteModalOpen(true);
+                        handleMenuClose();
+                    }}
+                >
+                    <ListItemIcon>
+                        <DeleteIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Delete Project</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setIsAccessModalOpen(true);
+                        handleMenuClose();
+                    }}
+                >
+                    <ListItemIcon>
+                        <LockPersonIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Project Access</ListItemText>
+                </MenuItem>
+                {/* <MenuItem
+                    onClick={() => {
                         setIsSettingsModalOpen(true);
                         handleMenuClose();
                     }}
@@ -183,8 +225,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         <Settings fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Project Settings</ListItemText>
-                </MenuItem>
-                <MenuItem
+                </MenuItem> */}
+                {/* <MenuItem
                     onClick={() => {
                         setIsShareModalOpen(true);
                         handleMenuClose();
@@ -194,7 +236,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         <Share fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Share Project</ListItemText>
-                </MenuItem>
+                </MenuItem> */}
             </Menu>
 
             <ProjectInfoModal
@@ -225,6 +267,29 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 onClose={() => setIsShareModalOpen(false)}
                 onAddCollaborator={onAddCollaborator}
                 projectId={id}
+            />
+
+            <ProjectRenameModal
+                id={id}
+                name={name}
+                open={isRenameModalOpen}
+                onRename={onRename}
+                onClose={() => setIsRenameModalOpen(false)}
+            />
+
+            <ProjectDeleteModal
+                id={id}
+                open={isDeleteModalOpen}
+                onDelete={onDelete}
+                onClose={() => setIsDeleteModalOpen(false)}
+            />
+
+            <ProjectAccessModal
+                id={id}
+                type={type}
+                open={isAccessModalOpen}
+                onChangeType={onChangeType}
+                onClose={() => setIsAccessModalOpen(false)}
             />
         </Card>
     );
