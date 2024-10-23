@@ -49,18 +49,15 @@ const useProjects = () => {
     }
   }, []);
 
-  const createProject = useCallback(async (projectName: string) => {
+  const createProject = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await fetch("create_project", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: projectName, // will be ignored with real backend, but currently used in mdv_desktop
-        }),
+          "Content-Type": "application/json"
+        }
       });
 
       if (!response.ok) {
@@ -68,12 +65,32 @@ const useProjects = () => {
       }
 
       const data = await response.json();
-      setProjects(prevProjects => [...prevProjects, data]);
-      return data;
+      
+      if (data.status === "error") {
+        throw new Error(data.message);
+      }
+
+      // Add the new project to the local state with default values
+      // These will be populated by subsequent fetch
+      const newProject: Project = {
+        id: data.id,
+        name: data.name,
+        type: "Editable" as const,
+        lastModified: "",
+        createdAt: "",
+        owner: "",
+        collaborators: [],
+        numberOfStructures: "0",
+        numberOfImages: "0"
+      };
+      
+      setProjects(prevProjects => [...prevProjects, newProject]);
+      return newProject;
       
     } catch (error) {
       setError('Error creating project. Please try again later.');
       console.error("Error creating project:", error);
+      throw error;
     } finally {
       setIsLoading(false);
     }

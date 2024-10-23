@@ -34,19 +34,22 @@ The Multi-Dimensional Viewer (MDV) is a web-based application designed to help u
 
 ### System Requirements
 
-For running a release version:
+- **Browser**: A modern browser (e.g., Chrome, Firefox, Safari, or Edge)
+- **Memory**: At least 4 GB of RAM, even for handling large datasets (~10 million items), due to the lazy loading of data in raw bytes
 
-* A modern browser
-* python (3.6 or above)
-* only 4GB of ram is required even for large datasets (~10 000 000 items) as data is lazily loaded as raw bytes
-* `htslib` is required only for Genome Browser functionality.
+You can browse existing projects at the [MDV Website](https://mdv.molbiol.ox.ac.uk/)
+You can register at the [MDV Registration page](https://mdv.molbiol.ox.ac.uk/user/register?next=https://mdv.molbiol.ox.ac.uk/) for your own projects. 
 
-For development, or running the current version from the repository:
+We are working hard on a new version that will make uploading and installing data much easier. Please contact [Us](mailto:stephen.taylor@well.ox.ac.uk) if you want to upload your own data sets or wish to be added to the mailing list for news. 
 
-* git
-* npm and node.js (https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
-* python (>=3.10, 3.12 is most tested/supported)
-* poetry (for managing python dependencies - optional, but recommended especially for contributing to the Python code)
+### For Development or Running a Local Version from the Repository:
+
+If you plan to contribute or run the latest development version, additional tools are required:
+- **Browser**: A modern browser (e.g., Chrome, Firefox, Safari, or Edge)
+- **Git**: For cloning the repository and version control
+- **Node.js & npm**: For managing JavaScript dependencies ([Installation Guide](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm))
+- **Python**: Version 3.10 or higher (3.12 is the most thoroughly tested and supported)
+- **Poetry** (optional, but recommended): For managing Python dependencies, especially if you are contributing to the Python codebase
 
 ## Running On Local Machine
 
@@ -84,7 +87,7 @@ pip install -e python
 
 ```
 python -m venv venv
-venv/Scripts/activate.bat
+venv/Scripts/activate
 pip install -e python
 ```
 
