@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ciview2</title>
+    <style>
+      body{
+        background:lightgrey;
+        height:100%;
+        width:100%;
+        margin:0px;
+      }
+
+      html{
+        height:100%;
+        width:100%;
+      }
+      .all{
+        height:100%;
+        width:100%;
+        display:flex;
+        /* safari issue... removing doesn't seem to adversely effect */
+        /* flex-wrap:wrap; */
+      }
+      .holder{
+        height:300px;
+        width:300px;
+        background:white;
+        z-index:40;
+        /* padding:5px; */
+        margin:10px;
+        display:inline-block;
+      }
+
+
+    </style>
+  </head>
+  <body>
+
+
+<div id="app1" class="all"></div>
+
+
+
+
+    <script src="dist/ciview2.js"></script>
+  </body>
+</html>
