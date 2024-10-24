@@ -236,9 +236,9 @@ class ChartManager {
                     position: "bottom-right",
                 },
                 func: () => {
-                    const state = this.getState();
-                    this._callListeners("state_saved", state);
-                    window.location.href = `${window.location.origin}/catalog_dev`;
+                    // const state = this.getState();
+                    // this._callListeners("state_saved", state);
+                    window.location.href = import.meta.env.DEV ? `${window.location.origin}/catalog_dev` : `${window.location.origin}/../`;
                 },
             },
             this.menuBar,
