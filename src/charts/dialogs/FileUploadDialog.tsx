@@ -168,7 +168,17 @@ const FileSummaryHeading = ({ children }) => (
 );
 
 const FileSummaryText = ({ children }) => (
-    <p className="text-lg text-gray-700 dark:text-white my-1">{children}</p>
+    <>
+        {typeof children === 'string' ? (
+            <p className="text-lg text-gray-700 dark:text-white my-1">
+                {children}
+            </p>
+        ) : (
+            <div className="text-lg text-gray-700 dark:text-white my-1">
+                {children}
+            </div>
+        )}
+    </>
 );
 
 const ErrorContainer = ({ children }) => (
@@ -451,8 +461,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
                 };
             }
 
-    viewerStore.setState({ isChannelLoading: [true] });
-    viewerStore.setState({ isViewerLoading: true });
+            viewerStore.setState({ isChannelLoading: [true] });
+            viewerStore.setState({ isViewerLoading: true });
 
             try {
                 const newLoader = await createLoader(
@@ -726,160 +736,245 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
         }
     };
 
-  const handleClose = async () => {
-    dispatch({ type: "SET_FILE_SUMMARY", payload: null });
-    onResize(450, 320);
-    onClose();
-  };
+    const handleClose = async () => {
+        dispatch({ type: "SET_FILE_SUMMARY", payload: null });
+        onResize(450, 320);
+        onClose();
+    };
 
-  return (
-    <Container>
-      {state.isUploading ? (
-        <StatusContainer>
-          <Message>{"Your file is being uploaded, please wait..."}</Message>
-          <ProgressBar value={progress} max="100" />
-        </StatusContainer>
-      ) : state.isInserting ? (
-        <StatusContainer>
-          <Message>{"Your file is being processed, please wait..."}</Message>
-          <Spinner />
-        </StatusContainer>
-      ) : state.success ? (
-        <>
-          <SuccessContainer>
-            <SuccessHeading>Success!</SuccessHeading>
-            <SuccessText>
-              The file was uploaded successfully to the database.
-            </SuccessText>
-          </SuccessContainer>
-          <Button color="green" onClick={() => window.location.reload()}>
-            Refresh Page
-          </Button>
-        </>
+    return (
+        <Container>
+            {state.isUploading ? (
+                <StatusContainer>
+                    <Message>
+                        {"Your file is being uploaded, please wait..."}
+                    </Message>
+                    <ProgressBar value={progress} max="100" />
+                </StatusContainer>
+            ) : state.isInserting ? (
+                <StatusContainer>
+                    <Message>
+                        {"Your file is being processed, please wait..."}
+                    </Message>
+                    <Spinner />
+                </StatusContainer>
+            ) : state.success ? (
+                <>
+                    <SuccessContainer>
+                        <SuccessHeading>Success!</SuccessHeading>
+                        <SuccessText>
+                            The file was uploaded successfully to the database.
+                        </SuccessText>
+                    </SuccessContainer>
+                    <Button
+                        color="green"
+                        onClick={() => window.location.reload()}
+                    >
+                        Refresh Page
+                    </Button>
+                </>
+            ) : state.error ? (
+                <>
+                    <ErrorContainer>
+                        <ErrorHeading>
+                            An error occurred while uploading the file:
+                        </ErrorHeading>
+                        <p>{state.error.message}</p>
+                        {state.error.traceback && (
+                            <pre>{state.error.traceback}</pre>
+                        )}
+                    </ErrorContainer>
+                </>
+            ) : state.isValidating ? (
+                <StatusContainer>
+                    <Message>{"Validating data, please wait..."}</Message>
+                    <Spinner />
+                </StatusContainer>
+            ) : state.validationResult ? (
+                <>
+                    {state.fileType === "csv" && (
+                        <>
+                            <FileSummary>
+                                <FileSummaryHeading>
+                                    {"Uploaded File Summary"}
+                                </FileSummaryHeading>
+                                <FileSummaryText>
+                                    <DatasourceNameInput
+                                        value={datasourceName}
+                                        onChange={handleDatasourceNameChange}
+                                        isDisabled={
+                                            state.selectedFiles.length === 0
+                                        }
+                                    />
+                                </FileSummaryText>
+                                <FileSummaryText>
+                                    <strong>{"File name"}</strong>{" "}
+                                    {csvSummary.fileName}
+                                </FileSummaryText>
+                                <FileSummaryText>
+                                    <strong>{"Number of rows"}</strong>{" "}
+                                    {csvSummary.rowCount}
+                                </FileSummaryText>
+                                <FileSummaryText>
+                                    <strong>{"Number of columns"}</strong>{" "}
+                                    {csvSummary.columnCount}
+                                </FileSummaryText>
+                                <FileSummaryText>
+                                    <strong>{"File size"}</strong>{" "}
+                                    {csvSummary.fileSize} MB
+                                </FileSummaryText>
+                            </FileSummary>
+                            <ColumnPreview
+                                columnNames={columnNames}
+                                columnTypes={columnTypes}
+                                secondRowValues={secondRowValues}
+                            />
 
-      ) : state.error ? (
-        <>
-          <ErrorContainer>
-            <ErrorHeading>An error occurred while uploading the file:</ErrorHeading>
-            <p>{state.error.message}</p>
-            {state.error.traceback && (
-              <pre>{state.error.traceback}</pre>
-            )}
-          </ErrorContainer>
-        </>
-      ) : state.isValidating ? (
-        <StatusContainer>
-          <Message>{"Validating data, please wait..."}</Message>
-          <Spinner />
-        </StatusContainer>
-      ) : state.validationResult ? (
-        <>
-          {state.fileType === "csv" && (
-            <>
-              <FileSummary>
-                <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
-                <FileSummaryText>
-                  <strong>{"Datasource name"}</strong> {csvSummary.datasourceName}
-                </FileSummaryText>
-                <FileSummaryText>
-                  <strong>{"File name"}</strong> {csvSummary.fileName}
-                </FileSummaryText>
-                <FileSummaryText>
-                  <strong>{"Number of rows"}</strong> {csvSummary.rowCount}
-                </FileSummaryText>
-                <FileSummaryText>
-                  <strong>{"Number of columns"}</strong> {csvSummary.columnCount}
-                </FileSummaryText>
-                <FileSummaryText>
-                  <strong>{"File size"}</strong> {csvSummary.fileSize} MB
-                </FileSummaryText>
-              </FileSummary>
-              <ColumnPreview columnNames={columnNames} columnTypes={columnTypes} secondRowValues={secondRowValues} />
-              <div className="flex justify-center items-center gap-6 mt-4">
-                <Button marginTop="mt-1" onClick={handleUploadClick}>{"Upload"}</Button>
-                <Button color="red" size="px-6 py-2.5" marginTop="mt-1" onClick={handleClose}>{"Cancel"}</Button>
-              </div>
-            </>
-          )}
+                            <div className="flex justify-center items-center gap-6 mt-4">
+                                <Button
+                                    marginTop="mt-1"
+                                    onClick={handleUploadClick}
+                                >
+                                    {"Upload"}
+                                </Button>
+                                <Button
+                                    color="red"
+                                    size="px-6 py-2.5"
+                                    marginTop="mt-1"
+                                    onClick={handleClose}
+                                >
+                                    {"Cancel"}
+                                </Button>
+                            </div>
+                        </>
+                    )}
 
-
-          {state.fileType === "tiff" && state.tiffMetadata && (
-            <>
-              <div className="h-full w-full flex">
-                <div className="w-1/3 flex flex-col">
-                  <div className="flex items-center justify-center">
-                    <div className="flex items-start justify-start pt-5 pl-4">
-                      <FileSummary>
-                        <FileSummaryHeading>{"Uploaded File Summary"}</FileSummaryHeading>
-                        <FileSummaryText>
-                          <strong>{"File name:"}</strong> {tiffSummary.fileName}
-                        </FileSummaryText>
-                        <FileSummaryText>
-                          <strong>{"File size:"}</strong> {tiffSummary.fileSize} MB
-                        </FileSummaryText>
-                        <DatasourceDropdown options={updatedNamesArray} onSelect={handleSelect} />
-
-                      </FileSummary>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <div className="flex flex-col items-center justify-center ">
-                      <FileSummaryText>
-                        <strong>Image Preview:</strong>
-                      </FileSummaryText>
-                      <TiffVisualization
-                        metadata={state.tiffMetadata}
-                        file={state.selectedFiles[0]}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="w-2/3">
-                  <div className="flex items-start justify-start h-[70%] min-h-[420px]">
-                    {showMetadata ? <TiffMetadataTable metadata={state.tiffMetadata} /> : <TiffPreview metadata={state.tiffMetadata} />}
-                  </div>
-                  <div className="flex justify-between items-center ml-4 mr-2 mt-12">
-                    <Button color="gray" size="px-6 py-2.5" marginTop="mt-1" onClick={toggleView}>{showMetadata ? "View Metadata as XML" : "View Metadata as Table"}</Button>
-                    <div className="flex space-x-4 ml-auto">
-                      <Button marginTop="mt-6" onClick={handleUploadClick}>{"Upload"}</Button>
-                      <Button color="red" size="px-6 py-2.5" marginTop="mt-6" onClick={handleClose}>{"Cancel"}</Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </>
-      ) : (
-        <>
-          <DropzoneContainer {...getRootProps()} isDragOver={isDragActive} aria-label={"dropzoneLabel"}>
-            <input {...getInputProps()} />
-            {isDragActive ? (
-              <DynamicText text={"Drop files here..."} />
+                    {state.fileType === "tiff" && state.tiffMetadata && (
+                        <>
+                            <div className="h-full w-full flex">
+                                <div className="w-1/3 flex flex-col">
+                                    <div className="flex items-center justify-center">
+                                        <div className="flex items-start justify-start pt-5 pl-4">
+                                            <FileSummary>
+                                                <FileSummaryHeading>
+                                                    {"Uploaded File Summary"}
+                                                </FileSummaryHeading>
+                                                <FileSummaryText>
+                                                    <strong>
+                                                        {"File name:"}
+                                                    </strong>{" "}
+                                                    {tiffSummary.fileName}
+                                                </FileSummaryText>
+                                                <FileSummaryText>
+                                                    <strong>
+                                                        {"File size:"}
+                                                    </strong>{" "}
+                                                    {tiffSummary.fileSize} MB
+                                                </FileSummaryText>
+                                                <DatasourceDropdown
+                                                    options={updatedNamesArray}
+                                                    onSelect={handleSelect}
+                                                />
+                                            </FileSummary>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-center">
+                                        <div className="flex flex-col items-center justify-center ">
+                                            <FileSummaryText>
+                                                <strong>Image Preview:</strong>
+                                            </FileSummaryText>
+                                            <TiffVisualization
+                                                metadata={state.tiffMetadata}
+                                                file={state.selectedFiles[0]}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="w-2/3">
+                                    <div className="flex items-start justify-start h-[70%] min-h-[420px]">
+                                        {showMetadata ? (
+                                            <TiffMetadataTable
+                                                metadata={state.tiffMetadata}
+                                            />
+                                        ) : (
+                                            <TiffPreview
+                                                metadata={state.tiffMetadata}
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="flex justify-between items-center ml-4 mr-2 mt-12">
+                                        <Button
+                                            color="gray"
+                                            size="px-6 py-2.5"
+                                            marginTop="mt-1"
+                                            onClick={toggleView}
+                                        >
+                                            {showMetadata
+                                                ? "View Metadata as XML"
+                                                : "View Metadata as Table"}
+                                        </Button>
+                                        <div className="flex space-x-4 ml-auto">
+                                            <Button
+                                                marginTop="mt-6"
+                                                onClick={handleUploadClick}
+                                            >
+                                                {"Upload"}
+                                            </Button>
+                                            <Button
+                                                color="red"
+                                                size="px-6 py-2.5"
+                                                marginTop="mt-6"
+                                                onClick={handleClose}
+                                            >
+                                                {"Cancel"}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </>
             ) : (
-              <DynamicText text={state.selectedFiles.length > 0 ? `Selected file: ${state.selectedFiles[0].name}` : rejectionMessage} className={rejectionMessageStyle} />
+                <>
+                    <DropzoneContainer
+                        {...getRootProps()}
+                        isDragOver={isDragActive}
+                        aria-label={"dropzoneLabel"}
+                    >
+                        <input {...getInputProps()} />
+                        <div className="flex flex-col items-center justify-center space-y-0">
+                            <CloudUploadIcon
+                                className="text-gray-400"
+                                style={{ fontSize: "5rem" }}
+                            />
+                            {isDragActive ? (
+                                <DynamicText
+                                    text={"Drop files here..."}
+                                    className="text-sm"
+                                />
+                            ) : (
+                                <DynamicText
+                                    text={
+                                        state.selectedFiles.length > 0
+                                            ? `Selected file: ${state.selectedFiles[0].name}`
+                                            : rejectionMessage
+                                    }
+                                    className={`${rejectionMessageStyle} text-sm`}
+                                />
+                            )}
+                            <FileInputLabel
+                                htmlFor="fileInput"
+                                className="text-sm"
+                            >
+                                {"Choose File"}
+                            </FileInputLabel>
+                        </div>
+                    </DropzoneContainer>
+                </>
             )}
-            <FileInputLabel htmlFor="fileInput">{"Choose File"}</FileInputLabel>
-          </DropzoneContainer>
-          <div className="w-full flex items-center pl-4 pr-4">
-            <DatasourceNameInput
-              value={datasourceName}
-              onChange={handleDatasourceNameChange}
-              isDisabled={state.selectedFiles.length === 0}
-            />
-            <Button onClick={handleValidateClick}
-              disabled={(state.selectedFiles.length === 0 || state.isUploading)}
-              marginTop="mt-5"
-              size="px-6 py-0.5"
-              color="blue"
-            >
-              {"Validate File"}
-            </Button>
-          </div>
-        </>
-      )}
-    </Container>
-  );
+        </Container>
+    );
 };
 
-export default observer(FileUploadDialogComponent);; 
+export default observer(FileUploadDialogComponent);
