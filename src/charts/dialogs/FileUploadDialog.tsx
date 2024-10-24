@@ -5,6 +5,7 @@ import {
     useReducer,
     type PropsWithChildren,
     forwardRef,
+    useEffect,
 } from "react";
 import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
@@ -25,6 +26,7 @@ import { TiffMetadataTable } from "./TiffMetadataTable";
 import TiffVisualization from "./TiffVisualization";
 import { DatasourceDropdown } from "./DatasourceDropdown";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import { Dialog, Paper } from "@mui/material";
 
 // Use dynamic import for the worker
 const CsvWorker = new Worker(new URL("./csvWorker.ts", import.meta.url), {
@@ -279,7 +281,7 @@ const useFileUploadProgress = () => {
     return { progress, setProgress, startProgress, resetProgress };
 };
 
-const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
+const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = observer(({
     onClose,
     onResize,
 }) => {
@@ -975,6 +977,31 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
             )}
         </Container>
     );
-};
+});
 
-export default observer(FileUploadDialogComponent);
+const Wrapper = (props: FileUploadDialogComponentProps) => {
+    const [open, setOpen] = useState(true);
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, []);
+    //p-4 mt-2 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]
+    return (
+        <Dialog open={open} fullScreen disableEscapeKeyDown={true}>
+            <div className="h-screen flex items-center justify-center">
+                <Paper variant="outlined" elevation={24} sx={{p: 2}}>
+                    <FileUploadDialogComponent {...props} />
+                </Paper>
+            </div>
+        </Dialog>
+    );
+}
+
+export default Wrapper;
