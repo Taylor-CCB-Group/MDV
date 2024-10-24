@@ -227,6 +227,24 @@ class ChartManager {
 
         createEl("span", { classes: ["mdv-divider"] }, this.menuBar);
 
+        
+        const homeButton = createMenuIcon(
+            "fas fa-home",
+            {
+                tooltip: {
+                    text: "Back to Catalog",
+                    position: "bottom-right",
+                },
+                func: () => {
+                    // const state = this.getState();
+                    // this._callListeners("state_saved", state);
+                    window.location.href = import.meta.env.DEV ? `${window.location.origin}/catalog_dev` : `${window.location.origin}/../`;
+                },
+            },
+            this.menuBar,
+        );
+        homeButton.style.marginRight = "20px";
+
         if (config.all_views) {
             this.viewSelect = createEl(
                 "select",

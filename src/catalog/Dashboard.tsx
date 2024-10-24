@@ -68,19 +68,13 @@ const Dashboard: React.FC = () => {
     }, [fetchProjects]);
 
     const handleCreateProject = async () => {
-        // in future we should change the signature of createProject to not need the project name...
-        // mdv_server_app will ignore it anyway... but for now I'm making it so in dev server we can enter the project name with a prompt...
-        const newProjectName = import.meta.env.DEV ? prompt("Enter project name") : "<<UNUSED>>";
-        if (newProjectName.trim()) {
-            try {
-                const newProject = await createProject(newProjectName.trim());
-                // Redirect to the new project page
-                // note that we may not be hosted in the root of the domain, so we should use relative paths
-                window.location.href = `project/${newProject.id}`;
-            } catch (error) {
-                console.error("Failed to create project:", error);
-                alert("Failed to create project. Please try again.");
-            }
+        try {
+            const newProject = await createProject();
+            const base = import.meta.env.DEV ? "http://localhost:5170?dir=/" : "";
+            window.location.href = `${base}project/${newProject.id}`;
+        } catch (error) {
+            console.error("Failed to create project:", error);
+            alert("Failed to create project. Please try again.");
         }
     };
 
