@@ -234,7 +234,7 @@ def create_app(
             return _send_file(file_name)
         return get_range(file_name, range_header)
 
-    @project_bp.route("/save_state", methods=["POST"])
+    @project_bp.route("/save_state", access_level='editable', methods=["POST"])
     def save_data():
         success = True
         try:
@@ -245,34 +245,45 @@ def create_app(
 
         return jsonify({"success": success})
     
-    @project_bp.route("/add_or_update_image_datasource", methods=["POST"])
+    @project_bp.route("/add_or_update_image_datasource", access_level='editable', methods=["POST"])
     def add_or_update_image_datasource():
         try:
-            # Extract data from the request
-            data = request.json
-            if not data:
-                return "Request must contain JSON data with tiffMetadata & datasourceName", 400
-            tiff_metadata = data.get('tiffMetadata')
-            datasource_name = data.get('datasourceName')
+            # Check if request has a file part
+            if 'file' not in request.files:
+                return "No file part in the request", 400
 
-            if not tiff_metadata or not datasource_name:
-                return "Request must contain JSON data with tiffMetadata & datasourceName", 400
+            # Get the file from the request
+            file = request.files['file']
+            
+            # Get the text fields from the request form
+            datasource_name = request.form.get('datasourceName') # ""
+            tiff_metadata = request.form.get('tiffMetadata')
+            # Validate the presence of required fields
+            if not file or not tiff_metadata:
+                return "Missing file or tiffMetadata", 400
+            # If tiff_metadata is sent as JSON string, deserialize it
+            try:
+                tiff_metadata = json.loads(tiff_metadata)
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Invalid JSON format for tiffMetadata: {e}"}), 400
+            
+            # Call the method to add or update the image datasource
+            view_name = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file, project.id)
+            
+            # If no exception is raised, the operation was successful. let the client know which view will show the image.
+            print(f">>> notify client that image datasource updated and file uploaded successfully, view: {view_name}")
+            return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully", "view": view_name}), 200
 
-            # Call the method in the project class to add or update image datasource
-            success = project.add_or_update_image_datasource(tiff_metadata, datasource_name)
-            if success:
-                return "Image datasource updated successfully", 200
-            else:
-                return "Failed to update image datasource", 500
         except Exception as e:
-            return str(e), 500
+            return jsonify({"status": "error", "message": str(e)}), 500
 
-    @project_bp.route("/add_datasource", methods=["POST"])
+
+    @project_bp.route("/add_datasource", access_level='editable', methods=["POST"])
     def add_datasource():
         # we shouldn't be passing "backend" in request.form, the logic should only be on server
-        if backend:
-            response = add_datasource_backend(project)
-            return response
+        #if backend:
+        #    response = add_datasource_backend(project)
+        #    return response
 
         if (
             "permission" not in project.state
@@ -282,6 +293,9 @@ def create_app(
         success = True
         try:
             name = request.form["name"]
+
+            print("%%%%1")
+
             if not name:
                 return "Request must contain 'name'", 400
             # xxx - not how column metadata should be passed, todo fix
@@ -294,7 +308,8 @@ def create_app(
             # I'm not sure we really want to add to default view by default - could mess up existing views in a project with multiple datasources
             # but probably ok for now (famous last words)
             view = request.form["view"] if "view" in request.form else "default"
-            replace = True if "replace" in request.form else False
+            # replace = True if "replace" in request.form else False
+            replace = False
             if not replace and name in [ds["name"] for ds in project.datasources]:
                 return (
                     f"Datasource '{name}' already exists, and 'replace' was not set in request",
@@ -309,15 +324,19 @@ def create_app(
             file.seek(0)
             # will this work? can we return progress to the client?
             df = pd.read_csv(file.stream)
+            print("%%%%2")
+            print("df is ready, calling project.add_datasource")
             project.add_datasource(
+                project.id,
                 name,
                 df,
                 # cols,
                 add_to_view=view,
                 supplied_columns_only=supplied_only,
-                replace_data=replace,
-            )
-
+                replace_data=replace
+                )
+            print("%%%%3")
+            print("added df - project.add_datasource completed")
         except Exception as e:
             # success = False
             return str(e), 400
@@ -343,119 +362,3 @@ def create_app(
         app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
 
 
-def add_datasource_backend(project):
-    from mdvtools.dbutils.dbmodels import db, Project, File
-    from sqlalchemy.exc import SQLAlchemyError
-
-    try:
-        if (
-            "permission" not in project.state
-            or not project.state["permission"] == "edit"
-        ):
-            return jsonify({"error": "Project is read-only"}), 400
-
-        name = request.form["name"]
-        if not name:
-            return jsonify({"error": "Request must contain 'name'"}), 400
-
-        # Check if project exists
-        project_db = Project.query.filter_by(name=name).first()
-        if not project_db:
-            return jsonify({"project does not exist in database"}), 400
-
-        view = request.form["view"] if "view" in request.form else None
-        replace = True if "replace" in request.form else False
-        if not replace and name in [ds["name"] for ds in project.datasources]:
-            return (
-                f"Datasource '{name}' already exists, and 'replace' was not set in request",
-                400,
-            )
-        if "file" not in request.files:
-            return "No 'file' provided in request form data", 400
-        file = request.files["file"]
-        supplied_only = True if "supplied_only" in request.form else False
-
-        # Validate the file
-        is_valid, error_message = validate_file(file)
-        if not is_valid:
-            return jsonify({"error": error_message}), 400
-
-        # Read file and add the datasource
-        file.seek(0)
-        # will this work? can we return progress to the client?
-        df = pd.read_csv(file.stream)
-        project.add_datasource(
-            name,
-            df,
-            # cols,
-            add_to_view=view,
-            supplied_columns_only=supplied_only,
-            replace_data=replace,
-        )
-
-        # database operations
-        file_set = [project.h5file, project.datasourcesfile]
-        if view:
-            file_set.append(project.viewsfile)
-
-        for file in file_set:
-            existing_file = File.query.filter_by(
-                name=os.path.basename(file), project_id=project_db.id
-            ).first()
-
-            if existing_file:
-                # Update the database entry with new file path and update timestamp
-                existing_file.update_timestamp = datetime.now()
-
-            else:
-                # Create a new file entry
-                new_file = File()
-                new_file.name = os.path.basename(
-                    file
-                )  # Assign value to the name attribute
-                new_file.file_path = None  # Assign value to the file_path attribute
-                new_file.project_id = project_db.id
-                db.session.add(new_file)
-
-        db.session.commit()
-        return jsonify(
-            {
-                "message": f'File Validation Status: Success. Successfully added csv as a new datasource and files {file_set} have been modified under project "{name}"'
-            }
-        ), 200
-
-    except SQLAlchemyError:
-        # Rollback transaction on database error
-        db.session.rollback()
-        return jsonify({"error": "Database error occurred"}), 500
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-
-def validate_file(file):
-    try:
-        if not file:
-            return False, "File is missing"
-
-        """Validate the CSV file."""
-        file_dir = os.path.dirname(os.path.abspath(__file__))
-        dbutils_dir = os.path.join(file_dir, "dbutils")
-        validation_rules_path = os.path.join(dbutils_dir, "validation_rules.json")
-
-        with open(validation_rules_path, "r") as f:
-            validation_rules = json.load(f)
-
-        # Check file type
-        if file.mimetype not in validation_rules["file_type"]["allowed_types"]:
-            return False, validation_rules["file_type"]["error_message"]
-
-        # Check file size
-        max_size = validation_rules["file_size"]["max_size"]
-        if file.content_length > max_size:
-            return False, validation_rules["file_size"]["error_message"]
-
-        return True, None
-
-    except Exception as e:
-        return False, f"An error occurred during file validation: {str(e)}"

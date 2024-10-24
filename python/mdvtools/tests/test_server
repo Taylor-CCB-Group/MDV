@@ -1,0 +1,107 @@
+import unittest
+import os
+import json
+from flask import Flask
+from flask_testing import TestCase
+from mdvtools.server import create_app
+from mdvtools.mdvproject import MDVProject
+
+class TestMDVServer(TestCase):
+    def create_app(self):
+        # Set up a temporary project directory
+        test_dir = os.path.join(os.path.dirname(__file__), 'test_project')
+        os.makedirs(test_dir, exist_ok=True)
+
+        # Create a mock MDVProject instance
+        self.project = MDVProject(dir=test_dir, delete_existing=True)
+        return create_app(self.project, open_browser=False)
+
+    def tearDown(self):
+        # Clean up the temporary project directory
+        for root, dirs, files in os.walk(self.project.dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        os.rmdir(self.project.dir)
+
+    def test_project_index(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_add_or_update_image_datasource(self):
+        # Prepare mock data
+        datasource_name = "TestDataSource"
+        mock_file_data = (b'This is a test file', 'test_image.tiff')
+        tiff_metadata = {
+            "Pixels": {
+                "SizeX": 100,
+                "SizeY": 100,
+                "PhysicalSizeX": 0.5,
+                "PhysicalSizeXUnit": "µm"
+            },
+            "Name": "test_image.tiff"
+        }
+
+        response = self.client.post(
+            '/add_or_update_image_datasource',
+            data={
+                'datasourceName': datasource_name,
+                'tiffMetadata': json.dumps(tiff_metadata),
+                'file': (mock_file_data, 'test_image.tiff')
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Image datasource updated and file uploaded successfully", response.json['message'])
+
+    def test_add_datasource(self):
+        # Prepare a mock CSV file
+        csv_data = "column1,column2\nvalue1,value2"
+        mock_file_data = (csv_data, 'test_data.csv')
+
+        response = self.client.post(
+            '/add_datasource',
+            data={
+                'name': 'TestDataSource',
+                'view': 'default',
+                'file': (mock_file_data, 'test_data.csv')
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("success", response.json)
+
+    def test_get_binary_file(self):
+        # This test assumes that there is a binary file present in the project directory
+        # Please create a dummy binary file in the test setup for this test to pass.
+        binary_file_path = os.path.join(self.project.dir, 'test_file.b')
+        with open(binary_file_path, 'wb') as f:
+            f.write(os.urandom(1024))  # Write random binary data
+
+        response = self.client.get('/test_file.b')
+        self.assertEqual(response.status_code, 206)
+
+    def test_get_json_file(self):
+        # Create a dummy JSON file
+        json_file_path = os.path.join(self.project.dir, 'test_file.json')
+        with open(json_file_path, 'w') as f:
+            json.dump({"key": "value"}, f)
+
+        response = self.client.get('/test_file.json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"key": "value"})
+
+    def test_get_data_invalid(self):
+        response = self.client.post('/get_data', json={})
+        self.assertEqual(response.status_code, 400)
+
+    def test_get_view_invalid(self):
+        response = self.client.post('/get_view', json={})
+        self.assertEqual(response.status_code, 400)
+
+    def test_save_state(self):
+        response = self.client.post('/save_state', json={"state": "some_state"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("success", response.json)
+
+if __name__ == '__main__':
+    unittest.main()

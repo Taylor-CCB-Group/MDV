@@ -20,6 +20,8 @@ from typing import Optional, NewType, List, Union, Any
 from .charts.view import View
 import time
 import copy
+from mdvtools.dbutils.dbservice import ProjectService, FileService
+from mdvtools.image_view_prototype import create_image_view_prototype
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -52,7 +54,7 @@ class MDVProject:
         dir: str,
         id: Optional[str] = None,
         delete_existing=False,
-        skip_column_clean=False,
+        skip_column_clean=True,
     ):
         self.skip_column_clean = (
             skip_column_clean  # signficant speedup for large datasets
@@ -259,49 +261,175 @@ class MDVProject:
         print(f"Added image set {name} to {ds} datasource")
         self.set_datasource_metadata(ds_metadata)
 
-    def add_or_update_image_datasource(self, tiff_metadata, datasource_name):
-        """Add or update an image datasource in datasources.json"""
+    def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file, project_id):
+        """Add or update an image datasource in datasources.json
+        returns the name of the added view so the user can navigate to it"""
+        # Load current datasources
+        datasources = self.datasources
+        # Check if the datasource exists
+        datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
+        datasource_backup = None
+        
+        is_new_datasource = False
+
+        target_folder = os.path.join(self.imagefolder, 'avivator')
+        if not os.path.exists(target_folder):
+            os.makedirs(target_folder)
+        original_filename = file.filename
+        upload_file_path = os.path.join(target_folder, original_filename)
+        view_name = None
         try:
-            # Load current datasources
-            datasources = self.datasources
             
-            # Check if the datasource exists
-            datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
-            
+            # Step 1: Update or create datasource
             if datasource:
-                # Update the existing datasource and check the result
-                update_success = self.update_datasource(datasource, tiff_metadata)
-                if not update_success:
-                    print(f"Failed to update datasource '{datasource_name}'.")
-                    return False
+                 # Create a backup of the existing datasource before updating
+                datasource_backup = datasource.copy()
+                view_name = self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id, original_filename)
             else:
-                # Create a new datasource
-                # Uncomment and implement the following line if needed
-                # creation_success = self.create_new_datasource(tiff_metadata, datasource_name)
-                print(f"Datasource '{datasource_name}' does not exist and creation is not implemented yet.")
-                return False
+                is_new_datasource = True
+                datasource_name = "default" if not datasource_name else datasource_name
 
-            return True
+                # Check if the default datasource exists
+                datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
+
+                view_name = self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id, original_filename)
+            
+            # Step 2: Upload the image
+            self.upload_image_file(file, upload_file_path)
+            
+            # Step 3: Add database entry (exception will propagate up if it fails)
+            FileService.add_or_update_file_in_project(
+                file_name=file.filename,
+                file_path=upload_file_path,  # Adjust as necessary for actual file path
+                project_id=project_id
+            )
+            
+            ProjectService.set_project_update_timestamp(project_id)
+            # Print success message
+            print(f"Datasource '{datasource_name}' updated, TIFF file uploaded, and database entry created successfully.")
+
         except Exception as e:
-            print(f"Error updating or adding datasource '{datasource_name}': {e}")
-            return False
+            print(f"Error in MDVProject.add_or_update_image_datasource: {e}")
+            
+            # Attempt rollback actions
+            try:
+                # Rollback the file upload
+                if os.path.exists(upload_file_path):  # Check the existence of the file at the upload path
+                    print("Reverting file upload...")
+                    self.delete_uploaded_image(upload_file_path) 
+                
+                # Rollback datasource creation if it was new
+                if is_new_datasource and any(ds['name'] == datasource_name for ds in self.datasources):
+                    print("Reverting new datasource creation...")
+                    self.datasources = [x for x in self.datasources if x["name"] != datasource_name]
+                    #self.delete_datasource(datasource_name, False)
+                elif datasource:
+                    print("Reverting datasource update...")
+                    self.restore_datasource(datasource_backup)  # This method may need to be implemented for updates
+            except Exception as rollback_error:
+                print(f"Error during rollback in MDVProject.add_or_update_image_datasource: {rollback_error}")
+            
+            # Re-raise the original exception for the caller to handle
+            raise
+        return view_name
+    def upload_image_file(self, file, upload_file_path):
+        """Upload the TIFF file to the imagefolder, saving it with the original filename."""
+        try:
+            # Save the file to the /images/avivator folder
+            file.save(upload_file_path)
+            print(f"File uploaded successfully to {upload_file_path}")
 
+        except Exception as e:
+            print(f"Error in MDVProject.upload_image_file: Failed to upload file to '{upload_file_path}': {e}")
+            raise
+    
+    def delete_uploaded_image(self, file_path):
+        """Delete the uploaded image file at the specified path."""
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"Deleted uploaded image at: {file_path}")
+            else:
+                print(f"File does not exist at: {file_path}")
+        except Exception as e:
+            print(f"Error in MDVProject.delete_uploaded_image: Error deleting file at {file_path}: {e}")
+            raise 
+    
+    def restore_datasource(self, datasource_backup):
+        """Restore the datasource from the backup."""
+        try:
+            # Find the existing datasource by name
+            existing_datasource = next(
+                (ds for ds in self.datasources if ds["name"] == datasource_backup["name"]), 
+                None
+            )
 
-    def update_datasource(self, datasource, tiff_metadata):
+            if existing_datasource:
+                # Overwrite the existing datasource with the backup values
+                existing_datasource.update(datasource_backup)  
+                print(f"Restored datasource '{datasource_backup['name']}' from backup.")
+
+                # Save the updated datasources to the JSON file
+                self.datasources = self.datasources  # This will call the setter and save the data
+            else:
+                print(f"Warning: Could not find datasource '{datasource_backup['name']}' to restore.")
+        
+        except Exception as e:
+            print(f"Error in MDVProject.restore_datasource: {str(e)}")
+            raise
+    
+
+    def update_datasource_for_tiff(self, datasource, datasource_name, tiff_metadata, project_id, region_name: str):
         """Update an existing datasource with new image metadata."""
         try:
-            # Extract image metadata from tiff_metadata
-            width = tiff_metadata['OME']['Image']['Pixels']['SizeX']
-            height = tiff_metadata['OME']['Image']['Pixels']['SizeY']
-            scale = tiff_metadata['OME']['Image']['Pixels']['PhysicalSizeX']
-            scale_unit = tiff_metadata['OME']['Image']['Pixels'].get('PhysicalSizeUnit', 'µm')  # Default to µm if not present
+            # Find the existing datasource by name
+            existing_datasource = next((ds for ds in self.datasources if ds["name"] == datasource_name), None)
 
+            print("*****1")
+            print(datasource_name)
+            print(existing_datasource)
+            print(datasource)
+            #datasources empty template
+            # If the datasource doesn't exist, create a new one
+            if (existing_datasource is None):
+                print("*****1--1")
+                datasource = self.create_datasource_template(datasource_name)
+                self.datasources.append(datasource)  # Add the new datasource to the list
+                print(f"In MDVProject.update_datasource: Created new datasource template for '{datasource_name}'.")
+                
+                #adding default columns for new empty ds
+                filename = 'mdvtools/dbutils/emptyds.csv'
+                df_default = pandas.read_csv(filename)
+                # self.add_datasource(project_id, datasource_name, df_default, add_to_view=None)
+                self.add_datasource(datasource_name, df_default, add_to_view=None)
+                datasource = self.get_datasource_metadata(datasource_name)
+            
+            
+            #datasources-> regions section
             # Ensure datasource has a 'regions' field
             if "regions" not in datasource:
-                datasource["regions"] = {"all_regions": {}}
+               datasource["regions"] = {}
             
+
+            # Corrected path to access size and scale information
+            pixels_data = tiff_metadata['Pixels']
+            width = pixels_data['SizeX']
+            height = pixels_data['SizeY']
+            scale = pixels_data.get('PhysicalSizeX', 1.0)
+            scale_unit = pixels_data.get('PhysicalSizeXUnit', 'µm')  # Default to µm if not present
+
+            # Call ensure_regions_fields to ensure the required fields and values are set
+            datasource['regions'] = self.ensure_regions_fields(
+                datasource['regions'],  # Existing regions dictionary
+                scale_unit=scale_unit,  # Pass the scale unit
+                scale=scale             # Pass the scale
+            )
+            
+            
+            #datasources-> regions -> all_regions-> new entry section
             # Determine region name
-            region_name = tiff_metadata.get('name', 'unknown')  # Default to 'unknown' if not present in metadata
+            # full_name = tiff_metadata.get('Name', 'unknown')
+            # region_name = full_name.split(".ome")[0] if ".ome" in full_name else full_name  # Use 'Name' from metadata or 'unknown'
             
             # Define new region with metadata
             new_region = {
@@ -312,41 +440,87 @@ class MDVProject:
                     "max_y": height
                 },
                 "images": {},
-                "json": f"json/{region_name}.tif.s1.json",
                 "viv_image": {
-                    "file": f"{region_name}.tiff",
+                    "file": region_name,
                     "linked_file": True
-                },
-                'width': width,  # Adding width
-                'height': height,  # Adding height
-                'scale': scale,  # Adding scale
-                'scale_unit': scale_unit  # Adding scale_unit
-            }
-
-            image_metadata = {
-                'path': tiff_metadata['path']
+                }
             }
 
             # Update or add the region in the datasource
             datasource["regions"]["all_regions"][region_name] = new_region
-            datasource['size'] = len(datasource['regions']['all_regions'])
+            #datasource['size'] = len(datasource['regions']['all_regions'])
 
             # Save the updated datasource
             self.set_datasource_metadata(datasource)
 
-            # Update views and images
-            self.add_viv_viewer(region_name, [{'name': 'DAPI'}])
-            self.add_viv_images(region_name, image_metadata, link_images=True)
-
-            print(f"Datasource '{datasource.get('name', 'unknown')}' updated successfully.")
-            return True
-        except Exception as e:
-            print(f"Error updating datasource '{datasource.get('name', 'unknown')}': {e}")
-            return False
-    
-    
+            #add empty default columns
+            
+            # Update views and image            
+            region_view_json = create_image_view_prototype(datasource_name, region_name)
+            view_name = region_name
+            
+            print(view_name)
+            self.set_view(view_name, region_view_json)
+            
+            #self.add_viv_images(region_name, image_metadata, link_images=True)
+            return view_name
         
+        except Exception as e:
+            print(f"Error in MDVProject.update_datasource :  Error updating datasource '{datasource_name}': {e}")
+            raise
+    
+    def create_datasource_template(self, datasource_name: str) -> dict:
+        """Create a new datasource template with the basic structure."""
+        try:
+            template = {
+                "name": datasource_name,
+                "columns": [],          # Initialize empty columns
+                "size": 0,              # Start size at 0
+                "regions": {},            # Initialize regions as an empty dictionary,
+                "columnGroups": []
+            }
+            print(f"Created new datasource template '{datasource_name}'.")
+            return template
+        
+        except Exception as e:
+            print(f"In MDVProject.create_datasource_template: Error creating datasource template '{datasource_name}': {e}")
+            raise  # Re-raises the caught exception
 
+    def ensure_regions_fields(self, 
+                          regions, 
+                          position_fields=['x', 'y'], 
+                          region_field='sample_id', 
+                          default_color='leiden', 
+                          scale_unit='µm', 
+                          scale=1.0):
+        try:
+            
+            # Ensure that required fields exist with default values
+            regions["position_fields"] = regions.get("position_fields", position_fields)
+            regions["region_field"] = regions.get("region_field", region_field)
+            regions["default_color"] = regions.get("default_color", default_color)
+            regions["scale_unit"] = regions.get("scale_unit", scale_unit)
+            regions["scale"] = regions.get("scale", scale)
+            
+            # Initialize regions structure if needed
+            if "all_regions" not in regions:
+                regions["all_regions"] = {}
+
+            # Check if 'avivator' field is present, if not, add default settings
+            if "avivator" not in regions:
+                default_channels = [{'name': 'DAPI'}]
+                regions["avivator"] = {
+                    "default_channels": default_channels,
+                    "base_url": "images/avivator/",
+                }
+
+            return regions
+        
+        except Exception as e:
+            print(f"In MDVProject.ensure_regions_fields: Error in ensure_regions_fields: {e}")
+            raise  # Re-raises the caught exception
+
+    
     def get_image(self, path: str):
         """Gets the filename of an image."""
         # assume path is of the form <ds>/<name>/<filename>
@@ -568,12 +742,16 @@ class MDVProject:
         self.set_datasource_metadata(ds)
 
     def delete_datasource(self, name, delete_views=True):
+        print("in delete -1 ")
         h5 = self._get_h5_handle()
         del h5[name]
         h5.close()
+        print("in delete -2 ")
         self.datasources = [x for x in self.datasources if x["name"] != name]
+        print("in delete -3 ")
         # delete all views contining that datasource
         if delete_views:
+            print("in delete -4 ")
             views = self.views
             for view in views:
                 data = views[view]
@@ -720,88 +898,124 @@ class MDVProject:
 
     def add_datasource(
         self,
+        # project_id: str,
         name: str,
         dataframe: pandas.DataFrame | str,
         columns: Optional[list] = None,
         supplied_columns_only=False,
         replace_data=False,
         add_to_view: Optional[str] = "default",
-        separator="\t",
+        separator="\t"
     ) -> list[dict[str, str]]:
         """Adds a pandas dataframe to the project. Each column's datatype, will be deduced by the
         data it contains, but this is not always accurate. Hence, you can supply a list of column
         metadata, which will override the names/types deduced from the dataframe.
-
+        
         Args:
             name (string): The name of datasource
             dataframe (dataframe|str): Either a pandas dataframe or the path of a text file
             columns (list, optional) : A list of objects containing the column name and datatype.
-                e.g. [{"name":"column_1","datatype":"double"},]. If you want the column to have a
-                different label, the object requires a field (the column name in the dataframe) and
-                a name (the label seen by the user) e.g. {"field":"column_1","datatype":"double","name":"My Column 1"}
-                In the case of "multitext" columns, you can also supply a "separator" field, otherwise it will
-                default to a comma. <<< check this >>>
-            supplied_columns_only(bool, optional): If True, only the the subset of columns in the columns argument
-                will be added to the datasource. Default is False
-            replace_data(bool, optional): If True, the existing datasource will be overwritten, Default is False,
-                in which case, trying to add a datasource which already exists, will throw an error.
-            add_to_view (string, optional): The datasource will be added to the specified view. The view will
-                be created if it does not exist. The default is 'default'. If None, then it will not be added to
-                a view.
+            supplied_columns_only (bool, optional): If True, only the the subset of columns in the columns argument
+            replace_data (bool, optional): If True, the existing datasource will be overwritten, Default is False,
+            add_to_view (string, optional): The datasource will be added to the specified view.
             separator (str, optional): If a path to text file is supplied, then this should be the file's delimiter.
-                Defaults to a tab.
         """
-        if isinstance(dataframe, str):
-            dataframe = pandas.read_csv(dataframe, sep=separator)
-        # get the columns to add
-        columns = get_column_info(columns, dataframe, supplied_columns_only)
-        # does the datasource exist
+        dodgy_columns = []  # To hold any columns that can't be added
+        gr = None  # Initialize the group variable
+        h5 = None
+        
         try:
-            ds = self.get_datasource_metadata(name)
-        except Exception:
-            ds = None
-        if ds:
-            # delete the datasource
-            if replace_data:
-                self.delete_datasource(name)
-            else:
-                raise FileExistsError(
-                    f"Trying to create {name} datasource, which already exits"
-                )
-        # create the h5 group
-        h5 = self._get_h5_handle()
-        gr = h5.create_group(name)
-        size = len(dataframe)
-        dodgy_columns = []
-        if not columns:
-            # we could set columns to an empty list, but it's probably better to throw an error
-            # seems unlikely a user would want to add a datasource with no columns
-            raise AttributeError("no columns to add")
-        for col in columns:
+            print("£££1 - starting add_datasource")
+            if isinstance(dataframe, str):
+                dataframe = pandas.read_csv(dataframe, sep=separator)
+            
+            # Get columns to add
+            columns = get_column_info(columns, dataframe, supplied_columns_only)
+            
+            # Check if the datasource already exists
             try:
-                add_column_to_group(
-                    col, dataframe[col["field"]], gr, size, self.skip_column_clean
-                )
-            except Exception as e:
-                dodgy_columns.append(col["field"])
-                warnings.warn(
-                    f"cannot add column '{col['field']}' to datasource '{name}':\n{repr(e)}"
-                )
+                ds = self.get_datasource_metadata(name)
+            except Exception:
+                ds = None
 
-        h5.close()
-        columns = [x for x in columns if x["field"] not in dodgy_columns]
-        # add the metadata
-        ds = None
-        ds = {"name": name, "columns": columns, "size": size}
-        self.set_datasource_metadata(ds)
-        # add it to the view
-        if add_to_view:
-            v = self.get_view(add_to_view)
-            if not v:
-                v = {"initialCharts": {}}
-            v["initialCharts"][name] = []
-            self.set_view(add_to_view, v)
-        return dodgy_columns
+            print(f"£££1 - is ds None? {ds}")
+
+            if ds:
+                # Delete the existing datasource if replace_data is True
+                if replace_data:
+                    self.delete_datasource(name)
+                else:
+                    raise FileExistsError(
+                        f"Attempt to create datasource '{name}' failed because it already exists."
+                    )
+            
+            print("£££2 - got passed the ds check")
+            # Open HDF5 file and handle group creation
+            try:
+                h5 = self._get_h5_handle()
+                
+                # Print current groups for visibility
+                for group_name in h5.keys():
+                    print(group_name)
+                    
+                # Check for and delete existing group with this name
+                if name in h5:
+                    del h5[name]
+                    print(f"Deleted existing group '{name}' in HDF5 file.")
+                    print("£££-----2")
+                
+                gr = h5.create_group(name)
+            except Exception as e:
+                raise RuntimeError(f"Error managing HDF5 groups for datasource '{name}': {e}")
+            
+            print("£££3 - created h5 group without error")
+            # Verify columns are provided
+            if not columns:
+                raise AttributeError("No columns to add. Please provide valid columns metadata.")
+            
+            # Add columns to the HDF5 group
+            dodgy_columns = []
+            for col in columns:
+                try:
+                    print(f"- adding column '{col['field']}' to datasource '{name}'")
+                    add_column_to_group(col, dataframe[col["field"]], gr, len(dataframe), self.skip_column_clean)
+                except Exception as e:
+                    print(f" ++++++ DODGY COLUMN: {col['field']}")
+                    dodgy_columns.append(col["field"])
+                    warnings.warn(
+                        f"Failed to add column '{col['field']}' to datasource '{name}': {repr(e)}"
+                    )
+            print("£££4 ")
+            h5.close()  # Close HDF5 file
+            columns = [x for x in columns if x["field"] not in dodgy_columns]
+            print(f" - non-dodgy columns: {columns}")
+            
+            # Update datasource metadata
+            ds = {"name": name, "columns": columns, "size": len(dataframe)}
+            print(f'--- setting datasource metadata: {ds}')
+            self.set_datasource_metadata(ds)
+            
+            print("£££5")
+            # Add to view if specified
+            if add_to_view:
+                v = self.get_view(add_to_view)
+                if not v:
+                    v = {"initialCharts": {}}
+                v["initialCharts"][name] = []
+                self.set_view(add_to_view, v)
+            
+            print("£££6")
+
+            # Update the project's update timestamp using the dedicated method
+            # ProjectService.set_project_update_timestamp(project_id)
+            print("£££7")
+            print(f"In MDVProject.add_datasource: Added datasource successfully '{name}'")
+            return dodgy_columns
+
+        except Exception as e:
+            print(f"Error in MDVProject.add_datasource : Error adding datasource '{name}': {e}")
+            raise  # Re-raise the exception to propagate it to the caller
+
 
     def insert_link(self, datasource, linkto, linktype, data):
         """
@@ -1052,6 +1266,9 @@ class MDVProject:
         """Sets the view with the given name to the supplied view data.
         If the view is None, then the view will be deleted.
         """
+        print("In set_view")
+        print(name)
+        
         views = self.views
         # update or add the view
         if view:
@@ -1278,22 +1495,34 @@ class MDVProject:
             all_regions[k]["images"][name] = reg
         self.set_datasource_metadata(md)
 
-    def add_viv_viewer(self, datasource, default_channels):
-        md = self.get_datasource_metadata(datasource)
-        reg = md.get("regions")
-        if not reg:
-            raise AttributeError(
-                f"Adding viv viewer to {datasource}, which does not contain regions"
-            )
-        imdir = join(self.dir, "images", "avivator")
-        if not exists(imdir):
-            os.makedirs(imdir)
+    def add_viv_viewer(self, datasource_name, default_channels):
+        """Add a Viv viewer to the specified datasource with default channels."""
+        try:
+            md = self.get_datasource_metadata(datasource_name)
+            reg = md.get("regions")
+            if not reg:
+                raise AttributeError(
+                    f"Adding viv viewer to {datasource_name}, which does not contain regions"
+                )
 
-        reg["avivator"] = {
-            "default_channels": default_channels,
-            "base_url": "images/avivator/",
-        }
-        self.set_datasource_metadata(md)
+            # Create the directory for storing images if it doesn't exist
+            imdir = join(self.dir, "images", "avivator")
+            if not exists(imdir):
+                os.makedirs(imdir)
+
+            # Add avivator configuration to the regions
+            reg["avivator"] = {
+                "default_channels": default_channels,
+                "base_url": "images/avivator/",
+            }
+            
+            # Save the updated metadata
+            self.set_datasource_metadata(md)
+
+        except Exception as e:
+            print(f"Error in MDVProject.add_viv_viewer: {e}")
+            raise  # Re-raise the exception after logging
+
 
     def add_viv_images(self, datasource, data, link_images=True):
         md = self.get_datasource_metadata(datasource)
@@ -1523,6 +1752,8 @@ def add_column_to_group(
         or col["datatype"] == "unique"
         or col["datatype"] == "text16"
     ):
+        
+        print("-----1/1")
         if data.dtype == "category":
             data = data.cat.add_categories("ND")
             data = data.fillna("ND")
@@ -1530,6 +1761,8 @@ def add_column_to_group(
             # may need to double-check this...
             data = data.fillna("NaN")
         values = data.value_counts()
+
+        print("-----1/2")
         if len(values) < 65537 and col["datatype"] != "unique":
             t8 = len(values) < 257
             col["datatype"] = "text" if t8 else "text16"
@@ -1547,12 +1780,16 @@ def add_column_to_group(
             col["values"] = [str(x) for x in col["values"]]
 
         else:
+            print("-----1/3")
             max_len = max(data.str.len())
             utf8_type = h5py.string_dtype("utf-8", int(max_len))
             col["datatype"] = "unique"
             col["stringLength"] = max_len
             group.create_dataset(col["field"], length, data=data, dtype=utf8_type)
+        print("-----1/4")
+
     elif col["datatype"] == "multitext":
+        print("-----2/1")
         delim = col.get("delimiter", ",")
         value_set: set[str] = set()
         maxv = 0
@@ -1564,7 +1801,7 @@ def add_column_to_group(
             vs = v.split(delim)
             value_set.update([x.strip() for x in vs])
             maxv = max(maxv, len(vs))
-
+        print("------2/2")
         if "" in value_set:
             value_set.remove("")
         ndata = numpy.empty(shape=(length * maxv,), dtype=numpy.uint16)
@@ -1590,8 +1827,9 @@ def add_column_to_group(
         group.create_dataset(
             col["field"], length * maxv, data=ndata, dtype=numpy.uint16
         )
-
+        print("-----2/3")
     else:
+        print("-----3/1")
         dt = numpy.int32 if col["datatype"] == "int32" else numpy.float32
         clean = (
             data
@@ -1600,8 +1838,10 @@ def add_column_to_group(
         )  # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
+        print("-----3/2")
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
         # remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
+        print("-----3/3")
         na = numpy.array(ds)
         na = na[numpy.isfinite(na)]
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
@@ -1612,7 +1852,7 @@ def add_column_to_group(
                 numpy.percentile(na, 100 * q),
                 numpy.percentile(na, 100 * (1 - q)),
             ]
-
+        print("-----3/4")
 
 def get_column_info(columns, dataframe, supplied_columns_only):
     if columns:

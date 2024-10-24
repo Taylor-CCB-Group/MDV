@@ -18,7 +18,7 @@ const useProjects = () => {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [sortBy, setSortBy] = useState<"lastModified" | "name">("lastModified");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const fetchProjects = useCallback(async () => {
     setIsLoading(true);

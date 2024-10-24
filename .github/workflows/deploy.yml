@@ -3,7 +3,7 @@ name: Build and Deploy to Dockerhub
 on:
   push:
     branches:
-      - jh-dev
+      - jh-dev-exp-1
     paths-ignore:
       - '**.github/workflows/**' # Ignore changes to workflow files
     if: "contains(github.event.head_commit.message, '[deploy]')"

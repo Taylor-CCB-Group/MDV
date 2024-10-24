@@ -2,6 +2,7 @@ import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "../../utilities/Dialog";
 import FileUploadDialogComponent from "./FileUploadDialog";
 import { VivProvider, createVivStores } from '../../react/components/avivatorish/state';
+import { Dialog } from "@mui/material";
 
 class FileUploadDialogReact extends BaseDialog {
     root: ReturnType<typeof createMdvPortal>;
@@ -20,13 +21,17 @@ class FileUploadDialogReact extends BaseDialog {
             const vivStores = createVivStores();
             this.root = createMdvPortal(
                 <VivProvider vivStores={vivStores}>
+                    {/* <Dialog open={true} className="w-full h-full"> */}
                     <FileUploadDialogComponent
                         onClose={() => this.close()}
-                        onResize={(width: number, height: number) => this.resizeDialog(width, height)}
+                        onResize={(width: number, height: number) => {}}
+                        // onResize={(width: number, height: number) => this.resizeDialog(width, height)}
                     />
+                    {/* </Dialog> */}
                 </VivProvider>,
                 this.dialog
             );
+            this.dialog.parentElement.style.display = "none";
         } else {
             console.error("Dialog element not found");
         }
