@@ -146,9 +146,15 @@ def load_config(app,config_name=None):
                     print(f"Error: Secret '{secret_name}' not found. {fnf_error}")
                     raise  # Re-raise the exception to be handled by the parent
 
-            db_user = read_secret('db_user')
-            db_password = read_secret('db_password')
-            db_name = read_secret('db_name')
+            #db_user = read_secret('db_user')
+            #db_password = read_secret('db_password')
+            #db_name = read_secret('db_name')
+            #db_host = app.config['db_host']
+
+            # Load sensitive data from environment variables
+            db_user = os.getenv('DB_USER')
+            db_password = os.getenv('DB_PASSWORD')
+            db_name = os.getenv('DB_NAME')
             db_host = app.config['db_host']
 
             if not all([db_user, db_password, db_name, db_host]):
