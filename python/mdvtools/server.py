@@ -250,17 +250,17 @@ def create_app(
         try:
             # Check if request has a file part
             if 'file' not in request.files:
-                return jsonify({"status": "error", "message": "No file part in the request"}), 400
+                return "No file part in the request", 400
 
             # Get the file from the request
             file = request.files['file']
             
             # Get the text fields from the request form
-            datasource_name = request.form.get('datasourceName')
+            datasource_name = request.form.get('datasourceName') # ""
             tiff_metadata = request.form.get('tiffMetadata')
 
             # Validate the presence of required fields
-            if not file or not datasource_name or not tiff_metadata:
+            if not file or not tiff_metadata:
                 return jsonify({"status": "error", "message": "Missing file, tiffMetadata, or datasourceName"}), 400
 
             # If tiff_metadata is sent as JSON string, deserialize it
@@ -270,7 +270,7 @@ def create_app(
                 return jsonify({"status": "error", "message": f"Invalid JSON format for tiffMetadata: {e}"}), 400
 
             # Call your method to add or update the image datasource
-            success = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file)
+            success = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file, project.id)
 
             if success:
                 return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully"}), 200
