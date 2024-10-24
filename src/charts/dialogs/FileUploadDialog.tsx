@@ -701,7 +701,16 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
 
             // Specific handling for known Axios errors
             if (axios.isAxiosError(error)) {
-                if (error.response?.status === 400) {
+                if (error.response?.status === 403) {
+                    dispatch({
+                        type: "SET_ERROR",
+                        payload: {
+                            message: "Permission Denied: This project is read-only and cannot be modified.",
+                            status: 403,
+                            traceback: error.response?.data?.message || error.message,
+                        },
+                    });
+                } else if (error.response?.status === 400) {
                     dispatch({
                         type: "SET_ERROR",
                         payload: {
