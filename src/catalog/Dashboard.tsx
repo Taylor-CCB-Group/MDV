@@ -37,13 +37,15 @@ import useProjects from "./hooks/useProjects";
 import UserProfile from "./UserProfile";
 import mdvLogo from "./assets/mdv_logo.png";
 import { useColorMode } from "@/ThemeProvider";
-
+import ErrorModal from "./ProjectErrorModal";
 
 const Dashboard: React.FC = () => {
     const {
         projects,
         isLoading,
         error,
+        isErrorModalOpen,
+        closeErrorModal,
         fetchProjects,
         createProject,
         deleteProject,
@@ -74,7 +76,6 @@ const Dashboard: React.FC = () => {
             window.location.href = `${base}project/${newProject.id}`;
         } catch (error) {
             console.error("Failed to create project:", error);
-            alert("Failed to create project. Please try again.");
         }
     };
 
@@ -317,8 +318,6 @@ const Dashboard: React.FC = () => {
 
                     {isLoading ? (
                         <CircularProgress />
-                    ) : error ? (
-                        <Typography color="error">{error}</Typography>
                     ) : (
                         <Grid container spacing={4}>
                             {projects.map((project) => (
@@ -342,6 +341,11 @@ const Dashboard: React.FC = () => {
                         </Grid>
                     )}
                 </Container>
+                <ErrorModal 
+                    open={isErrorModalOpen}
+                    message={error || ''}
+                    onClose={closeErrorModal}
+                />
             </Box>
     );
 };
