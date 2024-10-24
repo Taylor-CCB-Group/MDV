@@ -469,7 +469,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
             try {
                 const newLoader = await createLoader(
                     newSource.urlOrFile,
-                    () => {}, // placeholder for toggleIsOffsetsSnackbarOn
+                    () => { }, // placeholder for toggleIsOffsetsSnackbarOn
                     (message) =>
                         viewerStore.setState({
                             loaderErrorSnackbar: { on: true, message },
@@ -595,18 +595,18 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         return Math.max(800, totalWidth);
     };
 
-  const handleUploadClick = async () => {
-    console.log("Uploading file...");
-    if (!state.selectedFiles.length) {
-        dispatch({
-            type: "SET_ERROR",
-            payload: {
-                message: "No files selected. Please select a file before uploading.",
-                status: 400,
-            },
-        });
-        return;
-    }
+    const handleUploadClick = async () => {
+        console.log("Uploading file...");
+        if (!state.selectedFiles.length) {
+            dispatch({
+                type: "SET_ERROR",
+                payload: {
+                    message: "No files selected. Please select a file before uploading.",
+                    status: 400,
+                },
+            });
+            return;
+        }
 
         const fileExtension = state.selectedFiles[0].name
             .split(".")
@@ -674,7 +674,15 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 dispatch({ type: "SET_SUCCESS", payload: true });
 
                 if (fileExtension === "tiff") {
-                    chartManager.saveState();
+                    // chartManager.saveState();
+                    const params = new URLSearchParams(window.location.search);
+                    params.set("view", response.data.view);
+                    window.history.replaceState(
+                        {},
+                        "",
+                        `${window.location.pathname}?${params}`,
+                    );
+                    window.location.reload();
                 }
             } else {
                 console.error(`Failed to confirm: Server responded with status ${response.status}`);
@@ -690,7 +698,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
             }
         } catch (error) {
             console.error("Error uploading file:", error);
-    
+
             // Specific handling for known Axios errors
             if (axios.isAxiosError(error)) {
                 if (error.response?.status === 400) {
@@ -731,7 +739,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                     },
                 });
             }
-    
+
             // Clean up and reset state
             dispatch({ type: "SET_IS_UPLOADING", payload: false });
             console.log("Attempting to clean up partially uploaded files...");
@@ -996,7 +1004,7 @@ const Wrapper = (props: FileUploadDialogComponentProps) => {
     return (
         <Dialog open={open} fullScreen disableEscapeKeyDown={true}>
             <div className="h-screen flex items-center justify-center">
-                <Paper variant="outlined" elevation={24} sx={{p: 2}}>
+                <Paper elevation={24} sx={{ p: 2 }}>
                     <FileUploadDialogComponent {...props} />
                 </Paper>
             </div>

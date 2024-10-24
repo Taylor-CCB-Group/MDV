@@ -252,33 +252,27 @@ def create_app(
             if 'file' not in request.files:
                 return "No file part in the request", 400
 
-            print("@@@@1")
             # Get the file from the request
             file = request.files['file']
             
             # Get the text fields from the request form
             datasource_name = request.form.get('datasourceName') # ""
             tiff_metadata = request.form.get('tiffMetadata')
-
-            print("@@@@2")
-
             # Validate the presence of required fields
             if not file or not tiff_metadata:
                 return "Missing file or tiffMetadata", 400
-
             # If tiff_metadata is sent as JSON string, deserialize it
             try:
                 tiff_metadata = json.loads(tiff_metadata)
             except Exception as e:
                 return jsonify({"status": "error", "message": f"Invalid JSON format for tiffMetadata: {e}"}), 400
-            print("@@@@3")
             
             # Call the method to add or update the image datasource
-            project.add_or_update_image_datasource(tiff_metadata, datasource_name, file, project.id)
+            view_name = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file, project.id)
             
-            print("@@@@4")
-            # If no exception is raised, the operation was successful
-            return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully"}), 200
+            # If no exception is raised, the operation was successful. let the client know which view will show the image.
+            print(f">>> notify client that image datasource updated and file uploaded successfully, view: {view_name}")
+            return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully", "view": view_name}), 200
 
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500

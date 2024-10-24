@@ -262,7 +262,8 @@ class MDVProject:
         self.set_datasource_metadata(ds_metadata)
 
     def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file, project_id):
-        """Add or update an image datasource in datasources.json"""
+        """Add or update an image datasource in datasources.json
+        returns the name of the added view so the user can navigate to it"""
         # Load current datasources
         datasources = self.datasources
         # Check if the datasource exists
@@ -276,43 +277,34 @@ class MDVProject:
             os.makedirs(target_folder)
         original_filename = file.filename
         upload_file_path = os.path.join(target_folder, original_filename)
-        
+        view_name = None
         try:
             
             # Step 1: Update or create datasource
-            print("^^^ Step 1")
             if datasource:
                  # Create a backup of the existing datasource before updating
                 datasource_backup = datasource.copy()
-                self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id, original_filename)
+                view_name = self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id, original_filename)
             else:
-                print("@@@@@ new_datasource_name")
-                print(f"datasource_name received: {datasource_name}")
-                
                 is_new_datasource = True
                 datasource_name = "default" if not datasource_name else datasource_name
 
                 # Check if the default datasource exists
                 datasource = next((ds for ds in datasources if ds["name"] == datasource_name), None)
 
-                print(f"new_datasource_name set to: {datasource_name}")
-                self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id, original_filename)
+                view_name = self.update_datasource_for_tiff(datasource, datasource_name, tiff_metadata, project_id, original_filename)
             
             # Step 2: Upload the image
-            print("^^^ Step 2")
             self.upload_image_file(file, upload_file_path)
             
             # Step 3: Add database entry (exception will propagate up if it fails)
-            print("^^^ Step 3")
             FileService.add_or_update_file_in_project(
                 file_name=file.filename,
                 file_path=upload_file_path,  # Adjust as necessary for actual file path
                 project_id=project_id
             )
             
-            print("^^^ Step 4")
             ProjectService.set_project_update_timestamp(project_id)
-            print("^^^ Step 5")
             # Print success message
             print(f"Datasource '{datasource_name}' updated, TIFF file uploaded, and database entry created successfully.")
 
@@ -339,7 +331,7 @@ class MDVProject:
             
             # Re-raise the original exception for the caller to handle
             raise
-        
+        return view_name
     def upload_image_file(self, file, upload_file_path):
         """Upload the TIFF file to the imagefolder, saving it with the original filename."""
         try:
@@ -408,22 +400,17 @@ class MDVProject:
                 #adding default columns for new empty ds
                 filename = 'mdvtools/dbutils/emptyds.csv'
                 df_default = pandas.read_csv(filename)
-                print('>>>> df_default for image view:::')
-                print(df_default)
                 # self.add_datasource(project_id, datasource_name, df_default, add_to_view=None)
                 self.add_datasource(datasource_name, df_default, add_to_view=None)
                 datasource = self.get_datasource_metadata(datasource_name)
-                print(f"In MDVProject.update_datasource: Added default columns to new datasource '{datasource_name}'.")
             
             
-            print("*****2")
             #datasources-> regions section
             # Ensure datasource has a 'regions' field
             if "regions" not in datasource:
                datasource["regions"] = {}
             
 
-            print("*****3")
             # Corrected path to access size and scale information
             pixels_data = tiff_metadata['Pixels']
             width = pixels_data['SizeX']
@@ -439,7 +426,6 @@ class MDVProject:
             )
             
             
-            print("******4")
             #datasources-> regions -> all_regions-> new entry section
             # Determine region name
             # full_name = tiff_metadata.get('Name', 'unknown')
@@ -464,32 +450,20 @@ class MDVProject:
             datasource["regions"]["all_regions"][region_name] = new_region
             #datasource['size'] = len(datasource['regions']['all_regions'])
 
-            print("*****5")
             # Save the updated datasource
             self.set_datasource_metadata(datasource)
 
-            print("*****6")
             #add empty default columns
             
-
-            print("*****7")
-            # Update views and image
-            
+            # Update views and image            
             region_view_json = create_image_view_prototype(datasource_name, region_name)
-
-            views = self.views
-
-            if views and "default" in views:
-                view_name = region_name  # If "default" exists, set view_name to region_name
-            else:
-                view_name = "default"
+            view_name = region_name
             
             print(view_name)
             self.set_view(view_name, region_view_json)
             
             #self.add_viv_images(region_name, image_metadata, link_images=True)
-            print("*****8")
-            print(f"In MDVProject.update_datasource : Datasource '{datasource_name}' updated successfully.")
+            return view_name
         
         except Exception as e:
             print(f"Error in MDVProject.update_datasource :  Error updating datasource '{datasource_name}': {e}")
