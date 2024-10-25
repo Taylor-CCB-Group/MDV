@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+        // "strict": true, //not today 😳...
         "jsx": "react-jsx",
         "outDir": "./dist/",
         "noImplicitAny": false,
