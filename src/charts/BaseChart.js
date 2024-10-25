@@ -95,26 +95,24 @@ class BaseChart {
         //set up context menu and icon which opens it
         this.contextMenu = new ContextMenu((data) => {
             const menu = this.getContextMenu(data);
-            if (import.meta.env.MODE !== "production") {
-                menu.push({
-                    text: "debug chart",
-                    icon: "fas fa-bug",
-                    func: () => {
-                        window.mdv.debugChart = this;
-                        this.dialogs.push(
-                            new DebugJsonDialogReactWrapper(this.config, this),
-                        );
-                    },
-                });
-                menu.push({
-                    text: "copy config JSON to clipboard",
-                    icon: "fas fa-copy",
-                    func: () =>
-                        navigator.clipboard.writeText(
-                            JSON.stringify(this.config, null, 2),
-                        ),
-                });
-            }
+            menu.push({
+                text: "debug chart",
+                icon: "fas fa-bug",
+                func: () => {
+                    window.mdv.debugChart = this;
+                    this.dialogs.push(
+                        new DebugJsonDialogReactWrapper(this.config, this),
+                    );
+                },
+            });
+            menu.push({
+                text: "copy config JSON to clipboard",
+                icon: "fas fa-copy",
+                func: () =>
+                    navigator.clipboard.writeText(
+                        JSON.stringify(this.config, null, 2),
+                    ),
+            });
             return menu;
         });
 
