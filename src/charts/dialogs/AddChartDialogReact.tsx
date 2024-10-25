@@ -12,9 +12,10 @@ import type { Param } from "@/charts/ChartTypes.js";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
 import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
-import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
-import { makeAutoObservable, runInAction } from "mobx";
+import ColumnSelectionComponent, { columnMatchesType } from "@/react/components/ColumnSelectionComponent.js";
+import { action, observable, runInAction } from "mobx";
 import z from "zod";
+import type { DataColumn } from "../charts.js";
 
 const ChartConfigSchema = z.object({
     title: z.string(),
@@ -25,10 +26,33 @@ const ChartConfigSchema = z.object({
     // in the original AddChartDialog, extra props are on the root object, not nested
     // so when we pass this to ChartManager, we'll need to flatten it
     extra: z.record(z.unknown()),
+    _updated: z.date(),
 });
 type ChartConfig = z.infer<typeof ChartConfigSchema>;
 
-const ConfigureChart = observer(({config}: {config: ChartConfig}) => {
+// may want something like this... or to obviate the need for it, ideally.
+function actionWithUpdate<T extends any[]>(
+    config: ChartConfig,
+    fn: (...args: T) => void
+): (...args: T) => void {
+    return action((...args: T): void => {
+        fn(...args);
+        config._updated = new Date();
+    });
+}
+
+const ChartPreview = observer(({config}: {config: ChartConfig}) => {
+    // this could be an actual chart preview, but for now, the config is useful
+    return (
+        <div>
+            {/* <h2>Chart Preview</h2> */}
+            <JsonView src={config} collapsed />
+        </div>
+    );
+});
+
+
+const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone: () => void}) => {
     const dataStore = useDataStore();
     const chartTypes = useMemo(() => {
         return Object.values(BaseChart.types).filter(t => {
@@ -48,13 +72,34 @@ const ConfigureChart = observer(({config}: {config: ChartConfig}) => {
     }, [dataStore]);
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
+    const paramColumns = useMemo(
+        () => config.param.map(p => dataStore.columnIndex[p] as DataColumn),
+    [config.param, dataStore]);
     const setChartTypeName = useCallback((chartTypeName: string) => {
         runInAction(() => {
             config.type = chartTypeName;
+            const chartType = chartTypes.find(t => t.name === config.type);
+            if (!chartType) throw new Error(`Chart type ${config.type} not found`);
+            // set default values for params, use previous values if possible
+            const previousParams = config.param;
+            // what is the observable status of this new array?
+            config.param = new Array(chartType.params.length);
+            for (const [i, p] of chartType.params.entries()) {
+                const previousColumn = paramColumns[i];
+                if (previousParams[i] && columnMatchesType(previousColumn, p.type)) {
+                    config.param[i] = previousParams[i];
+                } else {
+                    // we could try to be a bit clever about finding a suitable column, like "x"...
+                    config.param[i] = "";
+                }
+            }
+            config._updated = new Date();
         });
-    }, [config.type, config]);
+    }, [config.type, config, chartTypes, paramColumns]);
     const chartType = chartTypes.find(t => t.name === config.type);
     const extraControls = useMemo(() => {
+        // I don't think these need to be observer components
+        // (and anyway, this part of GUI is totally placeholder for now)
         return chartType?.extra_controls?.(dataStore).map((control, i) => (
             <Box key={control.name}>
                 <Typography>{control.label}</Typography>
@@ -74,7 +119,26 @@ const ConfigureChart = observer(({config}: {config: ChartConfig}) => {
         ));
     }, [chartType, dataStore]);
 
-    
+    const addChart = useCallback(() => {
+        const { extra, _updated, ...props } = config;
+        // flatten the config into props
+        for (const [k, v] of Object.entries(extra)) {
+            props[k] = v;
+        }
+        // find the key in BaseChart.types that corresponds to this chart type
+        // I don't much like this, but it seems to vaguely work for now
+        for (const [k, v] of Object.entries(BaseChart.types)) {
+            if (v.name === config.type) {
+                props.type = k;
+                break;
+            }
+        }
+
+        // this is where we'd call the chart manager to add the chart
+        window.mdv.chartManager.addChart(dataStore.name, props, true);
+        // and then close the dialog...
+        onDone();
+    }, [config, dataStore]);
     return (
         <>
             <Grid container spacing={2} sx={{margin: 1, width: '50em'}}>
@@ -91,10 +155,11 @@ const ConfigureChart = observer(({config}: {config: ChartConfig}) => {
                                 <TextField {...params} label="Chart Type" />
                             )}
                         />
-                        <TextField label="Title" size="small" />
+                        <TextField label="Title" size="small" onChange={action((e) => config.title = e.target.value)} />
                         <TextField label="Description" size="small" 
                         multiline aria-multiline
                         rows={6}
+                        onChange={action((e) => config.legend = e.target.value)}
                         />
                     </Grid>
                 </Grid>
@@ -103,9 +168,13 @@ const ConfigureChart = observer(({config}: {config: ChartConfig}) => {
                     sx={{gap: 1}}
                     >
                         <h2>Columns</h2>
-                        {chartType?.params?.map(p => (
+                        {chartType?.params?.map((p, i) => (
                             <ColumnSelectionComponent key={p.name} placeholder={p.name} 
-                            setSelectedColumn={(column) => console.log(column)}
+                            setSelectedColumn={action((column) => {
+                                config.param[i] = column;
+                                // grumble grumble
+                                config._updated = new Date();
+                            })}
                             type={p.type}
                             />
                         ))}
@@ -117,47 +186,50 @@ const ConfigureChart = observer(({config}: {config: ChartConfig}) => {
                 </Grid>
             </Grid>
             <AppBar position="absolute" sx={{ top: 'auto', bottom: 0 }}>
-                <Button variant="contained" color="primary" disabled>Add Chart</Button>
+                <Button variant="contained" color="primary" onClick={addChart}>Add Chart</Button>
             </AppBar>
         </>
     );
 });
 
 const AddChartDialogComponent = observer(
-    ({ dataStore, config }: { dataStore: DataStore, config: ChartConfig }) => {
-        const chartTypes = BaseChart.types;
-        const [selectedChartType, setSelectedChartType] = useState("");
+    ({ dataStore, config, onDone }: { dataStore: DataStore, config: ChartConfig, onDone: () => void }) => {
+        // prompt, e.g.: "dot-plot of gene expression"
         return (
             <>
                 <DataStoreContext.Provider value={dataStore}>
                     <div className="align-top">
-                    <ConfigureChart config={config} />
+                    <ConfigureChart config={config} onDone={onDone} />
                     </div>
-                    <div className="w-full h-[40vh]">
-                        <p>Chart Preview: "{config.title}"</p>
-                        <JsonView src={config} />
-                    </div>
+                    {/* NOTE - before config._updated was added, this causes update when config.legend chages,
+                    otherwise not unless we spread config... and then nested `config.params[i] = c` updates didn't work */}
+                    {/* <div>
+                        <p>Chart Preview: "{config.legend}"</p>
+                        <JsonView src={{...config}} />
+                    </div> */}
+                    <ChartPreview config={{...config}} />
                 </DataStoreContext.Provider>
             </>
         )
     },
 );
 /** we could standardise this more for reuse... but not sure we want this to be modal, actually */
-const Wrapper = (props: { dataStore: DataStore, modal: boolean }) => {
+const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => void }) => {
     // how to manage this state?
     // it is currently possible for multiple dialogs to be open at once, with different states
     // this should not be allowed.
     // then we could use zustand without bothering with faff of multiple store contexts
     // the only consequence of allowing multiple dialogs to be open would be that they'd share state
     // but that could actually be bad in that they are all associated with a particular dataStore
-    const config = useMemo(() => makeAutoObservable(ChartConfigSchema.parse({
+    const config = useMemo(() => observable.object((ChartConfigSchema.parse({
             title: "",
             legend: "",
             type: "",
             param: [] as Param[],
             extra: {},
-        } satisfies ChartConfig)
-    ), []);
+            _updated: new Date(),
+        })
+    )), []);
     const [open, setOpen] = useState(true);
     useEffect(() => {
         if (!props.modal) return;
@@ -199,7 +271,7 @@ class AddChartDialogReact extends BaseDialog {
         );
         const modal = true;
         this.root = createMdvPortal(
-            <Wrapper dataStore={dataStore} modal={modal} />,
+            <Wrapper dataStore={dataStore} modal={modal} onDone={() => this.close()}/>,
             this.dialog,
             this,
         );
