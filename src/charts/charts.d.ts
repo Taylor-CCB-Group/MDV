@@ -22,7 +22,7 @@ type DataStructureTypes = {
     text: Uint8Array;
     text16: Uint16Array;
     multitext: Uint16Array;
-    unique: Uint8Array; //not sure about this either.
+    unique: Uint8Array; //raw bytes of strings to be decoded
 };
 // even if they're just aliases, these could be useful for documentation / clarity
 export type ColumnName = string;
