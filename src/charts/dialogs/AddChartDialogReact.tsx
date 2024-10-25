@@ -1,23 +1,34 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type DataStore from "../../datastore/DataStore.js";
-import TagModel from "../../table/TagModel";
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createMdvPortal } from "@/react/react_utils";
 import { observer } from "mobx-react-lite";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
-import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
-import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
-import CheckBoxIcon from "@mui/icons-material/CheckBox";
 
 import BaseChart from "../BaseChart.js";
+import type { Param } from "@/charts/ChartTypes.js";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
-import { AppBar, Box, Button, Dialog, Grid, Typography } from "@mui/material";
+import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
+import { makeAutoObservable, runInAction } from "mobx";
+import z from "zod";
 
-function ChooseChartType() {
+const ChartConfigSchema = z.object({
+    title: z.string(),
+    legend: z.string(),
+    // in future, allow for "virtual" / "computed" / "smart" columns
+    param: z.array(z.string()),
+    type: z.string(),
+    // in the original AddChartDialog, extra props are on the root object, not nested
+    // so when we pass this to ChartManager, we'll need to flatten it
+    extra: z.record(z.unknown()),
+});
+type ChartConfig = z.infer<typeof ChartConfigSchema>;
+
+const ConfigureChart = observer(({config}: {config: ChartConfig}) => {
     const dataStore = useDataStore();
     const chartTypes = useMemo(() => {
         return Object.values(BaseChart.types).filter(t => {
@@ -36,8 +47,13 @@ function ChooseChartType() {
         });
     }, [dataStore]);
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
-    const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
-    const chartType = chartTypes.find(t => t.name === chartTypeName);
+    // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
+    const setChartTypeName = useCallback((chartTypeName: string) => {
+        runInAction(() => {
+            config.type = chartTypeName;
+        });
+    }, [config.type, config]);
+    const chartType = chartTypes.find(t => t.name === config.type);
     const extraControls = useMemo(() => {
         return chartType?.extra_controls?.(dataStore).map((control, i) => (
             <Box key={control.name}>
@@ -61,7 +77,7 @@ function ChooseChartType() {
     
     return (
         <>
-            <Grid container spacing={2} sx={{margin: 1}}>
+            <Grid container spacing={2} sx={{margin: 1, width: '50em'}}>
                 <Grid item xs={6}>
                     <Grid container direction={"column"} spacing={1}
                     sx={{gap: 1}}
@@ -69,7 +85,7 @@ function ChooseChartType() {
                         <h2>Chart Type</h2>
                         <Autocomplete
                             options={chartNames}
-                            value={chartTypeName}
+                            value={config.type}
                             onChange={(_, value) => setChartTypeName(value)}
                             renderInput={(params) => (
                                 <TextField {...params} label="Chart Type" />
@@ -105,24 +121,71 @@ function ChooseChartType() {
             </AppBar>
         </>
     );
-}
+});
 
 const AddChartDialogComponent = observer(
-    ({ dataStore }: { dataStore: DataStore }) => {
+    ({ dataStore, config }: { dataStore: DataStore, config: ChartConfig }) => {
         const chartTypes = BaseChart.types;
         const [selectedChartType, setSelectedChartType] = useState("");
         return (
             <>
                 <DataStoreContext.Provider value={dataStore}>
                     <div className="align-top">
-                    <ChooseChartType />
+                    <ConfigureChart config={config} />
+                    </div>
+                    <div className="w-full h-[40vh]">
+                        <p>Chart Preview: "{config.title}"</p>
+                        <JsonView src={config} />
                     </div>
                 </DataStoreContext.Provider>
             </>
         )
     },
 );
-
+/** we could standardise this more for reuse... but not sure we want this to be modal, actually */
+const Wrapper = (props: { dataStore: DataStore, modal: boolean }) => {
+    // how to manage this state?
+    // it is currently possible for multiple dialogs to be open at once, with different states
+    // this should not be allowed.
+    // then we could use zustand without bothering with faff of multiple store contexts
+    // the only consequence of allowing multiple dialogs to be open would be that they'd share state
+    // but that could actually be bad in that they are all associated with a particular dataStore
+    const config = useMemo(() => makeAutoObservable(ChartConfigSchema.parse({
+            title: "",
+            legend: "",
+            type: "",
+            param: [] as Param[],
+            extra: {},
+        } satisfies ChartConfig)
+    ), []);
+    const [open, setOpen] = useState(true);
+    useEffect(() => {
+        if (!props.modal) return;
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [props.modal]);
+    //p-4 mt-2 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]
+    if (!props.modal) {
+        return <AddChartDialogComponent {...props} config={config} />;
+    }
+    return (
+        <Dialog open={open} fullScreen disableEscapeKeyDown={true}>
+            <div className="h-screen flex items-center justify-center">
+                <Paper elevation={2} sx={{ p: 2 }}>
+                    <h1>Add Chart in "{props.dataStore.name}"...</h1>
+                    <AddChartDialogComponent {...props} config={config} />
+                </Paper>
+            </div>
+        </Dialog>
+    );
+}
 class AddChartDialogReact extends BaseDialog {
     root: ReturnType<typeof createMdvPortal>;
     constructor(dataStore: DataStore) {
@@ -134,11 +197,13 @@ class AddChartDialogReact extends BaseDialog {
             },
             null,
         );
+        const modal = true;
         this.root = createMdvPortal(
-            <AddChartDialogComponent dataStore={dataStore} />,
+            <Wrapper dataStore={dataStore} modal={modal} />,
             this.dialog,
             this,
         );
+        this.outer.style.display = modal ? "none" : "block";
     }
     close(): void {
         super.close();
