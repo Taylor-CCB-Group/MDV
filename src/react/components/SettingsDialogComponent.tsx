@@ -108,9 +108,10 @@ function DropdownAutocompleteComponent({
     const id = useId();
     const multiple = props.type === "multidropdown";
     // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
+    if (!props.values) throw "DropdownAutocompleteComponent requires props.values";
     const useObjectKeys = props.values.length === 3;
-    const [_valueObjectArray, labelKey, valueKey] = props.values;
-
+    const [_valueObjectArray, labelKey, valueKey] = useObjectKeys ? props.values : ["X", "X", "X"];
+    if (!labelKey || !valueKey) throw "DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys";
     //todo handle multitext / tags properly.
 
     // todo think about how this relates to different type logic with {label, value, original}
@@ -497,7 +498,8 @@ const ErrorComponent = observer(({ props, label }: { props: any, label: string }
     );
 });
 
-const AbstractComponent = observer(
+// how close is this to something we could use from AddChartDialog?
+export const AbstractComponent = observer(
     ({ props }: { props: GuiSpec<GuiSpecType> }) => {
         // would like to lose this `as` cast - maybe a newer/future typescript might manage it better?
         const Component = Components[props.type] as React.FC<{

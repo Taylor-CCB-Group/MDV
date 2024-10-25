@@ -13,15 +13,16 @@ import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
 import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
 import ColumnSelectionComponent, { columnMatchesType } from "@/react/components/ColumnSelectionComponent.js";
-import { action, observable, runInAction } from "mobx";
+import { action, observable, reaction, runInAction } from "mobx";
 import z from "zod";
-import type { DataColumn } from "../charts.js";
+import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
+import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 
 const ChartConfigSchema = z.object({
     title: z.string(),
     legend: z.string(),
     // in future, allow for "virtual" / "computed" / "smart" columns
-    param: z.array(z.string()),
+    param: z.optional(z.array(z.string())),
     type: z.string(),
     // in the original AddChartDialog, extra props are on the root object, not nested
     // so when we pass this to ChartManager, we'll need to flatten it
@@ -51,6 +52,59 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
     );
 });
 
+/** given an (observable) ExtraControl, return an (observable) GuiSpec
+ * adapted so we can use SettingsDialogComponent widgets
+ * When the returned GuiSpec is updated, the property of config corresponding to the control is updated
+*/
+function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T>, onChange: (v: GuiValueTypes[T]) => void): GuiSpec<T> {
+    const draftSpec = {
+        type: control.type,
+        label: control.label,
+        name: control.name,
+        current_value: control.defaultVal,
+        // values: control.values,
+    } satisfies GuiSpec<T>;
+    if (draftSpec.type === "dropdown" || draftSpec.type === "multidropdown") {
+        // we run into this irritating logic with format that dropdown values can come in
+        // >the props.values may be a tuple of [valueObjectArray, textKey, valueKey], 
+        // or an array of length 1 - [string[]]
+        //const useObjectKeys = Array.isArray(control.values) && control.values.length === 3;
+        const values = control.values as any;
+        // if (!control.defaultVal) draftSpec.current_value = useObjectKeys ? values[0][0][values[0][2]] : values[0][0];
+        if (!control.defaultVal) draftSpec.current_value = values[0]["name"];
+        //(draftSpec as any).values = control.values; //doesn't give runtime error, doesn't work
+        (draftSpec as any).values = [values, "name", "value"];
+    }
+    if (draftSpec.type === "radiobuttons") {}//todo test
+    //bad bad bad
+    //if (draftSpec.type === "check" && !control.defaultVal) (draftSpec as any).current_value = false;
+    // if ((draftSpec as any).type === "checkbox" && !control.defaultVal) (draftSpec as any).current_value = false;
+    if ((draftSpec.type as string) === "checkbox") (draftSpec as any).type = "check";
+    const spec = observable(draftSpec);
+    // if (!spec.current_value) throw new Error(`current_value should be set - no default in '${JSON.stringify(control)}'`);
+    // strict typescript warns us about spec.current_value being potentially undefined, and it's dead right.
+    // IMO much of the faffing around I'm doing getting this all to work could be avoided with better types.
+    reaction(() => spec.current_value, onChange);
+    return spec;
+}
+function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<T>, config: ChartConfig): GuiSpec<T> {
+    const spec = useMemo(() => {
+        const val = controlToGuiSpec(control, (v) => {config.extra[control.name] = v});
+        config.extra[control.name] = val.current_value;
+        return val;
+    }, [control, config]);
+    return spec;
+}
+
+const ExtraControlComponent = observer(({ control, config }: { control: ExtraControl<keyof GuiValueTypes>, config: ChartConfig }) => {
+    const spec = useGuiSpecControl(control, config);
+    return (
+        <Paper elevation={6}>
+            <AbstractComponent props={spec} />
+        </Paper>
+    );
+});
+
 
 const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone: () => void}) => {
     const dataStore = useDataStore();
@@ -73,7 +127,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     const paramColumns = useMemo(
-        () => config.param.map(p => dataStore.columnIndex[p] as DataColumn),
+        () => config.param ? config.param.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
     [config.param, dataStore]);
     const setChartTypeName = useCallback((chartTypeName: string) => {
         runInAction(() => {
@@ -81,47 +135,41 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
             const chartType = chartTypes.find(t => t.name === config.type);
             if (!chartType) throw new Error(`Chart type ${config.type} not found`);
             // set default values for params, use previous values if possible
-            const previousParams = config.param;
-            // what is the observable status of this new array?
-            config.param = new Array(chartType.params.length);
-            for (const [i, p] of chartType.params.entries()) {
-                const previousColumn = paramColumns[i];
-                if (previousParams[i] && columnMatchesType(previousColumn, p.type)) {
-                    config.param[i] = previousParams[i];
-                } else {
-                    // we could try to be a bit clever about finding a suitable column, like "x"...
-                    config.param[i] = "";
+            if (chartType.params) {
+                const previousParams = config.param || [];
+                config.param = new Array(chartType.params.length);
+                for (const [i, p] of chartType.params.entries()) {
+                    const previousColumn = paramColumns[i];
+                    if (previousParams[i] && columnMatchesType(previousColumn, p.type)) {
+                        config.param[i] = previousParams[i];
+                    } else {
+                        // we could try to be a bit clever about finding a suitable column, like "x"...
+                        config.param[i] = "";
+                    }
                 }
+            } else {
+                config.param = [];
             }
             config._updated = new Date();
         });
     }, [config.type, config, chartTypes, paramColumns]);
     const chartType = chartTypes.find(t => t.name === config.type);
     const extraControls = useMemo(() => {
-        // I don't think these need to be observer components
-        // (and anyway, this part of GUI is totally placeholder for now)
         return chartType?.extra_controls?.(dataStore).map((control, i) => (
-            <Box key={control.name}>
-                <Typography>{control.label}</Typography>
-                <p>
-                {control.name} :  {control.type}
-                </p>
-                <p>
-                defaultVal: {control.defaultVal}
-                </p>
-                <div>
-                    <h3>Values</h3>
-                    {control.values?.map(({name, value}) => (
-                        <Chip key={name} label={name} />
-                    ))}
-                </div>
-            </Box>
+            <ExtraControlComponent key={control.name} control={control} config={config} />
         ));
-    }, [chartType, dataStore]);
+    }, [chartType, dataStore, config]);
 
     const addChart = useCallback(() => {
         const { extra, _updated, ...props } = config;
         // flatten the config into props
+        chartType?.extra_controls?.(dataStore).forEach(control => {
+            if (control.defaultVal && !extra[control.name]) {
+                extra[control.name] = control.defaultVal;
+            } else {
+                // if (!control.defaultVal)
+            }
+        });
         for (const [k, v] of Object.entries(extra)) {
             props[k] = v;
         }
@@ -133,12 +181,16 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 break;
             }
         }
+        if (chartType?.init) {
+            chartType.init(props, dataStore, extra);
+        }
 
         // this is where we'd call the chart manager to add the chart
+        if (!window.mdv.chartManager) throw new Error("chartManager not found");
         window.mdv.chartManager.addChart(dataStore.name, props, true);
         // and then close the dialog...
         onDone();
-    }, [config, dataStore]);
+    }, [config, dataStore, onDone, chartType]);
     return (
         <>
             <Grid container spacing={2} sx={{margin: 1, width: '50em'}}>
@@ -150,7 +202,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                         <Autocomplete
                             options={chartNames}
                             value={config.type}
-                            onChange={(_, value) => setChartTypeName(value)}
+                            onChange={(_, value) => value && setChartTypeName(value)}
                             renderInput={(params) => (
                                 <TextField {...params} label="Chart Type" />
                             )}
@@ -167,10 +219,11 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     <Grid container direction={"column"} spacing={1}
                     sx={{gap: 1}}
                     >
-                        <h2>Columns</h2>
+                        {chartType?.params && <h2>Columns</h2>}
                         {chartType?.params?.map((p, i) => (
                             <ColumnSelectionComponent key={p.name} placeholder={p.name} 
                             setSelectedColumn={action((column) => {
+                                if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
                                 config.param[i] = column;
                                 // grumble grumble
                                 config._updated = new Date();
@@ -178,6 +231,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                             type={p.type}
                             />
                         ))}
+                        {extraControls && <h2>Extra Controls</h2>}
                         {extraControls}
                         <Dialog open={false}>
                             <JsonView src={chartType} collapsed/>
@@ -224,7 +278,7 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
     const config = useMemo(() => observable.object((ChartConfigSchema.parse({
             title: "",
             legend: "",
-            type: "",
+            type: "Text Box",
             param: [] as Param[],
             extra: {},
             _updated: new Date(),
@@ -236,13 +290,14 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 setOpen(false);
+                props.onDone();
             }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => {
             window.removeEventListener("keydown", handleKeyDown);
         };
-    }, [props.modal]);
+    }, [props.modal, props.onDone]);
     //p-4 mt-2 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]
     if (!props.modal) {
         return <AddChartDialogComponent {...props} config={config} />;
