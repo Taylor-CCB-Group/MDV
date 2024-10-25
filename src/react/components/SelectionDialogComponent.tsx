@@ -17,6 +17,7 @@ import { action, runInAction } from "mobx";
 import { useChart } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
+import { useDebounce } from "use-debounce";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -207,16 +208,18 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const value = (filters[column.field] || column.minMax) as [number, number];
     const isInteger = column.datatype.match(/int/);
     const step = isInteger ? 1 : 0.01;
+    const [debouncedValue] = useDebounce(value, 10);
 
     // Effect to manage the filter state
     useEffect(() => {
+        const value = debouncedValue;
         if (value[0] === column.minMax[0] && value[1] === column.minMax[1]) {
             filter.removeFilter();
             return;
         }
         const [min, max] = value;
         filter.filter("filterRange", [column.name], { min, max }, true);
-    }, [column, filter, value]);
+    }, [column, filter, debouncedValue]);
 
     const [histogram, setHistogram] = useState<number[]>([]);
     // this could be a more general utility function - expect to extract soon
@@ -247,8 +250,8 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
 type RangeProps = ReturnType<typeof useRangeFilter>;
 const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryHistogram }: RangeProps) => {
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
-    const width = 100;
-    const height = 20;
+    const width = 99;
+    const height = 40;
     const lineColor = prefersDarkMode ? '#fff' : '#000';
     // Find max value for vertical scaling
     const maxValue = Math.max(...data);
