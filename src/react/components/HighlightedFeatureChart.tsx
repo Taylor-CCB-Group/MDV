@@ -47,6 +47,7 @@ class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureCo
 BaseChart.types["highlightedFeature"] = {
     class: HighlightedFeatureChartWrapper,
     name: "Highlighted Feature",
+    allow_user_add: false,
     // required: ['muspan'],
     params: [
         {
