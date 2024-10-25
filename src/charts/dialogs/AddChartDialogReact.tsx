@@ -324,7 +324,7 @@ class AddChartDialogReact extends BaseDialog {
             },
             null,
         );
-        const modal = true;
+        const modal = false;
         this.root = createMdvPortal(
             <Wrapper dataStore={dataStore} modal={modal} onDone={() => this.close()}/>,
             this.dialog,
