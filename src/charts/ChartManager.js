@@ -1642,9 +1642,9 @@ class ChartManager {
                     position: "bottom-right",
                 },
                 func: () => {
-                    new AddChartDialog(ds, (config) =>
-                        this.addChart(ds.name, config, true),
-                    );
+                    // new AddChartDialog(ds, (config) =>
+                    //     this.addChart(ds.name, config, true),
+                    // );
                     new BaseDialog.experiment["AddChartDialogReact"](dataStore);
                 },
             },
