@@ -140,6 +140,7 @@ export class AddChartDialog extends BaseDialog {
     }
 
     submit(callback) {
+        // this logic to be used as a reference in React version (at least initially)
         const config = {
             title: this.chartName.value,
             legend: this.chartDescription.value,
