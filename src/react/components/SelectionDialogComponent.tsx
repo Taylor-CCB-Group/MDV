@@ -390,8 +390,8 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
                     aria-label="delete"
                     sx={{
                         position: 'absolute',
-                        right: '-16px',
-                        top: '-16px',
+                        right: '-18px',
+                        top: '-18px',
                         opacity: isHovered ? 1 : 0,
                         visibility: isHovered ? 'visible' : 'hidden',
                         transition: 'opacity 0.3s, visibility 0.3s',
