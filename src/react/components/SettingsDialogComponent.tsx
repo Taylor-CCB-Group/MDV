@@ -101,9 +101,9 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
-function DropdownAutocompleteComponent({
+export const DropdownAutocompleteComponent = observer(({
     props,
-}: { props: GuiSpec<"dropdown" | "multidropdown"> }) {
+}: { props: GuiSpec<"dropdown" | "multidropdown"> }) => {
     // todo review 'virtualization' for large lists
     const id = useId();
     const multiple = props.type === "multidropdown";
@@ -133,8 +133,9 @@ function DropdownAutocompleteComponent({
             if (a && option.length > 1) {
                 console.warn("ideally we shouldn't have to deal with arrays at all here, but we only expect one value when we do");
             }
-            return (Array.isArray(option) ? option[0] : option)},
-    []);
+            return (Array.isArray(option) ? option[0] : option)
+        },
+        []);
     const single = getSingleOption;
     const label = useCallback((option: OptionType | OptionType[]) => single(option).label, [single]);
     const val = useCallback((option: OptionType | OptionType[]) => single(option).value, [single]);
@@ -164,7 +165,7 @@ function DropdownAutocompleteComponent({
     const okOption = (Array.isArray(okValue)
         ? okValue.map((v) => options.find((o) => o.value === v))
         : [options.find((o) => o.value === v)])
-        // : options.find((o) => o.value === v); //not-multiple...
+    // : options.find((o) => o.value === v); //not-multiple...
 
     return (
         <>
@@ -234,14 +235,14 @@ function DropdownAutocompleteComponent({
                 renderInput={(params) => (
                     <TextField
                         {...params}
-                        // label="Checkboxes"
-                        // placeholder={props.label}
+                    // label="Checkboxes"
+                    // placeholder={props.label}
                     />
                 )}
             />
         </>
     );
-}
+});
 
 const DropdownComponent = ({
     props,
@@ -465,13 +466,13 @@ const Components: {
     textbox: observer(TextBoxComponent),
     slider: observer(SliderComponent),
     spinner: observer(SpinnerComponent),
-    dropdown: observer(DropdownAutocompleteComponent),
+    dropdown: DropdownAutocompleteComponent,
     // consider having component specifically for column/category selection
     // the column selection can make use of column groups
     // category selection can have some logic for multitext / tags
     // both can have the ability to reactively update their options based on the current data
     // 'multidropdown': observer(DropdownComponent),
-    multidropdown: observer(DropdownAutocompleteComponent),
+    multidropdown: DropdownAutocompleteComponent,
     check: observer(CheckboxComponent),
     radiobuttons: observer(RadioButtonComponent),
     doubleslider: observer(DoubleSliderComponent),
