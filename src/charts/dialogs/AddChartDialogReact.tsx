@@ -13,7 +13,7 @@ import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
 import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
 import ColumnSelectionComponent, { columnMatchesType } from "@/react/components/ColumnSelectionComponent.js";
-import { action, observable, reaction, runInAction } from "mobx";
+import { action, observable, reaction, runInAction, toJS } from "mobx";
 import z from "zod";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
@@ -43,11 +43,51 @@ function actionWithUpdate<T extends any[]>(
 }
 
 const ChartPreview = observer(({config}: {config: ChartConfig}) => {
+    const dataStore = useDataStore();
+    const chartType = useMemo(() => {
+        return Object.values(BaseChart.types).find(t => t.name === config.type);
+    }, [config.type]);
     // this could be an actual chart preview, but for now, the config is useful
+    // will probably keep it as an option to show the JSON, but default to a chart preview
+    // this should always have the result of any extra controls & init applied - which may be an error
+    // todo rearrange so that the same code is used for adding actual chart
+    const scratchProps = useMemo(() => {
+        const scratchConfig = toJS(config);
+        const { extra, _updated, ...props } = scratchConfig;
+        // flatten the config into props
+        chartType?.extra_controls?.(dataStore).forEach(control => {
+            if (control.defaultVal && !extra[control.name]) {
+                extra[control.name] = control.defaultVal;
+            } else {
+                // if (!control.defaultVal)
+            }
+        });
+        for (const [k, v] of Object.entries(extra)) {
+            props[k] = v;
+        }
+        // find the key in BaseChart.types that corresponds to this chart type
+        // I don't much like this, but it seems to vaguely work for now
+        for (const [k, v] of Object.entries(BaseChart.types)) {
+            if (v.name === config.type) {
+                props.type = k;
+                break;
+            }
+        }
+        if (chartType?.init) {
+            try {
+                chartType.init(props, dataStore, extra);
+            } catch (e) {
+                return e;
+            }
+        }
+        return props;
+    }, [config, dataStore, chartType]);
+    const { _updated, ...configWithoutUpdated } = toJS(config);
     return (
-        <div>
+        <div className="grid grid-cols-2">
             {/* <h2>Chart Preview</h2> */}
-            <JsonView src={config} collapsed />
+            <JsonView src={configWithoutUpdated} collapsed collapseStringsAfterLength={10} />
+            <JsonView src={scratchProps} collapsed />
         </div>
     );
 });
@@ -129,36 +169,46 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     const paramColumns = useMemo(
         () => config.param ? config.param.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
     [config.param, dataStore]);
-    const setChartTypeName = useCallback((chartTypeName: string) => {
-        runInAction(() => {
-            config.type = chartTypeName;
-            const chartType = chartTypes.find(t => t.name === config.type);
-            if (!chartType) throw new Error(`Chart type ${config.type} not found`);
-            // set default values for params, use previous values if possible
-            if (chartType.params) {
-                const previousParams = config.param || [];
-                config.param = new Array(chartType.params.length);
-                for (const [i, p] of chartType.params.entries()) {
-                    const previousColumn = paramColumns[i];
-                    if (previousParams[i] && columnMatchesType(previousColumn, p.type)) {
-                        config.param[i] = previousParams[i];
-                    } else {
-                        // we could try to be a bit clever about finding a suitable column, like "x"...
-                        config.param[i] = "";
+    // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
+    const setChartTypeName = useCallback(action((chartTypeName: string) => {
+        config.type = chartTypeName;
+        const chartType = chartTypes.find(t => t.name === config.type);
+        if (!chartType) throw new Error(`Chart type ${config.type} not found`);
+        // set default values for params, use previous values if possible
+        if (chartType.params) {
+            // we could have some metadata on the column like `{intendedFor: "X axis"}` etc
+            const previousParams = toJS(config.param) || []; // warning: mobx gives us a proxy & normal indexing doesn't work
+            config.param = new Array(chartType.params.length);
+            for (const [i, p] of chartType.params.entries()) {
+                const previousColumn = paramColumns[i];
+                if (previousParams[i] && columnMatchesType(previousColumn, p.type)) {
+                    console.log(`[${config.type}, ${p.name}] using previous selection: '${previousParams[i]}'`);
+                    config.param[i] = previousParams[i];
+                } else {
+                    // we could try to be a bit clever about finding a suitable column, like "x"...
+                    const c = dataStore.columns.find(c => columnMatchesType(c, p.type));
+                    if (!c) {
+                        // we should let the user know - highlight the dropdown or something
+                        console.warn(`[${config.type}, ${p.name}] No column found for type '${p.type}'`);
+                        continue;
                     }
+                    console.log(`[${config.type}, ${p.name}] using first available ${p.type}: '${c.name}'`);
+                    // todo: figure out why this setting the value in the dropdown (it does apply to the config preview)
+                    config.param[i] = c.name;
                 }
-            } else {
-                config.param = [];
             }
-            config._updated = new Date();
-        });
-    }, [config.type, config, chartTypes, paramColumns]);
+        } else {
+            config.param = [];
+        }
+        config._updated = new Date();
+    }), [config.type, config, chartTypes, paramColumns, dataStore]);
     const chartType = chartTypes.find(t => t.name === config.type);
     const extraControls = useMemo(() => {
         return chartType?.extra_controls?.(dataStore).map((control, i) => (
             <ExtraControlComponent key={control.name} control={control} config={config} />
         ));
     }, [chartType, dataStore, config]);
+
 
     const addChart = useCallback(() => {
         const { extra, _updated, ...props } = config;
@@ -278,7 +328,7 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
     const config = useMemo(() => observable.object((ChartConfigSchema.parse({
             title: "",
             legend: "",
-            type: "Text Box",
+            type: "",
             param: [] as Param[],
             extra: {},
             _updated: new Date(),
@@ -319,12 +369,12 @@ class AddChartDialogReact extends BaseDialog {
         super(
             {
                 title: `Add Chart in '${dataStore.name}'`,
-                width: 400,
+                width: 600,
                 height: 420,
             },
             null,
         );
-        const modal = false;
+        const modal = false; //doesn't work on fullscreen panel as of writing
         this.root = createMdvPortal(
             <Wrapper dataStore={dataStore} modal={modal} onDone={() => this.close()}/>,
             this.dialog,
