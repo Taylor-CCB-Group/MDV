@@ -2,11 +2,10 @@ import React, { useCallback, useState } from "react";
 import {
     Add,
     Search,
-    Menu as MenuIcon,
-    GridView,
-    ViewList,
+    Reorder as ReorderIcon,
     ExpandMore,
     Folder,
+    GridView,
 } from "@mui/icons-material";
 import {
     AppBar,
@@ -23,21 +22,18 @@ import {
     Box,
     Container,
     Divider,
-    useTheme,
-    ThemeProvider,
-    createTheme,
     ButtonBase,
     CircularProgress,
 } from "@mui/material";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
-import { alpha } from "@mui/material/styles";
 import ProjectCard from "./ProjectCard";
 import useProjects from "./hooks/useProjects";
 import UserProfile from "./UserProfile";
 import mdvLogo from "./assets/mdv_logo.png";
 import { useColorMode } from "@/ThemeProvider";
 import ErrorModal from "./ProjectErrorModal";
+import ProjectListView from "./ProjectListView";
 
 const Dashboard: React.FC = () => {
     const {
@@ -268,36 +264,47 @@ const Dashboard: React.FC = () => {
                         }}
                     >
                         <Typography variant="h5">Recent Projects</Typography>
-                        <Paper
-                            elevation={1}
-                            sx={{
-                                padding: "8px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                borderRadius: "4px",
-                                width: "205px",
-                                height: "50px",
-                                bgcolor: "background.paper",
-                            }}
-                        >
-                            <Button
-                                endIcon={<ExpandMore />}
-                                onClick={toggleDropdown}
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                            <Paper
+                                elevation={1}
                                 sx={{
-                                    textTransform: "none",
-                                    width: "100%",
-                                    height: "100%",
+                                    padding: "8px",
                                     display: "flex",
+                                    alignItems: "center",
                                     justifyContent: "center",
+                                    borderRadius: "4px",
+                                    width: "205px",
+                                    height: "50px",
+                                    bgcolor: "background.paper",
                                 }}
                             >
-                                Sort by:{" "}
-                                {sortBy === "lastModified"
-                                    ? "Last modified"
-                                    : "Name"}
-                            </Button>
-                        </Paper>
+                                <Button
+                                    endIcon={<ExpandMore />}
+                                    onClick={toggleDropdown}
+                                    sx={{
+                                        textTransform: "none",
+                                        width: "100%",
+                                        height: "100%",
+                                        display: "flex",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    Sort by:{" "}
+                                    {sortBy === "lastModified"
+                                        ? "Last modified"
+                                        : "Name"}
+                                </Button>
+                            </Paper>
+                            <Tooltip title={viewMode === "grid" ? "List View" : "Grid View"}>
+                                <IconButton 
+                                    onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")} 
+                                    sx={{ ml: 2 }}
+                                >
+                                    {viewMode === "grid" ? <ReorderIcon sx={{ fontSize: 32 }} /> : <GridView sx={{ fontSize: 32 }} />}
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                        
                         <Menu
                             anchorEl={anchorEl}
                             open={isDropdownOpen}
@@ -318,7 +325,7 @@ const Dashboard: React.FC = () => {
 
                     {isLoading ? (
                         <CircularProgress />
-                    ) : (
+                    ) : viewMode === "grid" ? (
                         <Grid container spacing={4}>
                             {projects.map((project) => (
                                 <Grid
@@ -339,6 +346,13 @@ const Dashboard: React.FC = () => {
                                 </Grid>
                             ))}
                         </Grid>
+                    ) : (
+                        <ProjectListView 
+                            projects={projects}
+                            onDelete={deleteProject}
+                            onRename={renameProject}
+                            onChangeType={changeProjectType}
+                        />
                     )}
                 </Container>
                 <ErrorModal 
