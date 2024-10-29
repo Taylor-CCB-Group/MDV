@@ -17,6 +17,7 @@ import Autocomplete from "@mui/material/Autocomplete";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import JsonView from "react18-json-view";
+import { DataStoreContext } from "../context";
 
 const TextComponent = ({ props }: { props: GuiSpec<"text"> }) => (
     <>
@@ -515,10 +516,12 @@ export default observer(({ chart }: { chart: Chart }) => {
         return wrap.settings;
     }, [chart]);
     return (
-        <div className="w-full">
-            {settings.map(({ setting, id }) => (
-                <AbstractComponent key={id} props={setting} />
-            ))}
-        </div>
+        <DataStoreContext.Provider value={chart.dataStore}>
+            <div className="w-full max-h-[80vh]">
+                {settings.map(({ setting, id }) => (
+                    <AbstractComponent key={id} props={setting} />
+                ))}
+            </div>
+        </DataStoreContext.Provider>
     );
 });
