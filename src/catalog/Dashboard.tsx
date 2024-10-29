@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
     Add,
     Search,
@@ -34,6 +34,7 @@ import mdvLogo from "./assets/mdv_logo.png";
 import { useColorMode } from "@/ThemeProvider";
 import ErrorModal from "./ProjectErrorModal";
 import ProjectListView from "./ProjectListView";
+import { type SortBy, type SortOrder, sortProjects } from "./utils/projectUtils";
 
 const Dashboard: React.FC = () => {
     const {
@@ -48,9 +49,6 @@ const Dashboard: React.FC = () => {
         renameProject,
         changeProjectType,
         setFilter,
-        setSortBy,
-        setSortOrder,
-        sortBy,
     } = useProjects();
 
     const { mode, toggleColorMode } = useColorMode();
@@ -58,7 +56,8 @@ const Dashboard: React.FC = () => {
     const [projectType, setProjectType] = useState<"Editable" | "Read-Only">(
         "Editable",
     );
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [sortBy, setSortBy] = useState<SortBy>("lastModified");
+    const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
     React.useEffect(() => {
@@ -75,18 +74,24 @@ const Dashboard: React.FC = () => {
         }
     };
 
-    const handleSort = useCallback((newSortBy: "lastModified" | "name") => {
-        // toggle sort order if changing sort option
-        if (newSortBy === sortBy) setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
-        // default to ascending order if changing sort option to name, descending order otherwise (most recent first)
-        else setSortOrder(newSortBy === "name" ? "asc" : "desc");
-        setSortBy(newSortBy);
-        setIsDropdownOpen(false);
-    }, [sortBy]);
+    const sortedProjects = useMemo(() => {
+        return sortProjects(projects, sortBy, sortOrder);
+    }, [projects, sortBy, sortOrder]);
+    
+    const handleSort = useCallback((newSortBy: SortBy) => {
+        if (newSortBy === sortBy) {
+            // Toggle sort order if clicking the same sort option
+            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+        } else {
+            // Set new sort type with default desc order for both cases
+            setSortBy(newSortBy);
+            setSortOrder("desc");
+        }
+        setAnchorEl(null);
+    }, [sortBy, sortOrder]);
 
     const toggleDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
         setAnchorEl(event.currentTarget);
-        setIsDropdownOpen(!isDropdownOpen);
     };
 
     return (
@@ -265,7 +270,7 @@ const Dashboard: React.FC = () => {
                     >
                         <Typography variant="h5">Recent Projects</Typography>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
-                            <Paper
+                        <Paper
                                 elevation={1}
                                 sx={{
                                     padding: "8px",
@@ -279,21 +284,24 @@ const Dashboard: React.FC = () => {
                                 }}
                             >
                                 <Button
-                                    endIcon={<ExpandMore />}
-                                    onClick={toggleDropdown}
-                                    sx={{
-                                        textTransform: "none",
-                                        width: "100%",
-                                        height: "100%",
-                                        display: "flex",
-                                        justifyContent: "center",
-                                    }}
-                                >
-                                    Sort by:{" "}
-                                    {sortBy === "lastModified"
-                                        ? "Last modified"
-                                        : "Name"}
-                                </Button>
+                                endIcon={<ExpandMore />}
+                                onClick={toggleDropdown}
+                                sx={{
+                                    textTransform: "none",
+                                    width: "100%",
+                                    height: "100%",
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                }}
+                            >
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                    Sort by: {sortBy === "lastModified" 
+                                        ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
+                                        : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`
+                                    }
+                                </Box>
+                            </Button>
                             </Paper>
                             <Tooltip title={viewMode === "grid" ? "List View" : "Grid View"}>
                                 <IconButton 
@@ -307,16 +315,36 @@ const Dashboard: React.FC = () => {
                         
                         <Menu
                             anchorEl={anchorEl}
-                            open={isDropdownOpen}
-                            onClose={() => setIsDropdownOpen(false)}
+                            open={Boolean(anchorEl)}
+                            onClose={() => setAnchorEl(null)}
                         >
-                            <MenuItem
+                            <MenuItem 
                                 onClick={() => handleSort("lastModified")}
+                                sx={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between',
+                                    width: '200px',
+                                    gap: 1
+                                }}
                             >
-                                Last modified
+                                <span>Last modified</span>
+                                {sortBy === "lastModified" && (
+                                    <span>{sortOrder === "desc" ? "Newest first" : "Oldest first"}</span>
+                                )}
                             </MenuItem>
-                            <MenuItem onClick={() => handleSort("name")}>
-                                Name
+                            <MenuItem 
+                                onClick={() => handleSort("name")}
+                                sx={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'space-between',
+                                    width: '200px',
+                                    gap: 1
+                                }}
+                            >
+                                <span>Name</span>
+                                {sortBy === "name" && (
+                                    <span>{sortOrder === "desc" ? "Z to A" : "A to Z"}</span>
+                                )}
                             </MenuItem>
                         </Menu>
                     </Box>
@@ -327,7 +355,7 @@ const Dashboard: React.FC = () => {
                         <CircularProgress />
                     ) : viewMode === "grid" ? (
                         <Grid container spacing={4}>
-                            {projects.map((project) => (
+                            {sortedProjects.map((project) => (
                                 <Grid
                                     item
                                     key={project.id}
@@ -348,7 +376,7 @@ const Dashboard: React.FC = () => {
                         </Grid>
                     ) : (
                         <ProjectListView 
-                            projects={projects}
+                            projects={sortedProjects}
                             onDelete={deleteProject}
                             onRename={renameProject}
                             onChangeType={changeProjectType}
