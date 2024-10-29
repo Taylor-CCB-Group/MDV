@@ -36,8 +36,12 @@ import { isColumnNumeric, isColumnText } from "../utilities/Utilities.js";
 
 class DataStore {
     constructor(size, config = {}, dataLoader = null) {
+        /** @type {number} */
         this.size = size;
+        /** @type {number} */
         this.filterSize = size;
+        /** why doesn't this annotation work?
+         * @type {Array.<import("@/charts/charts.js").DataColumn>} */
         this.columns = [];
         this.columnIndex = {};
         this.listeners = {};
