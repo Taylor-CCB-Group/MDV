@@ -30,7 +30,26 @@ const MaterialWrapper = observer(function MaterialWrapper({
                     MuiPopper: { defaultProps },
                     MuiPopover: { defaultProps },
                     MuiDialog: { defaultProps },
+                    // There is a bit of a general issue with material-ui favouring less dense layouts
+                    // than we would tend to want - it is aiming for a more mobile-friendly UX...
+                    MuiTextField: { defaultProps: { size: "small" }},
+                    MuiRadio: {
+                        styleOverrides: {
+                            root: {
+                                padding: '5px',
+                            },
+                        }
+                    }
                 },
+                typography: {
+                    fontFamily: [
+                        "Roboto",
+                        '"Helvetica Neue"',
+                        "Arial",
+                        "sans-serif",
+                    ].join(","),
+                    fontSize: 12,
+                }
             }),
         [prefersDarkMode, defaultProps],
     );
