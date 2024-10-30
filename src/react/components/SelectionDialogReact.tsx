@@ -28,7 +28,7 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 config.filters[col] = null;
             }
         }
-        // makeAutoObservable(config); //super will do this 
+        // makeAutoObservable(config); //super will do this
         //nb, considered `this.mobxAutorun` for showing/hiding reset button, but we use a hook.
         super(dataStore, div, config, observer(SelectionDialogComponent));
     }
@@ -38,6 +38,17 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 this.config.filters[key] = null;
             }
         })();
+    }
+    getSettings() {
+        // todo: add settings widget for 'column' with some properties somewhat similar to params type.
+        const settings = super.getSettings();
+        settings.push({
+            type: "column",
+            label: "Columns To filter",
+            current_value: this.config.param,
+            func: v => {}, //supposed to be optional, but ts still complains???
+        });
+        return settings;
     }
 }
 

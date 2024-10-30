@@ -12,11 +12,12 @@ import type { Param } from "@/charts/ChartTypes.js";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
 import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
-import ColumnSelectionComponent, { columnMatchesType } from "@/react/components/ColumnSelectionComponent.js";
+import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
 import { action, observable, reaction, runInAction, toJS } from "mobx";
 import z from "zod";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
+import { columnMatchesType } from "@/lib/utils.js";
 
 const ChartConfigSchema = z.object({
     title: z.string(),
@@ -374,7 +375,7 @@ class AddChartDialogReact extends BaseDialog {
             },
             null,
         );
-        const modal = false; //doesn't work on fullscreen panel as of writing
+        const modal = true; //doesn't work on fullscreen panel as of writing
         this.root = createMdvPortal(
             <Wrapper dataStore={dataStore} modal={modal} onDone={() => this.close()}/>,
             this.dialog,

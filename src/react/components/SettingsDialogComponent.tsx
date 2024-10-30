@@ -18,8 +18,10 @@ import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import JsonView from "react18-json-view";
 import { DataStoreContext } from "../context";
+import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
+import ColumnSelectionComponent from "./ColumnSelectionComponent";
 
-const MLabel = ({ props, htmlFor }: { props: GuiSpec<GuiSpecType>, htmlFor?: string }) => (
+export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<GuiSpecType>, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>{props.label}</Typography>
     // todo fix justifySelf - it's not working as expected
     // <FormControlLabel
@@ -28,7 +30,7 @@ const MLabel = ({ props, htmlFor }: { props: GuiSpec<GuiSpecType>, htmlFor?: str
     //     label=""
     //     htmlFor={htmlFor}
     // />
-);
+));
 
 const TextComponent = ({ props }: { props: GuiSpec<"text"> }) => (
     <>
@@ -97,6 +99,29 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
         />
     </>
 );
+// nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
+export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"column"> }) => {
+    // proably want to change the type of ColumnSelectionProps anyway...
+    // perhaps we should be looking at other places where it's used & make them use this,
+    // with a different evolution of the API.
+    // currently this is not showing the current_value, among other missing features...
+    const setSelectedColumn = useCallback(action((v: string) => {
+        props.current_value = v;
+        props.func?.(v);
+    }), []); //as of this writing, biome is right that props is not a dependency
+
+    const props2: ColumnSelectionProps = useMemo(() => ({
+        setSelectedColumn,
+        // type: props.type,
+        multiple: false,
+    }), [setSelectedColumn]);
+    return (
+        <>
+            <MLabel props={props} />
+            <ColumnSelectionComponent {...props2} />
+        </>
+    );
+});
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -467,7 +492,7 @@ const Components: {
     slider: observer(SliderComponent),
     spinner: observer(SpinnerComponent),
     dropdown: DropdownAutocompleteComponent,
-    // consider having component specifically for column/category selection
+    // consider having component specifically for column/category selection <<<<
     // the column selection can make use of column groups
     // category selection can have some logic for multitext / tags
     // both can have the ability to reactively update their options based on the current data
@@ -478,6 +503,7 @@ const Components: {
     doubleslider: observer(DoubleSliderComponent),
     button: observer(ButtonComponent),
     folder: observer(FolderComponent),
+    column: ColumnSelectionSettingGui, 
 } as const;
 
 const ErrorComponent = observer(({ props, label }: { props: any, label: string }) => {

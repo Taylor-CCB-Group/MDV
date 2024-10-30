@@ -523,7 +523,7 @@ class BaseChart {
 
         if (colorOptions.colorby) {
             //cannot color by unique (at the moment)
-            const filter =
+            const filter = (
                 colorOptions.colorby === "all"
                     ? [
                           "int32",
@@ -533,14 +533,22 @@ class BaseChart {
                           "text16",
                           "multitext",
                       ]
-                    : colorOptions.colorby;
-            const cols = this.dataStore.getColumnList(filter);
-            cols.push({ name: "None", field: "_none" });
+                    : colorOptions.colorby
+            );
+
+            const colorSettings = [];
             settings.push({
+                type: "folder",
+                label: "Color Settings",
+                current_value: colorSettings,
+            });
+            
+            // change this to use setting with type: "column" - so it should understand "filter" in a similar way
+            colorSettings.push({
                 label: "Color By",
-                type: "dropdown",
-                values: [cols, "name", "field"],
-                current_value: c.color_by || "_none",
+                type: "column",
+                current_value: c.color_by,
+                // filter: filter,
                 func: (x) => {
                     if (x === "_none") {
                         c.color_by = undefined;
@@ -552,7 +560,7 @@ class BaseChart {
                 },
             });
             if (colorOptions.color_overlay !== undefined) {
-                settings.push({
+                colorSettings.push({
                     label: "Color Overlay",
                     type: "slider",
                     current_value: c.color_overlay,
@@ -562,7 +570,7 @@ class BaseChart {
                     },
                 });
             }
-            settings.push({
+            colorSettings.push({
                 label: "Show Color Legend",
                 type: "check",
 
@@ -575,7 +583,7 @@ class BaseChart {
                     this.setColorLegend();
                 },
             });
-            settings.push({
+            colorSettings.push({
                 label: "SymLog Color Scale",
                 type: "check",
 
@@ -587,7 +595,7 @@ class BaseChart {
                     }
                 },
             });
-            settings.push({
+            colorSettings.push({
                 label: "Treat zero as missing",
                 type: "check",
 
@@ -599,7 +607,7 @@ class BaseChart {
                     }
                 },
             });
-            settings.push({
+            colorSettings.push({
                 type: "radiobuttons",
                 label: "Trim Color Scale to Percentile",
                 current_value: c.trim_color_scale || "none",
