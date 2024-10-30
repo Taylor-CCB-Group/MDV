@@ -68,7 +68,7 @@ export function useChartDoc() {
     return chart.__doc__;
 }
 
-export function useParamColumns(): DataColumn<DataType>[] {
+export function useParamColumns(): DataColumn[] {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
     const columns = useMemo(() => {
@@ -96,10 +96,10 @@ export function useNamedColumn(name: string): {
     return { column, isLoaded };
 }
 
-export function useParamColumnsExperimental(): DataColumn<DataType>[] {
+export function useParamColumnsExperimental(): DataColumn[] {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
-    const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
+    const [columns, setColumns] = useState<DataColumn[]>([]);
     // const columns = useMemo(() => {
     useEffect(() => {
         const param = chart.config.param;
