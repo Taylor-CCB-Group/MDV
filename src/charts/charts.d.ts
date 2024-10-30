@@ -25,7 +25,8 @@ type DataStructureTypes = {
     unique: Uint8Array; //raw bytes of strings to be decoded
 };
 // even if they're just aliases, these could be useful for documentation / clarity
-export type ColumnName = string;
+export type ColumnName = string; //this will probably change to ColumnSpecifier with more structured data
+// ^^ I'd prefer that to having to reason about the string format everywhere
 export type DataSourceName = string;
 export type FieldName = string;
 
@@ -104,14 +105,29 @@ export type GuiValueTypes = {
     button: undefined;
     doubleslider: [number, number];
     folder: GuiSpec[];
+    // color: string; //not a bad idea, copilot... soon...
+    // when you are choosing a column, you need to be able to specify
+    // - the type of column you can accept
+    // - whether you can accept multiple
+    // The type you get back ColumnName is going to change into ColumnSpecifier to allow for more complex column references
+    // (for now we continue to parse things in a format as in LinkDataDialog)
+    // (and we have several keys for different types of column references)
+    // There should also be a general way of expressing that a property (like radius) can be set to a 
+    // number or a column (with modifiers) - this is where the node editor comes in...
+    column: ColumnName;
 };
 export type GuiSpecType = keyof GuiValueTypes;
+export type ColumnSelectionParameters = {
+    filter?: DataType[];
+    multiple?: boolean;
+    exclude?: string[];
+}
 export type GuiSpec<T extends GuiSpecType> = {
     type: T;
     label: string;
     name: string;
     current_value?: GuiValueTypes[T];
-    func?: (v: GuiValueTypes[T]) => void;
+    func?: (v: GuiValueTypes[T]) => void; //optional but ts insists on it?
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
     // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
     choices?: T extends "radiobuttons" ? [string, string][] : never;
@@ -119,6 +135,7 @@ export type GuiSpec<T extends GuiSpecType> = {
     max?: number;
     step?: number;
     defaultVal?: GuiValueTypes[T];
+    columnSelection?: T extends "column" ? ColumnSelectionParameters : never;
 };
 // todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
 export type ExtraControl<T extends GuiSpecType> = {
