@@ -25,7 +25,6 @@ type DataStructureTypes = {
     unique: Uint8Array; //raw bytes of strings to be decoded
 };
 // even if they're just aliases, these could be useful for documentation / clarity
-// but we expect to start having "virtual columns" so use of this type may help refactor.
 export type ColumnName = string;
 export type DataSourceName = string;
 export type FieldName = string;
@@ -36,7 +35,7 @@ type Quantiles = {
     "0.05": [number, number];
 };
 
-export type DataColumn<T extends DataType = DataType> = {
+export type DataColumn<T extends DataType> = {
     name: ColumnName;
     field: FieldName;
     datatype: T;
