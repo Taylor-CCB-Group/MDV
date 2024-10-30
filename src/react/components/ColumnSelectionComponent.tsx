@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { observer } from "mobx-react-lite";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -27,7 +27,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
     const { setSelectedColumn, placeholder, type } = props;
     const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
     const multiple = props.multiple || isMultiType;
-    const dataStore = useDataStore(); //in future we can pass props.dataStore so to override default
+    const dataStore = useDataStore(props.dataStore);
     // todo column groups
     const columns: DataColumn<DataType>[] = useMemo(
         () => dataStore.columns

@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useMetadata, useViewerStoreApi } from "./components/avivatorish/state";
-import { useChartID } from "./hooks";
+import { useChartID, useDataSources } from "./hooks";
 import type { VivMDVReact } from "./components/VivMDVReact";
+import { useChart } from "./context";
 
 export const useViewStateLink = () => {
     const viewerStore = useViewerStoreApi();
@@ -68,3 +69,24 @@ export const useViewStateLink = () => {
         metadata.Pixels.PhysicalSizeXUnit,
     ]);
 };
+
+export function useRowsAsColumnsLinks() {
+    const dataSources = useDataSources();
+    const chart = useChart();
+    const { dataSource } = chart;
+    if (dataSource.links) {
+        for (const linkedDsName in dataSource.links) {
+            const links = dataSource.links[linkedDsName];
+            if (links.rows_as_columns) {
+                const linkedDs = dataSources.find(
+                    (ds) => ds.name === linkedDsName,
+                );
+                if (!linkedDs) {
+                    throw new Error();
+                }
+                return { linkedDs, rowsAsColumns: links.rows_as_columns };
+            }
+        }
+    }
+    return null;
+}
