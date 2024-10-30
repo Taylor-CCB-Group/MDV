@@ -26,8 +26,9 @@ export function useChart() {
     //todo: typing...
     return chart;
 }
-export function useDataStore() {
+export function useDataStore(foreignDataStore?: DataStore) {
     const dataStore = useContext(DataStoreContext);
+    if (foreignDataStore) return foreignDataStore;
     if (!dataStore) throw new Error("no data store context");
     return dataStore;
 }
