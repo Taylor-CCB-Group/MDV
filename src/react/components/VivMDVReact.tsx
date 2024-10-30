@@ -203,7 +203,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     getSettings() {
         const c = this.config;
         const { tooltip } = c;
-        const cols = this.dataStore.getColumnList() as DataColumn[];
+        const cols = this.dataStore.getColumnList() as DataColumn<DataType>[];
         const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
