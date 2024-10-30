@@ -3,10 +3,10 @@ import { observer } from "mobx-react-lite";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 import { useDataStore } from "../context.js";
+import type { DataColumn, DataType } from "@/charts/charts.js";
 import type { Param } from "@/charts/ChartTypes.js";
 import type DataStore from "@/datastore/DataStore.js";
 import { columnMatchesType } from "@/lib/utils.js";
-import type { DataColumn, DataType } from "@/charts/charts.js";
 
 export type ColumnSelectionProps = {
     setSelectedColumn: (column: string) => void; //what about multiple?
