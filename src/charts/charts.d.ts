@@ -55,6 +55,15 @@ export type DataColumn<T extends DataType> = {
 //     columnIndex: Record<string, DataColumn<any>>;
 //     columnsWithData: string[];
 // };
+
+export type RowsAsColumnsLink = {
+    name: string;
+    name_column: ColumnName;
+    subgroups: Record<string, { label: string, name: string, type: "dense" | string }>;
+}
+
+export type DataSourceLinks = Record<DataSourceName, {rows_as_columns?: RowsAsColumnsLink}>;
+
 export type DataSource = {
     name: DataSourceName;
     charts: Chart[];
@@ -63,6 +72,7 @@ export type DataSource = {
     menuBar: HTMLDivElement;
     images?: Record<string, any>;
     regions?: Record<string, any>;
+    links?: DataSourceLinks;
 };
 
 type DropdownMappedValue<T extends string, V extends string> = {
