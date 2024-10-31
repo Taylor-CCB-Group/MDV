@@ -101,7 +101,6 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
     const draftSpec = {
         type: control.type,
         label: control.label,
-        name: control.name,
         current_value: control.defaultVal,
         // values: control.values,
     } satisfies GuiSpec<T>;

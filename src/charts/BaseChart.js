@@ -9,7 +9,7 @@ import { makeAutoObservable, action } from "mobx";
 class BaseChart {
     /**
      * The base constructor
-     * @param {DataStore} dataStore - The datastore object that contains the data for this chart
+     * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
      * @param {string | HTMLDivElement} div - The id of the div element or the element itself to house the chart
      * @param {Object} config - The config describing the chart
      */
@@ -195,6 +195,10 @@ class BaseChart {
             height: this.height,
             width: this.width - 5,
         };
+    }
+    /** @returns {import("./charts.js").DataSource} */
+    get dataSource() {
+        return window.mdv.chartManager.charts[this.config.id].dataSource;
     }
 
     getFilter() {}
@@ -486,7 +490,9 @@ class BaseChart {
         }
         // dynamic props?
     }
-
+    /**
+     * @typedef {Array<import("./charts.js").GuiSpec<import("./charts.js").GuiSpecType>>} Settings
+     */
     /**
      * Returns information about which controls to add to the settings dialog.
      * Subclasses should call this method and then add their own controls e.g.
@@ -506,9 +512,11 @@ class BaseChart {
      *     }]);
      * }
      * </pre>
+     * @returns {Settings} - an array of objects describing tweakable parameters
      */
     getSettings() {
         const c = this.config;
+        /** @type {Settings} */
         const settings = [
             {
                 type: "text",

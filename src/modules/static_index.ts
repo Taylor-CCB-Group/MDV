@@ -22,6 +22,7 @@ declare global {
             ChartManager: typeof ChartManager;
             chartManager?: ChartManager;
             chartTypes?: any;
+            debugChart?: any;
         };
     }
 }
