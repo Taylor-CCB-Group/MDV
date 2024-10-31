@@ -3,6 +3,7 @@ import BaseChart from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
 import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { HighlightedFeatureComponent } from "./HighlightedFeatureComponent";
+import type { GuiSpec } from "@/charts/charts";
 
 type HighlightedFeatureConfig = {
     text: string;
@@ -23,7 +24,7 @@ class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureCo
             ...super.getSettings(),
             {
                 type: "dropdown",
-                name: "Column",
+                // name: "Column",
                 label: "Column",
                 current_value: this.config.param[0],
                 values: [this.dataSource.dataStore.columns.map((c) => c.name)],
@@ -33,14 +34,14 @@ class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureCo
             },
             {
                 label: "Markdown Text",
-                name: "text",
+                // name: "text",
                 type: "textbox",
                 current_value: c.text || "",
                 func: action((x) => {
                     c.text = x;
                 }),
             },
-        ];
+        ] as GuiSpec<any>[];
     }
 }
 

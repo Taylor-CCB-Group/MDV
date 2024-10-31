@@ -211,7 +211,7 @@ type EditorProps = {
 //         </>
 //     );
 // }
-
+// /** !! if revisiting this: refer to `offsets` in datasource docs... */
 // function TransformEditor({
 //     scatterplotLayer,
 //     modelMatrix,

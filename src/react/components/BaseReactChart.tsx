@@ -49,12 +49,12 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
  */
-export abstract class BaseReactChart<T> extends BaseChart implements Chart {
-    declare config: T & BaseConfig;
+export abstract class BaseReactChart<T> extends BaseChart implements Chart<T & BaseConfig> {
+    declare config: T & BaseConfig; // would be good to review this T & BaseConfig thing...
     declare popoutIcon: HTMLElement;
-    get dataSource(): DataSource {
-        return window.mdv.chartManager.charts[this.config.id].dataSource;
-    }
+    // get dataSource(): DataSource {
+    //     return window.mdv.chartManager.charts[this.config.id].dataSource;
+    // }
     useMobx = true;
     root: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;

@@ -13,7 +13,7 @@ type Attrs = {
 export function createEl<T extends TagKey>(
     type: T,
     attrs: Attrs,
-    parent?: HTMLElement,
+    parent?: Element,
 ) {
     const el = document.createElement(type);
 
@@ -24,4 +24,9 @@ export function createEl<T extends TagKey>(
         parent.append(el);
     }
     return el;
+}
+declare global {
+    interface Element {
+        draggable?: boolean;
+    }
 }

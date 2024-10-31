@@ -3,6 +3,7 @@
 // - general shape of data structures NB - in many cases this can be inferred from JS, so I may remove these again...
 //   partly just using them as a form of documentation / notes-to-self.
 
+// todo rearrange - maybe have a datastore.d.ts etc
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
 export type DataType =
@@ -35,16 +36,53 @@ type Quantiles = {
     "0.01": [number, number];
     "0.05": [number, number];
 };
-
+type Colors = (string | number[])[];
+type SubgroupName = string;
 export type DataColumn<T extends DataType> = {
-    name: ColumnName;
+    /** human-readable column */
+    name: ColumnName; //nb - we should check use of 'name' vs 'field'
+    /** id of the column, used internally */
     field: FieldName;
+    /** the datatype- can be one of
+     *   - `"double"` - any floating point data
+     *   - `"integer"` - any integer data
+     *   - `"text"` - data containing strings but with no more than 256 categories
+     *   - `"text16"` - data containing strings with up to 65536 categories
+     *   - `"unique"` - data containing strings but with many categories
+     *   - `"multitext"` -
+     */
     datatype: T;
-    data: DataStructureTypes[T];
-    values: T extends CategoricalDataType ? string[] : never; //probably wrong for 'unique'
-    minMax: T extends NumberDataType ? [number, number] : never;
-    quantiles: T extends NumberDataType ? Quantiles : never;
+    /** whether the column's data can be changed */
+    editable?: boolean,
+    /**In the case of a double/integer (number) column, the array
+     * buffer should be the appropriate size to contain float32s. For text it should be Uint8
+     * and contain numbers corresponding to the indexes in the values parameter. For a column of
+     * type unique it should be a JavaScript array. This parameter is optional as the data can
+     * be added later see {@link DataStore#setColumnData} */
+    data?: DataStructureTypes[T];
+    values?: T extends CategoricalDataType ? string[] : never; //probably wrong for 'unique'
+    /** An array of rgb hex colors. In the case of a `"text"` column the `colors` should match the `values`. For number columns, the list represents
+     * colors that will be interpolated. If not specified, default color pallettes will be supplied.
+     */
+    colors?: Colors;
+    /** if `true` then the colors will be displayed on a log scale- useful if the dataset contains outliers.
+     * Because a symlog scale is used the data can contain 0 and negative values */
+    colorLogScale?: boolean;
+    /** the column's values will be displayed as links (text and unique columns only) */
+    is_url?: T extends CategoricalDataType ? boolean : never;
+    /** the min max values in the column's values (integer/double only) */
+    minMax?: T extends NumberDataType ? [number, number] : never;
+    /** an object describing the 0.05,0.01 and 0,001 qunatile ranges (integer/double only) */
+    quantiles?: T extends NumberDataType ? Quantiles : never;
+    /** if `true` then the store will keep a record that this column has been added and is not permanently stored in the backend */
+    dirty?: boolean;
+    /** return the value corresponding to a given row index `i`. If the data is categorical, this will be the appropriate value from `values` */
     getValue: (i: number) => T extends CategoricalDataType ? string : number;
+    stringLength?: number;
+    delimiter?: string;
+    subgroup?: SubgroupName; //not attempting to descriminate the other sg properties being related to this for now
+    sgindex?: number;
+    sgtype?: "dense" | string; //??
 };
 
 // export type DataStore = {
@@ -115,6 +153,7 @@ export type GuiValueTypes = {
     // There should also be a general way of expressing that a property (like radius) can be set to a 
     // number or a column (with modifiers) - this is where the node editor comes in...
     column: ColumnName;
+    // multicolumn: ColumnName[]; //easier to have distinct 'multicolumn' type than overly generic 'column'?
 };
 export type GuiSpecType = keyof GuiValueTypes;
 export type ColumnSelectionParameters = {
@@ -125,7 +164,7 @@ export type ColumnSelectionParameters = {
 export type GuiSpec<T extends GuiSpecType> = {
     type: T;
     label: string;
-    name: string;
+    // name: string; //unused - wrongly added in the original type
     current_value?: GuiValueTypes[T];
     func?: (v: GuiValueTypes[T]) => void; //optional but ts insists on it?
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
@@ -158,15 +197,18 @@ export type ExtraControl<T extends GuiSpecType> = {
 // }
 // a.values[0].map(x => x.a);
 // ^^ still not well-typed... `x` is `any`.
-// biome-ignore lint/suspicious/noRedeclare: I should probably fix this...
-interface DataStore {
-    getLoadedColumns: () => FieldName[];
-    getColumnName: (col: FieldName) => ColumnName | null;
-    getColumnList: () => DataColumn[];
-    getFilteredIndices: () => Promise<Uint32Array>;
-}
+//// biome-ignore lint/suspicious/noRedeclare: I should probably fix this...
+// interface DataStore {
+//     getLoadedColumns: () => FieldName[];
+//     getColumnName: (col: FieldName) => ColumnName | null;
+//     getColumnList: () => DataColumn[];
+//     getFilteredIndices: () => Promise<Uint32Array>;
+//     /** assigns the given `listener` callback to the `id` - will be unceremoniously replaced
+//      * if subsequent calls to `addListener` are made with the same `id` */
+//     addListener: (id: string, listener: (eventType: string, data: any) => void) => void;
+// }
 
-export type Chart = {
+export type Chart<T = any> = {
     getDiv: () => HTMLElement;
     remove: () => void;
     addMenuIcon: (classes: string, info: string) => HTMLElement;
@@ -174,8 +216,9 @@ export type Chart = {
     changeBaseDocument: (doc: Document) => void;
     getSettings: () => GuiSpec[];
     removeLayout?: () => void;
-    config: any;
+    config: T;
     dataStore: DataStore;
+    dataSource: DataSource;
     popoutIcon: HTMLElement;
 } & BaseChart;
 
