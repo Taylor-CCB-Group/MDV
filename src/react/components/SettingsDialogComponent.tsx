@@ -17,7 +17,7 @@ import Autocomplete from "@mui/material/Autocomplete";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import JsonView from "react18-json-view";
-import { DataStoreContext } from "../context";
+import { ChartProvider } from "../context";
 import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 
@@ -99,7 +99,11 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
         />
     </>
 );
-// nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
+/**
+ * Wrap the ColumnSelectionComponent in a setting GUI component.
+ * 
+ * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
+ */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"column"> }) => {
     // proably want to change the type of ColumnSelectionProps anyway...
     // perhaps we should be looking at other places where it's used & make them use this,
@@ -503,7 +507,8 @@ const Components: {
     doubleslider: observer(DoubleSliderComponent),
     button: observer(ButtonComponent),
     folder: observer(FolderComponent),
-    column: ColumnSelectionSettingGui, 
+    column: ColumnSelectionSettingGui,
+    // multicolumn: ColumnSelectionSettingGui,
 } as const;
 
 const ErrorComponent = observer(({ props, label }: { props: any, label: string }) => {
@@ -561,12 +566,12 @@ export default observer(({ chart }: { chart: Chart }) => {
         return wrap.settings;
     }, [chart]);
     return (
-        <DataStoreContext.Provider value={chart.dataStore}>
+        <ChartProvider chart={chart}>
             <div className="w-full max-h-[80vh]">
                 {settings.map(({ setting, id }) => (
                     <AbstractComponent key={id} props={setting} />
                 ))}
             </div>
-        </DataStoreContext.Provider>
+        </ChartProvider>
     );
 });

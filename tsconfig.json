@@ -6,7 +6,7 @@
         "noImplicitAny": false,
         "module": "es2022",
         "target": "ESNext",
-        "lib": ["ESNext", "DOM"],
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
         "allowJs": true,
         // "checkJs": true,
         "moduleResolution": "node",

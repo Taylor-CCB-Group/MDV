@@ -8,6 +8,7 @@ import { ImageArrayDeckExtension } from "../webgl/ImageArrayDeckExtension";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { OrthographicView } from "@deck.gl/core";
 import type Dimension from "../datastore/Dimension.js";
+import type { GuiSpec } from "./charts.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
 type Column = { data: Float32Array; minMax: [number, number] };
@@ -270,7 +271,7 @@ class ImageScatterChart extends BaseChart {
                     this.updateDeck();
                 },
             },
-        ];
+        ] as GuiSpec<any>[];
     }
 }
 
