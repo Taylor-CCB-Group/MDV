@@ -7,6 +7,10 @@ import type { DataColumn, DataType } from "@/charts/charts.js";
 import type { Param } from "@/charts/ChartTypes.js";
 import type DataStore from "@/datastore/DataStore.js";
 import { columnMatchesType } from "@/lib/utils.js";
+// todo - get the gui looking respectable with LinksComponent, and get it to work.
+// todo - get multiple working properly.
+// todo - subgroups
+// import LinksComponent from "./LinksComponent.js";
 
 export type ColumnSelectionProps = {
     setSelectedColumn: (column: string) => void; //what about multiple?
@@ -33,7 +37,6 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
         () => dataStore.columns
             .filter((c) => !props.exclude?.includes(c.name))
             .filter((c) => columnMatchesType(c, type))
-            // .map((c) => c.name as string)
             ,
         [dataStore, props.exclude, type],
     );
@@ -68,8 +71,6 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                     const { key, ...p } = props as typeof props & {
                         key: string;
                     };
-                    // !!! there may be missing columnIndex if it's a virtual column
-                    // const { datatype } = dataStore.columnIndex[column];
                     const { datatype } = column;
                     // todo: consider an optional description prop, which we could show in a tooltip?
                     return (
@@ -80,6 +81,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                     );
                 }}
             />
+            {/* <LinksComponent /> */}
         </>
     );
 });

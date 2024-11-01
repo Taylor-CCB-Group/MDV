@@ -157,11 +157,18 @@ export function useHighlightedForeignRows() {
 }
 /** design of this will need to change to account for n-links
  * 
- * We could also consider having distinct hooks for highlighted and filtered rows.
+ * Will return an array of DataColumn objects, with loaded data, updated as the highlighted/filtered rows change
+ * in the linked DataSource.
+ * 
+ * We could also consider 
+ * - having distinct hooks for highlighted and filtered rows (potentially ways of composing custom filter graphs).
+ * - controls for pagination.
+ * - returning column objects that are not loaded yet, but will be loaded when they are needed.
+ * 
  * 
  * @param max - maximum number of columns to return
- * @returns an array of DataColumn objects, with loaded data, for the linked dataSource columns 
- * corresponding to the highlighted/filtered rows
+ * @returns an array of DataColumn objects, with loaded data, for virtual columns 
+ * corresponding to the highlighted/filtered rows in the linked dataSource.
  */
 export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     const cols = useHighlightedForeignRows(); //not actual cols
@@ -180,6 +187,7 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
         // c.value & c.index are from the DataStore listener event, now in cols
         const sg = Object.keys(link.subgroups)[0];
         const f = filter.toLowerCase();
+        // todo: consider pagination... pass in a page number, return information about total number of columns etc.
         const c = cols.filter(({value}) => value.toLowerCase().includes(f)).slice(0, max).map(v => {
             const f = `${sg}|${v.value}(${sg})|${v.index}`;
             return ds.addColumnFromField(f);
