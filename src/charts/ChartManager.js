@@ -1524,7 +1524,10 @@ class ChartManager {
      * @param {number} [threads=2]  the number of concurrent requests
      */
     loadColumnSet(columns, dataSource, callback, split = 10, threads = 2) {
-        if (columns.length === 0) return;
+        if (columns.length === 0) {
+            callback(); //should there be any args? hard to tell without types
+            return;
+        }
         const id = getRandomString();
         const lc = this.config.dataloading || {};
         split = lc.split || 10;
