@@ -43,10 +43,10 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         // todo: add settings widget for 'column' with some properties somewhat similar to params type.
         const settings = super.getSettings();
         settings.push({
-            type: "column",
+            //!!this should be properly implemented...
+            type: "multicolumn",
             label: "Columns To filter",
             current_value: this.config.param,
-            func: v => {}, //supposed to be optional, but ts still complains???
         });
         return settings;
     }
