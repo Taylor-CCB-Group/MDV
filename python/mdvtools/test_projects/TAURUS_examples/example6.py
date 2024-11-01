@@ -1,11 +1,10 @@
 ## This file creates a new MDV project named 'project' containing a view named 'default'
 ## The datasource used is an h5ad file that was provided at run time
-## The view 'default' shows one stacked bar plot
-## The h5ad file is an AnnData object and here the obs attribute was used
+## The view 'default' shows one stacked bar plot.
+## The h5ad file is an AnnData object and here the obs attribute was used.
 ## The stacked bar plot shows the distribution of various cell states across different patients.
 ## By examining the cell state proportions for each patient, one can observe if there are unique patterns or 
 ## distributions specific to certain patients. For example, patients with particular conditions may show a higher abundance of certain cell states.
-
 
 
 import os
