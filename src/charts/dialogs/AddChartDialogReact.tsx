@@ -374,7 +374,7 @@ class AddChartDialogReact extends BaseDialog {
             },
             null,
         );
-        const modal = true; //doesn't work on fullscreen panel as of writing
+        const modal = false; //doesn't work on fullscreen panel as of writing, also needs some redesign of "add chart" button in particular
         this.root = createMdvPortal(
             <Wrapper dataStore={dataStore} modal={modal} onDone={() => this.close()}/>,
             this.dialog,
