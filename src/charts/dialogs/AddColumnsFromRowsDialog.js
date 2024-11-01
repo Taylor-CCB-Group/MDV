@@ -11,7 +11,7 @@ class AddColumnsFromRowsDialog extends BaseDialog {
             title: `Add ${link.name}`,
             footer: true,
             columns: 2,
-            width: 380,
+            width: 480,
         };
         super(config, { ds, ds_to, link, cm });
     }
@@ -166,7 +166,7 @@ class AddColumnsFromRowsDialog extends BaseDialog {
                             this.close();
                     }
                 });
-
+                //todo hookify this...
                 this.itemList = [];
                 const tds = this.ds_to.dataStore;
                 tds.addListener(this.rn, (type, data) => {

@@ -59,7 +59,7 @@ import { addChartLink } from "../links/link_utils";
 import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
-import { AddChartDialog } from "./dialogs/AddChartDialog";
+//import { AddChartDialog } from "./dialogs/AddChartDialog";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -113,7 +113,7 @@ function listenPreferredColorScheme(callback) {
 /**
 * The object to manage charts {@tutorial chartmanager}
 * 
-* @param {string|DOMelement} div - The DOM element or id of the element to house the app
+* @param {string|HTMLElement} div - The DOM element or id of the element to house the app
 * @param {object[]} datasources - An array of datasource configs -see  {@tutorial datasource}.
 * Each config must contain the size parameter, giving the number of rows in the DataStore.
 * @param {object} dataloader - An object containing the following
@@ -134,7 +134,8 @@ function listenPreferredColorScheme(callback) {
 * @param {string} [config.permisson] the level of permission the user has. This just makes certain
 * options unavaliable. Any logic should be handled when a state_saved event is broadcast
 * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
-* @param
+* @param {object} [listener] - An object with functions to listen to events.
+* beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
 * 
 */
 class ChartManager {
@@ -149,6 +150,7 @@ class ChartManager {
         }
         // manage global singleton
         if (!window.mdv) {
+            // @ts-ignore this is unclean but somewhat ok
             window.mdv = {};
         }
         if (window.mdv.chartManager) {
@@ -550,8 +552,8 @@ class ChartManager {
     }
 
     /**
-     * @param {ds} DataStore
-     * @param {ods} DataStore other data store
+     * @param {DataStore} ds
+     * @param {DataStore} ods other data store
      * @param {object} link - information about what properties to target in ods
      * For instance, `{ source_column: <column_name>, target_chart: <chart_id>, target_property: <property_name> }`
      * more concretely: `{ source_column: "feature", target_chart: "quadrat_image_chart", target_property: "color_by" }`
@@ -626,6 +628,7 @@ class ChartManager {
                     //would be nice if this could be maybe async / lazy / different ways of composing filters?
 
                     const args = [info[c1], info[c2]];
+                    // @ts-ignore should revisit this at some point
                     args.operand = "and"; //force multitext to use "and"
 
                     interactionFilter.filter(
@@ -1333,7 +1336,7 @@ class ChartManager {
         const initialCharts = {};
         const updatedColumns = {};
         const metadata = {};
-        const twidth = this.contentDiv.offsetWidth;
+        // const twidth = this.contentDiv.offsetWidth;
         for (const ds of this.dataSources) {
             if (ds.contentDiv) {
                 initialCharts[ds.name] = [];
@@ -1379,6 +1382,7 @@ class ChartManager {
         const view = JSON.parse(JSON.stringify(this.viewData));
         view.initialCharts = initialCharts;
         const all_views = this.viewSelect
+            // @ts-ignore do we know that we actually have elements with 'value'?
             ? Array.from(this.viewSelect.children, (x) => x.value)
             : null;
 
@@ -1516,10 +1520,14 @@ class ChartManager {
      * @param {string} dataSource The name of the dataSource
      * @param {function} callback A function which will be run once all the
      * columns are loaded
-     * @param {integer} [split=10]  the number of columns to send with each request
-     * @param {integer} [threads=2]  the number of concurrent requests
+     * @param {number} [split=10]  the number of columns to send with each request
+     * @param {number} [threads=2]  the number of concurrent requests
      */
     loadColumnSet(columns, dataSource, callback, split = 10, threads = 2) {
+        if (columns.length === 0) {
+            callback(); //should there be any args? hard to tell without types
+            return;
+        }
         const id = getRandomString();
         const lc = this.config.dataloading || {};
         split = lc.split || 10;
@@ -1625,6 +1633,7 @@ class ChartManager {
                     position: "bottom-right",
                 },
                 func: () => {
+                    // new BaseDialog.experiment["AddColumnsFromRows"](ds, ds_to, link, this);
                     new AddColumnsFromRowsDialog(ds, ds_to, link, this);
                 },
             },
@@ -1642,9 +1651,10 @@ class ChartManager {
                     position: "bottom-right",
                 },
                 func: () => {
-                    new AddChartDialog(ds, (config) =>
-                        this.addChart(ds.name, config, true),
-                    );
+                    // new AddChartDialog(ds, (config) =>
+                    //     this.addChart(ds.name, config, true),
+                    // );
+                    new BaseDialog.experiment["AddChartDialogReact"](dataStore);
                 },
             },
             ds.menuBar,
@@ -1866,7 +1876,7 @@ class ChartManager {
                     left: `${left}px`,
                     top: `${top}px`,
                     background: t.main_panel_color,
-                    zIndex: 2,
+                    zIndex: "2",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1929,7 +1939,7 @@ class ChartManager {
                         backdropFilter: "blur(10px)",
                     },
                 },
-                div.lastChild,
+                div.lastElementChild,
             );
             debugNode.innerHTML = `<div><h2>Error creating chart</h2><pre>${error.stack}</pre></div>`;
             debugNode.onclick = () => debugNode.remove();
@@ -2141,6 +2151,7 @@ class ChartManager {
             dataSource: ds,
         };
         this._makeChartRD(chart, ds);
+        // @ts-ignore
         chart.popoutIcon = chart.addMenuIcon(
             "fas fa-external-link-alt",
             "popout",
@@ -2162,12 +2173,15 @@ class ChartManager {
 
         //need to decorate any method that uses column data as data may
         //have to be loaded before method can execute
+        // @ts-ignore
         if (chart.colorByColumn) {
             this._decorateColumnMethod("colorByColumn", chart, dataSource);
         }
+        // @ts-ignore
         if (chart.setToolTipColumn) {
             this._decorateColumnMethod("setToolTipColumn", chart, dataSource);
         }
+        // @ts-ignore
         if (chart.setBackgroundFilter) {
             this._decorateColumnMethod(
                 "setBackgroundFilter",
@@ -2175,6 +2189,7 @@ class ChartManager {
                 dataSource,
             );
         }
+        // @ts-ignore
         if (chart.changeContourParameter) {
             this._decorateColumnMethod(
                 "changeContourParameter",
@@ -2190,6 +2205,7 @@ class ChartManager {
             }
         }
 
+        // @ts-ignore
         if (chart.setupLinks) {
             //phasing out
             if (ds.index_link_to) {
@@ -2210,11 +2226,13 @@ class ChartManager {
 
         //I think this is obsolete now
         const cll = ds.column_link_to;
+        // @ts-ignore
         if (cll && chart.createColumnLinks) {
             const func = (columns, callback) => {
                 //make sure index is loaded before use
                 this._getColumnsThen(cll.dataSource, columns, callback);
             };
+            // @ts-ignore
             chart.createColumnLinks(
                 this.dsIndex[cll.dataSource].dataStore,
                 cll.columns,
@@ -2407,7 +2425,7 @@ class ChartManager {
                     bottom: "40px",
                     right: "40px",
                     fontSize: "18px",
-                    zIndex: 100,
+                    zIndex: "100",
                 },
             },
             this.contentDiv,

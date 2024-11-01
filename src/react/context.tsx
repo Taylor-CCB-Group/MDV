@@ -1,15 +1,17 @@
 import { createContext, useContext } from "react";
-import type { BaseReactChart } from "./components/BaseReactChart";
+//import type { BaseReactChart } from "./components/BaseReactChart";
+import type { Chart } from "@/charts/charts";
+
 import type DataStore from "../datastore/DataStore";
 import type { VivConfig } from "./components/avivatorish/state";
 
-const ChartContext = createContext<BaseReactChart<any>>(undefined);
+const ChartContext = createContext<Chart>(undefined);
 export const DataStoreContext = createContext<DataStore>(undefined);
 
-export function ChartProvider({
+export function ChartProvider<T = any>({
     chart,
     children,
-}: { chart: BaseReactChart<any> } & React.PropsWithChildren) {
+}: { chart: Chart<T> } & React.PropsWithChildren) {
     //DataStoreContext.Provider would be applied at a wider scope if we had a global root & portals.
     return (
         <ChartContext.Provider value={chart}>
@@ -26,8 +28,9 @@ export function useChart() {
     //todo: typing...
     return chart;
 }
-export function useDataStore() {
+export function useDataStore(foreignDataStore?: DataStore) {
     const dataStore = useContext(DataStoreContext);
+    if (foreignDataStore) return foreignDataStore;
     if (!dataStore) throw new Error("no data store context");
     return dataStore;
 }

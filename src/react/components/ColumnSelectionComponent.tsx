@@ -1,12 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { observer } from "mobx-react-lite";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 import { useDataStore } from "../context.js";
+import type { DataColumn, DataType } from "@/charts/charts.js";
 import type { Param } from "@/charts/ChartTypes.js";
 import type DataStore from "@/datastore/DataStore.js";
 import { columnMatchesType } from "@/lib/utils.js";
-import type { DataColumn, DataType } from "@/charts/charts.js";
+// todo - get the gui looking respectable with LinksComponent, and get it to work.
+// todo - get multiple working properly.
+// todo - subgroups
+// import LinksComponent from "./LinksComponent.js";
 
 export type ColumnSelectionProps = {
     setSelectedColumn: (column: string) => void; //what about multiple?
@@ -27,13 +31,12 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
     const { setSelectedColumn, placeholder, type } = props;
     const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
     const multiple = props.multiple || isMultiType;
-    const dataStore = useDataStore(); //in future we can pass props.dataStore so to override default
+    const dataStore = useDataStore(props.dataStore);
     // todo column groups
     const columns: DataColumn<DataType>[] = useMemo(
         () => dataStore.columns
             .filter((c) => !props.exclude?.includes(c.name))
             .filter((c) => columnMatchesType(c, type))
-            // .map((c) => c.name as string)
             ,
         [dataStore, props.exclude, type],
     );
@@ -68,8 +71,6 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                     const { key, ...p } = props as typeof props & {
                         key: string;
                     };
-                    // !!! there may be missing columnIndex if it's a virtual column
-                    // const { datatype } = dataStore.columnIndex[column];
                     const { datatype } = column;
                     // todo: consider an optional description prop, which we could show in a tooltip?
                     return (
@@ -80,6 +81,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                     );
                 }}
             />
+            {/* <LinksComponent /> */}
         </>
     );
 });

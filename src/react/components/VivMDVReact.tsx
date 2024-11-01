@@ -13,7 +13,7 @@ import {
 } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
-import type { ColumnName, DataColumn, DataType } from "../../charts/charts";
+import type { ColumnName, DataColumn, DataType, GuiSpec } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
@@ -404,7 +404,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                 },
                             },
                         ],
-                        func: (x) => {},
                     },
                     {
                         type: "slider",
@@ -452,13 +451,11 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                         },
                     },
                 ],
-                func: (x) => {},
             },
             {
                 type: "folder",
                 label: "Category Filters",
                 current_value: filters,
-                func: (x) => {},
             },
             // ...filters,
             // no longer using PictureInPictureViewer - up for review as could be useful
@@ -470,7 +467,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             //         c.overviewOn = x;
             //     }
             // }
-        ]);
+        ] as GuiSpec<any>[]);
     }
     getConfig() {
         const config = super.getConfig();

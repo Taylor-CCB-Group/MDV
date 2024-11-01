@@ -7,7 +7,11 @@ import { observer } from "mobx-react-lite";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { OuterContainerProvider, useOuterContainer } from "./screen_state";
+import { createFilterOptions } from "@mui/material";
 
+// todo - think about whether this might lead to unexpected future issues
+// consider virtualization etc
+const filterOptions = createFilterOptions<any>({ limit: 256 });
 /** This makes sure any material-ui components have an appropriate theme applied, including
  * setting `container` in `defaultProps` of any `<Popper>` and `<Popover>` components
  * which should ensure that tooltips / dropdowns etc work correctly without needing to manually
@@ -30,7 +34,27 @@ const MaterialWrapper = observer(function MaterialWrapper({
                     MuiPopper: { defaultProps },
                     MuiPopover: { defaultProps },
                     MuiDialog: { defaultProps },
+                    MuiAutocomplete: { defaultProps: { filterOptions } },
+                    // There is a bit of a general issue with material-ui favouring less dense layouts
+                    // than we would tend to want - it is aiming for a more mobile-friendly UX...
+                    MuiTextField: { defaultProps: { size: "small" }},
+                    MuiRadio: {
+                        styleOverrides: {
+                            root: {
+                                padding: '5px',
+                            },
+                        }
+                    }
                 },
+                typography: {
+                    fontFamily: [
+                        "Roboto",
+                        '"Helvetica Neue"',
+                        "Arial",
+                        "sans-serif",
+                    ].join(","),
+                    fontSize: 12,
+                }
             }),
         [prefersDarkMode, defaultProps],
     );
