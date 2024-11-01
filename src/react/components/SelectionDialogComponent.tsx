@@ -1,6 +1,6 @@
 import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography, Select } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo } from "react";
 
@@ -18,7 +18,7 @@ import { useChart } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
-import { useHighlightedForeignRowsAsColumns } from "../chartLinkHooks";
+import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -448,15 +448,22 @@ const AddRowComponent = observer(() => {
 
 const ForeignRows = () => {
     const [filter, setFilter] = useState("");
+    const [max, setMax] = useState(10);
     const [debouncedFilter] = useDebounce(filter, 300);
-    const fcols = useHighlightedForeignRowsAsColumns(100, debouncedFilter);
-    if (fcols.length === 0) return null;
+    const rlink = useRowsAsColumnsLinks();
+    const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter);
+    if (!rlink) return null;
+    const { linkedDs, link } = rlink;
     return (
         <div className="p-3">
-            <Typography variant="h6">Highlighted/Filtered Foreign Rows</Typography>
-            <Typography>This is an experimental feature, not representative of the final design.
-            </Typography>
+            <Typography variant="h6" sx={{ marginBottom: '0.5em' }}>Columns associated with selected '{linkedDs.name}':</Typography>
             <TextField size="small" label="Filter" variant="outlined" onChange={e => setFilter(e.target.value)} />
+            <TextField size="small" className="max-w-20 float-right" type="number"
+            label="Max" variant="outlined"
+                value={max}
+                onChange={(e) => setMax(Number(e.target.value))} 
+            />
+
             {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );
