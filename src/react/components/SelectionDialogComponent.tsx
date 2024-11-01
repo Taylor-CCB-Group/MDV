@@ -259,7 +259,7 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
 
     // Define the padding and scaling factor
     const padding = 2;
-    const xStep = 1; // Space between points
+    const xStep = data.length / (width + 1); // Space between points
     const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
 
     const lowX = lowFraction * width;
@@ -271,11 +271,11 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
 
     // Generate the points for the polyline
     // ??? useMemo was wrong ????
-    const points = data.map((value, index) => {
+    const points = useMemo(() => data.map((value, index) => {
         const x = index * xStep;
         const y = height - padding - value * yScale;
         return `${x},${y}`;
-    }).join(' ');
+    }).join(' '), [data, xStep, yScale]);
 
     return (
         <svg width={'100%'} height={height} 
