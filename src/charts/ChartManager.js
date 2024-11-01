@@ -59,7 +59,7 @@ import { addChartLink } from "../links/link_utils";
 import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
-import { AddChartDialog } from "./dialogs/AddChartDialog";
+//import { AddChartDialog } from "./dialogs/AddChartDialog";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1630,6 +1630,7 @@ class ChartManager {
                     position: "bottom-right",
                 },
                 func: () => {
+                    // new BaseDialog.experiment["AddColumnsFromRows"](ds, ds_to, link, this);
                     new AddColumnsFromRowsDialog(ds, ds_to, link, this);
                 },
             },
