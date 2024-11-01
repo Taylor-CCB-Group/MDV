@@ -447,13 +447,16 @@ const AddRowComponent = observer(() => {
 })
 
 const ForeignRows = () => {
-    const fcols = useHighlightedForeignRowsAsColumns(100);
+    const [filter, setFilter] = useState("");
+    const [debouncedFilter] = useDebounce(filter, 300);
+    const fcols = useHighlightedForeignRowsAsColumns(100, debouncedFilter);
     if (fcols.length === 0) return null;
     return (
         <div className="p-3">
             <Typography variant="h6">Highlighted/Filtered Foreign Rows</Typography>
             <Typography>This is an experimental feature, not representative of the final design.
             </Typography>
+            <TextField size="small" label="Filter" variant="outlined" onChange={e => setFilter(e.target.value)} />
             {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );

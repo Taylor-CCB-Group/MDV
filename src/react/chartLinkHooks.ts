@@ -163,7 +163,7 @@ export function useHighlightedForeignRows() {
  * @returns an array of DataColumn objects, with loaded data, for the linked dataSource columns 
  * corresponding to the highlighted/filtered rows
  */
-export function useHighlightedForeignRowsAsColumns(max = 10) {
+export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     const cols = useHighlightedForeignRows(); //not actual cols
     const { linkedDs, link } = useRowsAsColumnsLinks();
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
@@ -177,7 +177,8 @@ export function useHighlightedForeignRowsAsColumns(max = 10) {
         const { columnIndex, name } = linkedDs.dataStore;
         // c.value & c.index are from the DataStore listener event, now in cols
         const sg = Object.keys(link.subgroups)[0];
-        const c = cols.slice(0, max).map(v => {
+        const f = filter.toLowerCase();
+        const c = cols.filter(({value}) => value.toLowerCase().includes(f)).slice(0, max).map(v => {
             const f = `${sg}|${v.value}(${sg})|${v.index}`;
             return ds.addColumnFromField(f);
         });
@@ -190,6 +191,6 @@ export function useHighlightedForeignRowsAsColumns(max = 10) {
             setColumns(c);
         });
         return; //could consider cancelling any pending requests...
-    }, [cols, linkedDs, max, link, ds]);
+    }, [cols, linkedDs, max, link, ds, filter]);
     return columns;
 }
