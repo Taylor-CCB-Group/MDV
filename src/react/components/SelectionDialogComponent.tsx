@@ -218,7 +218,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
             return;
         }
         const [min, max] = value;
-        filter.filter("filterRange", [column.name], { min, max }, true);
+        filter.filter("filterRange", [column.field], { min, max }, true);
     }, [column, filter, debouncedValue]);
 
     const [histogram, setHistogram] = useState<number[]>([]);
