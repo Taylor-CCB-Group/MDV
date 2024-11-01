@@ -308,7 +308,7 @@ export default observer(function SelectionOverlay() {
                 setSelectedTool={setSelectedTool}
             />
         ));
-    }, [selectedTool]);
+    }, [selectedTool, setSelectedTool]);
     return (
         <>
             <ButtonGroup
