@@ -421,7 +421,7 @@ class DataStore {
      * @param {Omit<Column, 'getValue'>} column An object describing the column
      * @param {Array|SharedArrayBuffer} [data] The data for the column
      * @param {boolean} [dirty=false] true for columns that are not synched with the backend,
-     * for example 'virtual' columns added from a `rows_as_columns` link
+     * ~~for example 'virtual' columns added from a `rows_as_columns` link~~
      */
     addColumn(column, data = null, dirty = false) {
         /** @type {Column} */
@@ -475,6 +475,7 @@ class DataStore {
         if (dirty) {
             this.dirtyColumns.added[column.field] = true;
         }
+        return c;
     }
 
     /**
@@ -559,8 +560,29 @@ class DataStore {
         return matches;
     }
 
-    //for columns where the metadata is not housed locally
-    //need to create it from the field name
+    /** 
+     * For columns where the metadata is not listed in the `columns` of the DataSource/DataStore[*],
+     * in particular in the case of columns that result from a 'rows_as_columns' link,
+     * and perhaps in future for other features involving 'virtual' columns, such as generating synthetic data
+     * or computing new statistics at runtime.
+     * 
+     * This method will use a formatted "field" string to create a 'virtual' column.
+     * We may revise this specification to have a more structured object representation
+     * in place of the string format that will need to be parsed. The current system will 
+     * lead to edge-cases for example if column names contain the '|' character that may lead to unpleasant
+     * user-experience at a later date. It also makes it less easy to reason about the code.
+     * 
+     * Note that while this method will add relevant metadata to the DataStore, it will not fetch (or otherwise compute)
+     * the data.
+     * 
+     * [*] remarkable that I find this distinction confusing, this is perhaps an aspect of the design that could be improved
+     * 
+     * @param {string} field - a formatted string that contains the metadata for the column.
+     * The format is `subtype|name|index` where (for now):
+     * - `subtype` a name of a "subgroup" (whatever that means), like "Gene scores"
+     * - `name` the name to be given to the new virtual column, like "GENE (Gene scores)"
+     * - `index` the index of the column in the source data
+     */
     addColumnFromField(field) {
         const data = field.split("|");
         if (data.length !== 3) {
@@ -577,7 +599,7 @@ class DataStore {
             sg = g.subgroups[data[0]];
         }
         if (!this.columnIndex[field]) {
-            this.addColumn({
+            return this.addColumn({
                 name: data[1],
                 field: field,
                 datatype: "double",
@@ -586,6 +608,7 @@ class DataStore {
                 sgtype: sg.type,
             });
         }
+        return this.columnIndex[field];
     }
 
     /**
@@ -812,7 +835,7 @@ class DataStore {
      * Returns the value for the given row index and column
      * @param {number} index - the index of the row,
      * @param {string} column - the columns's field/id
-     * @returns {string|number} - the vaule for the given index and field
+     * @returns {string|number} - the value for the given index and field
      */
     getRowText(index, column) {
         //not very efficent
