@@ -104,7 +104,7 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
  * 
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
-export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"column"> }) => {
+export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"column" | "multicolumn"> }) => {
     // proably want to change the type of ColumnSelectionProps anyway...
     // perhaps we should be looking at other places where it's used & make them use this,
     // with a different evolution of the API.
@@ -508,7 +508,7 @@ const Components: {
     button: observer(ButtonComponent),
     folder: observer(FolderComponent),
     column: ColumnSelectionSettingGui,
-    // multicolumn: ColumnSelectionSettingGui,
+    multicolumn: ColumnSelectionSettingGui,
 } as const;
 
 const ErrorComponent = observer(({ props, label }: { props: any, label: string }) => {
