@@ -165,7 +165,10 @@ export function useHighlightedForeignRows() {
  */
 export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     const cols = useHighlightedForeignRows(); //not actual cols
+    //would like not to have this here - might have some more logic in above hook
+    //in particular want to redesign the fieldName being what determines the column
     const racLink = useRowsAsColumnsLinks();
+    const { link } = racLink; //!! passing the whole racLink object lead to an infinite loop
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
     const ds = useDataStore();
     useEffect(() => {
@@ -174,8 +177,6 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
             return;
         }
         const cm = window.mdv.chartManager;
-        if (!racLink) return; //shouldn't happen with cols.length > 0
-        const { link } = racLink;
         // c.value & c.index are from the DataStore listener event, now in cols
         const sg = Object.keys(link.subgroups)[0];
         const f = filter.toLowerCase();
@@ -192,6 +193,6 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
             setColumns(c);
         });
         return; //could consider cancelling any pending requests...
-    }, [cols, max, racLink, ds, filter]);
+    }, [cols, max, link, ds, filter]);
     return columns;
 }
