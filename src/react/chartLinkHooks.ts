@@ -123,10 +123,12 @@ export function useRowsAsColumnsLinks() {
  */
 export function useHighlightedForeignRows() {
     const id = useId();
-    const { linkedDs, link } = useRowsAsColumnsLinks();
+    const racLink = useRowsAsColumnsLinks();
+    // const { linkedDs, link } = racLink;
     const [values, setValues] = useState<{index: number, value: string}[]>([]);
     useEffect(() => {
-        if (!linkedDs) return;
+        if (!racLink) return;
+        const { linkedDs, link } = racLink;
         const tds = linkedDs.dataStore;
         tds.addListener(`highlightedRows:${id}`, async (eventType: string, data: any) => {
             if (eventType === "data_highlighted") {
@@ -150,9 +152,7 @@ export function useHighlightedForeignRows() {
         return () => {
             tds.removeListener(`highlightedRows:${id}`);
         };
-    }, [linkedDs, linkedDs.dataStore, id, link, 
-        linkedDs.getFilteredValues, linkedDs.getRowText
-    ]);
+    }, [id, racLink]);
     return values;
 }
 /** design of this will need to change to account for n-links
@@ -165,7 +165,7 @@ export function useHighlightedForeignRows() {
  */
 export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     const cols = useHighlightedForeignRows(); //not actual cols
-    const { linkedDs, link } = useRowsAsColumnsLinks();
+    const racLink = useRowsAsColumnsLinks();
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
     const ds = useDataStore();
     useEffect(() => {
@@ -174,7 +174,8 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
             return;
         }
         const cm = window.mdv.chartManager;
-        const { columnIndex, name } = linkedDs.dataStore;
+        if (!racLink) return; //shouldn't happen with cols.length > 0
+        const { link } = racLink;
         // c.value & c.index are from the DataStore listener event, now in cols
         const sg = Object.keys(link.subgroups)[0];
         const f = filter.toLowerCase();
@@ -191,6 +192,6 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
             setColumns(c);
         });
         return; //could consider cancelling any pending requests...
-    }, [cols, linkedDs, max, link, ds, filter]);
+    }, [cols, max, racLink, ds, filter]);
     return columns;
 }
