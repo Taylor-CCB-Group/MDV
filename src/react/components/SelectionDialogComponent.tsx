@@ -18,6 +18,7 @@ import { useChart } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
+import { useHighlightedForeignRowsAsColumns } from "../chartLinkHooks";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -445,6 +446,18 @@ const AddRowComponent = observer(() => {
     )
 })
 
+const ForeignRows = () => {
+    const fcols = useHighlightedForeignRowsAsColumns(100);
+    if (fcols.length === 0) return null;
+    return (
+        <div className="p-3">
+            <Typography variant="h6">Highlighted/Filtered Foreign Rows</Typography>
+            <Typography>This is an experimental feature, not representative of the final design.
+            </Typography>
+            {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
+        </div>
+    );
+}
 
 /**
  * This will control the behaviour of the reset menuIcon in the chart header - not rendered with react.
@@ -460,13 +473,18 @@ function useResetButton() {
     }, [hasFilter, chart.resetButton]);
 }
 
-export default function SelectionDialogComponent() {
+const SelectionDialogComponent = () => {
+    //!! this component doesn't update with HMR and introducing another wrapper component makes things worse
+    //(currently changes here aren't reflected in the browser, but the rest of the components are
+    //if we wrap this, then any change causes whole page to reload)
     const cols = useParamColumnsExperimental();
     useResetButton();
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
             <AddRowComponent />
+            <ForeignRows />
         </div>
     );
 };
+export default SelectionDialogComponent;
