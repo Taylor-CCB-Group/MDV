@@ -113,6 +113,8 @@ class ReactWordCloudChart extends BaseReactChart<WordCloudConfig> {
 BaseChart.types["WordCloud2"] = {
     class: ReactWordCloudChart,
     name: "WordCloud (React)",
+    //@ts-ignore should be in the type, but maybe that will be after merging something else
+    allow_user_add: false,
     params: [
         {
             type: ["text", "multitext"],
