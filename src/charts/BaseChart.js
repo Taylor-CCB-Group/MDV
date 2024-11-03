@@ -9,7 +9,7 @@ import { makeAutoObservable, action } from "mobx";
 class BaseChart {
     /**
      * The base constructor
-     * @param {DataStore} dataStore - The datastore object that contains the data for this chart
+     * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
      * @param {string | HTMLDivElement} div - The id of the div element or the element itself to house the chart
      * @param {Object} config - The config describing the chart
      */
@@ -95,26 +95,24 @@ class BaseChart {
         //set up context menu and icon which opens it
         this.contextMenu = new ContextMenu((data) => {
             const menu = this.getContextMenu(data);
-            if (import.meta.env.MODE !== "production") {
-                menu.push({
-                    text: "debug chart",
-                    icon: "fas fa-bug",
-                    func: () => {
-                        window.mdv.debugChart = this;
-                        this.dialogs.push(
-                            new DebugJsonDialogReactWrapper(this.config, this),
-                        );
-                    },
-                });
-                menu.push({
-                    text: "copy config JSON to clipboard",
-                    icon: "fas fa-copy",
-                    func: () =>
-                        navigator.clipboard.writeText(
-                            JSON.stringify(this.config, null, 2),
-                        ),
-                });
-            }
+            menu.push({
+                text: "debug chart",
+                icon: "fas fa-bug",
+                func: () => {
+                    window.mdv.debugChart = this;
+                    this.dialogs.push(
+                        new DebugJsonDialogReactWrapper(this.config, this),
+                    );
+                },
+            });
+            menu.push({
+                text: "copy config JSON to clipboard",
+                icon: "fas fa-copy",
+                func: () =>
+                    navigator.clipboard.writeText(
+                        JSON.stringify(this.config, null, 2),
+                    ),
+            });
             return menu;
         });
 
@@ -197,6 +195,10 @@ class BaseChart {
             height: this.height,
             width: this.width - 5,
         };
+    }
+    /** @returns {import("./charts.js").DataSource} */
+    get dataSource() {
+        return window.mdv.chartManager.charts[this.config.id].dataSource;
     }
 
     getFilter() {}
@@ -488,7 +490,9 @@ class BaseChart {
         }
         // dynamic props?
     }
-
+    /**
+     * @typedef {Array<import("./charts.js").GuiSpec<import("./charts.js").GuiSpecType>>} Settings
+     */
     /**
      * Returns information about which controls to add to the settings dialog.
      * Subclasses should call this method and then add their own controls e.g.
@@ -508,9 +512,11 @@ class BaseChart {
      *     }]);
      * }
      * </pre>
+     * @returns {Settings} - an array of objects describing tweakable parameters
      */
     getSettings() {
         const c = this.config;
+        /** @type {Settings} */
         const settings = [
             {
                 type: "text",
@@ -525,7 +531,7 @@ class BaseChart {
 
         if (colorOptions.colorby) {
             //cannot color by unique (at the moment)
-            const filter =
+            const filter = (
                 colorOptions.colorby === "all"
                     ? [
                           "int32",
@@ -535,14 +541,22 @@ class BaseChart {
                           "text16",
                           "multitext",
                       ]
-                    : colorOptions.colorby;
-            const cols = this.dataStore.getColumnList(filter);
-            cols.push({ name: "None", field: "_none" });
+                    : colorOptions.colorby
+            );
+
+            const colorSettings = [];
             settings.push({
+                type: "folder",
+                label: "Color Settings",
+                current_value: colorSettings,
+            });
+            
+            // change this to use setting with type: "column" - so it should understand "filter" in a similar way
+            colorSettings.push({
                 label: "Color By",
-                type: "dropdown",
-                values: [cols, "name", "field"],
-                current_value: c.color_by || "_none",
+                type: "column",
+                current_value: c.color_by,
+                // filter: filter,
                 func: (x) => {
                     if (x === "_none") {
                         c.color_by = undefined;
@@ -554,7 +568,7 @@ class BaseChart {
                 },
             });
             if (colorOptions.color_overlay !== undefined) {
-                settings.push({
+                colorSettings.push({
                     label: "Color Overlay",
                     type: "slider",
                     current_value: c.color_overlay,
@@ -564,7 +578,7 @@ class BaseChart {
                     },
                 });
             }
-            settings.push({
+            colorSettings.push({
                 label: "Show Color Legend",
                 type: "check",
 
@@ -577,7 +591,7 @@ class BaseChart {
                     this.setColorLegend();
                 },
             });
-            settings.push({
+            colorSettings.push({
                 label: "SymLog Color Scale",
                 type: "check",
 
@@ -589,7 +603,7 @@ class BaseChart {
                     }
                 },
             });
-            settings.push({
+            colorSettings.push({
                 label: "Treat zero as missing",
                 type: "check",
 
@@ -601,7 +615,7 @@ class BaseChart {
                     }
                 },
             });
-            settings.push({
+            colorSettings.push({
                 type: "radiobuttons",
                 label: "Trim Color Scale to Percentile",
                 current_value: c.trim_color_scale || "none",

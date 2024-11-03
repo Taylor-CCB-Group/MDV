@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type RangeDimension from "../datastore/RangeDimension";
-import type { BaseReactChart } from "./components/BaseReactChart";
 import { useRegionScale, useScatterplotLayer } from "./scatter_state";
 import { Matrix4 } from "@math.gl/core";
 import { CompositeMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useChartID, useRangeDimension2D } from "./hooks";
+import type { Chart } from "@/charts/charts";
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -69,7 +69,7 @@ function useScatterModelMatrix() {
 }
 
 
-function useCreateRange(chart: BaseReactChart<any>) {
+function useCreateRange(chart: Chart) {
     const id = useChartID();
     const { modelMatrix } = useScatterModelMatrix();
     // consider making selectionFeatureCollection part of config, so it can be persisted
@@ -143,7 +143,7 @@ function useCreateMeasure() {
     const [endPixels, setEnd] = useState<P>([0, 0]);
     return { startPixels, setStart, endPixels, setEnd };
 }
-function useCreateSpatialAnnotationState(chart: BaseReactChart<any>) {
+function useCreateSpatialAnnotationState(chart: Chart) {
     // should we use zustand for this state?
     // doesn't matter too much as it's just used once by SpatialAnnotationProvider
     // consider for project-wide annotation stuff as opposed to ephemeral selections
@@ -155,7 +155,7 @@ function useCreateSpatialAnnotationState(chart: BaseReactChart<any>) {
 export function SpatialAnnotationProvider({
     chart,
     children,
-}: { chart: BaseReactChart<any> } & React.PropsWithChildren) {
+}: { chart: Chart } & React.PropsWithChildren) {
     const annotationState = useCreateSpatialAnnotationState(chart);
     return (
         <SpatialAnnotationState.Provider value={annotationState}>

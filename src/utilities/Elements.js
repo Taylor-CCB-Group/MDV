@@ -1,5 +1,5 @@
 import Split from "split.js";
-import { createEl } from "./ElementsTyped.ts";
+import { createEl } from "./ElementsTyped";
 
 //PJT: moved to ElementsTyped.ts because I realised type annotations broke jsdoc script
 //(even though there were understood correctly by language server / IDE)
@@ -127,8 +127,8 @@ export function createFilterElement(selectEl, parent) {
         },
         parent,
     );
-    filter.oninput = (e) => {
-        const val = e.target.value.toLowerCase().split(" ");
+    filter.oninput = () => {
+        const val = filter.value.toLowerCase().split(" ");
         for (const o of selectEl.options) {
             const filter = val.some(
                 (v) => o.text.toLowerCase().indexOf(v) === -1,

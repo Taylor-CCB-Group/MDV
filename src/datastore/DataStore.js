@@ -17,7 +17,7 @@ import { isColumnNumeric, isColumnText } from "../utilities/Utilities.js";
 /**
  * Creates an empty data structure
  * @tutorial datasource
- * @param {integer} size - the number of rows(items) of the data structure
+ * @param {number} size - the number of rows(items) of the data structure
  * @param {Object} [config] - setup information for the datastore.
  * @param {Object[]} [config.columns] - an array of column objects, specifying
  * the metadata for data structure, see {@link DataStore#addColumn}
@@ -36,8 +36,12 @@ import { isColumnNumeric, isColumnText } from "../utilities/Utilities.js";
 
 class DataStore {
     constructor(size, config = {}, dataLoader = null) {
+        /** @type {number} */
         this.size = size;
+        /** @type {number} */
         this.filterSize = size;
+        /** why doesn't this annotation work?
+         * @type {Array.<import("@/charts/charts.js").DataColumn<any>>} */
         this.columns = [];
         this.columnIndex = {};
         this.listeners = {};
@@ -70,6 +74,7 @@ class DataStore {
         makeObservable(this, {
             _filteredIndicesPromise: observable,
             _callListeners: action,
+            //columns: observable, //will probably have clone issues...
         });
 
         // for re-usable filteredIndices
@@ -83,7 +88,7 @@ class DataStore {
 
         if (config.row_data_loader) {
             if (!dataLoader?.rowDataLoader) {
-                console.warning(
+                console.warn(
                     `datasource ${this.name} requires a row data loader but none has been supplied`,
                 );
             } else {
@@ -93,7 +98,7 @@ class DataStore {
         }
         if (config.binary_data_loader) {
             if (!dataLoader?.binaryDataLoader) {
-                console.warning(
+                console.warn(
                     `datasource ${this.name} requires a binary data loader but none has been supplied`,
                 );
             } else {
@@ -388,7 +393,7 @@ class DataStore {
     /**
      * Returns true if the row is in the filter and false if it
      * has been filtered out
-     * @param {integer} index The index of the row
+     * @param {number} index The index of the row
      * @returns {boolean} whether the row has been filtered out
      */
     isRowFiltered(index) {
@@ -409,46 +414,17 @@ class DataStore {
         }
     }
 
+    /** @typedef {import("@/charts/charts.js").DataColumn<any>} Column */
     /**
      * Adds a column's metadata and optionally it's data to the DataStore
      * @tutorial datasource
-     * @param {Object} column An object describing the column
-     * @param {string} column.field - the id of the column - used internally
-     * @param {string} column.name -the human readable column label
-     * @param {string} column.datatype - the datatype- can be one of
-     * <ul>
-     *   <li> double - any floating point data </li>
-     *   <li> integer - any integer data </li>
-     *   <li> text - data containing strings but with no more than 256 categories </li>
-     *   <li> text16 - data containing strings with up to 65536 categories </li>
-     *   <li> unique - data contianing strings but with many categories </li>
-     *   <li> multitext -
-     * </ul>
-     * @param {boolean} [column.editable] whether the column's data can be changed
-     * @param {boolean} [column.is_url] the column's values will be displayed as links
-     * (text and unique columns only)
-     * @param {string[]} [column.values] Only required for text columns, where the index
-     * of the array should match the value in the data
-     * @param {string[]} [column.colors] - An array of rgb hex colors. In the case of a
-     * text column the colors should match the values. For number columns, the list represents
-     * colors that will be interpolated. If not suplied default color pallettes will be
-     * supplied
-     * @param {number[]} [column.minMax] the min max values in the column's values
-     * (integer/double only)
-     * @param {object} [column.quantiles] an object describing the 0.05,0.01 and 0,001
-     * qunatile ranges (integer/double only)
-     * @param {boolean} [column.colorLogScale=false] - if true then the colors will be
-     * displayed on a log scale- useful if the dataset contains outliers. Because a symlog
-     * scale is used the data can contain 0 and negative values
-     * @param {SharedArrayBuffer|Array} [data] In the case of a double/integer (number) column, the array
-     * buffer should be the appropriate size to contain float32s. For text it should be Uint8
-     * and contain numbers corresponding to the indexes in the values parameter. For a column of
-     * type unique it should be a JavaScript array. This parameter is optional as the data can
-     * be added later see {@link DataStore#setColumnData}
-     * @param {boolean} [dirty=false] if true then the store will keep a record that this column has
-     * been added and is not permanently stored in the backend
+     * @param {Omit<Column, 'getValue'>} column An object describing the column
+     * @param {Array|SharedArrayBuffer} [data] The data for the column
+     * @param {boolean} [dirty=false] true for columns that are not synched with the backend,
+     * ~~for example 'virtual' columns added from a `rows_as_columns` link~~
      */
     addColumn(column, data = null, dirty = false) {
+        /** @type {Column} */
         const c = {
             name: column.name,
             field: column.field,
@@ -458,6 +434,7 @@ class DataStore {
                 //i.e. getRowAsObject would call this method on all columns...
                 return this.getRowAsObject(i, [column.field])[column.field];
             },
+            subgroup: column.subgroup,
         };
         if (!c.field) {
             c.field = column.name;
@@ -498,6 +475,7 @@ class DataStore {
         if (dirty) {
             this.dirtyColumns.added[column.field] = true;
         }
+        return c;
     }
 
     /**
@@ -582,8 +560,29 @@ class DataStore {
         return matches;
     }
 
-    //for columns where the metadata is not housed locally
-    //need to create it from the field name
+    /** 
+     * For columns where the metadata is not listed in the `columns` of the DataSource/DataStore[*],
+     * in particular in the case of columns that result from a 'rows_as_columns' link,
+     * and perhaps in future for other features involving 'virtual' columns, such as generating synthetic data
+     * or computing new statistics at runtime.
+     * 
+     * This method will use a formatted "field" string to create a 'virtual' column.
+     * We may revise this specification to have a more structured object representation
+     * in place of the string format that will need to be parsed. The current system will 
+     * lead to edge-cases for example if column names contain the '|' character that may lead to unpleasant
+     * user-experience at a later date. It also makes it less easy to reason about the code.
+     * 
+     * Note that while this method will add relevant metadata to the DataStore, it will not fetch (or otherwise compute)
+     * the data.
+     * 
+     * [*] remarkable that I find this distinction confusing, this is perhaps an aspect of the design that could be improved
+     * 
+     * @param {string} field - a formatted string that contains the metadata for the column.
+     * The format is `subtype|name|index` where (for now):
+     * - `subtype` a name of a "subgroup" (whatever that means), like "Gene scores"
+     * - `name` the name to be given to the new virtual column, like "GENE (Gene scores)"
+     * - `index` the index of the column in the source data
+     */
     addColumnFromField(field) {
         const data = field.split("|");
         if (data.length !== 3) {
@@ -600,7 +599,7 @@ class DataStore {
             sg = g.subgroups[data[0]];
         }
         if (!this.columnIndex[field]) {
-            this.addColumn({
+            return this.addColumn({
                 name: data[1],
                 field: field,
                 datatype: "double",
@@ -609,6 +608,7 @@ class DataStore {
                 sgtype: sg.type,
             });
         }
+        return this.columnIndex[field];
     }
 
     /**
@@ -617,7 +617,7 @@ class DataStore {
      * Or an array of column types
      * @param {boolean} [addNone=false] if true then an extra object will be added to the list
      * with name 'None' and field '__none__'
-     * @returns {Object[]}  An array of objects containing name,field and datatype
+     * @returns {Partial<Column>[]}  An array of objects containing name,field and datatype
      * properties. The columns are ordered by main columns followed by subgroups.
      * Each group is ordered alphabetically
      */
@@ -686,7 +686,7 @@ class DataStore {
             }
         }
         if (addNone) {
-            cols.push({ name: "None", field: "__none__" });
+            cols.push({ name: "None", field: "__none__", datatype: "double" });
         }
         return cols;
     }
@@ -712,7 +712,7 @@ class DataStore {
      * Returns an object, representing the row/item containing key/value pairs
      * for all columns. As an object is created, this method is slow,
      * so it is advisable not to use it for many rows at once.
-     * @param {integer} index - The index of the row
+     * @param {number} index - The index of the row
      * @param {string[]?} columns - The ids of columns to use. If not provided, `columnsWithData` will be used.
      * @returns {Object} An object containing key(field)/value pairs. An extra
      * variable 'index' containing the row index is also added to the object
@@ -833,9 +833,9 @@ class DataStore {
 
     /**
      * Returns the value for the given row index and column
-     * @param {integer} index - the index of the row,
+     * @param {number} index - the index of the row,
      * @param {string} column - the columns's field/id
-     * @returns {string|number} - the vaule for the given index and field
+     * @returns {string|number} - the value for the given index and field
      */
     getRowText(index, column) {
         //not very efficent
@@ -996,7 +996,7 @@ class DataStore {
 
     /**
      * resets the columns offsets to default values
-     * @param {string} [filter] - the filter value - or null if no filter
+     * @param {string|null} filter - the filter value - or null if no filter
      * @param {string} group - The group/category to reset
      * @param {boolean} update - whether to inform listeners data has changed
      */
@@ -1035,10 +1035,13 @@ class DataStore {
         this.dirtyMetadata.add("offsets");
     }
 
-    //single - info about the group to rotate/offset
-    //if null then all groups will be offset according to the values in offsets
-    //rotation -  will rotate rather than translate
-    //update - send message to update all dependants
+    /**
+     * Updates the columns offsets
+     * @param {object} single - information about the group to rotate/offset
+     * if `null` then all groups will be offset according to the values in offsets
+     * @param {boolean|number} rotation -  will rotate rather than translate if "truthy"
+     * @param {boolean} update - send message to update all dependants
+     */
     updateColumnOffsets(single, rotation = false, update = false) {
         const o = this.offsets;
         const gc = this.columnIndex[o.groups];
@@ -1123,7 +1126,7 @@ class DataStore {
      * @deprecated use dataExportUtils `getExportCsvStream` instead
      * Gets a text file blob of the data which can be downloaded
      * @param {string[]} columns A list of column fields/ids to create the file with
-     * @param {string|int[]} rows a value of 'filtered'  will only add filtered rows,
+     * @param {string|number[]} rows a value of 'filtered'  will only add filtered rows,
      * alternatively a list of row indexes can be given. Any other value will result
      * @param {string} [delimiter='\t'] The column delimiter to use
      * @param {string} [delimiter='\n'] The newline delimiter default '\n'
@@ -1235,6 +1238,8 @@ class DataStore {
     //experimental
     appendColumnData(column, data, newSize) {
         const c = this.columnIndex[column];
+        // handy utility type - ideally we wouldn't import this from luma.gl
+        /** @type {import("@luma.gl/core").TypedArrayConstructor} */
         let arrType = Uint8Array;
         let size = newSize;
         if (c.datatype === "integer" || c.datatype === "double") {
@@ -1420,10 +1425,10 @@ class DataStore {
     /**
      * Returns a function which gives the appropriate color for the value of
      * the specified column, when supplied with the index of a row/item in the datastore,
-     * @param {string} column The column id(field) to use for the function . Can be null, if
+     * @param {string|Partial<Column>} column The column id(field) to use for the function . Can be null, if
      * useValue = true i.e.  the functions will be supplied with a value rather than an index
      * @param {object} [config] An optional config with extra parameters
-     * @param {integer} [config.bins=100] For columns with continuous data (doubles/integers),
+     * @param {number} [config.bins=100] For columns with continuous data (doubles/integers),
      * bins are calculated across the data range so that only a limited number of
      * color values need to be calculated. The default is 100, although it can be
      * altered here.
@@ -1449,9 +1454,12 @@ class DataStore {
         let c = this.columnIndex[column];
         //not actually related to column -add dummy column
         if (column == null) {
+            //wtf is this? how is `column` used after this?
             c = column = {
                 datatype: config.datatype,
             };
+            //"the returned function will require the columns value, not index"
+            //clear as mud...
             config.useValue = true;
         }
 
@@ -1516,7 +1524,7 @@ class DataStore {
      * color for that category
      * @param {string} column - the coloumn's field/id
      * @param {string} cat - the category
-     * @returns {string} - the hex value of the color
+     * @returns {string|number[]} - the hex value of the color
      */
     getColorForCategory(column, cat) {
         const c = this.columnIndex[column];
@@ -1593,7 +1601,7 @@ class DataStore {
      * Changes the columns current colors
      * @param {string} column - the column's field or id
      * @param {string[]} colors - the column's new colors
-     * @param {booles} [notify=false] - notify any listeners that
+     * @param {boolean} [notify=false] - notify any listeners that
      * the data has changed
      */
     setColumnColors(column, colors, notify = false) {
@@ -1612,17 +1620,15 @@ class DataStore {
 
     /**
      * Returns the colors that the column uses or default ones if none have been set
-     * @param {string} column - the column's field or id
+     * @param {string|Partial<Column>} column - the column's field/id, or a column object
      * @param {object} config - see [here]{@link DataStore#getColorFunction}
-     * @returns {string[]} An array of colors. For text/multitext, the colors will correspond
+     * @returns {(string|number[])[]} An array of colors. For text/multitext, the colors will correspond
      * to the column's values. For double/integers it will contain binned values from the min
      * to max value
      */
     getColumnColors(column, config = {}) {
-        let c = column;
-        if (typeof column === "string") {
-            c = this.columnIndex[column];
-        }
+        /** @type {Column} */
+        const c = typeof column === "string" ? this.columnIndex[column] : column;
         const rArr = config.asArray;
         if (
             c.datatype === "double" ||

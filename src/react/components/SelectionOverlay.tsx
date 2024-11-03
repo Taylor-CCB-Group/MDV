@@ -211,7 +211,7 @@ type EditorProps = {
 //         </>
 //     );
 // }
-
+// /** !! if revisiting this: refer to `offsets` in datasource docs... */
 // function TransformEditor({
 //     scatterplotLayer,
 //     modelMatrix,
@@ -308,7 +308,7 @@ export default observer(function SelectionOverlay() {
                 setSelectedTool={setSelectedTool}
             />
         ));
-    }, [selectedTool]);
+    }, [selectedTool, setSelectedTool]);
     return (
         <>
             <ButtonGroup

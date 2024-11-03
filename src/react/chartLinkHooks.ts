@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useId, useState } from "react";
 import { useMetadata, useViewerStoreApi } from "./components/avivatorish/state";
-import { useChartID } from "./hooks";
+import { useChartID, useDataSources } from "./hooks";
 import type { VivMDVReact } from "./components/VivMDVReact";
+import { useDataStore } from "./context";
+import type { DataColumn, DataType } from "@/charts/charts";
 
 export const useViewStateLink = () => {
     const viewerStore = useViewerStoreApi();
@@ -68,3 +70,137 @@ export const useViewStateLink = () => {
         metadata.Pixels.PhysicalSizeXUnit,
     ]);
 };
+
+type RowsAsColslink = {
+    name_column: string;
+    name: string;
+    subgroups: {
+        [sgName: string]: {
+            name: string;
+            label: string;
+            type: string;
+        } 
+    }
+}
+
+export function useRowsAsColumnsLinks() {
+    const dataSources = useDataSources();
+    //- we should have useDataSource() which would work in dialogs not associated with a particular chart.
+    //(test in AddChartDialog)
+    const dataStore = useDataStore(); //! this whole dataSource vs dataStore thing still confuses me
+    if (!dataStore) {
+        throw "no dataStore!!!";
+    }
+    if (dataStore.links) {
+        for (const linkedDsName in dataStore.links) {
+            const links = dataStore.links[linkedDsName];
+            if (links.rows_as_columns) {
+                // first pass... there can be only one or zero.
+                // how often will users actually want to link multiple dataSources in this way?
+                // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
+                // UI should be simpler for the common case with a single linked dataSource.
+                // Are there any crazy edge cases we should consider - like indirect links? links to self?
+                // !! before pull - change find to filter and deal with the array of links
+                const linkedDs = dataSources.find(
+                    (ds) => ds.name === linkedDsName,
+                );
+                if (!linkedDs) {
+                    throw new Error();
+                }
+                // todo make sure the link is reasonably typed
+                
+                return { linkedDs, link: links.rows_as_columns as RowsAsColslink};
+            }
+        }
+    }
+    return null;
+}
+
+/** design of this will need to change to account for n-links
+ * 
+ * We could also consider having distinct hooks for highlighted and filtered rows.
+ * @returns the text values and indices of the highlighted/filtered rows in a linked dataSource
+ */
+export function useHighlightedForeignRows() {
+    const id = useId();
+    const racLink = useRowsAsColumnsLinks();
+    // const { linkedDs, link } = racLink;
+    const [values, setValues] = useState<{index: number, value: string}[]>([]);
+    useEffect(() => {
+        if (!racLink) return;
+        const { linkedDs, link } = racLink;
+        const tds = linkedDs.dataStore;
+        tds.addListener(`highlightedRows:${id}`, async (eventType: string, data: any) => {
+            if (eventType === "data_highlighted") {
+                const vals = data.indexes.map(index => ({index, value: tds.getRowText(index, link.name_column)}));
+                setValues(vals); //if there are huge numbers, we may want to deal with that downstream, or here.
+            } else if (eventType === "filtered") {
+                // const vals = tds.getFilteredValues(link.name_column) as string[];
+                // setValues(vals); //this isn't right - we need the index too
+                // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
+                const filteredIndices = await tds.getFilteredIndices();
+                //! this Array.from could be suboptimal for large numbers of indices
+                const vals = Array.from(filteredIndices).map(
+                    // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
+                    // so there's a type error on the setValues line.
+                    // why doesn't that happen in the "data_highlighted" case above?
+                    index => ({index, value: tds.getRowText(index, link.name_column) as string})
+                );
+                setValues(vals);
+            }
+        });
+        return () => {
+            tds.removeListener(`highlightedRows:${id}`);
+        };
+    }, [id, racLink]);
+    return values;
+}
+/** design of this will need to change to account for n-links
+ * 
+ * Will return an array of DataColumn objects, with loaded data, updated as the highlighted/filtered rows change
+ * in the linked DataSource.
+ * 
+ * We could also consider 
+ * - having distinct hooks for highlighted and filtered rows (potentially ways of composing custom filter graphs).
+ * - controls for pagination.
+ * - returning column objects that are not loaded yet, but will be loaded when they are needed.
+ * 
+ * 
+ * @param max - maximum number of columns to return
+ * @returns an array of DataColumn objects, with loaded data, for virtual columns 
+ * corresponding to the highlighted/filtered rows in the linked dataSource.
+ */
+export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
+    const cols = useHighlightedForeignRows(); //not actual cols
+    //would like not to have this here - might have some more logic in above hook
+    //in particular want to redesign the fieldName being what determines the column
+    const racLink = useRowsAsColumnsLinks();
+    const { link } = racLink || { link: null }; //!! passing the whole racLink object lead to an infinite loop
+    const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
+    const ds = useDataStore();
+    useEffect(() => {
+        if (cols.length === 0) {
+            setColumns([]);
+            return;
+        }
+        const cm = window.mdv.chartManager;
+        // c.value & c.index are from the DataStore listener event, now in cols
+        const sg = Object.keys(link.subgroups)[0];
+        const f = filter.toLowerCase();
+        // todo: consider pagination... pass in a page number, return information about total number of columns etc.
+        const c = cols.filter(({value}) => value.toLowerCase().includes(f)).slice(0, max).map(v => {
+            const f = `${sg}|${v.value}(${sg})|${v.index}`;
+            return ds.addColumnFromField(f);
+        });
+        // don't setColumns until we have the data...
+        // alternatively, they could be lazy-loaded by consuming components.
+        // that could be implemented relatively easily, but would lack some batching of requests,
+        // which may or may not be useful.
+        const cFields = c.map(col => col.field);
+        cm.loadColumnSet(cFields, ds.name, () => {
+            setColumns(c);
+        });
+        return; //could consider cancelling any pending requests...
+    }, [cols, max, link, ds, filter]);
+    return columns;
+}

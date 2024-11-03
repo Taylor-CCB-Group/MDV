@@ -1,6 +1,6 @@
 import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography, Select } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo } from "react";
 
@@ -17,6 +17,8 @@ import { action, runInAction } from "mobx";
 import { useChart } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
+import { useDebounce } from "use-debounce";
+import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -207,16 +209,18 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const value = (filters[column.field] || column.minMax) as [number, number];
     const isInteger = column.datatype.match(/int/);
     const step = isInteger ? 1 : 0.01;
+    const [debouncedValue] = useDebounce(value, 10);
 
     // Effect to manage the filter state
     useEffect(() => {
+        const value = debouncedValue;
         if (value[0] === column.minMax[0] && value[1] === column.minMax[1]) {
             filter.removeFilter();
             return;
         }
         const [min, max] = value;
-        filter.filter("filterRange", [column.name], { min, max }, true);
-    }, [column, filter, value]);
+        filter.filter("filterRange", [column.field], { min, max }, true);
+    }, [column, filter, debouncedValue]);
 
     const [histogram, setHistogram] = useState<number[]>([]);
     // this could be a more general utility function - expect to extract soon
@@ -247,15 +251,15 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
 type RangeProps = ReturnType<typeof useRangeFilter>;
 const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryHistogram }: RangeProps) => {
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
-    const width = 100;
-    const height = 20;
+    const width = 99;
+    const height = 40;
     const lineColor = prefersDarkMode ? '#fff' : '#000';
     // Find max value for vertical scaling
     const maxValue = Math.max(...data);
 
     // Define the padding and scaling factor
     const padding = 2;
-    const xStep = 1; // Space between points
+    const xStep = data.length / (width + 1); // Space between points
     const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
 
     const lowX = lowFraction * width;
@@ -267,11 +271,11 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
 
     // Generate the points for the polyline
     // ??? useMemo was wrong ????
-    const points = data.map((value, index) => {
+    const points = useMemo(() => data.map((value, index) => {
         const x = index * xStep;
         const y = height - padding - value * yScale;
         return `${x},${y}`;
-    }).join(' ');
+    }).join(' '), [data, xStep, yScale]);
 
     return (
         <svg width={'100%'} height={height} 
@@ -390,8 +394,8 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
                     aria-label="delete"
                     sx={{
                         position: 'absolute',
-                        right: '-16px',
-                        top: '-16px',
+                        right: '-18px',
+                        top: '-18px',
                         opacity: isHovered ? 1 : 0,
                         visibility: isHovered ? 'visible' : 'hidden',
                         transition: 'opacity 0.3s, visibility 0.3s',
@@ -442,6 +446,28 @@ const AddRowComponent = observer(() => {
     )
 })
 
+const ForeignRows = () => {
+    const [filter, setFilter] = useState("");
+    const [max, setMax] = useState(10);
+    const [debouncedFilter] = useDebounce(filter, 300);
+    const rlink = useRowsAsColumnsLinks();
+    const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter);
+    if (!rlink) return null;
+    const { linkedDs, link } = rlink;
+    return (
+        <div className="p-3">
+            <Typography variant="h6" sx={{ marginBottom: '0.5em' }}>Columns associated with selected '{linkedDs.name}':</Typography>
+            <TextField size="small" label="Filter" variant="outlined" onChange={e => setFilter(e.target.value)} />
+            <TextField size="small" className="max-w-20 float-right" type="number"
+            label="Max" variant="outlined"
+                value={max}
+                onChange={(e) => setMax(Number(e.target.value))} 
+            />
+
+            {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
+        </div>
+    );
+}
 
 /**
  * This will control the behaviour of the reset menuIcon in the chart header - not rendered with react.
@@ -457,13 +483,18 @@ function useResetButton() {
     }, [hasFilter, chart.resetButton]);
 }
 
-export default function SelectionDialogComponent() {
+const SelectionDialogComponent = () => {
+    //!! this component doesn't update with HMR and introducing another wrapper component makes things worse
+    //(currently changes here aren't reflected in the browser, but the rest of the components are
+    //if we wrap this, then any change causes whole page to reload)
     const cols = useParamColumnsExperimental();
     useResetButton();
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
             <AddRowComponent />
+            <ForeignRows />
         </div>
     );
 };
+export default SelectionDialogComponent;

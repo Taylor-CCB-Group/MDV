@@ -103,7 +103,7 @@ export function useParamColumnsExperimental(): DataColumn<DataType>[] {
     // const columns = useMemo(() => {
     useEffect(() => {
         const param = chart.config.param;
-        if (!param) {
+        if (!param || param.length === 0) {
             setColumns([]);
             return;
         }
