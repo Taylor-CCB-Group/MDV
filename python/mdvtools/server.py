@@ -333,7 +333,7 @@ def create_app(
             print("%%%%2")
             print("df is ready, calling project.add_datasource")
             project.add_datasource(
-                project.id,
+                #project.id,
                 name,
                 df,
                 # cols,
