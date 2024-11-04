@@ -18,8 +18,9 @@ COPY . .
 ## `npm run build-flask-docker-hotfix` in an envrionment where the build is working.
 ## this is included in the repo for now, but should be removed once the issue is resolved.
 
-## Install npm dependencies
-# RUN npm install
+## Install npm dependencies & start dev server (should only happen in dev - but other yml configs won't expose the port)
+RUN npm install
+# RUN npm run dev # run manually in container
 
 ## Run the npm build script for Flask and Vite
 # RUN npm run build-flask-dockerjs

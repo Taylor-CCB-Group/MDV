@@ -1,21 +1,21 @@
-import type React from "react";
-import { useState } from "react";
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    TextField,
-    Button,
-    IconButton,
-    Typography,
-    Box,
-    Snackbar,
-} from "@mui/material";
 import {
     Close as CloseIcon,
     ContentCopy as ContentCopyIcon,
     Email as EmailIcon,
 } from "@mui/icons-material";
+import {
+    Box,
+    Button,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    Snackbar,
+    TextField,
+    Typography,
+} from "@mui/material";
+import type React from "react";
+import { useState } from "react";
 
 interface ProjectShareModalProps {
     open: boolean;
