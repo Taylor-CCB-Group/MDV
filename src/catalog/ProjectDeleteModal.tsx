@@ -1,15 +1,15 @@
-import type React from "react";
+import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
 import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    IconButton,
     Box,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
     Typography,
 } from "@mui/material";
-import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
+import type React from "react";
 
 interface ProjectDeleteModalProps {
     id: string;
@@ -48,8 +48,10 @@ const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
             </DialogTitle>
             <DialogContent dividers>
                 <Typography variant="body1" align="center">
-                    Are you sure you want to permanently <strong>delete this project</strong>? 
-                    This action is <strong>irreversible</strong> and cannot be <strong>undone</strong>.
+                    Are you sure you want to permanently{" "}
+                    <strong>delete this project</strong>? This action is{" "}
+                    <strong>irreversible</strong> and cannot be{" "}
+                    <strong>undone</strong>.
                 </Typography>
             </DialogContent>
             <DialogActions>

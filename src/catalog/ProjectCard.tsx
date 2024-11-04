@@ -1,32 +1,32 @@
-import type React from "react";
-import { useEffect, useState } from "react";
 import {
     Delete as DeleteIcon,
     DriveFileRenameOutline,
-    MoreVert,
+    Image as ImageIcon,
     Info,
+    LockPerson as LockPersonIcon,
+    MoreVert,
     Settings,
     Share,
-    Image as ImageIcon,
-    LockPerson as LockPersonIcon
 } from "@mui/icons-material";
 import {
     Card,
     CardContent,
     CardMedia,
-    Typography,
     IconButton,
-    Menu,
-    MenuItem,
     ListItemIcon,
     ListItemText,
+    Menu,
+    MenuItem,
+    Typography,
 } from "@mui/material";
+import type React from "react";
+import { useEffect, useState } from "react";
+import ProjectAccessModal from "./ProjectAccessModal";
+import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
+import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
 import ProjectShareModal from "./ProjectShareModal";
-import ProjectRenameModal from "./ProjectRenameModal"
-import ProjectDeleteModal from "./ProjectDeleteModal"
-import ProjectAccessModal from "./ProjectAccessModal"
 
 interface ProjectCardProps {
     id: string;
@@ -40,7 +40,10 @@ interface ProjectCardProps {
     numberOfImages: string;
     onDelete: (id: string) => Promise<void>;
     onRename: (id: string, newName: string) => Promise<void>;
-    onChangeType: (id: string, newType: "Editable" | "Read-Only") => Promise<void>
+    onChangeType: (
+        id: string,
+        newType: "Editable" | "Read-Only",
+    ) => Promise<void>;
     onAddCollaborator?: (email: string) => void;
 }
 
@@ -71,11 +74,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     useEffect(() => {
         if (shouldNavigate) {
             // todo - review how we do stuff like this
-            const base = import.meta.env.DEV ? "http://localhost:5170?dir=/" : "";
+            const base = import.meta.env.DEV
+                ? "http://localhost:5170?dir=/"
+                : "";
             window.location.href = `${base}project/${id}`;
         }
     }, [shouldNavigate, id]);
-    
+
     const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
         setAnchorEl(event.currentTarget);
@@ -99,7 +104,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 position: "relative",
             }}
         >
-            <div 
+            <div
                 onClick={handleCardClick}
                 style={{
                     cursor: "pointer",

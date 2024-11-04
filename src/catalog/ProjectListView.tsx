@@ -1,41 +1,36 @@
-import React, { useState } from 'react';
 import {
+    Delete,
+    DriveFileRenameOutline,
+    Image as ImageIcon,
+    Info,
+    LockPerson,
+    MoreVert,
+} from "@mui/icons-material";
+import {
+    IconButton,
+    ListItemIcon,
+    ListItemText,
+    Menu,
+    MenuItem,
+    Paper,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
     TableRow,
-    Paper,
-    IconButton,
-    Menu,
-    MenuItem,
-    ListItemIcon,
-    ListItemText,
     Typography,
-} from '@mui/material';
-import {
-    MoreVert,
-    Info,
-    DriveFileRenameOutline,
-    Delete,
-    LockPerson,
-    Image as ImageIcon,
-} from '@mui/icons-material';
-import ProjectInfoModal from './ProjectInfoModal';
-import ProjectRenameModal from './ProjectRenameModal';
-import ProjectDeleteModal from './ProjectDeleteModal';
-import ProjectAccessModal from './ProjectAccessModal';
+} from "@mui/material";
+import React, { useState } from "react";
+import ProjectAccessModal from "./ProjectAccessModal";
+import ProjectDeleteModal from "./ProjectDeleteModal";
+import ProjectInfoModal from "./ProjectInfoModal";
+import ProjectRenameModal from "./ProjectRenameModal";
 
-const ProjectListView = ({ 
-    projects, 
-    onDelete, 
-    onRename, 
-    onChangeType,
-}) => {
+const ProjectListView = ({ projects, onDelete, onRename, onChangeType }) => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectedProject, setSelectedProject] = useState(null);
-    
+
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -76,15 +71,17 @@ const ProjectListView = ({
                     </TableHead>
                     <TableBody>
                         {projects.map((project) => (
-                            <TableRow 
+                            <TableRow
                                 key={project.id}
                                 hover
                                 onClick={() => handleRowClick(project.id)}
-                                sx={{ cursor: 'pointer' }}
+                                sx={{ cursor: "pointer" }}
                             >
                                 <TableCell>
                                     <div className="flex items-center gap-3">
-                                        <ImageIcon sx={{ color: 'text.secondary' }} />
+                                        <ImageIcon
+                                            sx={{ color: "text.secondary" }}
+                                        />
                                         <Typography>{project.name}</Typography>
                                     </div>
                                 </TableCell>
@@ -93,7 +90,9 @@ const ProjectListView = ({
                                 <TableCell>{project.type}</TableCell>
                                 <TableCell align="right">
                                     <IconButton
-                                        onClick={(e) => handleMenuClick(e, project)}
+                                        onClick={(e) =>
+                                            handleMenuClick(e, project)
+                                        }
                                         size="small"
                                     >
                                         <MoreVert />
