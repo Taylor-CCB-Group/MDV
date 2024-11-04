@@ -1,16 +1,16 @@
+import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
+import {
+    Box,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    TextField,
+} from "@mui/material";
 import type React from "react";
 import { useState } from "react";
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    Button,
-    IconButton,
-    Box,
-} from "@mui/material";
-import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
 
 interface ProjectRenameModalProps {
     id: string;

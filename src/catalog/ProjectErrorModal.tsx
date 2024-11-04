@@ -1,15 +1,18 @@
-import type React from "react";
 import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    IconButton,
+    Close as CloseIcon,
+    ErrorOutline as ErrorIcon,
+} from "@mui/icons-material";
+import {
     Box,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
     Typography,
 } from "@mui/material";
-import { Close as CloseIcon, ErrorOutline as ErrorIcon } from "@mui/icons-material";
+import type React from "react";
 
 interface ErrorModalProps {
     open: boolean;
@@ -17,11 +20,7 @@ interface ErrorModalProps {
     onClose: () => void;
 }
 
-const ErrorModal: React.FC<ErrorModalProps> = ({
-    open,
-    message,
-    onClose,
-}) => {
+const ErrorModal: React.FC<ErrorModalProps> = ({ open, message, onClose }) => {
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>
@@ -43,9 +42,7 @@ const ErrorModal: React.FC<ErrorModalProps> = ({
                 </IconButton>
             </DialogTitle>
             <DialogContent dividers>
-                <Typography variant="body1">
-                    {message}
-                </Typography>
+                <Typography variant="body1">{message}</Typography>
             </DialogContent>
             <DialogActions>
                 <Box
@@ -55,7 +52,11 @@ const ErrorModal: React.FC<ErrorModalProps> = ({
                         width: "100%",
                     }}
                 >
-                    <Button onClick={onClose} variant="contained" color="primary">
+                    <Button
+                        onClick={onClose}
+                        variant="contained"
+                        color="primary"
+                    >
                         Close
                     </Button>
                 </Box>
