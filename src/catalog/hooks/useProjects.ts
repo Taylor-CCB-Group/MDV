@@ -99,7 +99,7 @@ const useProjects = () => {
   
       const data = await response.json();
   
-      if (response.status === 201) {
+      if (response.ok) {
         // Add the new project to the local state with default values
         // These will be populated by subsequent fetch
         const newProject: Project = {
