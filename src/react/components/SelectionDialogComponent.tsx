@@ -223,6 +223,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     }, [column, filter, debouncedValue]);
 
     const [histogram, setHistogram] = useState<number[]>([]);
+    const [histogramGpu, setHistogramGpu] = useState<number[]>([]);
     // this could be a more general utility function - expect to extract soon
     const queryHistogram = useCallback(async () => {
         // waste of life trying to use Dimension class.
@@ -231,7 +232,9 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         // });
         const worker = new Worker(new URL("../../datastore/rawHistogramWorker.ts", import.meta.url));
         worker.onmessage = (event) => {
-            setHistogram(event.data);
+            const { histCpu, histGpu } = event.data;
+            setHistogram(histCpu);
+            setHistogramGpu(histGpu);
             worker.terminate();
         };
         const isInt32 = column.datatype === "int32";
@@ -246,16 +249,16 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const lowFraction = (low - min) / (max - min);
     const highFraction = (high - min) / (max - min);
 
-    return { value, step, histogram, lowFraction, highFraction, queryHistogram };
+    return { value, step, histogram, histogramGpu, lowFraction, highFraction, queryHistogram };
 }
 type RangeProps = ReturnType<typeof useRangeFilter>;
-const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryHistogram }: RangeProps) => {
+const Histogram = observer(({ histogram: data, histogramGpu, lowFraction, highFraction, queryHistogram }: RangeProps) => {
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const width = 99;
     const height = 40;
     const lineColor = prefersDarkMode ? '#fff' : '#000';
     // Find max value for vertical scaling
-    const maxValue = Math.max(...data);
+    const maxValue = Math.max(...data, ...histogramGpu);
 
     // Define the padding and scaling factor
     const padding = 2;
@@ -292,6 +295,13 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
                 // many thanks to ChatGPT for the following line (and the rest of the component
                 // but this would have been a real pain to figure out on my own)
                 vectorEffect="non-scaling-stroke" // Keeps the stroke width consistent
+            />
+            <polyline
+                points={gpuPoints}
+                fill="none"
+                stroke={prefersDarkMode ? '#f00' : '#f88'}
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
             />
             {/* Highlighted range */}
             <rect
