@@ -233,9 +233,10 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         // });
         const worker = new HistogramWoker(); //might be nice to have types for onmessage/postmessage
         worker.onmessage = (event) => {
-            const { histCpu, histGpu } = event.data;
-            setHistogram(histCpu);
-            setHistogramGpu(histGpu);
+            // const { histCpu, histGpu } = event.data;
+            // setHistogram(histCpu);
+            // setHistogramGpu(histGpu);
+            setHistogram(event.data);
             worker.terminate();
         };
         const isInt32 = column.datatype === "int32";
@@ -259,9 +260,9 @@ const Histogram = observer(({ histogram: data, histogramGpu, lowFraction, highFr
     const height = 40;
     const lineColor = prefersDarkMode ? '#fff' : '#000';
     // Find max value for vertical scaling
-    const maxValue = Math.max(...data, ...histogramGpu);
-    const maxGpuValue = Math.max(...histogramGpu);
-    console.log("maxValue: ", maxValue, "maxGpuValue: ", maxGpuValue, "ratio", maxGpuValue / maxValue);
+    const maxValue = Math.max(...data);//, ...histogramGpu);
+    // const maxGpuValue = Math.max(...histogramGpu);
+    // console.log("maxValue: ", maxValue, "maxGpuValue: ", maxGpuValue, "ratio", maxGpuValue / maxValue);
 
     // Define the padding and scaling factor
     const padding = 2;
@@ -299,13 +300,13 @@ const Histogram = observer(({ histogram: data, histogramGpu, lowFraction, highFr
                 // but this would have been a real pain to figure out on my own)
                 vectorEffect="non-scaling-stroke" // Keeps the stroke width consistent
             />
-            <polyline
+            {/* <polyline
                 points={gpuPoints}
                 fill="none"
                 stroke={prefersDarkMode ? '#f00' : '#f88'}
                 strokeWidth="1.5"
                 vectorEffect="non-scaling-stroke"
-            />
+            /> */}
             {/* Highlighted range */}
             <rect
                 x={0}
