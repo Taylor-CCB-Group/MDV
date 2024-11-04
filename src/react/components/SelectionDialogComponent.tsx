@@ -19,6 +19,7 @@ import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
+import HistogramWoker from "../../datastore/rawHistogramWorker?worker";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -230,7 +231,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         // filter.getBinsAsync(column.name, { bins: 100 }).then((histogram) => {
         //     setHistogram(histogram);
         // });
-        const worker = new Worker(new URL("../../datastore/rawHistogramWorker.ts", import.meta.url));
+        const worker = new HistogramWoker(); //might be nice to have types for onmessage/postmessage
         worker.onmessage = (event) => {
             const { histCpu, histGpu } = event.data;
             setHistogram(histCpu);
