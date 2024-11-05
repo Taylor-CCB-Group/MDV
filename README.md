@@ -73,6 +73,30 @@ npm i
 npm run build-flask-vite
 ```
 
+We have found on some **Windows** machines during the build you will get:
+
+```
+<--- JS stacktrace --->
+
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+```
+
+In this case replace:
+
+```
+npm run build-flask-vite
+
+```
+with 
+
+```
+$env:VITE_ENTRYPOINT="src/main.js"
+$env:NODE_OPTIONS="--max-old-space-size=4096"
+$env:build="desktop_pt"
+npx vite build --outDir python/mdvtools/static
+```
+
+
 Now install Python libaries 
 
 ## MacOS / Linux
@@ -90,7 +114,6 @@ python -m venv venv
 venv/Scripts/activate
 pip install -e python
 ```
-
 ### Running a test project
 
 This example will build and run a project based on the `pbmc3k_processed` dataset from `scanpy`:
