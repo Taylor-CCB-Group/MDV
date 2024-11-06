@@ -12,7 +12,7 @@ from flask import Flask, render_template, jsonify, request
 # from flask import Flask, render_template, jsonify, request
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
-from mdvtools.project_router import ProjectBlueprint
+from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService
@@ -198,7 +198,7 @@ def serve_projects_from_db(app):
                     p = MDVProject(dir=project.path, id=str(project.id))
                     p.set_editable(True)
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
-                    p.serve(app=app, open_browser=False, backend=True)
+                    p.serve(app=app, open_browser=False, backend_db=True)
                     print(f"Serving project: {project.path}")
 
                     # Update or add files in the database to reflect the actual files in the filesystem
@@ -264,7 +264,7 @@ def serve_projects_from_filesystem(app, base_dir):
 
                     p = MDVProject(dir=project_path,id= str(next_id))
                     p.set_editable(True)
-                    p.serve(app=app, open_browser=False, backend=True) 
+                    p.serve(app=app, open_browser=False, backend_db=True) 
                     print(f"Serving project: {project_path}")
 
                     # Create a new Project record in the database with the default name
@@ -367,7 +367,7 @@ def register_routes(app):
                     print("Creating and serving the new project")
                     p = MDVProject(project_path)
                     p.set_editable(True)
-                    p.serve(app=app, open_browser=False, backend=True)
+                    p.serve(app=app, open_browser=False, backend_db=True)
                 except Exception as e:
                     print(f"In register_routes: Error serving MDVProject: {e}")
                     return jsonify({"status": "error", "message": "Failed to serve MDVProject"}), 500

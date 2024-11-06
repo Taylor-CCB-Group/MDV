@@ -82,7 +82,7 @@ def create_app(
     port=5050,
     websocket=False,
     app: Optional[Flask] = None,
-    backend=False,
+    backend_db=False,
 ):
     if app is None:
         route = ""
@@ -107,7 +107,16 @@ def create_app(
         # this is to allow multiple projects to be served from the same server.
         multi_project = True
         route = "/project/" + project.id + "/"
-        project_bp = Blueprint(project.id, __name__, url_prefix=route)
+        
+
+        if backend_db:
+            from mdvtools.project_router import ProjectBlueprint_v2 as Blueprint_v2
+            print("backend_db is True")
+            project_bp = Blueprint_v2(project.id, __name__, url_prefix=route)
+        else:
+            project_bp = Blueprint(project.id, __name__, url_prefix=route)
+
+
     # if route in routes:
     #     raise Exception(
     #         "Route already exists - can't have two projects with the same name"
@@ -121,7 +130,7 @@ def create_app(
         # some requests were being downgraded to http, which caused problems with the backend
         # but if we always add the header it messes up localhost development.
         # todo if necessary, apply equivalent change to index.html / any other pages we might have
-        return render_template("page.html", route=route, backend=backend)
+        return render_template("page.html", route=route, backend=backend_db)
 
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
@@ -268,7 +277,7 @@ def create_app(
                 return jsonify({"status": "error", "message": f"Invalid JSON format for tiffMetadata: {e}"}), 400
             
             # Call the method to add or update the image datasource
-            view_name = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file, project.id)
+            view_name = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file)
             
             # If no exception is raised, the operation was successful. let the client know which view will show the image.
             print(f">>> notify client that image datasource updated and file uploaded successfully, view: {view_name}")
@@ -294,7 +303,7 @@ def create_app(
         try:
             name = request.form["name"]
 
-            print("%%%%1")
+            print("In server.py add_datasource")
 
             if not name:
                 return "Request must contain 'name'", 400
@@ -324,7 +333,7 @@ def create_app(
             file.seek(0)
             # will this work? can we return progress to the client?
             df = pd.read_csv(file.stream)
-            print("%%%%2")
+            print("In server.py add_datasource- df created")
             print("df is ready, calling project.add_datasource")
             project.add_datasource(
                 #project.id,
@@ -335,7 +344,6 @@ def create_app(
                 supplied_columns_only=supplied_only,
                 replace_data=replace
                 )
-            print("%%%%3")
             print("added df - project.add_datasource completed")
         except Exception as e:
             # success = False
@@ -347,17 +355,11 @@ def create_app(
     if open_browser:
         webbrowser.open(f"http://localhost:{port}/{route}")
 
-    if multi_project:
-        if not isinstance(project_bp, Blueprint):
+    if not multi_project:
+        if not isinstance(app, Flask):
             raise Exception(
-                "assert: project_bp must be a Flask instance when multi_project is True"
+                "assert: serving single project should have made a Flask app instance by now"
             )
-        if route in app.blueprints:
-            print(f"there is already a blueprint at {route}")
-        print(f"Adding project {project.id} to existing app")
-        ## nb - uncomment this if not using ProjectBlueprint refactor...
-        # app.register_blueprint(project_bp)
-    else:
         # user_reloader=False, allows the server to work within jupyter
         app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
 
