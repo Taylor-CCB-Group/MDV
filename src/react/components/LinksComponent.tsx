@@ -20,11 +20,13 @@ const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
     const cm = window.mdv.chartManager;
     const targetColumn = cm.getDataSource(linkedDs.name).columnIndex[name_column] as DataColumn<DataType>;
     const ds = useDataStore();
+    // potential symbols for live link ➤ ⌁ ⇢ ⍆ ⚡︎ ► ◎ ▷ ☑︎ ⦿
     const spec: GuiSpec<'multidropdown'> = useMemo(() => makeAutoObservable({
         type: 'multidropdown',
         name: name_column,
         label: name,
-        values: [["<<live link>>", ...targetColumn.values]],
+        // I don't think we want to prepend option to dropdown - we should have a different way of showing this
+        values: [[`◉ '${name}' selection`, ...targetColumn.values]],
         // current_value: targetColumn.values[0],
         current_value: rowNames,
     }), [targetColumn, name_column, name, rowNames]);
@@ -32,7 +34,7 @@ const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
     const v = Array.isArray(current_value) ? current_value : [current_value];
     return (
         <>
-            <IconButton onClick={() => setExpanded(!expanded)}>
+            <IconButton size="small" onClick={() => setExpanded(!expanded)}>
                 <LinkIcon />
             </IconButton>
                 {/* <h3><em>'{linkedDs.name}'</em> rows as <em>'{ds.name}'</em> columns</h3> */}
