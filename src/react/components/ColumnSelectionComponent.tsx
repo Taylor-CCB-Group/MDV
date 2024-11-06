@@ -11,6 +11,9 @@ import { columnMatchesType } from "@/lib/utils.js";
 // todo - get multiple working properly.
 // todo - subgroups
 import LinksComponent from "./LinksComponent.js";
+import { TextFieldExtended } from "./TextFieldExtended.js";
+import Grid from '@mui/material/Grid2';
+
 
 export type ColumnSelectionProps = {
     setSelectedColumn: (column: string) => void; //what about multiple?
@@ -43,48 +46,53 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
     // In general, this should (probably) be using our "(multi)dropdown" component
     // and the <LinksComponent /> can select which column options to show.
     return (
-        <>
-            <Autocomplete
-                className="w-full"
-                options={columns}
-                multiple={multiple}
-                onChange={(_, value) => {
-                    if (Array.isArray(value)) {
-                        // todo - need to make controlled anyway for multiple...
-                        setSelectedColumn(value[0].field);
-                    } else {
-                        setSelectedColumn(value.field);
-                    }
-                }}
-                getOptionLabel={(column) => column.name}
-                renderInput={(params) => {
-                    const { key, ...p } = params as typeof params & {
-                        key: string;
-                    };
-                    return (
-                        <TextField
-                            key={key}
-                            {...p}
-                            placeholder={placeholder}
-                        />
-                    );
-                }}
-                renderOption={(props, column) => {
-                    const { key, ...p } = props as typeof props & {
-                        key: string;
-                    };
-                    const { datatype } = column;
-                    // todo: consider an optional description prop, which we could show in a tooltip?
-                    return (
-                        <li key={key} {...p}>
-                            {column.name}
-                            <em className="opacity-40 ml-2">({datatype})</em>
-                        </li>
-                    );
-                }}
-            />
-            <LinksComponent />
-        </>
+        <Grid className="w-full items-center" container>
+            <Grid size={"grow"}>
+                <Autocomplete
+                    className="w-full"
+                    options={columns}
+                    multiple={multiple}
+                    onChange={(_, value) => {
+                        if (Array.isArray(value)) {
+                            // todo - need to make controlled anyway for multiple...
+                            setSelectedColumn(value[0].field);
+                        } else {
+                            setSelectedColumn(value.field);
+                        }
+                    }}
+                    getOptionLabel={(column) => column.name}
+                    renderInput={(params) => {
+                        const { key, ...p } = params as typeof params & {
+                            key: string;
+                        };
+                        return (
+                            <TextFieldExtended
+                                key={key}
+                                {...p}
+                                placeholder={placeholder}
+                                // customStartAdornment={<LinksComponent />}
+                            />
+                        );
+                    }}
+                    renderOption={(props, column) => {
+                        const { key, ...p } = props as typeof props & {
+                            key: string;
+                        };
+                        const { datatype } = column;
+                        // todo: consider an optional description prop, which we could show in a tooltip?
+                        return (
+                            <li key={key} {...p}>
+                                {column.name}
+                                <em className="opacity-40 ml-2">({datatype})</em>
+                            </li>
+                        );
+                    }}
+                />
+            </Grid>
+            <Grid>
+                <LinksComponent />
+            </Grid>
+        </Grid>
     );
 });
 export default ColumnSelectionComponent;
