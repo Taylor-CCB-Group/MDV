@@ -10,7 +10,7 @@ import { columnMatchesType } from "@/lib/utils.js";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
-// import LinksComponent from "./LinksComponent.js";
+import LinksComponent from "./LinksComponent.js";
 
 export type ColumnSelectionProps = {
     setSelectedColumn: (column: string) => void; //what about multiple?
@@ -40,6 +40,8 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
             ,
         [dataStore, props.exclude, type],
     );
+    // In general, this should (probably) be using our "(multi)dropdown" component
+    // and the <LinksComponent /> can select which column options to show.
     return (
         <>
             <Autocomplete
@@ -81,7 +83,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                     );
                 }}
             />
-            {/* <LinksComponent /> */}
+            <LinksComponent />
         </>
     );
 });
