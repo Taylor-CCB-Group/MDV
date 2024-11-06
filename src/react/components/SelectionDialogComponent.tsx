@@ -1,6 +1,6 @@
 import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography, Select } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, Typography, Select } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo } from "react";
 
@@ -19,6 +19,7 @@ import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
+import { TextFieldExtended } from "./TextFieldExtended";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -39,20 +40,6 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
         : K extends CategoricalDataType ? CategoryFilter
         : RangeFilter) | null;
     return filter;
-}
-
-/** Modified version of TextField that allows a `customEndAdornment`
- * along with the standard endAdornment passed in `InputProps`.
- */
-const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: JSX.Element }) => {
-    const { InputProps, customEndAdornment, ...rest } = props;
-    const inputProps = {
-        ...InputProps,
-        endAdornment: (
-            <>{customEndAdornment} {InputProps.endAdornment}</>
-        )
-    };
-    return <TextField {...rest} InputProps={inputProps} />;
 }
 
 const filterOptions = createFilterOptions<any>({ limit: 100 });
