@@ -196,3 +196,29 @@ class ProjectBlueprint_v2:
                 return method(*match.groups())
             
         raise ValueError(f"no matching route for {subpath}")
+
+import functools
+
+class SingleProjectShim:
+    def __init__(self, app: Flask) -> None:
+        self.app = app
+
+    def route(self, rule: str, **options: Any) -> Callable:
+        access_level = options.pop("access_level", None)  # Remove access_level if present
+
+        def decorator(func: Callable) -> Callable:
+            # Define a wrapper around the original view function
+            @functools.wraps(func)  # Preserve the original function’s name and docstring
+            def wrapped_func(*args, **kwargs):
+                # Process access_level or other logic here if needed
+                if access_level:
+                    print(f"Access level required: {access_level}")
+                # Call the original function
+                return func(*args, **kwargs)
+
+            # Set a unique endpoint name for each wrapped function using func's original name
+            endpoint = options.pop("endpoint", func.__name__)
+            # Register the route with Flask, using the unique endpoint name
+            return self.app.route(rule, endpoint=endpoint, **options)(wrapped_func)
+
+        return decorator

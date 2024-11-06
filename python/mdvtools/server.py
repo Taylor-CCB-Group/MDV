@@ -16,7 +16,10 @@ import re
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
 from mdvtools.mdvproject import MDVProject
-from mdvtools.project_router import ProjectBlueprint as Blueprint
+from mdvtools.project_router import (
+    ProjectBlueprint as Blueprint,
+    SingleProjectShim
+)
 import os
 import pandas as pd
 from typing import Optional
@@ -91,7 +94,7 @@ def create_app(
         print(f"created Flask {app}")
         # add headers to allow web workers
         app.after_request(add_safe_headers)
-        project_bp = app
+        project_bp = SingleProjectShim(app)
         multi_project = False
         # nb, may make this default to False again soon.
         ### 'MEW' in Unity is using IWeb PostMessage, not WebSockets.
@@ -115,7 +118,6 @@ def create_app(
             project_bp = Blueprint_v2(project.id, __name__, url_prefix=route)
         else:
             project_bp = Blueprint(project.id, __name__, url_prefix=route)
-
 
     # if route in routes:
     #     raise Exception(
