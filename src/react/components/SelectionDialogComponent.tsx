@@ -557,7 +557,7 @@ const ForeignRows = () => {
     const rlink = useRowsAsColumnsLinks();
     const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter);
     if (!rlink) return null;
-    const { linkedDs, link } = rlink;
+    const { linkedDs, link } = rlink[0];
     return (
         <div className="p-3">
             <Typography variant="h6" sx={{ marginBottom: '0.5em' }}>Columns associated with selected '{linkedDs.name}':</Typography>
