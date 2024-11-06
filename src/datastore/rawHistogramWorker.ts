@@ -25,8 +25,17 @@ function computeBinsCPU(props: HistogramConfig) {
     return hist;
 }
 
-// WebGPU compute shader code - with help from ChatGPT.
+// WebGPU compute shader code - with help from ChatGPT. (although it's very naive at the moment)
 // thinking about a version adapting to other Dimensions...
+// we'd have some boilerplate code that would be the same for all dimensions, arranging data within workgroups etc
+// but the predicate logic would be different for each type of dimension
+// write a bit of wgsl predicate logic to determine whether a given array element is filtered
+// for each type of dimension, that would be inserted into the boilerplate shader code
+// meaning that as we refine the data sharing within workgroups etc, it should hopefully
+// not require changing the predicate logic, just the data handling logic
+
+
+
 // !inject `struct Histogram` with BINS into the shader code when creating the shader module
 const shaderCode = /* wgsl */ `
 // struct Histogram {
@@ -89,6 +98,7 @@ async function runComputeShader(
 
         ${shaderCode}
         `,
+        label: 'histogram-compute-shader',
     });
 
     // Create bind group layout and pipeline layout
@@ -98,11 +108,16 @@ async function runComputeShader(
             { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
             { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
         ],
+        label: 'histogram-bind-group-layout',
     });
 
     const pipelineLayout = device.createPipelineLayout({
         bindGroupLayouts: [bindGroupLayout],
+        label: 'histogram-pipeline-layout',
     });
+
+    const maxWorkgroupsPerDimension = device.limits.maxComputeWorkgroupSizeX;
+    const workgroupSize = 64;
 
     // Create compute pipeline
     const computePipeline = device.createComputePipeline({
@@ -111,6 +126,7 @@ async function runComputeShader(
             module: shaderModule,
             entryPoint: 'main',
         },
+        label: 'histogram-compute-pipeline',
     });
 
     // Create the uniform buffer for the parameters
@@ -118,6 +134,7 @@ async function runComputeShader(
     const paramsBuffer = device.createBuffer({
         size: 12, // 3 * 4 bytes (min, binWidth, bins)
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        label: 'histogram-params-buffer',
     });
 
     // Calculate the bin width and write parameters
@@ -133,15 +150,36 @@ async function runComputeShader(
             { binding: 1, resource: { buffer: dataBuffer } },
             { binding: 2, resource: { buffer: histBuffer } },
         ],
+        label: 'histogram-bind-group',
     });
 
     // Dispatch the compute shader
-    const commandEncoder = device.createCommandEncoder();
-    const passEncoder = commandEncoder.beginComputePass();
-    passEncoder.setPipeline(computePipeline);
-    passEncoder.setBindGroup(0, bindGroup);
-    passEncoder.dispatchWorkgroups(Math.ceil(dataLength / 64)); // Now we pass `dataLength` for dispatch
-    passEncoder.end();
+    const commandEncoder = device.createCommandEncoder({ label: 'histogram-command-encoder' });
+    // Dispatch in chunks if needed
+    // !this is now giving wrong results for int32 data?
+    /// (also it's actually way slower than the CPU version - we need a non-naive shader)
+    let remainingElements = dataLength;
+    let offset = 0;
+
+    while (remainingElements > 0) {
+        const workgroupsForThisPass = Math.min(
+            Math.ceil(remainingElements / workgroupSize),
+            maxWorkgroupsPerDimension
+        );
+
+        // Begin a compute pass
+        const passEncoder = commandEncoder.beginComputePass({ label: 'histogram-compute-pass' });
+        passEncoder.setPipeline(computePipeline);
+        passEncoder.setBindGroup(0, bindGroup);
+
+        // Dispatch only as many workgroups as allowed
+        passEncoder.dispatchWorkgroups(workgroupsForThisPass);
+        passEncoder.end();
+
+        // Update remaining elements and offset
+        remainingElements -= workgroupsForThisPass * workgroupSize;
+        offset += workgroupsForThisPass * workgroupSize;
+    }
 
     // Submit commands to GPU
     device.queue.submit([commandEncoder.finish()]);
@@ -157,7 +195,7 @@ async function computeBinsGPU(props: HistogramConfig) {
     }
 
     const adapter = await navigator.gpu.requestAdapter();
-    const device = await adapter.requestDevice();
+    const device = await adapter.requestDevice({label: 'histogram-device'});
 
     // Create GPU buffer for input data
     const arrType = isInt32 ? Int32Array : Float32Array;
@@ -167,6 +205,7 @@ async function computeBinsGPU(props: HistogramConfig) {
     const dataBuffer = device.createBuffer({
         size: dataArray.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        label: 'data-buffer',
     });
 
     device.queue.writeBuffer(dataBuffer, 0, dataArray);
@@ -175,21 +214,52 @@ async function computeBinsGPU(props: HistogramConfig) {
     const histBuffer = device.createBuffer({
         size: bins * 4, // 4 bytes per bin (assuming 32-bit integers)
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+        label: 'histogram-buffer',
     });
 
     // Create compute shader (next step)
     // Set up compute pipeline (next step) 
     const len = isInt32 ? dataArray.length / 4 : dataArray.length;
-    await runComputeShader(device, dataBuffer, histBuffer, min, max, bins, len, isInt32);
+    // Get the maximum buffer binding size from the device's limits
+    const maxBindingSize = device.limits.maxStorageBufferBindingSize / 2048; //!! 2048 is a magic number
+    const elementSize = isInt32 ? 4 : 4; // 4 bytes per element for both Int32Array and Float32Array
+    const maxElementsPerChunk = Math.floor(maxBindingSize / elementSize);
+
+    // Calculate how many chunks we need
+    const totalChunks = Math.ceil(len / maxElementsPerChunk);
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const start = chunkIndex * maxElementsPerChunk;
+        const end = Math.min(start + maxElementsPerChunk, len);
+
+        const chunkLength = end - start;
+        const dataChunkBuffer = device.createBuffer({
+            size: chunkLength * elementSize,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+            mappedAtCreation: true,
+            label: `data-chunk-buffer-${chunkIndex}`,
+        });
+
+        // Copy the data for the chunk into the buffer
+        const arrayBufferView = isInt32 ? new Int32Array(data, start * elementSize, chunkLength)
+            : new Float32Array(data, start * elementSize, chunkLength);
+        new Float32Array(dataChunkBuffer.getMappedRange()).set(arrayBufferView);
+        dataChunkBuffer.unmap();
+
+        // Now bind the data chunk to the shader and run the compute pass
+        await runComputeShader(
+            device, dataChunkBuffer, histBuffer, min, max, bins, chunkLength, isInt32
+        );
+    }
 
     // Read results from GPU and return
     const readBuffer = device.createBuffer({
         size: bins * 4, // to store the result from GPU
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        label: 'histogram-read-buffer',
     });
 
     // Copy results from GPU to CPU-readable buffer
-    const commandEncoder = device.createCommandEncoder();
+    const commandEncoder = device.createCommandEncoder({label: 'histogram-read-encoder'});
     commandEncoder.copyBufferToBuffer(histBuffer, 0, readBuffer, 0, bins * 4);
     const commands = commandEncoder.finish();
     device.queue.submit([commands]);
@@ -207,11 +277,13 @@ self.onmessage = async (event: MessageEvent<HistogramConfig>) => {
     // TODO GPU chunking of data for large arrays
     
     // todo: add options for CPU/GPU mode etc if needed
-    // const [histCpu, histGpu] = await Promise.all([
-    //     computeBinsCPU(event.data),
-    //     computeBinsGPU(event.data),
-    // ]);
-    // self.postMessage({histCpu, histGpu});
-    const hist = await computeBinsGPU(event.data);
-    self.postMessage(hist);
+    // const data = await computeBinsGPU(event.data);
+    const [histCpu, histGpu] = await Promise.all([
+        // data, data
+        computeBinsCPU(event.data),
+        computeBinsGPU(event.data),
+    ]);
+    self.postMessage({histCpu, histGpu});
+    // const hist = await computeBinsGPU(event.data);
+    // self.postMessage(hist);
 }
