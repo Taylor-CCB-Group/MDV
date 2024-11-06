@@ -13,6 +13,9 @@ import { columnMatchesType } from "@/lib/utils.js";
 import LinksComponent from "./LinksComponent.js";
 import { TextFieldExtended } from "./TextFieldExtended.js";
 import Grid from '@mui/material/Grid2';
+import { Accordion, AccordionDetails, AccordionSummary, Typography } from "@mui/material";
+import LinkIcon from '@mui/icons-material/Link';
+import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
 
 
 export type ColumnSelectionProps = {
@@ -24,13 +27,7 @@ export type ColumnSelectionProps = {
     multiple?: boolean;
 };
 
-/**
- * A component for selecting a column from the data store.
- * Must be in a context where `useDataStore` is available
- * (e.g. if we're in a more global dialog etc rather than a chart context,
- * this would be ambiguous).
- */
-const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //GuiSpec<"column">) => {
+const ColumnDropdown = observer((props: ColumnSelectionProps) => {
     const { setSelectedColumn, placeholder, type } = props;
     const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
     const multiple = props.multiple || isMultiType;
@@ -40,7 +37,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
         () => dataStore.columns
             .filter((c) => !props.exclude?.includes(c.name))
             .filter((c) => columnMatchesType(c, type))
-            ,
+        ,
         [dataStore, props.exclude, type],
     );
     // In general, this should (probably) be using our "(multi)dropdown" component
@@ -67,10 +64,11 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                         };
                         return (
                             <TextFieldExtended
+                                onClick={(e) => e.stopPropagation()}
                                 key={key}
                                 {...p}
                                 placeholder={placeholder}
-                                // customStartAdornment={<LinksComponent />}
+                            // customStartAdornment={<LinksComponent />}
                             />
                         );
                     }}
@@ -89,10 +87,49 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                     }}
                 />
             </Grid>
-            <Grid>
-                <LinksComponent />
-            </Grid>
         </Grid>
+    );
+});
+
+/**
+ * A component for selecting a column from the data store.
+ * Must be in a context where `useDataStore` is available
+ * (e.g. if we're in a more global dialog etc rather than a chart context,
+ * this would be ambiguous).
+ */
+const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //GuiSpec<"column">) => {
+    const { setSelectedColumn, placeholder, type } = props;
+    const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
+    const multiple = props.multiple || isMultiType;
+    const dataStore = useDataStore(props.dataStore);
+    // todo column groups
+    const columns: DataColumn<DataType>[] = useMemo(
+        () => dataStore.columns
+            .filter((c) => !props.exclude?.includes(c.name))
+            .filter((c) => columnMatchesType(c, type))
+            ,
+        [dataStore, props.exclude, type],
+    );
+    const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
+    if (!linkProps) return <ColumnDropdown {...props} />;
+    // In general, this should (probably) be using our "(multi)dropdown" component
+    // and the <LinksComponent /> can select which column options to show.
+    return (
+        <>
+        <Accordion className="w-full">
+            <AccordionSummary expandIcon={<LinkIcon sx={{marginLeft: '0.2em'}} />} sx={{padding: '0 0.5em'}}>
+                <Grid className="w-full items-center" container>
+                    <Grid size={"grow"}>
+                        {/* we may want to show something different, especially if special value is selected... */}
+                        <ColumnDropdown {...props} />
+                    </Grid>
+                </Grid>
+            </AccordionSummary>
+            <AccordionDetails>
+                <LinksComponent />
+            </AccordionDetails>
+        </Accordion>
+        </>
     );
 });
 export default ColumnSelectionComponent;

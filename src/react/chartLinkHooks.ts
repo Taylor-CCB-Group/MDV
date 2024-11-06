@@ -92,7 +92,7 @@ export function useRowsAsColumnsLinks() {
         throw "no dataStore!!!";
     }
     if (dataStore.links) {
-        for (const linkedDsName in dataStore.links) {
+        return Object.keys(dataStore.links).map((linkedDsName) => {
             const links = dataStore.links[linkedDsName];
             if (links.rows_as_columns) {
                 // first pass... there can be only one or zero.
@@ -100,7 +100,7 @@ export function useRowsAsColumnsLinks() {
                 // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
                 // UI should be simpler for the common case with a single linked dataSource.
                 // Are there any crazy edge cases we should consider - like indirect links? links to self?
-                // !! before pull - change find to filter and deal with the array of links
+                // !! this should be right now, but we should test with multiple links.
                 const linkedDs = dataSources.find(
                     (ds) => ds.name === linkedDsName,
                 );
@@ -111,9 +111,9 @@ export function useRowsAsColumnsLinks() {
                 
                 return { linkedDs, link: links.rows_as_columns as RowsAsColslink};
             }
-        }
+        });
     }
-    return null;
+    return [];
 }
 
 /** design of this will need to change to account for n-links
@@ -123,7 +123,7 @@ export function useRowsAsColumnsLinks() {
  */
 export function useHighlightedForeignRows() {
     const id = useId();
-    const racLink = useRowsAsColumnsLinks();
+    const racLink = useRowsAsColumnsLinks()[0];
     // const { linkedDs, link } = racLink;
     const [values, setValues] = useState<{index: number, value: string}[]>([]);
     useEffect(() => {
@@ -174,7 +174,7 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     const cols = useHighlightedForeignRows(); //not actual cols
     //would like not to have this here - might have some more logic in above hook
     //in particular want to redesign the fieldName being what determines the column
-    const racLink = useRowsAsColumnsLinks();
+    const racLink = useRowsAsColumnsLinks()[0];
     const { link } = racLink || { link: null }; //!! passing the whole racLink object lead to an infinite loop
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
     const ds = useDataStore();

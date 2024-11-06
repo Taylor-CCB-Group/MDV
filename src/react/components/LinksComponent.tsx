@@ -1,19 +1,16 @@
 import { observer } from "mobx-react-lite";
 import { useDataStore } from "../context";
-import type { useDataSources } from "../hooks";
-import { makeAutoObservable, observable } from "mobx";
-import JsonView from "react18-json-view";
+import { makeAutoObservable } from "mobx";
 import { useHighlightedForeignRows, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import type { DataColumn, DataType, GuiSpec } from "@/charts/charts";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
-import LinkIcon from '@mui/icons-material/Link';
-import { Dialog, IconButton } from "@mui/material";
+import { Button, FormControl, FormControlLabel, Radio, RadioGroup } from "@mui/material";
 
-type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>;
+type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>[0];
 
-const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
-    const [expanded, setExpanded] = useState(false);
+const RowsAsCols = observer((props : RowsAsColsProps) => {
+    const { linkedDs, link } = props;
     const rowNames = useHighlightedForeignRows().map(r => r.value);
     const { name_column, name, subgroups } = link;
     // const dataSources = useDataSources();
@@ -21,12 +18,13 @@ const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
     const targetColumn = cm.getDataSource(linkedDs.name).columnIndex[name_column] as DataColumn<DataType>;
     const ds = useDataStore();
     // potential symbols for live link ➤ ⌁ ⇢ ⍆ ⚡︎ ► ◎ ▷ ☑︎ ⦿
+    const liveSelectionName = `⦿⌁ active '${name}' selection`;
     const spec: GuiSpec<'multidropdown'> = useMemo(() => makeAutoObservable({
         type: 'multidropdown',
         name: name_column,
-        label: name,
+        label: `specific '${name}' column`, //todo different label for multiple
         // I don't think we want to prepend option to dropdown - we should have a different way of showing this
-        values: [[`◉ '${name}' selection`, ...targetColumn.values]],
+        values: [targetColumn.values],
         // current_value: targetColumn.values[0],
         current_value: rowNames,
     }), [targetColumn, name_column, name, rowNames]);
@@ -34,21 +32,22 @@ const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
     const v = Array.isArray(current_value) ? current_value : [current_value];
     return (
         <>
-            <IconButton size="small" onClick={() => setExpanded(!expanded)}>
-                <LinkIcon />
-            </IconButton>
-                {/* <h3><em>'{linkedDs.name}'</em> rows as <em>'{ds.name}'</em> columns</h3> */}
-                {expanded && <DropdownAutocompleteComponent props={spec} />}
-            
+        <Button onClick={() => {}}>{liveSelectionName}</Button>
+        <DropdownAutocompleteComponent props={spec} />
+        {/* <FormControl>
+            <RadioGroup>
+                <FormControlLabel control={<Radio size="small" />} label={liveSelectionName} />
+                
+            </RadioGroup>
+        </FormControl> */}
         </>
     )
 });
 
 
 export default observer(function LinksComponent() {
-    const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
+    const linkProps = useRowsAsColumnsLinks()[0]; //todo: arbitrary number of links
     if (!linkProps) return null;
-    const { linkedDs, link } = linkProps;
     return (
         <>
             {/* <JsonView src={link} /> */}
