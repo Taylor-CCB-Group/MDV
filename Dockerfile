@@ -10,23 +10,15 @@ WORKDIR /app
 # Copy the entire project to the working directory
 COPY . .
 
-### !!! HOTFIX !!! ###
-## There is an issue with the frontend build that appears to originate from something
-## somewhat spooky - in that as far as we know, commits that had previously deployed
-## successfully are now failing. 
-## This is a hotfix to use a build output that is generated with
-## `npm run build-flask-docker-hotfix` in an envrionment where the build is working.
-## this is included in the repo for now, but should be removed once the issue is resolved.
 
 ## Install npm dependencies & start dev server (should only happen in dev - but other yml configs won't expose the port)
 RUN npm install
 # RUN npm run dev # run manually in container
 
 ## Run the npm build script for Flask and Vite
-# RUN npm run build-flask-dockerjs
+RUN npm run build-flask-dockerjs
 
-RUN ln -s /app/python/dist_hotfix /app/dist
-### !!! /HOTFIX !!! ###
+# RUN ln -s /app/python/dist_hotfix /app/dist
 
 # bootstrap project folder - this won't be necessary in future
 #RUN mkdir -p /app/mdv/pbmc3k /app/mdv/pbmc3k_project2

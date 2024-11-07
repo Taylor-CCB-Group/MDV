@@ -1759,7 +1759,6 @@ def add_column_to_group(
         or col["datatype"] == "text16"
     ):
         
-        print("-----1/1")
         if data.dtype == "category":
             data = data.cat.add_categories("ND")
             data = data.fillna("ND")
@@ -1768,7 +1767,6 @@ def add_column_to_group(
             data = data.fillna("NaN")
         values = data.value_counts()
 
-        print("-----1/2")
         if len(values) < 65537 and col["datatype"] != "unique":
             t8 = len(values) < 257
             col["datatype"] = "text" if t8 else "text16"
@@ -1786,16 +1784,13 @@ def add_column_to_group(
             col["values"] = [str(x) for x in col["values"]]
 
         else:
-            print("-----1/3")
             max_len = max(data.str.len())
             utf8_type = h5py.string_dtype("utf-8", int(max_len))
             col["datatype"] = "unique"
             col["stringLength"] = max_len
             group.create_dataset(col["field"], length, data=data, dtype=utf8_type)
-        print("-----1/4")
 
     elif col["datatype"] == "multitext":
-        print("-----2/1")
         delim = col.get("delimiter", ",")
         value_set: set[str] = set()
         maxv = 0
@@ -1807,7 +1802,6 @@ def add_column_to_group(
             vs = v.split(delim)
             value_set.update([x.strip() for x in vs])
             maxv = max(maxv, len(vs))
-        print("------2/2")
         if "" in value_set:
             value_set.remove("")
         ndata = numpy.empty(shape=(length * maxv,), dtype=numpy.uint16)
@@ -1833,9 +1827,7 @@ def add_column_to_group(
         group.create_dataset(
             col["field"], length * maxv, data=ndata, dtype=numpy.uint16
         )
-        print("-----2/3")
     else:
-        print("-----3/1")
         dt = numpy.int32 if col["datatype"] == "int32" else numpy.float32
         clean = (
             data
@@ -1844,10 +1836,8 @@ def add_column_to_group(
         )  # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)
-        print("-----3/2")
         ds = group.create_dataset(col["field"], length, data=clean, dtype=dt)
         # remove NaNs for min/max and quantiles - this needs to be tested with 'inf' as well.
-        print("-----3/3")
         na = numpy.array(ds)
         na = na[numpy.isfinite(na)]
         col["minMax"] = [float(str(numpy.amin(na))), float(str(numpy.amax(na)))]
@@ -1858,7 +1848,6 @@ def add_column_to_group(
                 numpy.percentile(na, 100 * q),
                 numpy.percentile(na, 100 * (1 - q)),
             ]
-        print("-----3/4")
 
 def get_column_info(columns, dataframe, supplied_columns_only):
     if columns:
