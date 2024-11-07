@@ -594,7 +594,7 @@ const SelectionDialogComponent = () => {
     const cols = useParamColumnsExperimental();
     useResetButton();
     return (
-        <div className="p-3 absolute w-[100%] h-[100%] overflow-auto">
+        <div className="p-3 absolute w-[100%] h-[100%] overflow-y-auto overflow-x-hidden">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
             <AddRowComponent />
             <ForeignRows />
