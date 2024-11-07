@@ -3,6 +3,7 @@
 ../test_projects/multiline_plot_example.py
 ../test_projects/stacked_row_plot_example.py
 ../test_projects/scatter_plot_3D_example.py
+../test_projects/image_table_plot_example.py
 ../test_projects/wordcloud_plot_example.py
 ../test_projects/histogram_plot_example.py
 ../test_projects/table_plot_example.py
@@ -18,8 +19,11 @@
 ../test_projects/TAURUS_examples/example5.py
 ../test_projects/TAURUS_examples/example1.py
 ../test_projects/TAURUS_examples/example4.py
+../test_projects/TAURUS_examples/example12.py
 ../test_projects/TAURUS_examples/example9.py
+../test_projects/TAURUS_examples/example11.py
 ../test_projects/TAURUS_examples/example8.py
+../test_projects/TAURUS_examples/example10.py
 ../test_projects/TAURUS_examples/example3.py
 ../test_projects/TAURUS_examples/example7.py
 ../test_projects/TAURUS_examples/example6.py
