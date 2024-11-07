@@ -1,58 +1,58 @@
-import React, { useCallback, useState } from "react";
+import { useColorMode } from "@/ThemeProvider";
 import {
     Add,
-    Search,
-    Menu as MenuIcon,
-    GridView,
-    ViewList,
     ExpandMore,
     Folder,
+    GridView,
+    Reorder as ReorderIcon,
+    Search,
 } from "@mui/icons-material";
-import {
-    AppBar,
-    Toolbar,
-    Typography,
-    IconButton,
-    InputBase,
-    Paper,
-    Button,
-    Grid,
-    Menu,
-    MenuItem,
-    Tooltip,
-    Box,
-    Container,
-    Divider,
-    useTheme,
-    ThemeProvider,
-    createTheme,
-    ButtonBase,
-    CircularProgress,
-} from "@mui/material";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
-import { alpha } from "@mui/material/styles";
+import {
+    AppBar,
+    Box,
+    Button,
+    ButtonBase,
+    CircularProgress,
+    Container,
+    Divider,
+    Grid,
+    IconButton,
+    InputBase,
+    Menu,
+    MenuItem,
+    Paper,
+    Toolbar,
+    Tooltip,
+    Typography,
+} from "@mui/material";
+import React, { useCallback, useMemo, useState } from "react";
 import ProjectCard from "./ProjectCard";
-import useProjects from "./hooks/useProjects";
+import ErrorModal from "./ProjectErrorModal";
+import ProjectListView from "./ProjectListView";
 import UserProfile from "./UserProfile";
 import mdvLogo from "./assets/mdv_logo.png";
-import { useColorMode } from "@/ThemeProvider";
-
+import useProjects from "./hooks/useProjects";
+import {
+    type SortBy,
+    type SortOrder,
+    sortProjects,
+} from "./utils/projectUtils";
 
 const Dashboard: React.FC = () => {
     const {
         projects,
         isLoading,
         error,
+        isErrorModalOpen,
+        closeErrorModal,
         fetchProjects,
         createProject,
         deleteProject,
         renameProject,
         changeProjectType,
         setFilter,
-        setSortBy,
-        setSortOrder,
-        sortBy,
     } = useProjects();
 
     const { mode, toggleColorMode } = useColorMode();
@@ -60,7 +60,8 @@ const Dashboard: React.FC = () => {
     const [projectType, setProjectType] = useState<"Editable" | "Read-Only">(
         "Editable",
     );
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [sortBy, setSortBy] = useState<SortBy>("lastModified");
+    const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
     React.useEffect(() => {
@@ -70,203 +71,205 @@ const Dashboard: React.FC = () => {
     const handleCreateProject = async () => {
         try {
             const newProject = await createProject();
-            const base = import.meta.env.DEV ? "http://localhost:5170?dir=/" : "";
+            const base = import.meta.env.DEV
+                ? "http://localhost:5170?dir=/"
+                : "";
             window.location.href = `${base}project/${newProject.id}`;
         } catch (error) {
             console.error("Failed to create project:", error);
-            alert("Failed to create project. Please try again.");
         }
     };
 
-    const handleSort = useCallback((newSortBy: "lastModified" | "name") => {
-        // toggle sort order if changing sort option
-        if (newSortBy === sortBy) setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
-        // default to ascending order if changing sort option to name, descending order otherwise (most recent first)
-        else setSortOrder(newSortBy === "name" ? "asc" : "desc");
-        setSortBy(newSortBy);
-        setIsDropdownOpen(false);
-    }, [sortBy]);
+    const sortedProjects = useMemo(() => {
+        return sortProjects(projects, sortBy, sortOrder);
+    }, [projects, sortBy, sortOrder]);
+
+    const handleSort = useCallback(
+        (newSortBy: SortBy) => {
+            if (newSortBy === sortBy) {
+                // Toggle sort order if clicking the same sort option
+                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+            } else {
+                // Set new sort type with default desc order for both cases
+                setSortBy(newSortBy);
+                setSortOrder("desc");
+            }
+            setAnchorEl(null);
+        },
+        [sortBy, sortOrder],
+    );
 
     const toggleDropdown = (event: React.MouseEvent<HTMLButtonElement>) => {
         setAnchorEl(event.currentTarget);
-        setIsDropdownOpen(!isDropdownOpen);
     };
 
     return (
-            <Box
-                sx={{
-                    flexGrow: 1,
-                    bgcolor: "background.default",
-                    minHeight: "100vh",
-                }}
-            >
-                <AppBar position="static" color="default" elevation={0}>
-                    <Toolbar>
-                        <Box
-                            component="img"
-                            sx={{
-                                height: 40,
-                                mr: 2,
-                            }}
-                            alt="MDV Projects Logo"
-                            src={mdvLogo}
-                        />
-                        <Box sx={{ flexGrow: 1 }} />
-                        <Paper
-                            component="form"
-                            sx={{
-                                p: "2px 4px",
-                                display: "flex",
-                                alignItems: "center",
-                                width: 400,
-                                mr: 2, // Add margin to the right
-                            }}
-                        >
-                            <InputBase
-                                sx={{ ml: 1, flex: 1 }}
-                                placeholder="Search projects"
-                                inputProps={{ "aria-label": "search projects" }}
-                                onChange={(e) => setFilter(e.target.value)}
-                            />
-                            <IconButton
-                                type="submit"
-                                sx={{ p: "10px" }}
-                                aria-label="search"
-                            >
-                                <Search />
-                            </IconButton>
-                        </Paper>
-                        <UserProfile />
-                        <IconButton
-                            sx={{ ml: 1 }}
-                            onClick={toggleColorMode}
-                            color="inherit"
-                        >
-                            {mode === "dark" ? (
-                                <Brightness7Icon />
-                            ) : (
-                                <Brightness4Icon />
-                            )}
-                        </IconButton>
-                    </Toolbar>
-                </AppBar>
-
-                <Container maxWidth="lg" sx={{ mt: 4 }}>
-                    <Grid container spacing={3} sx={{ mb: 4 }}>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <ButtonBase
-                                sx={{
-                                    width: "100%",
-                                    display: "block",
-                                    textAlign: "center",
-                                }}
-                            >
-                                <Paper
-                                    sx={{
-                                        p: 2,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                    }}
-                                    onClick={() => handleCreateProject()}
-                                >
-                                    <Add
-                                        sx={{
-                                            fontSize: 40,
-                                            color: "primary.main",
-                                            mb: 1,
-                                        }}
-                                    />
-                                    <Typography
-                                        variant="subtitle1"
-                                        align="center"
-                                    >
-                                        Create new project
-                                    </Typography>
-                                </Paper>
-                            </ButtonBase>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6} md={3}>
-                            <ButtonBase
-                                onClick={() => {
-                                    // Handle the create from template action
-                                }}
-                                sx={{
-                                    width: "100%",
-                                    display: "block",
-                                    textAlign: "center",
-                                }}
-                            >
-                                <Paper
-                                    sx={{
-                                        p: 2,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                    }}
-                                >
-                                    <Folder
-                                        sx={{
-                                            fontSize: 40,
-                                            color: "secondary.main",
-                                            mb: 1,
-                                        }}
-                                    />
-                                    <Typography
-                                        variant="subtitle1"
-                                        align="center"
-                                    >
-                                        Create from template 1
-                                    </Typography>
-                                </Paper>
-                            </ButtonBase>
-                        </Grid>
-
-                        <Grid item xs={12} sm={6} md={3}>
-                            <ButtonBase
-                                onClick={() => {}}
-                                sx={{
-                                    width: "100%",
-                                    display: "block",
-                                    textAlign: "center",
-                                }}
-                            >
-                                <Paper
-                                    sx={{
-                                        p: 2,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                    }}
-                                >
-                                    <Folder
-                                        sx={{
-                                            fontSize: 40,
-                                            color: "secondary.main",
-                                            mb: 1,
-                                        }}
-                                    />
-                                    <Typography
-                                        variant="subtitle1"
-                                        align="center"
-                                    >
-                                        Create from template 2
-                                    </Typography>
-                                </Paper>
-                            </ButtonBase>
-                        </Grid>
-                    </Grid>
-
+        <Box
+            sx={{
+                flexGrow: 1,
+                bgcolor: "background.default",
+                minHeight: "100vh",
+            }}
+        >
+            <AppBar position="static" color="default" elevation={0}>
+                <Toolbar>
                     <Box
+                        component="img"
                         sx={{
+                            height: 40,
+                            mr: 2,
+                        }}
+                        alt="MDV Projects Logo"
+                        src={mdvLogo}
+                    />
+                    <Box sx={{ flexGrow: 1 }} />
+                    <Paper
+                        component="form"
+                        sx={{
+                            p: "2px 4px",
                             display: "flex",
-                            justifyContent: "space-between",
                             alignItems: "center",
-                            mb: 1,
+                            width: 400,
+                            mr: 2, // Add margin to the right
                         }}
                     >
-                        <Typography variant="h5">Recent Projects</Typography>
+                        <InputBase
+                            sx={{ ml: 1, flex: 1 }}
+                            placeholder="Search projects"
+                            inputProps={{ "aria-label": "search projects" }}
+                            onChange={(e) => setFilter(e.target.value)}
+                        />
+                        <IconButton
+                            type="submit"
+                            sx={{ p: "10px" }}
+                            aria-label="search"
+                        >
+                            <Search />
+                        </IconButton>
+                    </Paper>
+                    <UserProfile />
+                    <IconButton
+                        sx={{ ml: 1 }}
+                        onClick={toggleColorMode}
+                        color="inherit"
+                    >
+                        {mode === "dark" ? (
+                            <Brightness7Icon />
+                        ) : (
+                            <Brightness4Icon />
+                        )}
+                    </IconButton>
+                </Toolbar>
+            </AppBar>
+
+            <Container maxWidth="lg" sx={{ mt: 4 }}>
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                    <Grid item xs={12} sm={6} md={3}>
+                        <ButtonBase
+                            sx={{
+                                width: "100%",
+                                display: "block",
+                                textAlign: "center",
+                            }}
+                        >
+                            <Paper
+                                sx={{
+                                    p: 2,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                }}
+                                onClick={() => handleCreateProject()}
+                            >
+                                <Add
+                                    sx={{
+                                        fontSize: 40,
+                                        color: "primary.main",
+                                        mb: 1,
+                                    }}
+                                />
+                                <Typography variant="subtitle1" align="center">
+                                    Create new project
+                                </Typography>
+                            </Paper>
+                        </ButtonBase>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                        <ButtonBase
+                            onClick={() => {
+                                // Handle the create from template action
+                            }}
+                            sx={{
+                                width: "100%",
+                                display: "block",
+                                textAlign: "center",
+                            }}
+                        >
+                            <Paper
+                                sx={{
+                                    p: 2,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                }}
+                            >
+                                <Folder
+                                    sx={{
+                                        fontSize: 40,
+                                        color: "secondary.main",
+                                        mb: 1,
+                                    }}
+                                />
+                                <Typography variant="subtitle1" align="center">
+                                    Create from template 1
+                                </Typography>
+                            </Paper>
+                        </ButtonBase>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                        <ButtonBase
+                            onClick={() => {}}
+                            sx={{
+                                width: "100%",
+                                display: "block",
+                                textAlign: "center",
+                            }}
+                        >
+                            <Paper
+                                sx={{
+                                    p: 2,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                }}
+                            >
+                                <Folder
+                                    sx={{
+                                        fontSize: 40,
+                                        color: "secondary.main",
+                                        mb: 1,
+                                    }}
+                                />
+                                <Typography variant="subtitle1" align="center">
+                                    Create from template 2
+                                </Typography>
+                            </Paper>
+                        </ButtonBase>
+                    </Grid>
+                </Grid>
+
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 1,
+                    }}
+                >
+                    <Typography variant="h5">Recent Projects</Typography>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
                         <Paper
                             elevation={1}
                             sx={{
@@ -288,61 +291,127 @@ const Dashboard: React.FC = () => {
                                     width: "100%",
                                     height: "100%",
                                     display: "flex",
-                                    justifyContent: "center",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
                                 }}
                             >
-                                Sort by:{" "}
-                                {sortBy === "lastModified"
-                                    ? "Last modified"
-                                    : "Name"}
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    Sort by:{" "}
+                                    {sortBy === "lastModified"
+                                        ? `Last modified (${sortOrder === "desc" ? "Newest first" : "Oldest first"})`
+                                        : `Name (${sortOrder === "desc" ? "Z to A" : "A to Z"})`}
+                                </Box>
                             </Button>
                         </Paper>
-                        <Menu
-                            anchorEl={anchorEl}
-                            open={isDropdownOpen}
-                            onClose={() => setIsDropdownOpen(false)}
+                        <Tooltip
+                            title={
+                                viewMode === "grid" ? "List View" : "Grid View"
+                            }
                         >
-                            <MenuItem
-                                onClick={() => handleSort("lastModified")}
+                            <IconButton
+                                onClick={() =>
+                                    setViewMode(
+                                        viewMode === "grid" ? "list" : "grid",
+                                    )
+                                }
+                                sx={{ ml: 2 }}
                             >
-                                Last modified
-                            </MenuItem>
-                            <MenuItem onClick={() => handleSort("name")}>
-                                Name
-                            </MenuItem>
-                        </Menu>
+                                {viewMode === "grid" ? (
+                                    <ReorderIcon sx={{ fontSize: 32 }} />
+                                ) : (
+                                    <GridView sx={{ fontSize: 32 }} />
+                                )}
+                            </IconButton>
+                        </Tooltip>
                     </Box>
 
-                    <Divider sx={{ mb: 2 }} />
+                    <Menu
+                        anchorEl={anchorEl}
+                        open={Boolean(anchorEl)}
+                        onClose={() => setAnchorEl(null)}
+                    >
+                        <MenuItem
+                            onClick={() => handleSort("lastModified")}
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                width: "200px",
+                                gap: 1,
+                            }}
+                        >
+                            <span>Last modified</span>
+                            {sortBy === "lastModified" && (
+                                <span>
+                                    {sortOrder === "desc"
+                                        ? "Newest first"
+                                        : "Oldest first"}
+                                </span>
+                            )}
+                        </MenuItem>
+                        <MenuItem
+                            onClick={() => handleSort("name")}
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                width: "200px",
+                                gap: 1,
+                            }}
+                        >
+                            <span>Name</span>
+                            {sortBy === "name" && (
+                                <span>
+                                    {sortOrder === "desc" ? "Z to A" : "A to Z"}
+                                </span>
+                            )}
+                        </MenuItem>
+                    </Menu>
+                </Box>
 
-                    {isLoading ? (
-                        <CircularProgress />
-                    ) : error ? (
-                        <Typography color="error">{error}</Typography>
-                    ) : (
-                        <Grid container spacing={4}>
-                            {projects.map((project) => (
-                                <Grid
-                                    item
-                                    key={project.id}
-                                    xs={12}
-                                    sm={6}
-                                    md={4}
-                                    lg={3}
-                                >
-                                    <ProjectCard
-                                        {...project}
-                                        onDelete={deleteProject}
-                                        onRename={renameProject}
-                                        onChangeType={changeProjectType}
-                                        onAddCollaborator={(email) => {}}
-                                    />
-                                </Grid>
-                            ))}
-                        </Grid>
-                    )}
-                </Container>
-            </Box>
+                <Divider sx={{ mb: 2 }} />
+
+                {isLoading ? (
+                    <CircularProgress />
+                ) : viewMode === "grid" ? (
+                    <Grid container spacing={4}>
+                        {sortedProjects.map((project) => (
+                            <Grid
+                                item
+                                key={project.id}
+                                xs={12}
+                                sm={6}
+                                md={4}
+                                lg={3}
+                            >
+                                <ProjectCard
+                                    {...project}
+                                    onDelete={deleteProject}
+                                    onRename={renameProject}
+                                    onChangeType={changeProjectType}
+                                    onAddCollaborator={(email) => {}}
+                                />
+                            </Grid>
+                        ))}
+                    </Grid>
+                ) : (
+                    <ProjectListView
+                        projects={sortedProjects}
+                        onDelete={deleteProject}
+                        onRename={renameProject}
+                        onChangeType={changeProjectType}
+                    />
+                )}
+            </Container>
+            <ErrorModal
+                open={isErrorModalOpen}
+                message={error || ""}
+                onClose={closeErrorModal}
+            />
+        </Box>
     );
 };
 

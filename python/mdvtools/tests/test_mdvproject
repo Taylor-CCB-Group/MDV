@@ -1,0 +1,209 @@
+import unittest
+import os
+import json
+import tempfile
+from unittest.mock import MagicMock
+from mdvtools.mdvproject import MDVProject
+
+
+class TestMDVProject(unittest.TestCase):
+
+    def setUp(self):
+        # Create a temporary directory for testing
+        self.test_dir = tempfile.mkdtemp()
+        self.project = MDVProject(dir=self.test_dir, delete_existing=True)
+
+    def tearDown(self):
+        # Remove the temporary directory after tests
+        for root, dirs, files in os.walk(self.test_dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        os.rmdir(self.test_dir)
+
+    def test_add_datasource(self):
+        # Simulate adding a datasource
+        datasource_name = "Test DataSource"
+        tiff_metadata = {
+            "Pixels": {
+                "SizeX": 100,
+                "SizeY": 100,
+                "PhysicalSizeX": 0.5,
+                "PhysicalSizeXUnit": "µm"
+            },
+            "Name": "DNAonedose-Lesioned_SAMPLE_19_ROI_1.ome.tiff"
+        }
+
+        # Call method to add/update image datasource
+        self.project.add_or_update_image_datasource(
+            tiff_metadata=tiff_metadata,
+            datasource_name=datasource_name,
+            file=MagicMock(filename="test.tiff"),  # Mocking a file object
+            project_id="dummy_project_id"
+        )
+
+        # Check if the datasource is added correctly
+        datasources = self.project.datasources
+        self.assertEqual(len(datasources), 1)
+        self.assertEqual(datasources[0]["name"], datasource_name)
+        self.assertIn("regions", datasources[0])
+        self.assertIn("all_regions", datasources[0]["regions"])
+
+    def test_create_datasource_template(self):
+        # Test creating a valid datasource template
+        datasource_name = "NewDataSourceTemplate"
+        template = self.project.create_datasource_template(datasource_name)
+
+        self.assertEqual(template["name"], datasource_name)
+        self.assertEqual(template["columns"], [])
+        self.assertEqual(template["size"], 0)
+        self.assertEqual(template["regions"], {})
+        self.assertEqual(template["columnGroups"], [])
+
+    def test_create_datasource_template_error_handling(self):
+        # Test error handling when creating a datasource template
+        original_method = self.project.create_datasource_template
+        self.project.create_datasource_template = MagicMock(side_effect=Exception("Forced error"))
+
+        with self.assertRaises(Exception) as context:
+            self.project.create_datasource_template("ErrorTemplate")
+        
+        self.assertIn("Forced error", str(context.exception))
+        self.project.create_datasource_template = original_method  # Restore the original method
+
+    def test_ensure_regions_fields(self):
+        # Test ensuring fields are set correctly
+        regions = {}
+        updated_regions = self.project.ensure_regions_fields(regions)
+
+        self.assertEqual(updated_regions["position_fields"], ['x', 'y'])
+        self.assertEqual(updated_regions["region_field"], 'sample_id')
+        self.assertEqual(updated_regions["default_color"], 'leiden')
+        self.assertEqual(updated_regions["scale_unit"], 'µm')
+        self.assertEqual(updated_regions["scale"], 1.0)
+        self.assertIn("all_regions", updated_regions)
+        self.assertEqual(updated_regions["avivator"]["default_channels"], [{'name': 'DAPI'}])
+
+    def test_ensure_regions_fields_error_handling(self):
+        # Test error handling in ensure_regions_fields
+        regions = {}
+        original_method = self.project.ensure_regions_fields
+        self.project.ensure_regions_fields = MagicMock(side_effect=Exception("Forced error"))
+
+        with self.assertRaises(Exception) as context:
+            self.project.ensure_regions_fields(regions)
+        
+        self.assertIn("Forced error", str(context.exception))
+        self.project.ensure_regions_fields = original_method  # Restore the original method
+
+    def test_get_datasource_metadata(self):
+        # Set up a datasource
+        datasource_name = "Test DataSource"
+        self.project.datasources = [{"name": datasource_name, "regions": {}}]
+
+        # Retrieve datasource metadata
+        metadata = self.project.get_datasource_metadata(datasource_name)
+        self.assertEqual(metadata["name"], datasource_name)
+
+    def test_set_column_metadata(self):
+        # Prepare a mock datasource with columns
+        datasource_name = "Test DataSource"
+        self.project.datasources = [
+            {
+                "name": datasource_name,
+                "columns": [
+                    {"field": "col1", "type": "integer"},
+                    {"field": "col2", "type": "double"}
+                ]
+            }
+        ]
+
+        # Set new metadata for a column
+        self.project.set_column_metadata(datasource_name, "col1", "type", "float")
+        updated_metadata = self.project.get_column_metadata(datasource_name, "col1")
+
+        self.assertEqual(updated_metadata["type"], "float")
+
+    def test_delete_uploaded_image(self):
+        # Mocking the upload of an image file
+        file_path = os.path.join(self.test_dir, "test_image.png")
+        with open(file_path, 'w') as f:
+            f.write("test image data")
+
+        # Ensure the file exists before deletion
+        self.assertTrue(os.path.exists(file_path))
+
+        # Delete the uploaded image
+        self.project.delete_uploaded_image(file_path)
+
+        # Check that the file has been deleted
+        self.assertFalse(os.path.exists(file_path))
+
+    def test_restore_datasource(self):
+        # Create a datasource and backup it
+        datasource_name = "Test DataSource"
+        datasource = {"name": datasource_name, "regions": {}}
+        self.project.datasources = [datasource]
+
+        # Create a backup and modify the original datasource
+        backup = {"name": datasource_name, "regions": {"new_region": {}}}
+        self.project.restore_datasource(backup)
+
+        # Ensure the datasource is restored from the backup
+        restored_datasource = self.project.get_datasource_metadata(datasource_name)
+        self.assertEqual(restored_datasource["regions"], backup["regions"])
+
+    def test_upload_image_file(self):
+        # Prepare a mock file
+        mock_file = MagicMock()
+        mock_file.filename = "mock_image.tiff"
+        upload_path = os.path.join(self.test_dir, "mock_image.tiff")
+
+        # Call the upload function
+        self.project.upload_image_file(mock_file, upload_path)
+
+        # Verify the file was saved
+        self.assertTrue(os.path.exists(upload_path))
+
+    def test_set_interactions(self):
+        # Prepare mock datasources
+        interaction_ds = "Interaction DataSource"
+        parent_ds = "Parent DataSource"
+        self.project.datasources = [
+            {"name": interaction_ds, "columns": []},
+            {"name": parent_ds, "columns": []}
+        ]
+
+        # Call set_interactions
+        self.project.set_interactions(interaction_ds, parent_ds)
+
+        # Check if the interaction metadata was added
+        interaction_metadata = self.project.get_datasource_metadata(interaction_ds)["interactions"]
+        self.assertIsNotNone(interaction_metadata)
+
+    def test_exception_handling_in_add_or_update(self):
+        # Create mock metadata for a datasource
+        tiff_metadata = {
+            "Pixels": {
+                "SizeX": 100,
+                "SizeY": 100,
+                "PhysicalSizeX": 0.5,
+                "PhysicalSizeXUnit": "µm"
+            },
+            "Name": "DNAonedose-Lesioned_SAMPLE_19_ROI_1.ome.tiff"
+        }
+
+        # Call with a non-existing file (simulating an error)
+        with self.assertRaises(Exception) as context:
+            self.project.add_or_update_image_datasource(
+                tiff_metadata=tiff_metadata,
+                datasource_name="NonExistentDataSource",
+                file=MagicMock(filename="non_existent.tiff"),
+                project_id="dummy_project_id"
+            )
+        self.assertTrue("Error in MDVProject.add_or_update_image_datasource" in str(context.exception))
+
+
+if __name__ == "__main__":
+    unittest.main()

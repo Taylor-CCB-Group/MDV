@@ -1,25 +1,28 @@
+import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
+import {
+    Box,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    FormControl,
+    IconButton,
+    InputLabel,
+    MenuItem,
+    Select,
+} from "@mui/material";
 import type React from "react";
 import { useState } from "react";
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Select,
-    MenuItem,
-    Button,
-    IconButton,
-    FormControl,
-    InputLabel,
-    Box,
-} from "@mui/material";
-import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
 
 interface ProjectAccessModalProps {
     id: string;
     type: "Editable" | "Read-Only";
     open: boolean;
-    onChangeType: (id: string, newType: "Editable" | "Read-Only") => Promise<void>;
+    onChangeType: (
+        id: string,
+        newType: "Editable" | "Read-Only",
+    ) => Promise<void>;
     onClose: () => void;
 }
 

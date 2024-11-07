@@ -8,7 +8,7 @@ document.body.appendChild(container);
 const root = createRoot(container);
 
 root.render(
-  <CustomThemeProvider>
-    <Dashboard />
-  </CustomThemeProvider>
+    <CustomThemeProvider>
+        <Dashboard />
+    </CustomThemeProvider>,
 );

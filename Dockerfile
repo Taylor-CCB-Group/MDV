@@ -10,11 +10,15 @@ WORKDIR /app
 # Copy the entire project to the working directory
 COPY . .
 
-# Install npm dependencies
-RUN npm install
 
-# Run the npm build script for Flask and Vite
+## Install npm dependencies & start dev server (should only happen in dev - but other yml configs won't expose the port)
+RUN npm install
+# RUN npm run dev # run manually in container
+
+## Run the npm build script for Flask and Vite
 RUN npm run build-flask-dockerjs
+
+# RUN ln -s /app/python/dist_hotfix /app/dist
 
 # bootstrap project folder - this won't be necessary in future
 #RUN mkdir -p /app/mdv/pbmc3k /app/mdv/pbmc3k_project2
@@ -35,7 +39,7 @@ RUN poetry install --with dev,backend
 EXPOSE 5055 
 
 # Command to run Gunicorn
-#CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "mdvtools.dbutils.mdv_server_app:app"]
-CMD ["poetry", "run", "python",  "-u", "-m", "mdvtools.dbutils.mdv_server_app"]
+CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.mdv_server_app:app"]
+#CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 
 
