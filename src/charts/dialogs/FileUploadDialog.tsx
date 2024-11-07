@@ -256,6 +256,64 @@ interface FileUploadDialogComponentProps {
     onResize: (width: number, height: number) => void; // Add this prop
 }
 
+// Define supported file types and their configurations
+interface FileTypeConfig {
+    type: string;
+    extensions: string[];
+    mimeTypes: string[];
+    maxSize?: number; // in bytes
+    processingConfig: {
+        defaultWidth: number;
+        defaultHeight: number;
+        requiresMetadata?: boolean;
+        endpoint: string;
+    };
+}
+
+const FILE_TYPES: Record<string, FileTypeConfig> = {
+    CSV: {
+        type: 'csv',
+        extensions: ['.csv'],
+        mimeTypes: ['text/csv'],
+        maxSize: 10000 * 1024 * 1024, // 10 GB
+        processingConfig: {
+            defaultWidth: 800,
+            defaultHeight: 745,
+            requiresMetadata: false,
+            endpoint: 'add_datasource'
+        }
+    },
+    TIFF: {
+        type: 'tiff',
+        extensions: ['.tiff', '.tif'],
+        mimeTypes: ['image/tiff'],
+        maxSize: 10000 * 1024 * 1024, // 10 GB
+        processingConfig: {
+            defaultWidth: 1032,
+            defaultHeight: 580,
+            requiresMetadata: true,
+            endpoint: 'add_or_update_image_datasource'
+        }
+    }
+};
+
+// Helper functions for file type checking
+const getFileTypeFromExtension = (fileName: string): FileTypeConfig | null => {
+    const extension = `.${fileName.split('.').pop()?.toLowerCase()}`;
+    return Object.values(FILE_TYPES).find(config => 
+        config.extensions.includes(extension)
+    ) || null;
+};
+
+const generateDropzoneAccept = () => {
+    return Object.values(FILE_TYPES).reduce((acc, config) => {
+        config.mimeTypes.forEach(mimeType => {
+            acc[mimeType] = config.extensions;
+        });
+        return acc;
+    }, {} as Record<string, string[]>);
+};
+
 // Custom hook for file upload progress
 const useFileUploadProgress = () => {
     const [progress, setProgress] = useState(0);
@@ -345,107 +403,123 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         (acceptedFiles: File[]) => {
             if (acceptedFiles.length > 0) {
                 const file = acceptedFiles[0];
+                const fileConfig = getFileTypeFromExtension(file.name);
+    
+                if (!fileConfig) {
+                    dispatch({
+                        type: "SET_ERROR",
+                        payload: {
+                            message: "Unsupported file type",
+                            status: 400,
+                        },
+                    });
+                    return;
+                }
+    
                 dispatch({
                     type: "SET_SELECTED_FILES",
                     payload: acceptedFiles,
                 });
-                const fileExtension = file.name.split(".").pop().toLowerCase();
-
-                // Common logic for both CSV and TIFF files
-                if (fileExtension === "csv") {
-                    const newDatasourceName = file.name;
-                    setDatasourceName(newDatasourceName);
-                    setCsvSummary({
-                        ...csvSummary,
-                        datasourceName: newDatasourceName,
-                        fileName: file.name,
-                        fileSize: (file.size / (1024 * 1024)).toFixed(2),
-                    });
-                    dispatch({ type: "SET_FILE_TYPE", payload: "csv" });
-                } else if (
-                    fileExtension === "tiff" ||
-                    fileExtension === "tif"
-                ) {
-                    const dataSources =
-                        window.mdv.chartManager?.dataSources ?? [];
-                    const namesArray = dataSources.map(
-                        (dataSource) => dataSource.name,
-                    );
-
-                    // Update state with the new array, triggering re-render
-                    setUpdatedNamesArray([...namesArray, "new datasource"]);
-                    settiffSummary({
-                        ...tiffSummary,
-                        fileName: file.name,
-                        fileSize: (file.size / (1024 * 1024)).toFixed(2),
-                    });
-                    dispatch({ type: "SET_FILE_TYPE", payload: "tiff" });
-                    handleSubmitFile(acceptedFiles);
-                }
-
-                // Start validation after dispatching file type
                 dispatch({ type: "SET_IS_VALIDATING", payload: true });
-
-                if (fileExtension === "csv") {
-                    CsvWorker.postMessage(file);
-                    CsvWorker.onmessage = (event: MessageEvent) => {
-                        const {
-                            columnNames,
-                            columnTypes,
-                            secondRowValues,
-                            rowCount,
-                            columnCount,
-                            error,
-                        } = event.data;
-                        if (error) {
-                            dispatch({
-                                type: "SET_ERROR",
-                                payload: {
-                                    message: "Validation failed.",
-                                    traceback: error,
-                                },
-                            });
-                            dispatch({
-                                type: "SET_IS_VALIDATING",
-                                payload: false,
-                            });
-                        } else {
-                            setColumnNames(columnNames);
-                            setColumnTypes(columnTypes);
-                            setSecondRowValues(secondRowValues);
-                            setCsvSummary((prevCsvSummary) => ({
-                                ...prevCsvSummary,
-                                rowCount,
-                                columnCount,
-                            }));
-
-                            const totalWidth = calculateTotalWidth(
+    
+                // Handle file based on its type
+                switch (fileConfig.type) {
+                    case 'csv': {
+                        const newDatasourceName = file.name;
+                        setDatasourceName(newDatasourceName);
+                        setCsvSummary({
+                            datasourceName: newDatasourceName,
+                            fileName: file.name,
+                            fileSize: (file.size / (1024 * 1024)).toFixed(2),
+                            rowCount: 0,
+                            columnCount: 0,
+                        });
+    
+                        // Process CSV with Web Worker
+                        CsvWorker.postMessage(file);
+                        CsvWorker.onmessage = (event: MessageEvent) => {
+                            const {
                                 columnNames,
                                 columnTypes,
                                 secondRowValues,
-                            );
-                            onResize(totalWidth, 745);
-                            dispatch({
-                                type: "SET_IS_VALIDATING",
-                                payload: false,
-                            });
-                            dispatch({
-                                type: "SET_VALIDATION_RESULT",
-                                payload: { columnNames, columnTypes },
-                            });
-                        }
-                    };
-                } else if (fileExtension === "tiff") {
-                    onResize(1032, 580);
-                    dispatch({ type: "SET_IS_VALIDATING", payload: false });
-                    dispatch({
-                        type: "SET_VALIDATION_RESULT",
-                        payload: { columnNames, columnTypes },
-                    });
+                                rowCount,
+                                columnCount,
+                                error,
+                            } = event.data;
+    
+                            if (error) {
+                                dispatch({
+                                    type: "SET_ERROR",
+                                    payload: {
+                                        message: "Validation failed.",
+                                        traceback: error,
+                                    },
+                                });
+                                dispatch({
+                                    type: "SET_IS_VALIDATING",
+                                    payload: false,
+                                });
+                            } else {
+                                setColumnNames(columnNames);
+                                setColumnTypes(columnTypes);
+                                setSecondRowValues(secondRowValues);
+                                setCsvSummary((prevCsvSummary) => ({
+                                    ...prevCsvSummary,
+                                    rowCount,
+                                    columnCount,
+                                }));
+    
+                                const totalWidth = calculateTotalWidth(
+                                    columnNames,
+                                    columnTypes,
+                                    secondRowValues,
+                                );
+                                onResize(totalWidth, 745);
+                                dispatch({
+                                    type: "SET_IS_VALIDATING",
+                                    payload: false,
+                                });
+                                dispatch({
+                                    type: "SET_VALIDATION_RESULT",
+                                    payload: { columnNames, columnTypes },
+                                });
+                            }
+                        };
+                        break;
+                    }
+    
+                    case 'tiff': {
+                        const dataSources = window.mdv.chartManager?.dataSources ?? [];
+                        const namesArray = dataSources.map(
+                            (dataSource) => dataSource.name
+                        );
+                        setUpdatedNamesArray([...namesArray, "new datasource"]);
+                        settiffSummary({
+                            fileName: file.name,
+                            fileSize: (file.size / (1024 * 1024)).toFixed(2),
+                        });
+                        
+                        // Process TIFF file
+                        handleSubmitFile(acceptedFiles);
+                        onResize(fileConfig.processingConfig.defaultWidth, fileConfig.processingConfig.defaultHeight);
+                        dispatch({ type: "SET_IS_VALIDATING", payload: false });
+                        dispatch({
+                            type: "SET_VALIDATION_RESULT",
+                            payload: { columnNames, columnTypes },
+                        });
+                        break;
+                    }
+    
+                    default:
+                        console.warn('Unhandled file type:', fileConfig.type);
+                        return;
                 }
+    
+                // Set file type in state
+                dispatch({ type: "SET_FILE_TYPE", payload: fileConfig.type });
             }
         },
-        [csvSummary, tiffSummary],
+        [csvSummary, tiffSummary]
     );
 
     const handleSubmitFile = useCallback(
@@ -469,7 +543,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
             try {
                 const newLoader = await createLoader(
                     newSource.urlOrFile,
-                    () => { }, // placeholder for toggleIsOffsetsSnackbarOn
+                    () => {}, // placeholder for toggleIsOffsetsSnackbarOn
                     (message) =>
                         viewerStore.setState({
                             loaderErrorSnackbar: { on: true, message },
@@ -533,11 +607,10 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     const { getRootProps, getInputProps, isDragActive, fileRejections } =
         useDropzone({
             onDrop,
-            accept: {
-                "text/csv": [".csv"],
-                "image/tiff": [".tiff", ".tif"],
-            },
+            accept: generateDropzoneAccept(),
+            maxSize: Math.max(...Object.values(FILE_TYPES).map(config => config.maxSize || 0))
         });
+
     const rejectionMessage =
         fileRejections.length > 0
             ? "Only CSV and TIFF files can be selected"
@@ -596,7 +669,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     };
 
     const handleUploadClick = async () => {
-        console.log("Uploading file...");
         if (!state.selectedFiles.length) {
             dispatch({
                 type: "SET_ERROR",
@@ -608,10 +680,20 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
             return;
         }
 
-        const fileExtension = state.selectedFiles[0].name
-            .split(".")
-            .pop()
-            ?.toLowerCase();
+        const file = state.selectedFiles[0];
+        const fileConfig = getFileTypeFromExtension(file.name);
+
+        if (!fileConfig) {
+            dispatch({
+                type: "SET_ERROR",
+                payload: {
+                    message: "Unsupported file type",
+                    status: 400,
+                },
+            });
+            return;
+        }
+
         dispatch({ type: "SET_IS_UPLOADING", payload: true });
         resetProgress();
 
@@ -628,131 +710,72 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         };
 
         try {
-            let response;
-            if (fileExtension === "tiff") {
-                const formData = new FormData();
-                formData.append("file", state.selectedFiles[0]);
-                formData.append("datasourceName", datasourceName);
+            const formData = new FormData();
+            formData.append("file", file);
 
-                try {
-                    formData.append("tiffMetadata", JSON.stringify(state.tiffMetadata));
-                } catch (jsonError) {
-                    console.error("Invalid JSON format for tiffMetadata:", jsonError);
-                    dispatch({
-                        type: "SET_ERROR",
-                        payload: {
-                            message: "Invalid JSON format in tiffMetadata. Please check the data.",
-                            status: 400,
-                            traceback: jsonError.message,
-                        },
-                    });
-                    dispatch({ type: "SET_IS_UPLOADING", payload: false });
-                    return;
-                }
+            // Add type-specific form data
+            switch (fileConfig.type) {
+                case 'csv':
+                    formData.append("name", datasourceName);
+                    formData.append("replace", "");
+                    break;
 
-                response = await axios.post(
-                    `${root}/add_or_update_image_datasource`,
-                    formData,
-                    config,
-                );
-            } else {
-                const formData = new FormData();
-                formData.append("file", state.selectedFiles[0]);
-                formData.append("name", datasourceName);
-                formData.append("replace", "");
-
-                response = await axios.post(
-                    `${root}/add_datasource`,
-                    formData,
-                    config,
-                );
+                case 'tiff':
+                    formData.append("datasourceName", datasourceName);
+                    if (fileConfig.processingConfig.requiresMetadata) {
+                        try {
+                            formData.append("tiffMetadata", JSON.stringify(state.tiffMetadata));
+                        } catch (jsonError) {
+                            throw new Error("Invalid JSON format in tiffMetadata");
+                        }
+                    }
+                    break;
             }
 
-            console.log("File uploaded successfully", response.data);
+            const response = await axios.post(
+                `${root}/${fileConfig.processingConfig.endpoint}`,
+                formData,
+                config
+            );
+
             if (response.status === 200) {
                 dispatch({ type: "SET_IS_UPLOADING", payload: false });
                 dispatch({ type: "SET_SUCCESS", payload: true });
 
-                if (fileExtension === "tiff") {
-                    // chartManager.saveState();
-                    const params = new URLSearchParams(window.location.search);
-                    params.set("view", response.data.view);
-                    window.history.replaceState(
-                        {},
-                        "",
-                        `${window.location.pathname}?${params}`,
-                    );
-                    window.location.reload();
+                if (fileConfig.type === 'tiff') {
+                    chartManager.saveState();
                 }
             } else {
-                console.error(`Failed to confirm: Server responded with status ${response.status}`);
-                dispatch({ type: "SET_IS_UPLOADING", payload: false });
-                dispatch({
-                    type: "SET_ERROR",
-                    payload: {
-                        message: `File upload completed, but confirmation failed with status: ${response.status}`,
-                        status: response.status,
-                        traceback: "Server responded with non-200 status",
-                    },
-                });
+                throw new Error(`Server responded with status ${response.status}`);
             }
         } catch (error) {
             console.error("Error uploading file:", error);
-
-            // Specific handling for known Axios errors
-            if (axios.isAxiosError(error)) {
-                if (error.response?.status === 403) {
-                    dispatch({
-                        type: "SET_ERROR",
-                        payload: {
-                            message: "Permission Denied: This project is read-only and cannot be modified.",
-                            status: 403,
-                            traceback: error.response?.data?.message || error.message,
-                        },
-                    });
-                } else if (error.response?.status === 400) {
-                    dispatch({
-                        type: "SET_ERROR",
-                        payload: {
-                            message: "Bad Request: The server could not process the uploaded file.",
-                            status: 400,
-                            traceback: error.message,
-                        },
-                    });
-                } else if (error.response?.status === 500) {
-                    dispatch({
-                        type: "SET_ERROR",
-                        payload: {
-                            message: "Server Error: An error occurred while processing the upload.",
-                            status: 500,
-                            traceback: error.message,
-                        },
-                    });
-                } else {
-                    dispatch({
-                        type: "SET_ERROR",
-                        payload: {
-                            message: `Upload failed with status: ${error.response?.status || "unknown"}`,
-                            status: error.response?.status || 500,
-                            traceback: error.message,
-                        },
-                    });
-                }
-            } else {
-                dispatch({
-                    type: "SET_ERROR",
-                    payload: {
-                        message: "Upload failed due to a network error or unknown issue.",
-                        status: 500,
-                        traceback: error.message,
-                    },
-                });
-            }
-
-            // Clean up and reset state
-            dispatch({ type: "SET_IS_UPLOADING", payload: false });
-            console.log("Attempting to clean up partially uploaded files...");
+            handleUploadError(error);
         }
+    };
+
+    const handleUploadError = (error: any) => {
+        const errorPayload = {
+            message: `Upload failed with status: ${error.response?.status || "unknown"}`,
+            status: error.response?.status || 500,
+            traceback: error.message,
+        };
+
+        if (axios.isAxiosError(error)) {
+            if (error.response?.status === 400) {
+                errorPayload.message = "Bad Request: The server could not process the uploaded file.";
+                errorPayload.status = 400;
+            } else if (error.response?.status === 500) {
+                errorPayload.message = "Server Error: An error occurred while processing the upload.";
+                errorPayload.status = 500;
+            }
+        }
+
+        dispatch({
+            type: "SET_ERROR",
+            payload: errorPayload,
+        });
+        dispatch({ type: "SET_IS_UPLOADING", payload: false });
     };
 
     const handleClose = async () => {
