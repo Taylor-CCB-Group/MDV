@@ -90,7 +90,6 @@ python -m venv venv
 venv/Scripts/activate
 pip install -e python
 ```
-
 ### Running a test project
 
 This example will build and run a project based on the `pbmc3k_processed` dataset from `scanpy`:
