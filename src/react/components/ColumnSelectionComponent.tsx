@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -26,9 +26,16 @@ export type ColumnSelectionProps = {
     type?: Param | Param[]; //wary of using 'type' as a name - not reserved, but could be confusing
     multiple?: boolean;
 };
+type setBoolean = ReturnType<typeof useState<boolean>>[1];
+type GuiStateProps = {
+    isExpanded: boolean;
+    setIsExpanded: setBoolean;
+    isAutocompleteFocused: boolean;
+    setIsAutocompleteFocused: setBoolean;
+}
 
-const ColumnDropdown = observer((props: ColumnSelectionProps) => {
-    const { setSelectedColumn, placeholder, type } = props;
+const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) => {
+    const { setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded } = props;
     const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
     const multiple = props.multiple || isMultiType;
     const dataStore = useDataStore(props.dataStore);
@@ -65,6 +72,8 @@ const ColumnDropdown = observer((props: ColumnSelectionProps) => {
                         return (
                             <TextFieldExtended
                                 onClick={(e) => e.stopPropagation()}
+                                onFocus={() => setIsAutocompleteFocused(true)}
+                                onBlur={() => setIsAutocompleteFocused(false)}
                                 key={key}
                                 {...p}
                                 placeholder={placeholder}
@@ -79,7 +88,12 @@ const ColumnDropdown = observer((props: ColumnSelectionProps) => {
                         const { datatype } = column;
                         // todo: consider an optional description prop, which we could show in a tooltip?
                         return (
-                            <li key={key} {...p}>
+                            <li key={key} {...p}
+                            onClick={(e) => {
+                                setIsExpanded(prev => prev);
+                                p.onClick?.(e);
+                            }}
+                            >
                                 {column.name}
                                 <em className="opacity-40 ml-2">({datatype})</em>
                             </li>
@@ -110,18 +124,26 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
             ,
         [dataStore, props.exclude, type],
     );
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
+
+    const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
-    if (!linkProps) return <ColumnDropdown {...props} />;
+    if (!linkProps) return <ColumnDropdown {...props} {...guiProps} />;
     // In general, this should (probably) be using our "(multi)dropdown" component
     // and the <LinksComponent /> can select which column options to show.
     return (
         <>
-        <Accordion className="w-full">
+        <Accordion className="w-full" expanded={isExpanded} onChange={e => {
+            if (!isAutocompleteFocused) {
+                setIsExpanded(prev => !prev);
+            }
+        }}>
             <AccordionSummary expandIcon={<LinkIcon sx={{marginLeft: '0.2em'}} />} sx={{padding: '0 0.5em'}}>
                 <Grid className="w-full items-center" container>
                     <Grid size={"grow"}>
                         {/* we may want to show something different, especially if special value is selected... */}
-                        <ColumnDropdown {...props} />
+                        <ColumnDropdown {...props} {...guiProps} />
                     </Grid>
                 </Grid>
             </AccordionSummary>
