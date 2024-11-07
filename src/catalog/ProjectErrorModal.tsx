@@ -1,4 +1,7 @@
-import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
+import {
+    Close as CloseIcon,
+    ErrorOutline as ErrorIcon,
+} from "@mui/icons-material";
 import {
     Box,
     Button,
@@ -11,28 +14,20 @@ import {
 } from "@mui/material";
 import type React from "react";
 
-interface ProjectDeleteModalProps {
-    id: string;
+interface ErrorModalProps {
     open: boolean;
-    onDelete: (id: string) => Promise<void>;
+    message: string;
     onClose: () => void;
 }
 
-const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
-    id,
-    open,
-    onDelete,
-    onClose,
-}) => {
-    const handleDelete = async () => {
-        await onDelete(id);
-        onClose();
-    };
-
+const ErrorModal: React.FC<ErrorModalProps> = ({ open, message, onClose }) => {
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>
-                Delete Project
+                <Box display="flex" alignItems="center">
+                    <ErrorIcon color="error" sx={{ mr: 1 }} />
+                    Error
+                </Box>
                 <IconButton
                     aria-label="close"
                     onClick={onClose}
@@ -47,12 +42,7 @@ const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
                 </IconButton>
             </DialogTitle>
             <DialogContent dividers>
-                <Typography variant="body1" align="center">
-                    Are you sure you want to permanently{" "}
-                    <strong>delete this project</strong>? This action is{" "}
-                    <strong>irreversible</strong> and cannot be{" "}
-                    <strong>undone</strong>.
-                </Typography>
+                <Typography variant="body1">{message}</Typography>
             </DialogContent>
             <DialogActions>
                 <Box
@@ -62,11 +52,12 @@ const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
                         width: "100%",
                     }}
                 >
-                    <Button onClick={onClose} color="primary" sx={{ mr: 2 }}>
-                        Cancel
-                    </Button>
-                    <Button onClick={handleDelete} color="error">
-                        Delete Project
+                    <Button
+                        onClick={onClose}
+                        variant="contained"
+                        color="primary"
+                    >
+                        Close
                     </Button>
                 </Box>
             </DialogActions>
@@ -74,4 +65,4 @@ const ProjectDeleteModal: React.FC<ProjectDeleteModalProps> = ({
     );
 };
 
-export default ProjectDeleteModal;
+export default ErrorModal;

@@ -1,17 +1,17 @@
-import type React from "react";
+import CloseIcon from "@mui/icons-material/Close";
 import {
+    Box,
     Dialog,
-    DialogTitle,
     DialogContent,
+    DialogTitle,
+    Divider,
     IconButton,
-    Typography,
     List,
     ListItem,
     ListItemText,
-    Divider,
-    Box,
+    Typography,
 } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import type React from "react";
 
 interface ProjectInfoModalProps {
     open: boolean;

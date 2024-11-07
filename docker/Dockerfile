@@ -10,11 +10,22 @@ WORKDIR /app
 # Copy the entire project to the working directory
 COPY . .
 
-# Install npm dependencies
-RUN npm install
+### !!! HOTFIX !!! ###
+## There is an issue with the frontend build that appears to originate from something
+## somewhat spooky - in that as far as we know, commits that had previously deployed
+## successfully are now failing. 
+## This is a hotfix to use a build output that is generated with
+## `npm run build-flask-docker-hotfix` in an envrionment where the build is working.
+## this is included in the repo for now, but should be removed once the issue is resolved.
 
-# Run the npm build script for Flask and Vite
-RUN npm run build-flask-dockerjs
+## Install npm dependencies
+# RUN npm install
+
+## Run the npm build script for Flask and Vite
+# RUN npm run build-flask-dockerjs
+
+RUN ln -s /app/python/dist_hotfix /app/dist
+### !!! /HOTFIX !!! ###
 
 # bootstrap project folder - this won't be necessary in future
 #RUN mkdir -p /app/mdv/pbmc3k /app/mdv/pbmc3k_project2
@@ -35,7 +46,7 @@ RUN poetry install --with dev,backend
 EXPOSE 5055 
 
 # Command to run Gunicorn
-CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "mdvtools.dbutils.mdv_server_app:app"]
+CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.mdv_server_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 
 

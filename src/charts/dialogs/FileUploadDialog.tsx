@@ -5,6 +5,7 @@ import {
     useReducer,
     type PropsWithChildren,
     forwardRef,
+    useEffect,
 } from "react";
 import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
@@ -25,6 +26,7 @@ import { TiffMetadataTable } from "./TiffMetadataTable";
 import TiffVisualization from "./TiffVisualization";
 import { DatasourceDropdown } from "./DatasourceDropdown";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import { Dialog, Paper } from "@mui/material";
 
 // Use dynamic import for the worker
 const CsvWorker = new Worker(new URL("./csvWorker.ts", import.meta.url), {
@@ -279,7 +281,7 @@ const useFileUploadProgress = () => {
     return { progress, setProgress, startProgress, resetProgress };
 };
 
-const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
+const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = observer(({
     onClose,
     onResize,
 }) => {
@@ -467,7 +469,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
             try {
                 const newLoader = await createLoader(
                     newSource.urlOrFile,
-                    () => {}, // placeholder for toggleIsOffsetsSnackbarOn
+                    () => { }, // placeholder for toggleIsOffsetsSnackbarOn
                     (message) =>
                         viewerStore.setState({
                             loaderErrorSnackbar: { on: true, message },
@@ -593,18 +595,18 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
         return Math.max(800, totalWidth);
     };
 
-  const handleUploadClick = async () => {
-    console.log("Uploading file...");
-    if (!state.selectedFiles.length) {
-        dispatch({
-            type: "SET_ERROR",
-            payload: {
-                message: "No files selected. Please select a file before uploading.",
-                status: 400,
-            },
-        });
-        return;
-    }
+    const handleUploadClick = async () => {
+        console.log("Uploading file...");
+        if (!state.selectedFiles.length) {
+            dispatch({
+                type: "SET_ERROR",
+                payload: {
+                    message: "No files selected. Please select a file before uploading.",
+                    status: 400,
+                },
+            });
+            return;
+        }
 
         const fileExtension = state.selectedFiles[0].name
             .split(".")
@@ -672,7 +674,15 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
                 dispatch({ type: "SET_SUCCESS", payload: true });
 
                 if (fileExtension === "tiff") {
-                    chartManager.saveState();
+                    // chartManager.saveState();
+                    const params = new URLSearchParams(window.location.search);
+                    params.set("view", response.data.view);
+                    window.history.replaceState(
+                        {},
+                        "",
+                        `${window.location.pathname}?${params}`,
+                    );
+                    window.location.reload();
                 }
             } else {
                 console.error(`Failed to confirm: Server responded with status ${response.status}`);
@@ -688,10 +698,19 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
             }
         } catch (error) {
             console.error("Error uploading file:", error);
-    
+
             // Specific handling for known Axios errors
             if (axios.isAxiosError(error)) {
-                if (error.response?.status === 400) {
+                if (error.response?.status === 403) {
+                    dispatch({
+                        type: "SET_ERROR",
+                        payload: {
+                            message: "Permission Denied: This project is read-only and cannot be modified.",
+                            status: 403,
+                            traceback: error.response?.data?.message || error.message,
+                        },
+                    });
+                } else if (error.response?.status === 400) {
                     dispatch({
                         type: "SET_ERROR",
                         payload: {
@@ -729,7 +748,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
                     },
                 });
             }
-    
+
             // Clean up and reset state
             dispatch({ type: "SET_IS_UPLOADING", payload: false });
             console.log("Attempting to clean up partially uploaded files...");
@@ -975,6 +994,31 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = ({
             )}
         </Container>
     );
-};
+});
 
-export default observer(FileUploadDialogComponent);
+const Wrapper = (props: FileUploadDialogComponentProps) => {
+    const [open, setOpen] = useState(true);
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, []);
+    //p-4 mt-2 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]
+    return (
+        <Dialog open={open} fullScreen disableEscapeKeyDown={true}>
+            <div className="h-screen flex items-center justify-center">
+                <Paper elevation={24} sx={{ p: 2 }}>
+                    <FileUploadDialogComponent {...props} />
+                </Paper>
+            </div>
+        </Dialog>
+    );
+}
+
+export default Wrapper;
