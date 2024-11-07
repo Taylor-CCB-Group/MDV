@@ -101,27 +101,12 @@ async function runComputeShader(
         label: 'histogram-compute-shader',
     });
 
-    // Create bind group layout and pipeline layout
-    const bindGroupLayout = device.createBindGroupLayout({
-        entries: [
-            { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-            { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-            { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        ],
-        label: 'histogram-bind-group-layout',
-    });
-
-    const pipelineLayout = device.createPipelineLayout({
-        bindGroupLayouts: [bindGroupLayout],
-        label: 'histogram-pipeline-layout',
-    });
-
     const maxWorkgroupsPerDimension = device.limits.maxComputeWorkgroupSizeX;
     const workgroupSize = 64;
 
     // Create compute pipeline
     const computePipeline = device.createComputePipeline({
-        layout: pipelineLayout,
+        layout: 'auto',
         compute: {
             module: shaderModule,
             entryPoint: 'main',
@@ -144,7 +129,7 @@ async function runComputeShader(
 
     // Create bind group
     const bindGroup = device.createBindGroup({
-        layout: bindGroupLayout,
+        layout: computePipeline.getBindGroupLayout(0),
         entries: [
             { binding: 0, resource: { buffer: paramsBuffer } },
             { binding: 1, resource: { buffer: dataBuffer } },
