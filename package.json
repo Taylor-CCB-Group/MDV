@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "cross-env build=dev_pt vite --host",
-    "vite-build": "tsc && cross-env build=dev_pt vite build --outDir ./vite-dist",
+    "vite-build": "tsc && cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=dev_pt vite build --outDir ./vite-dist",
     "build": "cross-env build=desktop vite build --outDir ./dist",
     "build-nofont": "cross-env build=production nofont=true vite build --outDir ./dist/basic",
     "build-flask-vite": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop_pt vite build --outDir ./python/mdvtools/static",
