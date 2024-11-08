@@ -2,7 +2,7 @@ import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../h
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, Typography, Select } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState, useMemo } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
@@ -237,6 +237,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
 }
 type RangeProps = ReturnType<typeof useRangeFilter>;
 const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryHistogram }: RangeProps) => {
+    const ref = useRef<SVGSVGElement>(null);
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const width = 99;
     const height = 40;
@@ -251,10 +252,19 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
 
     const lowX = lowFraction * width;
     const highX = highFraction * width;
-
+    const [hasQueried, setHasQueried] = useState(false);
     useEffect(() => {
-        queryHistogram();
-    }, [queryHistogram]);
+        if (!ref.current) return;
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && !hasQueried) {
+                setHasQueried(true);
+                queryHistogram();
+            }
+        }, { rootMargin: '0px 0px 100px 0px' });
+        observer.observe(ref.current);
+        // queryHistogram();
+        return () => observer.disconnect();
+    }, [queryHistogram, hasQueried]);
 
     // Generate the points for the polyline
     // ??? useMemo was wrong ????
@@ -269,6 +279,7 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
         onClick={queryHistogram}
+        ref={ref}
         >
             {/* Background polyline (the simple line connecting data points) */}
             <polyline
