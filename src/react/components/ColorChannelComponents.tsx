@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import { shallow } from "zustand/shallow";
 import {
     type VivContextType,
@@ -20,7 +20,7 @@ import {
     Slider,
 } from "@mui/material";
 import { PopoverPicker } from "./ColorPicker";
-import { getSingleSelectionStats } from "./avivatorish/utils";
+import { type Raster, getSingleSelectionStats } from "./avivatorish/utils";
 import { X } from "lucide-react";
 
 export default function MainVivColorDialog({
@@ -115,7 +115,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                             c: Number.parseInt(e.target.value),
                         };
                         setIsChannelLoading(index, true);
-                        const { domain: domains, contrastLimits } =
+                        const { domain: domains, contrastLimits, raster } =
                             await getSingleSelectionStats({
                                 loader,
                                 selection,
@@ -124,6 +124,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                         const newProps = {
                             domains,
                             contrastLimits, //, leaving out colors for now - keep existing color
+                            raster,
                         };
                         setPropertiesForChannel(index, newProps);
                         setIsChannelLoading(index, false);
@@ -203,15 +204,70 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     );
 };
 
+/**
+ * React component to render a thumbnail with contrast adjustment.
+ */
+function Thumbnail({ raster, contrastLimits, thumbWidth = 100, thumbHeight = 100 }: {
+    raster: Raster, contrastLimits: [number, number], thumbWidth?: number, thumbHeight?: number
+}) {
+    if (!raster) return null;
+    const { data, width, height } = raster;
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+
+        // Calculate the scaling factors
+        const scaleX = width / thumbWidth;
+        const scaleY = height / thumbHeight;
+
+        // Calculate contrast scaling factors
+        const [low, high] = contrastLimits;
+        const contrastFactor = 255 / (high - low);
+
+        // Create an ImageData object to store the pixel data for the thumbnail
+        const imageData = ctx.createImageData(thumbWidth, thumbHeight);
+        const { data: thumbData } = imageData;
+
+        // Map the pixel values to the thumbnail canvas
+        for (let y = 0; y < thumbHeight; y++) {
+            for (let x = 0; x < thumbWidth; x++) {
+                // Get the original image coordinates
+                const origX = Math.floor(x * scaleX);
+                const origY = Math.floor(y * scaleY);
+                const index = origY * width + origX;
+
+                // Apply contrast mapping
+                const value = data[index];
+                const contrastValue = Math.max(0, Math.min(255, (value - low) * contrastFactor));
+
+                // Set pixel data in the ImageData (grayscale to RGB)
+                const pixelIndex = (y * thumbWidth + x) * 4;
+                thumbData[pixelIndex] = contrastValue;     // Red
+                thumbData[pixelIndex + 1] = contrastValue; // Green
+                thumbData[pixelIndex + 2] = contrastValue; // Blue
+                thumbData[pixelIndex + 3] = 255;           // Alpha (opaque)
+            }
+        }
+
+        // Draw the processed ImageData to the canvas
+        ctx.putImageData(imageData, 0, 0);
+    }, [data, width, height, contrastLimits, thumbWidth, thumbHeight]);
+
+    return <canvas ref={canvasRef} width={thumbWidth} height={thumbHeight} />;
+}
+
 const ChannelController = ({ index }: { index: number }) => {
     const limits = useChannelsStore(({ contrastLimits }) => contrastLimits); //using shallow as per Avivator *prevents* re-rendering which should be happening
-    const { colors, domains, channelsVisible, removeChannel } =
+    const { colors, domains, channelsVisible, removeChannel, raster } =
         useChannelsStore(
-            ({ colors, domains, channelsVisible, removeChannel }) => ({
+            ({ colors, domains, channelsVisible, removeChannel, raster }) => ({
                 colors,
                 domains,
                 channelsVisible,
                 removeChannel,
+                raster,
             }),
         );
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
@@ -263,6 +319,7 @@ const ChannelController = ({ index }: { index: number }) => {
                         channelsStore.setState({ colors: newColors });
                     }}
                 />
+                <Thumbnail raster={raster[index] as any} contrastLimits={limits[index]} />
                 <Slider
                     size="small"
                     //slotProps={{ thumb: {  } }} //todo smaller thumb
