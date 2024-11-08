@@ -25,8 +25,11 @@ const RowsAsCols = observer((props : RowsAsColsProps) => {
         label: `specific '${name}' column`, //todo different label for multiple
         // I don't think we want to prepend option to dropdown - we should have a different way of showing this
         values: [targetColumn.values],
-        // current_value: targetColumn.values[0],
-        current_value: rowNames,
+        //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
+        current_value: rowNames, 
+        func: (v) => {
+            
+        }
     }), [targetColumn, name_column, name, rowNames]);
     const { current_value } = spec;
     const v = Array.isArray(current_value) ? current_value : [current_value];

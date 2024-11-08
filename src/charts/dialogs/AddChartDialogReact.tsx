@@ -272,7 +272,11 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                         {chartType?.params && <h2>Columns</h2>}
                         {chartType?.params?.map((p, i) => (
                             <ColumnSelectionComponent key={p.name} placeholder={p.name} 
+                            // this may be changing - perhaps we always pass mobx object to ColumnSelectionComponent
+                            // but we definitely need to know whether it's a multi-column or not & be able to set the value accordingly
                             setSelectedColumn={action((column) => {
+                                // !! in the original AddChartDialog, we use a "ChooseColumnDialog" for multi-column
+                                // that sets `this.multiColumns` which in `submit` is concatenated to `config.param`
                                 if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
                                 config.param[i] = column;
                                 // grumble grumble
