@@ -107,6 +107,7 @@ class DataStore {
             }
         }
 
+        /** @type {string[]} column names */
         this.columnsWithData = [];
         this.dirtyColumns = {
             added: {},
@@ -725,6 +726,10 @@ class DataStore {
         for (const c of columns) {
             //todo invert this to use col.getValue(index)
             const col = this.columnIndex[c];
+            if (!col.data) {
+                console.error(`Column ${c} has no data`);
+                continue;
+            }
             let v = col.data[index];
             if (col.datatype === "text" || col.datatype === "text16") {
                 v = col.values[v];

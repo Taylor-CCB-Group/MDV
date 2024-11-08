@@ -167,14 +167,14 @@ export type GuiSpec<T extends GuiSpecType> = {
     // name: string; //unused - wrongly added in the original type
     current_value?: GuiValueTypes[T];
     func?: (v: GuiValueTypes[T]) => void; //optional but ts insists on it?
-    values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
+    values?: T extends ("dropdown" | "multidropdown") ? DropDownValues : never;
     // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
     choices?: T extends "radiobuttons" ? [string, string][] : never;
     min?: number;
     max?: number;
     step?: number;
     defaultVal?: GuiValueTypes[T];
-    columnSelection?: T extends "column" ? ColumnSelectionParameters : never;
+    columnSelection?: T extends ("column" | "multicolumn") ? ColumnSelectionParameters : never;
 };
 // todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
 export type ExtraControl<T extends GuiSpecType> = {

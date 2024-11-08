@@ -811,6 +811,8 @@ class ChartManager {
 
     /**
      * Caution: doesn't return a 'DataSource', but a 'DataStore' (which is a property of a 'DataSource')
+     * @param {string} name
+     * @returns {DataStore}
      */
     getDataSource(name) {
         return this.dsIndex[name].dataStore;
@@ -1524,6 +1526,11 @@ class ChartManager {
      * @param {number} [threads=2]  the number of concurrent requests
      */
     loadColumnSet(columns, dataSource, callback, split = 10, threads = 2) {
+        const ds = this.getDataSource(dataSource);
+        // nb, if any items are in columnsLoading, we don't filter them here
+        // because we'd have to think of how to listen for their completion before calling the callback
+        // !! could be an issue if a column has been edited by another user and this method is supposed to reload it?
+        columns = columns.filter((x) => !ds.columnsWithData.includes(x));
         if (columns.length === 0) {
             callback(); //should there be any args? hard to tell without types
             return;
