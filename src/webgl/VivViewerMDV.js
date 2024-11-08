@@ -159,6 +159,7 @@ class VivViewerMDV {
 
         channel.contrastLimits = data[0].stats.contrastLimits; //this.defaultContrastLimits[channel.index].slice(0);
         channel.domains = data[0].stats.domain; //this.defaultDomains[channel.index].slice(0);
+        channel.raster = data[0].stats.raster;
         channel.channelsVisible = true;
         chs.colors.push(hexToRGB(channel.color));
         chs.contrastLimits.push(channel.contrastLimits);

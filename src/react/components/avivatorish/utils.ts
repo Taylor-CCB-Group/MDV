@@ -14,7 +14,7 @@ import {
 } from "@vivjs-experimental/viv";
 
 import { GLOBAL_SLIDER_DIMENSION_FIELDS } from "./constants";
-
+import type { TypedArray } from "zarr";
 const MAX_CHANNELS_FOR_SNACKBAR_WARNING = 40;
 
 /**
@@ -403,9 +403,71 @@ export function useWindowSize(scaleWidth = 1, scaleHeight = 1) {
     return windowSize;
 }
 
+export type Raster = {
+    data: TypedArray;
+    width: number;
+    height: number;
+}
+
+/**
+ * Render a thumbnail image with contrast adjustment. unused / untested and probably wrong.
+ * written by ChatGPT.
+ * 
+ * @param {Raster} raster - The raster data.
+ * @param {[number, number]} contrastLimits - The contrast limits [low, high].
+ * @param {number} [thumbWidth=100] - The desired thumbnail width.
+ * @param {number} [thumbHeight=100] - The desired thumbnail height.
+ * @returns {HTMLCanvasElement} - The canvas containing the rendered thumbnail.
+ */
+function renderThumbnail({ data, width, height }, contrastLimits, thumbWidth = 100, thumbHeight = 100) {
+    // Create a canvas for the thumbnail
+    const canvas = document.createElement('canvas');
+    canvas.width = thumbWidth;
+    canvas.height = thumbHeight;
+    const ctx = canvas.getContext('2d');
+
+    // Calculate the scaling factors
+    const scaleX = width / thumbWidth;
+    const scaleY = height / thumbHeight;
+
+    // Calculate contrast scaling factors
+    const [low, high] = contrastLimits;
+    const contrastFactor = 255 / (high - low);
+
+    // Create an ImageData object to store the pixel data for the thumbnail
+    const imageData = ctx.createImageData(thumbWidth, thumbHeight);
+    const { data: thumbData } = imageData;
+
+    // Map the pixel values to the thumbnail canvas
+    for (let y = 0; y < thumbHeight; y++) {
+        for (let x = 0; x < thumbWidth; x++) {
+            // Get the original image coordinates
+            const origX = Math.floor(x * scaleX);
+            const origY = Math.floor(y * scaleY);
+            const index = origY * width + origX;
+
+            // Apply contrast mapping
+            const value = data[index];
+            const contrastValue = Math.max(0, Math.min(255, (value - low) * contrastFactor));
+
+            // Set pixel data in the ImageData (grayscale to RGB)
+            const pixelIndex = (y * thumbWidth + x) * 4;
+            thumbData[pixelIndex] = contrastValue;     // Red
+            thumbData[pixelIndex + 1] = contrastValue; // Green
+            thumbData[pixelIndex + 2] = contrastValue; // Blue
+            thumbData[pixelIndex + 3] = 255;           // Alpha (opaque)
+        }
+    }
+
+    // Draw the processed ImageData to the canvas
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+}
+
+
 export async function getSingleSelectionStats2D({ loader, selection }) {
     const data = Array.isArray(loader) ? loader[loader.length - 1] : loader;
-    const raster = await data.getRaster({ selection });
+    const raster = await data.getRaster({ selection }) as Raster;
     const selectionStats = getChannelStats(raster.data);
     const { domain, contrastLimits } = selectionStats;
     // Edge case: if the contrast limits are the same, set them to the domain.
@@ -413,7 +475,7 @@ export async function getSingleSelectionStats2D({ loader, selection }) {
         contrastLimits[0] = domain[0];
         contrastLimits[1] = domain[1];
     }
-    return { domain, contrastLimits };
+    return { domain, contrastLimits, raster };
 }
 
 export async function getSingleSelectionStats3D({ loader, selection }) {
@@ -449,6 +511,7 @@ export async function getSingleSelectionStats3D({ loader, selection }) {
                 statsTop.contrastLimits[1],
             ),
         ],
+        raster: rasterMid as Raster
     };
 }
 
