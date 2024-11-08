@@ -1,9 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
-import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 import { useDataStore } from "../context.js";
-import type { DataColumn, DataType } from "@/charts/charts.js";
+import type { DataColumn, DataType, FieldName } from "@/charts/charts.js";
 import type { Param } from "@/charts/ChartTypes.js";
 import type DataStore from "@/datastore/DataStore.js";
 import { columnMatchesType } from "@/lib/utils.js";
@@ -19,7 +18,8 @@ import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
 
 
 export type ColumnSelectionProps = {
-    setSelectedColumn: (column: string) => void; //what about multiple?
+    setSelectedColumn: (column: FieldName) => void; //what about multiple? also, special values...
+    current_value?: FieldName;
     placeholder?: string;
     exclude?: string[];
     dataStore?: DataStore;
@@ -35,7 +35,7 @@ type GuiStateProps = {
 }
 
 const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) => {
-    const { setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded } = props;
+    const { setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded, current_value } = props;
     const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
     const multiple = props.multiple || isMultiType;
     const dataStore = useDataStore(props.dataStore);
@@ -56,6 +56,7 @@ const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) =>
                     className="w-full"
                     options={columns}
                     multiple={multiple}
+                    // value={current_value ? columns.find(c => c.name === current_value) : null}
                     onChange={(_, value) => {
                         if (Array.isArray(value)) {
                             // todo - need to make controlled anyway for multiple...
@@ -134,7 +135,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
     // and the <LinksComponent /> can select which column options to show.
     return (
         <>
-        <Accordion className="w-full" expanded={isExpanded} onChange={e => {
+        <Accordion expanded={isExpanded} onChange={e => {
             if (!isAutocompleteFocused) {
                 setIsExpanded(prev => !prev);
             }

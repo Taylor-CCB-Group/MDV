@@ -147,13 +147,13 @@ export type GuiValueTypes = {
     // when you are choosing a column, you need to be able to specify
     // - the type of column you can accept
     // - whether you can accept multiple
-    // The type you get back ColumnName is going to change into ColumnSpecifier to allow for more complex column references
+    // The type you get back FieldName is going to change into ColumnSpecifier to allow for more complex column references
     // (for now we continue to parse things in a format as in LinkDataDialog)
     // (and we have several keys for different types of column references)
     // There should also be a general way of expressing that a property (like radius) can be set to a 
     // number or a column (with modifiers) - this is where the node editor comes in...
-    column: ColumnName;
-    multicolumn: ColumnName[]; //easier to have distinct 'multicolumn' type than overly generic 'column'?
+    column: FieldName;
+    multicolumn: FieldName[]; //easier to have distinct 'multicolumn' type than overly generic 'column'?
 };
 export type GuiSpecType = keyof GuiValueTypes;
 export type ColumnSelectionParameters = {

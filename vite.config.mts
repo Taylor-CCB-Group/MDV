@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
 
-const flaskURL = "http://127.0.0.1:5051";
-const port = 5170;
+const flaskURL = "http://127.0.0.1:5055";
+const port = 5171;
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
 // maybe also the various build configurations at some point.

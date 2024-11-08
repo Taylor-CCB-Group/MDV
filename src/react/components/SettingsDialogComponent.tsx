@@ -22,7 +22,10 @@ import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 
 export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<GuiSpecType>, htmlFor?: string }) => (
-    <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>{props.label}</Typography>
+    <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>
+        {props.label} 
+        {/* <em className="opacity-30"> ({props.type})</em> */}
+    </Typography>
     // todo fix justifySelf - it's not working as expected
     // <FormControlLabel
     //     sx={{ justifySelf: "right" }}
@@ -105,6 +108,7 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"column" | "multicolumn"> }) => {
+    // multiple...
     // proably want to change the type of ColumnSelectionProps anyway...
     // perhaps we should be looking at other places where it's used & make them use this,
     // with a different evolution of the API.
