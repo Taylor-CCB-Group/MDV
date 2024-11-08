@@ -113,12 +113,13 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"
         props.current_value = v;
         props.func?.(v);
     }), []); //as of this writing, biome is right that props is not a dependency
-
+    const filter = props.columnSelection?.filter;
     const props2: ColumnSelectionProps = useMemo(() => ({
         setSelectedColumn,
-        // type: props.type,
-        multiple: false,
-    }), [setSelectedColumn]);
+        type: filter,
+        multiple: props.type === "multicolumn",
+        // current_value: props.current_value... maybe want to be more mobx-y about this
+    }), [setSelectedColumn, props.type, filter]);
     return (
         <>
             <MLabel props={props} />

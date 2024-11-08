@@ -556,7 +556,7 @@ class BaseChart {
                 label: "Color By",
                 type: "column",
                 current_value: c.color_by,
-                // filter: filter,
+                columnSelection: { filter },
                 func: (x) => {
                     if (x === "_none") {
                         c.color_by = undefined;
