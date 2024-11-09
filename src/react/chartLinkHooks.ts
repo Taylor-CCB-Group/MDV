@@ -4,6 +4,7 @@ import { useChartID, useDataSources } from "./hooks";
 import type { VivMDVReact } from "./components/VivMDVReact";
 import { useDataStore } from "./context";
 import type { DataColumn, DataType } from "@/charts/charts";
+import type DataStore from "@/datastore/DataStore";
 
 export const useViewStateLink = () => {
     const viewerStore = useViewerStoreApi();
@@ -83,14 +84,7 @@ type RowsAsColslink = {
     }
 }
 
-export function useRowsAsColumnsLinks() {
-    const dataSources = useDataSources();
-    //- we should have useDataSource() which would work in dialogs not associated with a particular chart.
-    //(test in AddChartDialog)
-    const dataStore = useDataStore(); //! this whole dataSource vs dataStore thing still confuses me
-    if (!dataStore) {
-        throw "no dataStore!!!";
-    }
+export function getRowsAsColumnsLinks(dataStore: DataStore, dataSources: ReturnType<typeof useDataSources>) {
     if (dataStore.links) {
         return Object.keys(dataStore.links).map((linkedDsName) => {
             const links = dataStore.links[linkedDsName];
@@ -108,12 +102,25 @@ export function useRowsAsColumnsLinks() {
                     throw new Error();
                 }
                 // todo make sure the link is reasonably typed
-                
-                return { linkedDs, link: links.rows_as_columns as RowsAsColslink};
+
+                return { linkedDs, link: links.rows_as_columns as RowsAsColslink };
             }
         });
     }
     return [];
+}
+
+/** returns information about any `rows_as_columns_link`s that exist in the context `dataSource` */
+export function useRowsAsColumnsLinks() {
+    const dataSources = useDataSources();
+    //- we should have useDataSource() which would work in dialogs not associated with a particular chart.
+    //(test in AddChartDialog)
+    const dataStore = useDataStore(); //! this whole dataSource vs dataStore thing still confuses me
+    if (!dataStore) {
+        throw "no dataStore!!!";
+    }
+    // if it was possible for user to edit this at runtime, we'd want this to be reactive
+    return getRowsAsColumnsLinks(dataStore, dataSources);
 }
 
 /** design of this will need to change to account for n-links
@@ -131,6 +138,7 @@ export function useHighlightedForeignRows() {
         const { linkedDs, link } = racLink;
         const tds = linkedDs.dataStore;
         const cm = window.mdv.chartManager;
+        // how about we have some kind of mobx observable in the link object, and we can just listen to that?
         cm.loadColumnSet([link.name_column], linkedDs.name, () => {                
             // - we need to make sure that the column in linkedDs is loaded before we add this listener.
             tds.addListener(`highlightedRows:${id}`, async (eventType: string, data: any) => {

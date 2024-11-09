@@ -583,6 +583,7 @@ class DataStore {
      * - `subtype` a name of a "subgroup" (whatever that means), like "Gene scores"
      * - `name` the name to be given to the new virtual column, like "GENE (Gene scores)"
      * - `index` the index of the column in the source data
+     * @returns {Column} The column that was added (not yet populated with data)
      */
     addColumnFromField(field) {
         const data = field.split("|");

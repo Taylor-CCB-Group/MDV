@@ -5,6 +5,7 @@ import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
+import { getRowsAsColumnsLinks } from "@/react/chartLinkHooks";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -206,7 +207,7 @@ class DotPlot extends SVGChart {
                     .on("mouseover pointermove", (e, d) => {
                         // ['id', 'total', 'count', 'frac', 'mean', 'cat_id']
                         //const tip = { category: vals[d.cat_id], value: d.id, fraction: d.frac };
-                        this.showToolTip(e, `(<em>${d.id}, ${vals[d.cat_id]}</em>)<br>percentage: ${d.frac.toFixed(0)}%`);
+                        this.showToolTip(e, `[<em>${d.id}, ${vals[d.cat_id]}</em>]<br>percentage: ${d.frac.toFixed(0)}%`);
                         // this.showToolTip(e, `fraction: <em>${d.frac}</em>`);
                     })
                     .on("mouseout", () => {
@@ -237,6 +238,70 @@ class DotPlot extends SVGChart {
     setSize(x, y) {
         super.setSize(x, y);
         this.drawChart();
+    }
+
+    async applyRowAsColLink() {
+        const cm = window.mdv.chartManager;
+        const dataSources = cm.dataSources;
+        const links = getRowsAsColumnsLinks(this.dataSource, dataSources);
+        if (links) {
+            const { link, linkedDs } = links[0];
+            const setValues = async (c_i) => {
+                const sg = Object.keys(link.subgroups)[0];
+                const ds = this.dataStore;
+                const cols = c_i.map(v => `${sg}|${v.value}(${sg})|${v.index}`).slice(0, 100).map(f => ds.addColumnFromField(f));
+                const p = cols.map(col => col.field);
+                const p0 = this.config.param[0];
+                this.config.param = [p0, ...p]; //first is the category column
+                await new Promise((resolve) => {
+                    cm.loadColumnSet(p, this.dataStore.name, () => {
+                        resolve();
+                    });
+                });
+                //const p = this.config.param;
+                const yLabels = [];
+                const c = this.config;
+                //work out color scales
+                c.color_scale = c.color_scale || { log: false };
+                if (!c.color_legend) {
+                    c.color_legend = { display: true };
+                }
+                if (!c.fraction_legend) {
+                    c.fraction_legend = { display: true };
+                }
+                this.fractionScale = scaleSqrt().domain([0, 100]);
+                for (let x = 1; x < p.length; x++) {
+                    yLabels.push(this.dataStore.getColumnName(p[x]));
+                }
+                this.x_scale.domain(yLabels);
+                // this.dim = this.dataStore.getDimension("catcol_dimension");
+                this.addToolTip();
+                //!! is the problem somehow that we expect categorical data but have numerical data?
+                this.onDataFiltered();
+            }
+            const tds = linkedDs.dataStore;
+            cm.loadColumnSet([link.name_column], linkedDs.name, () => {
+                tds.addListener(`dotPlot_${this.config.id}`, async (eventType, data) => {
+                    if (eventType === "data_highlighted") {
+                        const vals = data.indexes.map(index => ({ index, value: tds.getRowText(index, link.name_column) }));
+                        setValues(vals); //if there are huge numbers, we may want to deal with that downstream, or here.
+                    } else if (eventType === "filtered") {
+                        // const vals = tds.getFilteredValues(link.name_column) as string[];
+                        // setValues(vals); //this isn't right - we need the index too
+                        // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
+                        const filteredIndices = await tds.getFilteredIndices();
+                        //! this Array.from could be suboptimal for large numbers of indices
+                        const vals = Array.from(filteredIndices).map(
+                            // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
+                            // so there's a type error on the setValues line.
+                            // why doesn't that happen in the "data_highlighted" case above?
+                            index => ({ index, value: tds.getRowText(index, link.name_column)})
+                        );
+                        setValues(vals);
+                    }
+                });
+            });
+        }
     }
 
     getSettings() {
@@ -312,6 +377,14 @@ class DotPlot extends SVGChart {
                     this.drawChart();
                 },
             },
+            {
+                // experimental / short-term version of the feature
+                type: "button",
+                label: "Apply Row as Column Link",
+                func: () => {
+                    this.applyRowAsColLink();
+                },
+            }
         ]);
     }
 }
