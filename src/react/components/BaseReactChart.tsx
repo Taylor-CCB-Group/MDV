@@ -1,11 +1,11 @@
-import { autorun, makeAutoObservable } from "mobx";
-import type { IReactionDisposer, IAutorunOptions } from "mobx";
+import { makeAutoObservable } from "mobx";
+import type { IReactionDisposer } from "mobx";
 import BaseChart from "../../charts/BaseChart";
 import { createMdvPortal } from "@/react/react_utils";
 import type DataStore from "../../datastore/DataStore";
 import { ChartProvider } from "../context";
 import { createEl } from "../../utilities/ElementsTyped";
-import type { Chart, DataSource } from "../../charts/charts";
+import type { Chart } from "../../charts/charts";
 import { toPng, toSvg } from "html-to-image";
 
 function Fallback() {
@@ -59,7 +59,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart<T & B
     root: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
     ComponentFn: TComponent<T & BaseConfig>;
-    private reactionDisposers: IReactionDisposer[] = [];
+    declare reactionDisposers: IReactionDisposer[];
     protected constructor(
         dataStore: DataStore,
         div: string | HTMLDivElement,
@@ -101,17 +101,6 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart<T & B
         ); //other things may still be added to contentDiv outside react (e.g. legend)
         this.ComponentFn = ReactComponentFunction;
         this.mountReact();
-    }
-    /**
-     * On rare occasions where you need to run a function that depends on mobx state, outside of a React component.
-     * This is a convenience method for creating a mobx autorun reaction that will be dispsed when the chart is removed.
-     * @param fn - The function to run
-     * @param opts - Options for the autorun. 
-     * According to the docs you can pass an `equals` option to specify a mobx comparer... 
-     * but it isn't in IAutorunOptions type, and it doesn't seem to be in the code either.
-     */
-    mobxAutorun(fn: () => void, opts?: IAutorunOptions) {
-        this.reactionDisposers.push(autorun(fn, opts));
     }
     private mountReact() {
         const ReactComponentFunction = this.ComponentFn;

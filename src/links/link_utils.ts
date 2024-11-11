@@ -1,4 +1,4 @@
-import { makeAutoObservable, runInAction } from "mobx";
+import { makeAutoObservable, makeObservable, runInAction } from "mobx";
 import type ChartManager from "../charts/ChartManager";
 import type { ColumnName, FieldName } from "../charts/charts";
 import type DataStore from "@/datastore/DataStore";
@@ -176,6 +176,43 @@ export type RowsAsColslink = {
     // observableColumns: DataColumn<DataType>[]; //computed?
 }
 
+function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
+    if (link.observableFields !== undefined) return;
+    const cm = window.mdv.chartManager;
+    const nameCol = tds.columnIndex[link.name_column];
+    if (!nameCol) {
+        console.error(`Column ${link.name_column} not found in DataStore ${ds.name}`);
+        return;
+    }
+    link.observableFields = []; //maybe initialize this with current values
+    makeObservable(link, { observableFields: true });
+
+    cm.loadColumnSet([link.name_column], tds.name, () => {
+        //todo check link.name is a good id for the listener
+        tds.addListener(link.name, async (type, data) => {
+            if (type === "data_highlighted") {
+                const vals = data.indexes.map(index => ({ index, value: tds.getRowText(index, link.name_column) }));
+                runInAction(() => {
+                    link.observableFields = vals;
+                });
+            } else if (type === "filtered") {
+                // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
+                const filteredIndices = await tds.getFilteredIndices();
+                //! this Array.from could be suboptimal for large numbers of indices
+                const vals = Array.from(filteredIndices).map(
+                    // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
+                    // so there's a type error on the setValues line.
+                    // why doesn't that happen in the "data_highlighted" case above?
+                    index => ({ index, value: tds.getRowText(index, link.name_column) as string })
+                );
+                runInAction(() => {
+                    link.observableFields = vals;
+                });
+            }
+        });
+    });
+}
+
 export function getRowsAsColumnsLinks(dataStore: DataStore, dataSources: typeof ChartManager.prototype.dataSources) {
     if (dataStore.links) {
         return Object.keys(dataStore.links).map((linkedDsName) => {
@@ -194,12 +231,9 @@ export function getRowsAsColumnsLinks(dataStore: DataStore, dataSources: typeof 
                     throw new Error();
                 }
                 // todo make sure the link is reasonably typed
-                const link = links.rows_as_columns;
-                if (link.observableFields === undefined) {
-                    link.observableFields = []; //maybe initialize this with current values
-                    makeAutoObservable(link.observableFields);
-                }
-                return { linkedDs, link: links.rows_as_columns as RowsAsColslink };
+                const link = links.rows_as_columns as RowsAsColslink;
+                initRacListener(link, dataStore, linkedDs.dataStore);
+                return { linkedDs, link };
             }
         });
     }

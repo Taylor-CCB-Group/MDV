@@ -4,7 +4,8 @@ import { createEl } from "../utilities/Elements.js";
 import { chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
-import { makeAutoObservable, action } from "mobx";
+import { autorun, makeAutoObservable, action } from "mobx";
+
 
 class BaseChart {
     /**
@@ -187,6 +188,19 @@ class BaseChart {
         });
     }
     dialogs = [];
+    reactionDisposers = [];
+    /**
+     * On occasions where you need to run a function that depends on mobx state, outside of a React component.
+     * This is a convenience method for creating a mobx autorun reaction that will be dispsed when the chart is removed.
+     * @param {() => void} fn - The function to run
+     * @param {import("mobx").IAutorunOptions} [opts] - Options for the autorun. 
+     * According to the docs you can pass an `equals` option to specify a mobx comparer... 
+     * but it isn't in IAutorunOptions type, and it doesn't seem to be in the code either.
+     */
+    mobxAutorun(fn, opts) {
+        this.reactionDisposers.push(autorun(fn, opts));
+    }
+
     _getContentDimensions() {
         return {
             //PJT to review re. gridstack.

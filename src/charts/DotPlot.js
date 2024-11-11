@@ -276,26 +276,9 @@ class DotPlot extends SVGChart {
                 this.onDataFiltered();
             }
             const tds = linkedDs.dataStore;
-            cm.loadColumnSet([link.name_column], linkedDs.name, () => {
-                tds.addListener(`dotPlot_${this.config.id}`, async (eventType, data) => {
-                    if (eventType === "data_highlighted") {
-                        const vals = data.indexes.map(index => ({ index, value: tds.getRowText(index, link.name_column) }));
-                        setValues(vals); //if there are huge numbers, we may want to deal with that downstream, or here.
-                    } else if (eventType === "filtered") {
-                        // const vals = tds.getFilteredValues(link.name_column) as string[];
-                        // setValues(vals); //this isn't right - we need the index too
-                        // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-                        const filteredIndices = await tds.getFilteredIndices();
-                        //! this Array.from could be suboptimal for large numbers of indices
-                        const vals = Array.from(filteredIndices).map(
-                            // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
-                            // so there's a type error on the setValues line.
-                            // why doesn't that happen in the "data_highlighted" case above?
-                            index => ({ index, value: tds.getRowText(index, link.name_column)})
-                        );
-                        setValues(vals);
-                    }
-                });
+            this.mobxAutorun(() => {
+                const c_i = link.observableFields;
+                setValues(c_i);
             });
         }
     }

@@ -95,44 +95,7 @@ export function useRowsAsColumnsLinks() {
 export function useHighlightedForeignRows() {
     const id = useId();
     const racLink = useRowsAsColumnsLinks()[0];
-    // const { linkedDs, link } = racLink;
-    const [values, setValues] = useState<{index: number, value: string}[]>([]);
-    useEffect(() => {
-        if (!racLink) return;
-        const { linkedDs, link } = racLink;
-        const tds = linkedDs.dataStore;
-        const cm = window.mdv.chartManager;
-        //! how about we have some kind of mobx observable in the link object, and we can just listen to that?
-        
-        cm.loadColumnSet([link.name_column], linkedDs.name, () => {                
-            // - we need to make sure that the column in linkedDs is loaded before we add this listener.
-            tds.addListener(`highlightedRows:${id}`, async (eventType: string, data: any) => {
-                if (eventType === "data_highlighted") {
-                    const vals = data.indexes.map(index => ({index, value: tds.getRowText(index, link.name_column)}));
-                    setValues(vals); //if there are huge numbers, we may want to deal with that downstream, or here.
-                    runInAction(() => {
-                        
-                    })
-                } else if (eventType === "filtered") {
-                    // const vals = tds.getFilteredValues(link.name_column) as string[];
-                    // setValues(vals); //this isn't right - we need the index too
-                    // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-                    const filteredIndices = await tds.getFilteredIndices();
-                    //! this Array.from could be suboptimal for large numbers of indices
-                    const vals = Array.from(filteredIndices).map(
-                        // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
-                        // so there's a type error on the setValues line.
-                        // why doesn't that happen in the "data_highlighted" case above?
-                        index => ({index, value: tds.getRowText(index, link.name_column) as string})
-                    );
-                    setValues(vals);
-                }
-            });
-        });
-        return () => {
-            tds.removeListener(`highlightedRows:${id}`);
-        };
-    }, [id, racLink]);
+    const values = racLink?.link.observableFields || [];
     return values; //maybe don't useState version of this but return the mobx observable directly
 }
 /** design of this will need to change to account for n-links

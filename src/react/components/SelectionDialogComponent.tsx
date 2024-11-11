@@ -562,7 +562,7 @@ const AddRowComponent = observer(() => {
     )
 })
 
-const ForeignRows = () => {
+const ForeignRows = observer(() => {
     const [filter, setFilter] = useState("");
     const [max, setMax] = useState(10);
     const [debouncedFilter] = useDebounce(filter, 300);
@@ -583,7 +583,7 @@ const ForeignRows = () => {
             {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );
-}
+});
 
 /**
  * This will control the behaviour of the reset menuIcon in the chart header - not rendered with react.
