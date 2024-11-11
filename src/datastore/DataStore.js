@@ -198,7 +198,7 @@ class DataStore {
      *   the data has changed </li>
      * </ul>
      * @param {string} id - a unique id identifying the listener
-     * @param {function} listener - a function that accepts two paramaters, the type
+     * @param {(eventType: string, data: object) => void} listener - a function that accepts two paramaters, the type
      * of event and the data associated with it.
      */
     addListener(id, listener) {
