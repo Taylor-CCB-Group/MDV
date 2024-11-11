@@ -24,10 +24,11 @@ class DotPlot extends SVGChart {
     async setFields(fieldNames) {
         const cm = window.mdv.chartManager;
         const p0 = this.config.param[0];
-        //! we don't want to mutate the config object... we want to have a special value
-        // which signifies that it should use this behaviour.
-        // this won't work well if we save state.
-        this.config.param = [p0, ...fieldNames]; //first is the category column
+        //! we don't want to mutate the config object... 
+        // we want to have a special value which signifies that it should use this behaviour.
+        // then when we save state, it will have the appropriate value.
+        //this.config.param = [p0, ...fieldNames]; //first is the category column
+        this.fieldNames = fieldNames;
         await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
         const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
         const c = this.config;
@@ -56,7 +57,7 @@ class DotPlot extends SVGChart {
     }
 
     setColorFunction() {
-        const p = this.config.param;
+        const f = this.fieldNames[0];
         const mm = this.data.mean_range;
         const conf = {
             useValue: true,
@@ -67,7 +68,7 @@ class DotPlot extends SVGChart {
                 min: mm[0],
             },
         };
-        this.colorFunction = this.dataStore.getColorFunction(p[1], conf);
+        this.colorFunction = this.dataStore.getColorFunction(f, conf);
         this.setColorLegend();
     }
 
@@ -83,7 +84,7 @@ class DotPlot extends SVGChart {
             },
             name: "Mean Expression",
         };
-        return this.dataStore.getColorLegend(this.config.param[1], conf);
+        return this.dataStore.getColorLegend(this.fieldNames[0], conf);
     }
 
     showFractionLegend() {
@@ -130,7 +131,7 @@ class DotPlot extends SVGChart {
             method: "averages_simple",
             threshold: this.config.threshold_value,
         };
-
+        const p = [this.config.param[0], ...this.fieldNames];
         this.dim.getAverages(
             (data) => {
                 this.data = data;
@@ -138,7 +139,7 @@ class DotPlot extends SVGChart {
                 this.setColorFunction();
                 this.drawChart();
             },
-            this.config.param,
+            p,
             config,
         );
     }
@@ -158,7 +159,7 @@ class DotPlot extends SVGChart {
             .duration(tTime)
             .ease(easeLinear);
         const dim = this._getContentDimensions();
-        const cWidth = dim.width / (this.config.param.length - 1);
+        const cWidth = dim.width / (this.fieldNames.length);
         const fa = this.dim.filterMethod;
         this.setColorFunction();
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
