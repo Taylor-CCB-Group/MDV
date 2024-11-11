@@ -128,8 +128,5 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart<T & B
         // **is there any React teardown we should be considering?**
         this.root.unmount();
         super.remove();
-        for (const disposer of this.reactionDisposers) {
-            disposer();
-        }
     }
 }

@@ -188,6 +188,7 @@ class BaseChart {
         });
     }
     dialogs = [];
+    /** @type {import("mobx").IReactionDisposer[]} */
     reactionDisposers = [];
     /**
      * On occasions where you need to run a function that depends on mobx state, outside of a React component.
@@ -501,6 +502,9 @@ class BaseChart {
         }
         for (const d of this.dialogs) {
             d.close();
+        }
+        for (const disposer of this.reactionDisposers) {
+            disposer();
         }
         // dynamic props?
     }
