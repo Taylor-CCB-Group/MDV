@@ -60,6 +60,7 @@ import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { AddChartDialog } from "./dialogs/AddChartDialog";
+import decorateColumnMethod from "@/datastore/decorateColumnMethod";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -2101,45 +2102,6 @@ class ChartManager {
 
     }*/
 
-    //need to ensure that column data is loaded before calling method
-    _decorateColumnMethod(method, chart, dataSource) {
-        // let's make sure this works with our virtual column loading / mobx reaction... do we even need to change this?
-        // or will changing _getColumnsThen be enough?
-        // const newMethod = `_${method}`;
-        // chart[newMethod] = chart[method];
-        // //if original method is called check whether column has data
-        // chart[method] = (column) => {
-        //     this._getColumnsThen(dataSource, [column], () =>
-        //         chart[newMethod](column),
-        //     );
-        // };
-        this.__decorateColumnMethod(method, chart, dataSource);
-    }
-
-    //supercedes previous method - more genric
-    //method must be specified in the method UsingColumns in types of dictionary
-    __decorateColumnMethod(method, chart, dataSource) {
-        const newMethod = `_${method}`;
-        chart[newMethod] = chart[method];
-        //if original method is called check whether column has data
-        //first argument must be column(s) needed
-        const self = this;
-        // biome-ignore lint/complexity/useArrowFunction: we are using `arguments` here, think we need `function` syntax
-        chart[method] = function () {
-            //column not needed
-            if (arguments[0] == null) {
-                chart[newMethod](...arguments);
-            } else {
-                const cols = Array.isArray(arguments[0])
-                    ? arguments[0]
-                    : [arguments[0]];
-                self._getColumnsThen(dataSource, cols, () =>
-                    chart[newMethod](...arguments),
-                );
-            }
-        };
-    }
-
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
     _haveColumnsLoaded(neededCols, dataSource, func) {
@@ -2192,15 +2154,15 @@ class ChartManager {
         //have to be loaded before method can execute
         // @ts-ignore
         if (chart.colorByColumn) {
-            this._decorateColumnMethod("colorByColumn", chart, dataSource);
+            decorateColumnMethod("colorByColumn", chart, dataSource);
         }
         // @ts-ignore
         if (chart.setToolTipColumn) {
-            this._decorateColumnMethod("setToolTipColumn", chart, dataSource);
+            decorateColumnMethod("setToolTipColumn", chart, dataSource);
         }
         // @ts-ignore
         if (chart.setBackgroundFilter) {
-            this._decorateColumnMethod(
+            decorateColumnMethod(
                 "setBackgroundFilter",
                 chart,
                 dataSource,
@@ -2208,7 +2170,7 @@ class ChartManager {
         }
         // @ts-ignore
         if (chart.changeContourParameter) {
-            this._decorateColumnMethod(
+            decorateColumnMethod(
                 "changeContourParameter",
                 chart,
                 dataSource,
@@ -2218,7 +2180,7 @@ class ChartManager {
         //new preferred way to decorate column methods
         if (chartType.methodsUsingColumns) {
             for (const meth of chartType.methodsUsingColumns) {
-                this.__decorateColumnMethod(meth, chart, dataSource);
+                decorateColumnMethod(meth, chart, dataSource);
             }
         }
 
