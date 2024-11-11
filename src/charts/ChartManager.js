@@ -1572,6 +1572,11 @@ class ChartManager {
             this._loadColumnData(t, dataSource);
         }
     }
+    loadColumnSetAsync(columns, dataSource, split = 10, threads = 2) {
+        return new Promise((resolve, reject) => {
+            this.loadColumnSet(columns, dataSource, resolve, split, threads);
+        });
+    }
 
     _loadColumnData(trans, dataSource) {
         const dataStore = this.dsIndex[dataSource].dataStore;
