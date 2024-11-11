@@ -1,6 +1,7 @@
-import { runInAction } from "mobx";
+import { makeAutoObservable, runInAction } from "mobx";
 import type ChartManager from "../charts/ChartManager";
-import type { ColumnName } from "../charts/charts";
+import type { ColumnName, FieldName } from "../charts/charts";
+import type DataStore from "@/datastore/DataStore";
 // zod?
 
 type ChartLink = {
@@ -157,4 +158,50 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
             updateValue(newValue);
         }
     });
+}
+
+
+export type RowsAsColslink = {
+    name_column: string;
+    name: string;
+    subgroups: {
+        [sgName: string]: {
+            name: string;
+            label: string;
+            type: string;
+        }
+    },
+    /** added at runtime, observable array corresponding to currently selected/highlighted items */
+    observableFields: { index: number, value: FieldName }[];
+    // observableColumns: DataColumn<DataType>[]; //computed?
+}
+
+export function getRowsAsColumnsLinks(dataStore: DataStore, dataSources: typeof ChartManager.prototype.dataSources) {
+    if (dataStore.links) {
+        return Object.keys(dataStore.links).map((linkedDsName) => {
+            const links = dataStore.links[linkedDsName];
+            if (links.rows_as_columns) {
+                // first pass... there can be only one or zero.
+                // how often will users actually want to link multiple dataSources in this way?
+                // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
+                // UI should be simpler for the common case with a single linked dataSource.
+                // Are there any crazy edge cases we should consider - like indirect links? links to self?
+                // !! this should be right now, but we should test with multiple links.
+                const linkedDs = dataSources.find(
+                    (ds) => ds.name === linkedDsName,
+                );
+                if (!linkedDs) {
+                    throw new Error();
+                }
+                // todo make sure the link is reasonably typed
+                const link = links.rows_as_columns;
+                if (link.observableFields === undefined) {
+                    link.observableFields = []; //maybe initialize this with current values
+                    makeAutoObservable(link.observableFields);
+                }
+                return { linkedDs, link: links.rows_as_columns as RowsAsColslink };
+            }
+        });
+    }
+    return [];
 }

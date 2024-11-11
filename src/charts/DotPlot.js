@@ -5,7 +5,7 @@ import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
-import { getRowsAsColumnsLinks } from "@/react/chartLinkHooks";
+import { getRowsAsColumnsLinks } from "@/links/link_utils";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {

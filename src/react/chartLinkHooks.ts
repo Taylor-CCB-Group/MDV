@@ -3,8 +3,9 @@ import { useMetadata, useViewerStoreApi } from "./components/avivatorish/state";
 import { useChartID, useDataSources } from "./hooks";
 import type { VivMDVReact } from "./components/VivMDVReact";
 import { useDataStore } from "./context";
-import type { DataColumn, DataType } from "@/charts/charts";
-import type DataStore from "@/datastore/DataStore";
+import type { DataColumn, DataType, FieldName } from "@/charts/charts";
+import { runInAction } from "mobx";
+import { getRowsAsColumnsLinks } from "@/links/link_utils";
 
 export const useViewStateLink = () => {
     const viewerStore = useViewerStoreApi();
@@ -72,43 +73,6 @@ export const useViewStateLink = () => {
     ]);
 };
 
-type RowsAsColslink = {
-    name_column: string;
-    name: string;
-    subgroups: {
-        [sgName: string]: {
-            name: string;
-            label: string;
-            type: string;
-        } 
-    }
-}
-
-export function getRowsAsColumnsLinks(dataStore: DataStore, dataSources: ReturnType<typeof useDataSources>) {
-    if (dataStore.links) {
-        return Object.keys(dataStore.links).map((linkedDsName) => {
-            const links = dataStore.links[linkedDsName];
-            if (links.rows_as_columns) {
-                // first pass... there can be only one or zero.
-                // how often will users actually want to link multiple dataSources in this way?
-                // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
-                // UI should be simpler for the common case with a single linked dataSource.
-                // Are there any crazy edge cases we should consider - like indirect links? links to self?
-                // !! this should be right now, but we should test with multiple links.
-                const linkedDs = dataSources.find(
-                    (ds) => ds.name === linkedDsName,
-                );
-                if (!linkedDs) {
-                    throw new Error();
-                }
-                // todo make sure the link is reasonably typed
-
-                return { linkedDs, link: links.rows_as_columns as RowsAsColslink };
-            }
-        });
-    }
-    return [];
-}
 
 /** returns information about any `rows_as_columns_link`s that exist in the context `dataSource` */
 export function useRowsAsColumnsLinks() {
@@ -138,13 +102,17 @@ export function useHighlightedForeignRows() {
         const { linkedDs, link } = racLink;
         const tds = linkedDs.dataStore;
         const cm = window.mdv.chartManager;
-        // how about we have some kind of mobx observable in the link object, and we can just listen to that?
+        //! how about we have some kind of mobx observable in the link object, and we can just listen to that?
+        
         cm.loadColumnSet([link.name_column], linkedDs.name, () => {                
             // - we need to make sure that the column in linkedDs is loaded before we add this listener.
             tds.addListener(`highlightedRows:${id}`, async (eventType: string, data: any) => {
                 if (eventType === "data_highlighted") {
                     const vals = data.indexes.map(index => ({index, value: tds.getRowText(index, link.name_column)}));
                     setValues(vals); //if there are huge numbers, we may want to deal with that downstream, or here.
+                    runInAction(() => {
+                        
+                    })
                 } else if (eventType === "filtered") {
                     // const vals = tds.getFilteredValues(link.name_column) as string[];
                     // setValues(vals); //this isn't right - we need the index too
@@ -165,7 +133,7 @@ export function useHighlightedForeignRows() {
             tds.removeListener(`highlightedRows:${id}`);
         };
     }, [id, racLink]);
-    return values;
+    return values; //maybe don't useState version of this but return the mobx observable directly
 }
 /** design of this will need to change to account for n-links
  * 
