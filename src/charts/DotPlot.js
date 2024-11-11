@@ -15,8 +15,21 @@ class DotPlot extends SVGChart {
             y: { type: "band" },
             ry: {},
         });
-        const p = this.config.param;
-        const yLabels = [];
+        this.addToolTip();
+        this.dim = this.dataStore.getDimension("catcol_dimension");
+        this.colorScheme = schemeReds[8];
+        this.setFields(config.param.slice(1));
+    }
+
+    async setFields(fieldNames) {
+        const cm = window.mdv.chartManager;
+        const p0 = this.config.param[0];
+        //! we don't want to mutate the config object... we want to have a special value
+        // which signifies that it should use this behaviour.
+        // this won't work well if we save state.
+        this.config.param = [p0, ...fieldNames]; //first is the category column
+        await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
+        const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
         const c = this.config;
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
@@ -27,14 +40,8 @@ class DotPlot extends SVGChart {
             c.fraction_legend = { display: true };
         }
         this.fractionScale = scaleSqrt().domain([0, 100]);
-        for (let x = 1; x < p.length; x++) {
-            yLabels.push(this.dataStore.getColumnName(p[x]));
-        }
         this.x_scale.domain(yLabels);
-        this.dim = this.dataStore.getDimension("catcol_dimension");
-        this.addToolTip();
         this.onDataFiltered();
-        this.colorScheme = schemeReds[8];
     }
 
     remove(notify = true) {
@@ -247,43 +254,15 @@ class DotPlot extends SVGChart {
         const links = getRowsAsColumnsLinks(this.dataSource, dataSources);
         if (links) {
             const { link } = links[0];
-            const setValues = async (fields) => {
-                const sg = Object.keys(link.subgroups)[0];
-                const ds = this.dataStore;
-                // make sure we get the computed column properties for fields of interest,
-                // or loadColumnSet will fail later
-                const cols = fields.slice(0, 100).map(({column}) => column);
-                const fieldNames = cols.map(col => col.field);
-                const p0 = this.config.param[0];
-                // we don't want to mutate the config object... we want to have a special value
-                // which signifies that it should use this behaviour.
-                this.config.param = [p0, ...fieldNames]; //first is the category column
-                await new Promise((resolve) => {
-                    cm.loadColumnSet(fieldNames, this.dataStore.name, () => {
-                        resolve();
-                    });
-                });
-                //const p = this.config.param;
-                const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
-                const c = this.config;
-                //work out color scales
-                c.color_scale = c.color_scale || { log: false };
-                if (!c.color_legend) {
-                    c.color_legend = { display: true };
-                }
-                if (!c.fraction_legend) {
-                    c.fraction_legend = { display: true };
-                }
-                this.fractionScale = scaleSqrt().domain([0, 100]);
-                this.x_scale.domain(yLabels);
-                // this.dim = this.dataStore.getDimension("catcol_dimension");
-                this.addToolTip();
-                this.onDataFiltered();
-            }
             // we should have a different way to handle this - once it starts, it won't stop
             // it should be tied to config.param[1] having a value that signifies this behaviour
             this.mobxAutorun(() => {
-                setValues(link.observableFields);
+                // we need to make sure the computed column properties are invoked for columns of interest
+                // otherwise ds.addColumnFromField() won't be called...
+                const cols = link.observableFields.slice(0, 100).map(({ column }) => column);
+                // otherwise we could just get the field names.
+                const fieldNames = cols.map(col => col.field);
+                this.setFields(fieldNames);
             });
         }
     }
