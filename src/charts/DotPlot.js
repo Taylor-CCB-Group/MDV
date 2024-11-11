@@ -250,16 +250,16 @@ class DotPlot extends SVGChart {
                 const sg = Object.keys(link.subgroups)[0];
                 const ds = this.dataStore;
                 const cols = c_i.map(v => `${sg}|${v.value}(${sg})|${v.index}`).slice(0, 100).map(f => ds.addColumnFromField(f));
-                const p = cols.map(col => col.field);
+                const fieldNames = cols.map(col => col.field);
                 const p0 = this.config.param[0];
-                this.config.param = [p0, ...p]; //first is the category column
+                this.config.param = [p0, ...fieldNames]; //first is the category column
                 await new Promise((resolve) => {
-                    cm.loadColumnSet(p, this.dataStore.name, () => {
+                    cm.loadColumnSet(fieldNames, this.dataStore.name, () => {
                         resolve();
                     });
                 });
                 //const p = this.config.param;
-                const yLabels = [];
+                const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
                 const c = this.config;
                 //work out color scales
                 c.color_scale = c.color_scale || { log: false };
@@ -270,13 +270,9 @@ class DotPlot extends SVGChart {
                     c.fraction_legend = { display: true };
                 }
                 this.fractionScale = scaleSqrt().domain([0, 100]);
-                for (let x = 1; x < p.length; x++) {
-                    yLabels.push(this.dataStore.getColumnName(p[x]));
-                }
                 this.x_scale.domain(yLabels);
                 // this.dim = this.dataStore.getDimension("catcol_dimension");
                 this.addToolTip();
-                //!! is the problem somehow that we expect categorical data but have numerical data?
                 this.onDataFiltered();
             }
             const tds = linkedDs.dataStore;
