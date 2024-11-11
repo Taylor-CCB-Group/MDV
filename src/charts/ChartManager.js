@@ -2103,14 +2103,17 @@ class ChartManager {
 
     //need to ensure that column data is loaded before calling method
     _decorateColumnMethod(method, chart, dataSource) {
-        const newMethod = `_${method}`;
-        chart[newMethod] = chart[method];
-        //if original method is called check whether column has data
-        chart[method] = (column) => {
-            this._getColumnsThen(dataSource, [column], () =>
-                chart[newMethod](column),
-            );
-        };
+        // let's make sure this works with our virtual column loading / mobx reaction... do we even need to change this?
+        // or will changing _getColumnsThen be enough?
+        // const newMethod = `_${method}`;
+        // chart[newMethod] = chart[method];
+        // //if original method is called check whether column has data
+        // chart[method] = (column) => {
+        //     this._getColumnsThen(dataSource, [column], () =>
+        //         chart[newMethod](column),
+        //     );
+        // };
+        this.__decorateColumnMethod(method, chart, dataSource);
     }
 
     //supercedes previous method - more genric
@@ -2120,7 +2123,9 @@ class ChartManager {
         chart[newMethod] = chart[method];
         //if original method is called check whether column has data
         //first argument must be column(s) needed
-        chart[method] = () => {
+        const self = this;
+        // biome-ignore lint/complexity/useArrowFunction: we are using `arguments` here, think we need `function` syntax
+        chart[method] = function () {
             //column not needed
             if (arguments[0] == null) {
                 chart[newMethod](...arguments);
@@ -2128,7 +2133,7 @@ class ChartManager {
                 const cols = Array.isArray(arguments[0])
                     ? arguments[0]
                     : [arguments[0]];
-                this._getColumnsThen(dataSource, cols, () =>
+                self._getColumnsThen(dataSource, cols, () =>
                     chart[newMethod](...arguments),
                 );
             }
