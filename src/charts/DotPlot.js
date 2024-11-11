@@ -209,7 +209,7 @@ class DotPlot extends SVGChart {
                         //const tip = { category: vals[d.cat_id], value: d.id, fraction: d.frac };
                         const category = this.dataStore.columnIndex[this.config.param[0]].name;
                         const id = this.dataStore.columnIndex[d.id].name;
-                        this.showToolTip(e, `${id}<br />${category}: ${vals[d.cat_id]}<br>percentage: ${d.frac.toFixed(0)}%`);
+                        this.showToolTip(e, `${d.id}<br />${category}: ${vals[d.cat_id]}<br>percentage: ${d.frac.toFixed(0)}%`);
                     })
                     .on("mouseout", () => {
                         this.hideToolTip();
@@ -246,13 +246,17 @@ class DotPlot extends SVGChart {
         const dataSources = cm.dataSources;
         const links = getRowsAsColumnsLinks(this.dataSource, dataSources);
         if (links) {
-            const { link, linkedDs } = links[0];
-            const setValues = async (c_i) => {
+            const { link } = links[0];
+            const setValues = async (fields) => {
                 const sg = Object.keys(link.subgroups)[0];
                 const ds = this.dataStore;
-                const cols = c_i.map(v => `${sg}|${v.value}(${sg})|${v.index}`).slice(0, 100).map(f => ds.addColumnFromField(f));
+                // make sure we get the computed column properties for fields of interest,
+                // or loadColumnSet will fail later
+                const cols = fields.slice(0, 100).map(({column}) => column);
                 const fieldNames = cols.map(col => col.field);
                 const p0 = this.config.param[0];
+                // we don't want to mutate the config object... we want to have a special value
+                // which signifies that it should use this behaviour.
                 this.config.param = [p0, ...fieldNames]; //first is the category column
                 await new Promise((resolve) => {
                     cm.loadColumnSet(fieldNames, this.dataStore.name, () => {
@@ -276,10 +280,10 @@ class DotPlot extends SVGChart {
                 this.addToolTip();
                 this.onDataFiltered();
             }
-            const tds = linkedDs.dataStore;
+            // we should have a different way to handle this - once it starts, it won't stop
+            // it should be tied to config.param[1] having a value that signifies this behaviour
             this.mobxAutorun(() => {
-                const c_i = link.observableFields;
-                setValues(c_i);
+                setValues(link.observableFields);
             });
         }
     }

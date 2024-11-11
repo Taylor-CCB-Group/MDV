@@ -1,6 +1,6 @@
-import { makeAutoObservable, makeObservable, runInAction } from "mobx";
+import { computed, makeAutoObservable, makeObservable, runInAction } from "mobx";
 import type ChartManager from "../charts/ChartManager";
-import type { ColumnName, FieldName } from "../charts/charts";
+import type { ColumnName, DataColumn, DataType, FieldName } from "../charts/charts";
 import type DataStore from "@/datastore/DataStore";
 // zod?
 
@@ -160,6 +160,12 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
     });
 }
 
+interface IRowAsColumn {
+    index: number;
+    name: ColumnName;
+    fieldName: FieldName;
+    column: DataColumn<DataType>;
+}
 
 export type RowsAsColslink = {
     name_column: string;
@@ -172,11 +178,13 @@ export type RowsAsColslink = {
         }
     },
     /** added at runtime, observable array corresponding to currently selected/highlighted items */
-    observableFields: { index: number, value: FieldName }[];
+    observableFields: IRowAsColumn[];
+    //^^ what if it was Enumerable instead of Array? and/or `column` can be a computed value?
     // observableColumns: DataColumn<DataType>[]; //computed?
 }
 
-function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
+
+async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
     if (link.observableFields !== undefined) return;
     const cm = window.mdv.chartManager;
     const nameCol = tds.columnIndex[link.name_column];
@@ -186,30 +194,57 @@ function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
     }
     link.observableFields = []; //maybe initialize this with current values
     makeObservable(link, { observableFields: true });
-
-    cm.loadColumnSet([link.name_column], tds.name, () => {
-        //todo check link.name is a good id for the listener
-        tds.addListener(link.name, async (type, data) => {
-            if (type === "data_highlighted") {
-                const vals = data.indexes.map(index => ({ index, value: tds.getRowText(index, link.name_column) }));
-                runInAction(() => {
-                    link.observableFields = vals;
-                });
-            } else if (type === "filtered") {
-                // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-                const filteredIndices = await tds.getFilteredIndices();
-                //! this Array.from could be suboptimal for large numbers of indices
-                const vals = Array.from(filteredIndices).map(
-                    // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
-                    // so there's a type error on the setValues line.
-                    // why doesn't that happen in the "data_highlighted" case above?
-                    index => ({ index, value: tds.getRowText(index, link.name_column) as string })
-                );
-                runInAction(() => {
-                    link.observableFields = vals;
-                });
-            }
-        });
+    
+    await cm.loadColumnSetAsync([link.name_column], tds.name);
+    const sg = Object.keys(link.subgroups)[0];
+    class RAColumn implements IRowAsColumn {
+        index: number;
+        value: ColumnName;
+        get name() {
+            return tds.getRowText(this.index, link.name_column) as string;
+        }
+        get fieldName(): FieldName {
+            return `${sg}|${this.name} (${sg})|${this.index}`;
+        }
+        get column(): DataColumn<DataType> {
+            return ds.addColumnFromField(this.fieldName);
+        }
+        constructor(index: number) {
+            this.index = index;
+            makeObservable(this, {
+                name: computed,
+                fieldName: computed,
+                column: computed
+            })
+        }
+    }
+    const getField = (index: number) => {
+        // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
+        // const name = tds.getRowText(index, link.name_column) as string;
+        // const fieldName = `${sg}|${name} (${sg})|${index}`;
+        // const column = ds.addColumnFromField(fieldName);
+        // return ({ index, value: name, fieldName, column });
+        return new RAColumn(index);
+    };
+    //todo check link.name is a good id for the listener
+    tds.addListener(link.name, async (type, data) => {
+        if (type === "data_highlighted") {
+            const vals = data.indexes.map(getField);
+            runInAction(() => {
+                link.observableFields = vals;
+            });
+        } else if (type === "filtered") {
+            // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
+            const filteredIndices = await tds.getFilteredIndices();
+            //! this Array.from could be suboptimal for large numbers of indices
+            // we should do fieldName formatting here... should we also call ds.addColumnFromField?
+            // or do we want to limit that?
+            // slightly depends on our ability to display appropriately grouped options in the dropdown...
+            const vals = Array.from(filteredIndices).map(getField);
+            runInAction(() => {
+                link.observableFields = vals;
+            });
+        }
     });
 }
 

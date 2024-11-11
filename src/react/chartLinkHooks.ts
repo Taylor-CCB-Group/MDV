@@ -131,10 +131,8 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
         const sg = Object.keys(link.subgroups)[0];
         const f = filter.toLowerCase();
         // todo: consider pagination... pass in a page number, return information about total number of columns etc.
-        const c = cols.filter(({value}) => value.toLowerCase().includes(f)).slice(0, max).map(v => {
-            const f = `${sg}|${v.value}(${sg})|${v.index}`;
-            return ds.addColumnFromField(f);
-        });
+        // moving ds.addColumnsFromFields() up the stack...
+        const c = cols.filter(({name}) => name.toLowerCase().includes(f)).slice(0, max).map(({column}) => column);
         // don't setColumns until we have the data...
         // alternatively, they could be lazy-loaded by consuming components.
         // that could be implemented relatively easily, but would lack some batching of requests,
