@@ -1,4 +1,4 @@
-import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
+import { useConfig, useLazyDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, Typography, Select } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
@@ -46,7 +46,7 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
 
 const filterOptions = createFilterOptions<any>({ limit: 100 });
 const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
-    const dim = useDimensionFilter(column);
+    const dim = useLazyDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { values } = column;
     const filter = useFilterConfig(column);
@@ -62,10 +62,10 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     useEffect(() => {
         // filter could be undefined - but we previously checked for null causing component to crash
         if ((!filter) || (filter.category.length === 0)) {
-            dim.removeFilter();
+            dim().removeFilter();
             return;
         }
-        dim.filter("filterCategories", [column.field], value, true);
+        dim().filter("filterCategories", [column.field], value, true);
     }, [dim, column.field, value, filter]);
     const [hasFocus, setHasFocus] = useState(false);
     const toggleOption = useCallback((option: string) => {
@@ -164,16 +164,16 @@ const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
 });
 
 const UniqueComponent = observer(({ column }: Props<"unique">) => {
-    const dim = useDimensionFilter(column);
+    const dim = useLazyDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
     const filter = useFilterConfig(column);
     const [initialValue] = useState(filter);
     useEffect(() => {
         if (filter === null) {
-            dim.removeFilter();
+            dim().removeFilter();
             return;
         }
-        dim.filter("filterUnique", [column.field], filter, true);
+        dim().filter("filterUnique", [column.field], filter, true);
         //return () => dim.removeFilter(); //handled by useDimensionFilter
     }, [dim, column.field, filter]);
     const [localFilter, setLocalFilter] = useState(filter || "");
@@ -193,23 +193,26 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
  * state with mobx in the config.filters object.
  */
 function useRangeFilter(column: DataColumn<NumberDataType>) {
-    const filter = useDimensionFilter(column) as RangeDimension;
+    const filter = useLazyDimensionFilter(column) as () => RangeDimension;
     const filters = useConfig<SelectionDialogConfig>().filters;
     const value = (filters[column.field] || column.minMax) as [number, number];
     const isInteger = column.datatype.match(/int/);
     const step = isInteger ? 1 : 0.01;
     const [debouncedValue] = useDebounce(value, 10);
-
+    const [hasFiltered, setHasFiltered] = useState(false);
     // Effect to manage the filter state
     useEffect(() => {
         const value = debouncedValue;
         if (value[0] === column.minMax[0] && value[1] === column.minMax[1]) {
-            filter.removeFilter();
+            if (!hasFiltered) return;
+            filter().removeFilter();
+            // setHasFiltered(true);
             return;
         }
         const [min, max] = value;
-        filter.filter("filterRange", [column.field], { min, max }, true);
-    }, [column, filter, debouncedValue]);
+        filter().filter("filterRange", [column.field], { min, max }, true);
+        setHasFiltered(true);
+    }, [column, filter, debouncedValue, hasFiltered]);
 
     const [histogram, setHistogram] = useState<number[]>([]);
     // this could be a more general utility function - expect to extract soon

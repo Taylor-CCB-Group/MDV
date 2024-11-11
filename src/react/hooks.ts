@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
+import type Dimension from "@/datastore/Dimension";
 
 /**
  * Get the chart's config.
@@ -307,16 +308,39 @@ export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
     // it might be good to have something better for isTextLike, some tests for this...
     const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
     const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
-    const dim = useMemo(() => {
-        const dim = ds.getDimension(dimension_type);
-        return dim;
-    }, [ds, dimension_type]);
+    // worker-leak with react dev-mode...
+    // https://legacy.reactjs.org/docs/hooks-faq.html#how-to-create-expensive-objects-lazily
+    // supposedly this will only be called once, but doesn't seem to be the case.
+    const [dim] = useState(() => ds.getDimension(dimension_type));
     useEffect(() => {
         // cleanup when component unmounts
         return () => dim.destroy();
-    }, [dim.destroy]);
+    }, [dim]);
     return dim;
 }
+
+export function useLazyDimensionFilter<K extends DataType>(column: DataColumn<K>) {
+    const ds = useDataStore();
+    const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
+    const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
+    const dimRef = useRef<Dimension | null>(null);
+    const getDimension = useCallback(() => {
+        if (!dimRef.current) {
+            dimRef.current = ds.getDimension(dimension_type);
+        }
+        return dimRef.current;
+    }, [ds, dimension_type]);
+    useEffect(() => {
+        return () => {
+            if (dimRef.current) {
+                dimRef.current.destroy();
+                dimRef.current = null;
+            }
+        };
+    }, []);
+    return getDimension;
+}
+
 export function useRangeDimension2D() {
     const ds = useDataStore();
     const s = useRegionScale();
@@ -326,7 +350,7 @@ export function useRangeDimension2D() {
     }, [ds]);
     useEffect(() => {
         return () => rangeDimension.destroy();
-    }, [rangeDimension.destroy]);
+    }, [rangeDimension]);
     // encapsulating a bit more of the Dimension API here so I'm less likely to forget it.
     const { param } = useConfig();
     const cols = useMemo(() => [param[0], param[1]], [param]); //todo: 3d...
