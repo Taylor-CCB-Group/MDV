@@ -250,9 +250,7 @@ class DotPlot extends SVGChart {
     }
 
     async applyRowAsColLink() {
-        const cm = window.mdv.chartManager;
-        const dataSources = cm.dataSources;
-        const links = getRowsAsColumnsLinks(this.dataSource, dataSources);
+        const links = getRowsAsColumnsLinks(this.dataSource);
         if (links) {
             const { link } = links[0];
             // we should have a different way to handle this - once it starts, it won't stop

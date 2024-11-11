@@ -1,10 +1,9 @@
 import { useEffect, useId, useState } from "react";
 import { useMetadata, useViewerStoreApi } from "./components/avivatorish/state";
-import { useChartID, useDataSources } from "./hooks";
+import { useChartID } from "./hooks";
 import type { VivMDVReact } from "./components/VivMDVReact";
 import { useDataStore } from "./context";
-import type { DataColumn, DataType, FieldName } from "@/charts/charts";
-import { runInAction } from "mobx";
+import type { DataColumn, DataType } from "@/charts/charts";
 import { getRowsAsColumnsLinks } from "@/links/link_utils";
 
 export const useViewStateLink = () => {
@@ -76,7 +75,6 @@ export const useViewStateLink = () => {
 
 /** returns information about any `rows_as_columns_link`s that exist in the context `dataSource` */
 export function useRowsAsColumnsLinks() {
-    const dataSources = useDataSources();
     //- we should have useDataSource() which would work in dialogs not associated with a particular chart.
     //(test in AddChartDialog)
     const dataStore = useDataStore(); //! this whole dataSource vs dataStore thing still confuses me
@@ -84,7 +82,7 @@ export function useRowsAsColumnsLinks() {
         throw "no dataStore!!!";
     }
     // if it was possible for user to edit this at runtime, we'd want this to be reactive
-    return getRowsAsColumnsLinks(dataStore, dataSources);
+    return getRowsAsColumnsLinks(dataStore);
 }
 
 /** design of this will need to change to account for n-links

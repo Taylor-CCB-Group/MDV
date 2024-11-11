@@ -248,7 +248,8 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
     });
 }
 
-export function getRowsAsColumnsLinks(dataStore: DataStore, dataSources: typeof ChartManager.prototype.dataSources) {
+export function getRowsAsColumnsLinks(dataStore: DataStore) {
+    const dataSources = window.mdv.chartManager.dataSources;
     if (dataStore.links) {
         return Object.keys(dataStore.links).map((linkedDsName) => {
             const links = dataStore.links[linkedDsName];
