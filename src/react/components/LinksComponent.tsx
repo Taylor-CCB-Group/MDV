@@ -11,7 +11,7 @@ type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>[0];
 
 const RowsAsCols = observer((props : RowsAsColsProps) => {
     const { linkedDs, link } = props;
-    const rowNames = useHighlightedForeignRows().map(r => r.value);
+    const rowNames = useHighlightedForeignRows().map(r => r.fieldName);
     const { name_column, name, subgroups } = link;
     // const dataSources = useDataSources();
     const cm = window.mdv.chartManager;
