@@ -7,6 +7,7 @@ import { axisLeft } from "d3-axis";
 import BaseChart from "./BaseChart.js";
 import type CatRangeDimension from "@/datastore/CatRangeDimension.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import type { FieldName } from "./charts.js";
 
 class MultiLineChart extends SVGChart {
     defaultBandWidth: number;
@@ -61,7 +62,7 @@ class MultiLineChart extends SVGChart {
         this.onDataFiltered();
     }
 
-    stackLines(st) {
+    stackLines(st: boolean) {
         this.config.stacked = st;
         if (st) {
             this.y_scale = scaleBand();
@@ -80,7 +81,7 @@ class MultiLineChart extends SVGChart {
     }
 
     @loadColumnData
-    changeCategories(column, val1, val2) {
+    changeCategories(column: FieldName) {
         this.config.param[1] = column;
         this.onDataFiltered();
         this.setColorLegend();
@@ -248,17 +249,17 @@ class MultiLineChart extends SVGChart {
             {
                 type: "dropdown",
                 current_value: c.param[1],
-                label: "Change Cetegories (y axis)",
+                label: "Change Categories (y axis)",
                 values: [cols, "name", "field"],
-                func: (x) => {
-                    this.changeCategories(x, "val1", "val2");
+                func: (x: FieldName) => {
+                    this.changeCategories(x);
                 },
             },
             {
                 type: "check",
                 current_value: c.stacked,
                 label: "Stack Lines",
-                func: (x) => {
+                func: (x: boolean) => {
                     this.stackLines(x);
                     this.drawChart();
                 },
