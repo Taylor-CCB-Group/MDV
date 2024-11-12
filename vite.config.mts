@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react';
-import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
+// import '@babel/plugin-proposal-decorators';
+import type { RollupOptions } from 'rollup';
 import * as path from 'node:path';
 
-const flaskURL = "http://127.0.0.1:5055";
+const flaskURL = "http://127.0.0.1:5051";
 const port = 5171;
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
@@ -122,6 +123,11 @@ export default defineConfig(env => ({
         strictPort: true,
         proxy,
     },
+    esbuild: {
+        // make sure it transforms decorators in dev mode
+        // (only working in vanilla ts? don't want to switch to babel, maybe SWC will work)
+        target: 'es2022'
+    },
     publicDir: 'examples', //used for netlify.toml??... the rest is noise.
     build: {
         sourcemap: true,
@@ -133,6 +139,13 @@ export default defineConfig(env => ({
     plugins: [
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
+            // failing to get this to work with decorators...
+            // babel: {
+            //     plugins: ['@babel/plugin-proposal-decorators', { 
+            //         version: '2023-05',
+            //         // decoratorsBeforeExport: true,
+            //     }],
+            // }
         })
     ],
     worker: {

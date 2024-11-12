@@ -185,6 +185,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         this.vivStores = createVivStores();
     }
     colorBy?: (i: number) => [r: number, g: number, b: number];
+    // @loadColumnData
     colorByColumn(col?: ColumnName) {
         if (!col) return this.colorByDefault();
         this.config.color_by = col;

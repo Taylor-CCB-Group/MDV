@@ -4,9 +4,15 @@ import { easeLinear } from "d3-ease";
 import { select } from "d3-selection";
 import { scaleBand, scaleLinear } from "d3-scale";
 import { axisLeft } from "d3-axis";
-import BaseChart from "./BaseChart";
+import BaseChart from "./BaseChart.js";
+import type CatRangeDimension from "@/datastore/CatRangeDimension.js";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class MultiLineChart extends SVGChart {
+    defaultBandWidth: number;
+    declare dim: CatRangeDimension;
+    declare data: any[];
+    declare ticks: any;
     constructor(dataStore, div, config) {
         const x_name = dataStore.getColumnName(config.param[0]);
         if (!config.axis) {
@@ -68,14 +74,16 @@ class MultiLineChart extends SVGChart {
             );
         } else {
             this.y_scale = scaleLinear();
-            this.y_axis_call = axisLeft(this.y_scale);
+            this.y_axis_call = axisLeft(this.y_scale) as any;
             this.y_scale.domain([1, 0]);
         }
     }
 
+    @loadColumnData
     changeCategories(column, val1, val2) {
         this.config.param[1] = column;
         this.onDataFiltered();
+        this.setColorLegend();
     }
 
     scaleTrim(val) {
@@ -95,7 +103,7 @@ class MultiLineChart extends SVGChart {
         return this.dataStore.getColorLegend(this.config.param[1]);
     }
 
-    onDataFiltered(dim) {
+    onDataFiltered(dim?: any) {
         if (this.isPinned) {
             return;
         }
@@ -104,7 +112,8 @@ class MultiLineChart extends SVGChart {
                 this.resetButton.style.display = "none";
             }
             const c = this.config;
-            this.ticks = this.x_scale.ticks(c.intervals);
+            //todo review d3 types
+            this.ticks = (this.x_scale as any).ticks(c.intervals);
             this.dim.getKernalDensity(
                 (data) => {
                     this.data = data;
@@ -122,7 +131,8 @@ class MultiLineChart extends SVGChart {
     }
 
     remove(notify = true) {
-        this.dim.destroy(notify);
+        // this.dim.destroy(notify);
+        this.dim.destroy();
         super.remove();
     }
 
@@ -179,13 +189,14 @@ class MultiLineChart extends SVGChart {
                     .x((d, i) => {
                         return xpos[i];
                     })
-                    .y((d, i) => {
+                    //@ts-expect-error - todo review d3 types
+                    .y((d) => {
                         return d;
                     }),
             );
 
         if (c.fill) {
-            const a = area()
+            const a = (area as any)()
                 .x((d, i) => xpos[i])
                 .y0((d, i) => d)
                 .y1((d, i) => {
@@ -201,7 +212,7 @@ class MultiLineChart extends SVGChart {
                 .attr("fill", (d) => colors[d.id])
                 .style("opacity", 0.5)
                 .attr("d", (d, i) =>
-                    area()
+                    (area as any)()
                         .x((dd, ii) => xpos[ii])
                         .y0((dd) => dd)
                         .y1((d) => {
@@ -280,7 +291,7 @@ class MultiLineChart extends SVGChart {
                 type: "slider",
                 max: mm[1] / 10,
                 min: mm[0] < 0 ? 0 : mm[0],
-                doc: this.__doc__,
+                // doc: this.__doc__,
                 current_value: c.band_width,
                 label: "Band Width",
                 func: (x) => {
@@ -293,7 +304,7 @@ class MultiLineChart extends SVGChart {
                 max: 100,
                 min: 10,
                 step: 1,
-                doc: this.__doc__,
+                // doc: this.__doc__,
                 current_value: c.intervals,
                 label: "Intervals",
                 func: (x) => {
@@ -318,7 +329,7 @@ class MultiLineChart extends SVGChart {
 BaseChart.types["multi_line_chart"] = {
     class: MultiLineChart,
     name: "Multi Line Chart",
-    methodsUsingColumns: ["changeCategories"],
+    // methodsUsingColumns: ["changeCategories"],
     params: [
         {
             type: "number",

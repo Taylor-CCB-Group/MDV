@@ -8,10 +8,10 @@ import { ImageArrayDeckExtension } from "../webgl/ImageArrayDeckExtension";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { OrthographicView } from "@deck.gl/core";
 import type Dimension from "../datastore/Dimension.js";
-import type { GuiSpec } from "./charts.js";
+import type { DataColumn, FieldName, GuiSpec, NumberDataType } from "./charts.js";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
-// not a definitive type, but marginally better than 'any', locally for now...
-type Column = { data: Float32Array; minMax: [number, number] };
+type Column = DataColumn<NumberDataType>;
 let nextID = 0;
 class ImageScatterChart extends BaseChart {
     canvas: HTMLCanvasElement;
@@ -25,7 +25,7 @@ class ImageScatterChart extends BaseChart {
     saturation = 1;
     spaceX = 600;
     spaceY = 392;
-    colorBy?: (index: number) => number[];
+    colorBy?: (index: number) => [number, number, number];
     id: number;
     constructor(dataStore, div, config) {
         super(dataStore, div, config);
@@ -85,8 +85,8 @@ class ImageScatterChart extends BaseChart {
                         picked && {
                             html: `
                     <div>${titleColumn}: '${text}'</div>
-                    <div>x: '${param[0]}' = '${cx.data[index]}'</div>
-                    <div>y: '${param[1]}' = '${cy.data[index]}'</div>
+                    <div>x: '${cx.name}' = '${cx.data[index]}'</div>
+                    <div>y: '${cy.name}' = '${cy.data[index]}'</div>
                     `,
                         }
                     );
@@ -95,6 +95,7 @@ class ImageScatterChart extends BaseChart {
                     return `error: ${error}`;
                 }
             },
+            // todo preserveDrawingBuffer: true, //for saving images
             // glOptions: {},
             // parameters: {},
         });
@@ -142,7 +143,7 @@ class ImageScatterChart extends BaseChart {
                 target[0] = n(cx, i, this.spaceX);
                 target[1] = n(cy, i, this.spaceY);
                 target[2] = 0; //n(cz, i);
-                return target as unknown as Float32Array; // deck.gl types are wrong AFAICT;
+                return target as unknown as Float32Array; // deck.gl types are still wrong AFAICT;
             },
             getRadius: 1,
             radiusScale: this.size,
@@ -151,7 +152,7 @@ class ImageScatterChart extends BaseChart {
             saturation: this.saturation,
             getFillColor: (this.colorBy
                 ? (i: K) => this.colorBy(i)
-                : [255, 255, 255]) as unknown as any,
+                : [255, 255, 255]),
             imageArray,
             updateTriggers: {
                 // what is this actually for?
@@ -174,7 +175,8 @@ class ImageScatterChart extends BaseChart {
         this.updateDeck();
     }
 
-    colorByColumn(col: string) {
+    // @loadColumnData
+    colorByColumn(col: FieldName) {
         this.colorBy = this.getColorFunction(col, true);
         this.updateDeck();
     }

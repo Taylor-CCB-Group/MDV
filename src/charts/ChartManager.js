@@ -34,7 +34,7 @@ import "./HeatMap.js";
 import "./ViolinPlot.js";
 import "./BoxPlot.js";
 import "./SankeyChart.js";
-import "./MultiLineChart.js";
+import "./MultiLineChart";
 import "./DensityScatterPlot";
 // import "./SelectionDialog.js"; //now replaced with SelectionDialogReact (currently imported as a side-effect of import HmrHack)
 import "./StackedRowChart";
@@ -2161,7 +2161,7 @@ class ChartManager {
             decorateColumnMethod("setToolTipColumn", chart, dataSource);
         }
         // @ts-ignore
-        if (chart.setBackgroundFilter) {
+        if (chart.setBackgroundFilter) { //doesn't appear in the codebase
             decorateColumnMethod(
                 "setBackgroundFilter",
                 chart,

@@ -5,7 +5,7 @@ import type { DataType, ExtraControl, GuiSpecType } from "./charts";
 //new Set(Object.values(BaseChart.types).flatMap(t => t.params).filter(Boolean).flatMap(p => p.type))
 /** annotation of what kind of column type a given param will accept */
 // export type Param = "text" | "number" | "multitext" | "text16" | "_multi_column:number" | "_multi_column:all";
-export type Param = DataType | "_multi_column:number" | "_multi_column:all";
+export type Param = DataType | "number" | "_multi_column:number" | "_multi_column:all";
 
 /**
  * Describes how a chart will be displayed in the 'add chart' dialog etc.

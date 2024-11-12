@@ -1,6 +1,7 @@
 import { DataModel } from "../table/DataModel.js";
 import BaseChart from "./BaseChart.js";
 import ImageTable from "../table/ImageTable.js";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class ImageTableChart extends BaseChart {
     constructor(dataStore, div, config) {
@@ -71,6 +72,7 @@ class ImageTableChart extends BaseChart {
         this.grid.setImageLabel(column);
     }
 
+    // @loadColumnData
     colorByColumn(column) {
         this.grid.setColorBy(
             this.getColorFunction(column, false),

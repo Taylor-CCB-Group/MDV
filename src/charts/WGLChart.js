@@ -2,6 +2,7 @@ import SVGChart from "./SVGChart.js";
 import { createEl } from "../utilities/Elements.js";
 import { hexToRGB } from "../datastore/DataStore.js";
 import "d3-transition";
+// import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class WGLChart extends SVGChart {
     constructor(dataStore, div, config, axisTypes) {
@@ -88,6 +89,7 @@ class WGLChart extends SVGChart {
         return colorFunc;
     }
 
+    // @loadColumnData
     setToolTipColumn(column) {
         this.config.tooltip.column = column;
     }
@@ -161,6 +163,7 @@ class WGLChart extends SVGChart {
         this.app.refresh();
     }
 
+    // @loadColumnData
     colorByColumn(column) {
         this.config.color_by = column;
         const colorFunc = this.getColorFunction(column, true);

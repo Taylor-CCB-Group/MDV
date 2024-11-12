@@ -190,6 +190,9 @@ class BaseChart {
     dialogs = [];
     /** @type {import("mobx").IReactionDisposer[]} */
     reactionDisposers = [];
+    /** @type {import("../datastore/Dimension").default} */
+    dim = null;
+    isPinned = false;
     /**
      * On occasions where you need to run a function that depends on mobx state, outside of a React component.
      * This is a convenience method for creating a mobx autorun reaction that will be dispsed when the chart is removed.
@@ -662,6 +665,7 @@ class BaseChart {
             this.unpinChart();
         });
     }
+    unpinChart() {}
 
     _openSettingsDialog(e) {
         if (!this.settingsDialog) {

@@ -430,6 +430,7 @@ class GenomeBrowser extends BaseChart {
         };
     }
 
+    // @loadColumnData
     colorByColumn(column, update = true) {
         const colorFunc = this.getColorFunction(column);
         this.browser.setTrackColorFunction("_base_track", (feature) => {
@@ -440,6 +441,7 @@ class GenomeBrowser extends BaseChart {
         }
     }
 
+    // @loadColumnData
     setLabelFunction(column) {
         if (!column) {
             this.browser.setTrackLabelFunction("_base_track", null);

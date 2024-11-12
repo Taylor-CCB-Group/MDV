@@ -110,6 +110,7 @@ class DensityScatterPlot extends WGLScatterPlot {
         this.graph_area.selectAll(`.dp-poly-${c - 1}`).remove();
     }
 
+    // @loadColumnData
     changeContourParameter(newCat) {
         this.config.param[2] = newCat;
         this.removeCategory(1);

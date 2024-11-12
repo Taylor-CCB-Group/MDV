@@ -120,6 +120,7 @@ class VivVolume extends BaseChart {
         this._update();
     }
 
+    // @loadColumnData
     colorByColumn(column) {
         if (!this.scatterData) return;
         this.config.colorby = column;

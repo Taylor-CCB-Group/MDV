@@ -255,6 +255,7 @@ class DotPlot extends SVGChart {
             const { link } = links[0];
             // we should have a different way to handle this - once it starts, it won't stop
             // it should be tied to config.param[1] having a value that signifies this behaviour
+            // (or do we allow the special value to be at any index?)
             this.mobxAutorun(() => {
                 // we need to make sure the computed column properties are invoked for columns of interest
                 // otherwise ds.addColumnFromField() won't be called...
@@ -340,7 +341,7 @@ class DotPlot extends SVGChart {
                 },
             },
             {
-                // experimental / short-term version of the feature
+                // experimental / short-term version of the feature... this is not the way to do it.
                 type: "button",
                 label: "Apply Row as Column Link",
                 func: () => {
@@ -362,6 +363,7 @@ BaseChart.types["dot_plot"] = {
         {
             type: "_multi_column:number",
             name: "Fields on y axis",
+            racReady: true,
         },
     ],
 };
