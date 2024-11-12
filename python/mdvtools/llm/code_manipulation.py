@@ -177,7 +177,7 @@ def prepare_code(result: str, data: str | pd.DataFrame, log: callable = print, m
     # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
 
     # logger('# Run the saved Python file. This will start a server on localhost:5050, open the browser and display the plot with the server continuing to run in the background.')
-    # %run temp_code_3.py
+    # %run temp_code_3.pyc
     log("# Executing the code...")
     # - in order to get this to run in a chat context, we might want to get rid of the call to `p.add_datasource`
     final_code = f"""{packages_functions}\n{captured_lines}

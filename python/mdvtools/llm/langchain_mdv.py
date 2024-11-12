@@ -19,12 +19,11 @@ from langchain.prompts import PromptTemplate
 import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 from dotenv import load_dotenv
 
-from .github_utils import crawl_github_repo, extract_python_code_from_py, extract_python_code_from_ipynb
+from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import prepare_code
 from .code_execution import execute_code
 
-#logging.basicConfig(filename="timing_results.log", level=logging.INFO)
 
 # create logger
 logger = logging.getLogger('timing_results')
@@ -54,16 +53,16 @@ import matplotlib
 matplotlib.use('Agg') # this should prevent it making any windows etc
 
 print('# setting keys and variables')
-# .env file should have OPENAI_API_KEY & GITHUB_TOKEN
+# .env file should have OPENAI_API_KEY
 load_dotenv()
 # OPENAI_API_KEY environment variable will be used internally by OpenAI modules
 
 mypath = os.path.dirname(__file__)
 
 
-print('# Crawl the GitHub repository to get a list of relevant file URLs')
-with time_block("b1: GitHub repo crawling"):
-    code_files_urls = crawl_github_repo()
+print('# Crawl the local repository to get a list of relevant file paths')
+with time_block("b1: Local repo crawling"):
+    code_files_urls = crawl_local_repo()
 
     # Initialize an empty list to store the extracted code documents
     code_strings = []
@@ -125,17 +124,24 @@ class ProjectChat():
             raise ValueError("The project does not have any datasources")
         elif len(project.datasources) > 1:
             log("The project has more than one datasource, only the first one will be used")
+            self.ds_name1 = project.datasources[1]['name']
+            self.df1 = project.get_datasource_as_dataframe(self.ds_name1)
         self.ds_name = project.datasources[0]['name']
         try:
             self.df = project.get_datasource_as_dataframe(self.ds_name)
             with time_block("b6: Initialising LLM for RAG"):
                 self.code_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
             with time_block("b7: Initialising LLM for agent"):
-                self.dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4")
+                self.dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
             with time_block("b8: Pandas agent creating"):
-                self.agent = lp.create_pandas_dataframe_agent(
-                    self.dataframe_llm, self.df, verbose=True, handle_parse_errors=True, allow_dangerous_code=True
-                )
+                if len(project.datasources) == 1:
+                    self.agent = lp.create_pandas_dataframe_agent(
+                        self.dataframe_llm, self.df, verbose=True, handle_parse_errors=True, allow_dangerous_code=True
+                    )
+                elif len(project.datasources) == 2:
+                    self.agent = lp.create_pandas_dataframe_agent(
+                        self.dataframe_llm, [self.df, self.df1], verbose=True, handle_parse_errors=True, allow_dangerous_code=True
+                    )
             self.ok = True
         except Exception as e:
             # raise ValueError(f"An error occurred while trying to create the agent: {e[:100]}")
@@ -152,7 +158,7 @@ class ProjectChat():
             logger.info(f"Question asked by user: {question}")
         try:
             with time_block("b9b: Pandas agent invoking"):
-                response = self.agent.invoke(full_prompt) 
+                response = self.agent.invoke(full_prompt)
                 assert('output' in response)
             #!!! csv_path is not wanted - the code tries to use that as data source name which is all wrong
             with time_block("b10: RAG prompt preparation"):
@@ -194,7 +200,7 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project', 
     # Specify the model to use as "gpt-4o"
 
     code_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
-    dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4")
+    dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
 
     #user_question = "Create a heatmap plot of the localisation status vs the UTR length"
     if user_question is None:
