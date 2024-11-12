@@ -14,6 +14,7 @@ class MultiLineChart extends SVGChart {
     declare dim: CatRangeDimension;
     declare data: any[];
     declare ticks: any;
+    declare y_axis_call: any;
     constructor(dataStore, div, config) {
         const x_name = dataStore.getColumnName(config.param[0]);
         if (!config.axis) {
