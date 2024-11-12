@@ -5,7 +5,7 @@ import { chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
 import { autorun, makeAutoObservable, action } from "mobx";
-
+import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
 
 class BaseChart {
     /**
@@ -23,12 +23,8 @@ class BaseChart {
         }
         //**********
 
-        //copy the config
-        this.config = JSON.parse(JSON.stringify(config));
-        //give it a random id if one isn't supplied
-        if (!this.config.id) {
-            this.config.id = getRandomString();
-        }
+        //copy the config, and make it observable etc... may apply some other processing e.g. in case of 'virtual columns'
+        this.config = initialiseConfig(config, this);
         //required in case added to separate browser window
         this.__doc__ = document;
 
@@ -715,17 +711,6 @@ class BaseChart {
         if (this.addToContextMenu) {
             menu = menu.concat(this.addToContextMenu());
         }
-        menu.push({
-            text: "experimental settings dialog",
-            icon: "fas fa-cog",
-            func: async () => {
-                const m = await import(
-                    "../react/components/SettingsDialogReactWrapper"
-                );
-                const SettingsDialogReactWrapper = m.default;
-                this.dialogs.push(new SettingsDialogReactWrapper(this));
-            },
-        });
         return menu;
     }
 
@@ -791,7 +776,7 @@ class BaseChart {
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
             };
         }
-        return JSON.parse(JSON.stringify(this.config));
+        return serialiseConfig(this);
     }
 
     getColorOptions() {
