@@ -15,11 +15,14 @@ import Grid from '@mui/material/Grid2';
 import { Accordion, AccordionDetails, AccordionSummary, Typography } from "@mui/material";
 import LinkIcon from '@mui/icons-material/Link';
 import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
+import type { RowsAsColslink } from "@/links/link_utils.js";
 
+
+type FieldSpec = FieldName | RowsAsColslink;
 
 export type ColumnSelectionProps = {
-    setSelectedColumn: (column: FieldName) => void; //what about multiple? also, special values...
-    current_value?: FieldName;
+    setSelectedColumn: (column: FieldSpec) => void; //what about multiple? also, special values...
+    current_value?: FieldSpec;
     placeholder?: string;
     exclude?: string[];
     dataStore?: DataStore;
@@ -33,6 +36,10 @@ type GuiStateProps = {
     isAutocompleteFocused: boolean;
     setIsAutocompleteFocused: setBoolean;
 }
+
+const RAComponent = observer((props: ColumnSelectionProps & GuiStateProps) => {
+    return <div>🔥 RAComponent {JSON.stringify(props.current_value)}</div>;
+});
 
 const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) => {
     const { setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded, current_value } = props;
@@ -49,6 +56,9 @@ const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) =>
     );
     // In general, this should (probably) be using our "(multi)dropdown" component
     // and the <LinksComponent /> can select which column options to show.
+    if (current_value && typeof current_value !== "string" && !Array.isArray(current_value)) {
+        return <RAComponent {...props} />;
+    };
     return (
         <Grid className="w-full items-center" container>
             <Grid size={"grow"}>
@@ -149,7 +159,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                 </Grid>
             </AccordionSummary>
             <AccordionDetails>
-                <LinksComponent />
+                <LinksComponent {...props} />
             </AccordionDetails>
         </Accordion>
         </>

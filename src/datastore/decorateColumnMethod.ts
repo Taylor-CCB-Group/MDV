@@ -1,4 +1,5 @@
 import type BaseChart from "@/charts/BaseChart";
+import type { IReactionDisposer } from "mobx";
 
 /**
  * Apply the {@link loadColumnData} decorator to a method on a chart class manually at runtime, rather than using the `@loadColumnData` syntax
@@ -24,6 +25,7 @@ export function loadColumnData<This extends BaseChart, Args extends any[], Retur
     target: (this: This, ...args: Args) => void, // we could probably type this to have first argument specified...
     context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => void> | { target: This },
 ) {
+    let disposer: IReactionDisposer | null = null;
     function replacementMethod(this: This, ...args: any[]) {
         const dataSource = this.dataSource.name;
         // if we have a special value indicating live data, we can do something, perhaps with chart.mobxAutorun(), here...
@@ -40,10 +42,28 @@ export function loadColumnData<This extends BaseChart, Args extends any[], Retur
             // columns not needed
             target.call(this, ...args);
         } else {
-            const cols = Array.isArray(args[0]) ? args[0] : [args[0]];
-            const cm = window.mdv.chartManager;
-            cm._getColumnsThen(dataSource, cols, () => {
-                target.call(this, ...args);
+            // this should only happen if there are any live columns...
+            // and we should dispose if replacementMethod is called again
+            if (disposer) {
+                disposer();
+            }
+            const colsOriginal = Array.isArray(args[0]) ? args[0] : [args[0]];
+            args[0] = colsOriginal;
+            disposer = this.mobxAutorun(() => {
+                const cols = args[0].map(v => {
+                    if (typeof v === "string") {
+                        return v;
+                    }
+                    return v.observableFields[0]?.column.field;
+                }).filter(v => v);
+                // args[0] = cols[0]; //-- short-term measure...
+                const newArgs = [cols[0], ...args.slice(1)];
+                const cm = window.mdv.chartManager;
+                console.log('loading columns:', cols);
+                cm._getColumnsThen(dataSource, cols, () => {
+                    console.log('calling', target.name, 'with', newArgs);
+                    target.call(this, ...newArgs);
+                });
             });
         }
     }

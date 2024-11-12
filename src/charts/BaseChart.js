@@ -198,7 +198,9 @@ class BaseChart {
      * but it isn't in IAutorunOptions type, and it doesn't seem to be in the code either.
      */
     mobxAutorun(fn, opts) {
-        this.reactionDisposers.push(autorun(fn, opts));
+        const disposer = autorun(fn, opts);
+        this.reactionDisposers.push(disposer);
+        return disposer;
     }
 
     _getContentDimensions() {

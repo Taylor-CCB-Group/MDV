@@ -586,6 +586,9 @@ class DataStore {
      * @returns {Column} The column that was added (not yet populated with data)
      */
     addColumnFromField(field) {
+        if (typeof field !== "string") {
+            throw new Error("non-string field specified - should be handled elsewhere", field);
+        }
         const data = field.split("|");
         if (data.length !== 3) {
             throw new Error(

@@ -2,15 +2,17 @@ import { observer } from "mobx-react-lite";
 import { useDataStore } from "../context";
 import { makeAutoObservable } from "mobx";
 import { useHighlightedForeignRows, useRowsAsColumnsLinks } from "../chartLinkHooks";
-import type { DataColumn, DataType, GuiSpec } from "@/charts/charts";
+import type { DataColumn, DataType, FieldName, GuiSpec } from "@/charts/charts";
 import { useMemo } from "react";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import { Button, FormControl, FormControlLabel, Radio, RadioGroup } from "@mui/material";
+import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 
-type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>[0];
+type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>[0] & ColumnSelectionProps;
 
 const RowsAsCols = observer((props : RowsAsColsProps) => {
     const { linkedDs, link } = props;
+    const { setSelectedColumn } = props;
     const rowNames = useHighlightedForeignRows().map(r => r.fieldName);
     const { name_column, name, subgroups } = link;
     // const dataSources = useDataSources();
@@ -26,16 +28,17 @@ const RowsAsCols = observer((props : RowsAsColsProps) => {
         // I don't think we want to prepend option to dropdown - we should have a different way of showing this
         values: [targetColumn.values],
         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
-        current_value: rowNames, 
+        current_value: [], 
         func: (v) => {
             
         }
-    }), [targetColumn, name_column, name, rowNames]);
+    }), [targetColumn, name_column, name]);
     const { current_value } = spec;
     const v = Array.isArray(current_value) ? current_value : [current_value];
     return (
         <>
-        <Button onClick={() => {}}>{liveSelectionName}</Button>
+        {/* set the value... to something special... not just a specially formatted string */}
+        <Button onClick={() => {setSelectedColumn(link)}}>{liveSelectionName}</Button>
         <DropdownAutocompleteComponent props={spec} />
         {/* <FormControl>
             <RadioGroup>
@@ -48,13 +51,13 @@ const RowsAsCols = observer((props : RowsAsColsProps) => {
 });
 
 
-export default observer(function LinksComponent() {
+export default observer(function LinksComponent(props: ColumnSelectionProps) {
     const linkProps = useRowsAsColumnsLinks()[0]; //todo: arbitrary number of links
     if (!linkProps) return null;
     return (
         <>
             {/* <JsonView src={link} /> */}
-            <RowsAsCols {...linkProps} />
+            <RowsAsCols {...linkProps} {...props} />
         </>
     )
 });
