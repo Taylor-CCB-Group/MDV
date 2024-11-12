@@ -1,4 +1,5 @@
 import type BaseChart from "@/charts/BaseChart";
+import type { FieldSpec } from "@/react/components/ColumnSelectionComponent";
 import type { IReactionDisposer } from "mobx";
 
 /**
@@ -30,9 +31,9 @@ export function loadColumnData<This extends BaseChart, Args extends any[], Retur
         const dataSource = this.dataSource.name;
         // if we have a special value indicating live data, we can do something, perhaps with chart.mobxAutorun(), here...
         // we want to make sure that
-        // - the result of the live column change will be applied
+        // - the result of the live column change will be applied ✅
         // - the value stored in the config will be the special value, rather than the result of the live column change
-        // - reaction disposes when the live column is no longer needed
+        // - reaction disposes when the live column is no longer needed ✅ (to be tested)
         // there could be anything happening inside the method... but perhaps if we know that the config is always a
         // proxied mobx object, we can somehow generically detect changes and re-patch???
         // perhaps safer to have a copy of the config that will be used in chart.getConfig(), which has the 'special value',
@@ -46,16 +47,14 @@ export function loadColumnData<This extends BaseChart, Args extends any[], Retur
             // and we should dispose if replacementMethod is called again
             if (disposer) {
                 disposer();
+                this.reactionDisposers = this.reactionDisposers.filter(v => v !== disposer);
             }
             const colsOriginal = Array.isArray(args[0]) ? args[0] : [args[0]];
             args[0] = colsOriginal;
             disposer = this.mobxAutorun(() => {
-                const cols = args[0].map(v => {
-                    if (typeof v === "string") {
-                        return v;
-                    }
-                    return v.observableFields[0]?.column.field;
-                }).filter(v => v);
+                const cols = args[0].flatMap(
+                    (v: FieldSpec) => (typeof v === "string" ? v : v.fields)
+                ).filter(v => v);
                 // args[0] = cols[0]; //-- short-term measure...
                 const newArgs = [cols[0], ...args.slice(1)];
                 const cm = window.mdv.chartManager;

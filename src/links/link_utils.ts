@@ -183,6 +183,18 @@ export type RowsAsColslink = {
     // observableColumns: DataColumn<DataType>[]; //computed?
 }
 
+export class RowsAsColsQuery {
+    constructor(public link: RowsAsColslink, public maxItems = 1) {}
+    @computed
+    get columns() {
+        return this.link.observableFields.slice(0, this.maxItems).map(f => f.column);
+    }
+    @computed
+    get fields() {
+        return this.columns.map(c => c.field);
+    }
+}
+
 
 async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
     if (link.observableFields !== undefined) return;

@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import { Button, FormControl, FormControlLabel, Radio, RadioGroup } from "@mui/material";
 import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
+import { RowsAsColsQuery } from "@/links/link_utils";
 
 type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>[0] & ColumnSelectionProps;
 
@@ -38,7 +39,7 @@ const RowsAsCols = observer((props : RowsAsColsProps) => {
     return (
         <>
         {/* set the value... to something special... not just a specially formatted string */}
-        <Button onClick={() => {setSelectedColumn(link)}}>{liveSelectionName}</Button>
+        <Button onClick={() => {setSelectedColumn(new RowsAsColsQuery(link))}}>{liveSelectionName}</Button>
         <DropdownAutocompleteComponent props={spec} />
         {/* <FormControl>
             <RadioGroup>
