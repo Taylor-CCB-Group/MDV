@@ -36,10 +36,11 @@ const RowsAsCols = observer((props : RowsAsColsProps) => {
     }), [targetColumn, name_column, name]);
     const { current_value } = spec;
     const v = Array.isArray(current_value) ? current_value : [current_value];
+    const maxItems = props.multiple ? 10 : 1;
     return (
         <>
         {/* set the value... to something special... not just a specially formatted string */}
-        <Button onClick={() => {setSelectedColumn(new RowsAsColsQuery(link))}}>{liveSelectionName}</Button>
+        <Button onClick={() => {setSelectedColumn(new RowsAsColsQuery(link, maxItems))}}>{liveSelectionName}</Button>
         <DropdownAutocompleteComponent props={spec} />
         {/* <FormControl>
             <RadioGroup>

@@ -249,24 +249,6 @@ class DotPlot extends SVGChart {
         this.drawChart();
     }
 
-    applyRowAsColLink() {
-        const links = getRowsAsColumnsLinks(this.dataSource);
-        if (links) {
-            const { link } = links[0];
-            // we should have a different way to handle this - once it starts, it won't stop
-            // it should be tied to config.param[1] having a value that signifies this behaviour
-            // (or do we allow the special value to be at any index?)
-            this.mobxAutorun(() => {
-                // we need to make sure the computed column properties are invoked for columns of interest
-                // otherwise ds.addColumnFromField() won't be called...
-                const cols = link.observableFields.slice(0, 100).map(({ column }) => column);
-                // otherwise we could just get the field names.
-                const fieldNames = cols.map(col => col.field);
-                this.setFields(fieldNames);
-            });
-        }
-    }
-
     getSettings() {
         const c = this.config;
         const settings = super.getSettings();
@@ -341,13 +323,14 @@ class DotPlot extends SVGChart {
                 },
             },
             {
-                // experimental / short-term version of the feature... this is not the way to do it.
-                type: "button",
-                label: "Apply Row as Column Link",
-                func: () => {
-                    this.applyRowAsColLink();
+                type: "multicolumn",
+                label: "Fields on x axis",
+                current_value: this.fieldNames,
+                func: (v) => {
+                    // given that this is "multicolumn", we should be able to assume that v is an array
+                    this.setFields(Array.isArray(v) ? v : [v]);
                 },
-            }
+            },
         ]);
     }
 }
@@ -359,12 +342,11 @@ BaseChart.types["dot_plot"] = {
     params: [
         {
             type: "text",
-            name: "Categories on x-axis",
+            name: "Categories on y-axis",
         },
         {
             type: "_multi_column:number",
-            name: "Fields on y axis",
-            racReady: true,
+            name: "Fields on x axis",
         },
     ],
 };

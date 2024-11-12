@@ -15,10 +15,10 @@ import Grid from '@mui/material/Grid2';
 import { Accordion, AccordionDetails, AccordionSummary, Typography } from "@mui/material";
 import LinkIcon from '@mui/icons-material/Link';
 import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
-import type { RowsAsColsQuery } from "@/links/link_utils.js";
+import type { MulticolumnQuery } from "@/links/link_utils.js";
 
 
-export type FieldSpec = FieldName | RowsAsColsQuery; //this may be defined elsewhere in future
+export type FieldSpec = FieldName | MulticolumnQuery; //this may be defined elsewhere in future
 
 export type ColumnSelectionProps = {
     setSelectedColumn: (column: FieldSpec) => void; //what about multiple? also, special values...

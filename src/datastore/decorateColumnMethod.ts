@@ -49,14 +49,15 @@ export function loadColumnData<This extends BaseChart, Args extends any[], Retur
                 disposer();
                 this.reactionDisposers = this.reactionDisposers.filter(v => v !== disposer);
             }
-            const colsOriginal = Array.isArray(args[0]) ? args[0] : [args[0]];
+            const multiCol = Array.isArray(args[0]);
+            const colsOriginal = multiCol ? args[0] : [args[0]];
             args[0] = colsOriginal;
             disposer = this.mobxAutorun(() => {
                 const cols = args[0].flatMap(
                     (v: FieldSpec) => (typeof v === "string" ? v : v.fields)
                 ).filter(v => v);
-                // args[0] = cols[0]; //-- short-term measure...
-                const newArgs = [cols[0], ...args.slice(1)];
+                const a = multiCol ? cols : cols[0];
+                const newArgs = [a, ...args.slice(1)];
                 const cm = window.mdv.chartManager;
                 console.log('loading columns:', cols);
                 cm._getColumnsThen(dataSource, cols, () => {

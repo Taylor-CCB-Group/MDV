@@ -183,7 +183,12 @@ export type RowsAsColslink = {
     // observableColumns: DataColumn<DataType>[]; //computed?
 }
 
-export class RowsAsColsQuery {
+export interface MulticolumnQuery {
+    columns: DataColumn<DataType>[]; //could have a generic type for this?
+    fields: FieldName[];
+}
+
+export class RowsAsColsQuery implements MulticolumnQuery {
     constructor(public link: RowsAsColslink, public maxItems = 1) {}
     @computed
     get columns() {
