@@ -199,23 +199,20 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
     const sg = Object.keys(link.subgroups)[0];
     class RAColumn implements IRowAsColumn {
         index: number;
-        value: ColumnName;
+        @computed
         get name() {
             return tds.getRowText(this.index, link.name_column) as string;
         }
+        @computed
         get fieldName(): FieldName {
             return `${sg}|${this.name} (${sg})|${this.index}`;
         }
+        @computed
         get column(): DataColumn<DataType> {
             return ds.addColumnFromField(this.fieldName);
         }
         constructor(index: number) {
             this.index = index;
-            makeObservable(this, {
-                name: computed,
-                fieldName: computed,
-                column: computed
-            })
         }
     }
     const getField = (index: number) => {
