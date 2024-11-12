@@ -19,18 +19,6 @@ class DotPlot extends SVGChart {
         this.dim = this.dataStore.getDimension("catcol_dimension");
         this.colorScheme = schemeReds[8];
         this.setFields(config.param.slice(1));
-    }
-
-    async setFields(fieldNames) {
-        const cm = window.mdv.chartManager;
-        const p0 = this.config.param[0];
-        //! we don't want to mutate the config object... 
-        // we want to have a special value which signifies that it should use this behaviour.
-        // then when we save state, it will have the appropriate value.
-        //this.config.param = [p0, ...fieldNames]; //first is the category column
-        this.fieldNames = fieldNames;
-        await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
-        const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
         const c = this.config;
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
@@ -41,6 +29,18 @@ class DotPlot extends SVGChart {
             c.fraction_legend = { display: true };
         }
         this.fractionScale = scaleSqrt().domain([0, 100]);
+    }
+
+    // @loadColumnData
+    setFields(fieldNames) {
+        const cm = window.mdv.chartManager;
+        //! we don't want to mutate the config object... 
+        // we want to have a special value which signifies that it should use this behaviour.
+        // then when we save state, it will have the appropriate value.
+        //this.config.param = [p0, ...fieldNames]; //first is the category column
+        this.fieldNames = fieldNames;
+        // await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
+        const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
         this.x_scale.domain(yLabels);
         this.onDataFiltered();
     }
@@ -249,7 +249,7 @@ class DotPlot extends SVGChart {
         this.drawChart();
     }
 
-    async applyRowAsColLink() {
+    applyRowAsColLink() {
         const links = getRowsAsColumnsLinks(this.dataSource);
         if (links) {
             const { link } = links[0];
@@ -355,6 +355,7 @@ class DotPlot extends SVGChart {
 BaseChart.types["dot_plot"] = {
     name: "Dot Plot",
     class: DotPlot,
+    methodsUsingColumns: ["setFields"],
     params: [
         {
             type: "text",
