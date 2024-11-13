@@ -17,3 +17,7 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
     if (type === "number" && isNumeric) return true;
     return column.datatype === type;
 }
+
+export function isArray(arr: unknown): arr is any[] {
+    return Array.isArray(arr);
+}

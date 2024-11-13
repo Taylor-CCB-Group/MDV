@@ -19,6 +19,7 @@ export type NumberDataType = "integer" | "double" | "int32";
 
 type DataStructureTypes = {
     integer: Uint32Array;
+    int32: Int32Array;
     double: Float32Array; //why is it called 'double'???
     text: Uint8Array;
     text16: Uint16Array;
@@ -49,7 +50,8 @@ export type DataColumn<T extends DataType> = {
      *   - `"text"` - data containing strings but with no more than 256 categories
      *   - `"text16"` - data containing strings with up to 65536 categories
      *   - `"unique"` - data containing strings but with many categories
-     *   - `"multitext"` -
+     *   - `"multitext"` - A field that can have more than one value eg `'red'`, `'red, blue'`
+     *   - `"int32"` - for larger integers e.g. genomic co-ordinates (represented by an `int32`)
      */
     datatype: T;
     /** whether the column's data can be changed */

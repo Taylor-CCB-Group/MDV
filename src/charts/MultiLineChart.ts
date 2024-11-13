@@ -9,6 +9,8 @@ import type CatRangeDimension from "@/datastore/CatRangeDimension.js";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldName } from "./charts.js";
 
+type ScaleTrim = "none" | "0.001" | "0.01" | "0.05";
+
 class MultiLineChart extends SVGChart {
     defaultBandWidth: number;
     declare dim: CatRangeDimension;
@@ -88,7 +90,7 @@ class MultiLineChart extends SVGChart {
         this.setColorLegend();
     }
 
-    scaleTrim(val) {
+    scaleTrim(val: ScaleTrim) {
         const c = this.config;
         if (!val || val === "none") {
             c.scaletrim = undefined;
@@ -284,7 +286,7 @@ class MultiLineChart extends SVGChart {
                     ["0.01", "0.01"],
                     ["0.05", "0.05"],
                 ],
-                func: (v) => {
+                func: (v: ScaleTrim) => {
                     this.scaleTrim(v);
                     this.onDataFiltered();
                 },
