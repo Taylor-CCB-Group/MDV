@@ -2,7 +2,7 @@ import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../h
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography, Select } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState, useMemo } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
@@ -19,6 +19,8 @@ import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
+import { useOuterContainer } from "../screen_state";
+// import { brushX } from "d3-brush";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -248,11 +250,20 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
 
     return { value, step, histogram, lowFraction, highFraction, queryHistogram };
 }
-type RangeProps = ReturnType<typeof useRangeFilter>;
-const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryHistogram }: RangeProps) => {
+// type set2d = ReturnType<typeof useState<[number, number]>>[1];
+type set2d = (v: [number, number]) => void;
+type RangeProps = ReturnType<typeof useRangeFilter> & { 
+    setValue: set2d,
+    minMax: [number, number],
+};
+const useBrushX = (ref: React.RefObject<SVGSVGElement>, setValue: set2d, value: [number, number]) => {
+    
+}
+const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryHistogram, setValue, minMax, value }: RangeProps) => {
+    const ref = useRef<SVGSVGElement>(null);
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const width = 99;
-    const height = 40;
+    const height = 60;
     const lineColor = prefersDarkMode ? '#fff' : '#000';
     // Find max value for vertical scaling
     const maxValue = Math.max(...data);
@@ -276,12 +287,91 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
         const y = height - padding - value * yScale;
         return `${x},${y}`;
     }).join(' '), [data, xStep, yScale]);
-
+    
+    const doc = useOuterContainer();
+    // const doc = useChartDoc();
+    // const [dragging, setDragging] = useState(false);
+    const getX = useCallback((e: {clientX: number}) => {
+        const { width, left } = ref.current.getBoundingClientRect();
+        const normalizedX = (e.clientX - left) / width;
+        const [min, max] = minMax;
+        return min + normalizedX * (max - min);
+    }, [minMax]);
+    // const [startX, setStartX] = useState(0);
+    const startXref = useRef(0);
+    const lastXref = useRef(0);
+    const handleRef = useRef<"L" | "H" | "M">("M");
+    const valueRef = useRef(value);
+    const startValueRef = useRef(value);
+    valueRef.current = value;
+    const handleMouseMove = useCallback((e: {clientX: number}) => {
+        const x = getX(e);
+        const v = valueRef.current;
+        if (handleRef.current === "M") {
+            let dx = x - startXref.current;
+            const s = startValueRef.current;
+            console.log("M", dx);
+            // if (s[0] + dx < minMax[0] || s[1] + dx > minMax[1]) return;
+            if (s[0] + dx < minMax[0]) {
+                dx = minMax[0] - s[0];
+            } else if (s[1] + dx > minMax[1]) {
+                dx = minMax[1] - s[1];
+            }
+            setValue([s[0] + dx, s[1] + dx]);
+        } else if (handleRef.current === "L") {
+            if (x > v[1]) {
+                console.log("L -> H");
+                handleRef.current = "H";
+                setValue([v[1], x]);
+            } else setValue([x, v[1]]);
+        } else if (x < v[0]) {
+            console.log("H -> L");
+            handleRef.current = "L";
+            setValue([x, v[0]]);
+        } else setValue([v[0], x]);
+        // const currentLow = Math.min(startX, x);
+        // const currentHigh = Math.max(startX, x);
+        // setValue([currentLow, currentHigh]);
+    }, [getX, setValue, minMax]);
+    const handleMouseUp = useCallback(() => {
+        doc.removeEventListener('mouseup', handleMouseUp);
+        doc.removeEventListener('mousemove', handleMouseMove);
+    }, [doc, handleMouseMove]);
     return (
+        <>
         <svg width={'100%'} height={height} 
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
         onClick={queryHistogram}
+        ref={ref}
+        onMouseDown={(e) => {
+            const x = getX(e);
+            startXref.current = x;
+            const normalizedX = (x - minMax[0]) / (minMax[1] - minMax[0]);
+            if ((lowFraction === 0) && (highFraction === 1)) {
+                setValue([x, x]);
+                handleRef.current = "L";
+                lastXref.current = x;
+            } else if (Math.abs(normalizedX - lowFraction) < 0.05) {
+                handleRef.current = "L";
+                setValue([x, value[1]]);
+            } else if (Math.abs(normalizedX - highFraction) < 0.05) {
+                handleRef.current = "H";
+                setValue([value[0], x]);
+            } else if (normalizedX > lowFraction && normalizedX < highFraction) {
+                handleRef.current = "M";
+                startValueRef.current = value;
+                lastXref.current = x;
+            } else {
+                handleRef.current = "L"; //arbitrary choice between L and H
+                setValue([x, x]);
+            }
+            // setValue([x, x]); //not what we want... different handlers for low/high/mid,
+            // mouseMove should be on the outerContainer, not the svg...
+            //(similar to d3 brushX used on HistogramChart - could use that here, even?)
+            doc.addEventListener('mousemove', handleMouseMove);
+            doc.addEventListener('mouseup', handleMouseUp);
+        }}
         >
             {/* Background polyline (the simple line connecting data points) */}
             <polyline
@@ -311,6 +401,7 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
                 fillOpacity="0.8"
             />
         </svg>
+        </>
     );
 });
 
@@ -323,7 +414,7 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     }, [filters, column.field]);
     return (
         <div>
-            <Histogram {...rangeProps} />
+            <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} />
             <Slider
                 size="small"
                 value={value}
