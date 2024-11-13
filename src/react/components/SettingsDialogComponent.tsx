@@ -121,8 +121,9 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"
         setSelectedColumn,
         type: filter,
         multiple: props.type === "multicolumn",
+        current_value: props.current_value
         // current_value: props.current_value... maybe want to be more mobx-y about this
-    }), [setSelectedColumn, props.type, filter]);
+    }), [setSelectedColumn, props.type, filter, props.current_value]);
     return (
         <>
             <MLabel props={props} />
