@@ -323,8 +323,19 @@ class DotPlot extends SVGChart {
                 },
             },
             {
+                // perhaps the GuiType should be more aligned with params type - i.e. _multi_column:number
+                // * we should then be able to expose all params in the settings in a more consistent way *
+                // then we wouldn't want current_value to be this.fieldNames, but the entries in config.param
+                // corresponding to fields... as defined in BaseChart.types["dot_plot"].params
+                // - param is a flat array - so we'd need to mimic the behaviour of spreading values from here
+                // there's a more general question of whether settings operates on the mobx mutable config object
+                // ... in many cases we could avoid having a `func`...
                 type: "multicolumn",
                 label: "Fields on x axis",
+                // this is more of a nuisance than type: "_multi_column:number"
+                columnSelection: {
+                    filter: ["double", "integer", "int32"]
+                },
                 current_value: this.fieldNames,
                 func: (v) => {
                     // given that this is "multicolumn", we should be able to assume that v is an array

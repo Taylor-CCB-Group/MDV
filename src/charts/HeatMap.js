@@ -18,7 +18,6 @@ class HeatMap extends SVGChart {
         const p = this.config.param;
         const vals = this.dataStore.getColumnValues(p[0]);
         this.x_scale.domain(vals.slice(0));
-        const yLabels = [];
         const c = this.config;
         c.method = c.method || "mean";
         //work out color scales
@@ -27,19 +26,24 @@ class HeatMap extends SVGChart {
             c.color_legend = { display: true };
         }
         this.setColorFunction();
-
-        for (let x = 1; x < p.length; x++) {
-            yLabels.push(this.dataStore.getColumnName(p[x]));
-        }
         this.cat_scale = scaleLinear().range([0, 40]);
         this.cat_axis_svg = this.svg.append("g");
         this.cat_axis_call = axisLeft(this.cat_scale).ticks(3);
-        this.y_scale.domain(yLabels);
         this.dim = this.dataStore.getDimension("catcol_dimension");
         if (c.cluster_rows) {
             this.margins.right = 70;
         }
         this.addToolTip();
+        this.setFields(p.slice(1));
+    }
+    
+    setFields(p) {
+        const yLabels = [];
+        for (let x = 0; x < p.length; x++) {
+            yLabels.push(this.dataStore.getColumnName(p[x]));
+        }
+        this.y_scale.domain(yLabels);
+        this.config.param = [this.config.param[0]].concat(p);
         this.onDataFiltered();
     }
 
@@ -416,6 +420,18 @@ class HeatMap extends SVGChart {
                     this.drawChart();
                 },
             },
+            {
+                type: "multicolumn",
+                label: "Fields on y axis",
+                // this is more of a nuisance than type: "_multi_column:number"
+                columnSelection: {
+                    filter: ["double", "integer", "int32"]
+                },
+                current_value: this.config.param.slice(1),
+                func: (x) => {
+                    this.setFields(x);
+                },
+            }
         ]);
     }
 }
@@ -423,6 +439,7 @@ class HeatMap extends SVGChart {
 BaseChart.types["heat_map"] = {
     name: "Heat Map",
     class: HeatMap,
+    methodsUsingColumns: ["setFields"],
     params: [
         {
             type: "text",
