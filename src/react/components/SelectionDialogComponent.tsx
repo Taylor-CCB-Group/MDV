@@ -256,42 +256,12 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
     setValue: set2d,
     minMax: [number, number],
 };
-const useBrushX = (ref: React.RefObject<SVGSVGElement>, setValue: set2d, value: [number, number]) => {
-    
-}
-const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryHistogram, setValue, minMax, value }: RangeProps) => {
-    const ref = useRef<SVGSVGElement>(null);
-    const prefersDarkMode = window.mdv.chartManager.theme === "dark";
-    const width = 99;
-    const height = 60;
-    const lineColor = prefersDarkMode ? '#fff' : '#000';
-    // Find max value for vertical scaling
-    const maxValue = Math.max(...data);
-
-    // Define the padding and scaling factor
-    const padding = 2;
-    const xStep = data.length / (width + 1); // Space between points
-    const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
-
-    const lowX = lowFraction * width;
-    const highX = highFraction * width;
-
-    useEffect(() => {
-        queryHistogram();
-    }, [queryHistogram]);
-
-    // Generate the points for the polyline
-    // ??? useMemo was wrong ????
-    const points = useMemo(() => data.map((value, index) => {
-        const x = index * xStep;
-        const y = height - padding - value * yScale;
-        return `${x},${y}`;
-    }).join(' '), [data, xStep, yScale]);
-    
+const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax, lowFraction, highFraction}: RangeProps) => {
     const doc = useOuterContainer();
     // const doc = useChartDoc();
     // const [dragging, setDragging] = useState(false);
-    const getX = useCallback((e: {clientX: number}) => {
+    // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+    const getX = useCallback((e: { clientX: number }) => {
         const { width, left } = ref.current.getBoundingClientRect();
         const normalizedX = (e.clientX - left) / width;
         const [min, max] = minMax;
@@ -304,7 +274,7 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
     const valueRef = useRef(value);
     const startValueRef = useRef(value);
     valueRef.current = value;
-    const handleMouseMove = useCallback((e: {clientX: number}) => {
+    const handleMouseMove = useCallback((e: { clientX: number }) => {
         const x = getX(e);
         const v = valueRef.current;
         if (handleRef.current === "M") {
@@ -337,16 +307,12 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
         doc.removeEventListener('mouseup', handleMouseUp);
         doc.removeEventListener('mousemove', handleMouseMove);
     }, [doc, handleMouseMove]);
-    return (
-        <>
-        <svg width={'100%'} height={height} 
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
-        onClick={queryHistogram}
-        ref={ref}
-        onMouseDown={(e) => {
+    useEffect(() => {
+        if (!ref.current) return;
+        const handleMouseDown = (e: { clientX: number }) => {
             const x = getX(e);
             startXref.current = x;
+            const value = valueRef.current;
             const normalizedX = (x - minMax[0]) / (minMax[1] - minMax[0]);
             if ((lowFraction === 0) && (highFraction === 1)) {
                 setValue([x, x]);
@@ -371,7 +337,50 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
             //(similar to d3 brushX used on HistogramChart - could use that here, even?)
             doc.addEventListener('mousemove', handleMouseMove);
             doc.addEventListener('mouseup', handleMouseUp);
-        }}
+        };
+        ref.current.addEventListener('mousedown', handleMouseDown);
+        return () => ref.current?.removeEventListener('mousedown', handleMouseDown);
+    }, [ref, handleMouseMove, handleMouseUp, getX, setValue, minMax, lowFraction, highFraction, doc.addEventListener]);
+}
+const Histogram = observer((props: RangeProps) => {
+    const { histogram: data, lowFraction, highFraction, queryHistogram, setValue, minMax, value } = props;
+    const ref = useRef<SVGSVGElement>(null);
+    useBrushX(ref, props);
+    const prefersDarkMode = window.mdv.chartManager.theme === "dark";
+    const width = 99;
+    const height = 60;
+    const lineColor = prefersDarkMode ? '#fff' : '#000';
+    // Find max value for vertical scaling
+    const maxValue = Math.max(...data);
+
+    // Define the padding and scaling factor
+    const padding = 2;
+    const xStep = data.length / (width + 1); // Space between points
+    const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
+
+    const lowX = lowFraction * width;
+    const highX = highFraction * width;
+
+    useEffect(() => {
+        queryHistogram();
+    }, [queryHistogram]);
+
+    // Generate the points for the polyline
+    // ??? useMemo was wrong ????
+    const points = useMemo(() => data.map((value, index) => {
+        const x = index * xStep;
+        const y = height - padding - value * yScale;
+        return `${x},${y}`;
+    }).join(' '), [data, xStep, yScale]);
+    
+    return (
+        <>
+        <svg width={'100%'} height={height} 
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        onClick={queryHistogram}
+        ref={ref}
+        // onMouseDown={}
         >
             {/* Background polyline (the simple line connecting data points) */}
             <polyline
