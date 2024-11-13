@@ -2,10 +2,8 @@ import { useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
 import Autocomplete from "@mui/material/Autocomplete";
 import { useDataStore } from "../context.js";
-import type { DataColumn, DataType, FieldName } from "@/charts/charts.js";
-import type { Param } from "@/charts/ChartTypes.js";
-import type DataStore from "@/datastore/DataStore.js";
-import { columnMatchesType } from "@/lib/utils.js";
+import type { DataColumn, DataType } from "@/charts/charts.js";
+import { columnMatchesType, isArray } from "@/lib/utils.js";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
@@ -15,20 +13,9 @@ import Grid from '@mui/material/Grid2';
 import { Accordion, AccordionDetails, AccordionSummary, Typography } from "@mui/material";
 import LinkIcon from '@mui/icons-material/Link';
 import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
-import type { MulticolumnQuery } from "@/links/link_utils.js";
+import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers.js";
+import { inferGenericColumnGuiProps, isMultiColumn } from "@/lib/columnTypeHelpers.js";
 
-
-export type FieldSpec = FieldName | MulticolumnQuery; //this may be defined elsewhere in future
-
-export type ColumnSelectionProps = {
-    setSelectedColumn: (column: FieldSpec) => void; //what about multiple? also, special values...
-    current_value?: FieldSpec;
-    placeholder?: string;
-    exclude?: string[];
-    dataStore?: DataStore;
-    type?: Param | Param[]; //wary of using 'type' as a name - not reserved, but could be confusing
-    multiple?: boolean;
-};
 type setBoolean = ReturnType<typeof useState<boolean>>[1];
 type GuiStateProps = {
     isExpanded: boolean;
@@ -37,14 +24,16 @@ type GuiStateProps = {
     setIsAutocompleteFocused: setBoolean;
 }
 
-const RAComponent = observer((props: ColumnSelectionProps & GuiStateProps) => {
+const RAComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T> & GuiStateProps) => {
     return <div>🔥 RAComponent {JSON.stringify(props.current_value)}</div>;
 });
 
-const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) => {
-    const { setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded, current_value } = props;
-    const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
-    const multiple = props.multiple || isMultiType;
+const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T> & GuiStateProps) => {
+    const props = inferGenericColumnGuiProps(gProps);
+    const { setSelectedColumn, placeholder, type } = props;
+    const { setIsAutocompleteFocused, setIsExpanded, current_value } = props;
+    const isMultiType = isMultiColumn(type);
+    // const multiple = props.multiple || isMultiType;
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
     const columns: DataColumn<DataType>[] = useMemo(
@@ -65,13 +54,17 @@ const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) =>
                 <Autocomplete
                     className="w-full"
                     options={columns}
-                    multiple={multiple}
+                    multiple={isMultiType}
                     // value={current_value ? columns.find(c => c.name === current_value) : null}
                     onChange={(_, value) => {
-                        if (Array.isArray(value)) {
+                        if (!(isMultiType === isArray(value))) throw "type mismatch";
+                        if (isMultiType) {
                             // todo - need to make controlled anyway for multiple...
-                            setSelectedColumn(value[0].field);
+                            if (!isArray(value)) throw "Expected array - and really didn't expect to get here";
+                            // haven't quite managed to infer the setSelectedColumn type here...
+                            setSelectedColumn(value.map(v => v.field) as any);
                         } else {
+                            if (isArray(value)) throw "Expected single value - and really didn't expect to get here";
                             setSelectedColumn(value.field);
                         }
                     }}
@@ -122,10 +115,11 @@ const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) =>
  * (e.g. if we're in a more global dialog etc rather than a chart context,
  * this would be ambiguous).
  */
-const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //GuiSpec<"column">) => {
-    const { setSelectedColumn, placeholder, type } = props;
-    const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
-    const multiple = props.multiple || isMultiType;
+const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => { //GuiSpec<"column">) => {
+    const { type } = props;
+    // generics are messy, maybe we should just have two separate components...
+    // const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
+    // const multiple = props.multiple || isMultiType;
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
     const columns: DataColumn<DataType>[] = useMemo(

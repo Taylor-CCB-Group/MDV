@@ -557,6 +557,8 @@ const AddRowComponent = observer(() => {
         setSelectedColumn={setSelectedColumn} 
         placeholder="Add a filter column"
         exclude={param}
+        // type="_multi_column:all" //not sure about this...
+        type={["text", "text16", "multitext", "unique", "integer", "double", "int32"]}
         />
         </div>
     )

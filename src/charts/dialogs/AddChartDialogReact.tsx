@@ -23,7 +23,7 @@ const ChartConfigSchema = z.object({
     title: z.string(),
     legend: z.string(),
     // in future, allow for "virtual" / "computed" / "smart" columns
-    param: z.optional(z.array(z.string())),
+    param: z.optional(z.array(z.string())), //...
     type: z.string(),
     // in the original AddChartDialog, extra props are on the root object, not nested
     // so when we pass this to ChartManager, we'll need to flatten it
@@ -271,14 +271,18 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     >
                         {chartType?.params && <h2>Columns</h2>}
                         {chartType?.params?.map((p, i) => (
-                            <ColumnSelectionComponent key={p.name} placeholder={p.name} 
+                            <ColumnSelectionComponent key={p.name} placeholder={p.name} //multiple={false}
                             // this may be changing - perhaps we always pass mobx object to ColumnSelectionComponent
                             // but we definitely need to know whether it's a multi-column or not & be able to set the value accordingly
                             setSelectedColumn={action((column) => {
                                 // !! in the original AddChartDialog, we use a "ChooseColumnDialog" for multi-column
                                 // that sets `this.multiColumns` which in `submit` is concatenated to `config.param`
                                 if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
-                                config.param[i] = column;
+                                // the type of config.param is string[] - but this could be a multi-column or virtual column query...
+                                // we need to decide at which point to apply these transformations.
+                                // - to deal with string[] we should be able to specify multiple={false} which could change the return type
+                                if (typeof column !== "string") throw new Error("Expected string column name");
+                                config.param[i] = column; //legit type error - will fail at runtime
                                 // grumble grumble
                                 config._updated = new Date();
                             })}

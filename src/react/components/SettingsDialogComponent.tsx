@@ -18,8 +18,8 @@ import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import JsonView from "react18-json-view";
 import { ChartProvider } from "../context";
-import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
+import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
 
 export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<GuiSpecType>, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>
@@ -105,20 +105,19 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
 /**
  * Wrap the ColumnSelectionComponent in a setting GUI component.
  * 
+ * The properties passed
+ * 
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"column" | "multicolumn"> }) => {
-    // multiple...
-    // proably want to change the type of ColumnSelectionProps anyway...
-    // perhaps we should be looking at other places where it's used & make them use this,
-    // with a different evolution of the API.
-    // currently this is not showing the current_value, among other missing features...
+    // multiple? this type is a lie.
     const setSelectedColumn = useCallback(action((v: string) => {
         props.current_value = v;
         props.func?.(v);
     }), []); //as of this writing, biome is right that props is not a dependency
     const filter = props.columnSelection?.filter;
-    const props2: ColumnSelectionProps = useMemo(() => ({
+    // not only is the filter not working, but we need to decide how to express "multiple"
+    const props2 = useMemo(() => inferGenericColumnSelectionProps({
         setSelectedColumn,
         type: filter,
         multiple: props.type === "multicolumn",

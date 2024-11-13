@@ -1,5 +1,6 @@
 import type BaseChart from "@/charts/BaseChart";
-import type { FieldSpec } from "@/react/components/ColumnSelectionComponent";
+import type { FieldName } from "@/charts/charts";
+import type { FieldSpec } from "@/lib/columnTypeHelpers";
 import type { IReactionDisposer } from "mobx";
 
 /**
@@ -23,11 +24,11 @@ export default function decorateColumnMethod<T extends BaseChart>(method: string
  * as a `reaction`.
  */
 export function loadColumnData<This extends BaseChart, Args extends any[], Return>(
-    target: (this: This, ...args: Args) => void, // we could probably type this to have first argument specified...
-    context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => void> | { target: This },
+    target: (this: This, inputCol: FieldName | FieldName[], ...args: Args) => void, // we could probably type this to have first argument specified...
+    context: ClassMethodDecoratorContext<This, (this: This, inputCol: FieldSpec, ...args: Args) => void> | { target: This },
 ) {
     let disposer: IReactionDisposer | null = null;
-    function replacementMethod(this: This, ...args: any[]) {
+    function replacementMethod(this: This, inputCol: FieldSpec, ...args: any[]) {
         const dataSource = this.dataSource.name;
         // if we have a special value indicating live data, we can do something, perhaps with chart.mobxAutorun(), here...
         // we want to make sure that
@@ -39,9 +40,9 @@ export function loadColumnData<This extends BaseChart, Args extends any[], Retur
         // perhaps safer to have a copy of the config that will be used in chart.getConfig(), which has the 'special value',
         // but then when the decorated method does things to its config, it won't be reflected in the 'special value' config that we save
         // this is really a 'config vs state' thing.
-        if (args[0] == null) {
+        if (inputCol == null) {
             // columns not needed
-            target.call(this, ...args);
+            target.call(this, inputCol, ...args);
         } else {
             // this should only happen if there are any live columns...
             // and we should dispose if replacementMethod is called again
@@ -49,20 +50,18 @@ export function loadColumnData<This extends BaseChart, Args extends any[], Retur
                 disposer();
                 this.reactionDisposers = this.reactionDisposers.filter(v => v !== disposer);
             }
-            const multiCol = Array.isArray(args[0]);
-            const colsOriginal = multiCol ? args[0] : [args[0]];
-            args[0] = colsOriginal;
+            const multiCol = Array.isArray(inputCol);
+            const colsOriginalArr = multiCol ? inputCol : [inputCol];
+            // args[0] = colsOriginal;
             disposer = this.mobxAutorun(() => {
-                const cols = args[0].flatMap(
-                    (v: FieldSpec) => (typeof v === "string" ? v : v.fields)
+                const cols = colsOriginalArr.flatMap(
+                    (v: FieldSpec) => (Array.isArray(v) || typeof v === "string" ? v : v.fields)
                 ).filter(v => v);
                 const a = multiCol ? cols : cols[0];
-                const newArgs = [a, ...args.slice(1)];
+                // const newArgs = [a, ...args.slice(1)];
                 const cm = window.mdv.chartManager;
-                console.log('loading columns:', cols);
                 cm._getColumnsThen(dataSource, cols, () => {
-                    console.log('calling', target.name, 'with', newArgs);
-                    target.call(this, ...newArgs);
+                    target.call(this, a, args);
                 });
             });
         }

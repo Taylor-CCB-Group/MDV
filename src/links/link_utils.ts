@@ -2,6 +2,7 @@ import { computed, makeAutoObservable, makeObservable, runInAction } from "mobx"
 import type ChartManager from "../charts/ChartManager";
 import type { ColumnName, DataColumn, DataType, FieldName } from "../charts/charts";
 import type DataStore from "@/datastore/DataStore";
+import type { loadColumnData } from "../datastore/decorateColumnMethod";
 // zod?
 
 type ChartLink = {
@@ -179,17 +180,50 @@ export type RowsAsColslink = {
     },
     /** added at runtime, observable array corresponding to currently selected/highlighted items */
     observableFields: IRowAsColumn[];
-    //^^ what if it was Enumerable instead of Array? and/or `column` can be a computed value?
+    //^^ what if it was iterator instead of Array? and/or `column` can be a computed value?
     // observableColumns: DataColumn<DataType>[]; //computed?
 }
 
+/**
+ * Represents an active query for a set of columns based on the currently highlighted or filtered rows.
+ * ? in cases where only a single (virtual) column is needed, we can still use this interface 
+ * but only access the first element of the `columns` array?
+ */
 export interface MulticolumnQuery {
     columns: DataColumn<DataType>[]; //could have a generic type for this?
     fields: FieldName[];
 }
 
+type RowsAsColsPrefs = {
+    //todo: properties for setting the link to pause / choose between highlighted or filtered data.
+    //if paused, that implies we might remember the concrete values of the columns.
+    //could maybe have a firstIndex as well as maxItems, for pagination
+    maxItems: number;
+}
+type RowsAsColsQuerySerialized = {
+    linkedDsName: string;
+    type: "RowsAsColsQuery";
+} & RowsAsColsPrefs;
+
+/**
+ * Represents an active query for a set of columns based on the currently highlighted or filtered rows
+ * in a linked {@link DataSource}. Can be used in place of a {@link string} representing a column {@link FieldName}
+ * 
+ * Lazily evaluates with side-effects that will add column metadata into the parent {@link DataStore}, up
+ * to the number specified by `maxItems`. Loading column data is handled separately as of now - for example with
+ * by a {@link loadColumnData} decorator or `methods_using_columns`.
+ * 
+ * @param link - the link configuration object, with observable properties
+ * @param maxItems - the maximum number of columns to return
+ * 
+ * 
+ */
 export class RowsAsColsQuery implements MulticolumnQuery {
-    constructor(public link: RowsAsColslink, public maxItems = 1) {}
+    // it may be logical to make this class be the thing that encapsulates a listener,
+    // don't want to introduce extra overhead... but it's probably small.
+    // perhaps if rather than just link.observableFields, we have two separate arrays (!or iterators!)
+    // and the computed properties can choose between them based on config flags.
+    constructor(public link: RowsAsColslink, public linkedDsName: string, public maxItems = 1) {}
     @computed
     get columns() {
         return this.link.observableFields.slice(0, this.maxItems).map(f => f.column);
@@ -198,9 +232,24 @@ export class RowsAsColsQuery implements MulticolumnQuery {
     get fields() {
         return this.columns.map(c => c.field);
     }
+    @computed
+    get serialized() {
+        return { linkedDsName: this.linkedDsName, maxItems: this.maxItems, type: "RowsAsColsQuery" };
+    }
+    static fromSerialized(ds: DataStore, serialized: RowsAsColsQuerySerialized) {
+        const link = getRowsAsColumnsLinks(ds).find(l => l.linkedDs.name === serialized.linkedDsName)?.link;
+        if (!link) {
+            console.error(`Link not found for ${serialized.linkedDsName}`);
+            return;
+        }
+        return new RowsAsColsQuery(link, serialized.linkedDsName, serialized.maxItems);
+    }
 }
 
-
+/** 
+ * a given {@param link} will currently have a single listener associated with it,
+ * instantiated by this function. If the
+ */
 async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
     if (link.observableFields !== undefined) return;
     const cm = window.mdv.chartManager;
@@ -214,10 +263,14 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
     
     await cm.loadColumnSetAsync([link.name_column], tds.name);
     const sg = Object.keys(link.subgroups)[0];
+    /** ephemeral object representing a virtual column entry in a rows_as_columns link.
+     * accessing the `column` property will add the column to the parent DataStore.
+     */
     class RAColumn implements IRowAsColumn {
-        index: number;
+        constructor(public index: number) {}
         @computed
         get name() {
+            // if I don't have `as string` here, it's inferred as string | number
             return tds.getRowText(this.index, link.name_column) as string;
         }
         @computed
@@ -228,16 +281,8 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
         get column(): DataColumn<DataType> {
             return ds.addColumnFromField(this.fieldName);
         }
-        constructor(index: number) {
-            this.index = index;
-        }
     }
     const getField = (index: number) => {
-        // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
-        // const name = tds.getRowText(index, link.name_column) as string;
-        // const fieldName = `${sg}|${name} (${sg})|${index}`;
-        // const column = ds.addColumnFromField(fieldName);
-        // return ({ index, value: name, fieldName, column });
         return new RAColumn(index);
     };
     //todo check link.name is a good id for the listener
@@ -249,11 +294,9 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
             });
         } else if (type === "filtered") {
             // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-            const filteredIndices = await tds.getFilteredIndices();
             //! this Array.from could be suboptimal for large numbers of indices
-            // we should do fieldName formatting here... should we also call ds.addColumnFromField?
-            // or do we want to limit that?
-            // slightly depends on our ability to display appropriately grouped options in the dropdown...
+            //at risk of overthinking, but we could have a lazy filteredIndices iterator...
+            const filteredIndices = await tds.getFilteredIndices();
             const vals = Array.from(filteredIndices).map(getField);
             runInAction(() => {
                 link.observableFields = vals;
@@ -282,6 +325,7 @@ export function getRowsAsColumnsLinks(dataStore: DataStore) {
                 }
                 // todo make sure the link is reasonably typed
                 const link = links.rows_as_columns as RowsAsColslink;
+                // we could be lazier about this, especially if we have a lot of links.
                 initRacListener(link, dataStore, linkedDs.dataStore);
                 return { linkedDs, link };
             }

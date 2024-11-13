@@ -6,12 +6,12 @@ import type { DataColumn, DataType, FieldName, GuiSpec } from "@/charts/charts";
 import { useMemo } from "react";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import { Button, FormControl, FormControlLabel, Radio, RadioGroup } from "@mui/material";
-import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
+import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers";
 import { RowsAsColsQuery } from "@/links/link_utils";
 
-type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>[0] & ColumnSelectionProps;
+type RowsAsColsProps<T extends CTypes> = ReturnType<typeof useRowsAsColumnsLinks>[0] & ColumnSelectionProps<T>;
 
-const RowsAsCols = observer((props : RowsAsColsProps) => {
+const RowsAsCols = observer(<T extends CTypes,>(props : RowsAsColsProps<T>) => {
     const { linkedDs, link } = props;
     const { setSelectedColumn } = props;
     const rowNames = useHighlightedForeignRows().map(r => r.fieldName);
@@ -40,7 +40,7 @@ const RowsAsCols = observer((props : RowsAsColsProps) => {
     return (
         <>
         {/* set the value... to something special... not just a specially formatted string */}
-        <Button onClick={() => {setSelectedColumn(new RowsAsColsQuery(link, maxItems))}}>{liveSelectionName}</Button>
+        <Button onClick={() => {setSelectedColumn(new RowsAsColsQuery(link, linkedDs.name, maxItems))}}>{liveSelectionName}</Button>
         <DropdownAutocompleteComponent props={spec} />
         {/* <FormControl>
             <RadioGroup>
@@ -53,7 +53,7 @@ const RowsAsCols = observer((props : RowsAsColsProps) => {
 });
 
 
-export default observer(function LinksComponent(props: ColumnSelectionProps) {
+export default observer(function LinksComponent<T extends CTypes,>(props: ColumnSelectionProps<T>) {
     const linkProps = useRowsAsColumnsLinks()[0]; //todo: arbitrary number of links
     if (!linkProps) return null;
     return (
