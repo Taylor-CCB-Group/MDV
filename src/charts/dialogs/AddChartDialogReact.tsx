@@ -5,10 +5,8 @@ import { createMdvPortal } from "@/react/react_utils";
 import { observer } from "mobx-react-lite";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
-import Chip from "@mui/material/Chip";
 
 import BaseChart from "../BaseChart.js";
-import type { Param } from "@/charts/ChartTypes.js";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
 import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
@@ -18,6 +16,7 @@ import z from "zod";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType } from "@/lib/utils.js";
+import type { Param } from "@/lib/columnTypeHelpers.js";
 
 const ChartConfigSchema = z.object({
     title: z.string(),

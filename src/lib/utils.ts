@@ -1,7 +1,7 @@
-import type { Param } from "@/charts/ChartTypes";
 import type { DataColumn, DataType } from "@/charts/charts";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { Param } from "./columnTypeHelpers";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
