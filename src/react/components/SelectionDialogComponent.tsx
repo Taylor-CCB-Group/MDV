@@ -2,7 +2,7 @@ import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../h
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography, Select } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState, useMemo } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
@@ -19,6 +19,8 @@ import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
+import { useOuterContainer } from "../screen_state";
+// import { brushX } from "d3-brush";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -248,11 +250,93 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
 
     return { value, step, histogram, lowFraction, highFraction, queryHistogram };
 }
-type RangeProps = ReturnType<typeof useRangeFilter>;
-const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryHistogram }: RangeProps) => {
+// type set2d = ReturnType<typeof useState<[number, number]>>[1];
+type set2d = (v: [number, number]) => void;
+type RangeProps = ReturnType<typeof useRangeFilter> & { 
+    setValue: set2d,
+    minMax: [number, number],
+};
+const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax, lowFraction, highFraction}: RangeProps) => {
+    const doc = useOuterContainer();
+    const getX = useCallback((e: { clientX: number }) => {
+        const { width, left } = ref.current.getBoundingClientRect();
+        const normalizedX = Math.min(1, Math.max(0, (e.clientX - left) / width));
+        const [min, max] = minMax;
+        return min + normalizedX * (max - min);
+    }, [minMax, ref.current]); //not sure we should need ref.current here... biome says.
+    //lots of refs to avoid recreating callbacks and losing association with the correct listeners
+    //may be better to use a class here (or brushX from d3)
+    const startXref = useRef(0);
+    const lastXref = useRef(0);
+    const handleRef = useRef<"L" | "H" | "M">("M");
+    const valueRef = useRef(value);
+    const startValueRef = useRef(value);
+    valueRef.current = value;
+    const handleMouseMove = useCallback((e: { clientX: number }) => {
+        const x = getX(e);
+        const v = valueRef.current;
+        if (handleRef.current === "M") {
+            let dx = x - startXref.current;
+            const s = startValueRef.current;
+            if (s[0] + dx < minMax[0]) {
+                dx = minMax[0] - s[0];
+            } else if (s[1] + dx > minMax[1]) {
+                dx = minMax[1] - s[1];
+            }
+            setValue([s[0] + dx, s[1] + dx]);
+        } else if (handleRef.current === "L") {
+            if (x > v[1]) {
+                handleRef.current = "H";
+                setValue([v[1], x]);
+            } else setValue([x, v[1]]);
+        } else if (x < v[0]) {
+            handleRef.current = "L";
+            setValue([x, v[0]]);
+        } else setValue([v[0], x]);
+    }, [getX, setValue, minMax]);
+    const handleMouseUp = useCallback(() => {
+        doc.removeEventListener('mouseup', handleMouseUp);
+        doc.removeEventListener('mousemove', handleMouseMove);
+    }, [doc, handleMouseMove]);
+    useEffect(() => {
+        if (!ref.current) return;
+        const handleMouseDown = (e: { clientX: number }) => {
+            const x = getX(e);
+            startXref.current = x;
+            const value = valueRef.current;
+            const normalizedX = (x - minMax[0]) / (minMax[1] - minMax[0]);
+            // consider reviving 'no filter' behavior
+            if (Math.abs(normalizedX - lowFraction) < 0.05) {
+                handleRef.current = "L";
+                setValue([x, value[1]]);
+            } else if (Math.abs(normalizedX - highFraction) < 0.05) {
+                handleRef.current = "H";
+                setValue([value[0], x]);
+            } else if (normalizedX > lowFraction && normalizedX < highFraction) {
+                handleRef.current = "M";
+                startValueRef.current = value;
+                lastXref.current = x;
+            } else {
+                handleRef.current = "L"; //arbitrary choice between L and H
+                setValue([x, x]);
+            }
+            // setValue([x, x]); //not what we want... different handlers for low/high/mid,
+            // mouseMove should be on the outerContainer, not the svg...
+            //(similar to d3 brushX used on HistogramChart - could use that here, even?)
+            doc.addEventListener('mousemove', handleMouseMove);
+            doc.addEventListener('mouseup', handleMouseUp);
+        };
+        ref.current.addEventListener('mousedown', handleMouseDown);
+        return () => ref.current?.removeEventListener('mousedown', handleMouseDown);
+    }, [ref, handleMouseMove, handleMouseUp, getX, setValue, minMax, lowFraction, highFraction, doc.addEventListener]);
+}
+const Histogram = observer((props: RangeProps) => {
+    const { histogram: data, lowFraction, highFraction, queryHistogram, value } = props;
+    const ref = useRef<SVGSVGElement>(null);
+    useBrushX(ref, props);
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const width = 99;
-    const height = 40;
+    const height = 100;
     const lineColor = prefersDarkMode ? '#fff' : '#000';
     // Find max value for vertical scaling
     const maxValue = Math.max(...data);
@@ -276,12 +360,16 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
         const y = height - padding - value * yScale;
         return `${x},${y}`;
     }).join(' '), [data, xStep, yScale]);
-
+    
     return (
+        <>
         <svg width={'100%'} height={height} 
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
         onClick={queryHistogram}
+        ref={ref}
+        cursor="move"
+        // onMouseDown={}
         >
             {/* Background polyline (the simple line connecting data points) */}
             <polyline
@@ -301,6 +389,7 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
                 height={height}
                 fill={prefersDarkMode ? '#333' : '#888'}
                 fillOpacity="0.8"
+                cursor="crosshair"
             />
             <rect
                 x={highX}
@@ -309,8 +398,36 @@ const Histogram = observer(({ histogram: data, lowFraction, highFraction, queryH
                 height={height}
                 fill={prefersDarkMode ? '#333' : '#888'}
                 fillOpacity="0.8"
+                cursor="crosshair"
+            />
+            {/* would be better if these had a strokeWidth that didn't stretch
+            and if the mouse events were actually related to them
+            
+            also making sure they don't jump to x
+            */}
+            <line
+                x1={lowX}
+                y1={0}
+                x2={lowX}
+                y2={height}
+                stroke={lineColor}
+                strokeWidth="0.5"
+                cursor="ew-resize"
+                opacity={0.5}
+            />
+            <line
+                x1={highX}
+                y1={0}
+                x2={highX}
+                y2={height}
+                stroke={lineColor}
+                strokeWidth="0.5"
+                cursor="ew-resize"
+                opacity={0.5}
             />
         </svg>
+        <p className="flex justify-between"><em>{`${value[0].toFixed(2)}<`}</em> <em>{`<${value[1].toFixed(2)}`}</em></p>
+        </>
     );
 });
 
@@ -323,8 +440,8 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     }, [filters, column.field]);
     return (
         <div>
-            <Histogram {...rangeProps} />
-            <Slider
+            <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} />
+            {/* <Slider
                 size="small"
                 value={value}
                 min={column.minMax[0]}
@@ -339,7 +456,7 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
                 <TextField size="small" className="max-w-20 float-right" type="number"
                     value={value[1]}
                     onChange={(e) => setValue([value[0], Number(e.target.value)])} />
-            </div>
+            </div> */}
         </div>
     );
 });
