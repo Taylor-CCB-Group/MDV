@@ -260,7 +260,7 @@ const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax
     const doc = useOuterContainer();
     const getX = useCallback((e: { clientX: number }) => {
         const { width, left } = ref.current.getBoundingClientRect();
-        const normalizedX = (e.clientX - left) / width;
+        const normalizedX = Math.min(1, Math.max(0, (e.clientX - left) / width));
         const [min, max] = minMax;
         return min + normalizedX * (max - min);
     }, [minMax, ref.current]); //not sure we should need ref.current here... biome says.
