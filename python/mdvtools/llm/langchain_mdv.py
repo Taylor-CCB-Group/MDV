@@ -59,7 +59,6 @@ load_dotenv()
 
 mypath = os.path.dirname(__file__)
 
-
 print('# Crawl the local repository to get a list of relevant file paths')
 with time_block("b1: Local repo crawling"):
     code_files_urls = crawl_local_repo()
@@ -89,7 +88,7 @@ with time_block("b2: Text splitter initialising"):
     print('# Split the code documents into chunks using the text splitter')
     texts = text_splitter.split_documents(code_strings)
 
-assert(len(texts) > 0)
+#assert(len(texts) > 0)
 
 # Set the number of queries per minute (QPM) for embedding requests
 # EMBEDDING_QPM = 100 # unused

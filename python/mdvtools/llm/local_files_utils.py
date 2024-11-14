@@ -1,7 +1,11 @@
 import os
 import nbformat
 
-DIRECTORY_PATH = "../test_projects"
+# Get the directory of the current script
+mypath = os.path.dirname(__file__)
+
+# Define the relative path
+DIRECTORY_PATH = os.path.join(mypath, "../test_projects")
 
 def crawl_local_repo(
     directory_path: str = DIRECTORY_PATH
@@ -21,6 +25,7 @@ def crawl_local_repo(
 
     # Initialize an empty list to store file URLs
     files = []
+
 
     # Walk through the directory tree
     for root, dirs, file_names in os.walk(os.path.abspath(directory_path)):
