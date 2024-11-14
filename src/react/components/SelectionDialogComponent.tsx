@@ -335,10 +335,19 @@ const Histogram = observer((props: RangeProps) => {
 
     const lowX = lowFraction * width;
     const highX = highFraction * width;
-
+    const [hasQueried, setHasQueried] = useState(false);
     useEffect(() => {
-        queryHistogram();
-    }, [queryHistogram]);
+        if (!ref.current) return;
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && !hasQueried) {
+                setHasQueried(true);
+                queryHistogram();
+            }
+        }, { rootMargin: '0px 0px 100px 0px' });
+        observer.observe(ref.current);
+        // queryHistogram();
+        return () => observer.disconnect();
+    }, [queryHistogram, hasQueried]);
 
     // Generate the points for the polyline
     // ??? useMemo was wrong ????
