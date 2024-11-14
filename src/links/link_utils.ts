@@ -1,4 +1,4 @@
-import { computed, makeAutoObservable, makeObservable, runInAction } from "mobx";
+import { computed, makeObservable, observable, runInAction } from "mobx";
 import type ChartManager from "../charts/ChartManager";
 import type { ColumnName, DataColumn, DataType, FieldName } from "../charts/charts";
 import type DataStore from "@/datastore/DataStore";
@@ -223,7 +223,10 @@ export class RowsAsColsQuery implements MulticolumnQuery {
     // don't want to introduce extra overhead... but it's probably small.
     // perhaps if rather than just link.observableFields, we have two separate arrays (!or iterators!)
     // and the computed properties can choose between them based on config flags.
-    constructor(public link: RowsAsColslink, public linkedDsName: string, public maxItems = 1) {}
+    @observable accessor maxItems: number;
+    constructor(public link: RowsAsColslink, public linkedDsName: string, maxItems = 1) {
+        this.maxItems = maxItems;
+    }
     @computed
     get columns() {
         return this.link.observableFields.slice(0, this.maxItems).map(f => f.column);
@@ -279,6 +282,13 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
         }
         @computed
         get column(): DataColumn<DataType> {
+            //https://mobx.js.org/computeds.html
+            //"They should not have side effects or update other observables."
+            //this will have side effects - I think it's ok, subsequent calls will be idempotent
+            //(not sure idempotent is right, thanks copilot, but it will find the columnIndex
+            //and return the same DataColumn instance each time)
+            //"Avoid creating and returning new observables." - ok
+            //"They should not depend on non-observable values."
             return ds.addColumnFromField(this.fieldName);
         }
     }

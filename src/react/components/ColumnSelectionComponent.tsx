@@ -7,7 +7,7 @@ import { columnMatchesType, isArray } from "@/lib/utils.js";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
-import LinksComponent from "./LinksComponent.js";
+import LinksComponent, { RAComponent } from "./LinksComponent.js";
 import { TextFieldExtended } from "./TextFieldExtended.js";
 import Grid from '@mui/material/Grid2';
 import { Accordion, AccordionDetails, AccordionSummary, Typography } from "@mui/material";
@@ -23,10 +23,6 @@ type GuiStateProps = {
     isAutocompleteFocused: boolean;
     setIsAutocompleteFocused: setBoolean;
 }
-
-const RAComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T> & GuiStateProps) => {
-    return <div>🔥 RAComponent {JSON.stringify(props.current_value)}</div>;
-});
 
 const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T> & GuiStateProps) => {
     const props = inferGenericColumnGuiProps(gProps);

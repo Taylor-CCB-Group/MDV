@@ -1,12 +1,12 @@
 import { observer } from "mobx-react-lite";
 import { useDataStore } from "../context";
-import { makeAutoObservable } from "mobx";
+import { action, makeAutoObservable } from "mobx";
 import { useHighlightedForeignRows, useRowsAsColumnsLinks } from "../chartLinkHooks";
-import type { DataColumn, DataType, FieldName, GuiSpec } from "@/charts/charts";
+import type { DataColumn, DataType, GuiSpec } from "@/charts/charts";
 import { useMemo } from "react";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
-import { Button, FormControl, FormControlLabel, Radio, RadioGroup } from "@mui/material";
-import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers";
+import { Button, Paper } from "@mui/material";
+import { isMultiColumn, type CTypes, type ColumnSelectionProps } from "@/lib/columnTypeHelpers";
 import { RowsAsColsQuery } from "@/links/link_utils";
 
 type RowsAsColsProps<T extends CTypes> = ReturnType<typeof useRowsAsColumnsLinks>[0] & ColumnSelectionProps<T>;
@@ -19,23 +19,23 @@ const RowsAsCols = observer(<T extends CTypes,>(props : RowsAsColsProps<T>) => {
     // const dataSources = useDataSources();
     const cm = window.mdv.chartManager;
     const targetColumn = cm.getDataSource(linkedDs.name).columnIndex[name_column] as DataColumn<DataType>;
-    const ds = useDataStore();
+    const isMultiType = isMultiColumn(props.type);
     // potential symbols for live link ➤ ⌁ ⇢ ⍆ ⚡︎ ► ◎ ▷ ☑︎ ⦿
     const liveSelectionName = `⦿⌁ active '${name}' selection`;
-    const spec: GuiSpec<'multidropdown'> = useMemo(() => makeAutoObservable({
+    // what do we really want here? ColumnSelectionDialogs all the way down?
+    const spec: GuiSpec<'multidropdown' | 'dropdown'> = useMemo(() => makeAutoObservable({
         type: 'multidropdown',
         name: name_column,
         label: `specific '${name}' column`, //todo different label for multiple
         // I don't think we want to prepend option to dropdown - we should have a different way of showing this
         values: [targetColumn.values],
         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
-        current_value: [], 
-        func: (v) => {
-            
-        }
+        // current_value: props.current_value, 
+        func: action((v) => {
+            props.current_value = v as any;
+        })
     }), [targetColumn, name_column, name]);
     const { current_value } = spec;
-    const v = Array.isArray(current_value) ? current_value : [current_value];
     const maxItems = props.multiple ? 10 : 1;
     return (
         <>
@@ -51,6 +51,23 @@ const RowsAsCols = observer(<T extends CTypes,>(props : RowsAsColsProps<T>) => {
         </>
     )
 });
+
+export const RAComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => {
+    const { current_value } = props; //may want more props for dealing with accordion mouse event noise
+    // this type check will need to change in future if we have other kinds of virtual 'query' columns
+    if (!(current_value instanceof RowsAsColsQuery)) {
+        console.error("Expected RowsAsColsQuery");
+        return <div>Error! expected RowsAsColsQuery</div>;
+    }
+    const { link, linkedDsName, maxItems } = current_value;
+    const multiple = isMultiColumn(props.type);
+    return <Paper 
+    onClick={action((e) => {
+        current_value.maxItems = 100;
+        e.stopPropagation();
+    })}
+    >⦿⌁{maxItems} '{link.name}'</Paper>;
+})
 
 
 export default observer(function LinksComponent<T extends CTypes,>(props: ColumnSelectionProps<T>) {

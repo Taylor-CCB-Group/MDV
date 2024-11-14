@@ -116,6 +116,7 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     //would like not to have this here - might have some more logic in above hook
     //in particular want to redesign the fieldName being what determines the column
     const racLink = useRowsAsColumnsLinks()[0];
+    //! this next line may be problematic
     const { link } = racLink || { link: null }; //!! passing the whole racLink object lead to an infinite loop
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
     const ds = useDataStore();
