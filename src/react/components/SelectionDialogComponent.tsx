@@ -258,16 +258,14 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
 };
 const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax, lowFraction, highFraction}: RangeProps) => {
     const doc = useOuterContainer();
-    // const doc = useChartDoc();
-    // const [dragging, setDragging] = useState(false);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
     const getX = useCallback((e: { clientX: number }) => {
         const { width, left } = ref.current.getBoundingClientRect();
         const normalizedX = (e.clientX - left) / width;
         const [min, max] = minMax;
         return min + normalizedX * (max - min);
-    }, [minMax]);
-    // const [startX, setStartX] = useState(0);
+    }, [minMax, ref.current]); //not sure we should need ref.current here... biome says.
+    //lots of refs to avoid recreating callbacks and losing association with the correct listeners
+    //may be better to use a class here (or brushX from d3)
     const startXref = useRef(0);
     const lastXref = useRef(0);
     const handleRef = useRef<"L" | "H" | "M">("M");
@@ -280,8 +278,6 @@ const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax
         if (handleRef.current === "M") {
             let dx = x - startXref.current;
             const s = startValueRef.current;
-            console.log("M", dx);
-            // if (s[0] + dx < minMax[0] || s[1] + dx > minMax[1]) return;
             if (s[0] + dx < minMax[0]) {
                 dx = minMax[0] - s[0];
             } else if (s[1] + dx > minMax[1]) {
@@ -290,18 +286,13 @@ const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax
             setValue([s[0] + dx, s[1] + dx]);
         } else if (handleRef.current === "L") {
             if (x > v[1]) {
-                console.log("L -> H");
                 handleRef.current = "H";
                 setValue([v[1], x]);
             } else setValue([x, v[1]]);
         } else if (x < v[0]) {
-            console.log("H -> L");
             handleRef.current = "L";
             setValue([x, v[0]]);
         } else setValue([v[0], x]);
-        // const currentLow = Math.min(startX, x);
-        // const currentHigh = Math.max(startX, x);
-        // setValue([currentLow, currentHigh]);
     }, [getX, setValue, minMax]);
     const handleMouseUp = useCallback(() => {
         doc.removeEventListener('mouseup', handleMouseUp);
@@ -314,11 +305,8 @@ const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax
             startXref.current = x;
             const value = valueRef.current;
             const normalizedX = (x - minMax[0]) / (minMax[1] - minMax[0]);
-            if ((lowFraction === 0) && (highFraction === 1)) {
-                setValue([x, x]);
-                handleRef.current = "L";
-                lastXref.current = x;
-            } else if (Math.abs(normalizedX - lowFraction) < 0.05) {
+            // consider reviving 'no filter' behavior
+            if (Math.abs(normalizedX - lowFraction) < 0.05) {
                 handleRef.current = "L";
                 setValue([x, value[1]]);
             } else if (Math.abs(normalizedX - highFraction) < 0.05) {
@@ -343,12 +331,12 @@ const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax
     }, [ref, handleMouseMove, handleMouseUp, getX, setValue, minMax, lowFraction, highFraction, doc.addEventListener]);
 }
 const Histogram = observer((props: RangeProps) => {
-    const { histogram: data, lowFraction, highFraction, queryHistogram, setValue, minMax, value } = props;
+    const { histogram: data, lowFraction, highFraction, queryHistogram } = props;
     const ref = useRef<SVGSVGElement>(null);
     useBrushX(ref, props);
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const width = 99;
-    const height = 60;
+    const height = 100;
     const lineColor = prefersDarkMode ? '#fff' : '#000';
     // Find max value for vertical scaling
     const maxValue = Math.max(...data);
@@ -380,6 +368,7 @@ const Histogram = observer((props: RangeProps) => {
         preserveAspectRatio="none"
         onClick={queryHistogram}
         ref={ref}
+        cursor="move"
         // onMouseDown={}
         >
             {/* Background polyline (the simple line connecting data points) */}
@@ -400,6 +389,7 @@ const Histogram = observer((props: RangeProps) => {
                 height={height}
                 fill={prefersDarkMode ? '#333' : '#888'}
                 fillOpacity="0.8"
+                cursor="crosshair"
             />
             <rect
                 x={highX}
@@ -408,6 +398,32 @@ const Histogram = observer((props: RangeProps) => {
                 height={height}
                 fill={prefersDarkMode ? '#333' : '#888'}
                 fillOpacity="0.8"
+                cursor="crosshair"
+            />
+            {/* would be better if these had a strokeWidth that didn't stretch
+            and if the mouse events were actually related to them
+            
+            also making sure they don't jump to x
+            */}
+            <line
+                x1={lowX}
+                y1={0}
+                x2={lowX}
+                y2={height}
+                stroke={lineColor}
+                strokeWidth="0.5"
+                cursor="ew-resize"
+                opacity={0.5}
+            />
+            <line
+                x1={highX}
+                y1={0}
+                x2={highX}
+                y2={height}
+                stroke={lineColor}
+                strokeWidth="0.5"
+                cursor="ew-resize"
+                opacity={0.5}
             />
         </svg>
         </>
@@ -424,7 +440,7 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     return (
         <div>
             <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} />
-            <Slider
+            {/* <Slider
                 size="small"
                 value={value}
                 min={column.minMax[0]}
@@ -439,7 +455,7 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
                 <TextField size="small" className="max-w-20 float-right" type="number"
                     value={value[1]}
                     onChange={(e) => setValue([value[0], Number(e.target.value)])} />
-            </div>
+            </div> */}
         </div>
     );
 });
