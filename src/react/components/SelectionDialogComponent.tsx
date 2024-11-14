@@ -331,7 +331,7 @@ const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax
     }, [ref, handleMouseMove, handleMouseUp, getX, setValue, minMax, lowFraction, highFraction, doc.addEventListener]);
 }
 const Histogram = observer((props: RangeProps) => {
-    const { histogram: data, lowFraction, highFraction, queryHistogram } = props;
+    const { histogram: data, lowFraction, highFraction, queryHistogram, value } = props;
     const ref = useRef<SVGSVGElement>(null);
     useBrushX(ref, props);
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
@@ -426,6 +426,7 @@ const Histogram = observer((props: RangeProps) => {
                 opacity={0.5}
             />
         </svg>
+        <p className="flex justify-between"><em>{`${value[0].toFixed(2)}<`}</em> <em>{`<${value[1].toFixed(2)}`}</em></p>
         </>
     );
 });
