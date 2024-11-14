@@ -16,6 +16,8 @@ class HeatMap extends SVGChart {
         });
 
         const p = this.config.param;
+        //! we use this.fieldNames instead of `param[1, ...]` to avoid mutating config - which is observable - in setFields - which may be in an action
+        this.fieldNames = p.slice(1);
         const vals = this.dataStore.getColumnValues(p[0]);
         this.x_scale.domain(vals.slice(0));
         const c = this.config;
@@ -38,12 +40,10 @@ class HeatMap extends SVGChart {
     }
     
     setFields(p) {
-        const yLabels = [];
-        for (let x = 0; x < p.length; x++) {
-            yLabels.push(this.dataStore.getColumnName(p[x]));
-        }
+        this.fieldNames = p;
+        const yLabels = this.fieldNames.map(f => this.dataStore.getColumnName(f));
         this.y_scale.domain(yLabels);
-        this.config.param = [this.config.param[0]].concat(p);
+        // this.config.param = [this.config.param[0]].concat(p);
         this.onDataFiltered();
     }
 
@@ -134,7 +134,8 @@ class HeatMap extends SVGChart {
             this.resetButton.style.display = "none";
         }
         const config = { method: this.config.method, scaleVals: [] };
-        const p = this.config.param;
+        // const p = this.config.param;
+        const p = [this.config.param[0], ...this.fieldNames];
         const q =
             this.config.color_scale.trim === "none"
                 ? null
@@ -158,7 +159,7 @@ class HeatMap extends SVGChart {
                     console.error("Error drawing heatmap:", e);
                 }
             },
-            this.config.param,
+            p,
             config,
         );
     }
@@ -170,14 +171,13 @@ class HeatMap extends SVGChart {
             this.margins.right = 70;
             this.y_scale.domain(
                 this.rowClusterNodes.order.map((x) =>
-                    this.dataStore.getColumnName(this.config.param[x + 1]),
+                    this.dataStore.getColumnName(this.fieldNames[x]),
                 ),
             );
         } else {
             this.rowClusterNodes = undefined;
             this.y_scale.domain(
-                this.config.param
-                    .slice(1)
+                this.fieldNames
                     .map((x) => this.dataStore.getColumnName(x)),
             );
             this.margins.right = 10;
@@ -224,7 +224,7 @@ class HeatMap extends SVGChart {
             this.data.catTotals[x._id],
             x._id,
         ]);
-        const recHeight = dim.height / (this.config.param.length - 1);
+        const recHeight = dim.height / (this.fieldNames.length);
         this.graph_area
             .selectAll(".heatmap-row")
             .data(this.data.averages)
@@ -250,7 +250,7 @@ class HeatMap extends SVGChart {
             .attr("height", recHeight)
             .attr("width", recWidth)
             .on("click", (e, d) => {
-                const row = this.config.param[d.row_id + 1];
+                const row = this.fieldNames[d.row_id];
                 this._callListeners("cell_clicked", {
                     row: row,
                     col: vals[d.col_id],
@@ -259,7 +259,7 @@ class HeatMap extends SVGChart {
             })
             .on("mouseover pointermove", (e, d) => {
                 const row =
-                    this.dataStore.columnIndex[this.config.param[d.row_id + 1]]
+                    this.dataStore.columnIndex[this.fieldNames[d.row_id]]
                         .name;
 
                 this.showToolTip(
@@ -325,7 +325,7 @@ class HeatMap extends SVGChart {
         if (this.rowClusterNodes) {
             this.drawYTree(
                 this.rowClusterNodes.nodes,
-                this.config.param.length - 1,
+                this.fieldNames.length,
             );
         }
         if (this.columnClusterNodes) {
@@ -428,8 +428,9 @@ class HeatMap extends SVGChart {
                     filter: ["double", "integer", "int32"]
                 },
                 current_value: this.config.param.slice(1),
-                func: (x) => {
-                    this.setFields(x);
+                func: (v) => {
+                    // given that this is "multicolumn", we should be able to assume that v is an array
+                    this.setFields(Array.isArray(v) ? v : [v]);
                 },
             }
         ]);
