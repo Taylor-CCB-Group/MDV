@@ -565,12 +565,14 @@ const AddRowComponent = observer(() => {
 })
 
 const ForeignRows = observer(() => {
+    const rlink = useRowsAsColumnsLinks();
+    //!breaking rule of hooks here, but in a way that should be ok at runtime as of now
+    //! (just testing "infinte loop with no link" fix)
+    if (rlink.length === 0) return null; //todo: 30sec video clip
     const [filter, setFilter] = useState("");
     const [max, setMax] = useState(10);
     const [debouncedFilter] = useDebounce(filter, 300);
-    const rlink = useRowsAsColumnsLinks();
     const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter);
-    if (rlink.length === 0) return null;
     const { linkedDs, link } = rlink[0];
     return (
         <div className="p-3">
@@ -601,7 +603,7 @@ function useResetButton() {
     }, [hasFilter, chart.resetButton]);
 }
 
-const SelectionDialogComponent = () => {
+const SelectionDialogComponent = observer(() => {
     //!! this component doesn't update with HMR and introducing another wrapper component makes things worse
     //(currently changes here aren't reflected in the browser, but the rest of the components are
     //if we wrap this, then any change causes whole page to reload)
@@ -614,5 +616,5 @@ const SelectionDialogComponent = () => {
             <ForeignRows />
         </div>
     );
-};
+});
 export default SelectionDialogComponent;
