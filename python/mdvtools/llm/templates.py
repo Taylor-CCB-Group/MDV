@@ -12,6 +12,7 @@ Based on the question asked and the dataframes provided, please perform the foll
 
 packages_functions = """import os
 import pandas as pd
+import scanpy as sc
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.heatmap_plot import HeatmapPlot
 from mdvtools.charts.histogram_plot import HistogramPlot
@@ -29,6 +30,7 @@ from mdvtools.charts.table_plot import TablePlot
 from mdvtools.charts.wordcloud_plot import WordcloudPlot
 import json
 import numpy as np
+import sys
 
 def load_data(path):
     #Load data from the specified CSV file.
@@ -44,7 +46,7 @@ def convert_plot_to_json(plot):
 def get_createproject_prompt_RAG(project_id: str, path_to_data: str, final_answer: str):
     prompt_RAG = (
 """ 
-Context: {context}]
+Context: {context}
 
 The collection of Python scripts provided in the context, is designed to generate various types of data visualizations 
 using the mdvtools library. Each script focuses on a specific type of plot and follows a common structure that includes loading 

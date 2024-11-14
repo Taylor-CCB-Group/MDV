@@ -12,7 +12,7 @@ def create_pie_chart(title, param, size, position):
         size=size,
         position=position
     )
-
+    
     return plot
 
 def load_data(path):

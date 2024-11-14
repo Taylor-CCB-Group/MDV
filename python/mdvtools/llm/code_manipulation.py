@@ -186,7 +186,7 @@ else:
     final_code = final_code.replace("project.serve()", "# project.serve()")
     if modify_existing_project:
         # not at all robust... won't be needed in future
-        final_code = final_code.replace("project.add_datasource", "# project.add_datasource")
+        #final_code = final_code.replace("project.add_datasource", "# project.add_datasource")
         # all lines that include `data_frame` can be somewhat safely removed with the current template
         final_code = re.sub(r".*data_frame.*", "", final_code)
         final_code = final_code.replace("delete_existing=True", "delete_existing=False")

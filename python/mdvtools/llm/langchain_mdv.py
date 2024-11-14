@@ -86,9 +86,10 @@ with time_block("b2: Text splitter initialising"):
         chunk_size=20000,           # Set the chunk size to 1500 characters
         chunk_overlap=2000          # Set the chunk overlap to 150 characters
     )
-
     print('# Split the code documents into chunks using the text splitter')
     texts = text_splitter.split_documents(code_strings)
+
+assert(len(texts) > 0)
 
 # Set the number of queries per minute (QPM) for embedding requests
 # EMBEDDING_QPM = 100 # unused
@@ -102,8 +103,10 @@ with time_block("b3: Embeddings creating"):
         model="text-embedding-3-large"  # Specify the model to use for generating embeddings
         )
 
+print(embeddings)
 print('# Create an index from the embedded code chunks')
 print('# Use FAISS (Facebook AI Similarity Search) to create a searchable index')
+
 
 with time_block("b4: FAISS database creating"):
     db = FAISS.from_documents(texts, embeddings)

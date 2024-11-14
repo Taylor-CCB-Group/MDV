@@ -830,7 +830,7 @@ class MDVProject:
         return links
 
     def serve(self, **kwargs):
-        from .server import create_app
+        from mdvtools.server import create_app
 
         create_app(self, **kwargs)
 

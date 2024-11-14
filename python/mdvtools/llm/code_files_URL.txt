@@ -6,6 +6,7 @@
 ../test_projects/image_table_plot_example.py
 ../test_projects/wordcloud_plot_example.py
 ../test_projects/histogram_plot_example.py
+../test_projects/viv_mdv_plot_example.py
 ../test_projects/table_plot_example.py
 ../test_projects/violin_plot_example.py
 ../test_projects/TAURUS_example.ipynb

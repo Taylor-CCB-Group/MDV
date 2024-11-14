@@ -1,8 +1,7 @@
 import os
 import nbformat
 
-
-DIRECTORY_PATH = "python/mdvtools/test_projects"
+DIRECTORY_PATH = "../test_projects"
 
 def crawl_local_repo(
     directory_path: str = DIRECTORY_PATH
@@ -24,7 +23,7 @@ def crawl_local_repo(
     files = []
 
     # Walk through the directory tree
-    for root, dirs, file_names in os.walk(directory_path):
+    for root, dirs, file_names in os.walk(os.path.abspath(directory_path)):
         # Skip hidden directories (those starting with '.')
         dirs[:] = [d for d in dirs if not d.startswith('.')]
         
