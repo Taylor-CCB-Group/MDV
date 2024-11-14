@@ -570,7 +570,7 @@ const ForeignRows = observer(() => {
     const [debouncedFilter] = useDebounce(filter, 300);
     const rlink = useRowsAsColumnsLinks();
     const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter);
-    if (!rlink) return null;
+    if (rlink.length === 0) return null;
     const { linkedDs, link } = rlink[0];
     return (
         <div className="p-3">
