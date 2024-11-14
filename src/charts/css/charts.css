@@ -135,7 +135,7 @@ select, input, textarea {
 }
 
 .grid-stack  .ciview-chart-panel {
-    box-shadow: none;
+    box-shadow: 0 0 1em var(--shadow_color);
     /* nb changing box-sizing,  adjusted width in _getContentDimensions()...
     otherwise VolumeView was overflowing.
     Left 'overflow: hidden' for now anyway.

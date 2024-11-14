@@ -40,6 +40,7 @@ datatype_mappings = {
 
 numpy_dtypes = {
     "text": numpy.ubyte,
+    "text16": numpy.uint16,
     "multitext": numpy.uint16,
     "double": numpy.float32,
     "integer": numpy.float32,
