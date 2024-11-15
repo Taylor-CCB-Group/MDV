@@ -195,7 +195,7 @@ def serve_projects_from_db(app):
 
             if os.path.exists(project.path):
                 try:
-                    p = MDVProject(dir=project.path, id=str(project.id))
+                    p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
                     p.set_editable(True)
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
                     p.serve(app=app, open_browser=False, backend_db=True)
@@ -262,7 +262,7 @@ def serve_projects_from_filesystem(app, base_dir):
                     else:
                         next_id += 1
 
-                    p = MDVProject(dir=project_path,id= str(next_id))
+                    p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
                     p.set_editable(True)
                     p.serve(app=app, open_browser=False, backend_db=True) 
                     print(f"Serving project: {project_path}")
@@ -365,7 +365,7 @@ def register_routes(app):
                 # Create and serve the MDVProject
                 try:
                     print("Creating and serving the new project")
-                    p = MDVProject(project_path)
+                    p = MDVProject(project_path, backend_db= True)
                     p.set_editable(True)
                     p.serve(app=app, open_browser=False, backend_db=True)
                 except Exception as e:

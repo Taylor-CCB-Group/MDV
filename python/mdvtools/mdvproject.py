@@ -21,6 +21,7 @@ from .charts.view import View
 import time
 import copy
 from mdvtools.image_view_prototype import create_image_view_prototype
+from mdvtools.charts.table_plot import TablePlot
 
 DataSourceName = str  # NewType("DataSourceName", str)
 ColumnName = str  # NewType("ColumnName", str)
@@ -55,6 +56,7 @@ class MDVProject:
         id: Optional[str] = None,
         delete_existing=False,
         skip_column_clean=True,
+        backend_db = False
     ):
         self.skip_column_clean = (
             skip_column_clean  # signficant speedup for large datasets
@@ -84,6 +86,7 @@ class MDVProject:
             with open(self.statefile, "w") as o:
                 o.write(json.dumps({"all_views": []}))
         self._lock = fasteners.InterProcessReaderWriterLock(join(dir, "lock"))
+        self.backend_db = backend_db
 
     @property
     def datasources(self):
@@ -262,8 +265,6 @@ class MDVProject:
         self.set_datasource_metadata(ds_metadata)
 
     def add_or_update_image_datasource(self, tiff_metadata, datasource_name, file):
-
-        from mdvtools.dbutils.dbservice import ProjectService, FileService
         """Add or update an image datasource in datasources.json
         returns the name of the added view so the user can navigate to it"""
         # Load current datasources
@@ -300,13 +301,16 @@ class MDVProject:
             self.upload_image_file(file, upload_file_path)
             
             # Step 3: Add database entry (exception will propagate up if it fails)
-            FileService.add_or_update_file_in_project(
-                file_name=file.filename,
-                file_path=upload_file_path,  # Adjust as necessary for actual file path
-                project_id=self.id
-            )
-            
-            ProjectService.set_project_update_timestamp(self.id)
+            if self.backend_db:
+                from mdvtools.dbutils.dbservice import ProjectService, FileService
+
+                FileService.add_or_update_file_in_project(
+                    file_name=file.filename,
+                    file_path=upload_file_path,  # Adjust as necessary for actual file path
+                    project_id=self.id
+                )
+                
+                ProjectService.set_project_update_timestamp(self.id)
             # Print success message
             print(f"Datasource '{datasource_name}' updated, TIFF file uploaded, and database entry created successfully.")
 
@@ -1006,15 +1010,39 @@ class MDVProject:
             print("Updated datasource metadata")
             # Add to view if specified
             if add_to_view:
+                # TablePlot parameters
+                title=name,
+                #params = ["leiden", "ARVCF", "DOK3", "FAM210B", "GBGT1", "NFE2L2", "UBE2D4", "YPEL2"]
+                params = dataframe.columns.to_list()
+                size = [792, 472]
+                position = [10, 10]
+            
+                # Create plot
+                table_plot = self.create_table_plot(title, params, size, position)
+                
+                # Convert plot to JSON and set view
+                table_plot_json = self.convert_plot_to_json(table_plot)
+                
                 v = self.get_view(add_to_view)
                 if not v:
                     v = {"initialCharts": {}}
-                v["initialCharts"][name] = []
+
+                # Check if the initialCharts already has entries for `name`
+                if name not in v["initialCharts"] or not v["initialCharts"][name]:
+                    # If empty, initialize with [table_plot_json]
+                    v["initialCharts"][name] = [table_plot_json]
+                else:
+                    # If not empty, append table_plot_json to the existing list
+                    v["initialCharts"][name].append(table_plot_json)
+                    
                 self.set_view(add_to_view, v)
             
             
             # Update the project's update timestamp using the dedicated method
-            # ProjectService.set_project_update_timestamp(project_id)
+            if self.backend_db:
+                from mdvtools.dbutils.dbservice import ProjectService
+                ProjectService.set_project_update_timestamp(self.id)
+            
             
             print(f"In MDVProject.add_datasource: Added datasource successfully '{name}'")
             return dodgy_columns
@@ -1023,6 +1051,20 @@ class MDVProject:
             print(f"Error in MDVProject.add_datasource : Error adding datasource '{name}': {e}")
             raise  # Re-raise the exception to propagate it to the caller
 
+    def create_table_plot(self, title, params, size, position):
+        """Create and configure a TablePlot instance with the given parameters."""
+        plot = TablePlot(
+            title=title,
+            params=params,
+            size=size,
+            position=position
+        )
+        
+        return plot
+    
+    def convert_plot_to_json(self, plot):
+        """Convert plot data to JSON format."""
+        return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
 
     def insert_link(self, datasource, linkto, linktype, data):
         """
