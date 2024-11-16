@@ -83,24 +83,25 @@ class ReactWordCloudChart extends BaseReactChart<WordCloudConfig> {
     constructor(dataStore, div, config) {
         super(dataStore, div, config, ReactTest);
     }
-    getSettings() {
-        const c = this.config;
-        const settings = super.getSettings();
-        return settings.concat([
-            {
-                type: "slider",
-                label: "Word Size",
-                current_value: c.wordSize || 100,
-                min: 10,
-                max: 100,
-                //xxx: why isn't number inferred given type: "slider"? `as const` not much help
-                //issue maybe with lesser jsdoc Settings type in BaseChart
-                func: (x: number) => { 
-                    c.wordSize = x;
-                },
-            },
-        ]);
-    }
+    // getSettings() {
+    //     const c = this.config;
+    //     const settings = super.getSettings();
+    //     //-- type error here - but this chart is not used anyway... if we re-enable it, we should fix this.
+    //     // return settings.concat([
+    //     //     {
+    //     //         type: "slider",
+    //     //         label: "Word Size",
+    //     //         current_value: c.wordSize || 100,
+    //     //         min: 10,
+    //     //         max: 100,
+    //     //         //xxx: why isn't number inferred given type: "slider"? `as const` not much help
+    //     //         //issue maybe with lesser jsdoc Settings type in BaseChart
+    //     //         func: (x: number) => { 
+    //     //             c.wordSize = x;
+    //     //         },
+    //     //     },
+    //     // ]);
+    // }
     remove(): void {
         super.remove();
         // make sure dim and anything else relevant is removed...
