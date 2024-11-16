@@ -414,7 +414,10 @@ class DataStore {
         }
     }
 
-    /** @typedef {import("@/charts/charts.js").DataColumn<any>} Column */
+    /*
+     * todo infer generic type for column, not sure how to do this in jsdoc
+     * @typedef {import("@/charts/charts.js").DataColumn<any>} Column
+     *  */
     /**
      * Adds a column's metadata and optionally it's data to the DataStore
      * @tutorial datasource
@@ -426,9 +429,7 @@ class DataStore {
     addColumn(column, data = null, dirty = false) {
         /** @type {Column} */
         const c = {
-            name: column.name,
-            field: column.field,
-            datatype: column.datatype,
+            ...column, //may be useful to get any other properties we didn't explicitly copy before.
             getValue: (i) => {
                 //this could be more efficient if the logic was inverted;
                 //i.e. getRowAsObject would call this method on all columns...

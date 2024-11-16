@@ -24,6 +24,7 @@ type DataStructureTypes = {
     text16: Uint16Array;
     multitext: Uint16Array;
     unique: Uint8Array; //raw bytes of strings to be decoded
+    int32: Int32Array;
 };
 // even if they're just aliases, these could be useful for documentation / clarity
 export type ColumnName = string; //this will probably change to ColumnSpecifier with more structured data
@@ -58,8 +59,9 @@ export type DataColumn<T extends DataType> = {
     /**In the case of a double/integer (number) column, the array
      * buffer should be the appropriate size to contain float32s. For text it should be Uint8
      * and contain numbers corresponding to the indexes in the values parameter. For a column of
-     * type unique it should be a JavaScript array. This parameter is optional as the data can
-     * be added later see {@link DataStore#setColumnData} */
+     * be added later see {@link DataStore#setColumnData}.
+     * A {@link LoadedDataColumn<T>} can be used to represent a column that is known to have loaded data.
+     */
     data?: DataStructureTypes[T];
     values: T extends CategoricalDataType ? string[] : never; //probably wrong for 'unique'
     /** An array of rgb hex colors. In the case of a `"text"` column the `colors` should match the `values`. For number columns, the list represents
@@ -71,7 +73,7 @@ export type DataColumn<T extends DataType> = {
     colorLogScale?: boolean;
     /** the column's values will be displayed as links (text and unique columns only).
      * not sure if this is strictly boolean or can be undefined */
-    is_url: T extends CategoricalDataType ? boolean : never;
+    is_url?: T extends CategoricalDataType ? boolean : never;
     /** the min max values in the column's values (integer/double only) */
     minMax: T extends NumberDataType ? [number, number] : never;
     /** an object describing the 0.05,0.01 and 0,001 qunatile ranges (integer/double only) */
@@ -80,13 +82,17 @@ export type DataColumn<T extends DataType> = {
     dirty?: boolean;
     /** return the value corresponding to a given row index `i`. If the data is categorical, this will be the appropriate value from `values` */
     getValue: (i: number) => T extends CategoricalDataType ? string : number;
-    stringLength?: number;
-    delimiter?: string;
+    stringLength: T extends "unique" ? number : never;
+    delimiter?: T extends "multitext" ? string : never;
     subgroup?: SubgroupName; //not attempting to descriminate the other sg properties being related to this for now
     sgindex?: number;
-    sgtype?: "dense" | string; //??
+    sgtype?: "dense" | "sparse"; //?? any other options?
 };
-
+export type LoadedDataColumn<T extends DataType> = DataColumn<T> & Required<Pick<DataColumn<T>, "data">>;
+function test(column: LoadedDataColumn<"text">) {
+    column.data;
+    column.values; //why does this degrade to 'any'?
+}
 // export type DataStore = {
 //     size: number;
 //     filterSize: number;
@@ -119,14 +125,14 @@ export type DataSource = {
 type DropdownMappedValue<T extends string, V extends string> = {
     [P in T]: string;
 } & { [P in V]: string };
-/** tuple of `[object[], textKey, valueKey]` where `textKey` and `valueKey` are string properties of the object. */
-type DropdownMappedValues<T extends string, V extends string> = [
+/** tuple of `[{textKey: string, valueKey: string}[], textKey, valueKey]` where `textKey` and `valueKey` are string properties of the object. */
+type DropdownMappedValues<TextKey extends string, ValueKey extends string> = [
     Array<DropdownMappedValue<TextKey, ValueKey>>,
     TextKey,
     ValueKey,
 ];
 /** `'values'` for a dropdown are either a one-element array (with the element being a string array used for both 'text' and 'value'),
- * or a tuple of [object[], textKey, valueKey] where `textKey` and `valueKey` are properties of the object that will be used for 'text'
+ * or a tuple of `[{textKey: string, valueKey: string}[], textKey, valueKey]` where `textKey` and `valueKey` are properties of entries in the array that will be used for 'text'
  * and 'value' respectively.
  */
 export type DropDownValues =
@@ -190,6 +196,7 @@ export type ExtraControl<T extends GuiSpecType> = {
     values?: Array<{ name: string; value: string }>;
     defaultVal?: GuiValueTypes[T];
 };
+/// --- some type-testing code, could be in actual tests...
 // const a: GuiSpec<'dropdown'> = {
 //     type: 'dropdown',
 //     label: 'label',

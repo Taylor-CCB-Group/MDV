@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 export function columnMatchesType(column: DataColumn<DataType>, type?: Param | Param[]) {
     if (type === undefined) return true;
-    if (Array.isArray(type)) return type.some(t => columnMatchesType(column, t));
+    if (isArray(type)) return type.some(t => columnMatchesType(column, t));
     if (type === "_multi_column:all") return true;
     // this was allowing a "text" column to be selected for "number" without the '!!'?
     // we should unit-test this function...
@@ -17,9 +17,12 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
     if (type === "number" && isNumeric) return true;
     return column.datatype === type;
 }
-//nb, this was commited on a different branch earlier...
-export function isArray(arr: unknown): arr is any[] {
-    return Array.isArray(arr);
+/** 
+ * Check whether given value {@param v} is an array. 
+ * Acts as a type-predicate, so can be used for narrowing the type of subsequent code.
+ */
+export function isArray(v: unknown): v is any[] {
+    return Array.isArray(v);
 }
 
 export function isDatatypeNumeric(t: DataType): t is NumberDataType {
@@ -28,6 +31,7 @@ export function isDatatypeNumeric(t: DataType): t is NumberDataType {
 export function isDatatypeCategorical(t: DataType): t is CategoricalDataType {
     return t.includes("text");
 }
-export function isGuiValTypeNumeric(t: keyof GuiValueTypes): t is number | [number, number] ? true : false {
-    return !!t.match(/slider|spinner/);
-}
+// todo: this is not right...
+// export function isGuiValTypeNumeric(t: keyof GuiValueTypes): t is number | [number, number] ? true : false {
+//     return !!t.match(/slider|spinner/);
+// }

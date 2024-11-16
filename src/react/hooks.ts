@@ -3,11 +3,12 @@ import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType, NumberDataType } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, LoadedDataColumn, NumberDataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
+import { isArray } from "@/lib/utils";
 
 /**
  * Get the chart's config.
@@ -68,7 +69,24 @@ export function useChartDoc() {
     return chart.__doc__;
 }
 
-export function useParamColumns(): DataColumn<DataType>[] {
+/**
+ * Returns the columns associated with with the chart's `config.param` property.
+ * 
+ * This will be used in the context of an initialized chart - 
+ * which means that we assert that all columns are loaded, so consumers of this hook
+ * should be off-the-hook in terms of checking the `data` property.
+ * 
+ * **this assertion is tested internally and we throw an exception if not true**
+ * 
+ *  but the underlying logic should be evaluated, particularly with regard to 
+ *  - 'live virtual column queries' 
+ *  - in general, anything that involves changing `config.param` during the life of a chart.
+ * 
+ * The current intention is to implement such features in a way that 
+ * by the time `param` is mutated, the new columns are loaded; 
+ * this should help check that, or highlight whether that logic should be altered.
+ */
+export function useParamColumns(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
     const columns = useMemo(() => {
@@ -79,23 +97,34 @@ export function useParamColumns(): DataColumn<DataType>[] {
         // we should make sure they are loaded as well...
         return chart.config.param.map((name) => columnIndex[name]);
     }, [chart.config.param, columnIndex]);
+    // note that columns is 'any' here as of this writing 
+    // - so this isn't an exhaustive check and ts will have limited capacity to help us.
+    // but we should be fairly safe to assume that once we get past here, we have `LoadedDataColumn`s
+    if (columns.includes(c => !c.data)) {
+        throw new Error("we always expect that param columns are loaded by the time we try to use them... this shouldn't happen");
+    }
     return columns;
 }
 
-export function useNamedColumn(name: string): {
+export function useNamedColumn(name?: string): {
     column: DataColumn<any>;
     isLoaded: boolean;
-} {
+} | undefined {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
     const [isLoaded, setIsLoaded] = useState(false);
-    const column = columnIndex[name];
+    const column = name ? columnIndex[name] : undefined;
     useEffect(() => {
+        if (!name) {
+            setIsLoaded(false);
+            return;
+        }
         loadColumn(chart.dataStore.name, name).then(() => setIsLoaded(true));
     }, [name, chart.dataStore]);
     return { column, isLoaded };
 }
 
+// change this to return loaded columns...
 export function useParamColumnsExperimental(): DataColumn<DataType>[] {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
@@ -240,8 +269,8 @@ export function useFilteredIndices() {
 }
 
 export function useCategoryFilterIndices(
-    contourParameter: DataColumn<CategoricalDataType>,
-    category: string | string[] | null,
+    contourParameter?: DataColumn<CategoricalDataType>,
+    category?: string | string[] | null,
 ) {
     //might seem like we should be using a CategoryDimension...
     //but at the moment that will end up being (often much) slower 
@@ -249,22 +278,23 @@ export function useCategoryFilterIndices(
     const data = useFilteredIndices();
     //todo handle multitext / tags properly.
     const categoryValueIndex = useMemo(() => {
-        if (!category) return contourParameter.values; //is this what we want?
-        if (!contourParameter || !contourParameter.values) return -1;
-        if (Array.isArray(category)) {
+        if (!contourParameter || !category) return -1;
+        if (isArray(category)) {
             return category.map((c) => contourParameter.values?.indexOf(c));
         }
         return contourParameter.values.indexOf(category);
     }, [contourParameter, category]);
     const filteredIndices = useMemo(() => {
-        if (categoryValueIndex === -1) return [];
-        if (Array.isArray(categoryValueIndex)) {
+        if (!contourParameter) return [];
+        const pData = contourParameter.data;
+        if (categoryValueIndex === -1 || !pData) return [];
+        if (isArray(categoryValueIndex)) {
             return data.filter((i) =>
-                categoryValueIndex.includes(contourParameter.data[i]),
+                categoryValueIndex.includes(pData[i]),
             );
         }
         return data.filter(
-            (i) => contourParameter.data[i] === categoryValueIndex,
+            (i) => pData[i] === categoryValueIndex,
         );
     }, [data, categoryValueIndex, contourParameter]);
     return filteredIndices;

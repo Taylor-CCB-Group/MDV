@@ -1,11 +1,11 @@
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import type { DataColumn } from "../charts/charts";
+import type { LoadedDataColumn } from "../charts/charts";
 import type DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
 
 //multitext was buggy (empty data buffer after loading project)
 const COL_TYPE = "multitext";
-export type TagColumn = DataColumn<"multitext">;
+export type TagColumn = LoadedDataColumn<"multitext">;
 
 const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
 const JOIN = "; "; //join with semi-colon and space.
@@ -20,7 +20,7 @@ function getTagValueIndices(tag: string, col: TagColumn) {
     // we should use that instead of SEP.
     if (tag.match(SEP))
         throw new Error(
-            "getTagValueIndices: tag must not contain separator (should be handled before calling this function)",
+            "getTagValueIndices: tag must not contain delimiter (should be handled before calling this function)",
         );
     return col.values
         .map((v, i) => (v.split(SEP).includes(tag) ? i : -1))
@@ -65,10 +65,11 @@ export default class TagModel {
             // but it seems to make it a lot more complicated than just setting a string property here.
             const columnSpec = {
                 name: columnName,
-                datatype: "multitext",
+                datatype: "multitext" as const,
                 editable: true,
-                separator: ";",
+                delimiter: ";" as const,
                 field: columnName,
+                values: [] as string[],
             };
             //dataStore.size * 2 should be right for 'multitext' - wrong for 'text'
             const data = new SharedArrayBuffer(dataStore.size * 2);
@@ -76,10 +77,14 @@ export default class TagModel {
             this.isReady = true;
         } else {
             loadColumn(dataStore.name, columnName).then((column) => {
+                if (column.delimiter && column.delimiter !== ";") {
+                    throw new Error("delimiter must be ';' for current tag column implementation");
+                }
                 this.isReady = true;
                 this.callListeners();
             });
         }
+        //! col is `any` here...
         const col = dataStore.columnIndex[columnName];
         if (col.datatype !== COL_TYPE)
             throw new Error(
