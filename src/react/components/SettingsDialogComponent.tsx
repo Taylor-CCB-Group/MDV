@@ -20,6 +20,7 @@ import JsonView from "react18-json-view";
 import { ChartProvider } from "../context";
 import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
+import { isArray } from "@/lib/utils";
 
 export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<GuiSpecType>, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>{props.label}</Typography>
@@ -88,7 +89,7 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
             type="number"
             value={props.current_value}
             min={props.min || 0}
-            max={props.max || null}
+            max={props.max}
             step={props.step || 1}
             onChange={action((e) => {
                 const value = (props.current_value = Number.parseInt(
@@ -111,6 +112,7 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"
     // currently this is not showing the current_value, among other missing features...
     const setSelectedColumn = useCallback(action((v: string) => {
         props.current_value = v;
+        //@ts -expect-error //! this is genuinely not fully implemented yet, when it is, types should be right
         props.func?.(v);
     }), []); //as of this writing, biome is right that props is not a dependency
 
@@ -154,15 +156,17 @@ export const DropdownAutocompleteComponent = observer(({
         return { label, value, original };
     }, [useObjectKeys, labelKey, valueKey]);
     type OptionType = ReturnType<typeof toOption>;
-    const options = useMemo(() => props.values[0].map(toOption), [props.values, toOption]);
+    const NO_OPTIONS = [{ label: "No options (error - sorry...)", value: "", original: "" }];
+    const options = useMemo(() => props.values?.[0].map(toOption) || NO_OPTIONS, [props.values, toOption]);
     // bit of a faff with sometimes getting a one-item array, sometimes a single item...
     const getSingleOption = useCallback(
-        (option: OptionType | OptionType[]) => {
-            const a = Array.isArray(option);
+        (option: OptionType | OptionType[] | undefined) => {
+            if (!option) return NO_OPTIONS[0];
+            const a = isArray(option);
             if (a && option.length > 1) {
                 console.warn("ideally we shouldn't have to deal with arrays at all here, but we only expect one value when we do");
             }
-            return (Array.isArray(option) ? option[0] : option)
+            return (isArray(option) ? option[0] : option)
         },
         []);
     const single = getSingleOption;
@@ -187,9 +191,9 @@ export const DropdownAutocompleteComponent = observer(({
         (v: string) => options.some((item) => item.value === v),
         [options],
     );
-    const isArray = Array.isArray(v);
-    const allValid = isArray ? v.every(validVal) : validVal(v);
-    const okValue = allValid ? v : isArray ? v.filter(validVal) : null;
+    const isVArray = Array.isArray(v);
+    const allValid = isVArray ? v.every(validVal) : validVal(v);
+    const okValue = allValid ? v : isVArray ? v.filter(validVal) : null;
     //map from 'value' string to option object
     const okOption = (Array.isArray(okValue)
         ? okValue.map((v) => options.find((o) => o.value === v))
@@ -217,14 +221,19 @@ export const DropdownAutocompleteComponent = observer(({
                             (a: OptionType) => a.value,
                         );
                         props.current_value = selected;
-                        if (props.func) props.func(selected);
+                        // if (props.func && selected) props.func(selected);
+                        // would love to have way less messing around with getting things to and from arrays...
+                        //@ts -expect-error //! we need to do some better inference here so we know what func expects
+                        if (props.func && selected) props.func(multiple ? selected : selected[0]);
                         return;
                     }
                     props.current_value = value.value;
+                    //@ts-expect-error //! we need to do some better inference here so we know what func expects
                     if (props.func) props.func(value.value);
                 })}
-                isOptionEqualToValue={(option, value) => single(option).original === single(value).original}
+                isOptionEqualToValue={(option, value) => (single(option).original === single(value).original)}
                 renderOption={(props, option, { selected }) => {
+                    if (!option) return null; //FFS let's switch to Rust or something
                     // we could potentially render something richer here - like color swatches or icons
                     // if we had a richer sense of the data in context
                     // ^^ e.g. if we had a `GuiSpec<'category'>` it could have it's own internal logic for
@@ -253,7 +262,7 @@ export const DropdownAutocompleteComponent = observer(({
                 renderTags={(tagValue, getTagProps) => {
                     //seems to be a material-ui bug with not properly handling key / props...
                     //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
-                    return tagValue.map((option, index) => (
+                    return tagValue.map((option, index) => !option ? null : (
                         <Chip
                             {...getTagProps({ index })}
                             key={val(option)}
@@ -272,90 +281,7 @@ export const DropdownAutocompleteComponent = observer(({
         </>
     );
 });
-
-const DropdownComponent = ({
-    props,
-}: { props: GuiSpec<"dropdown" | "multidropdown"> }) => {
-    const id = useId();
-    const [filter, setFilter] = useState("");
-    const filterArray = filter.toLowerCase().split(" ");
-    const multiple = props.type === "multidropdown";
-    const v =
-        multiple && !Array.isArray(props.current_value)
-            ? [props.current_value]
-            : props.current_value;
-    // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
-    const useObjectKeys = props.values.length === 3;
-    const [valueObjectArray, textKey, valueKey] = props.values;
-    // for some reason I can't get this to work with useMemo, but it's not particularly heavy - we also don't memoize the children of the dropdown...
-    // so if we do find this is expensive, we can definitely optimize better.
-    // we just want a string array to filter on to avoid throwing error e.g. if we have a current_value that's not in the dropdown because category changed.
-    //todo handle multitext / tags properly.
-    const validVals = useObjectKeys
-        ? valueObjectArray.map((item) => item[valueKey])
-        : valueObjectArray;
-
-    const validVal = useCallback(
-        (v: string) => validVals.some((item) => item === v),
-        [validVals],
-    );
-    const isArray = Array.isArray(v);
-    const allValid = isArray ? v.every(validVal) : validVal(v);
-    const okValue = allValid ? v : isArray ? v.filter(validVal) : null; //not ok after changing category?
-
-    // type E = SelectChangeEvent<string | string[]>;
-    type E = { target: { value: string | string[] } }; // material-ui vs native types are different, but compatible enough to use this here
-    const handleChange = action((e: E) => {
-        const {
-            target: { value },
-        } = e;
-        if (multiple && Array.isArray(value) && value.length > 1) {
-            const selected = Array.from(value); // .map(o => o.value);
-            props.current_value = selected;
-            if (props.func) props.func(selected);
-            return;
-        }
-        props.current_value = value;
-        if (props.func) props.func(value);
-    });
-
-    return (
-        <>
-            <MLabel htmlFor={id} props={props} />
-            <Select
-                size="small"
-                id={id}
-                multiple={multiple}
-                value={okValue}
-                className="w-full"
-                onChange={handleChange}
-            >
-                {props.values[0].map((item) => {
-                    const text = useObjectKeys ? item[textKey] : item;
-                    const value = useObjectKeys ? item[valueKey] : item;
-                    const id = uuid();
-                    if (
-                        filterArray.some((f) => !text.toLowerCase().includes(f))
-                    )
-                        return null;
-                    return (
-                        <MenuItem key={id} value={value}>
-                            {text}
-                        </MenuItem>
-                    );
-                })}
-            </Select>
-            <div />
-            <input
-                type="text"
-                value={filter}
-                placeholder="Filter options..."
-                onChange={(e) => setFilter(e.target.value)}
-                className="m-1 pl-1 justify-self-center"
-            />
-        </>
-    );
-};
+// removed unused DropdownComponent...
 
 const CheckboxComponent = ({ props }: { props: GuiSpec<"check"> }) => (
     <>
@@ -376,7 +302,7 @@ const RadioButtonComponent = ({
     props,
 }: { props: GuiSpec<"radiobuttons"> }) => {
     const choices = useMemo(
-        () => props.choices.map((v) => ({ v, id: uuid() })),
+        () => props.choices?.map((v) => ({ v, id: uuid() })) || [],
         [props.choices],
     );
     return (
@@ -453,7 +379,8 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
         <Button
             variant="contained"
             onClick={() => {
-                if (props.func) props.func(undefined);
+                //is there a nicer way to write this / define GuiValueTypes?
+                if (props.func) props.func(undefined as never);
             }}
         >
             {props.label}

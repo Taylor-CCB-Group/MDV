@@ -133,6 +133,10 @@ export default async function connectIPC(cm: ChartManager) {
     function setupVuplex() {
         console.log("setupVuplex...");
         function addMessageListener() {
+            if (!window.vuplex) {
+                console.log("vuplex not found, cannot add listener (this was only relevant to unity embedded prototype)");
+                return;
+            }
             window.vuplex.postMessage({ type: "vuplex_ready" });
             window.vuplex.addEventListener("message", (e) => {
                 let msg = e.data;

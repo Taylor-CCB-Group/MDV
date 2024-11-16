@@ -636,6 +636,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     ) => {
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
+        if (!context) throw new Error("Could not get 2D context from canvas");
 
         let maxColumnNameWidth = 0;
         let maxColumnTypeWidth = 0;

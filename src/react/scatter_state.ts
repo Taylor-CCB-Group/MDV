@@ -49,7 +49,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
     // not using as dependency for scaling viewState to data - we don't want to zoom as chart size changes
     // (at least for now - may consider making this configurable / testing it out)
 
-    const [viewState, setViewState] = useState<ViewState>(null); //we should consider how this interacts with viv ViewerStore
+    const [viewState, setViewState] = useState<ViewState | null>(); //we should consider how this interacts with viv ViewerStore
     useEffect(() => {
         if (!config.zoom_on_filter) return;
         if (data.length === 0) {
@@ -140,7 +140,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
 
     const data = useFilteredIndices();
     const [cx, cy, contourParameter] = useParamColumns();
-    const hoverInfoRef = useRef<PickingInfo>(null);
+    const hoverInfoRef = useRef<PickingInfo | null>(null);
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback(
@@ -152,7 +152,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const contourLayers = useLegacyDualContour();
 
     const tooltipCol = useMemo(() => {
-        if (!config.tooltip) return undefined;
+        if (!config.tooltip.column) return undefined;
         return chart.dataStore.columnIndex[config.tooltip.column];
     }, [config.tooltip, config.tooltip.column, chart.dataStore.columnIndex]);
     const getTooltipVal = useCallback(

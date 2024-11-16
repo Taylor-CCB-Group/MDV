@@ -16,9 +16,11 @@ import { useDebounce } from "use-debounce";
 type ContourProps = {
     /** to be used as deck.gl sublayer id */
     id: string;
-    /** the column */
-    parameter: string;
-    category: string | string[];
+    /** the column - if not present, should we not filter the data? at the moment, we reduce to nothing
+     * maybe it should not be optional, in which case we need to re-arrange how hooks are called
+     */
+    parameter?: string;
+    category?: string | string[];
     fill: boolean;
     bandwidth: number;
     intensity: number;
@@ -50,7 +52,7 @@ const viridis = [
 
 function useColorRange(
     contourParameter: DataColumn<CategoricalDataType>,
-    category: string | string[],
+    category: string | string[] | undefined,
 ) {
     const ds = useDataStore();
     const columnColors = useMemo(
@@ -62,7 +64,8 @@ function useColorRange(
         [ds, contourParameter],
     );
     const categoryValueIndex = useMemo(() => {
-        if (!contourParameter || !contourParameter.values) return -1;
+        if (!category) return contourParameter.values;
+        if (!contourParameter) return -1;
         //we could do something different here... would need more clever color handling on the receiving end
         if (Array.isArray(category)) return category.length > 1 ? -1 : contourParameter.values.indexOf(category[0]);
         return contourParameter.values.indexOf(category);

@@ -68,7 +68,7 @@ type VivViewerWrapperState = {
     viewStates: any;
     //@ts-expect-error --- issue with new deck.gl - check up on this / review viv PR? ---
     deckRef?: React.MutableRefObject<DeckGL>;
-    outerContainer: Element;
+    outerContainer?: Element;
 };
 /**
  * @typedef HoverHooks
@@ -154,7 +154,7 @@ class MDVivViewerWrapper extends React.PureComponent<
 
         if (
             outerContainer !== this.state.outerContainer &&
-            this.state.deckRef.current
+            this.state.deckRef?.current
         ) {
             try {
                 const { eventManager } = this.state.deckRef.current.deck;

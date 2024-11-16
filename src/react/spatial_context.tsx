@@ -35,7 +35,7 @@ type SpatialAnnotationState = {
 };
 
 // Could more usefully be thought of as SpatialContext?
-const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined);
+const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined as any);
 
 const getEmptyFeatureCollection = () => ({
     type: "FeatureCollection",

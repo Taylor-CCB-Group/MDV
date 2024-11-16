@@ -51,9 +51,12 @@ export class ImageArray {
         this.dataView = dataView;
 
         const gl = canvas.getContext("webgl2");
+        if (!gl) throw new Error("Failed to get WebGL2 context");
         this.gl = gl;
-        this.texture = gl.createTexture();
-        this.logEl = createEl("div", {}, canvas.parentElement);
+        const texture = gl.createTexture();
+        if (!texture) throw new Error("Failed to create texture");
+        this.texture = texture;
+        this.logEl = createEl("div", {}, canvas.parentElement || undefined);
         this.logEl.style.color = "white";
         this.loadImageColumn(dataStore, gl, config);
     }
@@ -67,10 +70,10 @@ export class ImageArray {
     }
     getImageAspect(i: number) {
         // return 0.5 + Math.random() // for testing
-        return this.texturesByIndex.get(i).aspectRatio;
+        return this.texturesByIndex.get(i)?.aspectRatio;
     }
     getImageIndex(i: number) {
-        return this.texturesByIndex.get(i).zIndex;
+        return this.texturesByIndex.get(i)?.zIndex;
     }
     drawProgress(n = 0) {
         // this.logEl.textContent = `Loading images: ${Math.round(n * 100)}%`;
@@ -146,8 +149,9 @@ export class ImageArray {
             // this.dataView.updateModel();
             // -> would be better to map over col.values in the first place?
             const imageName = d; //col.values[d];//this.dataView.getItemField(d, image_key);
-            if (this.textures.has(imageName)) {
-                this.texturesByIndex.set(i, this.textures.get(imageName));
+            const texI = this.textures.get(imageName);
+            if (texI) {
+                this.texturesByIndex.set(i, texI);
                 nLoaded++;
                 return;
             }
@@ -206,12 +210,13 @@ function resizeImage(
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to get 2d context");
     ctx.drawImage(image, 0, 0, width, height);
     if (logEl) {
         canvas.style.opacity = "0.2";
-        logEl.parentElement.appendChild(canvas);
+        logEl.parentElement?.appendChild(canvas);
         setTimeout(() => {
-            logEl.parentElement.removeChild(canvas);
+            logEl.parentElement?.removeChild(canvas);
         }, 1000);
     }
     return canvas;

@@ -18,6 +18,7 @@ import z from "zod";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType } from "@/lib/utils.js";
+import { isColumnNumeric } from "@/utilities/Utilities.js";
 
 const ChartConfigSchema = z.object({
     title: z.string(),
@@ -109,14 +110,16 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
         // >the props.values may be a tuple of [valueObjectArray, textKey, valueKey], 
         // or an array of length 1 - [string[]]
         //const useObjectKeys = Array.isArray(control.values) && control.values.length === 3;
-        const values = control.values as any;
+        if (!control.values || control.values.length === 0) throw new Error(`Dropdown control '${control.label}' has no values`);
+        const values = control.values;
         // if (!control.defaultVal) draftSpec.current_value = useObjectKeys ? values[0][0][values[0][2]] : values[0][0];
+        // todo - add some type predicate so we know we're assigning the right type
         if (!control.defaultVal) draftSpec.current_value = values[0]["name"];
         //(draftSpec as any).values = control.values; //doesn't give runtime error, doesn't work
         (draftSpec as any).values = [values, "name", "value"];
     }
     if (draftSpec.type === "radiobuttons") {}//todo test
-    //bad bad bad
+    //bad bad bad <<< how did we end up needing "as string", "as any"???
     //if (draftSpec.type === "check" && !control.defaultVal) (draftSpec as any).current_value = false;
     // if ((draftSpec as any).type === "checkbox" && !control.defaultVal) (draftSpec as any).current_value = false;
     if ((draftSpec.type as string) === "checkbox") (draftSpec as any).type = "check";

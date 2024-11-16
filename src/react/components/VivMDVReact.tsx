@@ -51,6 +51,7 @@ const MainChart = observer(() => {
     }, [imgUrl, viewerStore.setState]);
 
     const source = useViewerStore((store) => store.source);
+    if (!source) throw "no image source";
     useImage(source);
     return !isViewerLoading && <VivScatter />;
 });
@@ -72,7 +73,7 @@ export type ScatterPlotConfig = {
     course_radius: number;
     radius: number;
     opacity: number;
-    color_by: ColumnName;
+    color_by?: ColumnName;
     color_legend: {
         display: boolean;
         // todo: add more options here...
@@ -87,7 +88,7 @@ const scatterDefaults: ScatterPlotConfig = {
     course_radius: 1,
     radius: 10,
     opacity: 1,
-    color_by: null,
+    color_by: undefined,
     color_legend: {
         display: false,
     },
@@ -153,7 +154,7 @@ function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
 }
 
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
-    colorDialog: ColorChannelDialogReactWrapper;
+    colorDialog?: ColorChannelDialogReactWrapper;
 
     vivStores: VivContextType;
     get viewerStore() {
@@ -191,8 +192,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         this.colorBy = this.getColorFunction(col, true);
     }
     colorByDefault() {
-        this.config.color_by = null;
-        this.colorBy = null;
+        this.config.color_by = undefined;
+        this.colorBy = undefined;
     }
     getColorOptions() {
         return {
@@ -519,7 +520,9 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 BaseChart.types["VivMdvRegionReact"] = {
     ...BaseChart.types["viv_scatter_plot"], //this is doing something that means my default radius isn't being used...
     init: (config, ds, ec) => {
-        BaseChart.types["viv_scatter_plot"].init(config, ds, ec);
+        const base = BaseChart.types["viv_scatter_plot"];
+        if (!base || !base.init) throw "no base viv_scatter_plot"; //may well want to change this behaviour soon
+        base.init(config, ds, ec);
         config.radius = scatterDefaults.radius;
     },
     class: VivMdvReact,

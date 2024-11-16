@@ -38,6 +38,7 @@ type Quantiles = {
 };
 type Colors = (string | number[])[];
 type SubgroupName = string;
+// wouldn't it be nice to have a type that determins that we know we have data?
 export type DataColumn<T extends DataType> = {
     /** human-readable column */
     name: ColumnName; //nb - we should check use of 'name' vs 'field'
@@ -60,7 +61,7 @@ export type DataColumn<T extends DataType> = {
      * type unique it should be a JavaScript array. This parameter is optional as the data can
      * be added later see {@link DataStore#setColumnData} */
     data?: DataStructureTypes[T];
-    values?: T extends CategoricalDataType ? string[] : never; //probably wrong for 'unique'
+    values: T extends CategoricalDataType ? string[] : never; //probably wrong for 'unique'
     /** An array of rgb hex colors. In the case of a `"text"` column the `colors` should match the `values`. For number columns, the list represents
      * colors that will be interpolated. If not specified, default color pallettes will be supplied.
      */
@@ -68,12 +69,13 @@ export type DataColumn<T extends DataType> = {
     /** if `true` then the colors will be displayed on a log scale- useful if the dataset contains outliers.
      * Because a symlog scale is used the data can contain 0 and negative values */
     colorLogScale?: boolean;
-    /** the column's values will be displayed as links (text and unique columns only) */
-    is_url?: T extends CategoricalDataType ? boolean : never;
+    /** the column's values will be displayed as links (text and unique columns only).
+     * not sure if this is strictly boolean or can be undefined */
+    is_url: T extends CategoricalDataType ? boolean : never;
     /** the min max values in the column's values (integer/double only) */
-    minMax?: T extends NumberDataType ? [number, number] : never;
+    minMax: T extends NumberDataType ? [number, number] : never;
     /** an object describing the 0.05,0.01 and 0,001 qunatile ranges (integer/double only) */
-    quantiles?: T extends NumberDataType ? Quantiles : never;
+    quantiles: T extends NumberDataType ? Quantiles : never;
     /** if `true` then the store will keep a record that this column has been added and is not permanently stored in the backend */
     dirty?: boolean;
     /** return the value corresponding to a given row index `i`. If the data is categorical, this will be the appropriate value from `values` */
@@ -119,9 +121,9 @@ type DropdownMappedValue<T extends string, V extends string> = {
 } & { [P in V]: string };
 /** tuple of `[object[], textKey, valueKey]` where `textKey` and `valueKey` are string properties of the object. */
 type DropdownMappedValues<T extends string, V extends string> = [
-    Array<DropdownMappedValue<T, V>>,
-    T,
-    V,
+    Array<DropdownMappedValue<TextKey, ValueKey>>,
+    TextKey,
+    ValueKey,
 ];
 /** `'values'` for a dropdown are either a one-element array (with the element being a string array used for both 'text' and 'value'),
  * or a tuple of [object[], textKey, valueKey] where `textKey` and `valueKey` are properties of the object that will be used for 'text'
@@ -133,14 +135,15 @@ export type DropDownValues =
 export type GuiValueTypes = {
     //is the premise of this correct? technically, could we have a dropdown of numbers?
     dropdown: string;
-    multidropdown: string | string[];
+    multidropdown: string[];
     check: boolean;
     text: string;
     textbox: string;
     radiobuttons: string;
     slider: number;
     spinner: number;
-    button: undefined;
+    /** buttons don't have a `current_value` - just the `func()` to call back */
+    button: never;
     doubleslider: [number, number];
     folder: GuiSpec[];
     // color: string; //not a bad idea, copilot... soon...
@@ -165,13 +168,16 @@ export type GuiSpec<T extends GuiSpecType> = {
     type: T;
     label: string;
     // name: string; //unused - wrongly added in the original type
-    current_value?: GuiValueTypes[T];
-    func?: (v: GuiValueTypes[T]) => void; //optional but ts insists on it?
+    current_value: GuiValueTypes[T];
+    // is this optional or not? depends slightly how much we lean on mobx current_value mutation for reactivity...
+    // should it necessarily not be there for 'folder' - maybe we have some kind of 'is the folder open' property?
+    func?: T extends "folder" ? never : (v: GuiValueTypes[T]) => void;
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
     // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
     choices?: T extends "radiobuttons" ? [string, string][] : never;
-    min?: number;
-    max?: number;
+    //thouht we could make these non-optional and only have it insist for number types, but that's not happening for some reason
+    min?: T extends NumberDataType ? number : never;
+    max?: T extends NumberDataType ? number : never;
     step?: number;
     defaultVal?: GuiValueTypes[T];
     columnSelection?: T extends "column" ? ColumnSelectionParameters : never;

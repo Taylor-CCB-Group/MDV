@@ -241,7 +241,7 @@ export function useFilteredIndices() {
 
 export function useCategoryFilterIndices(
     contourParameter: DataColumn<CategoricalDataType>,
-    category: string | string[],
+    category: string | string[] | null,
 ) {
     //might seem like we should be using a CategoryDimension...
     //but at the moment that will end up being (often much) slower 
@@ -249,9 +249,10 @@ export function useCategoryFilterIndices(
     const data = useFilteredIndices();
     //todo handle multitext / tags properly.
     const categoryValueIndex = useMemo(() => {
+        if (!category) return contourParameter.values; //is this what we want?
         if (!contourParameter || !contourParameter.values) return -1;
         if (Array.isArray(category)) {
-            return category.map((c) => contourParameter.values.indexOf(c));
+            return category.map((c) => contourParameter.values?.indexOf(c));
         }
         return contourParameter.values.indexOf(category);
     }, [contourParameter, category]);

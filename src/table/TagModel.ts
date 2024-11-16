@@ -265,6 +265,7 @@ function sanitizeTags(col: TagColumn, notify = false) {
     const usedValuesByIndex = new Set<number>();
     for (const i in col.data) {
         const j = mapToSorted.get(col.data[i]);
+        if (j === undefined) throw new Error("sanitizingTags: missing value");
         col.data[i] = j;
         usedValuesByIndex.add(j);
     }
@@ -283,6 +284,8 @@ function getTags(col: TagColumn) {
 function getTagsInSelection(col: TagColumn, dataModel: DataModel) {
     const usedValuesByIndex = new Set<number>();
     for (const i of dataModel.data) {
+        // maybe good to have a bounds check here? not expecting it to fail, but it's a good habit.
+        // actually, probably ok without - and seems like this function isn't used, so may get removed.
         usedValuesByIndex.add(col.data[i]);
     }
     const values = [...usedValuesByIndex].map((i) => col.values[i]);

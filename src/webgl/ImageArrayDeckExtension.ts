@@ -116,6 +116,7 @@ export class ImageArrayDeckExtension<
             if (!(device.type === "webgl")) throw new Error("non-webgl device not implemented");
             params.props.imageArray.wrapLumaTexture(device);
             const { lumaTexture } = params.props.imageArray;
+            if (!lumaTexture) throw new Error("no luma texture");
             // const gl = (device as any).gl as WebGL2RenderingContext;
             // gl.activeTexture(gl.TEXTURE10);
             // gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);

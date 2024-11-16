@@ -141,9 +141,11 @@ export const useImage = (
                 (c, i) => c.Name ?? `Channel ${i}`,
             );
             // Default RGB.
-            let newContrastLimits = [];
-            let newDomains = [];
-            let newColors = [];
+            type Limits = [number, number][];
+            type Colors = [number, number, number][];
+            let newContrastLimits: Limits = [];
+            let newDomains: Limits = [];
+            let newColors: Colors = [];
             const isRgb = guessRgb(metadata);
             if (isRgb) {
                 if (isInterleaved(loader[0].shape)) {

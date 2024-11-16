@@ -29,6 +29,7 @@ export function debounce(fn, timeout) {
     };
 }
 
+// let's make TypeScript versions of these, and also for GuiSpec etc...
 export function isColumnNumeric(column) {
     const t = column.datatype;
     return t === "double" || t === "int32" || t === "integer";

@@ -179,7 +179,9 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
     const ds = useDataStore();
     useEffect(() => {
-        if (cols.length === 0) {
+        // todo - check whether checking link for null here means we can clean up ForeignRows component
+        // (which currently breaks rules of hooks)
+        if (cols.length === 0 || !link) {
             setColumns([]);
             return;
         }

@@ -31,7 +31,9 @@ class FileUploadDialogReact extends BaseDialog {
                 </VivProvider>,
                 this.dialog
             );
-            this.dialog.parentElement.style.display = "none";
+            if (this.dialog.parentElement) {
+                this.dialog.parentElement.style.display = "none";
+            }
         } else {
             console.error("Dialog element not found");
         }

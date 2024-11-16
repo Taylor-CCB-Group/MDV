@@ -40,6 +40,7 @@ const TiffVisualization = observer(({ metadata, file }: { metadata: OME_TIFF['me
   }, [fileUrl, file.name, viewerStore]);
 
   const source = useViewerStore(store => store.source);
+  if (!source) return null; //maybe revisit this
   useImage(source);
 
   const handleFullscreenChange = (fullscreenState: boolean) => {

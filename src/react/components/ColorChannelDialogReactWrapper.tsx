@@ -33,7 +33,7 @@ class ColorDialogReactWrapper extends BaseDialog {
             title: `Color Channels (${parent.config.title})`,
             doc: parent.__doc__ || document,
             onclose: () => {
-                parent.colorDialog = null;
+                parent.colorDialog = undefined;
                 parent.dialogs.splice(parent.dialogs.indexOf(this), 1);
             },
         };

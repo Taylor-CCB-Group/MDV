@@ -116,6 +116,8 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart<T & B
     private mountReact() {
         const ReactComponentFunction = this.ComponentFn;
         this.root = createMdvPortal(
+            //! todo sort out this chart type thing...
+            //(apparently ok again now)
             <ChartProvider chart={this}>
                 <ReactComponentFunction />
             </ChartProvider>,

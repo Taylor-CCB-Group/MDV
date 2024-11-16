@@ -6,6 +6,7 @@ export default function popoutChart(chart: Chart) {
     const mainWindow = window;
     const div = chart.getDiv();
     const originalParent = div.parentElement;
+    if (!originalParent) throw "Chart div has no parent element";
     const wtop = window.screenTop ? window.screenTop : window.screenY;
     const wleft = window.screenLeft ? window.screenLeft : window.screenX;
     const { width, height, left, top } = div.getBoundingClientRect();
@@ -22,6 +23,7 @@ export default function popoutChart(chart: Chart) {
         // "width=800,height=600",
         `width=${w},height=${h},left=${l},top=${t}`,
     );
+    if (!popoutWindow) throw "Failed to open popout window";
     popoutWindow.document.body.style.overflow = "hidden";
 
     // Function to add a stylesheet or style element to the popout window

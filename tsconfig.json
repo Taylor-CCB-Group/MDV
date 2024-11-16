@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
         // "strict": true, //not today 😳...
+        "strictNullChecks": true,
         "jsx": "react-jsx",
         "outDir": "./dist/",
         "noImplicitAny": false,

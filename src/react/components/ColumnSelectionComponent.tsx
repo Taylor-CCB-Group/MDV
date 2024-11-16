@@ -47,6 +47,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                 options={columns}
                 multiple={multiple}
                 onChange={(_, value) => {
+                    // if (!value) return; // todo - is this allowed ? clear selection?
                     if (Array.isArray(value)) {
                         // todo - need to make controlled anyway for multiple...
                         setSelectedColumn(value[0].field);

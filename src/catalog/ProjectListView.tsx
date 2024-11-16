@@ -26,10 +26,18 @@ import ProjectAccessModal from "./ProjectAccessModal";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
+import type { Project } from "./utils/projectUtils";
 
-const ProjectListView = ({ projects, onDelete, onRename, onChangeType }) => {
-    const [anchorEl, setAnchorEl] = useState(null);
-    const [selectedProject, setSelectedProject] = useState(null);
+type Pvoid = Promise<void>;
+type ProjectListViewProps = {
+    projects: Project[];
+    onDelete: (id: string) => Pvoid;
+    onRename: (id: string, name: string) => Pvoid;
+    onChangeType: (id: string, type: string) => Pvoid;
+};
+const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: ProjectListViewProps) => {
+    const [anchorEl, setAnchorEl] = useState<HTMLAnchorElement | null>();
+    const [selectedProject, setSelectedProject] = useState<Project>();
 
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);

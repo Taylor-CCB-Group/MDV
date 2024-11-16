@@ -10,9 +10,10 @@ import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import LinkIcon from '@mui/icons-material/Link';
 import { Dialog, IconButton } from "@mui/material";
 
-type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>;
+type RowsAsColsProps = NonNullable<ReturnType<typeof useRowsAsColumnsLinks>>;
 
-const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
+const RowsAsCols = observer((props : RowsAsColsProps) => {
+    const { linkedDs, link } = props;
     const [expanded, setExpanded] = useState(false);
     const rowNames = useHighlightedForeignRows().map(r => r.value);
     const { name_column, name, subgroups } = link;
@@ -46,7 +47,6 @@ const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
 export default observer(function LinksComponent() {
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
     if (!linkProps) return null;
-    const { linkedDs, link } = linkProps;
     return (
         <>
             {/* <JsonView src={link} /> */}

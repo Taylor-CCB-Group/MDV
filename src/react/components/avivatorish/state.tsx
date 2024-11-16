@@ -24,7 +24,7 @@ type TogglesReturnType<T> = {
 type WithToggles<T> = T & TogglesReturnType<T>;
 type SetFunctionType<T> = (fn: (state: T) => T) => void;
 
-function generateToggles<T>(
+function generateToggles<T extends {}>(
     defaults: T,
     set: SetFunctionType<T>,
 ): TogglesReturnType<T> {
@@ -96,11 +96,11 @@ type ImageState = typeof DEFAULT_IMAGE_STATE;
 const DEFAULT_VIEWER_STATE = {
     isChannelLoading: [] as boolean[],
     isViewerLoading: true,
-    pixelValues: [],
+    pixelValues: [] as number[],
     isOffsetsSnackbarOn: false,
     loaderErrorSnackbar: {
         on: false,
-        message: null,
+        message: null as string | null,
     },
     isNoImageUrlSnackbarOn: false,
     isVolumeRenderingWarningOn: false,
@@ -110,9 +110,9 @@ const DEFAULT_VIEWER_STATE = {
     useLens: false,
     useColormap: false,
     globalSelection: { z: 0, t: 0 },
-    channelOptions: [],
-    metadata: null,
-    viewState: null,
+    channelOptions: [] as any[],
+    metadata: null as any,
+    viewState: null as any,
     source: null as { urlOrFile: string; description: string } | null,
     pyramidResolution: 0,
 };
@@ -260,7 +260,7 @@ export function createVivStores() {
     return { viewerStore, channelsStore, imageSettingsStore } as VivContextType;
 }
 
-const VivContext = createContext<VivContextType>(null);
+const VivContext = createContext<VivContextType>(null as any);
 /**
  * This implictly assumes that we are in a context where there is a chart, and that we
  * can access it with `useChart()`. That design decision may be revisited (and it means
@@ -317,7 +317,7 @@ export function useImageSettingsStore<U>(
 }
 
 export function useViewerStore<U>(
-    selector?: Selector<ViewerStore, U>,
+    selector: Selector<ViewerStore, U>,
     equalityFn?: EqFn<U>,
 ) {
     const store = useViewerStoreApi();

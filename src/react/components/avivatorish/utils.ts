@@ -84,17 +84,20 @@ async function getTiffImageCount(src) {
     const tiff = await from(src);
     return tiff.getImageCount();
 }
-
+/** addresses `c` channel, `z` z-stack index, `t`: time index */
+export type VivSelection = { c: number; z: number; t: number };
+// all very clever but unnecessary abstraction and also wrong:
+// type VivSelection = { [Key in typeof GLOBAL_SLIDER_DIMENSION_FIELDS[number]]?: number };
 /**
  * Guesses whether string URL or File is one or multiple standard TIFF images.
  * @param {string | File | File[]} urlOrFiles
  */
 async function generateMultiTiffSources(urlOrFiles) {
     const multiTiffFiles = await generateMultiTiffFileArray(urlOrFiles);
-    const sources = [];
+    const sources: [VivSelection[], any][] = [];
     let c = 0;
     for (const tiffFile of multiTiffFiles) {
-        const selections = [];
+        const selections: VivSelection[] = [];
         const numImages = await getTiffImageCount(tiffFile);
         for (let i = 0; i < numImages; i++) {
             selections.push({ c, z: 0, t: 0 });
@@ -279,22 +282,22 @@ export function getNameFromUrl(url) {
 
 /**
  * Return the midpoint of the global dimensions as a default selection.
- *
- * @param {{ name: string, size: number }[]} dimensions
- * @returns {{ [Key in typeof GLOBAL_SLIDER_DIMENSION_FIELDS[number]]?: number }
+ * 
+ * n.b. some of the more abstract way in which dimension could be addressed has been
+ * removed in favor of a more direct approach - would be good to verify that the premise
+ * is still valid.
  */
-function getDefaultGlobalSelection(dimensions) {
+function getDefaultGlobalSelection(dimensions: {name: string, size: number}[]) {
     const globalSelectableDimensions = dimensions.filter((d) =>
         GLOBAL_SLIDER_DIMENSION_FIELDS.includes(d.name.toLowerCase()),
     );
 
-    /** @type {{ [Key in typeof GLOBAL_SLIDER_DIMENSION_FIELDS[number]]?: number } */
-    const selection = {};
+    const selection: Partial<VivSelection> = {};
     for (const dim of globalSelectableDimensions) {
         selection[dim.name] = Math.floor(dim.size / 2);
     }
 
-    return selection;
+    return selection as VivSelection; //!probably not partial at this point?
 }
 
 function isGlobalOrXYDimension(name) {
@@ -335,8 +338,8 @@ function zip(a, b) {
  *
  * @param {{ labels: string[], shape: number[] }} pixelSource
  */
-export function buildDefaultSelection({ labels, shape }) {
-    const selection = [];
+export function buildDefaultSelection({ labels, shape }): VivSelection[] {
+    const selection: VivSelection[] = [];
 
     const dimensions = zip(labels, shape).map(([name, size]) => ({
         name,
@@ -360,6 +363,7 @@ export function buildDefaultSelection({ labels, shape }) {
         i < Math.min(4, firstNonGlobalSelectableDimension.size);
         i += 1
     ) {
+        //@ts-ignore
         selection.push({
             [firstNonGlobalSelectableDimension.name]: i,
             ...globalSelection,
@@ -376,6 +380,10 @@ export function buildDefaultSelection({ labels, shape }) {
 export function hexToRgb(hex) {
     // https://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!result) {
+        console.error(`Invalid hex color: ${hex}`);
+        return [255, 0, 255];
+    }
     return result.map((d) => Number.parseInt(d, 16)).slice(1);
 }
 

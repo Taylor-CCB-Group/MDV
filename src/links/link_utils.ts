@@ -77,6 +77,7 @@ export function addHighlightColumnLink(
             }
             if (target.set_param) {
                 runInAction(() => {
+                    if (target.param_index === undefined) return;
                     targetChart.config.param[target.param_index] = newValue;
                 });
             }
@@ -129,6 +130,7 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
             }
             if (link.set_param) {
                 runInAction(() => {
+                    if (link.param_index === undefined) return;
                     target.config.param[link.param_index] = newValue;
                     //not sure what the most appropriate way to update non-react charts is... needs some work
                     if (target.config.type === "table_chart") {

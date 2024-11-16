@@ -32,7 +32,7 @@ class SettingsDialogReactWrapper extends BaseDialog {
             position,
             onclose: () => {
                 chart.dialogs.splice(chart.dialogs.indexOf(this), 1);
-                if (chart.settingsDialog === this) chart.settingsDialog = null;
+                if (chart.settingsDialog === this) chart.settingsDialog = undefined;
             },
         };
         super(config, chart);

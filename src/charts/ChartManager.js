@@ -134,7 +134,7 @@ function listenPreferredColorScheme(callback) {
 * @param {string} [config.permisson] the level of permission the user has. This just makes certain
 * options unavaliable. Any logic should be handled when a state_saved event is broadcast
 * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
-* @param {object} [listener] - An object with functions to listen to events.
+* @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
 * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
 * 
 */

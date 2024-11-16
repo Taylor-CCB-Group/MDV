@@ -81,6 +81,7 @@ class ImageScatterChart extends BaseChart {
                         index,
                         titleColumn,
                     );
+                    if (!picked) return null;
                     return (
                         picked && {
                             html: `
@@ -127,6 +128,7 @@ class ImageScatterChart extends BaseChart {
 
         const { imageArray, billboard } = this;
         // const {getImageAspect, getImageIndex} = this.imageArray;// need to bind this
+        const { colorBy } = this;
         const layer = new ScatterplotLayer({
             id: `scatter-${this.id}`,
             data,
@@ -149,8 +151,8 @@ class ImageScatterChart extends BaseChart {
             // getFillColor: this.colorBy ? (i: K)=>[...this.colorBy(i), this.opacity] : [255, 255, 255, this.opacity],
             opacity: this.opacity / 255,
             saturation: this.saturation,
-            getFillColor: (this.colorBy
-                ? (i: K) => this.colorBy(i)
+            getFillColor: (colorBy
+                ? (i: K) => colorBy(i)
                 : [255, 255, 255]) as unknown as any,
             imageArray,
             updateTriggers: {
@@ -160,7 +162,7 @@ class ImageScatterChart extends BaseChart {
                 // It should be be able to avoid updating position etc when unrelated data changes, but that's not happening.
                 getImageAspect: this.progress,
                 getPosition: [this.spaceX, this.spaceY],
-                getFillColor: [this.colorBy, this.opacity],
+                getFillColor: [colorBy, this.opacity],
             },
             extensions: [new ImageArrayDeckExtension()],
         });
@@ -179,7 +181,7 @@ class ImageScatterChart extends BaseChart {
         this.updateDeck();
     }
     colorByDefault() {
-        this.colorBy = null;
+        this.colorBy = undefined;
         this.updateDeck();
     }
 
@@ -298,7 +300,7 @@ BaseChart.types["ImageScatterChart"] = {
         config.image_key = i.key_column;
     },
     extra_controls: (dataStore) => {
-        const imageSets = [];
+        const imageSets: {name: string, value: string}[] = [];
         for (const iname in dataStore.images) {
             imageSets.push({ name: iname, value: iname });
         }

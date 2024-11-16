@@ -12,7 +12,7 @@ export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFil
 
 export type SelectionDialogConfig = {
     type: "selection_dialog";
-    filters?: Record<string, SelectionDialogFilter | null>;
+    filters: Record<string, SelectionDialogFilter | null>;
 };
 
 class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {

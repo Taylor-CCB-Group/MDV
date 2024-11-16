@@ -36,6 +36,7 @@ class BaseChart {
 
         //create the DOM elements
         this.div = typeof div === "string" ? document.getElementById(div) : div;
+        if (!this.div) throw new Error("failed to get div element");
         this.div.classList.add("ciview-chart-panel");
         this.titleBar = createEl("div", {
             classes: ["ciview-chart-titlebar"],

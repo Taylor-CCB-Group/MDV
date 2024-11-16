@@ -44,7 +44,7 @@ interface ProjectCardProps {
         id: string,
         newType: "Editable" | "Read-Only",
     ) => Promise<void>;
-    onAddCollaborator?: (email: string) => void;
+    onAddCollaborator: (email: string) => void;
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({

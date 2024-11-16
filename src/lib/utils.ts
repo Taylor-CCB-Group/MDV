@@ -1,5 +1,5 @@
 import type { Param } from "@/charts/ChartTypes";
-import type { DataColumn, DataType } from "@/charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, GuiValueTypes, NumberDataType } from "@/charts/charts";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -16,4 +16,18 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
     if (type === "_multi_column:number") return isNumeric;
     if (type === "number" && isNumeric) return true;
     return column.datatype === type;
+}
+//nb, this was commited on a different branch earlier...
+export function isArray(arr: unknown): arr is any[] {
+    return Array.isArray(arr);
+}
+
+export function isDatatypeNumeric(t: DataType): t is NumberDataType {
+    return !!t.match(/double|float|int/);
+}
+export function isDatatypeCategorical(t: DataType): t is CategoricalDataType {
+    return t.includes("text");
+}
+export function isGuiValTypeNumeric(t: keyof GuiValueTypes): t is number | [number, number] ? true : false {
+    return !!t.match(/slider|spinner/);
 }
