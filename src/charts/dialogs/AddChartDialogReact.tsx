@@ -18,7 +18,6 @@ import z from "zod";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType } from "@/lib/utils.js";
-import { isColumnNumeric } from "@/utilities/Utilities.js";
 
 const ChartConfigSchema = z.object({
     title: z.string(),

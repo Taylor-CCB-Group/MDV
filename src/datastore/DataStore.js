@@ -12,7 +12,7 @@ import { scaleLinear, scaleSymlog } from "d3-scale";
 import { getColorLegend, getColorBar } from "../utilities/Color.js";
 import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
-import { isColumnNumeric, isColumnText } from "../utilities/Utilities.js";
+import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 
 /**
  * Creates an empty data structure
@@ -476,6 +476,7 @@ class DataStore {
         if (dirty) {
             this.dirtyColumns.added[column.field] = true;
         }
+        // can we infer/check the type of column here?
         return c;
     }
 

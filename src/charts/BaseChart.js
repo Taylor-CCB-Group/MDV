@@ -1,4 +1,4 @@
-import { getRandomString } from "../utilities/Utilities.js";
+import { getRandomString } from "../utilities/Utilities";
 import { ContextMenu } from "../utilities/ContextMenu.js";
 import { createEl } from "../utilities/Elements.js";
 import { chartTypes } from "./ChartTypes";

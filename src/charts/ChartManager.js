@@ -14,7 +14,7 @@ import DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
-import { getRandomString } from "../utilities/Utilities.js";
+import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";

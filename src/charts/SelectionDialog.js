@@ -1,7 +1,7 @@
 import BaseChart from "./BaseChart.js";
 import { createEl, makeSortable } from "../utilities/Elements.js";
 import noUiSlider from "nouislider";
-import { getRandomString } from "../utilities/Utilities.js";
+import { getRandomString } from "../utilities/Utilities";
 import MultiSelectDropdown from "../utilities/MultiSelect";
 
 class SelectionDialog extends BaseChart {

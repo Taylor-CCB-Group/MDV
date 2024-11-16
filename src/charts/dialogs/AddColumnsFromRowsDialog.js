@@ -1,7 +1,7 @@
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createEl } from "../../utilities/Elements.js";
 import AutoComplete from "../../utilities/AutoComplete.js";
-import { getRandomString } from "../../utilities/Utilities.js";
+import { getRandomString } from "../../utilities/Utilities";
 
 const max_genes = 500;
 
