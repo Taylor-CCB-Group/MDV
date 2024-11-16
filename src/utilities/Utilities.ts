@@ -33,6 +33,7 @@ export function debounce<A=unknown>(fn: (args: A) => void, timeout: number) {
     return (...args) => {
         clearTimeout(timer);
         timer = setTimeout(() => {
+            //@ts-ignore
             fn.apply(this, args);
         }, timeout);
     };

@@ -2,7 +2,7 @@ import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "../../utilities/Dialog";
 import FileUploadDialogComponent from "./FileUploadDialog";
 import { VivProvider, createVivStores } from '../../react/components/avivatorish/state';
-import { Dialog } from "@mui/material";
+// import { Dialog } from "@mui/material";
 
 class FileUploadDialogReact extends BaseDialog {
     root: ReturnType<typeof createMdvPortal>;
@@ -17,25 +17,22 @@ class FileUploadDialogReact extends BaseDialog {
             null,
         );
         this.outer.classList.add("fileUploadDialog");
-        if (this.dialog) {
-            const vivStores = createVivStores();
-            this.root = createMdvPortal(
-                <VivProvider vivStores={vivStores}>
-                    {/* <Dialog open={true} className="w-full h-full"> */}
-                    <FileUploadDialogComponent
-                        onClose={() => this.close()}
-                        onResize={(width: number, height: number) => {}}
-                        // onResize={(width: number, height: number) => this.resizeDialog(width, height)}
-                    />
-                    {/* </Dialog> */}
-                </VivProvider>,
-                this.dialog
-            );
-            if (this.dialog.parentElement) {
-                this.dialog.parentElement.style.display = "none";
-            }
-        } else {
-            console.error("Dialog element not found");
+        if (!this.dialog) throw new Error("no dialog??");
+        const vivStores = createVivStores();
+        this.root = createMdvPortal(
+            <VivProvider vivStores={vivStores}>
+                {/* <Dialog open={true} className="w-full h-full"> */}
+                <FileUploadDialogComponent
+                    onClose={() => this.close()}
+                    onResize={(width: number, height: number) => {}}
+                    // onResize={(width: number, height: number) => this.resizeDialog(width, height)}
+                />
+                {/* </Dialog> */}
+            </VivProvider>,
+            this.dialog
+        );
+        if (this.dialog.parentElement) {
+            this.dialog.parentElement.style.display = "none";
         }
     }
 

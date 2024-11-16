@@ -56,7 +56,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart<T & B
     //     return window.mdv.chartManager.charts[this.config.id].dataSource;
     // }
     useMobx = true;
-    root: ReturnType<typeof createMdvPortal>;
+    root?: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
     ComponentFn: TComponent<T & BaseConfig>;
     private reactionDisposers: IReactionDisposer[] = [];
@@ -139,7 +139,7 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart<T & B
     remove(): void {
         // make sure dim and anything else relevant is removed...
         // **is there any React teardown we should be considering?**
-        this.root.unmount();
+        this.root?.unmount();
         super.remove();
         for (const disposer of this.reactionDisposers) {
             disposer();

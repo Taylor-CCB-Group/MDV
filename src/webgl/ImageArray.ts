@@ -38,7 +38,7 @@ export class ImageArray {
     logEl: HTMLElement;
     dataView: DataModel;
     lumaTexture?: Texture;
-    onProgress: (n: number) => void;
+    onProgress?: (n: number) => void;
     constructor(
         dataStore,
         canvas: HTMLCanvasElement,

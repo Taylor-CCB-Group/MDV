@@ -144,7 +144,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback(
-        (i: number) => {
+        (i: unknown) => {
+            if (typeof i !== "number") throw new Error("expected index");
             return i === highlightedIndex ? (0.2 * radiusScale) / scale : 0.0;
         },
         [radiusScale, highlightedIndex],
@@ -204,7 +205,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             getFillColor: colorBy ?? [255, 255, 255],
             getRadius: 1 / scale,
             // todo review buffer data / accessors / filters...
-            getPosition: (i: number, { target }) => {
+            getPosition: (i: unknown, { target }) => {
+                if (typeof i !== "number") throw new Error("expected index");
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
                 target[2] = 0;

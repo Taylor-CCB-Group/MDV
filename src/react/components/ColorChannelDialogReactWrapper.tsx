@@ -16,7 +16,7 @@ const ColorChannelDialogReact = observer(function ColorChannelDialogReact({
 // don't necessarily want to inherit from BaseDialog, could consider different approach.
 // this will be more consistent / less work in short-term, and a basis for refactoring later.
 class ColorDialogReactWrapper extends BaseDialog {
-    _root: ReturnType<typeof createMdvPortal>;
+    _root?: ReturnType<typeof createMdvPortal>;
     get root() {
         return this._root;
     }

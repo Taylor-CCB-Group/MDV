@@ -105,7 +105,7 @@ async function getView(view?: string) {
     if (!view) return undefined; //this seems to be a somewhat reasonable way to handle empty project with no views - but could do with more testing...
     try {
         return await getPostData(`${projectRoot}/get_view`, { view });
-    } catch (e) {
+    } catch (e: any) {
         //todo nicer dialog
         const dialog = createEl("dialog", { title: "Error loading view" });
         dialog.innerText = e.message;

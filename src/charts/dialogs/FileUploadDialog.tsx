@@ -578,7 +578,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
 
                     dispatch({ type: "SET_TIFF_METADATA", payload: nextMeta });
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Error loading file:", error);
                 dispatch({
                     type: "SET_ERROR",
