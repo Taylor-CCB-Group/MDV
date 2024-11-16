@@ -27,11 +27,12 @@ import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
 import ProjectShareModal from "./ProjectShareModal";
+import type { ProjectAccessType } from "./utils/projectUtils";
 
 interface ProjectCardProps {
     id: string;
     name: string;
-    type: "Editable" | "Read-Only";
+    type: ProjectAccessType;
     lastModified: string;
     createdAt: string;
     owner: string;
@@ -42,7 +43,7 @@ interface ProjectCardProps {
     onRename: (id: string, newName: string) => Promise<void>;
     onChangeType: (
         id: string,
-        newType: "Editable" | "Read-Only",
+        newType: ProjectAccessType,
     ) => Promise<void>;
     onAddCollaborator: (email: string) => void;
 }

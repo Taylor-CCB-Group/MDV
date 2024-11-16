@@ -21,19 +21,20 @@ import {
     TableRow,
     Typography,
 } from "@mui/material";
-import React, { useState } from "react";
+import { useState } from "react";
 import ProjectAccessModal from "./ProjectAccessModal";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import type { Project } from "./utils/projectUtils";
+import type { ProjectAccessType } from "./utils/projectUtils";
 
 type Pvoid = Promise<void>;
 type ProjectListViewProps = {
     projects: Project[];
     onDelete: (id: string) => Pvoid;
     onRename: (id: string, name: string) => Pvoid;
-    onChangeType: (id: string, type: string) => Pvoid;
+    onChangeType: (id: string, type: ProjectAccessType) => Pvoid;
 };
 const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: ProjectListViewProps) => {
     const [anchorEl, setAnchorEl] = useState<HTMLAnchorElement | null>();
