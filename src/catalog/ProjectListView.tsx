@@ -21,7 +21,7 @@ import {
     TableRow,
     Typography,
 } from "@mui/material";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import ProjectAccessModal from "./ProjectAccessModal";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
@@ -36,8 +36,9 @@ type ProjectListViewProps = {
     onRename: (id: string, name: string) => Pvoid;
     onChangeType: (id: string, type: ProjectAccessType) => Pvoid;
 };
+type MouseEv = React.MouseEvent<HTMLElement>;
 const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: ProjectListViewProps) => {
-    const [anchorEl, setAnchorEl] = useState<HTMLAnchorElement | null>();
+    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>();
     const [selectedProject, setSelectedProject] = useState<Project>();
 
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
@@ -45,25 +46,25 @@ const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: Project
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
 
-    const handleMenuClick = (event, project) => {
+    const handleMenuClick = useCallback((event: MouseEv, project: Project) => {
         event.stopPropagation();
         setAnchorEl(event.currentTarget);
         setSelectedProject(project);
-    };
+    }, []);
 
-    const handleMenuClose = () => {
+    const handleMenuClose = useCallback(() => {
         setAnchorEl(null);
-    };
+    }, []);
 
-    const handleRowClick = (projectId) => {
+    const handleRowClick = useCallback((projectId: Project['id']) => {
         const base = import.meta.env.DEV ? "http://localhost:5170?dir=/" : "";
         window.location.href = `${base}project/${projectId}`;
-    };
+    }, []);
 
-    const handleModalOpen = (modalSetter) => {
+    const handleModalOpen = useCallback((modalSetter: typeof setIsAccessModalOpen) => {
         handleMenuClose();
         modalSetter(true);
-    };
+    }, [handleMenuClose]);
 
     return (
         <>
