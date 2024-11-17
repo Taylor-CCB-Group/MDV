@@ -102,7 +102,7 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
 );
 /**
  * Wrap the ColumnSelectionComponent in a setting GUI component.
- * 
+ *
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"column" | "multicolumn"> }) => {
@@ -148,7 +148,8 @@ export const DropdownAutocompleteComponent = observer(({
     // todo think about how this relates to different type logic with {label, value, original}
     // const validVals = useObjectKeys ? valueObjectArray.map(item => item[valueKey]) : valueObjectArray;
 
-    const toOption = useCallback((original) => {
+    // pending some nicer typing and moving some of this logic to a hook
+    const toOption = useCallback((original: any) => {
         const label: string = useObjectKeys ? original[labelKey] : original;
         // is value really always a string?
         const value: string = useObjectKeys ? original[valueKey] : original;
@@ -180,22 +181,22 @@ export const DropdownAutocompleteComponent = observer(({
     // if 'multiple' is true, make sure we get an array even if one / zero values selected.
     // second half of ternary will either be the existing array if 'multiple', or the single value otherwise.
     const v = useMemo(() => (
-        multiple && !Array.isArray(props.current_value)
+        multiple && !isArray(props.current_value)
             ? [props.current_value]
             : props.current_value
     ), [props.current_value, multiple]);
     // check that and maybe provide a bit of a type guard
-    if (multiple !== Array.isArray(v))
+    if (multiple !== isArray(v))
         throw "logical inconsistency - 'multidropdown' value should be coerced to array by now";
     const validVal = useCallback(
         (v: string) => options.some((item) => item.value === v),
         [options],
     );
-    const isVArray = Array.isArray(v);
+    const isVArray = isArray(v);
     const allValid = isVArray ? v.every(validVal) : validVal(v);
     const okValue = allValid ? v : isVArray ? v.filter(validVal) : null;
     //map from 'value' string to option object
-    const okOption = (Array.isArray(okValue)
+    const okOption = (isArray(okValue)
         ? okValue.map((v) => options.find((o) => o.value === v))
         : [options.find((o) => o.value === v)])
     // : options.find((o) => o.value === v); //not-multiple...
@@ -211,7 +212,7 @@ export const DropdownAutocompleteComponent = observer(({
                 options={options}
                 disableCloseOnSelect={multiple}
                 getOptionLabel={label}
-                value={okOption}
+                value={okOption.filter((a) => a !== undefined)}
                 onChange={action((_, value: OptionType) => {
                     //added type annotation above because mobx seems to fluff the inference to `never`
                     if (value === null) return;

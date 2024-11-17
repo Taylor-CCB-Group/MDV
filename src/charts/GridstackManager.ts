@@ -3,7 +3,7 @@ import { GridStack } from "gridstack";
 import { debounce } from "../utilities/Utilities";
 import type { Chart, ChartManager, DataSource } from "./charts";
 
-function clearPosition(div) {
+function clearPosition(div: HTMLElement) {
     div.style.position = "";
     div.style.left = "";
     div.style.right = "";
@@ -58,15 +58,11 @@ export default class GridStackManager {
                 },
                 div,
             );
-            grid.on("resizestop", (ev, el) => {
-                if (el instanceof HTMLElement) {
-                    el.style.filter = "";
-                }
+            grid.on("resizestop", (_: Event, el: HTMLElement) => {
+                el.style.filter = "";
             });
-            grid.on("resizestart", (ev, el) => {
-                if (el instanceof HTMLElement) {
-                    el.style.filter = "blur(1px) opacity(0.5)";
-                }
+            grid.on("resizestart", (_: Event, el: HTMLElement) => {
+                el.style.filter = "blur(1px) opacity(0.5)";
             });
 
             const i = this.chartManager.addMenuIcon(
@@ -221,7 +217,7 @@ export default class GridStackManager {
                 // console.log('removing from gridstack');
                 grid.removeWidget(div, true);
             };
-            chart.changeBaseDocument = (doc) => {
+            chart.changeBaseDocument = (doc: Document) => {
                 //by now, it's too late... the parent element is no longer the grid.
                 //grid.removeWidget(div, true);
                 changeBaseDocument.apply(chart, [doc]);

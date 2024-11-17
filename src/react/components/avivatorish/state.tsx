@@ -14,6 +14,7 @@ export type PixelSource = OME_TIFF | OME_ZARR | BIO_ZARR;
 
 // --- copied straight from Avivator's code::: with notes / changes for MDV ---
 import { RENDERING_MODES } from "@vivjs-experimental/viv";
+import { getEntries } from "@/lib/utils";
 
 const capitalize = (string: string) => string.charAt(0).toUpperCase() + string.slice(1);
 
@@ -227,7 +228,7 @@ export function createVivStores() {
             }),
         addChannel: (newProperties: NewChannelValues) =>
             set((state: ChannelsState) => {
-                const entries = Object.entries(newProperties);
+                const entries = getEntries(newProperties);
                 const newState = { ...state };
                 entries.forEach(([property, value]) => {
                     //@ts-ignore there is a strong case for changing the structure of the state...

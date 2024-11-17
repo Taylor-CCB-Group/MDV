@@ -12,6 +12,7 @@ import {
     useViewerStoreApi,
     useChannelsStoreApi,
     useImageSettingsStoreApi,
+    // type PixelSource,
 } from "./state";
 import {
     createLoader,
@@ -55,7 +56,7 @@ const useSavedVivConfig = () => {
 };
 
 export const useImage = (
-    source: { description: string; urlOrFile: string },
+    source?: { description: string; urlOrFile: string },
     history?: any,
 ) => {
     const applyConfig = useSavedVivConfig();
@@ -78,11 +79,13 @@ export const useImage = (
     const imageSettingsStore = useImageSettingsStoreApi();
     // biome-ignore lint/correctness/useExhaustiveDependencies: disabled in viv as well, and would cause a bunch of re-running...
     useEffect(() => {
+        if (!source) return;
         async function changeLoader() {
             // Placeholder
             viewerStore.setState({ isChannelLoading: [true] });
             viewerStore.setState({ isViewerLoading: true });
             if (use3d) toggleUse3d();
+            if (!source) throw "this should never happen - this is a type-guard";
             const { urlOrFile } = source;
             const newLoader = await createLoader(
                 urlOrFile,
@@ -92,8 +95,10 @@ export const useImage = (
                         loaderErrorSnackbar: { on: true, message },
                     }),
             );
-            let nextMeta;
-            let nextLoader;
+            //@ts-ignore flagging so we can get back to this
+            let nextMeta: any;
+            //@ts-ignore flagging so we can get back to this
+            let nextLoader: any;//PixelSource | PixelSource[] | null = null;
             if (Array.isArray(newLoader)) {
                 if (newLoader.length > 1) {
                     nextMeta = newLoader.map((l) => l.metadata);
@@ -185,11 +190,11 @@ export const useImage = (
                 // If there is only one channel, use white.
                 newColors =
                     newDomains.length === 1
-                        ? [[255, 255, 255]]
+                        ? [[255, 255, 255]] as Colors
                         : newDomains.map(
                               (_, i) =>
-                                  Channels[i]?.Color?.slice(0, -1) ??
-                                  COLOR_PALLETE[i],
+                                  (Channels[i]?.Color?.slice(0, -1) ??
+                                  COLOR_PALLETE[i]) as Colors[number],
                           );
                 viewerStore.setState({
                     useLens: channelOptions.length !== 1,

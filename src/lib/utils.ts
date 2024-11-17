@@ -1,12 +1,12 @@
 import type { Param } from "@/charts/ChartTypes";
-import type { CategoricalDataType, DataColumn, DataType, GuiValueTypes, NumberDataType } from "@/charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, GuiSpec, GuiSpecType, GuiValueTypes, NumberDataType } from "@/charts/charts";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
-export function columnMatchesType(column: DataColumn<DataType>, type?: Param | Param[]) {
+export function columnMatchesType(column: DataColumn<DataType>, type?: Param | Param[]): boolean {
     if (type === undefined) return true;
     if (isArray(type)) return type.some(t => columnMatchesType(column, t));
     if (type === "_multi_column:all") return true;
@@ -24,6 +24,15 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
 export function isArray(v: unknown): v is any[] {
     return Array.isArray(v);
 }
+export function toArray<T>(v: T | T[]) {
+    return isArray(v) ? v : [v];
+}
+type Entries<T> = {
+    [K in keyof T]: [K, T[K]];
+}[keyof T][];
+export function getEntries<T extends object>(o: T) {
+    return Object.entries(o) as Entries<T>;
+}
 
 export function isDatatypeNumeric(t: DataType): t is NumberDataType {
     return !!t.match(/double|float|int/);
@@ -35,3 +44,10 @@ export function isDatatypeCategorical(t: DataType): t is CategoricalDataType {
 // export function isGuiValTypeNumeric(t: keyof GuiValueTypes): t is number | [number, number] ? true : false {
 //     return !!t.match(/slider|spinner/);
 // }
+
+/** concise type-helper factory for making elements of Gui i.e. for settings 
+ * this will enable type-checking of the GuiSpec objects at the point of declaration
+ */
+export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
+    return spec;
+}

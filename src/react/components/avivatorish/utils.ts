@@ -401,11 +401,19 @@ export function useWindowSize(scaleWidth = 1, scaleHeight = 1) {
     return windowSize;
 }
 type LOADER = OME_TIFF | any; //idk
-
-export async function getSingleSelectionStats2D({ loader, selection }) {
+function narrowLimits(limits: number[]): limits is [number, number] {
+    return limits.length === 2;
+}
+function narrowStats(stats: { domain: number[]; contrastLimits: number[] }): stats is { domain: [number, number]; contrastLimits: [number, number] } {
+    return narrowLimits(stats.domain) && narrowLimits(stats.contrastLimits);
+}
+export async function getSingleSelectionStats2D({ loader, selection }: { loader: LOADER, selection: VivSelection}) {
     const data = Array.isArray(loader) ? loader[loader.length - 1] : loader;
     const raster = await data.getRaster({ selection });
     const selectionStats = getChannelStats(raster.data);
+    if (!narrowStats(selectionStats)) {
+        throw new Error("expected getChannelStats() to return domain and contrastLimits as [number, number]");
+    }
     const { domain, contrastLimits } = selectionStats;
     // Edge case: if the contrast limits are the same, set them to the domain.
     if (contrastLimits[0] === contrastLimits[1]) {

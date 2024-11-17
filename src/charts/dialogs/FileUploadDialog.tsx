@@ -10,13 +10,15 @@ import {
 import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
 
-import axios from "axios";
+import axios, { type AxiosProgressEvent } from "axios";
 import { useProject } from "../../modules/ProjectContext";
 import { ColumnPreview } from "./ColumnPreview";
 
 import {
     useViewerStoreApi,
     useChannelsStoreApi,
+    type PixelSource,
+    type Metadata,
 } from "../../react/components/avivatorish/state";
 import { createLoader } from "../../react/components/avivatorish/utils";
 import { unstable_batchedUpdates } from "react-dom";
@@ -27,6 +29,7 @@ import TiffVisualization from "./TiffVisualization";
 import { DatasourceDropdown } from "./DatasourceDropdown";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { Dialog, Paper } from "@mui/material";
+import { isArray } from "@/lib/utils";
 
 // Use dynamic import for the worker
 const CsvWorker = new Worker(new URL("./csvWorker.ts", import.meta.url), {
@@ -49,17 +52,17 @@ const StatusContainer = ({ children }: PropsWithChildren) => {
     );
 };
 
-const SuccessContainer = ({ children }) => (
+const SuccessContainer = ({ children }: PropsWithChildren) => (
     <div className="flex flex-col items-center justify-center bg-[#f0f8ff] shadow-md border border-[#e0e0e0] m-4 dark:bg-black dark:border-gray-600">
         {children}
     </div>
 );
 
-const SuccessHeading = ({ children }) => (
+const SuccessHeading = ({ children }: PropsWithChildren) => (
     <h1 className="text-[#333] mb-1 dark:text-white">{children}</h1>
 );
 
-const SuccessText = ({ children }) => (
+const SuccessText = ({ children }: PropsWithChildren) => (
     <p className="text-2xl text-[#555] mb-3 text-center dark:text-gray-300">
         {children}
     </p>
@@ -77,7 +80,9 @@ const DropzoneContainer = forwardRef(
     ),
 );
 
-const FileInputLabel = ({ children, ...props }) => (
+//! warning: className isn't being merged etc, I think it just gets overriden.
+// not sure if there's a better type for `htmlFor`.
+const FileInputLabel = ({ children, ...props }: PropsWithChildren & {className: string, htmlFor: string}) => (
     <label
         {...props}
         className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500"
@@ -123,7 +128,13 @@ const colorStyles = {
         darkHoverColor: "dark:bg-gray-900",
     },
 };
-
+type ButtonProps = {
+    onClick: () => void,
+    color?: "blue" | "red" | "green" | "gray",
+    disabled?: boolean,
+    size?: string,
+    marginTop?: string,
+} & PropsWithChildren;
 const Button = ({
     onClick,
     color = "blue",
@@ -131,7 +142,7 @@ const Button = ({
     size = "px-5 py-2.5",
     marginTop = "mt-2.5",
     children,
-}) => {
+}: ButtonProps) => {
     const { bgColor, hoverColor, darkBgColor, darkHoverColor } =
         colorStyles[color] || colorStyles.blue;
 
@@ -147,6 +158,7 @@ const Button = ({
     );
 };
 
+//@ts-ignore CBA
 const ProgressBar = ({ value, max }) => (
     <progress
         className="w-full h-8 mb-5 mt-10 bg-gray-200 dark:bg-white-200 border border-gray-300 rounded"
@@ -155,21 +167,21 @@ const ProgressBar = ({ value, max }) => (
     />
 );
 
-const Message = ({ children }) => (
+const Message = ({ children }: PropsWithChildren) => (
     <p className="text-lg font-bold text-[#333] dark:text-white text-center">
         {children}
     </p>
 );
 
-const FileSummary = ({ children }) => (
+const FileSummary = ({ children }: PropsWithChildren) => (
     <div className="max-w-[800px] w-[100%] text-center mb-5">{children}</div>
 );
 
-const FileSummaryHeading = ({ children }) => (
+const FileSummaryHeading = ({ children }: PropsWithChildren) => (
     <h1 className="text-gray-800 dark:text-white mb-3">{children}</h1>
 );
 
-const FileSummaryText = ({ children }) => (
+const FileSummaryText = ({ children }: PropsWithChildren) => (
     <>
         {typeof children === 'string' ? (
             <p className="text-lg text-gray-700 dark:text-white my-1">
@@ -183,15 +195,16 @@ const FileSummaryText = ({ children }) => (
     </>
 );
 
-const ErrorContainer = ({ children }) => (
+const ErrorContainer = ({ children }: PropsWithChildren) => (
     <div className="bg-[#fff0f0] text-[#d8000c] border border-[#ffbaba] p-5 my-5 rounded shadow-sm text-left w-[90%] max-w-[600px]">
         {children}
     </div>
 );
 
-const DynamicText = ({ text, className = "" }) => (
+const DynamicText = ({ text, className = "" }: { text: string, className: string }) => (
     <div className="w-96 h-20 overflow-hidden flex items-center justify-center">
         <p
+            //consider using `cn()` from lib/utils
             className={`text-center m-0 font-bold text-sm sm:text-lg md:text-m ${className}`}
         >
             {text}
@@ -199,10 +212,10 @@ const DynamicText = ({ text, className = "" }) => (
     </div>
 );
 
-const ErrorHeading = ({ children }) => (
+const ErrorHeading = ({ children }: PropsWithChildren) => (
     <h4 className="mt-0 text-lg font-bold">{children}</h4>
 );
-
+//@ts-ignore CBA
 const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
     <div className="flex-left items-center space-x-2 pr-4">
         <label className="text-lg text-gray-700 dark:text-white my-1">
@@ -220,8 +233,36 @@ const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
     </div>
 );
 
+type UploadActionType = "SET_SELECTED_FILES" | "SET_IS_UPLOADING" 
+| "SET_IS_INSERTING" | "SET_SUCCESS" | "SET_ERROR" | "SET_IS_VALIDATING" 
+| "SET_VALIDATION_RESULT" | "SET_FILE_TYPE" | "SET_TIFF_METADATA" | "SET_FILE_SUMMARY";
 // Reducer function
-const reducer = (state, action) => {
+const DEFAULT_REDUCER_STATE = {
+    selectedFiles: [] as File[],
+    isUploading: false,
+    isInserting: false,
+    isValidating: false,
+    validationResult: null as unknown,
+    success: false,
+    error: null as unknown,
+    fileType: null as "csv" | "tiff" | null,
+    tiffMetadata: null as unknown,
+} as const;
+type ReducerState = typeof DEFAULT_REDUCER_STATE;
+// TODO - would be good to type this, this is not how I should be spending my weekend.
+//                                    ^^ only myself to blame for this - I should get a life
+type ReducerPayload<T extends UploadActionType> = T extends "SET_SELECTED_FILES" ? File[]
+: T extends "SET_IS_UPLOADING" ? boolean
+: T extends "SET_IS_INSERTING" ? boolean
+: T extends "SET_SUCCESS" ? boolean
+: T extends "SET_ERROR" ? { message: string, status: number, traceback?: string }
+: T extends "SET_IS_VALIDATING" ? boolean
+: T extends "SET_VALIDATION_RESULT" ? { columnNames: string[], columnTypes: string[] }
+: T extends "SET_FILE_TYPE" ? "csv" | "tiff" | null
+: T extends "SET_TIFF_METADATA" ? unknown
+: never;
+type ReducerAction<T extends UploadActionType> = { type: T, payload: ReducerPayload<T> };
+const reducer = <T extends UploadActionType,>(state: ReducerState, action: { type: T, payload: any }) => {
     switch (action.type) {
         case "SET_SELECTED_FILES":
             return { ...state, selectedFiles: action.payload };
@@ -339,21 +380,23 @@ const useFileUploadProgress = () => {
     return { progress, setProgress, startProgress, resetProgress };
 };
 
+//todo figure out why type inference is failing with observer if we take out the `React.FC<...>` here
+//also - are we actually observing anything here? not that it particularly matters (apart from type inference, apparently)
 const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = observer(({
     onClose,
     onResize,
-}) => {
+}: FileUploadDialogComponentProps) => {
     const { root, projectName, chartManager } = useProject();
 
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
     const [updatedNamesArray, setUpdatedNamesArray] = useState<string[]>([]);
 
-    const handleSelect = (value: string) => {
+    const handleSelect = useCallback((value: string) => {
         setSelectedOption(value);
         setDatasourceName(value);
         console.log("Selected:", value);
-    };
+    }, []);
 
     const [datasourceName, setDatasourceName] = useState("");
 
@@ -383,17 +426,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     // TIFF
     const channelsStore = useChannelsStoreApi();
 
-    const [state, dispatch] = useReducer(reducer, {
-        selectedFiles: [],
-        isUploading: false,
-        isInserting: false,
-        isValidating: false,
-        validationResult: null,
-        success: false,
-        error: null,
-        fileType: null,
-        tiffMetadata: null,
-    });
+    const [state, dispatch] = useReducer(reducer, DEFAULT_REDUCER_STATE);
 
     const viewerStore = useViewerStoreApi();
 
@@ -519,7 +552,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 dispatch({ type: "SET_FILE_TYPE", payload: fileConfig.type });
             }
         },
-        [csvSummary, tiffSummary]
+        [onResize, columnNames, columnTypes],
     );
 
     const handleSubmitFile = useCallback(
@@ -544,16 +577,19 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 const newLoader = await createLoader(
                     newSource.urlOrFile,
                     () => {}, // placeholder for toggleIsOffsetsSnackbarOn
-                    (message) =>
+                    (message) => {
                         viewerStore.setState({
                             loaderErrorSnackbar: { on: true, message },
-                        }),
+                        })
+                    }
                 );
-
-                let nextMeta;
-                let nextLoader;
-                if (Array.isArray(newLoader)) {
+                // types are still somewhat on a wing and a prayer... we'll get there
+                let nextMeta: Metadata;
+                let nextLoader: PixelSource['data'] | PixelSource['data'][];
+                //let nextLoader: OME_TIFF['data'] | OME_TIFF['data'][];
+                if (isArray(newLoader)) {
                     if (newLoader.length > 1) {
+                        //@ts-ignore flagging so we can get back to this
                         nextMeta = newLoader.map((l) => l.metadata);
                         nextLoader = newLoader.map((l) => l.data);
                     } else {
@@ -561,6 +597,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         nextLoader = newLoader[0].data;
                     }
                 } else {
+                    //@ts-ignore flagging so we can get back to this
                     nextMeta = newLoader.metadata;
                     nextLoader = newLoader.data;
                 }
@@ -595,14 +632,14 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         [viewerStore, channelsStore],
     );
 
-    const handleDatasourceNameChange = (event) => {
+    const handleDatasourceNameChange = useCallback((event: any) => {
         const { value } = event.target;
         setDatasourceName(value); // Update the state with the new value
         setCsvSummary((prevCsvSummary) => ({
             ...prevCsvSummary,
             datasourceName: value, // Update datasourceName in the summary object
         }));
-    };
+    }, []);
 
     const { getRootProps, getInputProps, isDragActive, fileRejections } =
         useDropzone({
@@ -624,7 +661,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         context: CanvasRenderingContext2D,
         text: string,
     ) => {
-        context.font = getComputedStyle(document.body).fontSize + " Arial";
+        context.font = `${getComputedStyle(document.body).fontSize} Arial`;
         return context.measureText(text).width;
     };
 
@@ -702,11 +739,15 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
             headers: {
                 "Content-Type": "multipart/form-data",
             },
-            onUploadProgress: (progressEvent) => {
-                const percentComplete = Math.round(
-                    (progressEvent.loaded * 100) / progressEvent.total,
-                );
-                setProgress(percentComplete);
+            onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+                if (progressEvent.total) {
+                    const percentComplete = Math.round(
+                        (progressEvent.loaded * 100) / progressEvent.total,
+                    );
+                    setProgress(percentComplete);
+                } else {
+                    // console.warn("Upload progress not computable");
+                }
             },
         };
 
@@ -755,7 +796,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         }
     };
 
-    const handleUploadError = (error: any) => {
+    const handleUploadError = useCallback((error: any) => {
         const errorPayload = {
             message: `Upload failed with status: ${error.response?.status || "unknown"}`,
             status: error.response?.status || 500,
@@ -777,13 +818,13 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
             payload: errorPayload,
         });
         dispatch({ type: "SET_IS_UPLOADING", payload: false });
-    };
+    }, []);
 
-    const handleClose = async () => {
+    const handleClose = useCallback(async () => {
         dispatch({ type: "SET_FILE_SUMMARY", payload: null });
         onResize(450, 320);
         onClose();
-    };
+    }, [onClose, onResize]);
 
     return (
         <Container>

@@ -126,7 +126,7 @@ async function loadBinaryData(datasource: string, name: string) {
     );
 }
 //send json args and return json/array buffer response
-export async function getPostData(url: string, args, return_type = "json") {
+export async function getPostData(url: string, args: any, return_type = "json") {
     const resp = await fetch(url, {
         method: "POST",
         body: JSON.stringify(args),
@@ -149,7 +149,7 @@ export async function getPostData(url: string, args, return_type = "json") {
  * Returns a Column object when the data is loaded.
  * 
  * todo - consider batching requests (add to queue, then load all at once in `setTimeout(...,0)`?)
- * better types - for `columnName` and return value generic
+ * better types - for `columnName` and return value generic(?)
  */
 export async function loadColumn(datasourceName: string, columnName: string): Promise<LoadedDataColumn<DataType>> {
     return new Promise((resolve, reject) => {

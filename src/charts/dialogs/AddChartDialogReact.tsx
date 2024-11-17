@@ -64,6 +64,7 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
             }
         });
         for (const [k, v] of Object.entries(extra)) {
+            //@ts-ignore
             props[k] = v;
         }
         // find the key in BaseChart.types that corresponds to this chart type
@@ -161,6 +162,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 // nb `t.required.every(r => r in dataStore)` seems like it should work,
                 // but since we're in glorious JS land, we have things like `dataStore['interactions'] = undefined`
                 // which means that `'interactions' in dataStore` is true, but `!!dataStore['interactions']` is false.
+                //@ts-ignore for the moment
                 return t.required.every(r => !!dataStore[r]);
             }
             return true;
@@ -169,7 +171,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     const paramColumns = useMemo(
-        () => config.param ? config.param.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
+        () => config.param?.map(p => dataStore.columnIndex[p]) ?? [],
     [config.param, dataStore]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
     const setChartTypeName = useCallback(action((chartTypeName: string) => {
@@ -183,7 +185,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
             config.param = new Array(chartType.params.length);
             for (const [i, p] of chartType.params.entries()) {
                 const previousColumn = paramColumns[i];
-                if (previousParams[i] && columnMatchesType(previousColumn, p.type)) {
+                if (previousColumn && previousParams[i] && columnMatchesType(previousColumn, p.type)) {
                     console.log(`[${config.type}, ${p.name}] using previous selection: '${previousParams[i]}'`);
                     config.param[i] = previousParams[i];
                 } else {
@@ -223,6 +225,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
             }
         });
         for (const [k, v] of Object.entries(extra)) {
+            //@ts-ignore
             props[k] = v;
         }
         // find the key in BaseChart.types that corresponds to this chart type
