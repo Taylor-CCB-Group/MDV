@@ -1,18 +1,26 @@
 import * as React from "react";
 import DeckGL from "@deck.gl/react";
+import type { MjolnirEvent } from 'mjolnir.js';
 // import { getVivId } from '@vivjs-experimental/views';
 // No need to use the ES6 or React variants.
 import equal from "fast-deep-equal";
 import { ScaleBarLayer } from "@vivjs-experimental/viv";
-export function getVivId(id) {
+import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
+export function getVivId(id: string) {
     return `-#${id}#`;
 }
-
-const areViewStatesEqual = (viewState, otherViewState) => {
+type ViewState = (OrthographicViewState | OrbitViewState) & { id: string }; //questionable
+// type ViewStates = { [id: string]: ViewState } & { find: any }; //highly questionable - should look at runtime/docs...
+type ViewStates = ViewState[];
+type View = {id: string} & any; //placeholder
+type VivPickInfo = PickingInfo<any, any> & { tile: any }; //placeholder
+const areViewStatesEqual = (viewState: ViewState, otherViewState?: ViewState) => {
     return (
         otherViewState === viewState ||
         (viewState?.zoom === otherViewState?.zoom &&
+            //@ts-ignore CBA to discriminate between Orbit and Ortho viewStates
             viewState?.rotationX === otherViewState?.rotationX &&
+            //@ts-ignore
             viewState?.rotationOrbit === otherViewState?.rotationOrbit &&
             equal(viewState?.target, otherViewState?.target))
     );
@@ -53,16 +61,17 @@ const areViewStatesEqual = (viewState, otherViewState) => {
  */
 
 type VivViewerWrapperProps = {
-    views: any;
-    viewStates: any;
+    views: View[];
+    // viewStates: { [id: string]: ViewState & { id: string } }; //todo
+    viewStates: ViewStates; //Map<string, ViewState & { id: string }>;
     onViewStateChange?: any;
-    onHover?: any;
+    onHover?: (info: PickingInfo, event: MjolnirEvent) => void;
     hoverHooks?: any;
     layerProps: any;
-    deckProps?: any;
+    deckProps?: DeckGLProps;
     randomize?: boolean;
     useDevicePixels?: boolean;
-    outerContainer?: Element;
+    outerContainer?: HTMLElement;
 };
 type VivViewerWrapperState = {
     viewStates: any;
@@ -81,7 +90,7 @@ class MDVivViewerWrapper extends React.PureComponent<
     VivViewerWrapperProps,
     VivViewerWrapperState
 > {
-    constructor(props) {
+    constructor(props: VivViewerWrapperProps) {
         console.log(
             "using custom VivViewerWrapper via MDVivViewer - now necessary for fixing mouse events on popouts",
         );
@@ -93,9 +102,9 @@ class MDVivViewerWrapper extends React.PureComponent<
         };
         const { viewStates } = this.state;
         const { views, viewStates: initialViewStates } = this.props;
-        views.forEach((view) => {
+        views.forEach((view: any) => {
             viewStates[view.id] = view.filterViewState({
-                viewState: initialViewStates.find((v) => v.id === view.id),
+                viewState: initialViewStates.find((v: any) => v.id === view.id),
             });
         });
         this._onViewStateChange = this._onViewStateChange.bind(this);
@@ -113,7 +122,7 @@ class MDVivViewerWrapper extends React.PureComponent<
      * @returns {boolean} Whether or not this layer should be drawn in this viewport.
      */
     // eslint-disable-next-line class-methods-use-this
-    layerFilter({ layer, viewport }) {
+    layerFilter({ layer, viewport }: any) {
         //return true; // for testing whether viv id matching is an issue
         return layer.id.includes(getVivId(viewport.id));
     }
@@ -122,7 +131,7 @@ class MDVivViewerWrapper extends React.PureComponent<
      * This updates the viewState as a callback to the viewport changing in DeckGL
      * (hence the need for storing viewState in state).
      */
-    _onViewStateChange({ viewId, viewState, interactionState, oldViewState }) {
+    _onViewStateChange({ viewId, viewState, interactionState, oldViewState }: any) {
         // Save the view state and trigger rerender.
         const { views, onViewStateChange } = this.props;
         // eslint-disable-next-line no-param-reassign
@@ -134,7 +143,7 @@ class MDVivViewerWrapper extends React.PureComponent<
                 oldViewState,
             }) || viewState;
         this.setState((prevState) => {
-            const viewStates = {};
+            const viewStates: any = {};
             views.forEach((view) => {
                 const currentViewState = prevState.viewStates[view.id];
                 viewStates[view.id] = view.filterViewState({
@@ -148,7 +157,7 @@ class MDVivViewerWrapper extends React.PureComponent<
         return viewState;
     }
 
-    componentDidUpdate(prevProps) {
+    componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
         const { views, outerContainer } = props;
 
@@ -211,7 +220,7 @@ class MDVivViewerWrapper extends React.PureComponent<
      * width on any call where the viewStates changes (i.e resize events),
      * using the previous state (falling back on the view's initial state) for target x and y, zoom level etc.
      */
-    static getDerivedStateFromProps(props, prevState) {
+    static getDerivedStateFromProps(props: VivViewerWrapperProps, prevState: VivViewerWrapperState) {
         const { views, viewStates: viewStatesProps } = props;
         // Update internal viewState on view changes as well as height and width changes.
         // Maybe we should add x/y too?
@@ -223,14 +232,14 @@ class MDVivViewerWrapper extends React.PureComponent<
                     view.width !== prevState.viewStates[view.id].width,
             )
         ) {
-            const viewStates = {};
+            const viewStates: ViewStates = {} as any; //nonono
             views.forEach((view) => {
                 const { height, width } = view;
                 const currentViewState = prevState.viewStates[view.id];
                 viewStates[view.id] = view.filterViewState({
                     viewState: {
                         ...(currentViewState ||
-                            viewStatesProps.find((v) => v.id === view.id)),
+                            viewStatesProps.find((v: any) => v.id === view.id)),
                         height,
                         width,
                         id: view.id,
@@ -243,7 +252,7 @@ class MDVivViewerWrapper extends React.PureComponent<
     }
 
     // eslint-disable-next-line consistent-return
-    onHover(info, event) {
+    onHover(info: VivPickInfo, event: MjolnirEvent) {
         const { tile, coordinate, sourceLayer: layer } = info;
         const { onHover, hoverHooks } = this.props;
         if (onHover) {
@@ -286,7 +295,7 @@ class MDVivViewerWrapper extends React.PureComponent<
                 Math.floor((coordinate[1] - bounds[3]) / layerZoomScale),
             ];
             const coords = dataCoords[1] * width + dataCoords[0];
-            hoverData = data.map((d) => d[coords]);
+            hoverData = data.map((d: any) => d[coords]);
         } else {
             const { channelData } = layer.props;
             if (!channelData) {
@@ -305,7 +314,7 @@ class MDVivViewerWrapper extends React.PureComponent<
                 Math.floor((coordinate[1] - bounds[3]) / layerZoomScale),
             ];
             const coords = dataCoords[1] * width + dataCoords[0];
-            hoverData = data.map((d) => d[coords]);
+            hoverData = data.map((d: any) => d[coords]);
         }
         handleValue(hoverData);
         handleCoordnate(coordinate);
@@ -361,8 +370,8 @@ class MDVivViewerWrapper extends React.PureComponent<
         // MDV: make sure the scalebar is on top of other layers
         // perhaps this should be in _renderLayers(), yolo.
         const vivLayers = this._renderLayers()[0];
-        const scaleBarLayer = vivLayers.find((layer) => layer instanceof ScaleBarLayer);
-        const otherLayers = vivLayers.filter((layer) => layer !== scaleBarLayer);
+        const scaleBarLayer = vivLayers.find((layer: any) => layer instanceof ScaleBarLayer);
+        const otherLayers = vivLayers.filter((layer: any) => layer !== scaleBarLayer);
         const layers = deckProps?.layers === undefined
             ? [vivLayers]
             : [otherLayers, ...deckProps.layers, scaleBarLayer];

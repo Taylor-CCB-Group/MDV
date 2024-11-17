@@ -41,8 +41,12 @@ class DataStore {
         /** @type {number} */
         this.filterSize = size;
         /** why doesn't this annotation work?
-         * @type {Array.<import("@/charts/charts.js").DataColumn<any>>} */
+         * @typedef {import("@/charts/charts.js").DataType} DataType
+         * @typedef {import("@/charts/charts.js").DataColumn} DataColumn
+         * @type {Array.<DataColumn<DataType>>} */
         this.columns = [];
+        /** 
+         * @type {{[k: string]: DataColumn<DataType> | undefined}} */
         this.columnIndex = {};
         this.listeners = {};
         this.indexes = {};
@@ -1762,6 +1766,10 @@ class DataStore {
         return this.columns.map((x) => x.field);
     }
 
+    /**
+     * @param {string} column - the column's field/id
+     * @returns {string[]} - the column's values
+     */
     getColumnValues(column, format = null) {
         const v = this.columnIndex[column].values;
         if (format === "name_value") {

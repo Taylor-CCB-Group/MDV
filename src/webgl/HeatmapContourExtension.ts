@@ -86,6 +86,7 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
         });
     }
 
+    //@ts-ignore would like to review this
     draw({ uniforms }): void {
         const { model } = this.state;
         const { intensity, threshold, aggregationMode, colorDomain, contourOpacity } = this.props;

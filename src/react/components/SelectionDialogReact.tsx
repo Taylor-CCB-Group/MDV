@@ -3,6 +3,7 @@ import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart, type BaseConfig } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
 import { observer } from "mobx-react-lite";
+import type DataStore from "@/datastore/DataStore";
 
 export type CategoryFilter = { category: string[] };
 export type MultiTextFilter = CategoryFilter & { operand: "or" | "and" };
@@ -16,7 +17,7 @@ export type SelectionDialogConfig = {
 };
 
 class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
-    constructor(dataStore, div, config: SelectionDialogConfig & BaseConfig) {
+    constructor(dataStore: DataStore, div: HTMLElement, config: SelectionDialogConfig & BaseConfig) {
         if (!config.filters) {
             config.filters = {};
             for (const col of config.param) {

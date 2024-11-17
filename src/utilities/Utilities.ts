@@ -28,9 +28,9 @@ export function NPOT(n: number) {
  * will not be called until {@param timeout}ms have passed since the last call.
  * based on https://www.freecodecamp.org/news/javascript-debounce-example/
  */
-export function debounce<A=unknown>(fn: (args: A) => void, timeout: number) {
-    let timer;
-    return (...args) => {
+export function debounce<A extends any[]>(fn: (...args: A) => void, timeout: number) {
+    let timer: ReturnType<typeof setTimeout>;
+    return (...args: A) => {
         clearTimeout(timer);
         timer = setTimeout(() => {
             //@ts-ignore

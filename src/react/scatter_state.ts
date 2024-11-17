@@ -112,7 +112,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
             // minZoom: -10,
             maxZoom,
             transitionDuration: 400, // Smooth transition
-            transitionEasing: (x) => -(Math.cos(Math.PI * x) - 1) / 2, //https://easings.net/#easeInOutSine
+            transitionEasing: (x: number) => -(Math.cos(Math.PI * x) - 1) / 2, //https://easings.net/#easeInOutSine
             // transitionInterpolator: new FlyToInterpolator({speed: 1}), //applicable for MapState - latitude is required
         });
     }, [
@@ -127,7 +127,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
     return viewState;
 }
 
-type Tooltip = (PickingInfo) => string;
+// type Tooltip = (PickingInfo) => string;
 type P = [number, number];
 export function useScatterplotLayer(modelMatrix: Matrix4) {
     const id = useChartID();
@@ -166,7 +166,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     // biome-ignore lint/correctness/useExhaustiveDependencies: fix this
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
-        ({ object }) => {
+        () => {
             if (!config.tooltip.show) return;
             // testing reading object properties --- pending further development
             // (not hardcoding DN property etc)

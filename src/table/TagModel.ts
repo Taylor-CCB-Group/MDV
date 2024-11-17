@@ -112,10 +112,11 @@ export default class TagModel {
     getTags() {
         return getTags(this.tagColumn);
     }
-    entireSelectionHasTag(tag: string) {
+    entireSelectionHasTag(tag: string): boolean {
         const col = this.tagColumn;
-        if (tag.match(SEP))
+        if (tag.match(SEP)) {
             return tag.split(SEP).every((t) => this.entireSelectionHasTag(t));
+        }
         const tagIndices = getTagValueIndices(tag, col);
         return !this.dataModel.data.some(
             (v) => !tagIndices.includes(col.data[v]),

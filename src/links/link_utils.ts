@@ -84,7 +84,7 @@ export function addHighlightColumnLink(
         }
     }
 
-    ds.addListener(link.id, async (type, data) => {
+    ds.addListener(link.id, async (type: string, data: any) => {
         if (type === "data_highlighted") {
             const newValue = srcCol.values[srcCol.data[data.indexes[0]]];
             updateValue(newValue);
@@ -149,7 +149,7 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
         }
     }
 
-    chart.chart.addListener(link.id, async (type, data) => {
+    chart.chart.addListener(link.id, async (type: string, data: any) => {
         if (type === "cell_clicked") {
             // this is specific to HeatMap cells...
             updateValue(data.row);

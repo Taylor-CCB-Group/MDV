@@ -1,5 +1,5 @@
 import { type PropsWithChildren, createContext, useContext } from "react";
-import type { loadOmeTiff } from "@vivjs-experimental/viv";
+import type { loadBioformatsZarr, loadOmeTiff, loadOmeZarr } from "@vivjs-experimental/viv";
 import { createStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { observer } from "mobx-react-lite";
@@ -8,11 +8,14 @@ import type { EqFn, Selector, ZustandStore } from "./zustandTypes";
 // what about loadOmeZarr, loadBioformatsZarr...
 // ... not to mention HTJ2K?
 export type OME_TIFF = Awaited<ReturnType<typeof loadOmeTiff>>;
+export type OME_ZARR = Awaited<ReturnType<typeof loadOmeZarr>>;
+export type BIO_ZARR = Awaited<ReturnType<typeof loadBioformatsZarr>>;
+export type PixelSource = OME_TIFF | OME_ZARR | BIO_ZARR;
 
 // --- copied straight from Avivator's code::: with notes / changes for MDV ---
 import { RENDERING_MODES } from "@vivjs-experimental/viv";
 
-const capitalize = (string) => string.charAt(0).toUpperCase() + string.slice(1);
+const capitalize = (string: string) => string.charAt(0).toUpperCase() + string.slice(1);
 
 // typing for generateToggles... not the most useful ones to have, but it's a start.
 type BooleanKeys<T> = {
@@ -34,6 +37,7 @@ function generateToggles<T extends {}>(
             toggles[`toggle${capitalize(k)}`] = () =>
                 set((state) => ({
                     ...state,
+                    //@ts-ignore
                     [k]: !state[k],
                 }));
         }
@@ -91,7 +95,7 @@ const DEFAULT_IMAGE_STATE = {
     ySlice: null as [number, number] | null,
     zSlice: null as [number, number] | null,
     onViewportLoad: () => {},
-};
+} as const;
 type ImageState = typeof DEFAULT_IMAGE_STATE;
 const DEFAULT_VIEWER_STATE = {
     isChannelLoading: [] as boolean[],
@@ -111,9 +115,10 @@ const DEFAULT_VIEWER_STATE = {
     useColormap: false,
     globalSelection: { z: 0, t: 0 },
     channelOptions: [] as any[],
-    metadata: null as any,
+    /** type is WIP */
+    metadata: null as Metadata | null,
     viewState: null as any,
-    source: null as { urlOrFile: string; description: string } | null,
+    source: undefined as { urlOrFile: string; description: string } | undefined,
     pyramidResolution: 0,
 };
 type ViewerState = typeof DEFAULT_VIEWER_STATE;
@@ -148,7 +153,7 @@ export type ROI = {
     max_x: number;
     max_y: number;
 };
-
+type NewChannelValues = Partial<typeof DEFAUlT_CHANNEL_VALUES>;
 /**
  * In Avivator, there is a zustand store for the channels, image settings, and viewers.
  * While there can be plural 'viewers', it is always of a single image, with shared channels and image settings.
@@ -162,11 +167,11 @@ export type VivContextType = {
             toggleIsOn: (index: number) => void;
             setPropertiesForChannel: (
                 channel: number,
-                newProperties: Partial<typeof DEFAUlT_CHANNEL_VALUES>,
+                newProperties: NewChannelValues,
             ) => void;
             removeChannel: (channel: number) => void;
             addChannel: (
-                newProperties: Partial<typeof DEFAUlT_CHANNEL_VALUES>,
+                newProperties: NewChannelValues,
             ) => void;
         }
     >;
@@ -179,49 +184,59 @@ export type VivContextType = {
         }
     >; //also has some extra methods... setIsChannelLoading, addIsChannelLoading, removeIsChannelLoading
 };
+// ChannelsState has a bunch of arrays, we need something that describes entries in those arrays...
+
 export function createVivStores() {
     const channelsStore = createStore((set) => ({
         ...DEFAUlT_CHANNEL_STATE,
         // ...chart.config.viv.channelsStore,
         ...generateToggles(DEFAUlT_CHANNEL_VALUES, set),
-        toggleIsOn: (index) =>
-            set((state) => {
+        toggleIsOn: (index: number) =>
+            set((state: ChannelsState) => {
                 const channelsVisible = [...state.channelsVisible];
                 channelsVisible[index] = !channelsVisible[index];
                 return { ...state, channelsVisible };
             }),
-        setPropertiesForChannel: (channel, newProperties) =>
-            set((state) => {
-                const entries = Object.entries(newProperties);
-                const newState = {};
+        setPropertiesForChannel: (channel: number, newProperties: NewChannelValues) =>
+            set((state: ChannelsState) => {
+                const entries = getEntries(newProperties);
+                const newState: Partial<ChannelsState> = {};
+                //@ts-ignore there is a strong case for changing the structure of the state...
                 entries.forEach(([property, value]) => {
+                    //@ts-ignore there is a strong case for changing the structure of the state...
                     newState[property] = [...state[property]];
+                    //@ts-ignore there is a strong case for changing the structure of the state...
                     newState[property][channel] = value;
                 });
                 return { ...state, ...newState };
             }),
-        removeChannel: (channel) =>
-            set((state) => {
+        removeChannel: (channel: number) =>
+            set((state: ChannelsState) => {
                 const newState = {};
                 const channelKeys = Object.keys(DEFAUlT_CHANNEL_VALUES);
                 Object.keys(state).forEach((key) => {
                     if (channelKeys.includes(key)) {
+                        //@ts-ignore
                         newState[key] = state[key].filter(
+                            //@ts-ignore
                             (_, j) => j !== channel,
                         );
                     }
                 });
                 return { ...state, ...newState };
             }),
-        addChannel: (newProperties) =>
-            set((state) => {
+        addChannel: (newProperties: NewChannelValues) =>
+            set((state: ChannelsState) => {
                 const entries = Object.entries(newProperties);
                 const newState = { ...state };
                 entries.forEach(([property, value]) => {
+                    //@ts-ignore there is a strong case for changing the structure of the state...
                     newState[property] = [...state[property], value];
                 });
                 Object.entries(DEFAUlT_CHANNEL_VALUES).forEach(([k, v]) => {
+                    //@ts-ignore
                     if (newState[k].length < newState[entries[0][0]].length) {
+                        //@ts-ignore
                         newState[k] = [...state[k], v];
                     }
                 });
@@ -331,8 +346,10 @@ export const useLoader = () => {
     ]);
     return Array.isArray(fullLoader[0]) ? fullLoader[image] : fullLoader;
 };
-
-export const useMetadata = () => {
+//! todo review the typing here...
+export type Metadata = OME_TIFF['metadata'];// | OME_ZARR['metadata'] | BIO_ZARR['metadata'];
+//export type Metadata = TiffPreviewProps["metadata"];
+export const useMetadata = (): Metadata => {
     const image = useChannelsStore((store) => store.image);
     const metadata = useViewerStore((store) => store.metadata);
     return Array.isArray(metadata) ? metadata[image] : metadata;

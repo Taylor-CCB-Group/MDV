@@ -8,10 +8,12 @@ import { ImageArrayDeckExtension } from "../webgl/ImageArrayDeckExtension";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { OrthographicView } from "@deck.gl/core";
 import type Dimension from "../datastore/Dimension.js";
-import type { GuiSpec } from "./charts.js";
+import type { LoadedDataColumn, GuiSpec, NumberDataType } from "./charts.js";
+import type DataStore from "@/datastore/DataStore.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
-type Column = { data: Float32Array; minMax: [number, number] };
+//type Column = { data: Float32Array; minMax: [number, number] };
+type Column = LoadedDataColumn<NumberDataType>;
 let nextID = 0;
 class ImageScatterChart extends BaseChart {
     canvas: HTMLCanvasElement;
@@ -27,7 +29,8 @@ class ImageScatterChart extends BaseChart {
     spaceY = 392;
     colorBy?: (index: number) => number[];
     id: number;
-    constructor(dataStore, div, config) {
+    // todo - type this config
+    constructor(dataStore: DataStore, div: HTMLDivElement, config: any) {
         super(dataStore, div, config);
         this.id = nextID++;
         const canvas = (this.canvas = createEl("canvas", {}, this.contentDiv));

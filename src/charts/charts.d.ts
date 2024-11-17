@@ -182,9 +182,10 @@ export type GuiSpec<T extends GuiSpecType> = {
     // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
     choices?: T extends "radiobuttons" ? [string, string][] : never;
     //thouht we could make these non-optional and only have it insist for number types, but that's not happening for some reason
-    min?: T extends NumberDataType ? number : never;
-    max?: T extends NumberDataType ? number : never;
-    step?: number;
+    min?: GuiValueTypes[T] extends number ? number : never;
+    max?: GuiValueTypes[T] extends number ? number : never;
+    step?: GuiValueTypes[T] extends number ? number : never;
+    continuous?: GuiValueTypes[T] extends number ? boolean : never;
     defaultVal?: GuiValueTypes[T];
     columnSelection?: T extends "column" ? ColumnSelectionParameters : never;
 };
@@ -209,7 +210,9 @@ export type ExtraControl<T extends GuiSpecType> = {
 //     ], 'a', 'b']
 // }
 // a.values[0].map(x => x.a);
-// ^^ still not well-typed... `x` is `any`.
+// ^^ well-typed as long as we declare the generic type...
+// doesn't manage to infer it.
+//... might consider a factory method...
 //// biome-ignore lint/suspicious/noRedeclare: I should probably fix this...
 // interface DataStore {
 //     getLoadedColumns: () => FieldName[];
@@ -220,7 +223,7 @@ export type ExtraControl<T extends GuiSpecType> = {
 //      * if subsequent calls to `addListener` are made with the same `id` */
 //     addListener: (id: string, listener: (eventType: string, data: any) => void) => void;
 // }
-
+//todo make BaseChart ts and remove this type...
 export type Chart<T = any> = {
     getDiv: () => HTMLElement;
     remove: () => void;
@@ -233,7 +236,7 @@ export type Chart<T = any> = {
     dataStore: DataStore;
     dataSource: DataSource;
     popoutIcon: HTMLElement;
-} & BaseChart;
+} & BaseChart<T>;
 
 export type ChartState = {
     chart: Chart;

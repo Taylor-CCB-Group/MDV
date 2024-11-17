@@ -34,6 +34,10 @@ export function useDataStore(foreignDataStore?: DataStore) {
     if (!dataStore) throw new Error("no data store context");
     return dataStore;
 }
+/** 
+ * If called from within a {@link ChartContext}, this will return the charts viv config.
+ * Otherwise, it will return something that should function as an empty config object.
+ */
 export function useVivConfig(): VivConfig {
     const chart = useContext(ChartContext);
     if (!chart) return { viewerStore: {}, channelsStore: {}, imageSettingsStore: {} };

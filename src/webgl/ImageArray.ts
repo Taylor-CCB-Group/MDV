@@ -40,7 +40,7 @@ export class ImageArray {
     lumaTexture?: Texture;
     onProgress?: (n: number) => void;
     constructor(
-        dataStore,
+        dataStore: DataStore,
         canvas: HTMLCanvasElement,
         dataView: DataModel,
         config: ImageArrayConfig,

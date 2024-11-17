@@ -77,7 +77,7 @@ export default async function connectIPC(cm: ChartManager) {
         },
     );
     //temporarily disable websocket connection
-    const socket = { on: (s, f) => {} }; //io(url);
+    const socket = { on: (s: any, f: any) => {} }; //io(url);
 
     function sendMessage(msg: MDVMessage) {
         // socket.emit("message", msg);

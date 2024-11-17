@@ -90,6 +90,7 @@ export default function popoutChart(chart: Chart) {
         popStyles();
         originalParent.appendChild(div);
         chartManager._makeChartRD(chart);
+        //@ts-ignore
         chartManager.charts[chart.config.id].win = mainWindow;
         chart.changeBaseDocument(document);
         observer.disconnect();

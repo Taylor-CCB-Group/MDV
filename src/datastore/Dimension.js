@@ -54,7 +54,7 @@ class Dimension {
             }
         }
         // xxx: why would we not notify listeners?
-        //I'm a bit dubious about the general pattern 
+        //I'm a bit dubious about the general pattern
         //- using filter(methodName...) for now to be more in line with other things
         //this.parent._callListeners("filtered", this);
     }
@@ -128,7 +128,7 @@ class Dimension {
      * @param {string} method- The name of the filter method.
      * if 'filterPredicate' then the args should contain a predicate function
      * @param {string[]} columns - a list of column ids used in the filtering
-     * @param {object} args - any extra arguments for filtering
+     * @param {object|string} args - any extra arguments for filtering
      * @param {boolean} [notify=true] - notify any listeners in the dataStore that the
      * data has been filtered
      */
@@ -261,6 +261,6 @@ class Dimension {
         this.parent.dimensions.splice(this.parent.dimensions.indexOf(this), 1);
     }
 }
-
+/** @type {{[k: string]: undefined | typeof Dimension}} */
 Dimension.types = { base_dimension: Dimension };
 export default Dimension;
