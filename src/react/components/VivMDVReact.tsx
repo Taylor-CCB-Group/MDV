@@ -1,6 +1,6 @@
 import BaseChart from "../../charts/BaseChart";
 import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
-import { action, makeAutoObservable, makeObservable, observable } from "mobx";
+import { action, makeObservable, observable } from "mobx";
 import {
     type ROI,
     type VivConfig,
@@ -13,7 +13,7 @@ import {
 } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
-import type { ColumnName, DataColumn, DataType, GuiSpec } from "../../charts/charts";
+import type { ColumnName, GuiSpec } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
@@ -22,6 +22,8 @@ import type { DualContourLegacyConfig } from "../contour_state";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
+import type DataStore from "@/datastore/DataStore";
+import { g, toArray } from "@/lib/utils";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -51,7 +53,7 @@ const MainChart = observer(() => {
     }, [imgUrl, viewerStore.setState]);
 
     const source = useViewerStore((store) => store.source);
-    if (!source) throw "no image source";
+    // if (!source) throw "no image source"; //this is allowed to be undefined
     useImage(source);
     return !isViewerLoading && <VivScatter />;
 });
@@ -155,6 +157,7 @@ function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
 
 class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog?: ColorChannelDialogReactWrapper;
+    declare dataStore: DataStore;
 
     vivStores: VivContextType;
     get viewerStore() {
@@ -163,7 +166,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
-    constructor(dataStore, div, originalConfig) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: VivMdvReactConfig & BaseConfig) {
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
         const config = adaptConfig(originalConfig);
@@ -204,16 +207,19 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     getSettings() {
         const c = this.config;
         const { tooltip } = c;
-        const cols = this.dataStore.getColumnList() as DataColumn<DataType>[];
+        const cols = this.dataStore.getColumnList();// as DataColumn<DataType>[];
         const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
-        let cats = this.dataStore.getColumnValues(c.param[2]) || [];
-        cats = cats.map((x) => {
+        const ocats = this.dataStore.getColumnValues(c.param[2]).slice() || [];
+        const cats = ocats.map((x) => {
             return { t: x };
         });
-        cats.push({ t: "None" });
-        const catsValues = observable.array([cats, "t", "t"]);
+        // could've sworn mobx observable had been working here at some point
+        // (changing contourParameter should immediately update "Contour Category" dropdowns)... it isn't now.
+        // and the type is dodgy - need to get on top of that with mobx in general.
+        const catsValues = observable.array([cats, "t", "t"]) as unknown as [{t: string}[], "t", "t"];
+        // const catsValues = [cats, "t", "t"];
 
         // What I would like is ability to
         // - change selected image at runtime.
@@ -223,16 +229,16 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             // able to handle an array of them with controls for adding/removing...
             const values = this.dataStore.columnIndex[f.column].values.slice();
             values.unshift("all");
-            return {
+            return g({
                 type: "multidropdown",
                 label: `'${f.column}' filter`,
-                current_value: f.category,
+                current_value: toArray(f.category),
                 values: [values],
                 func: (v) => {
                     f.category = v;
                     c.category_filters = c.category_filters.slice();
                 },
-            };
+            });
         });
         //   ^^ kinda want a more react-y SettingsDialog for that...
         // todo make sure associated json etc switches when region changes
@@ -353,17 +359,18 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 type: "folder",
                 label: "Density Visualisation",
                 current_value: [
-                    {
+                    g({
                         type: "folder",
                         label: "Category selection",
                         current_value: [
                             //maybe 2-spaces format is better...
-                            {
-                                type: "dropdown",
+                            g({
+                                type: "dropdown", //todo, make this "column" and fix odd behaviour with showing the value...
+                                //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
                                 label: "Contour parameter",
                                 // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
                                 current_value: c.contourParameter || c.param[2],
-                                values: [catCols, "name", "field"],
+                                // values: [catCols, "name", "field"],
                                 func: (x) => {
                                     if (x === c.contourParameter) return;
                                     // could we change 'cats' and have the dropdowns update?
@@ -373,7 +380,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                     const newCats = (
                                         this.dataStore.getColumnValues(x) || []
                                     ).map((t) => ({ t }));
-                                    newCats.push({ t: "None" });
+                                    // newCats.push({ t: "None" });
+                                    console.warn("changing contour parameter isn't properly updating dropdowns as of this writing...");
                                     catsValues[0] = newCats;
                                     //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
                                     //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
@@ -381,32 +389,32 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                     //the dropdowns can set values to null if they're invalid rather than throw error?
                                     //is that a good idea?
                                 },
-                            },
-                            {
+                            }),
+                            g({
                                 type: "multidropdown",
                                 label: "Contour Category 1",
-                                current_value: c.category1 || "None",
+                                current_value: toArray(c.category1 || "None"),
                                 // values: [cats, "t", "t"],
                                 values: catsValues,
-                                func: (x) => {
-                                    if (x === "None") x = null;
+                                func(x) {
+                                    // if (x === "None") x = null;
                                     c.category1 = x;
                                 },
-                            },
-                            {
+                            }),
+                            g({
                                 type: "multidropdown",
                                 label: "Contour Category 2",
-                                current_value: c.category2 || "None",
+                                current_value: toArray(c.category2 || "None"),
                                 // values: [cats, "t", "t"],
                                 values: catsValues,
-                                func: (x) => {
-                                    if (x === "None") x = null;
+                                func(x) {
+                                    // if (x === "None") x = null;
                                     c.category2 = x;
                                 },
-                            },
+                            }),
                         ],
-                    },
-                    {
+                    }),
+                    g({
                         type: "slider",
                         max: 25,
                         min: 1,
@@ -415,42 +423,40 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                         current_value: c.contour_bandwidth,
                         label: "KDE Bandwidth",
                         continuous: true,
-                        func: (x) => {
+                        func(x) {
                             c.contour_bandwidth = x;
                         },
-                    },
-                    {
+                    }),
+                    g({
                         label: "Fill Contours",
                         type: "check",
                         current_value: c.contour_fill,
-                        func: (x) => {
+                        func(x) {
                             c.contour_fill = x;
                         },
-                    },
-                    {
+                    }),
+                    g({
                         type: "slider",
                         max: 1,
                         min: 0,
                         current_value: c.contour_intensity,
                         continuous: true,
                         label: "Fill Intensity",
-                        func: (x) => {
+                        func(x) {
                             c.contour_intensity = x;
                         },
-                    },
-                    {
+                    }),
+                    g({
                         type: "slider",
                         max: 1,
                         min: 0,
-
-                        doc: this.__doc__,
                         current_value: c.contour_opacity,
                         continuous: false, //why so slow?
                         label: "Contour opacity",
-                        func: (x) => {
+                        func(x) {
                             c.contour_opacity = x ** 3;
                         },
-                    },
+                    }),
                 ],
             },
             {
