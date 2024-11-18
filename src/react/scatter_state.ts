@@ -36,6 +36,7 @@ export function useRegionScale() {
         console.warn(
             `physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`,
         );
+    if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
     const scale = Pixels.PhysicalSizeX / regionScale;
     return scale;
 }

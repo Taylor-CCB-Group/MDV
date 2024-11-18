@@ -3,6 +3,7 @@ import BaseChart from "../../charts/BaseChart";
 import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
 import { useChart } from "../context";
 import { useChartID } from "../hooks";
+import DataStore from "@/datastore/DataStore";
 
 function ReactTest() {
     const parent = useChart();
@@ -16,7 +17,7 @@ function ReactTest() {
     useEffect(() => {
         console.warn("WordCloudChart effect liable to be buggy");
         dataStore.addListener(id, () => setFilterSize(dataStore.filterSize));
-        parent.addListener("text", (type, data) =>
+        parent.addListener("text", (type: string, data: any) =>
             setText(`${data} ${parent.config.wordSize}`),
         );
         const colNameWords = parent.config.param[0];
@@ -38,7 +39,7 @@ function ReactTest() {
 
         if (dim?.getAverages) {
             dim.getAverages(
-                (data) => {
+                (data: any) => {
                     console.log(data);
                 },
                 [colNameSize],
@@ -80,7 +81,7 @@ type WordCloudConfig = {
     wordSize: number;
 } & BaseConfig; //shouldn't BaseConfig be added by the base class?
 class ReactWordCloudChart extends BaseReactChart<WordCloudConfig> {
-    constructor(dataStore, div, config) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, config: WordCloudConfig) {
         super(dataStore, div, config, ReactTest);
     }
     // getSettings() {
@@ -96,7 +97,7 @@ class ReactWordCloudChart extends BaseReactChart<WordCloudConfig> {
     //     //         max: 100,
     //     //         //xxx: why isn't number inferred given type: "slider"? `as const` not much help
     //     //         //issue maybe with lesser jsdoc Settings type in BaseChart
-    //     //         func: (x: number) => { 
+    //     //         func: (x: number) => {
     //     //             c.wordSize = x;
     //     //         },
     //     //     },

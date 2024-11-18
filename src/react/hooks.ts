@@ -3,7 +3,7 @@ import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
-import type { CategoricalDataType, DataColumn, DataType, LoadedDataColumn, NumberDataType } from "../charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, FieldName, LoadedDataColumn, NumberDataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
 import type { BaseConfig } from "./components/BaseReactChart";
 import type RangeDimension from "@/datastore/RangeDimension";
@@ -71,36 +71,37 @@ export function useChartDoc() {
 
 /**
  * Returns the columns associated with with the chart's `config.param` property.
- * 
- * This will be used in the context of an initialized chart - 
+ *
+ * This will be used in the context of an initialized chart -
  * which means that we assert that all columns are loaded, so consumers of this hook
  * should be off-the-hook in terms of checking the `data` property.
- * 
+ *
  * **this assertion is tested internally and we throw an exception if not true**
- * 
- *  but the underlying logic should be evaluated, particularly with regard to 
- *  - 'live virtual column queries' 
+ *
+ *  but the underlying logic should be evaluated, particularly with regard to
+ *  - 'live virtual column queries'
  *  - in general, anything that involves changing `config.param` during the life of a chart.
- * 
- * The current intention is to implement such features in a way that 
- * by the time `param` is mutated, the new columns are loaded; 
+ *
+ * The current intention is to implement such features in a way that
+ * by the time `param` is mutated, the new columns are loaded;
  * this should help check that, or highlight whether that logic should be altered.
  */
 export function useParamColumns(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
     const columns = useMemo(() => {
-        const param = chart.config.param;
-        if (!param) return [];
+        if (!chart.config.param) return [];
         if (typeof chart.config.param === "string")
             return [columnIndex[chart.config.param]];
         // we should make sure they are loaded as well...
-        return chart.config.param.map((name) => columnIndex[name]);
-    }, [chart.config.param, columnIndex]);
-    // note that columns is 'any' here as of this writing 
+        if (!isArray(chart.config.param)) throw new Error("param should be string or array");
+        const param = chart.config.param as FieldName[]; // up for review with query objects etc.
+        return param.map((name) => columnIndex[name]);
+    }, [chart.config.param, columnIndex]) as LoadedDataColumn<DataType>[];
+    // note that columns is 'any' here as of this writing
     // - so this isn't an exhaustive check and ts will have limited capacity to help us.
     // but we should be fairly safe to assume that once we get past here, we have `LoadedDataColumn`s
-    if (columns.includes(c => !c.data)) {
+    if (columns.find(c => !c.data)) {
         throw new Error("we always expect that param columns are loaded by the time we try to use them... this shouldn't happen");
     }
     return columns;
@@ -152,7 +153,7 @@ export function useParamColumnsExperimental(): DataColumn<DataType>[] {
         // we should make sure they are loaded as well...
         // (see above comment on trusting this method)
         cm.loadColumnSet(param, dsName, () => {
-            setColumns(param.map((name) => columnIndex[name]));
+            setColumns((param as FieldName[]).map((name) => columnIndex[name]));
         });
         return;
     }, [chart.config.param, columnIndex, chart.dataStore]);
@@ -273,7 +274,7 @@ export function useCategoryFilterIndices(
     category?: string | string[] | null,
 ) {
     //might seem like we should be using a CategoryDimension...
-    //but at the moment that will end up being (often much) slower 
+    //but at the moment that will end up being (often much) slower
     //because it always passes through all rows, which this doesn't.
     const data = useFilteredIndices();
     //todo handle multitext / tags properly.

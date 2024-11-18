@@ -104,16 +104,18 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
         label: control.label,
         current_value: control.defaultVal,
         // values: control.values,
+    //@ts-expect-error - need to think about what we're actually trying to do here
     } satisfies GuiSpec<T>;
     if (draftSpec.type === "dropdown" || draftSpec.type === "multidropdown") {
         // we run into this irritating logic with format that dropdown values can come in
-        // >the props.values may be a tuple of [valueObjectArray, textKey, valueKey], 
+        // >the props.values may be a tuple of [valueObjectArray, textKey, valueKey],
         // or an array of length 1 - [string[]]
         //const useObjectKeys = Array.isArray(control.values) && control.values.length === 3;
         if (!control.values || control.values.length === 0) throw new Error(`Dropdown control '${control.label}' has no values`);
         const values = control.values;
         // if (!control.defaultVal) draftSpec.current_value = useObjectKeys ? values[0][0][values[0][2]] : values[0][0];
         // todo - add some type predicate so we know we're assigning the right type
+        //@ts-expect-error - need to think about what we're actually trying to do here
         if (!control.defaultVal) draftSpec.current_value = values[0]["name"];
         //(draftSpec as any).values = control.values; //doesn't give runtime error, doesn't work
         (draftSpec as any).values = [values, "name", "value"];
@@ -127,7 +129,9 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
     // if (!spec.current_value) throw new Error(`current_value should be set - no default in '${JSON.stringify(control)}'`);
     // strict typescript warns us about spec.current_value being potentially undefined, and it's dead right.
     // IMO much of the faffing around I'm doing getting this all to work could be avoided with better types.
+    //@ts-expect-error - need to think about what we're actually trying to do here
     reaction(() => spec.current_value, onChange);
+    //@ts-expect-error - need to think about what we're actually trying to do here
     return spec;
 }
 function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<T>, config: ChartConfig): GuiSpec<T> {
@@ -263,7 +267,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                             )}
                         />
                         <TextField label="Title" size="small" onChange={action((e) => config.title = e.target.value)} />
-                        <TextField label="Description" size="small" 
+                        <TextField label="Description" size="small"
                         multiline aria-multiline
                         rows={6}
                         onChange={action((e) => config.legend = e.target.value)}
@@ -276,7 +280,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     >
                         {chartType?.params && <h2>Columns</h2>}
                         {chartType?.params?.map((p, i) => (
-                            <ColumnSelectionComponent key={p.name} placeholder={p.name} 
+                            <ColumnSelectionComponent key={p.name} placeholder={p.name}
                             setSelectedColumn={action((column) => {
                                 if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
                                 config.param[i] = column;

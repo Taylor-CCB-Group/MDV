@@ -17,8 +17,8 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
     if (type === "number" && isNumeric) return true;
     return column.datatype === type;
 }
-/** 
- * Check whether given value {@param v} is an array. 
+/**
+ * Check whether given value {@param v} is an array.
  * Acts as a type-predicate, so can be used for narrowing the type of subsequent code.
  */
 export function isArray(v: unknown): v is any[] {
@@ -45,9 +45,18 @@ export function isDatatypeCategorical(t: DataType): t is CategoricalDataType {
 //     return !!t.match(/slider|spinner/);
 // }
 
-/** concise type-helper factory for making elements of Gui i.e. for settings 
+/** concise type-helper factory for making elements of Gui i.e. for settings
  * this will enable type-checking of the GuiSpec objects at the point of declaration
  */
 export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
     return spec;
 }
+// todo: unit testing
+// const m = g({
+//     type: "multicolumn",
+//     label: "multicolumn test",
+//     current_value: ["a"],
+//     func(v) {
+//         v.map(v => `${v}!`);
+//     }
+// });

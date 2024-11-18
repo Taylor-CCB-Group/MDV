@@ -4,6 +4,7 @@ import { BaseReactChart, type BaseConfig } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
 import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";
+import { g } from "@/lib/utils";
 
 export type CategoryFilter = { category: string[] };
 export type MultiTextFilter = CategoryFilter & { operand: "or" | "and" };
@@ -17,7 +18,7 @@ export type SelectionDialogConfig = {
 };
 
 class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
-    constructor(dataStore: DataStore, div: HTMLElement, config: SelectionDialogConfig & BaseConfig) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, config: SelectionDialogConfig & BaseConfig) {
         if (!config.filters) {
             config.filters = {};
             for (const col of config.param) {
@@ -43,12 +44,17 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
     getSettings() {
         // todo: add settings widget for 'column' with some properties somewhat similar to params type.
         const settings = super.getSettings();
-        settings.push({
+        //@ts-expect-error seems like some dodgy jsdoc typing issue? why only here?
+        settings.push(g({
             //!!this should be properly implemented...
             type: "multicolumn",
             label: "Columns To filter",
             current_value: this.config.param,
-        });
+            func: (v) => {
+                this.config.param = v;
+                // this.removeFilter();
+            }
+        }));
         return settings;
     }
 }
