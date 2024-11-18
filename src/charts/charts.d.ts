@@ -105,7 +105,7 @@ function test(column: LoadedDataColumn<"text">) {
 
 export type RowsAsColumnsLink = {
     name: string;
-    name_column: ColumnName;
+    name_column: FieldName;
     subgroups: Record<string, { label: string, name: string, type: "dense" | string }>;
 }
 
@@ -159,10 +159,10 @@ export type GuiValueTypes = {
     // The type you get back ColumnName is going to change into ColumnSpecifier to allow for more complex column references
     // (for now we continue to parse things in a format as in LinkDataDialog)
     // (and we have several keys for different types of column references)
-    // There should also be a general way of expressing that a property (like radius) can be set to a 
+    // There should also be a general way of expressing that a property (like radius) can be set to a
     // number or a column (with modifiers) - this is where the node editor comes in...
-    column: ColumnName;
-    multicolumn: ColumnName[]; //easier to have distinct 'multicolumn' type than overly generic 'column'?
+    column: FieldName;
+    multicolumn: FieldName[]; //easier to have distinct 'multicolumn' type than overly generic 'column'?
 };
 export type GuiSpecType = keyof GuiValueTypes;
 export type ColumnSelectionParameters = {
@@ -170,25 +170,45 @@ export type ColumnSelectionParameters = {
     multiple?: boolean;
     exclude?: string[];
 }
+// type GuiFunc<T extends GuiSpecType, V = GuiValueTypes<T>, F = (v: V) => void> = F;//T extends "folder" ? never : (v: V) => void;
+// export type GuiSpec<T extends GuiSpecType, V = GuiValueTypes<T>, F = GuiFunc<T>> = {
+type GV<T extends GuiSpecType> = GuiValueTypes[T];
+type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => void;
+// type GuiSpecExperiment<T extends keyof GuiSpecType> = T extends infer K
+//     ? K extends keyof GuiValueTypes
+//         ? {
+//             readonly type: K;
+//             label: string;
+//             current_value: GuiValueTypes[K];
+//             func?: GuiFunc<K>;
+//         }
+//         : never
+//     : never;
+
 export type GuiSpec<T extends GuiSpecType> = {
-    type: T;
+    readonly type: T;
     label: string;
     // name: string; //unused - wrongly added in the original type
-    current_value: GuiValueTypes[T];
+    current_value: GV<T>; //oops - thought that moving to `V = GuiValueTypes<T>` was helping, but it makes this `any`.
     // is this optional or not? depends slightly how much we lean on mobx current_value mutation for reactivity...
     // should it necessarily not be there for 'folder' - maybe we have some kind of 'is the folder open' property?
-    func?: T extends "folder" ? never : (v: GuiValueTypes[T]) => void;
+    // func?: GF<T>; //ends up with (v: any) => void
+    // func?: (v: GV<T>) => void; //ends up with (v: any) => void
+    func?: GuiFunc<T>;
+    // func?: T extends "folder" ? never : (v: V) => void;
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
     // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
     choices?: T extends "radiobuttons" ? [string, string][] : never;
     //thouht we could make these non-optional and only have it insist for number types, but that's not happening for some reason
-    min?: GuiValueTypes[T] extends number ? number : never;
-    max?: GuiValueTypes[T] extends number ? number : never;
-    step?: GuiValueTypes[T] extends number ? number : never;
-    continuous?: GuiValueTypes[T] extends number ? boolean : never;
-    defaultVal?: GuiValueTypes[T];
-    columnSelection?: T extends "column" ? ColumnSelectionParameters : never;
+    min?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
+    max?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
+    step?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
+    continuous?: GV<T> extends number ? boolean : GV<T> extends [number, number] ? boolean : never;
+    defaultVal?: GV<T>;
+    columnSelection?: T extends "column" ? ColumnSelectionParameters : never;//what about multicolumn?
 };
+type TestFunc<T extends GuiSpecType> = GuiSpec<T>['func'];
+const f: TestFunc<'multidropdown'> = (v) => { };
 // todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
 export type ExtraControl<T extends GuiSpecType> = {
     type: T;
@@ -223,7 +243,7 @@ export type ExtraControl<T extends GuiSpecType> = {
 //      * if subsequent calls to `addListener` are made with the same `id` */
 //     addListener: (id: string, listener: (eventType: string, data: any) => void) => void;
 // }
-//todo make BaseChart ts and remove this type...
+//todo make BaseChart ts and remove this type... which somehow ends up as `any` for some reason.
 export type Chart<T = any> = {
     getDiv: () => HTMLElement;
     remove: () => void;
