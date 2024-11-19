@@ -1,4 +1,4 @@
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import ImagePanZoom from "../utilities/PanZoom.js";
 import { createEl, makeSortable } from "../utilities/Elements.js";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";

@@ -1,6 +1,6 @@
 import { DataModel } from "../table/DataModel.js";
 import { Deck } from "@deck.gl/core";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import { ImageArray } from "../webgl/ImageArray";
 import { ImageArrayDeckExtension } from "../webgl/ImageArrayDeckExtension";

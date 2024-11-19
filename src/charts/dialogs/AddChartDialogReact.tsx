@@ -6,7 +6,7 @@ import { observer } from "mobx-react-lite";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 
-import BaseChart from "../BaseChart.js";
+import BaseChart from "../BaseChart";
 import type { Param } from "@/charts/ChartTypes.js";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";

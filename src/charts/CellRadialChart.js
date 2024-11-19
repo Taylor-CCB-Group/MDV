@@ -1,5 +1,5 @@
 import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { stratify as d3Stratify, scaleLinear, tree as d3Tree, arc } from "d3";
 import { getColorLegend } from "../utilities/Color.js";
 import { select } from "d3";

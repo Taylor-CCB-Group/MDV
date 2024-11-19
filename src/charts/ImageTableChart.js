@@ -1,5 +1,5 @@
 import { DataModel } from "../table/DataModel.js";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import ImageTable from "../table/ImageTable.js";
 
 class ImageTableChart extends BaseChart {

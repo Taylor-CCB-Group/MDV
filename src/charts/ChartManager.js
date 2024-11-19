@@ -9,7 +9,7 @@ import {
     splitPane,
     createFilterElement,
 } from "../utilities/Elements";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";

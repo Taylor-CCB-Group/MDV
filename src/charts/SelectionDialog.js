@@ -1,4 +1,4 @@
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { createEl, makeSortable } from "../utilities/Elements.js";
 import noUiSlider from "nouislider";
 import { getRandomString } from "../utilities/Utilities";
