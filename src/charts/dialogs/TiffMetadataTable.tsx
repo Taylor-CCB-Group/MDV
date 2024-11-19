@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import type React from 'react';
+import { useState, useMemo } from 'react';
 
 interface TiffMetadataTableProps {
   metadata: Record<string, any>;
@@ -17,7 +18,7 @@ const flattenObject = (obj: Record<string, any>, prefix: string[] = []): Flatten
 
     const newPrefix = [...prefix, key];
     if (typeof obj[key] === 'object' && obj[key] !== null) {
-      if (Array.isArray(obj[key]) && obj[key].every(item => typeof item === 'object')) {
+      if (Array.isArray(obj[key]) && obj[key].every((item: any) => typeof item === 'object')) {
         // Special handling for arrays of objects (like Pixels.Channels)
         obj[key].forEach((item: Record<string, any>, index: number) => {
           Object.keys(item).forEach(itemKey => {

@@ -170,6 +170,7 @@ const AnnotationDialogComponent = observer(
                     freeSolo
                     options={columns}
                     onChange={(_, value) => {
+                        if (!value) return;
                         if (validateInput(value)) setSelectedColumn(value);
                     }}
                     onInputChange={({ currentTarget }) => {

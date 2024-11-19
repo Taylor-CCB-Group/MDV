@@ -1,6 +1,6 @@
 import { WGL2DI } from "../webgl/WGL2DI.js";
 import WGLChart from "./WGLChart.js";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 
 class WGL3DScatterPlot extends WGLChart {
     constructor(dataStore, div, config) {

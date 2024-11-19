@@ -57,9 +57,10 @@ const Dashboard: React.FC = () => {
 
     const { mode, toggleColorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-    const [projectType, setProjectType] = useState<"Editable" | "Read-Only">(
-        "Editable",
-    );
+    // ! This is not used
+    // const [projectType, setProjectType] = useState<ProjectAccessType>(
+    //     "Editable",
+    // );
     const [sortBy, setSortBy] = useState<SortBy>("lastModified");
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);

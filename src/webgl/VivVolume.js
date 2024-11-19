@@ -1,4 +1,4 @@
-import BaseChart from "../charts/BaseChart.js";
+import BaseChart from "../charts/BaseChart";
 import { ColorChannelDialog } from "../charts/VivScatterPlot.js";
 import { createEl } from "../utilities/Elements.js";
 import VivViewerMDV from "../webgl/VivViewerMDV.js";

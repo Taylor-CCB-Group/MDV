@@ -1,6 +1,6 @@
 import { WGL2DI } from "../webgl/WGL2DI.js";
 import WGLChart from "./WGLChart.js";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { BaseDialog } from "../utilities/Dialog.js";
 import { createEl } from "../utilities/Elements.js";
 import { getProjectURL } from "../dataloaders/DataLoaderUtil.ts";

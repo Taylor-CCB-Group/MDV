@@ -77,13 +77,14 @@ export function addHighlightColumnLink(
             }
             if (target.set_param) {
                 runInAction(() => {
+                    if (target.param_index === undefined) return;
                     targetChart.config.param[target.param_index] = newValue;
                 });
             }
         }
     }
 
-    ds.addListener(link.id, async (type, data) => {
+    ds.addListener(link.id, async (type: string, data: any) => {
         if (type === "data_highlighted") {
             const newValue = srcCol.values[srcCol.data[data.indexes[0]]];
             updateValue(newValue);
@@ -129,6 +130,7 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
             }
             if (link.set_param) {
                 runInAction(() => {
+                    if (link.param_index === undefined) return;
                     target.config.param[link.param_index] = newValue;
                     //not sure what the most appropriate way to update non-react charts is... needs some work
                     if (target.config.type === "table_chart") {
@@ -147,7 +149,7 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
         }
     }
 
-    chart.chart.addListener(link.id, async (type, data) => {
+    chart.chart.addListener(link.id, async (type: string, data: any) => {
         if (type === "cell_clicked") {
             // this is specific to HeatMap cells...
             updateValue(data.row);

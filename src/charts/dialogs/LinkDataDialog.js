@@ -1,6 +1,6 @@
 import { BaseDialog } from "../../utilities/Dialog.js";
 import { createEl } from "../../utilities/Elements.js";
-import { getRandomString } from "../../utilities/Utilities.js";
+import { getRandomString } from "../../utilities/Utilities";
 
 class LinkDataDialog extends BaseDialog {
     constructor(cm, ds) {

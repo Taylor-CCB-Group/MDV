@@ -1,11 +1,12 @@
-import type { Chart } from "@/charts/charts";
+import type BaseChart from "@/charts/BaseChart";
 import { removeDraggable, removeResizable } from "./Elements";
 
-export default function popoutChart(chart: Chart) {
+export default function popoutChart(chart: BaseChart<any>) {
     const { chartManager } = window.mdv;
     const mainWindow = window;
     const div = chart.getDiv();
     const originalParent = div.parentElement;
+    if (!originalParent) throw "Chart div has no parent element";
     const wtop = window.screenTop ? window.screenTop : window.screenY;
     const wleft = window.screenLeft ? window.screenLeft : window.screenX;
     const { width, height, left, top } = div.getBoundingClientRect();
@@ -22,6 +23,7 @@ export default function popoutChart(chart: Chart) {
         // "width=800,height=600",
         `width=${w},height=${h},left=${l},top=${t}`,
     );
+    if (!popoutWindow) throw "Failed to open popout window";
     popoutWindow.document.body.style.overflow = "hidden";
 
     // Function to add a stylesheet or style element to the popout window
@@ -88,6 +90,7 @@ export default function popoutChart(chart: Chart) {
         popStyles();
         originalParent.appendChild(div);
         chartManager._makeChartRD(chart);
+        //@ts-ignore
         chartManager.charts[chart.config.id].win = mainWindow;
         chart.changeBaseDocument(document);
         observer.disconnect();
@@ -99,7 +102,7 @@ export default function popoutChart(chart: Chart) {
 }
 
 /** apply the styles for popped-out version of chart & return a function that will restore them later */
-function pushSetStyles(chart: Chart) {
+function pushSetStyles(chart: BaseChart<any>) {
     const div = chart.getDiv();
     const styles = {
         height: div.style.height,

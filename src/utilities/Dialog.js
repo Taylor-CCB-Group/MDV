@@ -28,7 +28,7 @@ class BaseDialog {
      *  e.g [{text:"OK",method:"doSomething"}] - the method 'doSomething' needs to be in the
      * subclass. Buttons are added to the footer, so this needs to also be specified in the config
      * @param {function} [onClose] A function called when the dialog is closed
-     * @param {object} content The object passed to the init method
+     * @param {object|null} [content] The object passed to the init method
      */
 
     constructor(config, content) {
@@ -313,6 +313,7 @@ function getTextInput(title, event, doc = document) {
 }
 
 //move this, type it differently... figure out what it is that makes it tick, or not.
+/** @type {{[k: string]: unknown}} */
 BaseDialog.experiment = {};
 
 export { BaseDialog, getTextInput };
