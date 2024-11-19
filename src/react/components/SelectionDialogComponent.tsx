@@ -286,7 +286,7 @@ export const useBrushX = (
             .extent([[0, -2], [histoWidth, histoHeight+2]])
             .on("brush end", (event) => {
                 if (event.selection) {
-                    const [start, end] = event.selection.map((x) => {
+                    const [start, end] = event.selection.map((x: number) => {
                         if (!ref.current) {
                             console.error("No ref.current in brush event handler");
                             return 0;
