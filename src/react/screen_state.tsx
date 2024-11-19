@@ -19,7 +19,7 @@ export const OuterContainerProvider = observer(
     ({
         children,
         parent,
-    }: { children: JSX.Element; parent?: BaseChart | BaseDialog }) => {
+    }: { children: JSX.Element; parent?: BaseChart<any> | BaseDialog }) => {
         return (
             <OuterContainerContext.Provider
                 value={parent?.observable?.container || document.body}

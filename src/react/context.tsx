@@ -1,17 +1,17 @@
 import { createContext, useContext } from "react";
 //import type { BaseReactChart } from "./components/BaseReactChart";
-import type { Chart } from "@/charts/charts";
 
 import type DataStore from "../datastore/DataStore";
 import type { VivConfig } from "./components/avivatorish/state";
+import type BaseChart from "@/charts/BaseChart";
 
-const ChartContext = createContext<Chart>(null as any);
+const ChartContext = createContext<BaseChart<any>>(null as any);
 export const DataStoreContext = createContext<DataStore>(null as any);
 
 export function ChartProvider<T = any>({
     chart,
     children,
-}: { chart: Chart<T> } & React.PropsWithChildren) {
+}: { chart: BaseChart<T> } & React.PropsWithChildren) {
     //DataStoreContext.Provider would be applied at a wider scope if we had a global root & portals.
     return (
         <ChartContext.Provider value={chart}>
@@ -34,7 +34,7 @@ export function useDataStore(foreignDataStore?: DataStore) {
     if (!dataStore) throw new Error("no data store context");
     return dataStore;
 }
-/** 
+/**
  * If called from within a {@link ChartContext}, this will return the charts viv config.
  * Otherwise, it will return something that should function as an empty config object.
  */

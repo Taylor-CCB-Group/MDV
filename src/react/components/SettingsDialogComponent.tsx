@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useState, useMemo, useId, useCallback, useEffect } from "react";
-import type { Chart, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
+import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
 import {
@@ -21,7 +21,7 @@ import { ChartProvider } from "../context";
 import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { g, isArray } from "@/lib/utils";
-import BaseChart from "@/charts/BaseChart";
+import type BaseChart from "@/charts/BaseChart";
 
 export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<any>, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>{props.label}</Typography>
@@ -506,7 +506,7 @@ const ErrorComponent = observer(({ props, label }: { props: any, label: string }
 
 // how close is this to something we could use from AddChartDialog?
 export const AbstractComponent = observer(
-    ({ props }: { props: GuiSpec<GuiSpecType> }) => {
+    ({ props }: { props: AnyGuiSpec | GuiSpec<GuiSpecType> }) => {
         // would like to lose this `as` cast - maybe a newer/future typescript might manage it better?
         const Component = Components[props.type] as React.FC<{
             props: typeof props;
@@ -527,12 +527,12 @@ export const AbstractComponent = observer(
     },
 );
 
-export default observer(({ chart }: { chart: Chart }) => {
+export default observer(<T,>({ chart }: { chart: BaseChart<T> }) => {
     const settings = useMemo(() => {
         // is the id just for a key in this component, or should the type passed to the component recognise it?
         // for now, I don't think there's a benefit to including it in the type.
         // FolderComponent also makes keys in a similar way that is again only relevant locally I think.
-        const settings = (chart as BaseChart) //todo: fix this typecast, resolve `Chart` vs `BaseChart`...
+        const settings = chart //todo: fix this typecast, resolve `Chart` vs `BaseChart`...
             .getSettings()
             .map((setting) => ({ setting, id: uuid() }));
         const wrap = { settings };

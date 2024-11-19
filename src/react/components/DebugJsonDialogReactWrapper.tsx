@@ -21,7 +21,7 @@ class DebugChartReactWrapper extends BaseDialog {
     set root(v) {
         this._root = v;
     }
-    constructor(json: any, chart?: BaseChart) {
+    constructor(json: any, chart?: BaseChart<any>) {
         const name = chart
             ? chart.config.title || `${chart.config.type} ${chart.config.id}`
             : "";

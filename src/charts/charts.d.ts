@@ -173,7 +173,7 @@ export type ColumnSelectionParameters = {
 // type GuiFunc<T extends GuiSpecType, V = GuiValueTypes<T>, F = (v: V) => void> = F;//T extends "folder" ? never : (v: V) => void;
 // export type GuiSpec<T extends GuiSpecType, V = GuiValueTypes<T>, F = GuiFunc<T>> = {
 type GV<T extends GuiSpecType> = GuiValueTypes[T];
-type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => void;
+type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => (void | Promise<void>);
 // type GuiSpecExperiment<T extends keyof GuiSpecType> = T extends infer K
 //     ? K extends keyof GuiValueTypes
 //         ? {
@@ -188,14 +188,10 @@ type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => void;
 export type GuiSpec<T extends GuiSpecType> = {
     readonly type: T;
     label: string;
-    // name: string; //unused - wrongly added in the original type
-    current_value: GV<T>; //oops - thought that moving to `V = GuiValueTypes<T>` was helping, but it makes this `any`.
+    current_value: GV<T>;
     // is this optional or not? depends slightly how much we lean on mobx current_value mutation for reactivity...
-    // should it necessarily not be there for 'folder' - maybe we have some kind of 'is the folder open' property?
-    // func?: GF<T>; //ends up with (v: any) => void
-    // func?: (v: GV<T>) => void; //ends up with (v: any) => void
     func?: GuiFunc<T>;
-    // func?: T extends "folder" ? never : (v: V) => void;
+    //@ts-check !this is for review... it should *not* be optional, but if I make it non-optional then it demands values for 'never'...
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
     // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
     choices?: T extends "radiobuttons" ? [string, string][] : never;
@@ -207,8 +203,16 @@ export type GuiSpec<T extends GuiSpecType> = {
     defaultVal?: GV<T>;
     columnSelection?: T extends "column" ? ColumnSelectionParameters : never;//what about multicolumn?
 };
-type TestFunc<T extends GuiSpecType> = GuiSpec<T>['func'];
-const f: TestFunc<'multidropdown'> = (v) => { };
+// export type GuiSpecs = Array<GuiSpec<GuiSpecType>>;
+// This creates a union of `GuiSpec<"folder"> | GuiSpec<"slider"> | ...`
+// rather than `GuiSpec<"folder" | "slider" | ...>` which can cause co/contra-variance issues (or something like that...)
+export type AnyGuiSpec = {
+    [T in GuiSpecType]: GuiSpec<T>;
+}[GuiSpecType];
+
+type GuiSpecs = Array<AnyGuiSpec>;
+// type TestFunc<T extends GuiSpecType> = GuiSpec<T>['func'];
+// const f: TestFunc<'multidropdown'> = (v) => { };
 // todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
 export type ExtraControl<T extends GuiSpecType> = {
     type: T;
@@ -232,7 +236,8 @@ export type ExtraControl<T extends GuiSpecType> = {
 // a.values[0].map(x => x.a);
 // ^^ well-typed as long as we declare the generic type...
 // doesn't manage to infer it.
-//... we can use g({...}) from `@lib/utils` to get type inference to work
+//... we can use g({...}) from `@lib/utils` to get type inference to work. sometimes.
+
 //// biome-ignore lint/suspicious/noRedeclare: I should probably fix this...
 // interface DataStore {
 //     getLoadedColumns: () => FieldName[];
@@ -243,23 +248,9 @@ export type ExtraControl<T extends GuiSpecType> = {
 //      * if subsequent calls to `addListener` are made with the same `id` */
 //     addListener: (id: string, listener: (eventType: string, data: any) => void) => void;
 // }
-//todo make BaseChart ts and remove this type... which somehow ends up as `any` for some reason.
-export type Chart<T = any> = {
-    getDiv: () => HTMLElement;
-    remove: () => void;
-    addMenuIcon: (classes: string, info: string) => HTMLElement;
-    setSize: (x?: number, y?: number) => void;
-    changeBaseDocument: (doc: Document) => void;
-    getSettings: () => GuiSpec[];
-    removeLayout?: () => void;
-    config: T;
-    dataStore: DataStore;
-    dataSource: DataSource;
-    popoutIcon: HTMLElement;
-} & BaseChart<T>;
 
-export type ChartState = {
-    chart: Chart;
+export type ChartState<T> = {
+    chart: BaseChart<T>;
     win?: Window;
     dataSource: DataSource;
 };
@@ -281,5 +272,5 @@ export type ChartManager = {
         func: () => void,
     ) => HTMLElement;
     /** probably not something we really want to use publicly like this */
-    _popOutChart: (chart: Chart) => void;
+    _popOutChart: (chart: BaseChart) => void;
 };

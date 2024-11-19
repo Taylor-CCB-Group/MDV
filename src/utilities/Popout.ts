@@ -1,7 +1,7 @@
-import type { Chart } from "@/charts/charts";
+import type BaseChart from "@/charts/BaseChart";
 import { removeDraggable, removeResizable } from "./Elements";
 
-export default function popoutChart(chart: Chart) {
+export default function popoutChart(chart: BaseChart<any>) {
     const { chartManager } = window.mdv;
     const mainWindow = window;
     const div = chart.getDiv();
@@ -102,7 +102,7 @@ export default function popoutChart(chart: Chart) {
 }
 
 /** apply the styles for popped-out version of chart & return a function that will restore them later */
-function pushSetStyles(chart: Chart) {
+function pushSetStyles(chart: BaseChart<any>) {
     const div = chart.getDiv();
     const styles = {
         height: div.style.height,

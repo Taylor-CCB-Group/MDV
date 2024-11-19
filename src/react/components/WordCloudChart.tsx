@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import BaseChart from "../../charts/BaseChart";
-import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
+import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import { BaseReactChart } from "./BaseReactChart";
 import { useChart } from "../context";
 import { useChartID } from "../hooks";
-import DataStore from "@/datastore/DataStore";
+import type DataStore from "@/datastore/DataStore";
 
 function ReactTest() {
     const parent = useChart();
@@ -33,21 +33,22 @@ function ReactTest() {
         //     const size = sizeVals[sizeCol.data[i]];
         //     console.log(word, size || `no size for ${i}`);
         // }
+        //@ts-expect-error - this whole file is not expected to work at the moment, may fix later
         dataStore.getRowAsObject();
         setWords(wordsVals);
         console.log(sizeVals);
 
-        if (dim?.getAverages) {
-            dim.getAverages(
-                (data: any) => {
-                    console.log(data);
-                },
-                [colNameSize],
-                {},
-            );
-        } else {
-            console.log("no averages");
-        }
+        // if (dim?.getAverages) {
+        //     dim.getAverages(
+        //         (data: any) => {
+        //             console.log(data);
+        //         },
+        //         [colNameSize],
+        //         {},
+        //     );
+        // } else {
+        //     console.log("no averages");
+        // }
 
         // dim.getCategories(data => {
         //     const d = new Array(data.length);

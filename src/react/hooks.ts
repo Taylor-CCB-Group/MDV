@@ -5,10 +5,10 @@ import { getRandomString } from "../utilities/Utilities";
 import { action } from "mobx";
 import type { CategoricalDataType, DataColumn, DataType, FieldName, LoadedDataColumn, NumberDataType } from "../charts/charts";
 import type { VivRoiConfig } from "./components/VivMDVReact";
-import type { BaseConfig } from "./components/BaseReactChart";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
 import { isArray } from "@/lib/utils";
+import type { BaseConfig } from "@/charts/BaseChart";
 
 /**
  * Get the chart's config.

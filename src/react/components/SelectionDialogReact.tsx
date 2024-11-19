@@ -1,6 +1,6 @@
 import { action } from "mobx";
-import BaseChart from "../../charts/BaseChart";
-import { BaseReactChart, type BaseConfig } from "./BaseReactChart";
+import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import { BaseReactChart } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
 import { observer } from "mobx-react-lite";
 import type DataStore from "@/datastore/DataStore";

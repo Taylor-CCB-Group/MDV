@@ -1,8 +1,9 @@
 import "gridstack/dist/gridstack.min.css";
 import { GridStack } from "gridstack";
 import { debounce } from "../utilities/Utilities";
-import type { Chart, ChartManager, DataSource } from "./charts";
-
+import type { ChartManager, DataSource } from "./charts";
+import type BaseChart from "./BaseChart";
+type Chart = BaseChart<unknown>;
 function clearPosition(div: HTMLElement) {
     div.style.position = "";
     div.style.left = "";

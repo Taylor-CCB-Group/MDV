@@ -1,12 +1,11 @@
-import { autorun, makeAutoObservable } from "mobx";
-import type { IReactionDisposer, IAutorunOptions } from "mobx";
-import BaseChart from "../../charts/BaseChart";
 import { createMdvPortal } from "@/react/react_utils";
-import type DataStore from "../../datastore/DataStore";
-import { ChartProvider } from "../context";
-import { createEl } from "../../utilities/ElementsTyped";
-import type { Chart, DataSource } from "../../charts/charts";
 import { toPng, toSvg } from "html-to-image";
+import { autorun, makeAutoObservable } from "mobx";
+import type { IAutorunOptions, IReactionDisposer } from "mobx";
+import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import type DataStore from "../../datastore/DataStore";
+import { createEl } from "../../utilities/ElementsTyped";
+import { ChartProvider } from "../context";
 
 function Fallback() {
     return (
@@ -24,14 +23,6 @@ function Fallback() {
     );
 }
 
-export type BaseConfig = {
-    id: string;
-    size: [x: number, y: number];
-    title: string;
-    legend: string;
-    type: string;
-    param: string[]; // | string,
-};
 type TComponent<T extends BaseConfig> = () => JSX.Element;
 
 /**
@@ -49,7 +40,7 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
  */
-export abstract class BaseReactChart<T> extends BaseChart implements Chart<T & BaseConfig> {
+export abstract class BaseReactChart<T> extends BaseChart<T> {
     declare config: T & BaseConfig; // would be good to review this T & BaseConfig thing...
     declare popoutIcon: HTMLElement;
     // get dataSource(): DataSource {
@@ -106,8 +97,8 @@ export abstract class BaseReactChart<T> extends BaseChart implements Chart<T & B
      * On rare occasions where you need to run a function that depends on mobx state, outside of a React component.
      * This is a convenience method for creating a mobx autorun reaction that will be dispsed when the chart is removed.
      * @param fn - The function to run
-     * @param opts - Options for the autorun. 
-     * According to the docs you can pass an `equals` option to specify a mobx comparer... 
+     * @param opts - Options for the autorun.
+     * According to the docs you can pass an `equals` option to specify a mobx comparer...
      * but it isn't in IAutorunOptions type, and it doesn't seem to be in the code either.
      */
     mobxAutorun(fn: () => void, opts?: IAutorunOptions) {

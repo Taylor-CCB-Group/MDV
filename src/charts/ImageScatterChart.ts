@@ -15,7 +15,8 @@ import type DataStore from "@/datastore/DataStore.js";
 //type Column = { data: Float32Array; minMax: [number, number] };
 type Column = LoadedDataColumn<NumberDataType>;
 let nextID = 0;
-class ImageScatterChart extends BaseChart {
+//todo type this config
+class ImageScatterChart extends BaseChart<any> {
     canvas: HTMLCanvasElement;
     imageArray: ImageArray;
     deck: Deck<OrthographicView>;
@@ -69,7 +70,7 @@ class ImageScatterChart extends BaseChart {
                 // if these are not set, there is an error when first using mouse-wheel to zoom
                 target: [0, 0, 0],
                 zoom: 0, //0 means "one pixel is one unit", 1 scales by 2
-            }, 
+            },
             getTooltip: (info) => {
                 try {
                     const { index, picked } = info;
