@@ -5,6 +5,12 @@ import type { VivMDVReact } from "./components/VivMDVReact";
 import { useDataStore } from "./context";
 import type { DataColumn, DataType } from "@/charts/charts";
 
+type ChartID = string;
+type ViewStateLink = {
+    type: "view_state";
+    linked_charts: ChartID[];
+}
+
 export const useViewStateLink = () => {
     const viewerStore = useViewerStoreApi();
     const id = useChartID();
@@ -19,7 +25,7 @@ export const useViewStateLink = () => {
         // find any "view_state" links in the viewData that include this chart's id in "linked_charts"
         if (!viewData.links) return;
         const vsLinks = viewData.links.filter(
-            (l) => l.type === "view_state" && l.linked_charts.includes(id),
+            (l: ViewStateLink) => l.type === "view_state" && l.linked_charts.includes(id),
         );
         if (vsLinks.length === 0) return;
         console.log("found view state link(s)", vsLinks);
@@ -29,10 +35,14 @@ export const useViewStateLink = () => {
             thisChart.ignoreStateUpdate = true; //<< add a setting for this, make sure we get the logic right
             const originalZoom = viewState.zoom as number;
             const ourPhysicalSize = metadata.Pixels.PhysicalSizeX;
+            if (!ourPhysicalSize) {
+                console.warn("no physical size in metadata - or unexpected metadata format?");
+                return;
+            }
             const ourUnits = metadata.Pixels.PhysicalSizeXUnit;
             // should we consider viewerStore.useLinkedView?
             // best to be clear about what is and isn't similar to Avivator.
-            vsLinks.forEach((link) => {
+            vsLinks.forEach((link: ViewStateLink) => {
                 // as VivMDVReact[] is very much not correct here, we should be checking - and that may not be what we want anyway.
                 const otherCharts = link.linked_charts
                     .filter((c) => c !== id)
@@ -47,6 +57,7 @@ export const useViewStateLink = () => {
                         c.vivStores?.viewerStore.getState().metadata;
                     if (!otherMeta) return;
                     const otherPhysicalSize = otherMeta.Pixels.PhysicalSizeX;
+                    if (!otherPhysicalSize) return;
                     const otherUnits = otherMeta.Pixels.PhysicalSizeXUnit;
                     if (otherUnits !== ourUnits)
                         throw "physical size units do not match"; //we could probably convert if this is a common case
@@ -132,7 +143,7 @@ export function useHighlightedForeignRows() {
         const tds = linkedDs.dataStore;
         tds.addListener(`highlightedRows:${id}`, async (eventType: string, data: any) => {
             if (eventType === "data_highlighted") {
-                const vals = data.indexes.map(index => ({index, value: tds.getRowText(index, link.name_column)}));
+                const vals = data.indexes.map((index: number) => ({index, value: tds.getRowText(index, link.name_column)}));
                 setValues(vals); //if there are huge numbers, we may want to deal with that downstream, or here.
             } else if (eventType === "filtered") {
                 // const vals = tds.getFilteredValues(link.name_column) as string[];
@@ -179,7 +190,9 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
     const ds = useDataStore();
     useEffect(() => {
-        if (cols.length === 0) {
+        // todo - check whether checking link for null here means we can clean up ForeignRows component
+        // (which currently breaks rules of hooks)
+        if (cols.length === 0 || !link) {
             setColumns([]);
             return;
         }

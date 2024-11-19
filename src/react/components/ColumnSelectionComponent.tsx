@@ -6,7 +6,7 @@ import { useDataStore } from "../context.js";
 import type { DataColumn, DataType } from "@/charts/charts.js";
 import type { Param } from "@/charts/ChartTypes.js";
 import type DataStore from "@/datastore/DataStore.js";
-import { columnMatchesType } from "@/lib/utils.js";
+import { columnMatchesType, isArray } from "@/lib/utils.js";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
@@ -47,7 +47,8 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                 options={columns}
                 multiple={multiple}
                 onChange={(_, value) => {
-                    if (Array.isArray(value)) {
+                    if (!value) return; // todo - is this allowed ? clear selection?
+                    if (isArray(value)) {
                         // todo - need to make controlled anyway for multiple...
                         setSelectedColumn(value[0].field);
                     } else {

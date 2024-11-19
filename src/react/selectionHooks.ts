@@ -13,7 +13,8 @@ export function useHighlightedIndex() {
 
     useEffect(() => {
         console.log("useHighlightedIndex effect");
-        chart.onDataHighlighted = ({ indexes }) => {
+        // todo check the type - but it's definitely indexable by number, returning number
+        chart.onDataHighlighted = ({ indexes }: { indexes: { [k: number]: number } }) => {
             setHighlightedIndex(indexes[0]);
         };
     }, [chart]);

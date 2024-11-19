@@ -1,4 +1,4 @@
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
 import { parseNewick } from "../utilities/clustering.js";
 import { easeLinear } from "d3-ease";

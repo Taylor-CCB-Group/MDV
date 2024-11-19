@@ -1,7 +1,11 @@
-import React from 'react';
+import type React from 'react';
 import XMLViewer from 'react-xml-viewer';
 
-interface TiffPreviewProps {
+// if we could be confident that this was right in general, it would be useful to have at the 
+// viv/avivator(ish) level - however, I suspect that there exist other forms of metadata...
+// we should attempt to document and characterize these; this is certainly a useful part of that.
+// !experimentally using in the context of `useMetadata()` in avivatorish, let's see how it goes.
+export type TiffPreviewProps = {
   metadata: {
     ID: string;
     Name: string;
@@ -37,22 +41,19 @@ interface TiffPreviewProps {
   };
 }
 
-const jsonToXml = (obj: any, rootName: string = 'root'): string => {
+const jsonToXml = (obj: any, rootName = 'root'): string => {
   const toXml = (obj: any, name: string): string => {
     if (typeof obj === 'object' && obj !== null) {
       if (Array.isArray(obj)) {
         return obj.map(item => toXml(item, name)).join('');
-      } else {
-        return `<${name}>${Object.keys(obj).map(key => toXml(obj[key], key)).join('')}</${name}>`;
       }
-    } else {
-      return `<${name}>${obj}</${name}>`;
+      return `<${name}>${Object.keys(obj).map(key => toXml(obj[key], key)).join('')}</${name}>`;
     }
+    return `<${name}>${obj}</${name}>`;
   };
 
   return `<?xml version="1.0" encoding="UTF-8"?>${toXml(obj, rootName)}`;
 };
-
 export const TiffPreview: React.FC<TiffPreviewProps> = ({ metadata }) => {
   const xmlData = jsonToXml(metadata, 'TiffMetadata');
 

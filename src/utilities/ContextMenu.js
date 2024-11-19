@@ -3,8 +3,10 @@
  * The list should contain objects with text,icon,ghosted,func and subitems
  */
 class ContextMenu {
+    /** @type {Document | undefined} */
+    __doc__ = undefined;
     /**
-     * @param {function} func - The method that will be used to construct the menu,
+     * @param {(data: any) => any} func - The method that will be used to construct the menu,
      * based on the data passed to the show method
      */
     constructor(func) {
@@ -16,7 +18,7 @@ class ContextMenu {
      * Will show the actual menu
      * @param {Event} e - The event that triggers the context menu
      * required to position the menu and also the menu is attached to event target
-     * @param {any} data - optional, the menu will be constructed based on the function
+     * @param {any} [data] - optional, the menu will be constructed based on the function
      * given to the construtor and the data passed in this method
      *
      */

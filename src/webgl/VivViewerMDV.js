@@ -16,7 +16,7 @@ import {
     getBoundingCube,
 } from "../utilities/VivUtils.js";
 import { ScatterplotLayer } from "deck.gl";
-import { getRandomString, NPOT } from "../utilities/Utilities.js";
+import { getRandomString } from "../utilities/Utilities";
 
 const tiffs = new Map();
 export function acceptTiffCache(oldTiffs) {

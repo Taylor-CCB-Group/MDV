@@ -1,8 +1,10 @@
 import { action } from "mobx";
-import BaseChart from "../../charts/BaseChart";
-import { BaseReactChart, type BaseConfig } from "./BaseReactChart";
+import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import { BaseReactChart } from "./BaseReactChart";
 import SelectionDialogComponent from "./SelectionDialogComponent";
 import { observer } from "mobx-react-lite";
+import type DataStore from "@/datastore/DataStore";
+import { g } from "@/lib/utils";
 
 export type CategoryFilter = { category: string[] };
 export type MultiTextFilter = CategoryFilter & { operand: "or" | "and" };
@@ -12,11 +14,11 @@ export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFil
 
 export type SelectionDialogConfig = {
     type: "selection_dialog";
-    filters?: Record<string, SelectionDialogFilter | null>;
+    filters: Record<string, SelectionDialogFilter | null>;
 };
 
 class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
-    constructor(dataStore, div, config: SelectionDialogConfig & BaseConfig) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, config: SelectionDialogConfig & BaseConfig) {
         if (!config.filters) {
             config.filters = {};
             for (const col of config.param) {
@@ -42,12 +44,19 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
     getSettings() {
         // todo: add settings widget for 'column' with some properties somewhat similar to params type.
         const settings = super.getSettings();
-        settings.push({
-            //!!this should be properly implemented...
-            type: "multicolumn",
-            label: "Columns To filter",
-            current_value: this.config.param,
-        });
+        // //@ts-expect-error seems like some dodgy jsdoc typing issue? why only here?
+        // >>> it is indeed broken at runtime - need general development of multi-column settings
+        // and how they relate to the mobx config store.
+        // settings.push(g({
+        //     //!!this should be properly implemented...
+        //     type: "multicolumn",
+        //     label: "Columns To filter",
+        //     current_value: this.config.param,
+        //     func: (v) => {
+        //         this.config.param = v;
+        //         // this.removeFilter();
+        //     }
+        // }));
         return settings;
     }
 }

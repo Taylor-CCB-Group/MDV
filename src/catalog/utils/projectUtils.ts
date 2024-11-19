@@ -1,10 +1,12 @@
 export type SortBy = "lastModified" | "name";
 export type SortOrder = "asc" | "desc";
+// todo - consider relating this to what is in state.json (used in ChartManager)
+export type ProjectAccessType = "Editable" | "Read-Only";
 
 export interface Project {
     id: string;
     name: string;
-    type: "Editable" | "Read-Only";
+    type: ProjectAccessType;
     lastModified: string;
     createdAt: string;
     owner: string;

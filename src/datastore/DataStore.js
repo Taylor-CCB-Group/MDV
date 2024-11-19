@@ -12,7 +12,7 @@ import { scaleLinear, scaleSymlog } from "d3-scale";
 import { getColorLegend, getColorBar } from "../utilities/Color.js";
 import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
-import { isColumnNumeric, isColumnText } from "../utilities/Utilities.js";
+import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 
 /**
  * Creates an empty data structure
@@ -41,8 +41,12 @@ class DataStore {
         /** @type {number} */
         this.filterSize = size;
         /** why doesn't this annotation work?
-         * @type {Array.<import("@/charts/charts.js").DataColumn<any>>} */
+         * @typedef {import("@/charts/charts.js").DataType} DataType
+         * @typedef {import("@/charts/charts.js").DataColumn} DataColumn
+         * @type {Array.<DataColumn<DataType>>} */
         this.columns = [];
+        /**
+         * @type {{[k: string]: DataColumn<DataType> | undefined}} */
         this.columnIndex = {};
         this.listeners = {};
         this.indexes = {};
@@ -197,7 +201,7 @@ class DataStore {
      *   the data has changed </li>
      * </ul>
      * @param {string} id - a unique id identifying the listener
-     * @param {function} listener - a function that accepts two paramaters, the type
+     * @param {(type: string, data: any) => void} listener - a function that accepts two paramaters, the type
      * of event and the data associated with it.
      */
     addListener(id, listener) {
@@ -414,7 +418,10 @@ class DataStore {
         }
     }
 
-    /** @typedef {import("@/charts/charts.js").DataColumn<any>} Column */
+    /*
+     * todo infer generic type for column, not sure how to do this in jsdoc
+     * @typedef {import("@/charts/charts.js").DataColumn<any>} Column
+     *  */
     /**
      * Adds a column's metadata and optionally it's data to the DataStore
      * @tutorial datasource
@@ -426,9 +433,7 @@ class DataStore {
     addColumn(column, data = null, dirty = false) {
         /** @type {Column} */
         const c = {
-            name: column.name,
-            field: column.field,
-            datatype: column.datatype,
+            ...column, //may be useful to get any other properties we didn't explicitly copy before.
             getValue: (i) => {
                 //this could be more efficient if the logic was inverted;
                 //i.e. getRowAsObject would call this method on all columns...
@@ -475,6 +480,7 @@ class DataStore {
         if (dirty) {
             this.dirtyColumns.added[column.field] = true;
         }
+        // can we infer/check the type of column here?
         return c;
     }
 
@@ -560,23 +566,23 @@ class DataStore {
         return matches;
     }
 
-    /** 
+    /**
      * For columns where the metadata is not listed in the `columns` of the DataSource/DataStore[*],
      * in particular in the case of columns that result from a 'rows_as_columns' link,
      * and perhaps in future for other features involving 'virtual' columns, such as generating synthetic data
      * or computing new statistics at runtime.
-     * 
+     *
      * This method will use a formatted "field" string to create a 'virtual' column.
      * We may revise this specification to have a more structured object representation
-     * in place of the string format that will need to be parsed. The current system will 
+     * in place of the string format that will need to be parsed. The current system will
      * lead to edge-cases for example if column names contain the '|' character that may lead to unpleasant
      * user-experience at a later date. It also makes it less easy to reason about the code.
-     * 
+     *
      * Note that while this method will add relevant metadata to the DataStore, it will not fetch (or otherwise compute)
      * the data.
-     * 
+     *
      * [*] remarkable that I find this distinction confusing, this is perhaps an aspect of the design that could be improved
-     * 
+     *
      * @param {string} field - a formatted string that contains the metadata for the column.
      * The format is `subtype|name|index` where (for now):
      * - `subtype` a name of a "subgroup" (whatever that means), like "Gene scores"
@@ -1447,7 +1453,7 @@ class DataStore {
      * @param {boolean} [config.useValue=false]  The returned function will require the
      * columns value, not index
      * @param {string} [config.datatype] Only required if a column is not supplied
-     * @returns {function} The function, which when given a row index (or value if this
+     * @returns {(i: number) => [number, number, number]} The function, which when given a row index (or value if this
      * was specified) will return a color.
      */
     getColorFunction(column, config = {}) {
@@ -1760,6 +1766,10 @@ class DataStore {
         return this.columns.map((x) => x.field);
     }
 
+    /**
+     * @param {string} column - the column's field/id
+     * @returns {string[]} - the column's values
+     */
     getColumnValues(column, format = null) {
         const v = this.columnIndex[column].values;
         if (format === "name_value") {

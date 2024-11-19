@@ -1,5 +1,5 @@
 import WGLScatterPlot from "./WGLScatterPlot.js";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { geoPath } from "d3-geo";
 import { scaleLinear } from "d3-scale";
 import { createEl } from "../utilities/Elements.js";

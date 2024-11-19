@@ -97,7 +97,7 @@ const Tools = {
     //     mode: DrawLineStringMode
     // },
 } as const;
-
+type ToolIcon = typeof Tools[keyof typeof Tools]["ToolIcon"];
 type Tool = (typeof Tools)[keyof typeof Tools]["name"];
 const ToolArray = Object.values(Tools);
 type P = [number, number];
@@ -253,8 +253,13 @@ type EditorProps = {
 //         </>
 //     );
 // }
-
-const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }) => {
+type ToolButtonProps = {
+    name: Tool;
+    ToolIcon: ToolIcon;
+    selectedTool: Tool;
+    setSelectedTool: (tool: Tool) => void;
+};
+const ToolButton = ({ name, ToolIcon, selectedTool, setSelectedTool }: ToolButtonProps) => {
     const style = useMemo(
         () => ({
             backgroundColor:

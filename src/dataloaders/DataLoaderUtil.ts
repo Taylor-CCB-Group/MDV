@@ -4,6 +4,7 @@ import {
     getArrayBufferDataLoader,
     getLocalCompressedBinaryDataLoader,
 } from "./DataLoaders";
+import type { DataType, LoadedDataColumn } from "@/charts/charts";
 
 let projectRoot = "";
 export async function fetchJsonConfig(url: string, root: string) {
@@ -104,7 +105,7 @@ async function getView(view?: string) {
     if (!view) return undefined; //this seems to be a somewhat reasonable way to handle empty project with no views - but could do with more testing...
     try {
         return await getPostData(`${projectRoot}/get_view`, { view });
-    } catch (e) {
+    } catch (e: any) {
         //todo nicer dialog
         const dialog = createEl("dialog", { title: "Error loading view" });
         dialog.innerText = e.message;
@@ -125,7 +126,7 @@ async function loadBinaryData(datasource: string, name: string) {
     );
 }
 //send json args and return json/array buffer response
-export async function getPostData(url: string, args, return_type = "json") {
+export async function getPostData(url: string, args: any, return_type = "json") {
     const resp = await fetch(url, {
         method: "POST",
         body: JSON.stringify(args),
@@ -146,20 +147,24 @@ export async function getPostData(url: string, args, return_type = "json") {
 
 /** Get a column with given name from the given dataSource, fetching from server if necessary.
  * Returns a Column object when the data is loaded.
+ * 
+ * todo - consider batching requests (add to queue, then load all at once in `setTimeout(...,0)`?)
+ * better types - for `columnName` and return value generic(?)
  */
-export async function loadColumn(datasourceName: string, columnName: string) {
+export async function loadColumn(datasourceName: string, columnName: string): Promise<LoadedDataColumn<DataType>> {
     return new Promise((resolve, reject) => {
         try {
             const ds = window.mdv.chartManager.getDataSource(datasourceName);
             const column = ds.columnIndex[columnName];
-            if (ds.columnsWithData.includes(columnName))
+            if (ds.columnsWithData.includes(columnName)) {
                 resolve(column); //hopefully this is trustworthy
-            else
+            } else {
                 window.mdv.chartManager.loadColumnSet(
                     [columnName],
                     datasourceName,
                     () => resolve(column),
                 );
+            }
         } catch (e) {
             reject(e);
         }

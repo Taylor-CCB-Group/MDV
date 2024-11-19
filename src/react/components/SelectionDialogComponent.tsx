@@ -51,7 +51,7 @@ const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: JSX.El
     const inputProps = {
         ...InputProps,
         endAdornment: (
-            <>{customEndAdornment} {InputProps.endAdornment}</>
+            <>{customEndAdornment} {InputProps?.endAdornment}</>
         )
     };
     return <TextField {...rest} InputProps={inputProps} />;
@@ -259,6 +259,7 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
 const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax, lowFraction, highFraction}: RangeProps) => {
     const doc = useOuterContainer();
     const getX = useCallback((e: { clientX: number }) => {
+        if (!ref.current) return 0;
         const { width, left } = ref.current.getBoundingClientRect();
         const normalizedX = Math.min(1, Math.max(0, (e.clientX - left) / width));
         const [min, max] = minMax;

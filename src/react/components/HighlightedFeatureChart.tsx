@@ -1,7 +1,7 @@
 import { action } from "mobx";
-import BaseChart from "../../charts/BaseChart";
+import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
-import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
+import { BaseReactChart } from "./BaseReactChart";
 import { HighlightedFeatureComponent } from "./HighlightedFeatureComponent";
 import type { GuiSpec } from "@/charts/charts";
 

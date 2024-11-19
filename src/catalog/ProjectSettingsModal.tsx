@@ -15,16 +15,17 @@ import {
 } from "@mui/material";
 import type React from "react";
 import { useState } from "react";
+import type { ProjectAccessType } from "./utils/projectUtils";
 
 interface ProjectSettingsModalProps {
     id: string;
     name: string;
-    type: "Editable" | "Read-Only";
+    type: ProjectAccessType;
     open: boolean;
     onRename: (id: string, newName: string) => Promise<void>;
     onChangeType: (
         id: string,
-        newType: "Editable" | "Read-Only",
+        newType: ProjectAccessType,
     ) => Promise<void>;
     onDelete: (id: string) => Promise<void>;
     onClose: () => void;
@@ -107,7 +108,7 @@ const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                         value={newType}
                         onChange={(e) =>
                             setNewType(
-                                e.target.value as "Editable" | "Read-Only",
+                                e.target.value as ProjectAccessType,
                             )
                         }
                         label="Project Type"

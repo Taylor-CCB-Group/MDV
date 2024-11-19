@@ -1,9 +1,10 @@
 import "gridstack/dist/gridstack.min.css";
 import { GridStack } from "gridstack";
 import { debounce } from "../utilities/Utilities";
-import type { Chart, ChartManager, DataSource } from "./charts";
-
-function clearPosition(div) {
+import type { ChartManager, DataSource } from "./charts";
+import type BaseChart from "./BaseChart";
+type Chart = BaseChart<unknown>;
+function clearPosition(div: HTMLElement) {
     div.style.position = "";
     div.style.left = "";
     div.style.right = "";
@@ -58,15 +59,11 @@ export default class GridStackManager {
                 },
                 div,
             );
-            grid.on("resizestop", (ev, el) => {
-                if (el instanceof HTMLElement) {
-                    el.style.filter = "";
-                }
+            grid.on("resizestop", (_: Event, el: HTMLElement) => {
+                el.style.filter = "";
             });
-            grid.on("resizestart", (ev, el) => {
-                if (el instanceof HTMLElement) {
-                    el.style.filter = "blur(1px) opacity(0.5)";
-                }
+            grid.on("resizestart", (_: Event, el: HTMLElement) => {
+                el.style.filter = "blur(1px) opacity(0.5)";
             });
 
             const i = this.chartManager.addMenuIcon(
@@ -87,6 +84,10 @@ export default class GridStackManager {
             return;
         }
         const gi = this.grids.get(ds);
+        if (!gi) {
+            console.error(`destroying non-existent gridstack - ${ds.name}`);
+            return;
+        }
         const div = ds.contentDiv;
         //store sizes/positions of div elements
         const sizes = new Map();
@@ -98,7 +99,7 @@ export default class GridStackManager {
                 d.offsetLeft,
                 d.offsetTop,
             ]);
-            chart.removeLayout();
+            chart.removeLayout?.();
             chart.config.gssize = undefined;
             chart.config.gsposition = undefined;
         }
@@ -125,12 +126,17 @@ export default class GridStackManager {
 
     getCellDimensions(ds: DataSource) {
         const gridInstance = this.getGrid(ds);
+        if (!gridInstance) {
+            console.error("no grid instance for", ds.name);
+            return [300, 150];
+        }
         const grid = gridInstance.grid;
         return [grid.cellWidth(), this.cellHeight];
     }
 
     manageChart(chart: Chart, ds: DataSource, autoPosition?: boolean) {
         const gridInstance = this.getGrid(ds);
+        if (!gridInstance) throw new Error(`no grid instance for ${ds.name}`);
         const grid = gridInstance.grid;
         gridInstance.charts.add(chart);
         const div = chart.getDiv();
@@ -199,7 +205,7 @@ export default class GridStackManager {
             const { remove } = chart;
             chart.remove = () => {
                 grid.removeWidget(div, true);
-                gridInstance.charts.delete(chart);
+                gridInstance?.charts.delete(chart);
 
                 //div.gridstackNode = undefined; //doesn't help
                 remove.apply(chart);
@@ -212,7 +218,7 @@ export default class GridStackManager {
                 // console.log('removing from gridstack');
                 grid.removeWidget(div, true);
             };
-            chart.changeBaseDocument = (doc) => {
+            chart.changeBaseDocument = (doc: Document) => {
                 //by now, it's too late... the parent element is no longer the grid.
                 //grid.removeWidget(div, true);
                 changeBaseDocument.apply(chart, [doc]);
@@ -353,8 +359,8 @@ export function positionChart(dataSource: DataSource, config: Config) {
         const cellDim = chartManager.gridStack.getCellDimensions(dataSource);
         width = Math.round(config.gssize[0] * cellDim[0]);
         height = Math.round(config.gssize[1] * cellDim[1]);
-        left = Math.round(config.gsposition[0] * (cellDim[0] + 5));
-        top = Math.floor(config.gsposition[1] * (cellDim[1] + 5));
+        left = config.gsposition ? Math.round(config.gsposition[0] * (cellDim[0] + 5)) : 20;
+        top = config.gsposition ? Math.floor(config.gsposition[1] * (cellDim[1] + 5)) : 20;
     }
 
     return { width, height, left, top };

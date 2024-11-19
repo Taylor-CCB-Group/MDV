@@ -1,7 +1,7 @@
 import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
 import CategoryChart from "./CategoryChart.js";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import WordCloud from "wordcloud";
 

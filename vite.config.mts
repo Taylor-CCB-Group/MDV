@@ -26,7 +26,7 @@ function getRollupOptions(): RollupOptions {
                 entryFileNames: 'js/mdv.js',
                 assetFileNames: (assetInfo) => {
                     //todo: match webpack behaviour with assetsDir / css-loader.
-                    if (assetInfo.name.includes('index.css')) return 'assets/mdv.css';
+                    if (assetInfo?.name?.includes('index.css')) return 'assets/mdv.css';
                     return 'img/[name][extname]';
                 },
             }

@@ -6,16 +6,14 @@ import type { ExtraControl, GuiSpecType } from "./charts";
 /** annotation of what kind of column type a given param will accept */
 export type Param = "text" | "number" | "multitext" | "text16" | "_multi_column:number" | "_multi_column:all";
 
+//chatGPT to the rescue
+type BaseChartConstructor<TProps = any> = new (...args: any[]) => BaseChart<TProps>;
 /**
  * Describes how a chart will be displayed in the 'add chart' dialog etc.
  */
-export type ChartType<T extends BaseChart> = {
+export type ChartType<T> = {
     /** A class extending BaseChart */
-    class: new (
-        dataStore: DataStore,
-        contentDiv: HTMLDivElement,
-        config: any,
-    ) => T;
+    class: BaseChartConstructor<T>;
     /** The human-readable name that will appear in the 'add chart' dialog etc. */
     name: string;
 
@@ -28,7 +26,7 @@ export type ChartType<T extends BaseChart> = {
     allow_user_add?: boolean;
 };
 
-export type ChartTypeMap = Record<string, ChartType<BaseChart>>;
+export type ChartTypeMap = Record<string, ChartType<any>>;
 
 /** A dictionary of all the chart types, also accessible as `BaseChart.types` */
 export const chartTypes: ChartTypeMap = {};

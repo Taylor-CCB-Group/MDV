@@ -61,6 +61,7 @@ export function mapCoords(
 // }
 
 function translate(feature: TurfFeature<TurfGeometry>, dp: [number, number]) {
+  if (!feature.geometry) return feature;
   const movedCoordinates = mapCoords(
     feature.geometry.coordinates as AnyCoordinates,
     (coordinate) => [coordinate[0] - dp[0], coordinate[1] - dp[1]]
@@ -88,6 +89,7 @@ export default class TranslateModeEx extends TranslateMode {
 
     const p1 = point(startDragPoint);
     const p2 = point(currentPoint);
+    if (!p1.geometry || !p2.geometry) return null;
     const c1 = p1.geometry.coordinates;
     const c2 = p2.geometry.coordinates;
     const dp: [number, number] = [c1[0] - c2[0], c1[1] - c2[1]];

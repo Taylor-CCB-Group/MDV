@@ -1,4 +1,4 @@
-import type DataStore from "./DataStore";
+import type { FieldName } from "@/charts/charts";
 import Dimension from "./Dimension";
 
 /**
@@ -7,10 +7,10 @@ import Dimension from "./Dimension";
 class ValueSetDimension extends Dimension {
     /**
      * Filter the dimension to only include values from the given set.
-     * @param {Set} valueSet
-     * @param {string[]} columns
+     * @param valueSet
+     * @param columns
      */
-    filterValueset(valueSet, columns) {
+    filterValueset(valueSet: Set<number>, columns: FieldName[]) {
         if (valueSet.size === 0) return;
         // if it's strings, we should first convert valueSet to numbers representing the index of those strings in the target column
         // we'll determine that we should do this by checking if the column is a text-like column, which we do by seeing if it has a values array
@@ -18,7 +18,7 @@ class ValueSetDimension extends Dimension {
         const parent = this.parent;
         const col = parent.columnIndex[column];
         if (col.values) {
-            const newSet = new Set();
+            const newSet = new Set<number>();
             valueSet.forEach((v) => {
                 const i = col.values.indexOf(v);
                 if (i !== -1) {
@@ -27,7 +27,7 @@ class ValueSetDimension extends Dimension {
             });
             valueSet = newSet;
         }
-        const predicate = (i) => valueSet.has(col.data[i]);
+        const predicate = (i: number) => valueSet.has(col.data[i]);
         return this.filterPredicate({ predicate }, columns);
     }
 }

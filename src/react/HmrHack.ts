@@ -1,5 +1,5 @@
 import vSideEffect from "../react/components/VivMDVReact";
-const arr = [];
+const arr: any[] = [];
 arr.push(vSideEffect);
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
 arr.push(SideEffect);

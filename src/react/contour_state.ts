@@ -16,9 +16,11 @@ import { useDebounce } from "use-debounce";
 type ContourProps = {
     /** to be used as deck.gl sublayer id */
     id: string;
-    /** the column */
-    parameter: string;
-    category: string | string[];
+    /** the column - if not present, should we not filter the data? at the moment, we reduce to nothing
+     * maybe it should not be optional, in which case we need to re-arrange how hooks are called
+     */
+    parameter?: string;
+    category?: string | string[];
     fill: boolean;
     bandwidth: number;
     intensity: number;
@@ -50,7 +52,7 @@ const viridis = [
 
 function useColorRange(
     contourParameter: DataColumn<CategoricalDataType>,
-    category: string | string[],
+    category: string | string[] | undefined,
 ) {
     const ds = useDataStore();
     const columnColors = useMemo(
@@ -61,8 +63,16 @@ function useColorRange(
             }),
         [ds, contourParameter],
     );
+    /** 
+     * if the category refers to a specific value, 
+     * return its index in `category.values` (and associated `columnColors`).
+     * otherwise return `-1` indicating that we should use the default color range
+     * (currently hardcoded to `viridis`)
+     */
     const categoryValueIndex = useMemo(() => {
-        if (!contourParameter || !contourParameter.values) return -1;
+        // if (!category) return contourParameter.values.map((_, i) => i); //NO: -1 is a clue to use general 'viridis' color range atm.
+        // if (!contourParameter || !category) return -1;
+        if (!category) return -1;
         //we could do something different here... would need more clever color handling on the receiving end
         if (Array.isArray(category)) return category.length > 1 ? -1 : contourParameter.values.indexOf(category[0]);
         return contourParameter.values.indexOf(category);
@@ -88,7 +98,11 @@ export function useContour(props: ContourProps) {
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
-    const { column: contourParameter } = useNamedColumn(parameter);
+    const { column: contourParameter } = useNamedColumn(parameter) || { column: undefined };
+    if (!contourParameter) {
+        console.error(`Contour parameter '${parameter}' not found`);
+        return undefined;
+    }
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);
@@ -153,7 +167,11 @@ export type DualContourLegacyConfig = {
     contour_opacity: number;
 };
 
-/** */
+/**
+ * In future we will want more flexible array of contours.
+ * Dual-contour is a special case of this - may be useful in terms
+ * of how it relates to cell-pair interation links
+ */
 export function useLegacyDualContour() {
     const config = useConfig<DualContourLegacyConfig>();
     const commonProps = {
