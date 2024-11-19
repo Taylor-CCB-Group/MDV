@@ -46,7 +46,10 @@ export function isDatatypeCategorical(t: DataType): t is CategoricalDataType {
 // }
 
 /** concise type-helper factory for making elements of Gui i.e. for settings
- * this will enable type-checking of the GuiSpec objects at the point of declaration
+ * this will enable type-checking of the GuiSpec objects at the point of declaration.
+ * 
+ * As of now, this doesn't do anything at runtime - if we want to have some centralised processing of the GuiSpec objects,
+ * we could consider adding that here, or may want to keep it separate.
  */
 export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
     return spec;

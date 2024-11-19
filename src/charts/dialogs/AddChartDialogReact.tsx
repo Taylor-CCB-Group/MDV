@@ -5,17 +5,16 @@ import { createMdvPortal } from "@/react/react_utils";
 import { observer } from "mobx-react-lite";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
-import Chip from "@mui/material/Chip";
 
 import BaseChart from "../BaseChart.js";
 import type { Param } from "@/charts/ChartTypes.js";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
-import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
+import { AppBar, Button, Dialog, Grid, Paper } from "@mui/material";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
-import { action, observable, reaction, runInAction, toJS } from "mobx";
+import { action, observable, reaction, toJS } from "mobx";
 import z from "zod";
-import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
+import type { ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType } from "@/lib/utils.js";
 
