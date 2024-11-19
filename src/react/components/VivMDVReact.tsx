@@ -370,7 +370,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                 label: "Contour parameter",
                                 // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
                                 current_value: c.contourParameter || c.param[2],
-                                // values: [catCols, "name", "field"],
+                                values: [catCols, "name", "field"],
                                 func: (x) => {
                                     if (x === c.contourParameter) return;
                                     // could we change 'cats' and have the dropdowns update?
