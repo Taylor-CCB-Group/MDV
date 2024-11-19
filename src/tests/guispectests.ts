@@ -1,4 +1,4 @@
-import type { GuiSpec } from "@/charts/charts";
+import type { GuiSpec, GuiSpecs } from "@/charts/charts";
 import { g } from "@/lib/utils";
 
 const untyped = {
@@ -51,3 +51,42 @@ const c = g({
 // g hasn't made it know that func is defined - that is correct as it could change
 // it has inferred the type correctly, though
 c.func?.(false);
+
+const specArray: GuiSpecs = [
+    g({
+        type: "check",
+        label: "label",
+        current_value: true,
+        func(v) {
+            c.current_value = v;
+        }
+    }),
+    g({
+        type: "dropdown",
+        label: "label",
+        current_value: "current_value",
+        func(v) {
+            b.current_value = v;
+            this.current_value = v;
+        }
+    })
+]
+
+specArray.concat([
+    g({
+        type: "check",
+        label: "label",
+        current_value: true,
+        async func(v) {
+            this.current_value = v;
+        }
+    }),
+    g({
+        type: "multidropdown",
+        label: "label",
+        current_value: ["current_value"],
+        func(v) {
+            this.current_value = v.slice();
+        }
+    })
+]);

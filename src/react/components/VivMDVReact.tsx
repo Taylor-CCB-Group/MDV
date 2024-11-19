@@ -1,5 +1,5 @@
-import BaseChart from "../../charts/BaseChart";
-import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
+import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import {
     type ROI,
@@ -247,13 +247,15 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             (r) => ds.regions.all_regions[r].viv_image,
         );
         const images = imageRegionKeys.map((r) => ({ name: r, value: r }));
+
+
         return settings.concat([
-            {
+            g({
                 type: "dropdown",
                 label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
                 current_value: c.region,
                 values: [images, "name", "value"],
-                func: (v) => {
+                func(v) {
                     console.log("setting image region:", v);
                     //nb, 'this' is not the chart...
                     if (c.title === c.region) {
@@ -266,8 +268,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     // (this shouldn't be the responsibility of this function)
                     c.background_filter.category = v;
                 },
-            },
-            {
+            }),
+            g({
                 type: "check",
                 label: "Show Tooltip",
                 current_value: tooltip.show,
@@ -277,14 +279,14 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                         const columnName = cols[0].field;
                         console.log(
                             "No tooltip column set, using first column:",
-                            columnName,
+                            columnName
                         );
                         await loadColumn(this.dataStore.name, cols[0].field);
                         tooltip.column = cols[0].field;
                     }
                 },
-            },
-            {
+            }),
+            g({
                 type: "dropdown",
                 label: "Tooltip value",
                 current_value: c.tooltip.column || cols[0].field,
@@ -293,31 +295,33 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     await loadColumn(this.dataStore.name, c);
                     tooltip.column = c;
                 },
-            },
-            {
+            }),
+            g({
                 type: "dropdown",
                 label: "Shape",
                 current_value: c.point_shape,
                 values: [["circle", "square", "gaussian"]], //ugh
                 func: (x) => {
+                    //@ts-ignore we have a very restricted type for point_shape - could think about supporting that
                     c.point_shape = x;
                 },
-            },
-            {
+            }),
+            g({
                 type: "radiobuttons",
                 label: "course radius",
-                current_value: c.course_radius || 1,
+                current_value: `${c.course_radius || 1}`,
                 choices: [
                     [0.1, 0.1],
                     [1, 1],
                     [10, 10],
                     [100, 100],
-                ],
+                ].map(a => [`${a[0]}`, `${a[1]}]`]),
                 func: (x) => {
-                    c.course_radius = x;
+                    //@ts-check !todo - maybe we should allow radiobuttons to use different datatypes
+                    c.course_radius = Number.parseFloat(x);
                 },
-            },
-            {
+            }),
+            g({
                 type: "slider",
                 label: "radius",
                 current_value: c.radius || 5,
@@ -327,8 +331,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 func: (x) => {
                     c.radius = x;
                 },
-            },
-            {
+            }),
+            g({
                 type: "slider",
                 label: "opacity",
                 current_value: Math.sqrt(c.opacity || scatterDefaults.opacity),
@@ -338,24 +342,24 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                 func: (x) => {
                     c.opacity = x * x;
                 },
-            },
-            {
+            }),
+            g({
                 type: "check",
                 label: "zoom on filter",
                 current_value: c.zoom_on_filter || false,
                 func: (x) => {
                     c.zoom_on_filter = x;
                 },
-            },
-            {
+            }),
+            g({
                 type: "check",
                 label: "show json layer",
                 current_value: c.showJson || false,
                 func: (x) => {
                     c.showJson = x;
                 },
-            },
-            {
+            }),
+            g({
                 type: "folder",
                 label: "Density Visualisation",
                 current_value: [
@@ -458,12 +462,12 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                         },
                     }),
                 ],
-            },
-            {
+            }),
+            g({
                 type: "folder",
                 label: "Category Filters",
                 current_value: filters,
-            },
+            }),
             // ...filters,
             // no longer using PictureInPictureViewer - up for review as could be useful
             // {
@@ -474,7 +478,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             //         c.overviewOn = x;
             //     }
             // }
-        ] as GuiSpec<any>[]);
+        ]);
     }
     getConfig() {
         const config = super.getConfig();
