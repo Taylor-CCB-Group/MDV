@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
 import { getRandomString } from "../utilities/Utilities";
@@ -9,6 +9,8 @@ import type RangeDimension from "@/datastore/RangeDimension";
 import { useRegionScale } from "./scatter_state";
 import { isArray } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
+import type Dimension from "@/datastore/Dimension";
+
 
 /**
  * Get the chart's config.
@@ -349,6 +351,29 @@ export function useDimensionFilter<K extends DataType>(column: DataColumn<K>) {
     }, [dim.destroy]);
     return dim;
 }
+
+export function useLazyDimensionFilter<K extends DataType>(column: DataColumn<K>) {
+    const ds = useDataStore();
+    const isTextLike = (column.values !== undefined) || (column.datatype === "unique");
+    const dimension_type = isTextLike ? "category_dimension" : "range_dimension";
+    const dimRef = useRef<Dimension | null>(null);
+    const getDimension = useCallback(() => {
+        if (!dimRef.current) {
+            dimRef.current = ds.getDimension(dimension_type);
+        }
+        return dimRef.current;
+    }, [ds, dimension_type]);
+    useEffect(() => {
+        return () => {
+            if (dimRef.current) {
+                dimRef.current.destroy();
+                dimRef.current = null;
+            }
+        };
+    }, []);
+    return getDimension;
+}
+
 export function useRangeDimension2D() {
     const ds = useDataStore();
     const s = useRegionScale();

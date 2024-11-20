@@ -18,12 +18,12 @@ import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import JsonView from "react18-json-view";
 import { ChartProvider } from "../context";
-import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
+import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
 import { g, isArray } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 
-export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<GuiSpecType>, htmlFor?: string }) => (
+export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>
         {props.label} 
         {/* <em className="opacity-30"> ({props.type})</em> */}
@@ -116,18 +116,24 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
     // perhaps we should be looking at other places where it's used & make them use this,
     // with a different evolution of the API.
     // currently this is not showing the current_value, among other missing features...
+    /** this needs fixing... and we should be able to observe mobx state for column queries 
+     * which should persist when the dialog (entire react root) is closed.
+    */
+
     const setSelectedColumn = useCallback(action((v: string) => {
         props.current_value = v;
         //@ts-expect-error //! this is genuinely not fully implemented yet, when it is, types should be right
         props.func?.(v);
     }), []); //as of this writing, biome is right that props is not a dependency
     const filter = props.columnSelection?.filter;
-    const props2: ColumnSelectionProps = useMemo(() => ({
+    // not only is the filter not working, but we need to decide how to express "multiple"
+    const props2 = useMemo(() => inferGenericColumnSelectionProps({
         setSelectedColumn,
         type: filter,
         multiple: props.type === "multicolumn",
+        current_value: props.current_value
         // current_value: props.current_value... maybe want to be more mobx-y about this
-    }), [setSelectedColumn, props.type, filter]);
+    }), [setSelectedColumn, props.type, filter, props.current_value]);
     return (
         <>
             <MLabel props={props} />
@@ -431,8 +437,8 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
         <Button
             variant="contained"
             onClick={() => {
-                //is there a nicer way to write this / define GuiValueTypes?
-                if (props.func) props.func(undefined as never);
+                //@ts-expect-error `undefined as never` works, is there a nicer way to write this / define GuiValueTypes?
+                if (props.func) props.func();
             }}
         >
             {props.label}

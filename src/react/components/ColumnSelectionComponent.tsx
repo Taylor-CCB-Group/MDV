@@ -9,25 +9,16 @@ import { columnMatchesType, isArray } from "@/lib/utils.js";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
-import LinksComponent from "./LinksComponent.js";
+import LinksComponent, { RAComponent } from "./LinksComponent.js";
 import { TextFieldExtended } from "./TextFieldExtended.js";
 import Grid from '@mui/material/Grid2';
 import { Accordion, AccordionDetails, AccordionSummary, Typography } from "@mui/material";
 import LinkIcon from '@mui/icons-material/Link';
 import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
+import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers.js";
+import { inferGenericColumnGuiProps, isMultiColumn } from "@/lib/columnTypeHelpers.js";
 
-
-export type ColumnSelectionProps = {
-    setSelectedColumn: (column: FieldName) => void; //what about multiple? also, special values...
-    current_value?: FieldName;
-    placeholder?: string;
-    exclude?: string[];
-    dataStore?: DataStore;
-    type?: Param | Param[]; //wary of using 'type' as a name - not reserved, but could be confusing
-    multiple?: boolean;
-};
-//!!AAAAAH FFS
-type setBoolean = any | ReturnType<typeof useState<boolean>>[1];
+type setBoolean = ReturnType<typeof useState<boolean>>[1];
 type GuiStateProps = {
     isExpanded: boolean;
     setIsExpanded: setBoolean;
@@ -42,10 +33,12 @@ type GuiStateProps = {
  * (e.g. if we're in a more global dialog etc rather than a chart context,
  * this would be ambiguous).
  */
-const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) => { //GuiSpec<"column">) => {
+const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T> & GuiStateProps) => {
+    const props = inferGenericColumnGuiProps(gProps);
     const { setSelectedColumn, placeholder, type } = props;
-    const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
-    const multiple = props.multiple || isMultiType;
+    const { setIsAutocompleteFocused, setIsExpanded, current_value } = props;
+    const isMultiType = isMultiColumn(type);
+    // const multiple = props.multiple || isMultiType;
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
     const columns: DataColumn<DataType>[] = useMemo(
@@ -55,28 +48,35 @@ const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) =>
             ,
         [dataStore, props.exclude, type],
     );
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
+    // const [isExpanded, setIsExpanded] = useState(false);
+    // const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
 
-    const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
-    const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
-    if (!linkProps) return <ColumnDropdown {...props} {...guiProps} />;
+    // const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
+    // const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
+    // if (!linkProps) return <ColumnDropdown {...props} {...guiProps} />;
     // In general, this should (probably) be using our "(multi)dropdown" component
     // and the <LinksComponent /> can select which column options to show.
+    if (current_value && typeof current_value !== "string" && !Array.isArray(current_value)) {
+        return <RAComponent {...props} />;
+    };
     return (
         <Grid className="w-full items-center" container>
             <Grid size={"grow"}>
                 <Autocomplete
                     className="w-full"
                     options={columns}
-                    multiple={multiple}
+                    multiple={isMultiType}
                     // value={current_value ? columns.find(c => c.name === current_value) : null}
                     onChange={(_, value) => {
-                        if (!value) return; // todo - is this allowed ? clear selection?
-                        if (isArray(value)) {
+                        if (!value) return; //! check if this is correct
+                        if (!(isMultiType === isArray(value))) throw "type mismatch";
+                        if (isMultiType) {
                             // todo - need to make controlled anyway for multiple...
-                            setSelectedColumn(value[0].field);
+                            if (!isArray(value)) throw "Expected array - and really didn't expect to get here";
+                            // haven't quite managed to infer the setSelectedColumn type here...
+                            setSelectedColumn(value.map(v => v.field) as any);
                         } else {
+                            if (isArray(value)) throw "Expected single value - and really didn't expect to get here";
                             setSelectedColumn(value.field);
                         }
                     }}
@@ -127,10 +127,11 @@ const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) =>
  * (e.g. if we're in a more global dialog etc rather than a chart context,
  * this would be ambiguous).
  */
-const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //GuiSpec<"column">) => {
-    const { setSelectedColumn, placeholder, type } = props;
-    const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
-    const multiple = props.multiple || isMultiType;
+const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => { //GuiSpec<"column">) => {
+    const { type } = props;
+    // generics are messy, maybe we should just have two separate components...
+    // const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
+    // const multiple = props.multiple || isMultiType;
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
     const columns: DataColumn<DataType>[] = useMemo(
@@ -145,7 +146,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
 
     const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
-    //@ts -expect-error nonsense about setBoolean type
+    //@ts-expect-error nonsense about setBoolean type
     if (!linkProps) return <ColumnDropdown {...props} {...guiProps} />;
     // In general, this should (probably) be using our "(multi)dropdown" component
     // and the <LinksComponent /> can select which column options to show.
@@ -165,7 +166,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
                 </Grid>
             </AccordionSummary>
             <AccordionDetails>
-                <LinksComponent />
+                <LinksComponent {...props} />
             </AccordionDetails>
         </Accordion>
         </>

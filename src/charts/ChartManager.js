@@ -60,6 +60,7 @@ import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { AddChartDialog } from "./dialogs/AddChartDialog";
+import decorateColumnMethod from "@/datastore/decorateColumnMethod";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1585,6 +1586,11 @@ class ChartManager {
             this._loadColumnData(t, dataSource);
         }
     }
+    loadColumnSetAsync(columns, dataSource, split = 10, threads = 2) {
+        return new Promise((resolve, reject) => {
+            this.loadColumnSet(columns, dataSource, resolve, split, threads);
+        });
+    }
 
     _loadColumnData(trans, dataSource) {
         const dataStore = this.dsIndex[dataSource].dataStore;
@@ -2077,6 +2083,7 @@ class ChartManager {
             const col = dStore.columnIndex[x];
             //no record of column- need to load it (plus metadata)
             if (!col) {
+                // what if x is something like a MulticolumnQuery?
                 dStore.addColumnFromField(x);
                 return true;
             }

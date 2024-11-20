@@ -7,22 +7,22 @@ import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 
 import BaseChart from "../BaseChart";
-import type { Param } from "@/charts/ChartTypes.js";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
-import { AppBar, Button, Dialog, Grid, Paper } from "@mui/material";
+import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
-import { action, observable, reaction, toJS } from "mobx";
+import { action, observable, reaction, runInAction, toJS } from "mobx";
 import z from "zod";
-import type { ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
+import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType } from "@/lib/utils.js";
+import type { Param } from "@/lib/columnTypeHelpers.js";
 
 const ChartConfigSchema = z.object({
     title: z.string(),
     legend: z.string(),
     // in future, allow for "virtual" / "computed" / "smart" columns
-    param: z.optional(z.array(z.string())),
+    param: z.optional(z.array(z.string())), //...
     type: z.string(),
     // in the original AddChartDialog, extra props are on the root object, not nested
     // so when we pass this to ChartManager, we'll need to flatten it
@@ -174,7 +174,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     const paramColumns = useMemo(
-        () => config.param?.map(p => dataStore.columnIndex[p]) ?? [],
+        () => config.param ? config.param.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
     [config.param, dataStore]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
     const setChartTypeName = useCallback(action((chartTypeName: string) => {
@@ -279,14 +279,19 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     >
                         {chartType?.params && <h2>Columns</h2>}
                         {chartType?.params?.map((p, i) => (
-                            <ColumnSelectionComponent key={p.name} placeholder={p.name} 
+                            <ColumnSelectionComponent key={p.name} placeholder={p.name} //multiple={false}
                             // this may be changing - perhaps we always pass mobx object to ColumnSelectionComponent
                             // but we definitely need to know whether it's a multi-column or not & be able to set the value accordingly
                             setSelectedColumn={action((column) => {
                                 // !! in the original AddChartDialog, we use a "ChooseColumnDialog" for multi-column
                                 // that sets `this.multiColumns` which in `submit` is concatenated to `config.param`
                                 if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
-                                config.param[i] = column;
+                                // the type of config.param is string[] - but this could be a multi-column or virtual column query...
+                                // we need to decide at which point to apply these transformations.
+                                // - to deal with string[] we should be able to specify multiple={false} which could change the return type
+                                //... could we set up a reaction to update the config when the column changes?
+                                if (typeof column !== "string") throw new Error("Expected string column name");
+                                config.param[i] = column; //legit type error - will fail at runtime
                                 // grumble grumble
                                 config._updated = new Date();
                             })}

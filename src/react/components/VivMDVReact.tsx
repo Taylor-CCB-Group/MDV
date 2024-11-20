@@ -32,6 +32,7 @@ function VivScatterChartRoot() {
     // in a way that is similar to Avivator - with the caveat that use of state in callbacks needs to be done
     // with saving a reference to e.g. `useViewerStoreApi()` and calling the `setState` method on that
     // rather than `useViewerStore.setState()`.
+    //@ts-expect-error
     const { vivStores } = useChart() as VivMdvReact;
     return (
         <VivProvider vivStores={vivStores}>

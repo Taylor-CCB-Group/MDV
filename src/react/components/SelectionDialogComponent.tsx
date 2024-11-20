@@ -511,16 +511,23 @@ const AddRowComponent = observer(() => {
     }, [filters, param, config]);
     return (
         <div className="p-5">
-        <ColumnSelectionComponent
-        setSelectedColumn={setSelectedColumn}
-        placeholder="Add a filter column"
-        exclude={param}
-        />
+            <ColumnSelectionComponent
+                //@ts-expect-error this is hinting at what we need to work on
+                setSelectedColumn={setSelectedColumn}
+                placeholder="Add a filter column"
+                exclude={param}
+                // type="_multi_column:all" //not sure about this...
+                type={["text", "text16", "multitext", "unique", "integer", "double", "int32"]}
+            />
         </div>
     )
 })
 
-const ForeignRows = () => {
+const ForeignRows = observer(() => {
+    // const rlink = useRowsAsColumnsLinks();
+    // //!breaking rule of hooks here, but in a way that should be ok at runtime as of now
+    // //! (just testing "infinte loop with no link" fix)
+    // if (rlink.length === 0) return null; //todo: 30sec video clip
     const [filter, setFilter] = useState("");
     const [max, setMax] = useState(10);
     const [debouncedFilter] = useDebounce(filter, 300);
@@ -541,7 +548,7 @@ const ForeignRows = () => {
             {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );
-}
+});
 
 /**
  * This will control the behaviour of the reset menuIcon in the chart header - not rendered with react.

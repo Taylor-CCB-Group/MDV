@@ -4,12 +4,13 @@ import { createEl } from "../utilities/Elements.js";
 import { type ChartTypeMap, chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
-import { makeAutoObservable, action } from "mobx";
+import { makeAutoObservable, action, autorun, IReactionDisposer, IAutorunOptions } from "mobx";
 import type DataStore from "@/datastore/DataStore";
 import type { BaseDialog } from "@/utilities/Dialog";
 import type { DataColumn, FieldName, GuiSpec, GuiSpecs } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
+import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
 type ChartEventType = string;
 type Listener = (type: ChartEventType, data: any) => void;
 type LegacyColorBy = { column: DataColumn<any> }
@@ -44,6 +45,7 @@ class BaseChart<T> {
     width = 0;
     height = 0;
     legend: any;
+    activeQueries: any;
     /**
      * The base constructor
      * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
@@ -61,12 +63,15 @@ class BaseChart<T> {
         }
         //**********
 
-        //copy the config
-        this.config = JSON.parse(JSON.stringify(config));
-        //give it a random id if one isn't supplied
-        if (!this.config.id) {
-            this.config.id = getRandomString();
-        }
+        //copy the config, 
+        // this.config = JSON.parse(JSON.stringify(config));
+        //^^ previously, only react charts had observable config
+        //and make it observable etc... may apply some other processing e.g. in case of 'virtual columns'
+        //   we've been experimenting with applying this to all charts
+        //   but there are issues with mobx actions that result in mutations to the config
+        //... so perhaps the idea of keeping that property to react charts is a good one?
+        this.config = initialiseConfig(config, this);
+
         //required in case added to separate browser window
         this.__doc__ = document;
 
@@ -226,6 +231,12 @@ class BaseChart<T> {
         this.observable = makeAutoObservable({
             container: this.__doc__.body,
         });
+    }
+    reactionDisposers: IReactionDisposer[] = [];
+    mobxAutorun(fn: ()=>void, opts?: IAutorunOptions) {
+        const disposer = autorun(fn, opts);
+        this.reactionDisposers.push(disposer);
+        return disposer;
     }
     _getContentDimensions() {
         return {
@@ -530,6 +541,9 @@ class BaseChart<T> {
         for (const d of this.dialogs) {
             d.close();
         }
+        for (const disposer of this.reactionDisposers) {
+            disposer();
+        }
         // dynamic props?
     }
     removeLayout?(): void;
@@ -744,17 +758,6 @@ class BaseChart<T> {
         if (this.addToContextMenu) {
             menu = menu.concat(this.addToContextMenu());
         }
-        menu.push({
-            text: "experimental settings dialog",
-            icon: "fas fa-cog",
-            func: async () => {
-                const m = await import(
-                    "../react/components/SettingsDialogReactWrapper"
-                );
-                const SettingsDialogReactWrapper = m.default;
-                this.dialogs.push(new SettingsDialogReactWrapper(this));
-            },
-        });
         return menu;
     }
 
@@ -822,7 +825,7 @@ class BaseChart<T> {
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
             };
         }
-        return JSON.parse(JSON.stringify(this.config));
+        return serialiseConfig(this);
     }
 
     getColorOptions(): ColorOptions {
