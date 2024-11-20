@@ -2116,40 +2116,6 @@ class ChartManager {
 
     }*/
 
-    //need to ensure that column data is loaded before calling method
-    _decorateColumnMethod(method, chart, dataSource) {
-        const newMethod = `_${method}`;
-        chart[newMethod] = chart[method];
-        //if original method is called check whether column has data
-        chart[method] = (column) => {
-            this._getColumnsThen(dataSource, [column], () =>
-                chart[newMethod](column),
-            );
-        };
-    }
-
-    //supercedes previous method - more genric
-    //method must be specified in the method UsingColumns in types of dictionary
-    __decorateColumnMethod(method, chart, dataSource) {
-        const newMethod = `_${method}`;
-        chart[newMethod] = chart[method];
-        //if original method is called check whether column has data
-        //first argument must be column(s) needed
-        chart[method] = () => {
-            //column not needed
-            if (arguments[0] == null) {
-                chart[newMethod](...arguments);
-            } else {
-                const cols = Array.isArray(arguments[0])
-                    ? arguments[0]
-                    : [arguments[0]];
-                this._getColumnsThen(dataSource, cols, () =>
-                    chart[newMethod](...arguments),
-                );
-            }
-        };
-    }
-
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
     _haveColumnsLoaded(neededCols, dataSource, func) {
@@ -2202,15 +2168,15 @@ class ChartManager {
         //have to be loaded before method can execute
         // @ts-ignore
         if (chart.colorByColumn) {
-            this._decorateColumnMethod("colorByColumn", chart, dataSource);
+            decorateColumnMethod("colorByColumn", chart, dataSource);
         }
         // @ts-ignore
         if (chart.setToolTipColumn) {
-            this._decorateColumnMethod("setToolTipColumn", chart, dataSource);
+            decorateColumnMethod("setToolTipColumn", chart, dataSource);
         }
         // @ts-ignore
-        if (chart.setBackgroundFilter) {
-            this._decorateColumnMethod(
+        if (chart.setBackgroundFilter) { //doesn't appear in the codebase
+            decorateColumnMethod(
                 "setBackgroundFilter",
                 chart,
                 dataSource,
@@ -2218,7 +2184,7 @@ class ChartManager {
         }
         // @ts-ignore
         if (chart.changeContourParameter) {
-            this._decorateColumnMethod(
+            decorateColumnMethod(
                 "changeContourParameter",
                 chart,
                 dataSource,
@@ -2228,7 +2194,7 @@ class ChartManager {
         //new preferred way to decorate column methods
         if (chartType.methodsUsingColumns) {
             for (const meth of chartType.methodsUsingColumns) {
-                this.__decorateColumnMethod(meth, chart, dataSource);
+                decorateColumnMethod(meth, chart, dataSource);
             }
         }
 
