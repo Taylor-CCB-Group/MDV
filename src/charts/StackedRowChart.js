@@ -24,6 +24,7 @@ class StackedRowChart extends SVGChart {
     }
 
     setFieldNames(fieldNames) {
+        //! this should filter to only categorical fields, also not generally sure it's even working...
         this.fieldNames = fieldNames;
         this.onDataFiltered(null);
     }
