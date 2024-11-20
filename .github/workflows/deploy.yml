@@ -1,16 +1,15 @@
-name: Build and Deploy to Dockerhub
+name: Build and Deploy to Dockerhub- on PR Merge
 
 on:
-  push:
+  pull_request:
     branches:
-      - feature/upload-154
-    paths-ignore:
-      - '**.github/workflows/**' # Ignore changes to workflow files
-    if: "contains(github.event.head_commit.message, '[deploy]')"
-    
+      - dev
+    types:
+      - closed  # This will trigger only when a PR is closed (merged or not)
+
 jobs:
   build-and-push:
-    if: "contains(github.event.head_commit.message, '[deploy]')"
+    if: ${{ github.event.pull_request.merged }} # Only run if the PR was merged
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
