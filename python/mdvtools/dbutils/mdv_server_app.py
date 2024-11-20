@@ -97,7 +97,7 @@ def wait_for_database():
             print("*************** Database is ready! *************")
             return
         except OperationalError as oe:
-            print(f"Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1} of {max_retries})")
+            print(f"OperationalError: {oe}. Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1} of {max_retries})")
             time.sleep(delay)
         except Exception as e:
             print(f"An unexpected error occurred while waiting for the database: {e}")
@@ -155,6 +155,21 @@ def load_config(app,config_name=None):
                 raise ValueError("Error: One or more required secrets or configurations are missing.")
             
             app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+
+            # Auth0 specific configuration
+            auth0_domain = os.getenv('AUTH0_DOMAIN') or app.config.get('AUTH0_DOMAIN')
+            auth0_client_id = os.getenv('AUTH0_CLIENT_ID') or app.config.get('AUTH0_CLIENT_ID')
+            auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET') or app.config.get('AUTH0_CLIENT_SECRET')
+
+            if not all([auth0_domain, auth0_client_id, auth0_client_secret]):
+                raise ValueError("Error: One or more required secrets or configurations are missing for Auth0.")
+
+            app.config['AUTH0_DOMAIN'] = auth0_domain
+            app.config['AUTH0_CLIENT_ID'] = auth0_client_id
+            app.config['AUTH0_CLIENT_SECRET'] = auth0_client_secret
+
+            # If you're using a callback URL, make sure it's configured
+            app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL') or app.config.get('AUTH0_CALLBACK_URL')
 
     except Exception as e:
         print(f"An unexpected error occurred while configuring the database: {e}")
@@ -394,7 +409,7 @@ def register_routes(app):
                 # Optional: Remove project routes from Flask app if needed
                 if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(next_id)]
-                    print(f"In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
+                    print("In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
                 
                 return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -402,7 +417,7 @@ def register_routes(app):
 
         @app.route("/delete_project/<project_id>", methods=["DELETE"])
         def delete_project(project_id: int):
-            project_removed_from_blueprints = False
+            #project_removed_from_blueprints = False
             try:
                 print(f"Deleting project '{project_id}'")
                 
@@ -422,7 +437,7 @@ def register_routes(app):
                 # Remove the project from the ProjectBlueprint.blueprints dictionary
                 if str(project_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(project_id)]
-                    project_removed_from_blueprints = True  # Mark as removed
+                    #project_removed_from_blueprints = True  # Mark as removed
                     print(f"In register_routes - /delete_project : Removed project '{project_id}' from ProjectBlueprint.blueprints")
                 
                 # Soft delete the project

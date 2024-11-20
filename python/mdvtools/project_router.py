@@ -3,7 +3,7 @@ from typing import Dict, Any, Callable, Tuple
 import re
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
-
+import functools
 
 """
 This should work as a drop-in replacement for `Blueprint` in the context
@@ -197,7 +197,7 @@ class ProjectBlueprint_v2:
             
         raise ValueError(f"no matching route for {subpath}")
 
-import functools
+
 
 class SingleProjectShim:
     def __init__(self, app: Flask) -> None:
