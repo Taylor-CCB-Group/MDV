@@ -1,4 +1,5 @@
-import React, { useState, useCallback, PropsWithChildren, useRef, useEffect } from 'react';
+import type React from 'react';
+import { useState, useCallback, type PropsWithChildren, useRef, useEffect } from 'react'
 import { observer } from 'mobx-react-lite';
 
 interface TiffChartWrapperProps {
@@ -8,7 +9,8 @@ interface TiffChartWrapperProps {
   onFullscreenChange: (isFullscreen: boolean) => void;
 }
 
-const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = observer(({ metadata, file, config, children, onFullscreenChange }) => {
+const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = observer(({ metadata, file, config, children, onFullscreenChange }
+  : PropsWithChildren<TiffChartWrapperProps>) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [oldSize, setOldSize] = useState<[number, number] | null>(null);
   const contentDivRef = useRef<HTMLDivElement>(null);
@@ -61,7 +63,7 @@ const TiffChartWrapper: React.FC<PropsWithChildren<TiffChartWrapperProps>> = obs
         className="mx-px cursor-pointer"
         onClick={config.func}
       >
-        <i className={`ciview-chart-icon ${icon}`}></i>
+        <i className={`ciview-chart-icon ${icon}`} />
       </span>
     );
   }, []);

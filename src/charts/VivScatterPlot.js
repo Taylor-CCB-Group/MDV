@@ -1,5 +1,5 @@
 import DensityScatterPlot from "./DensityScatterPlot.js";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import { BaseDialog } from "../utilities/Dialog.js";
 import noUiSlider from "nouislider";

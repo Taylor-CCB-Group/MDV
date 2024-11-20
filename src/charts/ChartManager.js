@@ -9,12 +9,12 @@ import {
     splitPane,
     createFilterElement,
 } from "../utilities/Elements";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import DataStore from "../datastore/DataStore.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 import { ContextMenu } from "../utilities/ContextMenu";
 import { BaseDialog } from "../utilities/Dialog.js";
-import { getRandomString } from "../utilities/Utilities.js";
+import { getRandomString } from "../utilities/Utilities";
 import { csv, tsv, json } from "d3-fetch";
 import AddColumnsFromRowsDialog from "./dialogs/AddColumnsFromRowsDialog.js";
 import ColorChooser from "./dialogs/ColorChooser";
@@ -134,7 +134,7 @@ function listenPreferredColorScheme(callback) {
 * @param {string} [config.permisson] the level of permission the user has. This just makes certain
 * options unavaliable. Any logic should be handled when a state_saved event is broadcast
 * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
-* @param {object} [listener] - An object with functions to listen to events.
+* @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
 * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
 * 
 */
@@ -168,12 +168,17 @@ class ChartManager {
         //or to allow the user to explicitly say 'system default'
         listenPreferredColorScheme((t) => this.setTheme(t));
 
-        // each entry in dataSources will contain
-        //  dataSource - the actual dataStore object
-        //  name - the name given to this data source
-        //  menuBar the dom menu associated with this element
-        //  contentDiv the div that the charts associated with the datastore will be added
+        /** !typed according to previous comments - but I was using it in a way that was working and doesn't match the comments...
+         * each entry in dataSources will contain
+         *  dataStore - the actual dataStore object (previously this comment erroneously referred to as 'dataSource')
+         *  name - the name given to this data source
+         *  menuBar the dom menu associated with this element
+         *  contentDiv the div that the charts associated with the datastore will be added
+         * @typedef {{dataStore: DataStore, name: string, menuBar: HTMLElement, contentDiv: HTMLElement}} DataSource
+         * @type {DataSource[]} 
+         */
         this.dataSources = [];
+        /** @type {{[k: string]: DataSource | undefined}} */
         this.dsIndex = {};
         this.columnsLoading = {};
         for (const d of dataSources) {
@@ -207,11 +212,13 @@ class ChartManager {
         this.transactions = {};
 
         //set up container and top(main menu)
+        /** @type {HTMLElement} */
         this.containerDiv =
             typeof div === "string" ? document.getElementById(div) : div;
         this.containerDiv.style.display = "flex";
         this.containerDiv.style.flexDirection = "column";
 
+        /** @type {HTMLDivElement} */
         this.menuBar = createEl(
             "div",
             {
@@ -220,7 +227,9 @@ class ChartManager {
             this.containerDiv,
         );
 
+        /** @type {HTMLSpanElement} */
         this.leftMenuBar = createEl("span", {}, this.menuBar);
+        /** @type {HTMLSpanElement} */
         this.rightMenuBar = createEl(
             "span",
             { styles: { float: "right" } },
@@ -230,6 +239,7 @@ class ChartManager {
         createEl("span", { classes: ["mdv-divider"] }, this.menuBar);
 
         
+        /** @type {HTMLSpanElement} */
         const homeButton = createMenuIcon(
             "fas fa-home",
             {
@@ -387,6 +397,7 @@ class ChartManager {
 
         this._setupThemeContextMenu();
 
+        /** @type {HTMLDivElement} */
         this.contentDiv = createEl(
             "div",
             {
@@ -399,12 +410,14 @@ class ChartManager {
         );
         this.contentDiv.classList.add("ciview-contentDiv");
 
+        /** @type {GridStackManager} */
         this.gridStack = new GridStackManager(this);
 
         //each entry in charts will contain
         //  chart - the actual chart
         //  win - the popout window it is in (or null)
         //  dataSource - the data source associated with it
+        /** @type {{[id: string]: {chart: import("./charts").Chart, win: Window | null, dataSource: import("./charts").DataSource} */
         this.charts = {};
 
         this.config = config;
@@ -811,6 +824,8 @@ class ChartManager {
 
     /**
      * Caution: doesn't return a 'DataSource', but a 'DataStore' (which is a property of a 'DataSource')
+     * @param {string} name
+     * @returns {DataStore}
      */
     getDataSource(name) {
         return this.dsIndex[name].dataStore;

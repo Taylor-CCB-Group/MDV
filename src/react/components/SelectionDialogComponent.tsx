@@ -20,7 +20,9 @@ import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import { useOuterContainer } from "../screen_state";
-// import { brushX } from "d3-brush";
+import * as d3 from 'd3';
+import { brushX } from "d3-brush";
+import { isArray } from "@/lib/utils";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -51,7 +53,7 @@ const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: JSX.El
     const inputProps = {
         ...InputProps,
         endAdornment: (
-            <>{customEndAdornment} {InputProps.endAdornment}</>
+            <>{customEndAdornment} {InputProps?.endAdornment}</>
         )
     };
     return <TextField {...rest} InputProps={inputProps} />;
@@ -164,7 +166,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
 
 const MultiTextComponent = observer(({ column }: Props<"multitext">) => {
     // todo: think about what to do with null config for filter
-    console.log("multitext selection dialog has missing features for 'operand' and other logic");    
+    console.log("multitext selection dialog has missing features for 'operand' and other logic");
     // !!! - uncommenting this stuff makes the entire chart disappear when the filter is removed
     // const config = useFilterConfig(column);
     // const operand = config.operand || "or";
@@ -208,7 +210,13 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
 function useRangeFilter(column: DataColumn<NumberDataType>) {
     const filter = useDimensionFilter(column) as RangeDimension;
     const filters = useConfig<SelectionDialogConfig>().filters;
-    const value = (filters[column.field] || column.minMax) as [number, number];
+    //nb - we may want to allow value to be null, rather than defaulting to minMax
+    //relates to e.g. clearBrush function
+    // const value = (filters[column.field] || column.minMax) as [number, number];
+    const fVal = filters[column.field] as RangeFilter | null;
+    // if (!isArray(fVal)) throw new Error("Expected range filter to be an array");
+    const value = fVal;
+    // const value = fVal;
     const isInteger = column.datatype.match(/int/);
     const step = isInteger ? 1 : 0.01;
     const [debouncedValue] = useDebounce(value, 10);
@@ -216,7 +224,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     // Effect to manage the filter state
     useEffect(() => {
         const value = debouncedValue;
-        if (value[0] === column.minMax[0] && value[1] === column.minMax[1]) {
+        if (!value) {
             filter.removeFilter();
             return;
         }
@@ -243,7 +251,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         worker.postMessage({ data, min: column.minMax[0], max: column.minMax[1], bins: 100, isFloat: isInt32 });
     }, [column]);
 
-    const [low, high] = value;
+    const [low, high] = value || column.minMax;
     const [min, max] = column.minMax;
     const lowFraction = (low - min) / (max - min);
     const highFraction = (high - min) / (max - min);
@@ -252,91 +260,91 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
 }
 // type set2d = ReturnType<typeof useState<[number, number]>>[1];
 type set2d = (v: [number, number]) => void;
-type RangeProps = ReturnType<typeof useRangeFilter> & { 
+type RangeProps = ReturnType<typeof useRangeFilter> & {
     setValue: set2d,
     minMax: [number, number],
+    // probably want to review how these are specified / controlled
+    histoWidth: number, //number of bins
+    histoHeight: number, //height of the histogram
 };
-const useBrushX = (ref: React.RefObject<SVGSVGElement>, {value, setValue, minMax, lowFraction, highFraction}: RangeProps) => {
-    const doc = useOuterContainer();
-    const getX = useCallback((e: { clientX: number }) => {
-        const { width, left } = ref.current.getBoundingClientRect();
-        const normalizedX = Math.min(1, Math.max(0, (e.clientX - left) / width));
-        const [min, max] = minMax;
-        return min + normalizedX * (max - min);
-    }, [minMax, ref.current]); //not sure we should need ref.current here... biome says.
-    //lots of refs to avoid recreating callbacks and losing association with the correct listeners
-    //may be better to use a class here (or brushX from d3)
-    const startXref = useRef(0);
-    const lastXref = useRef(0);
-    const handleRef = useRef<"L" | "H" | "M">("M");
-    const valueRef = useRef(value);
-    const startValueRef = useRef(value);
-    valueRef.current = value;
-    const handleMouseMove = useCallback((e: { clientX: number }) => {
-        const x = getX(e);
-        const v = valueRef.current;
-        if (handleRef.current === "M") {
-            let dx = x - startXref.current;
-            const s = startValueRef.current;
-            if (s[0] + dx < minMax[0]) {
-                dx = minMax[0] - s[0];
-            } else if (s[1] + dx > minMax[1]) {
-                dx = minMax[1] - s[1];
-            }
-            setValue([s[0] + dx, s[1] + dx]);
-        } else if (handleRef.current === "L") {
-            if (x > v[1]) {
-                handleRef.current = "H";
-                setValue([v[1], x]);
-            } else setValue([x, v[1]]);
-        } else if (x < v[0]) {
-            handleRef.current = "L";
-            setValue([x, v[0]]);
-        } else setValue([v[0], x]);
-    }, [getX, setValue, minMax]);
-    const handleMouseUp = useCallback(() => {
-        doc.removeEventListener('mouseup', handleMouseUp);
-        doc.removeEventListener('mousemove', handleMouseMove);
-    }, [doc, handleMouseMove]);
+
+export const useBrushX = (
+    ref: React.RefObject<SVGSVGElement>,
+    { value, setValue, minMax, histoWidth, histoHeight }: RangeProps //consider different typing here
+) => {
+    const brushRef = useRef<(ReturnType<typeof d3.brushX>) | null>(null);
+    const [initialValue] = useState(value);
+
     useEffect(() => {
         if (!ref.current) return;
-        const handleMouseDown = (e: { clientX: number }) => {
-            const x = getX(e);
-            startXref.current = x;
-            const value = valueRef.current;
-            const normalizedX = (x - minMax[0]) / (minMax[1] - minMax[0]);
-            // consider reviving 'no filter' behavior
-            if (Math.abs(normalizedX - lowFraction) < 0.05) {
-                handleRef.current = "L";
-                setValue([x, value[1]]);
-            } else if (Math.abs(normalizedX - highFraction) < 0.05) {
-                handleRef.current = "H";
-                setValue([value[0], x]);
-            } else if (normalizedX > lowFraction && normalizedX < highFraction) {
-                handleRef.current = "M";
-                startValueRef.current = value;
-                lastXref.current = x;
-            } else {
-                handleRef.current = "L"; //arbitrary choice between L and H
-                setValue([x, x]);
-            }
-            // setValue([x, x]); //not what we want... different handlers for low/high/mid,
-            // mouseMove should be on the outerContainer, not the svg...
-            //(similar to d3 brushX used on HistogramChart - could use that here, even?)
-            doc.addEventListener('mousemove', handleMouseMove);
-            doc.addEventListener('mouseup', handleMouseUp);
+
+        const svg = d3.select(ref.current);
+        // const { clientWidth } = ref.current;//clientWidth can change, we need to respond to that...
+        // Set up brush
+        const brush = d3.brushX()
+            .handleSize(1)
+            .extent([[0, -2], [histoWidth, histoHeight+2]])
+            .on("brush end", (event) => {
+                if (event.selection) {
+                    const [start, end] = event.selection.map((x: number) => {
+                        if (!ref.current) {
+                            console.error("No ref.current in brush event handler");
+                            return 0;
+                        }
+                        const { width } = ref.current.getBoundingClientRect();
+                        // Normalize x-coordinate to [minMax[0], minMax[1]]
+                        const r = width / histoWidth;
+                        const normalizedX = r * x / width;
+                        return minMax[0] + normalizedX * (minMax[1] - minMax[0]);
+                    });
+                    setValue([start, end]);
+                } else {
+                    setValue(minMax); // Reset to full range if brush is cleared
+                }
+            });
+
+        brushRef.current = brush;
+
+        // Apply the brush to the SVG
+        const brushGroup = svg.append("g").attr("class", "brush").call(brush);
+        // Initialize brush selection based on the initial value
+        if (initialValue) {
+            const [start, end] = initialValue.map(
+                (v) => ((v - minMax[0]) / (minMax[1] - minMax[0])) * histoWidth
+            );
+            brushGroup.call(brush.move, [start, end]); // Move the brush to the initial selection
+        }
+
+        // Apply `vectorEffect` directly to handles
+        brushGroup.selectAll(".selection").attr("vector-effect", "non-scaling-stroke");
+        brushGroup.selectAll(".handle").attr("vector-effect", "non-scaling-stroke");
+
+        // Cleanup on unmount
+        return () => {
+            svg.select(".brush").remove();
         };
-        ref.current.addEventListener('mousedown', handleMouseDown);
-        return () => ref.current?.removeEventListener('mousedown', handleMouseDown);
-    }, [ref, handleMouseMove, handleMouseUp, getX, setValue, minMax, lowFraction, highFraction, doc.addEventListener]);
-}
+    }, [ref, setValue, minMax, histoWidth, histoHeight, initialValue]);
+
+    const clearBrush = useCallback(() => {
+        if (!ref.current || !brushRef.current) return;
+
+        const svg = d3.select(ref.current);
+        //@ts-ignore life is too short
+        svg.select(".brush").call(brushRef.current.move, null);
+    }, [ref]);
+
+    // return { clearBrush };
+    // this seems to be working reasonably well 🤞
+    if (value === null) clearBrush();
+};
 const Histogram = observer((props: RangeProps) => {
-    const { histogram: data, lowFraction, highFraction, queryHistogram, value } = props;
+    const { histogram: data, queryHistogram, value } = props;
+    const { histoWidth, histoHeight } = props;
     const ref = useRef<SVGSVGElement>(null);
     useBrushX(ref, props);
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
-    const width = 99;
-    const height = 100;
+    const width = histoWidth;
+    const height = histoHeight;
     const lineColor = prefersDarkMode ? '#fff' : '#000';
     // Find max value for vertical scaling
     const maxValue = Math.max(...data);
@@ -346,9 +354,7 @@ const Histogram = observer((props: RangeProps) => {
     const xStep = data.length / (width + 1); // Space between points
     const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
 
-    const lowX = lowFraction * width;
-    const highX = highFraction * width;
-
+    const [hasQueried, setHasQueried] = useState(false);
     useEffect(() => {
         queryHistogram();
     }, [queryHistogram]);
@@ -359,17 +365,15 @@ const Histogram = observer((props: RangeProps) => {
         const x = index * xStep;
         const y = height - padding - value * yScale;
         return `${x},${y}`;
-    }).join(' '), [data, xStep, yScale]);
-    
+    }).join(' '), [data, xStep, yScale, height]);
+    const v = value || props.minMax;
     return (
         <>
-        <svg width={'100%'} height={height} 
+        <svg width={'100%'} height={height}
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
-        onClick={queryHistogram}
         ref={ref}
         cursor="move"
-        // onMouseDown={}
         >
             {/* Background polyline (the simple line connecting data points) */}
             <polyline
@@ -381,52 +385,9 @@ const Histogram = observer((props: RangeProps) => {
                 // but this would have been a real pain to figure out on my own)
                 vectorEffect="non-scaling-stroke" // Keeps the stroke width consistent
             />
-            {/* Highlighted range */}
-            <rect
-                x={0}
-                y={0}
-                width={lowX}
-                height={height}
-                fill={prefersDarkMode ? '#333' : '#888'}
-                fillOpacity="0.8"
-                cursor="crosshair"
-            />
-            <rect
-                x={highX}
-                y={0}
-                width={width - highX}
-                height={height}
-                fill={prefersDarkMode ? '#333' : '#888'}
-                fillOpacity="0.8"
-                cursor="crosshair"
-            />
-            {/* would be better if these had a strokeWidth that didn't stretch
-            and if the mouse events were actually related to them
-            
-            also making sure they don't jump to x
-            */}
-            <line
-                x1={lowX}
-                y1={0}
-                x2={lowX}
-                y2={height}
-                stroke={lineColor}
-                strokeWidth="0.5"
-                cursor="ew-resize"
-                opacity={0.5}
-            />
-            <line
-                x1={highX}
-                y1={0}
-                x2={highX}
-                y2={height}
-                stroke={lineColor}
-                strokeWidth="0.5"
-                cursor="ew-resize"
-                opacity={0.5}
-            />
+            {/* d3.brushX will add more elements as a side-effect, handled in hook */}
         </svg>
-        <p className="flex justify-between"><em>{`${value[0].toFixed(2)}<`}</em> <em>{`<${value[1].toFixed(2)}`}</em></p>
+        <p className="flex justify-between"><em>{`${v[0].toFixed(2)}<`}</em> <em>{`<${v[1].toFixed(2)}`}</em></p>
         </>
     );
 });
@@ -440,7 +401,7 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     }, [filters, column.field]);
     return (
         <div>
-            <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} />
+            <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} histoWidth={99} histoHeight={100} />
             {/* <Slider
                 size="small"
                 value={value}
@@ -486,6 +447,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     const clearFilter = useCallback(
         action((e: MouseEvent) => {
             e.stopPropagation();
+            // what about clearing the brush on histogram?
             filters[column.field] = null;
         }),
         []  //xxx: don't need deps here because the mobx references are stable?
@@ -525,7 +487,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
                     <HighlightOffIcon />
                 </IconButton>
                 <div className="flex items-center h-4">
-                    <Typography variant="subtitle1">{column.name} 
+                    <Typography variant="subtitle1">{column.name}
                         {hasFilter && <IconButton onClick={clearFilter}>
                             <CachedIcon fontSize="small" />
                         </IconButton>}
@@ -554,8 +516,8 @@ const AddRowComponent = observer(() => {
     }, [filters, param, config]);
     return (
         <div className="p-5">
-        <ColumnSelectionComponent 
-        setSelectedColumn={setSelectedColumn} 
+        <ColumnSelectionComponent
+        setSelectedColumn={setSelectedColumn}
         placeholder="Add a filter column"
         exclude={param}
         />
@@ -578,7 +540,7 @@ const ForeignRows = () => {
             <TextField size="small" className="max-w-20 float-right" type="number"
             label="Max" variant="outlined"
                 value={max}
-                onChange={(e) => setMax(Number(e.target.value))} 
+                onChange={(e) => setMax(Number(e.target.value))}
             />
 
             {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}

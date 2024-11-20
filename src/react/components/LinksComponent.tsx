@@ -9,25 +9,28 @@ import { useMemo, useState } from "react";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import LinkIcon from '@mui/icons-material/Link';
 import { Dialog, IconButton } from "@mui/material";
+import { g } from "@/lib/utils";
 
-type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>;
+type RowsAsColsProps = NonNullable<ReturnType<typeof useRowsAsColumnsLinks>>;
 
-const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
+const RowsAsCols = observer((props : RowsAsColsProps) => {
+    const { linkedDs, link } = props;
     const [expanded, setExpanded] = useState(false);
     const rowNames = useHighlightedForeignRows().map(r => r.value);
     const { name_column, name, subgroups } = link;
     // const dataSources = useDataSources();
     const cm = window.mdv.chartManager;
     const targetColumn = cm.getDataSource(linkedDs.name).columnIndex[name_column] as DataColumn<DataType>;
-    const ds = useDataStore();
-    const spec: GuiSpec<'multidropdown'> = useMemo(() => makeAutoObservable({
+    // const ds = useDataStore();
+    const spec: GuiSpec<'multidropdown'> = useMemo(() => makeAutoObservable(g({
         type: 'multidropdown',
-        name: name_column,
+        // name: name_column,
         label: name,
-        values: [["<<live link>>", ...targetColumn.values]],
+        // values: [["<<live link>>", ...targetColumn.values]],
+        values: [targetColumn.values],
         // current_value: targetColumn.values[0],
         current_value: rowNames,
-    }), [targetColumn, name_column, name, rowNames]);
+    })), [targetColumn, name, rowNames]);
     const { current_value } = spec;
     const v = Array.isArray(current_value) ? current_value : [current_value];
     return (
@@ -37,7 +40,7 @@ const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
             </IconButton>
                 {/* <h3><em>'{linkedDs.name}'</em> rows as <em>'{ds.name}'</em> columns</h3> */}
                 {expanded && <DropdownAutocompleteComponent props={spec} />}
-            
+
         </>
     )
 });
@@ -46,7 +49,6 @@ const RowsAsCols = observer(({linkedDs, link} : RowsAsColsProps) => {
 export default observer(function LinksComponent() {
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
     if (!linkProps) return null;
-    const { linkedDs, link } = linkProps;
     return (
         <>
             {/* <JsonView src={link} /> */}

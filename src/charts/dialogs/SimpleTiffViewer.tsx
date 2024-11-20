@@ -14,7 +14,7 @@ interface SimpleTiffViewerProps {
   isFullscreen: boolean;
 }
 
-const SimpleTiffViewer: React.FC<SimpleTiffViewerProps> = observer(({ width, height, isFullscreen }) => {
+const SimpleTiffViewer: React.FC<SimpleTiffViewerProps> = observer(({ width, height, isFullscreen }: SimpleTiffViewerProps) => {
   const loader = useLoader();
   const { colors, contrastLimits, channelsVisible, selections, brightness, contrast } = useChannelsStore(
     ({ colors, contrastLimits, channelsVisible, selections, brightness, contrast }) => ({
@@ -78,7 +78,7 @@ const SimpleTiffViewer: React.FC<SimpleTiffViewerProps> = observer(({ width, hei
       views={[detailView]}
       layerProps={[layerConfig]}
       viewStates={[{ ...viewState, id: 'detail-view' }]}
-      onViewStateChange={e => {
+      onViewStateChange={(e: any) => {
         console.log('View State Change:', e.viewState);
         viewerStore.setState({ viewState: { ...e.viewState, id: 'detail-view' } });
       }}
@@ -91,7 +91,7 @@ const SimpleTiffViewer: React.FC<SimpleTiffViewerProps> = observer(({ width, hei
           width: `${viewerWidth}px`,
           position: 'relative',
         },
-        onError: (error) => {
+        onError: (error: any) => {
           console.error('MDVivViewer Error:', error);
         },
       }}

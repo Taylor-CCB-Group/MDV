@@ -6,7 +6,7 @@ import { CompositeMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useChartID, useRangeDimension2D } from "./hooks";
-import type { Chart } from "@/charts/charts";
+import type BaseChart from "@/charts/BaseChart";
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -35,7 +35,7 @@ type SpatialAnnotationState = {
 };
 
 // Could more usefully be thought of as SpatialContext?
-const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined);
+const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined as any);
 
 const getEmptyFeatureCollection = () => ({
     type: "FeatureCollection",
@@ -69,7 +69,7 @@ function useScatterModelMatrix() {
 }
 
 
-function useCreateRange(chart: Chart) {
+function useCreateRange(chart: BaseChart<any>) {
     const id = useChartID();
     const { modelMatrix } = useScatterModelMatrix();
     // consider making selectionFeatureCollection part of config, so it can be persisted
@@ -79,7 +79,7 @@ function useCreateRange(chart: Chart) {
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
-    
+
     useEffect(() => {
         console.log("pending different way of managing resetButton?");
         chart.removeFilter = () => {
@@ -110,12 +110,12 @@ function useCreateRange(chart: Chart) {
             editHandlePointStrokeWidth: 1,
             editHandleIconSizeScale: 1,
             editHandlePointRadiusMaxPixels: 5,
-            getEditHandlePointColor: h => { 
+            getEditHandlePointColor: h => {
                 const intermediate = h.properties.editHandleType === "intermediate";
                 return [0, 0, intermediate ? 200 : 0, 255]
             },
             lineWidthMinPixels: 1,
-            selectedFeatureIndexes,            
+            selectedFeatureIndexes,
             onEdit: ({ updatedData }) => {
                 // console.log("onEdit", editType, updatedData);
                 const feature = updatedData.features.pop();
@@ -143,7 +143,8 @@ function useCreateMeasure() {
     const [endPixels, setEnd] = useState<P>([0, 0]);
     return { startPixels, setStart, endPixels, setEnd };
 }
-function useCreateSpatialAnnotationState(chart: Chart) {
+//@ts-expect-error maybe we can have a generic that describes appropriate types of chart
+function useCreateSpatialAnnotationState(chart: BaseChart) {
     // should we use zustand for this state?
     // doesn't matter too much as it's just used once by SpatialAnnotationProvider
     // consider for project-wide annotation stuff as opposed to ephemeral selections
@@ -155,7 +156,8 @@ function useCreateSpatialAnnotationState(chart: Chart) {
 export function SpatialAnnotationProvider({
     chart,
     children,
-}: { chart: Chart } & React.PropsWithChildren) {
+//@ts-expect-error maybe we can have a generic that describes appropriate types of chart
+}: { chart: BaseChart } & React.PropsWithChildren) {
     const annotationState = useCreateSpatialAnnotationState(chart);
     return (
         <SpatialAnnotationState.Provider value={annotationState}>
@@ -176,7 +178,7 @@ export function useMeasure() {
     return measure;
 }
 
-/** work in progress... very much unstable return type etc, but starting to make use 
+/** work in progress... very much unstable return type etc, but starting to make use
  * and hopefully refactor into something coherent soon.
  */
 export function useSpatialLayers() {
@@ -184,7 +186,7 @@ export function useSpatialLayers() {
     const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
     const { getTooltip } = scatterProps;
     // const layers = [rectRange.polygonLayer, scatterplotLayer]; /// should probably be in a CompositeLayer?
-    return { 
+    return {
         getTooltip, scatterProps, selectionLayer: rectRange.editableLayer,
         selectionProps: rectRange
     };

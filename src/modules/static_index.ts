@@ -20,12 +20,13 @@ declare global {
     interface Window {
         mdv: {
             ChartManager: typeof ChartManager;
-            chartManager?: ChartManager;
+            chartManager: ChartManager;
             chartTypes?: any;
             debugChart?: any;
         };
     }
 }
+//@ts-expect-error maybe we'll be less hacky about this later
 window.mdv = {
     // does this not want to be a singleton - rather than referring to the class?
     // not sure what I'd use the class for - would generally import in a module
@@ -127,7 +128,7 @@ async function loadData() {
         datasources,
         dataLoader,
         config,
-        listener,
+        listener as any, //jsdoc 🙄
     );
 
     // add a button for debugging datasources & views metadata

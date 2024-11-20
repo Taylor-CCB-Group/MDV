@@ -1,16 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-
-interface Project {
-    id: string;
-    name: string;
-    type: "Editable" | "Read-Only";
-    lastModified: string;
-    createdAt: string;
-    owner: string;
-    collaborators: string[];
-    numberOfStructures: string;
-    numberOfImages: string;
-}
+import type { Project, ProjectAccessType } from "../utils/projectUtils";
 
 const useProjects = () => {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -296,7 +285,7 @@ const useProjects = () => {
     );
 
     const changeProjectType = useCallback(
-        async (id: string, newType: "Editable" | "Read-Only") => {
+        async (id: string, newType: ProjectAccessType) => {
             setIsLoading(true);
             setError(null);
 

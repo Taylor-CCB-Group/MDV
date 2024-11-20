@@ -1,6 +1,6 @@
 import { DataModel } from "../table/DataModel.js";
 import { Deck } from "@deck.gl/core";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import { ImageArray } from "../webgl/ImageArray";
 import { ImageArrayDeckExtension } from "../webgl/ImageArrayDeckExtension";
@@ -8,12 +8,15 @@ import { ImageArrayDeckExtension } from "../webgl/ImageArrayDeckExtension";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { OrthographicView } from "@deck.gl/core";
 import type Dimension from "../datastore/Dimension.js";
-import type { GuiSpec } from "./charts.js";
+import type { LoadedDataColumn, GuiSpec, NumberDataType } from "./charts.js";
+import type DataStore from "@/datastore/DataStore.js";
 
 // not a definitive type, but marginally better than 'any', locally for now...
-type Column = { data: Float32Array; minMax: [number, number] };
+//type Column = { data: Float32Array; minMax: [number, number] };
+type Column = LoadedDataColumn<NumberDataType>;
 let nextID = 0;
-class ImageScatterChart extends BaseChart {
+//todo type this config
+class ImageScatterChart extends BaseChart<any> {
     canvas: HTMLCanvasElement;
     imageArray: ImageArray;
     deck: Deck<OrthographicView>;
@@ -27,7 +30,8 @@ class ImageScatterChart extends BaseChart {
     spaceY = 392;
     colorBy?: (index: number) => number[];
     id: number;
-    constructor(dataStore, div, config) {
+    // todo - type this config
+    constructor(dataStore: DataStore, div: HTMLDivElement, config: any) {
         super(dataStore, div, config);
         this.id = nextID++;
         const canvas = (this.canvas = createEl("canvas", {}, this.contentDiv));
@@ -66,7 +70,7 @@ class ImageScatterChart extends BaseChart {
                 // if these are not set, there is an error when first using mouse-wheel to zoom
                 target: [0, 0, 0],
                 zoom: 0, //0 means "one pixel is one unit", 1 scales by 2
-            }, 
+            },
             getTooltip: (info) => {
                 try {
                     const { index, picked } = info;
@@ -81,6 +85,7 @@ class ImageScatterChart extends BaseChart {
                         index,
                         titleColumn,
                     );
+                    if (!picked) return null;
                     return (
                         picked && {
                             html: `
@@ -127,6 +132,7 @@ class ImageScatterChart extends BaseChart {
 
         const { imageArray, billboard } = this;
         // const {getImageAspect, getImageIndex} = this.imageArray;// need to bind this
+        const { colorBy } = this;
         const layer = new ScatterplotLayer({
             id: `scatter-${this.id}`,
             data,
@@ -149,8 +155,8 @@ class ImageScatterChart extends BaseChart {
             // getFillColor: this.colorBy ? (i: K)=>[...this.colorBy(i), this.opacity] : [255, 255, 255, this.opacity],
             opacity: this.opacity / 255,
             saturation: this.saturation,
-            getFillColor: (this.colorBy
-                ? (i: K) => this.colorBy(i)
+            getFillColor: (colorBy
+                ? (i: K) => colorBy(i)
                 : [255, 255, 255]) as unknown as any,
             imageArray,
             updateTriggers: {
@@ -160,7 +166,7 @@ class ImageScatterChart extends BaseChart {
                 // It should be be able to avoid updating position etc when unrelated data changes, but that's not happening.
                 getImageAspect: this.progress,
                 getPosition: [this.spaceX, this.spaceY],
-                getFillColor: [this.colorBy, this.opacity],
+                getFillColor: [colorBy, this.opacity],
             },
             extensions: [new ImageArrayDeckExtension()],
         });
@@ -179,7 +185,7 @@ class ImageScatterChart extends BaseChart {
         this.updateDeck();
     }
     colorByDefault() {
-        this.colorBy = null;
+        this.colorBy = undefined;
         this.updateDeck();
     }
 
@@ -298,7 +304,7 @@ BaseChart.types["ImageScatterChart"] = {
         config.image_key = i.key_column;
     },
     extra_controls: (dataStore) => {
-        const imageSets = [];
+        const imageSets: {name: string, value: string}[] = [];
         for (const iname in dataStore.images) {
             imageSets.push({ name: iname, value: iname });
         }

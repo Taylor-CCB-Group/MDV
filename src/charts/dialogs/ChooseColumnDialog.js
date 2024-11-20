@@ -1,6 +1,6 @@
 import { createEl } from "../../utilities/Elements";
 import { BaseDialog } from "../../utilities/Dialog.js";
-import { getRandomString } from "../../utilities/Utilities.js";
+import { getRandomString } from "../../utilities/Utilities";
 
 /**
  * Creates a dialog for the user to choose multiple columns

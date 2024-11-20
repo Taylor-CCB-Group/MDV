@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useChart, useDataStore } from "../context";
 import { observer } from "mobx-react-lite";
-import type { ColumnName } from "../../charts/charts";
+// should maybe be FieldName rather than ColumnName here
+import type { DataColumn, ColumnName } from "../../charts/charts";
 import { useHighlightedIndex } from "../selectionHooks";
 
 function useColumnData(columnName: ColumnName, maxItems = 100) {
     const ds = useDataStore();
-    const [columnData, setColumnData] = useState<Float32Array>(null);
-    const [indices, setIndices] = useState<Uint32Array>(null);
-    const [column, setColumn] = useState(null);
+    const [columnData, setColumnData] = useState<Float32Array | null>();
+    const [indices, setIndices] = useState<Uint32Array | null>();
+    const [column, setColumn] = useState<DataColumn<any> | null>(null);
     // biome-ignore lint/correctness/useExhaustiveDependencies: ds._filteredIndicesPromise is used to trigger reactivity
     useEffect(() => {
         if (!window.mdv.chartManager) return;
@@ -59,8 +60,7 @@ function useColumnData(columnName: ColumnName, maxItems = 100) {
 }
 
 function useMarkdownText(md: string) {
-    const [renderTextFn, setRenderTextFn] =
-        useState<(md: string) => string>(null);
+    const [renderTextFn, setRenderTextFn] = useState<(md: string) => string>();
     const [html, setHtml] = useState<string>("");
     useEffect(() => {
         import("../../utilities/MarkdownText").then(
@@ -87,6 +87,7 @@ export const HighlightedFeatureComponent = observer(() => {
         8,
     );
     const highlightedIndex = useHighlightedIndex();
+    if (!indices) return <></>;
     const highlightInRange =
         indices && highlightedIndex >= 0 && indices.includes(highlightedIndex);
     const highlightValue = column?.data[highlightedIndex];

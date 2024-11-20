@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useState, useMemo, useId, useCallback, useEffect } from "react";
-import type { Chart, GuiSpec, GuiSpecType } from "../../charts/charts";
+import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
 import {
@@ -20,8 +20,10 @@ import JsonView from "react18-json-view";
 import { ChartProvider } from "../context";
 import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
+import { g, isArray } from "@/lib/utils";
+import type BaseChart from "@/charts/BaseChart";
 
-export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<GuiSpecType>, htmlFor?: string }) => (
+export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<any>, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>{props.label}</Typography>
     // todo fix justifySelf - it's not working as expected
     // <FormControlLabel
@@ -88,7 +90,7 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
             type="number"
             value={props.current_value}
             min={props.min || 0}
-            max={props.max || null}
+            max={props.max}
             step={props.step || 1}
             onChange={action((e) => {
                 const value = (props.current_value = Number.parseInt(
@@ -99,18 +101,20 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
         />
     </>
 );
+type ColumnSelectionSpec = GuiSpec<"column"> | GuiSpec<"multicolumn">;
 /**
  * Wrap the ColumnSelectionComponent in a setting GUI component.
- * 
+ *
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
-export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"column" | "multicolumn"> }) => {
+export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSelectionSpec }) => {
     // proably want to change the type of ColumnSelectionProps anyway...
     // perhaps we should be looking at other places where it's used & make them use this,
     // with a different evolution of the API.
     // currently this is not showing the current_value, among other missing features...
     const setSelectedColumn = useCallback(action((v: string) => {
         props.current_value = v;
+        //@ts-expect-error //! this is genuinely not fully implemented yet, when it is, types should be right
         props.func?.(v);
     }), []); //as of this writing, biome is right that props is not a dependency
 
@@ -130,72 +134,123 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
-export const DropdownAutocompleteComponent = observer(({
-    props,
-}: { props: GuiSpec<"dropdown" | "multidropdown"> }) => {
-    // todo review 'virtualization' for large lists
-    const id = useId();
-    const multiple = props.type === "multidropdown";
-    // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
-    if (!props.values) throw "DropdownAutocompleteComponent requires props.values";
-    const useObjectKeys = props.values.length === 3;
-    const [_valueObjectArray, labelKey, valueKey] = useObjectKeys ? props.values : ["X", "X", "X"];
+// nb this is not the same as `GuiSpec<"dropdown" | "multidropdown">`
+type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
+// type DropdownSpec = GuiSpec<"dropdown" | "multidropdown">;
+function getOptionAsObjectHelper(values: DropDownValues) {
+    const useObjectKeys = values.length === 3;
+    const [_valueObjectArray, labelKey, valueKey] = useObjectKeys ? values : ["X", "X", "X"];
     if (!labelKey || !valueKey) throw "DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys";
-    //todo handle multitext / tags properly.
-
-    // todo think about how this relates to different type logic with {label, value, original}
-    // const validVals = useObjectKeys ? valueObjectArray.map(item => item[valueKey]) : valueObjectArray;
-
-    const toOption = useCallback((original) => {
-        const label: string = useObjectKeys ? original[labelKey] : original;
-        // is value really always a string?
-        const value: string = useObjectKeys ? original[valueKey] : original;
-        // const id: string = uuid();
+    type Option = { label: string, value: string, original: any };
+    // might put some more elaborate types here on original at some point
+    return (original: string | any): Option => {
+        const isString = typeof original === "string";
+        if (isString === useObjectKeys) throw "DropdownAutocompleteComponent requires values to be either all strings or all objects";
+        if (isString) {
+            return { label: original, value: original, original };
+        }
+        const label: string = original[labelKey];
+        const value: string = original[valueKey];
         return { label, value, original };
-    }, [useObjectKeys, labelKey, valueKey]);
+    };
+}
+function useDropdownOptions(props: DropdownSpec) {
+    // this check should be redundant with current types, but leaving it in for now
+    if (!props.values) throw "DropdownAutocompleteComponent requires props.values - probable logic error in type definitions";
+    const toOption = useCallback(getOptionAsObjectHelper(props.values), []);
     type OptionType = ReturnType<typeof toOption>;
-    const options = useMemo(() => props.values[0].map(toOption), [props.values, toOption]);
+    const NO_OPTIONS = [{ label: "No options (error - sorry...)", value: "", original: "" }];
+    const options = useMemo(() => props.values?.[0].map(toOption) || NO_OPTIONS, [props.values, toOption]);
     // bit of a faff with sometimes getting a one-item array, sometimes a single item...
     const getSingleOption = useCallback(
-        (option: OptionType | OptionType[]) => {
-            const a = Array.isArray(option);
+        (option: OptionType | OptionType[] | undefined) => {
+            if (!option) return NO_OPTIONS[0];
+            const a = isArray(option);
             if (a && option.length > 1) {
                 console.warn("ideally we shouldn't have to deal with arrays at all here, but we only expect one value when we do");
             }
-            return (Array.isArray(option) ? option[0] : option)
+            return (isArray(option) ? option[0] : option)
         },
-        []);
+        []
+    );
+    // coerce to single option
     const single = getSingleOption;
+    // get label for option
+    // -- do we need `| OptionType[]` here - perhaps `getSingleOption` can go away as well?
     const label = useCallback((option: OptionType | OptionType[]) => single(option).label, [single]);
+    // const label = useCallback((option: OptionType) => single(option).label, [single]);
+    // get value for option
     const val = useCallback((option: OptionType | OptionType[]) => single(option).value, [single]);
 
     // ------
-    // deal with cases where the options have changed (e.g. values from a different column)
-    // and may be incompatible with props.current_value
+    // deal with cases where the options have changed (e.g. values from a different column
+    // when a different "contour parameter" is selected by another GUI element)
+    // so available values may be incompatible with props.current_value
     // ------
     // if 'multiple' is true, make sure we get an array even if one / zero values selected.
-    // second half of ternary will either be the existing array if 'multiple', or the single value otherwise.
-    const v = useMemo(() => (
-        multiple && !Array.isArray(props.current_value)
-            ? [props.current_value]
-            : props.current_value
-    ), [props.current_value, multiple]);
-    // check that and maybe provide a bit of a type guard
-    if (multiple !== Array.isArray(v))
-        throw "logical inconsistency - 'multidropdown' value should be coerced to array by now";
+    // this should now be handled by type-predicate isMultidropdown
+    // const multiple = isMultidropdown(props);
+    const v = props.current_value;
     const validVal = useCallback(
         (v: string) => options.some((item) => item.value === v),
         [options],
     );
-    const isArray = Array.isArray(v);
-    const allValid = isArray ? v.every(validVal) : validVal(v);
-    const okValue = allValid ? v : isArray ? v.filter(validVal) : null;
+    // some type checking / evaluation
+    // if (props.type === "multidropdown") {
+    //     const t: "multidropdown" = props.type;
+    //     const arr: string[] = props.current_value;
+    //     const func: GuiSpec<"multidropdown">['func'] = props.func;
+    // } else {
+    //     const t: "dropdown" = props.type;
+    //     //@ts-expect-error
+    //     const arr: string = v;
+    //     const arr2: string = props.current_value;
+    //     if (props.func) {
+    //         const func: (v: string) => void = props.func;
+    //     }
+    // }
+    const isVArray = isArray(v);
+    const allValid = isVArray ? v.every(validVal) : validVal(v);
+    const okValue = allValid ? v : isVArray ? v.filter(validVal) : null;
     //map from 'value' string to option object
-    const okOption = (Array.isArray(okValue)
+    const okOption = (isArray(okValue)
         ? okValue.map((v) => options.find((o) => o.value === v))
         : [options.find((o) => o.value === v)])
     // : options.find((o) => o.value === v); //not-multiple...
 
+    return {options, single, label, val, okOption};
+}
+function isMultidropdown(props: DropdownSpec): props is GuiSpec<"multidropdown"> {
+    const multi = props.type === "multidropdown";
+    if (multi !== isArray(props.current_value)) throw "current_value should be an array if (and only if) type is multidropdown";
+    return multi;
+}
+function inferDropdownType<T extends "dropdown" | "multidropdown">(props: GuiSpec<T>): GuiSpec<T> {
+    return props;
+}
+function getCurrentValue(props: DropdownSpec) {
+    const multi = isMultidropdown(props);
+    if (multi) return props.current_value; //ts correctly infers this is an array
+    // return props.current_value; //.. fails to infer this is a string
+    if (isArray(props.current_value)) throw "current_value should be an array if and only if type is multidropdown";
+    return props.current_value;
+}
+export const DropdownAutocompleteComponent = observer(({
+    props//: propsAmbiguous,
+}: { props: DropdownSpec }) => {
+    // todo review 'virtualization' for large lists
+    const id = useId();
+    // const props = inferDropdownType(propsAmbiguous);
+    const multiple = isMultidropdown(props);
+    // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
+    if (!props.values) throw "DropdownAutocompleteComponent requires props.values";
+    //todo handle multitext / tags properly.
+
+    const {options, single, label, val, okOption} = useDropdownOptions(props);
+
+    type Option = typeof options[number]; // hopefully we can improve `{ original: any }`
+    // still not entirely sure about the type for onChange...
+    type OVal = Option | Option[] | (Option | Option[])[] | null;
     return (
         <>
             <MLabel htmlFor={id} props={props} />
@@ -207,24 +262,25 @@ export const DropdownAutocompleteComponent = observer(({
                 options={options}
                 disableCloseOnSelect={multiple}
                 getOptionLabel={label}
-                value={okOption}
-                onChange={action((_, value: OptionType) => {
+                value={okOption.filter((a) => a !== undefined)}
+                onChange={action((_, value: OVal) => {
                     //added type annotation above because mobx seems to fluff the inference to `never`
                     if (value === null) return;
-                    if (Array.isArray(value)) {
-                        // && valueA.length > 1) {
-                        const selected = Array.from(value).map(
-                            (a: OptionType) => a.value,
-                        );
-                        props.current_value = selected;
-                        if (props.func) props.func(selected);
+                    if (isArray(value)) {
+                        if (!multiple) throw "shouldn't get an array here";
+                        const vals = value.map(val);
+                        props.current_value = vals;
+                        props.func?.(vals);
                         return;
                     }
-                    props.current_value = value.value;
-                    if (props.func) props.func(value.value);
+                    if (multiple) throw "shouldn't get a single value here";
+                    const v = val(value);
+                    props.current_value = v;
+                    if (props.func) props.func(v);
                 })}
-                isOptionEqualToValue={(option, value) => single(option).original === single(value).original}
+                isOptionEqualToValue={(option, value) => (single(option).original === single(value).original)}
                 renderOption={(props, option, { selected }) => {
+                    if (!option) return null; //FFS let's switch to Rust or something
                     // we could potentially render something richer here - like color swatches or icons
                     // if we had a richer sense of the data in context
                     // ^^ e.g. if we had a `GuiSpec<'category'>` it could have it's own internal logic for
@@ -253,7 +309,7 @@ export const DropdownAutocompleteComponent = observer(({
                 renderTags={(tagValue, getTagProps) => {
                     //seems to be a material-ui bug with not properly handling key / props...
                     //https://stackoverflow.com/questions/75818761/material-ui-autocomplete-warning-a-props-object-containing-a-key-prop-is-be
-                    return tagValue.map((option, index) => (
+                    return tagValue.map((option, index) => !option ? null : (
                         <Chip
                             {...getTagProps({ index })}
                             key={val(option)}
@@ -272,90 +328,7 @@ export const DropdownAutocompleteComponent = observer(({
         </>
     );
 });
-
-const DropdownComponent = ({
-    props,
-}: { props: GuiSpec<"dropdown" | "multidropdown"> }) => {
-    const id = useId();
-    const [filter, setFilter] = useState("");
-    const filterArray = filter.toLowerCase().split(" ");
-    const multiple = props.type === "multidropdown";
-    const v =
-        multiple && !Array.isArray(props.current_value)
-            ? [props.current_value]
-            : props.current_value;
-    // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
-    const useObjectKeys = props.values.length === 3;
-    const [valueObjectArray, textKey, valueKey] = props.values;
-    // for some reason I can't get this to work with useMemo, but it's not particularly heavy - we also don't memoize the children of the dropdown...
-    // so if we do find this is expensive, we can definitely optimize better.
-    // we just want a string array to filter on to avoid throwing error e.g. if we have a current_value that's not in the dropdown because category changed.
-    //todo handle multitext / tags properly.
-    const validVals = useObjectKeys
-        ? valueObjectArray.map((item) => item[valueKey])
-        : valueObjectArray;
-
-    const validVal = useCallback(
-        (v: string) => validVals.some((item) => item === v),
-        [validVals],
-    );
-    const isArray = Array.isArray(v);
-    const allValid = isArray ? v.every(validVal) : validVal(v);
-    const okValue = allValid ? v : isArray ? v.filter(validVal) : null; //not ok after changing category?
-
-    // type E = SelectChangeEvent<string | string[]>;
-    type E = { target: { value: string | string[] } }; // material-ui vs native types are different, but compatible enough to use this here
-    const handleChange = action((e: E) => {
-        const {
-            target: { value },
-        } = e;
-        if (multiple && Array.isArray(value) && value.length > 1) {
-            const selected = Array.from(value); // .map(o => o.value);
-            props.current_value = selected;
-            if (props.func) props.func(selected);
-            return;
-        }
-        props.current_value = value;
-        if (props.func) props.func(value);
-    });
-
-    return (
-        <>
-            <MLabel htmlFor={id} props={props} />
-            <Select
-                size="small"
-                id={id}
-                multiple={multiple}
-                value={okValue}
-                className="w-full"
-                onChange={handleChange}
-            >
-                {props.values[0].map((item) => {
-                    const text = useObjectKeys ? item[textKey] : item;
-                    const value = useObjectKeys ? item[valueKey] : item;
-                    const id = uuid();
-                    if (
-                        filterArray.some((f) => !text.toLowerCase().includes(f))
-                    )
-                        return null;
-                    return (
-                        <MenuItem key={id} value={value}>
-                            {text}
-                        </MenuItem>
-                    );
-                })}
-            </Select>
-            <div />
-            <input
-                type="text"
-                value={filter}
-                placeholder="Filter options..."
-                onChange={(e) => setFilter(e.target.value)}
-                className="m-1 pl-1 justify-self-center"
-            />
-        </>
-    );
-};
+// removed unused DropdownComponent...
 
 const CheckboxComponent = ({ props }: { props: GuiSpec<"check"> }) => (
     <>
@@ -376,7 +349,7 @@ const RadioButtonComponent = ({
     props,
 }: { props: GuiSpec<"radiobuttons"> }) => {
     const choices = useMemo(
-        () => props.choices.map((v) => ({ v, id: uuid() })),
+        () => props.choices?.map((v) => ({ v, id: uuid() })) || [],
         [props.choices],
     );
     return (
@@ -453,7 +426,8 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
         <Button
             variant="contained"
             onClick={() => {
-                if (props.func) props.func(undefined);
+                //is there a nicer way to write this / define GuiValueTypes?
+                if (props.func) props.func(undefined as never);
             }}
         >
             {props.label}
@@ -532,7 +506,7 @@ const ErrorComponent = observer(({ props, label }: { props: any, label: string }
 
 // how close is this to something we could use from AddChartDialog?
 export const AbstractComponent = observer(
-    ({ props }: { props: GuiSpec<GuiSpecType> }) => {
+    ({ props }: { props: AnyGuiSpec | GuiSpec<GuiSpecType> }) => {
         // would like to lose this `as` cast - maybe a newer/future typescript might manage it better?
         const Component = Components[props.type] as React.FC<{
             props: typeof props;
@@ -553,12 +527,12 @@ export const AbstractComponent = observer(
     },
 );
 
-export default observer(({ chart }: { chart: Chart }) => {
+export default observer(<T,>({ chart }: { chart: BaseChart<T> }) => {
     const settings = useMemo(() => {
         // is the id just for a key in this component, or should the type passed to the component recognise it?
         // for now, I don't think there's a benefit to including it in the type.
         // FolderComponent also makes keys in a similar way that is again only relevant locally I think.
-        const settings = chart
+        const settings = chart //todo: fix this typecast, resolve `Chart` vs `BaseChart`...
             .getSettings()
             .map((setting) => ({ setting, id: uuid() }));
         const wrap = { settings };

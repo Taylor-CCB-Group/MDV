@@ -81,7 +81,7 @@ const MaterialWrapper = observer(function MaterialWrapper({
 const createMdvPortal = (
     component: JSX.Element,
     container: HTMLElement,
-    parent?: BaseChart | BaseDialog,
+    parent?: BaseChart<any> | BaseDialog,
 ) => {
     const root = createRoot(container);
     root.render(

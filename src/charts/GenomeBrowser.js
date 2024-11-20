@@ -1,4 +1,4 @@
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import CustomDialog from "./dialogs/CustomDialog.js";
 

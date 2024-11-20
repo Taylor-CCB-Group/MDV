@@ -1,4 +1,4 @@
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { select } from "d3-selection";
 import { scaleLinear, scaleBand } from "d3-scale";
 import "d3-transition";
