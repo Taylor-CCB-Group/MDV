@@ -36,6 +36,7 @@ export function useRegionScale() {
         console.warn(
             `physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`,
         );
+    if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
     const scale = Pixels.PhysicalSizeX / regionScale;
     return scale;
 }
@@ -49,7 +50,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
     // not using as dependency for scaling viewState to data - we don't want to zoom as chart size changes
     // (at least for now - may consider making this configurable / testing it out)
 
-    const [viewState, setViewState] = useState<ViewState>(null); //we should consider how this interacts with viv ViewerStore
+    const [viewState, setViewState] = useState<ViewState | null>(); //we should consider how this interacts with viv ViewerStore
     useEffect(() => {
         if (!config.zoom_on_filter) return;
         if (data.length === 0) {
@@ -112,7 +113,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
             // minZoom: -10,
             maxZoom,
             transitionDuration: 400, // Smooth transition
-            transitionEasing: (x) => -(Math.cos(Math.PI * x) - 1) / 2, //https://easings.net/#easeInOutSine
+            transitionEasing: (x: number) => -(Math.cos(Math.PI * x) - 1) / 2, //https://easings.net/#easeInOutSine
             // transitionInterpolator: new FlyToInterpolator({speed: 1}), //applicable for MapState - latitude is required
         });
     }, [
@@ -127,7 +128,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
     return viewState;
 }
 
-type Tooltip = (PickingInfo) => string;
+// type Tooltip = (PickingInfo) => string;
 type P = [number, number];
 export function useScatterplotLayer(modelMatrix: Matrix4) {
     const id = useChartID();
@@ -140,11 +141,12 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
 
     const data = useFilteredIndices();
     const [cx, cy, contourParameter] = useParamColumns();
-    const hoverInfoRef = useRef<PickingInfo>(null);
+    const hoverInfoRef = useRef<PickingInfo | null>(null);
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
     const getLineWidth = useCallback(
-        (i: number) => {
+        (i: unknown) => {
+            if (typeof i !== "number") throw new Error("expected index");
             return i === highlightedIndex ? (0.2 * radiusScale) / scale : 0.0;
         },
         [radiusScale, highlightedIndex],
@@ -152,7 +154,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const contourLayers = useLegacyDualContour();
 
     const tooltipCol = useMemo(() => {
-        if (!config.tooltip) return undefined;
+        if (!config.tooltip.column) return undefined;
         return chart.dataStore.columnIndex[config.tooltip.column];
     }, [config.tooltip, config.tooltip.column, chart.dataStore.columnIndex]);
     const getTooltipVal = useCallback(
@@ -165,7 +167,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     // biome-ignore lint/correctness/useExhaustiveDependencies: fix this
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
-        ({ object }) => {
+        () => {
             if (!config.tooltip.show) return;
             // testing reading object properties --- pending further development
             // (not hardcoding DN property etc)
@@ -204,7 +206,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             getFillColor: colorBy ?? [255, 255, 255],
             getRadius: 1 / scale,
             // todo review buffer data / accessors / filters...
-            getPosition: (i: number, { target }) => {
+            getPosition: (i: unknown, { target }) => {
+                if (typeof i !== "number") throw new Error("expected index");
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
                 target[2] = 0;

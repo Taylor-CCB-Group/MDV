@@ -39,7 +39,7 @@ export const PopoverPicker = ({
                     c.slice(3, 5),
                     c.slice(5, 7),
                 ].map((x) => Number.parseInt(x, 16));
-                onChange([r, g, b]);
+                onChange?.([r, g, b]);
             }}
         />
     );

@@ -57,7 +57,7 @@ const Projects = () => {
                 placeholder="Search projects..."
                 className="p-2 m-8 bg-slate-100 rounded-xl"
                 onChange={(e) => setFilter(e.target.value)}
-                value={filter}
+                value={filter||""}
             />
             <div className="grid grid-flow-row grid-cols-8 w-full items-center gap-4">
                 {filteredProjects.map((p) => (

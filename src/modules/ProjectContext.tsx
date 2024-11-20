@@ -13,7 +13,7 @@ type ProjectInfo = {
     projectName: string;
 };
 
-const ProjectContext = createContext<ProjectInfo>(null);
+const ProjectContext = createContext<ProjectInfo>(null as any);
 
 export const ProjectProvider = ({ children }: PropsWithChildren) => {
     // Derive initial state from window.location and URL parameters
@@ -28,12 +28,15 @@ export const ProjectProvider = ({ children }: PropsWithChildren) => {
     const root = getRoot(dir);
     // todo - get these from e.g. state.json instead?
     const staticFolder = urlParams.get("static") !== null;
-    const projectName = dir.split("/").pop();
+    const projectName = dir.split("/").pop() || ""; //todo - check logic for default project name
     const { chartManager } = window.mdv;
 
-    const [projectConfig, setProjectConfig] = useState({
-        flaskURL,
-        dir,
+    const [projectConfig, setProjectConfig] = useState<ProjectInfo>({
+        // not used? - test / check <<<---
+        // I think we determined that `root` was the useful thing to expose
+        // in a way that hides most of the sketchiness of the current setup.
+        // flaskURL,
+        // dir,
         root,
         staticFolder,
         projectName,

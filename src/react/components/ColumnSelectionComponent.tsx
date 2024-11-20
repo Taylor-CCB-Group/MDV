@@ -5,7 +5,7 @@ import { useDataStore } from "../context.js";
 import type { DataColumn, DataType, FieldName } from "@/charts/charts.js";
 import type { Param } from "@/charts/ChartTypes.js";
 import type DataStore from "@/datastore/DataStore.js";
-import { columnMatchesType } from "@/lib/utils.js";
+import { columnMatchesType, isArray } from "@/lib/utils.js";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
@@ -26,7 +26,8 @@ export type ColumnSelectionProps = {
     type?: Param | Param[]; //wary of using 'type' as a name - not reserved, but could be confusing
     multiple?: boolean;
 };
-type setBoolean = ReturnType<typeof useState<boolean>>[1];
+//!!AAAAAH FFS
+type setBoolean = any | ReturnType<typeof useState<boolean>>[1];
 type GuiStateProps = {
     isExpanded: boolean;
     setIsExpanded: setBoolean;
@@ -34,8 +35,15 @@ type GuiStateProps = {
     setIsAutocompleteFocused: setBoolean;
 }
 
-const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) => {
-    const { setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded, current_value } = props;
+
+/**
+ * A component for selecting a column from the data store.
+ * Must be in a context where `useDataStore` is available
+ * (e.g. if we're in a more global dialog etc rather than a chart context,
+ * this would be ambiguous).
+ */
+const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) => { //GuiSpec<"column">) => {
+    const { setSelectedColumn, placeholder, type } = props;
     const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
     const multiple = props.multiple || isMultiType;
     const dataStore = useDataStore(props.dataStore);
@@ -44,9 +52,15 @@ const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) =>
         () => dataStore.columns
             .filter((c) => !props.exclude?.includes(c.name))
             .filter((c) => columnMatchesType(c, type))
-        ,
+            ,
         [dataStore, props.exclude, type],
     );
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
+
+    const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
+    const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
+    if (!linkProps) return <ColumnDropdown {...props} {...guiProps} />;
     // In general, this should (probably) be using our "(multi)dropdown" component
     // and the <LinksComponent /> can select which column options to show.
     return (
@@ -58,7 +72,8 @@ const ColumnDropdown = observer((props: ColumnSelectionProps & GuiStateProps) =>
                     multiple={multiple}
                     // value={current_value ? columns.find(c => c.name === current_value) : null}
                     onChange={(_, value) => {
-                        if (Array.isArray(value)) {
+                        if (!value) return; // todo - is this allowed ? clear selection?
+                        if (isArray(value)) {
                             // todo - need to make controlled anyway for multiple...
                             setSelectedColumn(value[0].field);
                         } else {
@@ -130,6 +145,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
 
     const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
+    //@ts -expect-error nonsense about setBoolean type
     if (!linkProps) return <ColumnDropdown {...props} {...guiProps} />;
     // In general, this should (probably) be using our "(multi)dropdown" component
     // and the <LinksComponent /> can select which column options to show.
@@ -143,7 +159,7 @@ const ColumnSelectionComponent = observer((props: ColumnSelectionProps) => { //G
             <AccordionSummary expandIcon={<LinkIcon sx={{marginLeft: '0.2em'}} />} sx={{padding: '0 0.5em'}}>
                 <Grid className="w-full items-center" container>
                     <Grid size={"grow"}>
-                        {/* we may want to show something different, especially if special value is selected... */}
+                        {/* we may want to show something different, especially if special value is selected... */}                        
                         <ColumnDropdown {...props} {...guiProps} />
                     </Grid>
                 </Grid>

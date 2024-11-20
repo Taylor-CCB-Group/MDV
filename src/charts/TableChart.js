@@ -1,7 +1,7 @@
 import { SlickGrid, TextEditor, Overlays } from "../table/SlickGrid.js";
 import { RowSelectionModel } from "../table/RowSelectionModel.js";
 import { DataModel } from "../table/DataModel.js";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import { createEl } from "../utilities/Elements.js";
 import { BaseDialog } from "../utilities/Dialog.js";
 

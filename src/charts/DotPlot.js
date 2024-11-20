@@ -1,6 +1,6 @@
 import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";

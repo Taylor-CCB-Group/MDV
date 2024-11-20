@@ -3,14 +3,19 @@ import { useDataStore } from "../context";
 import { makeAutoObservable } from "mobx";
 import { useHighlightedForeignRows, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import type { DataColumn, DataType, GuiSpec } from "@/charts/charts";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
-import { Button, FormControl, FormControlLabel, Radio, RadioGroup } from "@mui/material";
+import LinkIcon from '@mui/icons-material/Link';
+import { IconButton } from "@mui/material";
+import { g } from "@/lib/utils";
 
-type RowsAsColsProps = ReturnType<typeof useRowsAsColumnsLinks>[0];
+type RowsAsColsProps = NonNullable<ReturnType<typeof useRowsAsColumnsLinks>>[0];
 
 const RowsAsCols = observer((props : RowsAsColsProps) => {
+    //! no this breaks rules of hooks
+    if (!props) return null;
     const { linkedDs, link } = props;
+    const [expanded, setExpanded] = useState(false);
     const rowNames = useHighlightedForeignRows().map(r => r.value);
     const { name_column, name, subgroups } = link;
     // const dataSources = useDataSources();
@@ -19,9 +24,9 @@ const RowsAsCols = observer((props : RowsAsColsProps) => {
     const ds = useDataStore();
     // potential symbols for live link ➤ ⌁ ⇢ ⍆ ⚡︎ ► ◎ ▷ ☑︎ ⦿
     const liveSelectionName = `⦿⌁ active '${name}' selection`;
-    const spec: GuiSpec<'multidropdown'> = useMemo(() => makeAutoObservable({
+    const spec: GuiSpec<'multidropdown'> = useMemo(() => makeAutoObservable(g({
         type: 'multidropdown',
-        name: name_column,
+        // name: name_column,
         label: `specific '${name}' column`, //todo different label for multiple
         // I don't think we want to prepend option to dropdown - we should have a different way of showing this
         values: [targetColumn.values],
@@ -30,19 +35,17 @@ const RowsAsCols = observer((props : RowsAsColsProps) => {
         func: (v) => {
             
         }
-    }), [targetColumn, name_column, name, rowNames]);
+    })), [targetColumn, name_column, name, rowNames]);
     const { current_value } = spec;
     const v = Array.isArray(current_value) ? current_value : [current_value];
     return (
         <>
-        <Button onClick={() => {}}>{liveSelectionName}</Button>
-        <DropdownAutocompleteComponent props={spec} />
-        {/* <FormControl>
-            <RadioGroup>
-                <FormControlLabel control={<Radio size="small" />} label={liveSelectionName} />
-                
-            </RadioGroup>
-        </FormControl> */}
+            <IconButton onClick={() => setExpanded(!expanded)}>
+                <LinkIcon />
+            </IconButton>
+                {/* <h3><em>'{linkedDs.name}'</em> rows as <em>'{ds.name}'</em> columns</h3> */}
+                {expanded && <DropdownAutocompleteComponent props={spec} />}
+
         </>
     )
 });

@@ -25,6 +25,7 @@ import { useProject } from "@/modules/ProjectContext";
 import VivContrastExtension from "@/webgl/VivContrastExtension";
 import { trace } from "mobx";
 import { useOuterContainer } from "../screen_state";
+import type { DeckGLProps, OrbitViewState, OrthographicViewState } from "deck.gl";
 
 export type ViewState = ReturnType<typeof getDefaultInitialViewState>; //<< move this / check if there's an existing type
 
@@ -57,6 +58,7 @@ const useJsonLayer = () => {
                   lineWidthMinPixels: 1,
                   pickable: true,
                   autoHighlight: true,
+                  //@ts-expect-error - might think about using zod to type/validate this
                   getText: (f) => f.properties.DN,
                   getTextColor: [255, 255, 255, 255],
                   getTextSize: 12,
@@ -171,7 +173,8 @@ const Main = observer(() => {
             contrast,
         ],
     );
-    const deckProps = useMemo(
+    //@ts-expect-error - this is WIP
+    const deckProps: Partial<DeckGLProps> = useMemo(
         () => ({
             getTooltip,
             style: {
@@ -210,7 +213,8 @@ const Main = observer(() => {
                 views={[detailView]}
                 layerProps={[layerConfig]}
                 viewStates={[{ ...viewState, id: detailId }]}
-                onViewStateChange={(e) => {
+                // not really expecting OrbitViewState... yet... but we will for 3D.
+                onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
                     viewerStore.setState({
                         viewState: { ...e.viewState, id: detailId },
                     });

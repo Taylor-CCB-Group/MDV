@@ -1,23 +1,62 @@
-import { getRandomString } from "../utilities/Utilities.js";
+import { getRandomString } from "../utilities/Utilities";
 import { ContextMenu } from "../utilities/ContextMenu.js";
 import { createEl } from "../utilities/Elements.js";
-import { chartTypes } from "./ChartTypes";
+import { type ChartTypeMap, chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
 import { makeAutoObservable, action } from "mobx";
-
-class BaseChart {
+import type DataStore from "@/datastore/DataStore";
+import type { BaseDialog } from "@/utilities/Dialog";
+import type { DataColumn, FieldName, GuiSpec, GuiSpecs } from "./charts";
+import type Dimension from "@/datastore/Dimension";
+import { g } from "@/lib/utils";
+type ChartEventType = string;
+type Listener = (type: ChartEventType, data: any) => void;
+type LegacyColorBy = { column: DataColumn<any> }
+export type BaseConfig = {
+    id: string;
+    size: [x: number, y: number];
+    title: string;
+    legend: string;
+    type: string;
+    param: FieldName[]; // | string,
+    //nb we might want to represent columns as something other than string soon, in which case this will need to be updated
+    color_by?: FieldName | LegacyColorBy;
+    title_color?: string;
+};
+type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
+type ColorOptions = any;
+class BaseChart<T> {
+    config: any;
+    __doc__: Document;
+    dataStore: DataStore;
+    listeners: Record<string, Listener>;
+    title: HTMLDivElement;
+    div: HTMLElement;
+    titleBar: HTMLDivElement;
+    menuSpace: HTMLDivElement;
+    contentDiv: HTMLDivElement;
+    resetButton: HTMLButtonElement | HTMLSpanElement;
+    contextMenu: ContextMenu;
+    dialogs: BaseDialog[] = [];
+    legendIcon: HTMLElement;
+    observable: { container: HTMLElement };
+    width = 0;
+    height = 0;
+    legend: any;
     /**
      * The base constructor
      * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
      * @param {string | HTMLDivElement} div - The id of the div element or the element itself to house the chart
      * @param {Object} config - The config describing the chart
      */
-    constructor(dataStore, div, config) {
+    constructor(dataStore: DataStore, div: HTMLDivElement | string, config: T & BaseConfig) {
         //******adapt legacy configs
         if (config.color_by) {
-            if (config.color_by.column) {
-                config.color_by = config.color_by.column.field;
+            const { color_by } = config;
+            //nb we might want to represent columns as something other than string soon, in which case this will need to be updated
+            if (typeof color_by !== "string" && color_by.column) {
+                config.color_by = color_by.column.field;
             }
         }
         //**********
@@ -35,7 +74,9 @@ class BaseChart {
         this.listeners = {};
 
         //create the DOM elements
-        this.div = typeof div === "string" ? document.getElementById(div) : div;
+        const divElement = typeof div === "string" ? document.getElementById(div) : div;
+        if (!divElement) throw new Error("failed to get div element");
+        this.div = divElement;
         this.div.classList.add("ciview-chart-panel");
         this.titleBar = createEl("div", {
             classes: ["ciview-chart-titlebar"],
@@ -186,7 +227,6 @@ class BaseChart {
             container: this.__doc__.body,
         });
     }
-    dialogs = [];
     _getContentDimensions() {
         return {
             //PJT to review re. gridstack.
@@ -196,14 +236,14 @@ class BaseChart {
             width: this.width - 5,
         };
     }
-    /** @returns {import("./charts.js").DataSource} */
     get dataSource() {
         return window.mdv.chartManager.charts[this.config.id].dataSource;
     }
 
-    getFilter() {}
+    getFilter(): any {}
 
-    setFilter() {}
+    /** appears to be an appropriate type signature from glancing at uses in the code */
+    setFilter(active: boolean) {}
 
     /**
      * Adds a listener to the datastore that will be called when an event occurs,
@@ -212,23 +252,24 @@ class BaseChart {
      * <ul>
      * <li> removed - called when the chart has been removed </li>
      * </ul>
-     * @param {string} id - a unique id indetifying the listener
-     * @param {function} listener - a function that accepts two paramaters, the type
+     * @param id - a unique id indetifying the listener
+     * @param listener - a function that accepts two paramaters, the type
      * of event and the data associated with it
      */
-    addListener(id, listener) {
+    addListener(id: string, listener: Listener) {
         this.listeners[id] = listener;
     }
 
     /**
      * Removes the specified listener from the chart
-     * @param {string} id The id of the listener to remove
+     * @param id The id of the listener to remove
      */
-    removeListener(id) {
+    removeListener(id: string) {
+        if (!Object.hasOwn(this.listeners, id)) console.warn("listener not found");
         delete this.listeners[id];
     }
 
-    _callListeners(type, data) {
+    _callListeners(type: ChartEventType, data: any) {
         for (const id in this.listeners) {
             this.listeners[id](type, data);
         }
@@ -236,15 +277,17 @@ class BaseChart {
 
     /**
      * Adds a menu icon with tooltip to the title bar
-     * @param {string} icon - the css classs of the icon (space delimited).
-     * @param {string} tooltip - the tooltip text
-     * @param {object} config - extra inormation about the icon/tooltip
-     * @param {string} [config.size=small] - the size of the tooltip
-     * @param {string} [config.position=bottom] - the position of the tooltip.
-     * @param {function} [config.func] - a function that is called when the icon is clicked
-     * @returns {DOMElement} - the icon
+     * @param icon - the css classs of the icon (space delimited).
+     * @param tooltip - the tooltip text
+     * @param config - extra inormation about the icon/tooltip
+     * @param [config.size=small] - the size of the tooltip
+     * @param [config.position=bottom] - the position of the tooltip.
+     * @param [config.func] - a function that is called when the icon is clicked
+     * @returns - the icon
      */
-    addMenuIcon(icon, tooltip, config = {}) {
+    addMenuIcon(icon: string, tooltip: string, config:
+        {size?: string, position?: string, func?: (e: MouseEvent)=>void} = {}
+    ) {
         const sp = createEl(
             "span",
             {
@@ -268,7 +311,7 @@ class BaseChart {
             sp,
         );
         if (config.func) {
-            sp.addEventListener("click", (e) => config.func(e));
+            sp.addEventListener("click", (e) => config.func?.(e));
         }
         return sp;
     }
@@ -281,18 +324,20 @@ class BaseChart {
     /**
      * Called by the datastore when the data is filtered. Needs to
      * be implemented on any subclasses.
-     * @param {Dimension} dim - the dimension that has been filtered
+     * @param dim - the dimension that has been filtered
      */
-    onDataFiltered(dim) {}
+    onDataFiltered(dim?: Dimension) {}
 
+    colorByColumn?(c: FieldName): void;
+    colorByDefault?(): void;
     /**Check if chart is composed of any columns whose data has
      * changed. if so re-calculate and re-draw chart (call onDataFiltered)
-     * @param {object} data - a list of column/fields whose data has been modified
-     * @param {string[]} data.columns a list of column ids whose data has changed
-     * @param {boolean} data.hasFiltered Whether a 'filtered' callback has already been
+     * @param data - a list of column/fields whose data has been modified
+     * @param data.columns a list of column ids whose data has changed
+     * @param data.hasFiltered Whether a 'filtered' callback has already been
      * issued
      */
-    onDataChanged(data) {
+    onDataChanged(data: ColumnChangeEvent) {
         const columns = data.columns;
         //update any charts which use data from the columns
         //(if they haven't already been updated by the filter changing)
@@ -314,7 +359,7 @@ class BaseChart {
         }
         //recolor any charts coloured by the column
         if (columns.indexOf(this.config.color_by) !== -1) {
-            this.colorByColumn(this.config.color_by);
+            this.colorByColumn?.(this.config.color_by);
         }
     }
 
@@ -329,9 +374,9 @@ class BaseChart {
         return this.dataStore.getColorLegend(this.config.color_by, conf);
     }
 
-    getQunatile;
+    // getQunatile;
 
-    _addTrimmedColor(column, conf) {
+    _addTrimmedColor(column: FieldName, conf: any) {
         const tr = this.config.trim_color_scale;
         const col = this.dataStore.columnIndex[column];
         if (tr && tr !== "none") {
@@ -360,8 +405,8 @@ class BaseChart {
             return;
         }
         const box = this._getContentDimensions();
-        let lt = 0;
-        let ll = 0;
+        let lt: string | number = 0;
+        let ll: string | number = 0;
         if (this.legend) {
             ll = this.legend.style.left;
             lt = this.legend.style.top;
@@ -386,7 +431,7 @@ class BaseChart {
         this.legend.__doc__ = this.__doc__;
     }
 
-    getColorFunction(column, asArray) {
+    getColorFunction(column: FieldName, asArray?: boolean) {
         this.config.color_by = column;
         const conf = {
             asArray: asArray,
@@ -411,13 +456,9 @@ class BaseChart {
 
     /**Checks to see if the column is used in the chart
      * If so, the chart will be removed but no callbacks will be involved
-     * @param {object} data - a list of column/fields whose data has been modified
-     * @param {string[]} data.columns a list of column ids whose data has changed
-     * @param {boolean} hasFiltered Whether a 'filtered' callback has already been
-     * issued
-     * @returns {boolean} true if the chart has been removed
+     * @returns `true` if the chart has been removed
      */
-    onColumnRemoved(column) {
+    onColumnRemoved(column: FieldName) {
         let cols = this.config.param;
         let isDirty = false;
         if (typeof this.config.param === "string") {
@@ -436,18 +477,18 @@ class BaseChart {
         if (this.colorByColumn) {
             if (this.config.color_by === column) {
                 this.config.color_by = undefined;
-                this.colorByDefault();
+                this.colorByDefault?.();
             }
         }
         return false;
     }
 
-    onDataAdded(newSize) {
+    onDataAdded(newSize: number) {
         this.onDataFiltered();
     }
 
-    onDataHighlighted(data) {}
-
+    onDataHighlighted(data: any) {}
+    _tooltip?: HTMLDivElement;
     addToolTip() {
         this._tooltip = createEl(
             "div",
@@ -462,8 +503,9 @@ class BaseChart {
         );
     }
 
-    showToolTip(e, msg) {
+    showToolTip(e: MouseEvent, msg: string) {
         if (!this._tooltip) this.addToolTip();
+        if (!this._tooltip) throw 'expected tooltip to be added by now';
         this._tooltip.innerHTML = msg;
         this._tooltip.style.display = "inline-block";
         this._tooltip.style.left = `${3 + e.clientX}px`;
@@ -478,7 +520,7 @@ class BaseChart {
     /**
      * Just removes the DOM elements, subclasses should do their own cleanup
      */
-    remove() {
+    remove(notify?: boolean) {
         this.titleBar.remove();
         this.contentDiv.remove();
         this.dataStore.removeListener(this.config.id);
@@ -490,9 +532,7 @@ class BaseChart {
         }
         // dynamic props?
     }
-    /**
-     * @typedef {Array<import("./charts.js").GuiSpec<import("./charts.js").GuiSpecType>>} Settings
-     */
+    removeLayout?(): void;
     /**
      * Returns information about which controls to add to the settings dialog.
      * Subclasses should call this method and then add their own controls e.g.
@@ -512,12 +552,14 @@ class BaseChart {
      *     }]);
      * }
      * </pre>
-     * @returns {Settings} - an array of objects describing tweakable parameters
+     *
+     * wrapping controls with a call to @{link g} will perform type checking
+     * todo- specifiy the link to `g` above properly/ document better
+     * @returns an array of objects describing tweakable parameters
      */
     getSettings() {
         const c = this.config;
-        /** @type {Settings} */
-        const settings = [
+        const settings: GuiSpecs = [
             {
                 type: "text",
                 label: "Chart Name",
@@ -544,15 +586,15 @@ class BaseChart {
                     : colorOptions.colorby
             );
 
-            const colorSettings = [];
-            settings.push({
+            const colorSettings: GuiSpecs = [];
+            settings.push(g({
                 type: "folder",
                 label: "Color Settings",
                 current_value: colorSettings,
-            });
-            
+            }));
+
             // change this to use setting with type: "column" - so it should understand "filter" in a similar way
-            colorSettings.push({
+            colorSettings.push(g({
                 label: "Color By",
                 type: "column",
                 current_value: c.color_by,
@@ -560,13 +602,13 @@ class BaseChart {
                 func: (x) => {
                     if (x === "_none") {
                         c.color_by = undefined;
-                        this.colorByDefault();
+                        this.colorByDefault?.();
                     } else {
                         c.color_by = x;
-                        this.colorByColumn(x);
+                        this.colorByColumn?.(x);
                     }
                 },
-            });
+            }));
             if (colorOptions.color_overlay !== undefined) {
                 colorSettings.push({
                     label: "Color Overlay",
@@ -574,7 +616,7 @@ class BaseChart {
                     current_value: c.color_overlay,
                     func: (x) => {
                         c.color_overlay = x;
-                        this.colorByColumn(c.color_by);
+                        this.colorByColumn?.(c.color_by);
                     },
                 });
             }
@@ -599,7 +641,7 @@ class BaseChart {
                 func: (x) => {
                     c.log_color_scale = x;
                     if (c.color_by) {
-                        this.colorByColumn(c.color_by);
+                        this.colorByColumn?.(c.color_by);
                     }
                 },
             });
@@ -611,7 +653,7 @@ class BaseChart {
                 func: (x) => {
                     c.fallbackOnZero = x;
                     if (c.color_by) {
-                        this.colorByColumn(c.color_by);
+                        this.colorByColumn?.(c.color_by);
                     }
                 },
             });
@@ -628,7 +670,7 @@ class BaseChart {
                 func: (v) => {
                     c.trim_color_scale = v;
                     if (c.color_by) {
-                        this.colorByColumn(c.color_by);
+                        this.colorByColumn?.(c.color_by);
                     }
                 },
             });
@@ -637,15 +679,16 @@ class BaseChart {
         return settings;
     }
 
+    unpinIcon?: HTMLElement;
     _addUnpinIcon() {
         this.unpinIcon = this.addMenuIcon("fas fa-thumbtack", "unpin chart");
         this.unpinIcon.addEventListener("click", (e) => {
-            this.unpinIcon.remove();
-            this.unpinChart();
+            this.unpinIcon?.remove();
+            this.unpinChart?.();
         });
     }
-
-    _openSettingsDialog(e) {
+    settingsDialog?: BaseDialog;
+    _openSettingsDialog(e: MouseEvent) {
         if (!this.settingsDialog) {
             // the dialog will set `this.settingsDialog = null` (and remove itself from this.dialogs) when it closes.
             this.settingsDialog = new SettingsDialogReactWrapper(this, [
@@ -655,9 +698,17 @@ class BaseChart {
             this.dialogs.push(this.settingsDialog);
         }
     }
-
-    getContextMenu(data) {
-        let menu = [];
+    isPinned = false;
+    pinChart?(): void;
+    unpinChart?(): void;
+    getChartData?(): any;
+    /**
+     * @returns an array of `ContextMenuItems`
+    */
+    addToContextMenu?(): any;
+    getContextMenu(data?: any) {
+        type ContextMenuItem = { text: string, icon: string, func: () => void };
+        let menu: ContextMenuItem[] = [];
         if (this.getImage) {
             menu = menu.concat([
                 {
@@ -677,7 +728,7 @@ class BaseChart {
                 text: "pin chart",
                 icon: "fas fa-thumbtack",
                 func: () => {
-                    this.pinChart();
+                    this.pinChart?.();
                     this._addUnpinIcon();
                 },
             });
@@ -713,13 +764,13 @@ class BaseChart {
     getDiv() {
         return this.div;
     }
-
+    extra_legends?: any[];
     /**
      * Instructs the chart to use a different document. This is only required if you are
      * going to add the chart to a different browser window
-     * @param {document} doc - the document that the chart will use
+     * @param doc - the document that the chart will use
      */
-    changeBaseDocument(doc) {
+    changeBaseDocument(doc: Document) {
         //this needs to be reviewed for popout windows
         // - mouse events need to be on the right window ✅
         // - dialogs need to be on the right window ✅ / transferred
@@ -743,14 +794,16 @@ class BaseChart {
         }
         if (this.extra_legends) {
             for (const l of this.extra_legends) {
+                //@ts-expect-error
                 if (this[l]) {
+                    //@ts-expect-error
                     this[l].__doc__ = doc;
                 }
             }
         }
     }
 
-    _setConfigValue(conf, value, def) {
+    _setConfigValue(conf: T, value: keyof T, def: any) {
         if (conf[value] === undefined) {
             conf[value] = def;
         }
@@ -772,7 +825,7 @@ class BaseChart {
         return JSON.parse(JSON.stringify(this.config));
     }
 
-    getColorOptions() {
+    getColorOptions(): ColorOptions {
         return {};
     }
 
@@ -781,10 +834,10 @@ class BaseChart {
      * then the graph will be resized based on it container.
      * Subclasses should overide this, but call the super method
      * first which will calculate width and height of the content div
-     * @param {integer} x - The new width
-     * @param {integer} y The new height;
+     * @param x - The new width
+     * @param y The new height;
      */
-    setSize(x, y) {
+    setSize(x?: number, y?: number) {
         //if supplied change the div dimensions
         if (x) {
             this.div.style.height = `${y}px`;
@@ -804,14 +857,15 @@ class BaseChart {
         this.width = x;
     }
 
+    getImage?(callback: (resp: any) => void, im_type: "png" | "svg"): void;
     /**
      * Downloads an image of the chart
-     * @param {"svg" | "png"} im_type - either svg or png
+     * @param im_type - either svg or png
      */
-    downloadImage(im_type) {
+    downloadImage(im_type: "svg" | "png") {
         const originalColor = this.contentDiv.style.color;
         this.contentDiv.style.color = "black";
-        this.getImage((resp) => {
+        this.getImage?.((resp) => {
             const link = document.createElement("a");
             const name = this.config.title || "image";
             link.download = `${name}.${im_type}`;
@@ -832,7 +886,8 @@ class BaseChart {
     }
 
     downloadData() {
-        const blob = this.getChartData();
+        const blob = this.getChartData?.();
+        if (!blob) throw new Error("No data to download");
         const save = createEl(
             "a",
             {
@@ -846,7 +901,7 @@ class BaseChart {
         save.remove();
     }
 
-    setTitle(title) {
+    setTitle(title: string) {
         this.title.textContent = title;
         // avoid issue with mobx autorun mutating this when reacting to config.title change
         if (this.config.title !== title) {
@@ -854,7 +909,7 @@ class BaseChart {
         }
     }
 
-    getImageFromSVG(svg, callback) {
+    getImageFromSVG(svg: any|SVGElement, callback: (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => void) {
         const copy = svg.cloneNode(true);
         copyStylesInline(copy, svg);
         const canvas = document.createElement("canvas");
@@ -863,6 +918,7 @@ class BaseChart {
         canvas.width = svg.width.baseVal.value;
         canvas.height = svg.height.baseVal.value;
         const ctx = canvas.getContext("2d");
+        if (!ctx) throw "Could not get 2d context from canvas";
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const data = new XMLSerializer().serializeToString(copy);
         const DOMURL = window.URL || window.webkitURL || window;
@@ -877,6 +933,7 @@ class BaseChart {
             callback(canvas, ctx);
         };
     }
+    static types: ChartTypeMap;
 }
 
 /**
@@ -884,25 +941,37 @@ class BaseChart {
  */
 BaseChart.types = chartTypes;
 
-function copyStylesInline(destinationNode, sourceNode) {
+function copyStylesInline(
+    destinationNode: HTMLElement,
+    sourceNode: HTMLElement
+): void {
     const containerElements = ["svg", "g"];
     for (let cd = 0; cd < destinationNode.childNodes.length; cd++) {
-        const child = destinationNode.childNodes[cd];
-        if (containerElements.indexOf(child.tagName) !== -1) {
-            copyStylesInline(child, sourceNode.childNodes[cd]);
+        const child = destinationNode.childNodes[cd] as HTMLElement;
+        const sourceChild = sourceNode.childNodes[cd] as HTMLElement;
+
+        if (!child || !sourceChild) continue;
+
+        if (containerElements.includes(child.tagName.toLowerCase())) {
+            copyStylesInline(child, sourceChild);
             continue;
         }
+
         const style =
-            sourceNode.childNodes[cd].currentStyle ||
-            window.getComputedStyle(sourceNode.childNodes[cd]);
-        if (style === "undefined" || style == null) continue;
+            (sourceChild as any).currentStyle ||
+            window.getComputedStyle(sourceChild);
+
+        if (!style) continue;
+
         for (let st = 0; st < style.length; st++) {
+            const property = style[st];
             child.style.setProperty(
-                style[st],
-                style.getPropertyValue(style[st]),
+                property,
+                style.getPropertyValue(property)
             );
         }
     }
 }
+
 
 export default BaseChart;

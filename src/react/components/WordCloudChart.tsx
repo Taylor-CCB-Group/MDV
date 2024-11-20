@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import BaseChart from "../../charts/BaseChart";
-import { type BaseConfig, BaseReactChart } from "./BaseReactChart";
+import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import { BaseReactChart } from "./BaseReactChart";
 import { useChart } from "../context";
 import { useChartID } from "../hooks";
+import type DataStore from "@/datastore/DataStore";
 
 function ReactTest() {
     const parent = useChart();
@@ -16,7 +17,7 @@ function ReactTest() {
     useEffect(() => {
         console.warn("WordCloudChart effect liable to be buggy");
         dataStore.addListener(id, () => setFilterSize(dataStore.filterSize));
-        parent.addListener("text", (type, data) =>
+        parent.addListener("text", (type: string, data: any) =>
             setText(`${data} ${parent.config.wordSize}`),
         );
         const colNameWords = parent.config.param[0];
@@ -32,21 +33,22 @@ function ReactTest() {
         //     const size = sizeVals[sizeCol.data[i]];
         //     console.log(word, size || `no size for ${i}`);
         // }
+        //@ts-expect-error - this whole file is not expected to work at the moment, may fix later
         dataStore.getRowAsObject();
         setWords(wordsVals);
         console.log(sizeVals);
 
-        if (dim?.getAverages) {
-            dim.getAverages(
-                (data) => {
-                    console.log(data);
-                },
-                [colNameSize],
-                {},
-            );
-        } else {
-            console.log("no averages");
-        }
+        // if (dim?.getAverages) {
+        //     dim.getAverages(
+        //         (data: any) => {
+        //             console.log(data);
+        //         },
+        //         [colNameSize],
+        //         {},
+        //     );
+        // } else {
+        //     console.log("no averages");
+        // }
 
         // dim.getCategories(data => {
         //     const d = new Array(data.length);
@@ -80,27 +82,28 @@ type WordCloudConfig = {
     wordSize: number;
 } & BaseConfig; //shouldn't BaseConfig be added by the base class?
 class ReactWordCloudChart extends BaseReactChart<WordCloudConfig> {
-    constructor(dataStore, div, config) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, config: WordCloudConfig) {
         super(dataStore, div, config, ReactTest);
     }
-    getSettings() {
-        const c = this.config;
-        const settings = super.getSettings();
-        return settings.concat([
-            {
-                type: "slider",
-                label: "Word Size",
-                current_value: c.wordSize || 100,
-                min: 10,
-                max: 100,
-                //xxx: why isn't number inferred given type: "slider"? `as const` not much help
-                //issue maybe with lesser jsdoc Settings type in BaseChart
-                func: (x: number) => { 
-                    c.wordSize = x;
-                },
-            },
-        ]);
-    }
+    // getSettings() {
+    //     const c = this.config;
+    //     const settings = super.getSettings();
+    //     //-- type error here - but this chart is not used anyway... if we re-enable it, we should fix this.
+    //     // return settings.concat([
+    //     //     {
+    //     //         type: "slider",
+    //     //         label: "Word Size",
+    //     //         current_value: c.wordSize || 100,
+    //     //         min: 10,
+    //     //         max: 100,
+    //     //         //xxx: why isn't number inferred given type: "slider"? `as const` not much help
+    //     //         //issue maybe with lesser jsdoc Settings type in BaseChart
+    //     //         func: (x: number) => {
+    //     //             c.wordSize = x;
+    //     //         },
+    //     //     },
+    //     // ]);
+    // }
     remove(): void {
         super.remove();
         // make sure dim and anything else relevant is removed...

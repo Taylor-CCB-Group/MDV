@@ -9,7 +9,7 @@ import { createContext, useContext, useEffect, useState } from "react";
  * tooltips and dropdowns into.
  */
 export type OuterContainerObservable = { container: HTMLElement };
-const OuterContainerContext = createContext<Element>(null);
+const OuterContainerContext = createContext<HTMLElement>(null as any);
 /**
  * As of now we only ever use react to render charts & dialogs, and they should be mobx observable
  * in as much as any `changeBaseDocument()` or `setParent()` will cause this to update...
@@ -19,7 +19,7 @@ export const OuterContainerProvider = observer(
     ({
         children,
         parent,
-    }: { children: JSX.Element; parent?: BaseChart | BaseDialog }) => {
+    }: { children: JSX.Element; parent?: BaseChart<any> | BaseDialog }) => {
         return (
             <OuterContainerContext.Provider
                 value={parent?.observable?.container || document.body}

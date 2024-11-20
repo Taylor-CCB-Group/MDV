@@ -1,11 +1,11 @@
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
-import type { DataColumn } from "../charts/charts";
+import type { LoadedDataColumn } from "../charts/charts";
 import type DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
 
 //multitext was buggy (empty data buffer after loading project)
 const COL_TYPE = "multitext";
-export type TagColumn = DataColumn<"multitext">;
+export type TagColumn = LoadedDataColumn<"multitext">;
 
 const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
 const JOIN = "; "; //join with semi-colon and space.
@@ -20,7 +20,7 @@ function getTagValueIndices(tag: string, col: TagColumn) {
     // we should use that instead of SEP.
     if (tag.match(SEP))
         throw new Error(
-            "getTagValueIndices: tag must not contain separator (should be handled before calling this function)",
+            "getTagValueIndices: tag must not contain delimiter (should be handled before calling this function)",
         );
     return col.values
         .map((v, i) => (v.split(SEP).includes(tag) ? i : -1))
@@ -65,10 +65,11 @@ export default class TagModel {
             // but it seems to make it a lot more complicated than just setting a string property here.
             const columnSpec = {
                 name: columnName,
-                datatype: "multitext",
+                datatype: "multitext" as const,
                 editable: true,
-                separator: ";",
+                delimiter: ";" as const,
                 field: columnName,
+                values: [] as string[],
             };
             //dataStore.size * 2 should be right for 'multitext' - wrong for 'text'
             const data = new SharedArrayBuffer(dataStore.size * 2);
@@ -76,10 +77,14 @@ export default class TagModel {
             this.isReady = true;
         } else {
             loadColumn(dataStore.name, columnName).then((column) => {
+                if (column.delimiter && column.delimiter !== ";") {
+                    throw new Error("delimiter must be ';' for current tag column implementation");
+                }
                 this.isReady = true;
                 this.callListeners();
             });
         }
+        //! col is `any` here...
         const col = dataStore.columnIndex[columnName];
         if (col.datatype !== COL_TYPE)
             throw new Error(
@@ -107,10 +112,11 @@ export default class TagModel {
     getTags() {
         return getTags(this.tagColumn);
     }
-    entireSelectionHasTag(tag: string) {
+    entireSelectionHasTag(tag: string): boolean {
         const col = this.tagColumn;
-        if (tag.match(SEP))
+        if (tag.match(SEP)) {
             return tag.split(SEP).every((t) => this.entireSelectionHasTag(t));
+        }
         const tagIndices = getTagValueIndices(tag, col);
         return !this.dataModel.data.some(
             (v) => !tagIndices.includes(col.data[v]),
@@ -265,6 +271,7 @@ function sanitizeTags(col: TagColumn, notify = false) {
     const usedValuesByIndex = new Set<number>();
     for (const i in col.data) {
         const j = mapToSorted.get(col.data[i]);
+        if (j === undefined) throw new Error("sanitizingTags: missing value");
         col.data[i] = j;
         usedValuesByIndex.add(j);
     }
@@ -283,6 +290,8 @@ function getTags(col: TagColumn) {
 function getTagsInSelection(col: TagColumn, dataModel: DataModel) {
     const usedValuesByIndex = new Set<number>();
     for (const i of dataModel.data) {
+        // maybe good to have a bounds check here? not expecting it to fail, but it's a good habit.
+        // actually, probably ok without - and seems like this function isn't used, so may get removed.
         usedValuesByIndex.add(col.data[i]);
     }
     const values = [...usedValuesByIndex].map((i) => col.values[i]);

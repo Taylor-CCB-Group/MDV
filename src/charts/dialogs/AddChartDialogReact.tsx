@@ -5,17 +5,16 @@ import { createMdvPortal } from "@/react/react_utils";
 import { observer } from "mobx-react-lite";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
-import Chip from "@mui/material/Chip";
 
-import BaseChart from "../BaseChart.js";
+import BaseChart from "../BaseChart";
 import type { Param } from "@/charts/ChartTypes.js";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
-import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
+import { AppBar, Button, Dialog, Grid, Paper } from "@mui/material";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
-import { action, observable, reaction, runInAction, toJS } from "mobx";
+import { action, observable, reaction, toJS } from "mobx";
 import z from "zod";
-import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
+import type { ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType } from "@/lib/utils.js";
 
@@ -64,6 +63,7 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
             }
         });
         for (const [k, v] of Object.entries(extra)) {
+            //@ts-ignore
             props[k] = v;
         }
         // find the key in BaseChart.types that corresponds to this chart type
@@ -103,20 +103,24 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
         label: control.label,
         current_value: control.defaultVal,
         // values: control.values,
+    //@ts-expect-error - need to think about what we're actually trying to do here
     } satisfies GuiSpec<T>;
     if (draftSpec.type === "dropdown" || draftSpec.type === "multidropdown") {
         // we run into this irritating logic with format that dropdown values can come in
-        // >the props.values may be a tuple of [valueObjectArray, textKey, valueKey], 
+        // >the props.values may be a tuple of [valueObjectArray, textKey, valueKey],
         // or an array of length 1 - [string[]]
         //const useObjectKeys = Array.isArray(control.values) && control.values.length === 3;
-        const values = control.values as any;
+        if (!control.values || control.values.length === 0) throw new Error(`Dropdown control '${control.label}' has no values`);
+        const values = control.values;
         // if (!control.defaultVal) draftSpec.current_value = useObjectKeys ? values[0][0][values[0][2]] : values[0][0];
+        // todo - add some type predicate so we know we're assigning the right type
+        //@ts-expect-error - need to think about what we're actually trying to do here
         if (!control.defaultVal) draftSpec.current_value = values[0]["name"];
         //(draftSpec as any).values = control.values; //doesn't give runtime error, doesn't work
         (draftSpec as any).values = [values, "name", "value"];
     }
     if (draftSpec.type === "radiobuttons") {}//todo test
-    //bad bad bad
+    //bad bad bad <<< how did we end up needing "as string", "as any"???
     //if (draftSpec.type === "check" && !control.defaultVal) (draftSpec as any).current_value = false;
     // if ((draftSpec as any).type === "checkbox" && !control.defaultVal) (draftSpec as any).current_value = false;
     if ((draftSpec.type as string) === "checkbox") (draftSpec as any).type = "check";
@@ -124,7 +128,9 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
     // if (!spec.current_value) throw new Error(`current_value should be set - no default in '${JSON.stringify(control)}'`);
     // strict typescript warns us about spec.current_value being potentially undefined, and it's dead right.
     // IMO much of the faffing around I'm doing getting this all to work could be avoided with better types.
+    //@ts-expect-error - need to think about what we're actually trying to do here
     reaction(() => spec.current_value, onChange);
+    //@ts-expect-error - need to think about what we're actually trying to do here
     return spec;
 }
 function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<T>, config: ChartConfig): GuiSpec<T> {
@@ -159,6 +165,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 // nb `t.required.every(r => r in dataStore)` seems like it should work,
                 // but since we're in glorious JS land, we have things like `dataStore['interactions'] = undefined`
                 // which means that `'interactions' in dataStore` is true, but `!!dataStore['interactions']` is false.
+                //@ts-ignore for the moment
                 return t.required.every(r => !!dataStore[r]);
             }
             return true;
@@ -167,7 +174,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     const paramColumns = useMemo(
-        () => config.param ? config.param.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
+        () => config.param?.map(p => dataStore.columnIndex[p]) ?? [],
     [config.param, dataStore]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
     const setChartTypeName = useCallback(action((chartTypeName: string) => {
@@ -181,7 +188,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
             config.param = new Array(chartType.params.length);
             for (const [i, p] of chartType.params.entries()) {
                 const previousColumn = paramColumns[i];
-                if (previousParams[i] && columnMatchesType(previousColumn, p.type)) {
+                if (previousColumn && previousParams[i] && columnMatchesType(previousColumn, p.type)) {
                     console.log(`[${config.type}, ${p.name}] using previous selection: '${previousParams[i]}'`);
                     config.param[i] = previousParams[i];
                 } else {
@@ -221,6 +228,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
             }
         });
         for (const [k, v] of Object.entries(extra)) {
+            //@ts-ignore
             props[k] = v;
         }
         // find the key in BaseChart.types that corresponds to this chart type
@@ -258,7 +266,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                             )}
                         />
                         <TextField label="Title" size="small" onChange={action((e) => config.title = e.target.value)} />
-                        <TextField label="Description" size="small" 
+                        <TextField label="Description" size="small"
                         multiline aria-multiline
                         rows={6}
                         onChange={action((e) => config.legend = e.target.value)}

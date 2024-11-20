@@ -1,6 +1,6 @@
 import { select } from "d3-selection";
 import { easeLinear } from "d3-ease";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
 import { scaleLinear } from "d3-scale";
 import { getHierarchicalNodes } from "../utilities/clustering.js";

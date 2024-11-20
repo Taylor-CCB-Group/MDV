@@ -1,5 +1,5 @@
 import SVGChart from "./SVGChart.js";
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import {
     forceSimulation,
     forceLink,

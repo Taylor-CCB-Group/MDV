@@ -1,4 +1,4 @@
-import BaseChart from "./BaseChart.js";
+import BaseChart from "./BaseChart";
 import SVGChart from "./SVGChart.js";
 import { select } from "d3-selection";
 import { geoPath } from "d3-geo";

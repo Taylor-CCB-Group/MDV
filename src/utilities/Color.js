@@ -7,7 +7,7 @@ import {
 import { select } from "d3-selection";
 import { scaleLinear } from "d3-scale";
 import { axisBottom } from "d3-axis";
-import { getRandomString } from "./Utilities.js";
+import { getRandomString } from "./Utilities";
 
 function getColorLegendCustom(scale, config = {}) {
     const ticks = scale.ticks(config.ticks || 4);
