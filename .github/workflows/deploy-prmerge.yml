@@ -1,4 +1,4 @@
-name: Build and Deploy to Dockerhub
+name: Build and Deploy to Dockerhub- on PR Merge
 
 on:
   pull_request:
