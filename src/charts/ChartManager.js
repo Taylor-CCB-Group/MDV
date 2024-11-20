@@ -2070,6 +2070,7 @@ class ChartManager {
             const col = dStore.columnIndex[x];
             //no record of column- need to load it (plus metadata)
             if (!col) {
+                // what if x is something like a MulticolumnQuery?
                 dStore.addColumnFromField(x);
                 return true;
             }

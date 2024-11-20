@@ -23,8 +23,15 @@ class BaseChart {
         }
         //**********
 
-        //copy the config, and make it observable etc... may apply some other processing e.g. in case of 'virtual columns'
+        //copy the config, 
+        // this.config = JSON.parse(JSON.stringify(config));
+        //^^ previously, only react charts had observable config
+        //and make it observable etc... may apply some other processing e.g. in case of 'virtual columns'
+        //   we've been experimenting with applying this to all charts
+        //   but there are issues with mobx actions that result in mutations to the config
+        //... so perhaps the idea of keeping that property to react charts is a good one?
         this.config = initialiseConfig(config, this);
+
         //required in case added to separate browser window
         this.__doc__ = document;
 

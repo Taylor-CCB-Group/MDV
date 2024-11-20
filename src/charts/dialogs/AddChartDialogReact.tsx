@@ -280,6 +280,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                                 // the type of config.param is string[] - but this could be a multi-column or virtual column query...
                                 // we need to decide at which point to apply these transformations.
                                 // - to deal with string[] we should be able to specify multiple={false} which could change the return type
+                                //... could we set up a reaction to update the config when the column changes?
                                 if (typeof column !== "string") throw new Error("Expected string column name");
                                 config.param[i] = column; //legit type error - will fail at runtime
                                 // grumble grumble

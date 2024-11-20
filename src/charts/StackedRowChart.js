@@ -18,7 +18,13 @@ class StackedRowChart extends SVGChart {
         this.config.type = "stacked_row_chart";
         this.dim = this.dataStore.getDimension("category_dimension");
         this.addToolTip();
+        this.setFieldNames(config.param.slice(2));
         //redraw the chart
+        this.onDataFiltered(null);
+    }
+
+    setFieldNames(fieldNames) {
+        this.fieldNames = fieldNames;
         this.onDataFiltered(null);
     }
 
@@ -27,13 +33,14 @@ class StackedRowChart extends SVGChart {
         if (this.dim === dim || this.isPinned) {
             return;
         }
+        const p = [this.config.param[0], this.config.param[1], ...this.fieldNames];
         this.dim.getSankeyData(
             (data) => {
                 this.data = data;
                 this.sortData();
                 this.drawChart();
             },
-            this.config.param,
+            p,
             { method: "stacked" },
         );
     }
@@ -95,6 +102,15 @@ class StackedRowChart extends SVGChart {
                     this.drawChart();
                 },
             },
+            {
+                type: "multicolumn",
+                label: "Field Names",
+                current_value: this.fieldNames,
+                //! this should filter to only categorical fields, also not generally sure setFieldNames is even working...
+                func: (x) => {
+                    this.setFieldNames(x);
+                },
+            }
         ]);
     }
 
@@ -181,6 +197,7 @@ class StackedRowChart extends SVGChart {
 BaseChart.types["stacked_row_chart"] = {
     class: StackedRowChart,
     name: "Stacked Row Chart",
+    methodsUsingColumns: ["setFieldNames"],
     params: [
         {
             type: "text",

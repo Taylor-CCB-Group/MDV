@@ -4,6 +4,8 @@ import type { MulticolumnQuery } from "@/links/link_utils.js";
 import type { useState } from "react";
 import type { DataType } from "../charts/charts";
 
+// this is more to do with column queries than columns themselves
+
 //new Set(Object.values(BaseChart.types).flatMap(t => t.params).filter(Boolean).flatMap(p => p.type))
 // export type Param = "text" | "number" | "multitext" | "text16" | "_multi_column:number" | "_multi_column:all";
 export type MultiColumnPrefix = `_multi_column:${"all" | "number"}`; //didn't exist in wild before, but maybe "text" as well?

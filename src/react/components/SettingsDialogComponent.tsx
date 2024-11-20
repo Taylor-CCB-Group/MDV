@@ -111,6 +111,9 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: GuiSpec<"column" | "multicolumn"> }) => {
     // multiple? this type is a lie.
+    /** this needs fixing... and we should be able to observe mobx state for column queries 
+     * which should persist when the dialog (entire react root) is closed.
+    */
     const setSelectedColumn = useCallback(action((v: string) => {
         props.current_value = v;
         props.func?.(v);

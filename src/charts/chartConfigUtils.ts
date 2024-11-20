@@ -25,6 +25,7 @@ export function serialiseConfig<T extends BaseChart>(chart: T) {
 export function initialiseConfig<T extends BaseChart>(originalConfig, chart: T) {
     let config = JSON.parse(JSON.stringify(originalConfig));
     if (!config.id) {
+        // what about when we duplicate a chart?
         config.id = getRandomString();
     }
 
