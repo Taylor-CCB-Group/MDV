@@ -1,13 +1,13 @@
 import { getRandomString } from "../utilities/Utilities";
 import { ContextMenu } from "../utilities/ContextMenu.js";
 import { createEl } from "../utilities/Elements.js";
-import { type ChartTypeMap, chartTypes } from "./ChartTypes";
+import { chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
 import { makeAutoObservable, action, autorun, IReactionDisposer, IAutorunOptions } from "mobx";
 import type DataStore from "@/datastore/DataStore";
 import type { BaseDialog } from "@/utilities/Dialog";
-import type { DataColumn, FieldName, GuiSpec, GuiSpecs } from "./charts";
+import type { DataColumn, FieldName, GuiSpecs } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
 import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
@@ -943,13 +943,11 @@ class BaseChart<T> {
             callback(canvas, ctx);
         };
     }
-    static types: ChartTypeMap;
+    /**
+     * A dictionary of all the chart types
+     */
+    static types = chartTypes;
 }
-
-/**
- * A dictionary of all the chart types
- */
-BaseChart.types = chartTypes;
 
 function copyStylesInline(
     destinationNode: HTMLElement,
