@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useDataStore } from "../context";
-import { action, makeAutoObservable } from "mobx";
+import { action, makeAutoObservable, runInAction } from "mobx";
 import { useHighlightedForeignRows, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import type { DataColumn, DataType, GuiSpec } from "@/charts/charts";
 import { useMemo, useState } from "react";
@@ -25,18 +25,23 @@ const RowsAsCols = observer(<T extends CTypes,>(props : RowsAsColsProps<T>) => {
     // potential symbols for live link ➤ ⌁ ⇢ ⍆ ⚡︎ ► ◎ ▷ ☑︎ ⦿
     const liveSelectionName = `⦿⌁ active '${name}' selection`;
     // what do we really want here? ColumnSelectionDialogs all the way down?
-    const spec: GuiSpec<'multidropdown' | 'dropdown'> = useMemo(() => makeAutoObservable({
+    // we need to decide how to manage non-string values in the config
+    // as of now, it appears we need to explicity state the generic type which I thought was related
+    // to some of the props not being of an appropriate type - but now I'm not sure.
+    // ** the type of data where dealing with is the core thing we're trying to figure out how to represent from a user perspective
+    // I'm just a bit burnt out on this right now.
+    const spec = useMemo(() => makeAutoObservable(g<"multidropdown">({
         type: 'multidropdown',
         // name: name_column,
         label: `specific '${name}' column`, //todo different label for multiple
         // I don't think we want to prepend option to dropdown - we should have a different way of showing this
         values: [targetColumn.values],
         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
-        // current_value: props.current_value, 
+        current_value: [`${props.current_value}`],
         func: action((v) => {
-            props.current_value = v as any;
+            props.current_value = v[0];
         })
-    }), [targetColumn, name_column, name]);
+    })), [targetColumn, name_column, name]);
     const { current_value } = spec;
     const maxItems = props.multiple ? 10 : 1;
     return (
@@ -63,10 +68,12 @@ export const RAComponent = observer(<T extends CTypes,>(props: ColumnSelectionPr
     const { link, linkedDsName, maxItems } = current_value;
     const multiple = isMultiColumn(props.type);
     return <Paper 
-    onClick={action((e) => {
-        current_value.maxItems = 100;
-        e.stopPropagation();
-    })}
+    onClick={(e) => {
+        runInAction(() => {
+            current_value.maxItems = 100;
+            e.stopPropagation();
+        });
+    }}
     >⦿⌁{maxItems} '{link.name}'</Paper>;
 })
 

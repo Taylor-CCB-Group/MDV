@@ -71,7 +71,7 @@ const specArray: GuiSpecs = [
         }
     })
 ]
-
+const stringArray = ["a", "b"];
 specArray.concat([
     g({
         type: "check",
@@ -84,7 +84,8 @@ specArray.concat([
     g({
         type: "multidropdown",
         label: "label",
-        current_value: ["current_value"],
+        current_value: stringArray,
+        values: [stringArray],
         func(v) {
             this.current_value = v.slice();
         }

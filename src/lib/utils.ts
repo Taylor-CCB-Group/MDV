@@ -50,6 +50,14 @@ export function isDatatypeCategorical(t: DataType): t is CategoricalDataType {
  * 
  * As of now, this doesn't do anything at runtime - if we want to have some centralised processing of the GuiSpec objects,
  * we could consider adding that here, or may want to keep it separate.
+ * 
+ * Sometimes the error messages that it generates can be confusing - for example, if you specify
+ * a `current_value` for a `"multidropdown"` that is not a `string[]` (which as of this writing is specified
+ * as the legal data-type for `GuiSpec<"multidropdown">`), you may get an error message that
+ * includes something like
+ * ```
+ * '"multidropdown"' is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of constraint 'keyof GuiValueTypes'
+ * ```
  */
 export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
     return spec;
