@@ -58,23 +58,6 @@ export abstract class BaseReactChart<T> extends BaseChart<T> {
     ) {
         super(dataStore, div, config);
         config = this.config; //original config will be copied by super, before doing things like adding id to it...
-        makeAutoObservable(config);
-        Object.defineProperty(this, "config", {
-            get: () => config,
-            set: (v) => {
-                config = v; // re-assigning config ref in this closure is not really relevant now;
-                //we are using makeAutoObservable and not referring to config directly...
-                makeAutoObservable(config);
-            },
-        });
-        this.mobxAutorun(() => {
-            // setTitle also sets config.title - which is what we're observing here...
-            // so we got warnings about setTitle mutating config.title 'outside an action' (at least it didn't go into infinite loop).
-            // perhaps title.textContent could be a computed value and we may not need this autorun at all...
-            // this.title.textContent = config.title;
-            // we can now safely call this.setTitle() without warnings as it avoids unnecessary config.title changes.
-            this.setTitle(config.title);
-        });
         // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
         // that worked, with extra extraneous number that changed to be observed by the hook...
         // What I have now done is change DataStore to be observable, and added a method for getting filtered indices
