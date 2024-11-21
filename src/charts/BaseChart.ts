@@ -251,7 +251,11 @@ class BaseChart<T> {
         //this fails if we're still in chart construction
         //return window.mdv.chartManager.charts[this.config.id].dataSource;
         const name = this.dataStore.name;
-        return window.mdv.chartManager.dataSources.find((ds) => ds.name === name);
+        const ds = window.mdv.chartManager.dataSources.find((ds) => ds.name === name);
+        if (!ds) {
+            throw new Error(`failed to find dataSource ${name}`);
+        }
+        return ds;
     }
 
     getFilter(): any {}
