@@ -9,8 +9,9 @@ import type { IReactionDisposer } from "mobx";
  */
 export default function decorateColumnMethod<T extends BaseChart<unknown>>(method: string, chart: T, dataSource: string) {
     // could try to make `method: keyof T`, but that would require a more type juggling...
+    // passing { target: chart } as context is not full information - what difference does it make?
     //@ts-expect-error
-    chart[method] = loadColumnData(chart[method], { target: chart });
+    chart[method] = loadColumnData(chart[method], { target: chart, name: method });
 }
 
 // also consider configEntriesUsingColumns...
@@ -23,13 +24,18 @@ export default function decorateColumnMethod<T extends BaseChart<unknown>>(metho
  * 
  * Anything specified as a virtual column that may change at runtime should cause the original method to be called again
  * as a `reaction`.
+ * 
+ * Considering the possibility that this might also take arguments about how this will map to the config object / params....
+ * Maybe it's enough in the short term to remember which method will be called with associated column specifications.
  */
 export function loadColumnData<This extends BaseChart<unknown>, Args extends any[], Return>(
     target: (this: This, inputCol: FieldName | FieldName[], ...args: Args) => void, // we could probably type this to have first argument specified...
-    context: ClassMethodDecoratorContext<This, (this: This, inputCol: FieldSpec, ...args: Args) => void> | { target: This },
+    // context: ClassMethodDecoratorContext<This, (this: This, inputCol: FieldSpec, ...args: Args) => void> | { target: This },
 ) {
     let disposer: IReactionDisposer | null = null;
     function replacementMethod(this: This, inputCol: FieldSpec, ...args: Args) {
+        // when I deserialise a chart, it should have working reactions for any live columns...
+        console.log("decorated loadColumnData method called", this.config.type, inputCol, args);
         const dataSource = this.dataSource.name;
         // if we have a special value indicating live data, we can do something, perhaps with chart.mobxAutorun(), here...
         // we want to make sure that
@@ -54,6 +60,8 @@ export function loadColumnData<This extends BaseChart<unknown>, Args extends any
             const multiCol = Array.isArray(inputCol);
             const colsOriginalArr = multiCol ? inputCol : [inputCol];
             // args[0] = colsOriginal;
+            // how do we specify which params this will operate on?
+            this.activeQueries[target.name] = [...colsOriginalArr, ...args];
             disposer = this.mobxAutorun(() => {
                 const cols = colsOriginalArr.flatMap(
                     (v: FieldSpec) => (Array.isArray(v) || typeof v === "string" ? v : v.fields)

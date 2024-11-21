@@ -11,6 +11,7 @@ import type { DataColumn, FieldName, GuiSpecs } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
 import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
+import { MulticolumnQuery } from "@/links/link_utils";
 type ChartEventType = string;
 type Listener = (type: ChartEventType, data: any) => void;
 type LegacyColorBy = { column: DataColumn<any> }
@@ -45,7 +46,10 @@ class BaseChart<T> {
     width = 0;
     height = 0;
     legend: any;
-    activeQueries: any;
+    // activeQueries: Record<string, FieldSpec> = {};
+    // thinking of making this a class with a bit more logic, for now, this is a record of queries...
+    activeQueries: Record<string, (string | MulticolumnQuery)[]> = {};
+    // _hasDecorated: Set<string> = new Set();
     /**
      * The base constructor
      * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
@@ -62,6 +66,8 @@ class BaseChart<T> {
             }
         }
         //**********
+        // this needs to be set before we initialise the config
+        this.dataStore = dataStore;
 
         //copy the config, 
         // this.config = JSON.parse(JSON.stringify(config));
@@ -75,7 +81,6 @@ class BaseChart<T> {
         //required in case added to separate browser window
         this.__doc__ = document;
 
-        this.dataStore = dataStore;
         this.listeners = {};
 
         //create the DOM elements
@@ -147,7 +152,7 @@ class BaseChart<T> {
                 func: () => {
                     window.mdv.debugChart = this;
                     this.dialogs.push(
-                        new DebugJsonDialogReactWrapper(this.config, this),
+                        new DebugJsonDialogReactWrapper(this.getConfig(), this),
                     );
                 },
             });

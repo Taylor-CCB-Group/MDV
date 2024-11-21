@@ -2084,8 +2084,14 @@ class ChartManager {
             //no record of column- need to load it (plus metadata)
             if (!col) {
                 // what if x is something like a MulticolumnQuery?
-                dStore.addColumnFromField(x);
-                return true;
+                if (typeof x !== "string") {
+                    // we could make dataStore understand it as a 'field'...
+                    // or if we return false to filter it out, chart deserialise can handle it?
+                    return false;
+                } else {
+                    dStore.addColumnFromField(x);
+                    return true;
+                }
             }
             //only load if has no data
             return !col.data;
@@ -2166,15 +2172,12 @@ class ChartManager {
 
         //need to decorate any method that uses column data as data may
         //have to be loaded before method can execute
-        // @ts-ignore
         if (chart.colorByColumn) {
             decorateColumnMethod("colorByColumn", chart, dataSource);
         }
-        // @ts-ignore
         if (chart.setToolTipColumn) {
             decorateColumnMethod("setToolTipColumn", chart, dataSource);
         }
-        // @ts-ignore
         if (chart.setBackgroundFilter) { //doesn't appear in the codebase
             decorateColumnMethod(
                 "setBackgroundFilter",
@@ -2182,7 +2185,6 @@ class ChartManager {
                 dataSource,
             );
         }
-        // @ts-ignore
         if (chart.changeContourParameter) {
             decorateColumnMethod(
                 "changeContourParameter",
@@ -2191,9 +2193,13 @@ class ChartManager {
             );
         }
 
-        //new preferred way to decorate column methods
+        //new preferred way to decorate column methods (now maybe prefer `@loadColumnData`?)
         if (chartType.methodsUsingColumns) {
             for (const meth of chartType.methodsUsingColumns) {
+                // if (chart._hasDecorated.has(meth)) {
+                //     console.log('already decorated', meth);
+                //     continue;
+                // }
                 decorateColumnMethod(meth, chart, dataSource);
             }
         }

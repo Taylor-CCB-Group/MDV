@@ -202,7 +202,7 @@ type RowsAsColsPrefs = {
     //could maybe have a firstIndex as well as maxItems, for pagination
     maxItems: number;
 }
-type RowsAsColsQuerySerialized = {
+export type RowsAsColsQuerySerialized = {
     linkedDsName: string;
     type: "RowsAsColsQuery";
 } & RowsAsColsPrefs;
@@ -320,7 +320,7 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
 export function getRowsAsColumnsLinks(dataStore: DataStore) {
     const dataSources = window.mdv.chartManager.dataSources;
     if (dataStore.links) {
-        return Object.keys(dataStore.links).map((linkedDsName) => {
+        const result = Object.keys(dataStore.links).map((linkedDsName) => {
             const links = dataStore.links[linkedDsName];
             if (links.rows_as_columns) {
                 // first pass... there can be only one or zero.
@@ -341,7 +341,8 @@ export function getRowsAsColumnsLinks(dataStore: DataStore) {
                 initRacListener(link, dataStore, linkedDs.dataStore);
                 return { linkedDs, link };
             }
-        }); //todo filter out undefined
+        }).filter(l => l !== undefined); //todo type-safety of filter
+        return result;
     }
     return [];
 }

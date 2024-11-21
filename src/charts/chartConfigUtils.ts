@@ -1,7 +1,46 @@
 import { getRandomString } from "@/utilities/Utilities";
-import type BaseChart from "./BaseChart";
-import { makeAutoObservable } from "mobx";
+import BaseChart from "./BaseChart";
+import { action, makeAutoObservable } from "mobx";
+import { FieldSpec } from "@/lib/columnTypeHelpers";
+import { RowsAsColsQuery, RowsAsColsQuerySerialized } from "@/links/link_utils";
+import { DataSource, FieldName } from "./charts";
+import DataStore from "@/datastore/DataStore";
+import { isArray } from "@/lib/utils";
 
+// const ParamSpec = {
+//     "linkedDsName": "genes",
+//         "maxItems": 10,
+//             "type": "RowsAsColsQuery"
+// }
+type SerialisedColumnParam = (FieldName | RowsAsColsQuerySerialized);
+type SerialisedParams = SerialisedColumnParam | SerialisedColumnParam[];
+export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
+    const result = typeof param === "string" ? param : RowsAsColsQuery.fromSerialized(ds, param);
+    if (!result) {
+        throw new Error(`Failed to deserialise param: ${param}`);
+    }
+    return result;
+}
+
+export class ColumnQueryMapper<T> {
+    constructor(chart: BaseChart<T>) {
+
+    }
+}
+
+export function serialiseQueries(chart: BaseChart<any>) {
+    const { activeQueries } = chart;
+    const serialized: Record<string, any> = {};
+    for (const k in activeQueries) {
+        serialized[k] = activeQueries[k].map(q => {
+            if (q instanceof RowsAsColsQuery) {
+                return q.serialized;
+            }
+            return q;
+        });
+    }
+    return serialized;
+}
 
 export function serialiseConfig<T extends BaseChart<any>>(chart: T) {
     const { config } = chart;
@@ -19,6 +58,16 @@ export function serialiseConfig<T extends BaseChart<any>>(chart: T) {
     // use it to determine any `configEntriesUsingColumns`...
     const serialized = JSON.parse(JSON.stringify(config));
     console.log('processed config:', serialized);
+
+    // we should find any mapped column queries and replace relevant values with a representation of that
+    //the idea is that anywhere we previously had a column name, we can have a query object
+    for (const k in chart.activeQueries) {
+        // this is a different approach where we have a 'queries' property which has a method name as a key
+        // so the contents of `param` are less relevant...
+        // indeed, we could call this something like `columns` and use it in place of `param`...
+        // would mostly apply to non-react charts though, or I'd be more keen on this approach...
+        // serialized.queries = serialiseQueries(chart);
+    }
     return serialized;
 }
 
@@ -28,6 +77,26 @@ export function initialiseConfig<T extends BaseChart<any>>(originalConfig: any, 
         // what about when we duplicate a chart?
         config.id = getRandomString();
     }
+
+    //we might introspect this to figure out which config entries are known to use columns...
+    //const chartTypeInfo = BaseChart.types[chart.config.type];
+
+    //or rather than relying on that property we can traverse the config object for any special values
+    //for now, only operating on the param property of the config object
+    //also we move around where actual loading of column data currently done by ChartManager happens
+    const param: SerialisedParams = config.param;
+    const processed = isArray(param) ? param.map(p => deserialiseParam(chart.dataStore, p)) : deserialiseParam(chart.dataStore, param);
+    config.param = processed;
+    console.log(config.type, 'processed config:', config);
+    //temporary way of prototyping query
+    // setTimeout(action(() => {
+    //     const c = config as any;
+    //     const queries = c.queries;
+    //     for (const method in queries) {
+    //         const q = queries[method].map((v: any) => deserialiseParam(chart.dataStore, v));
+    //         (chart as any)[method](q);
+    //     }
+    // }));
 
     // makeAutoObservable(config);
     Object.defineProperty(chart, "config", {

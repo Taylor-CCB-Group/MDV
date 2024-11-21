@@ -5,7 +5,8 @@ import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
-import { loadColumnData } from "@/datastore/decorateColumnMethod";
+import decorateColumnMethod, { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { serialiseConfig, serialiseQueries } from "./chartConfigUtils";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -15,11 +16,17 @@ class DotPlot extends SVGChart {
             y: { type: "band" },
             ry: {},
         });
+        //! this.config is not the object that was passed in, it's been processed by super()
+        const c = this.config; 
+        
+        // ! we shouldn't need to call this... but "methodUsingColumns" is applied too late
+        // ! and `@loadColumnData` is not not working as expected
+        decorateColumnMethod('setFields', this, dataStore.name); //dataStore.name is ignored
+
         this.addToolTip();
         this.dim = this.dataStore.getDimension("catcol_dimension");
         this.colorScheme = schemeReds[8];
-        this.setFields(config.param.slice(1));
-        const c = this.config;
+        this.setFields(c.param.slice(1));
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
         if (!c.color_legend) {
@@ -31,7 +38,11 @@ class DotPlot extends SVGChart {
         this.fractionScale = scaleSqrt().domain([0, 100]);
     }
 
-    @loadColumnData
+    // todo figure out why annotation version isn't fully working - need methodsUsingColumns as well???
+    //if called with objects representing queries, this will cause the method to be called with column names
+    //and again whenever the column data changes
+    //but when we clone a chart like that, at the moment the old chart stops responding to changes
+    // @loadColumnData 
     setFields(fieldNames) {
         const cm = window.mdv.chartManager;
         //! we don't want to mutate the config object... 
@@ -113,6 +124,14 @@ class DotPlot extends SVGChart {
         const l = this.linkThicknessLegend;
         if (l) {
             config.fraction_legend.position = [l.offsetLeft, l.offsetTop];
+        }
+        // it looks as though individual charts may be on the hook to serialise their queries
+        // because only they really know how they relate to order of params in the config
+        const fieldQuery = serialiseQueries(this)['setFields'];
+        // if we have a way of interpreting this we'd be good to go
+        if (fieldQuery) {
+            console.log('DotPlot fieldQuery', fieldQuery);
+            config.param = [config.param[0], ...fieldQuery];
         }
         return config;
     }
@@ -349,6 +368,7 @@ class DotPlot extends SVGChart {
 BaseChart.types["dot_plot"] = {
     name: "Dot Plot",
     class: DotPlot,
+    // this applies too late...
     // methodsUsingColumns: ["setFields"],
     params: [
         {
