@@ -19,10 +19,10 @@ export const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?:
     const inputProps: typeof InputProps = {
         ...InputProps,
         endAdornment: (
-            <StyledAdornment>{customEndAdornment} {InputProps.endAdornment}</StyledAdornment>
+            <StyledAdornment>{customEndAdornment} {InputProps?.endAdornment}</StyledAdornment>
         ),
         startAdornment: (
-            <StyledAdornment>{props.customStartAdornment} {InputProps.startAdornment}</StyledAdornment>
+            <StyledAdornment>{props.customStartAdornment} {InputProps?.startAdornment}</StyledAdornment>
         )
     };
     return <TextField {...rest} InputProps={inputProps} />;

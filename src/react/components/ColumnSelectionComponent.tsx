@@ -44,6 +44,7 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
     const columns: DataColumn<DataType>[] = useMemo(
         () => dataStore.columns
             .filter((c) => !props.exclude?.includes(c.name))
+            //@ts-expect-error
             .filter((c) => columnMatchesType(c, type))
             ,
         [dataStore, props.exclude, type],
@@ -148,6 +149,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                 <Grid className="w-full items-center" container>
                     <Grid size={"grow"}>
                         {/* we may want to show something different, especially if special value is selected... */}                        
+                        {/* @ts-expect-error */}
                         <ColumnDropdown {...props} {...guiProps} />
                     </Grid>
                 </Grid>

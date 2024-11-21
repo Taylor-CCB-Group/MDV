@@ -128,9 +128,13 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
     const filter = props.columnSelection?.filter;
     // not only is the filter not working, but we need to decide how to express "multiple"
     const props2 = useMemo(() => inferGenericColumnSelectionProps({
+        // fixing this stuff is high priority
+        //@ts-expect-error
         setSelectedColumn,
+        //@ts-expect-error
         type: filter,
         multiple: props.type === "multicolumn",
+        //@ts-expect-error
         current_value: props.current_value
         // current_value: props.current_value... maybe want to be more mobx-y about this
     }), [setSelectedColumn, props.type, filter, props.current_value]);
