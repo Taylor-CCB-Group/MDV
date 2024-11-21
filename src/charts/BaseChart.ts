@@ -248,7 +248,10 @@ class BaseChart<T> {
         };
     }
     get dataSource() {
-        return window.mdv.chartManager.charts[this.config.id].dataSource;
+        //this fails if we're still in chart construction
+        //return window.mdv.chartManager.charts[this.config.id].dataSource;
+        const name = this.dataStore.name;
+        return window.mdv.chartManager.dataSources.find((ds) => ds.name === name);
     }
 
     getFilter(): any {}
