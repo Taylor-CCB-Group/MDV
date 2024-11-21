@@ -46,6 +46,7 @@
   },
   "homepage": "https://github.com/Taylor-CCB-Group/MDV#readme",
   "dependencies": {
+    "@babel/plugin-proposal-decorators": "^7.25.9",
     "@deck.gl-community/editable-layers": "^9.0.3",
     "@deck.gl-community/layers": "^9.0.3",
     "@emotion/react": "^11.11.1",
