@@ -128,19 +128,6 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
  * this would be ambiguous).
  */
 const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => { //GuiSpec<"column">) => {
-    const { type } = props;
-    // generics are messy, maybe we should just have two separate components...
-    // const isMultiType = type === "_multi_column:number" || type === "_multi_column:all";
-    // const multiple = props.multiple || isMultiType;
-    const dataStore = useDataStore(props.dataStore);
-    // todo column groups
-    const columns: DataColumn<DataType>[] = useMemo(
-        () => dataStore.columns
-            .filter((c) => !props.exclude?.includes(c.name))
-            .filter((c) => columnMatchesType(c, type))
-            ,
-        [dataStore, props.exclude, type],
-    );
     const [isExpanded, setIsExpanded] = useState(false);
     const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
 
