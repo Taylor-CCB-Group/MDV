@@ -263,7 +263,7 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
         console.error(`Column ${link.name_column} not found in DataStore ${ds.name}`);
         return;
     }
-    link.observableFields = []; //maybe initialize this with current values
+    link.observableFields = []; //this will be populated by setFieldsFromFilter below
     makeObservable(link, { observableFields: true });
     
     await cm.loadColumnSetAsync([link.name_column], tds.name);
@@ -297,6 +297,15 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
     const getField = (index: number) => {
         return new RAColumn(index);
     };
+    async function setFieldsFromFilter() {
+        //! this Array.from could be suboptimal for large numbers of indices
+        //at risk of overthinking, but we could have a lazy filteredIndices iterator...
+        const filteredIndices = await tds.getFilteredIndices();
+        const vals = Array.from(filteredIndices).map(getField);
+        runInAction(() => {
+            link.observableFields = vals;
+        });
+    }
     //todo check link.name is a good id for the listener
     tds.addListener(link.name, async (type, data) => {
         if (type === "data_highlighted") {
@@ -306,15 +315,11 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
             });
         } else if (type === "filtered") {
             // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-            //! this Array.from could be suboptimal for large numbers of indices
-            //at risk of overthinking, but we could have a lazy filteredIndices iterator...
-            const filteredIndices = await tds.getFilteredIndices();
-            const vals = Array.from(filteredIndices).map(getField);
-            runInAction(() => {
-                link.observableFields = vals;
-            });
+            
+            setFieldsFromFilter();
         }
     });
+    setFieldsFromFilter();
 }
 
 export function getRowsAsColumnsLinks(dataStore: DataStore) {
