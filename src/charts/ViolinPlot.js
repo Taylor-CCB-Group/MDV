@@ -19,7 +19,8 @@ class ViolinPlot extends WGLChart {
             };
         }
         if (!config.title) {
-            this.useDefaultTitle = true;
+            // --- causes some nasty exception... let's not do that for now
+            // this.useDefaultTitle = true;
             config.title = `${x_name} x ${y_name}`;
         }
         super(dataStore, div, config, { x: { type: "band" }, y: {} });
