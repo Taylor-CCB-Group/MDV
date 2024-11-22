@@ -132,7 +132,7 @@ class ViolinPlot extends WGLChart {
             ];
             this.dim(
                 "filterSquare",
-                [this.xPos, this.config.param[1]],
+                [this.xPos, this.valueField],
                 { range1: this.filter[0], range2: this.filter[1] },
                 [this.xPos, 1],
             );
@@ -152,14 +152,14 @@ class ViolinPlot extends WGLChart {
                 this.resetButton.style.display = "none";
             }
             this.config
-            const c = this.getConfig();
+            const c = this.config;
             this.ticks = this.y_scale.ticks(c.intervals);
             this.dim.getKernalDensity(
                 (data) => {
                     this.data = data;
                     this.drawChart();
                 },
-                c.param,
+                [c.param[0], this.valueField],
                 {
                     ticks: this.ticks,
                     bandwidth: c.band_width,
@@ -282,7 +282,7 @@ class ViolinPlot extends WGLChart {
     }
 
     onDataAdded(newSize) {
-        const p = this.getConfig().param;
+        const p = this.config.param;
         const config = this.getSetupConfig();
         const newX = new Float32Array(newSize);
         newX.set(this.xPos);
@@ -294,7 +294,7 @@ class ViolinPlot extends WGLChart {
         }
         this.xPos = newX;
         config.x = newX;
-        config.y = this.dataStore.getRawColumn(p[1]);
+        config.y = this.dataStore.getRawColumn(this.valueField);
         //update the filter with the extra data
         if (this.dim.filterColumns) {
             this.dimFilterColumns[0] = newX;
@@ -349,7 +349,7 @@ class ViolinPlot extends WGLChart {
         const s = super.getSettings();
         const c = this.config;
         // no - we should be using config value, but when serialising in getConfig() we need to patch
-        const p1 = this.config.param[1];
+        const p1 = this.valueField;
         const mm = this.dataStore.getMinMaxForColumn(p1);
 
         s.splice(
