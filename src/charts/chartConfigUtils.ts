@@ -17,9 +17,17 @@ type SerialisedParams = SerialisedColumnParam | SerialisedColumnParam[];
 export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
     const result = typeof param === "string" ? param : RowsAsColsQuery.fromSerialized(ds, param);
     if (!result) {
+        // this happens with unexpected array...
         throw new Error(`Failed to deserialise param: ${param}`);
     }
     return result;
+}
+
+export function getConcreteFieldName(fieldSpec: FieldSpec) {
+    if (isArray(fieldSpec)) {
+        throw new Error("Not implemented");
+    }
+    return typeof fieldSpec === "string" ? fieldSpec : fieldSpec.fields[0];
 }
 
 export class ColumnQueryMapper<T> {
@@ -57,8 +65,7 @@ export function serialiseConfig<T extends BaseChart<any>>(chart: T) {
     // get the BaseChart.types entry for this chart, 
     // use it to determine any `configEntriesUsingColumns`...
     const serialized = JSON.parse(JSON.stringify(config));
-    console.log('processed config:', serialized);
-
+    
     // we should find any mapped column queries and replace relevant values with a representation of that
     //the idea is that anywhere we previously had a column name, we can have a query object
     for (const k in chart.activeQueries) {
@@ -68,6 +75,13 @@ export function serialiseConfig<T extends BaseChart<any>>(chart: T) {
         // would mostly apply to non-react charts though, or I'd be more keen on this approach...
         // serialized.queries = serialiseQueries(chart);
     }
+    const serialisedQueries = serialiseQueries(chart);
+    const colorByColumn = serialisedQueries['colorByColumn'];
+    if (colorByColumn) {
+        // serialized.colorByColumn = getConcreteFieldName(chart.activeQueries['colorByColumn'][0]);
+        serialized.color_by = colorByColumn[0];
+    }
+    console.log('processed config:', serialized);
     return serialized;
 }
 
@@ -84,9 +98,19 @@ export function initialiseConfig<T extends BaseChart<any>>(originalConfig: any, 
     //or rather than relying on that property we can traverse the config object for any special values
     //for now, only operating on the param property of the config object
     //also we move around where actual loading of column data currently done by ChartManager happens
+    //todo process entire config object, not just param
     const param: SerialisedParams = config.param;
     const processed = isArray(param) ? param.map(p => deserialiseParam(chart.dataStore, p)) : deserialiseParam(chart.dataStore, param);
     config.param = processed;
+    //pending more generic approach to serialising queries...
+    if (originalConfig.color_by) {
+        const colorBy = isArray(originalConfig.color_by) ? deserialiseParam(chart.dataStore, originalConfig.color_by[0]) : config.color_by = deserialiseParam(chart.dataStore, originalConfig.color_by);
+        config.color_by = undefined;
+        setTimeout(() => {
+            //@ts-expect-error the method itself takes a string - but our decorated version takes what we're giving it...
+            chart.colorByColumn?.(colorBy);
+        })
+    }
     console.log(config.type, 'processed config:', config);
     //temporary way of prototyping query
     // setTimeout(action(() => {
