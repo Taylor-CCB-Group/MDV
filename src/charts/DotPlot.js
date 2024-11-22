@@ -368,8 +368,7 @@ class DotPlot extends SVGChart {
 BaseChart.types["dot_plot"] = {
     name: "Dot Plot",
     class: DotPlot,
-    // this applies too late...
-    // methodsUsingColumns: ["setFields"],
+    methodsUsingColumns: ["setFields"],
     params: [
         {
             type: "text",

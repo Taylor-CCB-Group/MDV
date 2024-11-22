@@ -102,6 +102,7 @@ class BoxPlot extends ViolinPlot {
 BaseChart.types["box_plot"] = {
     class: BoxPlot,
     name: "Box Plot",
+    methodsUsingColumns: ["setValueField"],
     params: [
         {
             type: "text",

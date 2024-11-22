@@ -319,7 +319,9 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
             setFieldsFromFilter();
         }
     });
-    setFieldsFromFilter();
+    console.log("settings initial fields for link...", link);
+    await setFieldsFromFilter();
+    console.log("link initialized", link);
 }
 
 export function getRowsAsColumnsLinks(dataStore: DataStore) {

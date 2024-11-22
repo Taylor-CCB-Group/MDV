@@ -12,6 +12,7 @@ import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
 import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
 import { MulticolumnQuery } from "@/links/link_utils";
+import { decorateChartColumnMethods } from "@/datastore/decorateColumnMethod";
 type ChartEventType = string;
 type Listener = (type: ChartEventType, data: any) => void;
 type LegacyColorBy = { column: DataColumn<any> }
@@ -68,7 +69,7 @@ class BaseChart<T> {
         //**********
         // this needs to be set before we initialise the config
         this.dataStore = dataStore;
-
+        
         //copy the config, 
         // this.config = JSON.parse(JSON.stringify(config));
         //^^ previously, only react charts had observable config
@@ -77,6 +78,8 @@ class BaseChart<T> {
         //   but there are issues with mobx actions that result in mutations to the config
         //... so perhaps the idea of keeping that property to react charts is a good one?
         this.config = initialiseConfig(config, this);
+        //this needs to be called after we initialise the config
+        decorateChartColumnMethods(this);
 
         //required in case added to separate browser window
         this.__doc__ = document;
@@ -351,6 +354,9 @@ class BaseChart<T> {
      */
     onDataFiltered(dim?: Dimension) {}
 
+    setToolTipColumn?(column: FieldName): void;
+    setBackgroundFilter?(column: FieldName): void;
+    changeContourParameter?(column: FieldName): void;
     colorByColumn?(c: FieldName): void;
     colorByDefault?(): void;
     /**Check if chart is composed of any columns whose data has

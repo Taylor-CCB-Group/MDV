@@ -5,7 +5,6 @@ import { easeLinear } from "d3-ease";
 import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
 import { g } from "@/lib/utils";
-import decorateColumnMethod, { loadColumnData } from "@/datastore/decorateColumnMethod";
 import { serialiseQueries } from "./chartConfigUtils";
 
 class ViolinPlot extends WGLChart {
@@ -24,7 +23,6 @@ class ViolinPlot extends WGLChart {
             config.title = `${x_name} x ${y_name}`;
         }
         super(dataStore, div, config, { x: { type: "band" }, y: {} });
-        decorateColumnMethod("setValueField", this);
         this.config.type = "violin_plot";
 
         //todo review general design around mutation of config in constructor / mobx
@@ -420,6 +418,7 @@ class ViolinPlot extends WGLChart {
 BaseChart.types["violin_plot"] = {
     class: ViolinPlot,
     name: "Violin Plot",
+    methodsUsingColumns: ["setValueField"],
     params: [
         {
             type: "text",

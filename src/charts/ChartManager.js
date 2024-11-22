@@ -60,7 +60,6 @@ import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { AddChartDialog } from "./dialogs/AddChartDialog";
-import decorateColumnMethod from "@/datastore/decorateColumnMethod";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -2169,40 +2168,6 @@ class ChartManager {
                 this._removeLinks(chart);
                 this._callListeners("chart_removed", chart);
             });
-
-        //need to decorate any method that uses column data as data may
-        //have to be loaded before method can execute
-        if (chart.colorByColumn) {
-            decorateColumnMethod("colorByColumn", chart, dataSource);
-        }
-        if (chart.setToolTipColumn) {
-            decorateColumnMethod("setToolTipColumn", chart, dataSource);
-        }
-        if (chart.setBackgroundFilter) { //doesn't appear in the codebase
-            decorateColumnMethod(
-                "setBackgroundFilter",
-                chart,
-                dataSource,
-            );
-        }
-        if (chart.changeContourParameter) {
-            decorateColumnMethod(
-                "changeContourParameter",
-                chart,
-                dataSource,
-            );
-        }
-
-        //new preferred way to decorate column methods (now maybe prefer `@loadColumnData`?)
-        if (chartType.methodsUsingColumns) {
-            for (const meth of chartType.methodsUsingColumns) {
-                // if (chart._hasDecorated.has(meth)) {
-                //     console.log('already decorated', meth);
-                //     continue;
-                // }
-                decorateColumnMethod(meth, chart, dataSource);
-            }
-        }
 
         // @ts-ignore
         if (chart.setupLinks) {

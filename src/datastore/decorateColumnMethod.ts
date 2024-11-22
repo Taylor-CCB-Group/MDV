@@ -1,4 +1,4 @@
-import type BaseChart from "@/charts/BaseChart";
+import BaseChart from "@/charts/BaseChart";
 import type { FieldName } from "@/charts/charts";
 import type { FieldSpec } from "@/lib/columnTypeHelpers";
 import type { IReactionDisposer } from "mobx";
@@ -7,12 +7,45 @@ import type { IReactionDisposer } from "mobx";
  * Apply the {@link loadColumnData} decorator to a method on a chart class manually at runtime, rather than using the `@loadColumnData` syntax
  * which as of this writing is only working with vanilla ts code - not js or react.
  */
-export default function decorateColumnMethod<T extends BaseChart<unknown>>(method: string, chart: T, dataSource: string) {
+function decorateColumnMethod<T extends BaseChart<any>>(method: string, chart: T) {
     // could try to make `method: keyof T`, but that would require a more type juggling...
     // passing { target: chart } as context is not full information - what difference does it make?
     //@ts-expect-error
     chart[method] = loadColumnData(chart[method], { target: chart, name: method });
 }
+
+/**
+ * Apply start @{link loadColumnData} decorator to all methods on a chart class that require column data to be loaded
+ * and which don't specify this with the `@loadColumnData` syntax.
+ */
+export function decorateChartColumnMethods<T extends BaseChart<any>>(chart: T) {
+    const chartType = BaseChart.types[chart.config.type];
+    
+    if (chart.colorByColumn) {
+        decorateColumnMethod("colorByColumn", chart);
+    }
+    if (chart.setToolTipColumn) {
+        decorateColumnMethod("setToolTipColumn", chart);
+    }
+    if (chart.setBackgroundFilter) { //doesn't appear in the codebase
+        decorateColumnMethod(
+            "setBackgroundFilter",
+            chart,
+        );
+    }
+    if (chart.changeContourParameter) {
+        decorateColumnMethod(
+            "changeContourParameter",
+            chart,
+        );
+    }
+
+    if (!chartType.methodsUsingColumns) return;
+    for (const m of chartType.methodsUsingColumns) {
+        decorateColumnMethod(m, chart);
+    }
+}
+
 
 // also consider configEntriesUsingColumns...
 // perhaps we can have computed getters and custom setters for the columns in the config
