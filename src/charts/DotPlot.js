@@ -5,8 +5,7 @@ import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
-import decorateColumnMethod, { loadColumnData } from "@/datastore/decorateColumnMethod";
-import { serialiseConfig, serialiseQueries } from "./chartConfigUtils";
+import { serialiseQueries } from "./chartConfigUtils";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -19,13 +18,12 @@ class DotPlot extends SVGChart {
         //! this.config is not the object that was passed in, it's been processed by super()
         const c = this.config; 
         
-        // ! we shouldn't need to call this... but "methodUsingColumns" is applied too late
-        // ! and `@loadColumnData` is not not working as expected
-        decorateColumnMethod('setFields', this, dataStore.name); //dataStore.name is ignored
-
         this.addToolTip();
         this.dim = this.dataStore.getDimension("catcol_dimension");
         this.colorScheme = schemeReds[8];
+        console.log('setting fields for dot plot', c.param.slice(1));
+        //this works ok because the method is decorated... which I think means if there's a query object,
+        //`setFields` won't actually be called until the link is properly initialised
         this.setFields(c.param.slice(1));
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
@@ -127,6 +125,9 @@ class DotPlot extends SVGChart {
         }
         // it looks as though individual charts may be on the hook to serialise their queries
         // because only they really know how they relate to order of params in the config
+        // in the case of react charts, they should hypothetically respond to changes in the config already
+        // - we just need to make that aware of queries in appropriate hooks?
+        // as for non-react... I suppose if they all have a contract whereby setConfig method will set appropriate state
         const fieldQuery = serialiseQueries(this)['setFields'];
         // if we have a way of interpreting this we'd be good to go
         if (fieldQuery) {
