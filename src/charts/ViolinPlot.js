@@ -4,6 +4,8 @@ import { curveBasis, line } from "d3-shape";
 import { easeLinear } from "d3-ease";
 import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
+import { g } from "@/lib/utils";
+import decorateColumnMethod, { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class ViolinPlot extends WGLChart {
     constructor(dataStore, div, config) {
@@ -19,8 +21,10 @@ class ViolinPlot extends WGLChart {
             config.title = `${x_name} x ${y_name}`;
         }
         super(dataStore, div, config, { x: { type: "band" }, y: {} });
+        decorateColumnMethod("setValueField", this);
         this.config.type = "violin_plot";
 
+        //todo review general design around mutation of config in constructor / mobx
         const c = this.config;
         c.brush = c.brush || "poly";
 
@@ -28,10 +32,14 @@ class ViolinPlot extends WGLChart {
 
         this.app = new WGL2DI(this.graphDiv, appConf);
         const colorFunc = this.afterAppCreation();
+        this.colorFunc = colorFunc;
         const len = this.dataStore.size;
         this.xPosBuff = new SharedArrayBuffer(len * 4);
         this.xPos = new Float32Array(this.xPosBuff);
 
+        //-- notes around column queries / TAURUS
+        //we want to have dynamic 'values' - but these are not the values we're looking for
+        //it's the contents of param[1] we care about at this time
         this.values = this.dataStore.getColumnValues(c.param[0]);
         const cats = this.dataStore.getRawColumn(c.param[0]);
         //jitter x position
@@ -47,14 +55,8 @@ class ViolinPlot extends WGLChart {
 
         this.dim = this.dataStore.getDimension("catrange_dimension");
         this.x_scale.domain(this.values);
-        const cy = this.dataStore.columnIndex[c.param[1]];
-        this.app.addCircles({
-            x: this.xPos,
-            y: cy.datatype === "int32" ? new Float32Array(cy.data) : cy.data,
-            localFilter: this.dim.getLocalFilter(),
-            globalFilter: this.dataStore.getFilter(),
-            colorFunc: colorFunc,
-        });
+        //...
+        this.setValueField(c.param[1]);
         this.app.addHandler("brush_stopped", (range, is_poly) => {
             this.resetButton.style.display = "inline";
             this.app.setFilter(true);
@@ -72,6 +74,21 @@ class ViolinPlot extends WGLChart {
         this.app.setPointOpacity(this.config.opacity);
         this.data = [];
         this.centerGraph();
+        this.onDataFiltered();
+    }
+
+    // @loadColumnData
+    setValueField(field) {
+        this.config.param[1] = field;
+        const cy = this.dataStore.columnIndex[field];
+        this.app.addCircles({
+            x: this.xPos,
+            y: cy.datatype === "int32" ? new Float32Array(cy.data) : cy.data,
+            localFilter: this.dim.getLocalFilter(),
+            globalFilter: this.dataStore.getFilter(),
+            colorFunc: this.colorFunc,
+        });
+
         this.onDataFiltered();
     }
 
@@ -109,7 +126,8 @@ class ViolinPlot extends WGLChart {
                 this.app.setFilter(false);
                 this.resetButton.style.display = "none";
             }
-            const c = this.config;
+            this.config
+            const c = this.getConfig();
             this.ticks = this.y_scale.ticks(c.intervals);
             this.dim.getKernalDensity(
                 (data) => {
@@ -239,7 +257,7 @@ class ViolinPlot extends WGLChart {
     }
 
     onDataAdded(newSize) {
-        const p = this.config.param;
+        const p = this.getConfig().param;
         const config = this.getSetupConfig();
         const newX = new Float32Array(newSize);
         newX.set(this.xPos);
@@ -267,7 +285,7 @@ class ViolinPlot extends WGLChart {
     }
 
     centerGraph() {
-        const mm = this.dataStore.getMinMaxForColumn(this.config.param[1]);
+        const mm = this.dataStore.getMinMaxForColumn(this.getConfig().param[1]);
         const max_x = this.data.length * 50;
         const max_y = mm[1];
         const min_x = 0;
@@ -295,11 +313,26 @@ class ViolinPlot extends WGLChart {
     getSettings() {
         const s = super.getSettings();
         const c = this.config;
-        const mm = this.dataStore.getMinMaxForColumn(c.param[1]);
+        const p1 = this.getConfig().param[1];
+        const mm = this.dataStore.getMinMaxForColumn(p1);
 
         s.splice(
             1,
             0,
+            g({
+                type: "column",
+                label: "Value (Y axis)",
+                columnSelection: {
+                    filter: ["double", "integer", "int32"]
+                },
+                current_value: p1,
+                func: (x) => {
+                    //! this is what we'd like to do - may be possible if we decorated the func with query response
+                    this.setValueField(x);
+                    // c.param[1] = x;
+                    // this.onDataFiltered();
+                },
+            }),
             {
                 type: "slider",
                 max: mm[1] / 10,
@@ -341,7 +374,7 @@ class ViolinPlot extends WGLChart {
             }
         }
         this.filter = vs;
-        this.dim.filter("filterPoly", [this.xPos, this.config.param[1]], vs);
+        this.dim.filter("filterPoly", [this.xPos, this.getConfig().param[1]], vs);
         this.app.refresh();
     }
 }

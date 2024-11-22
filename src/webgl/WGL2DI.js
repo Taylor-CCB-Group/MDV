@@ -630,6 +630,9 @@ class WGL2DI {
         this.squares.count = len;
     }
 
+    /** this looks as though it will conveniently replace any existing circles, as opposed to adding
+     * which is what I want... if not what the method name suggests.
+     */
     addCircles(config) {
         this.circles.x_pos = config.x;
         this.circles.y_pos = config.y;
