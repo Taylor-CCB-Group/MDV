@@ -568,10 +568,10 @@ class BaseChart<T> {
     /**
      * Returns information about which controls to add to the settings dialog.
      * Subclasses should call this method and then add their own controls e.g.
-     * <pre style='background:lightgray;padding:10px'>
+     * ```
      * getSettings(){
      *     let settings = super.getSettings();
-     *     return settings.concat([{
+     *     return settings.concat([g({
      *       label:"A value"
      *       type:"slider",
      *       default_value:this.config.value,
@@ -581,12 +581,14 @@ class BaseChart<T> {
      *           this.config.value=x;
      *           //update chart
      *       }
-     *     }]);
+     *     })]);
      * }
-     * </pre>
+     * ```
      *
      * wrapping controls with a call to @{link g} will perform type checking
      * todo- specifiy the link to `g` above properly/ document better
+     * at the moment it has no other purpose - but it is possbile we may
+     * use it for other housekeeping tasks in the future.
      * @returns an array of objects describing tweakable parameters
      */
     getSettings() {
