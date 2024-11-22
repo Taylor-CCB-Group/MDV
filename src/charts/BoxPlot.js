@@ -26,7 +26,7 @@ class BoxPlot extends ViolinPlot {
                     this.data = data;
                     this.drawChart();
                 },
-                this.config.param,
+                [this.config.param[0], this.valueField],
                 { xPos: this.xPosBuff },
             );
         }

@@ -6,11 +6,13 @@ import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
 import { g } from "@/lib/utils";
 import decorateColumnMethod, { loadColumnData } from "@/datastore/decorateColumnMethod";
+import { serialiseQueries } from "./chartConfigUtils";
 
 class ViolinPlot extends WGLChart {
+    useDefaultTitle = false;
     constructor(dataStore, div, config) {
         const x_name = dataStore.getColumnName(config.param[0]);
-        const y_name = dataStore.getColumnName(config.param[1]);
+        const y_name = dataStore.getColumnName(config.param[1]); //! no.
         if (!config.axis) {
             config.axis = {
                 x: { size: 30, label: x_name, textsize: 13 },
@@ -18,6 +20,7 @@ class ViolinPlot extends WGLChart {
             };
         }
         if (!config.title) {
+            this.useDefaultTitle = true;
             config.title = `${x_name} x ${y_name}`;
         }
         super(dataStore, div, config, { x: { type: "band" }, y: {} });
@@ -48,15 +51,17 @@ class ViolinPlot extends WGLChart {
         }
 
         //set default band width
-        const mm = this.dataStore.getMinMaxForColumn(c.param[1]);
-        this.defaultBandWidth = (mm[1] - mm[0]) / 100;
-        c.band_width = c.band_width || this.defaultBandWidth;
-        c.intervals = c.intervals || 20;
+        //this is where it's going wrong - when should we be using `getConfig()`?
+        //when this is called before initial fields for the link have been set, it fails
+        // const p1 = getConcreteFieldName(this.config.param[1]);
+        //if we do all this in setValueField, it'll be violating mobx rules?
+        // const mm = this.dataStore.getMinMaxForColumn(p1);
+        // this.defaultBandWidth = (mm[1] - mm[0]) / 100;
+        // c.band_width = c.band_width || this.defaultBandWidth;
+        // c.intervals = c.intervals || 20;
 
         this.dim = this.dataStore.getDimension("catrange_dimension");
         this.x_scale.domain(this.values);
-        //...
-        this.setValueField(c.param[1]);
         this.app.addHandler("brush_stopped", (range, is_poly) => {
             this.resetButton.style.display = "inline";
             this.app.setFilter(true);
@@ -66,20 +71,38 @@ class ViolinPlot extends WGLChart {
                 this._createPolyFilter(range);
             }
         });
-
+        
         c.radius = c.radius || 5;
         c.opacity = c.opacity || 0.8;
-
+        
         this.app.setPointRadius(this.config.radius);
         this.app.setPointOpacity(this.config.opacity);
         this.data = [];
-        this.centerGraph();
-        this.onDataFiltered();
+        this.setValueField(c.param[1]);
+        // this.centerGraph();
+        // this.onDataFiltered();
     }
+    // @computed get bandwidth() {
+    //     const mm = this.dataStore.getMinMaxForColumn(this.valueFieldName);
+    // }
 
     // @loadColumnData
-    setValueField(field) {
-        this.config.param[1] = field;
+    setValueField(field) {        
+        //this.config.param[1] = field; //NO
+        if (!field) {
+            console.warn("No field provided for setValueField");
+            return;
+        }
+        console.log("Setting value field", field);
+        this.valueField = field;
+
+        // set default band width
+        const mm = this.dataStore.getMinMaxForColumn(field);
+        this.defaultBandWidth = (mm[1] - mm[0]) / 100;
+        // ! violating mobx rules...
+        const c = this.config;
+        c.band_width = c.band_width || this.defaultBandWidth;
+        c.intervals = c.intervals || 20;
         const cy = this.dataStore.columnIndex[field];
         this.app.addCircles({
             x: this.xPos,
@@ -88,9 +111,13 @@ class ViolinPlot extends WGLChart {
             globalFilter: this.dataStore.getFilter(),
             colorFunc: this.colorFunc,
         });
-
+        //! todo make sure legend is updated.
+        this.centerGraph();
         this.onDataFiltered();
     }
+    // @computed get valueFieldName() {
+    //      return getConcreteFieldName(this.config.param[1]);
+    // }
 
     _createFilter(range) {
         this.range = range;
@@ -285,7 +312,7 @@ class ViolinPlot extends WGLChart {
     }
 
     centerGraph() {
-        const mm = this.dataStore.getMinMaxForColumn(this.getConfig().param[1]);
+        const mm = this.dataStore.getMinMaxForColumn(this.valueField);
         const max_x = this.data.length * 50;
         const max_y = mm[1];
         const min_x = 0;
@@ -309,11 +336,22 @@ class ViolinPlot extends WGLChart {
         //this.x_scale.domain([range.x_range[0],range.x_range[1]]);
         this.y_scale.domain([-range.y_range[0], -range.y_range[1]]);
     }
+    getConfig() {
+        const c = super.getConfig();
+        //! serialisation vs getting of config
+        const valueQuery = serialiseQueries(this)['setValueField'];
+        if (valueQuery) {
+            c.param = [c.param[0], valueQuery[0]];
+        }
+        console.log(c);
+        return c;
+    }
 
     getSettings() {
         const s = super.getSettings();
         const c = this.config;
-        const p1 = this.getConfig().param[1];
+        // no - we should be using config value, but when serialising in getConfig() we need to patch
+        const p1 = this.config.param[1];
         const mm = this.dataStore.getMinMaxForColumn(p1);
 
         s.splice(
@@ -327,7 +365,7 @@ class ViolinPlot extends WGLChart {
                 },
                 current_value: p1,
                 func: (x) => {
-                    //! this is what we'd like to do - may be possible if we decorated the func with query response
+                    //! what if we decorated the func with query response?
                     this.setValueField(x);
                     // c.param[1] = x;
                     // this.onDataFiltered();
@@ -374,7 +412,7 @@ class ViolinPlot extends WGLChart {
             }
         }
         this.filter = vs;
-        this.dim.filter("filterPoly", [this.xPos, this.getConfig().param[1]], vs);
+        this.dim.filter("filterPoly", [this.xPos, this.valueField], vs);
         this.app.refresh();
     }
 }
