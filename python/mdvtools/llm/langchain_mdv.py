@@ -186,8 +186,9 @@ class ProjectChat():
             # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
             # todo - save code at various stages of processing...
             # log_chat(output, prompt_RAG, final_code)
-            self.project.log_chat_item(output, prompt_RAG, final_code)
-            with time_block("b13: Execute code"):
+            with time_block("b13: Chat logging by MDV"):
+                self.project.log_chat_item(output, prompt_RAG, final_code)
+            with time_block("b14: Execute code"):
                 execute_code(final_code, open_code=False, log=self.log)
                 self.log(final_code)
                 return f"I ran some code for you:\n\n```python\n{final_code}```"

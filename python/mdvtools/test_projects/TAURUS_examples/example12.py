@@ -38,7 +38,8 @@ def main():
     view_name = "default"
     
     # Load data using scanpy
-    adata = sc.read_h5ad(sys.argv[1])
+    data_path = "file_path"
+    adata = sc.read_h5ad(data_path)
     cells_df = pd.DataFrame(adata.obs)
     cells_df.name = 'cells'
     
