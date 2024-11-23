@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html>
     <head>
-        {% if backend %}
+        <!-- {% if backend %} !!! have we fixed the server misconfiguration, or do we still need this?
+            it might be better to inject the header when needed, 
+            rather than add extra logic to convert_to_static_page
         <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
-        {% endif %}
+        {% endif %} -->
         <meta charset="utf-8">
         <style>
             html,body,#holder{
