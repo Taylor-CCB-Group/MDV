@@ -1208,7 +1208,7 @@ class MDVProject:
         # create the static binary files
         self.convert_data_to_binary(outdir)
         # write out the index file
-        page = "page.html"
+        page = "static_page.html"
         template = join(tdir, page)
         page = open(template).read()
         # make sure the static files are referenced correctly
