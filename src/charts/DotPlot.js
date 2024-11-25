@@ -33,9 +33,9 @@ class DotPlot extends SVGChart {
         if (!c.fraction_legend) {
             c.fraction_legend = { display: true };
         }
-        this.fractionScale = scaleSqrt().domain([0, 100]);
+        //this.fractionScale = scaleSqrt().domain([0, 100]);
     }
-
+    
     // todo figure out why annotation version isn't fully working - need methodsUsingColumns as well???
     //if called with objects representing queries, this will cause the method to be called with column names
     //and again whenever the column data changes
@@ -136,6 +136,18 @@ class DotPlot extends SVGChart {
         }
         return config;
     }
+    normaliseFractionScale() {
+        const { data } = this.data;
+        const getMaxFrac = () => {
+            let maxFraction = 0;
+            for (const d of data) {
+                const f = d.values.map(x => x.frac);
+                maxFraction = Math.max(maxFraction, ...f);
+            }
+            return maxFraction;
+        }
+        this.fractionScale = scaleSqrt().domain([0, getMaxFrac()]);
+    }
 
     onDataFiltered(dim) {
         //no need to change anything
@@ -155,7 +167,8 @@ class DotPlot extends SVGChart {
         this.dim.getAverages(
             (data) => {
                 this.data = data;
-
+                //perhaps normalise should be optional
+                this.normaliseFractionScale();
                 this.setColorFunction();
                 this.drawChart();
             },
@@ -258,7 +271,7 @@ class DotPlot extends SVGChart {
 
             .attr("cx", (d, i) => i * cWidth + 0.5 * cWidth)
             .attr("cy", cyPos)
-            .attr("r", (d) => this.fractionScale(d.frac))
+            .attr("r", (d) => this.fractionScale(d.frac)) // 
             .attr("fill", (d, i) => {
                 return this.colorFunction(d.mean);
             });
@@ -350,7 +363,7 @@ class DotPlot extends SVGChart {
                 // - param is a flat array - so we'd need to mimic the behaviour of spreading values from here
                 // there's a more general question of whether settings operates on the mobx mutable config object
                 // ... in many cases we could avoid having a `func`...
-                type: "multicolumn",
+                type: "multicolumn", //maybe this should be `"_multi_column:number"`
                 label: "Fields on x axis",
                 // this is more of a nuisance than type: "_multi_column:number"
                 columnSelection: {
@@ -378,6 +391,7 @@ BaseChart.types["dot_plot"] = {
         {
             type: "_multi_column:number",
             name: "Fields on x axis",
+            //maybe we could have some information here about which method this corresponds to
         },
     ],
 };
