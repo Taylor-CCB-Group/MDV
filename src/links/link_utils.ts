@@ -320,6 +320,10 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
         }
     });
     console.log("settings initial fields for link...", link);
+    runInAction(() => {
+        //initial population so sync callers will have something to work with
+        link.observableFields = [getField(0)];
+    });
     await setFieldsFromFilter();
     console.log("link initialized", link);
 }
