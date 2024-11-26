@@ -4,14 +4,14 @@ import { createEl } from "../utilities/Elements.js";
 import { chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
-import { makeAutoObservable, action, autorun, IReactionDisposer, IAutorunOptions } from "mobx";
+import { makeAutoObservable, action, autorun, type IReactionDisposer, type IAutorunOptions } from "mobx";
 import type DataStore from "@/datastore/DataStore";
 import type { BaseDialog } from "@/utilities/Dialog";
-import type { DataColumn, FieldName, GuiSpecs } from "./charts";
+import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
 import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
-import { MulticolumnQuery } from "@/links/link_utils";
+import type { MulticolumnQuery } from "@/links/link_utils";
 import { decorateChartColumnMethods } from "@/datastore/decorateColumnMethod";
 type ChartEventType = string;
 type Listener = (type: ChartEventType, data: any) => void;
@@ -406,10 +406,12 @@ class BaseChart<T> {
     // getQunatile;
 
     _addTrimmedColor(column: FieldName, conf: any) {
-        const tr = this.config.trim_color_scale;
+        const tr: keyof Quantiles | "none" = this.config.trim_color_scale;
         const col = this.dataStore.columnIndex[column];
+        if (!col) throw "expected color column to h"
         if (tr && tr !== "none") {
-            if (col.quantiles && col.quantiles !== "NA") {
+            if (col.quantiles) {
+                if (col.quantiles as any === "NA") return;
                 conf.overideValues.min = col.quantiles[tr][0];
                 conf.overideValues.max = col.quantiles[tr][1];
             }
