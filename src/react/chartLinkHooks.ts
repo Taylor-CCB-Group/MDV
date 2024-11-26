@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useMetadata, useViewerStoreApi } from "./components/avivatorish/state";
 import { useChartID } from "./hooks";
 import type { VivMDVReact } from "./components/VivMDVReact";
@@ -138,14 +138,17 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     //would like not to have this here - might have some more logic in above hook
     //in particular want to redesign the fieldName being what determines the column
     const racLink = useRowsAsColumnsLinks()[0];
-    //! this next line may be problematic
-    const { link } = racLink || { link: null }; //!! passing the whole racLink object lead to an infinite loop
+    //! this next line may be problematic - useMemo is important
+    const { link } = useMemo(() => racLink || { link: null }, [racLink]);
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
     const ds = useDataStore();
     useEffect(() => {
         // todo - check whether checking link for null here means we can clean up ForeignRows component
         // (which currently breaks rules of hooks)
-        if (cols.length === 0 || !link) {
+        if (!link) {
+            return;
+        }
+        if (cols.length === 0) {
             setColumns([]);
             return;
         }
