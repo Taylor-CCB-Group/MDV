@@ -1,8 +1,9 @@
-import type { DataColumn, FieldName } from "@/charts/charts";
+import type { DataColumn, FieldName, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import type { MulticolumnQuery } from "@/links/link_utils.js";
 import type { useState } from "react";
 import type { DataType } from "../charts/charts";
+import { isArray } from "./utils";
 
 // this is more to do with column queries than columns themselves
 
@@ -12,8 +13,14 @@ export type MultiColumnPrefix = `_multi_column:${"all" | "number"}`; //didn't ex
 export type Param = DataType | "number" | MultiColumnPrefix;
 
 // we should be able to describe what permutation of multiple / virtual columns we allow
-export type FieldSpec = FieldName | FieldName[] | MulticolumnQuery; //this may be defined elsewhere in future
-
+// the assumption that if we have an array it will only be strings is wrong.
+export type FieldSpec = FieldName | MulticolumnQuery | (FieldName | MulticolumnQuery)[];
+/**
+ * @returns an array of strings representing 'field names' - column IDs.
+ */
+export function flattenFields(spec: FieldSpec): FieldName[] {
+    return isArray(spec) ? spec.flatMap(flattenFields) : typeof spec === "string" ? [spec] : spec.fields;
+}
 /** annotation of what kind of column type a given param will accept */
 export type CTypes = Param | Param[];
 // type MultiPrefix = `_multi_column:${string}`;
@@ -79,3 +86,14 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
     if (type === "number" && isNumeric) return true;
     return column.datatype === type;
 }
+/**
+ * Checks whether the given @param column has `data`, also acting as a type-predicate such that
+ * subsequent references to that column can safely use it.
+ */
+export function isColumnLoaded(column: DataColumn<DataType>): column is LoadedDataColumn<DataType> {
+    return column.data !== undefined;
+}
+export function allColumnsLoaded(columns: DataColumn<DataType>[]): columns is LoadedDataColumn<DataType>[] {
+    return columns.every(isColumnLoaded);
+}
+

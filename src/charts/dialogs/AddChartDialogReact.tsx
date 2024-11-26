@@ -15,7 +15,7 @@ import { action, observable, reaction, runInAction, toJS } from "mobx";
 import z from "zod";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
-import { columnMatchesType } from "@/lib/utils.js";
+import { columnMatchesType } from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
 
 const ChartConfigSchema = z.object({

@@ -39,7 +39,6 @@ type Quantiles = {
 };
 type Colors = (string | number[])[];
 type SubgroupName = string;
-// wouldn't it be nice to have a type that determins that we know we have data?
 export type DataColumn<T extends DataType> = {
     /** human-readable column */
     name: ColumnName; //nb - we should check use of 'name' vs 'field'

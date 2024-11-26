@@ -5,7 +5,8 @@ import { useDataStore } from "../context.js";
 import type { DataColumn, DataType, FieldName } from "@/charts/charts.js";
 import type { Param } from "@/charts/ChartTypes.js";
 import type DataStore from "@/datastore/DataStore.js";
-import { columnMatchesType, isArray } from "@/lib/utils.js";
+import { isArray } from "@/lib/utils.js";
+import { columnMatchesType } from "@/lib/columnTypeHelpers.js";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
@@ -44,7 +45,7 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
     const columns: DataColumn<DataType>[] = useMemo(
         () => dataStore.columns
             .filter((c) => !props.exclude?.includes(c.name))
-            //@ts-expect-error
+            //@ts- expect-error << looks like we don't need this any more.
             .filter((c) => columnMatchesType(c, type))
             ,
         [dataStore, props.exclude, type],

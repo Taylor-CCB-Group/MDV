@@ -1,10 +1,10 @@
 import { getRandomString } from "@/utilities/Utilities";
-import BaseChart from "./BaseChart";
+import type BaseChart from "./BaseChart";
 import { action, makeAutoObservable } from "mobx";
-import { FieldSpec } from "@/lib/columnTypeHelpers";
-import { RowsAsColsQuery, RowsAsColsQuerySerialized } from "@/links/link_utils";
-import { DataSource, FieldName } from "./charts";
-import DataStore from "@/datastore/DataStore";
+import type { FieldSpec } from "@/lib/columnTypeHelpers";
+import { RowsAsColsQuery, type RowsAsColsQuerySerialized } from "@/links/link_utils";
+import type { DataSource, FieldName } from "./charts";
+import type DataStore from "@/datastore/DataStore";
 import { isArray } from "@/lib/utils";
 
 // const ParamSpec = {
@@ -12,13 +12,15 @@ import { isArray } from "@/lib/utils";
 //         "maxItems": 10,
 //             "type": "RowsAsColsQuery"
 // }
+// consider having synthetic columns that can be used for testing...
+// possibly including things like multi-text columns that automatically mutate over time...
 type SerialisedColumnParam = (FieldName | RowsAsColsQuerySerialized);
 type SerialisedParams = SerialisedColumnParam | SerialisedColumnParam[];
 export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
     const result = typeof param === "string" ? param : RowsAsColsQuery.fromSerialized(ds, param);
     if (!result) {
         // this happens with unexpected array...
-        throw new Error(`Failed to deserialise param: ${param}`);
+        throw new Error(`Failed to deserialise param: ${JSON.stringify(param)}`);
     }
     return result;
 }
@@ -31,9 +33,9 @@ export function getConcreteFieldName(fieldSpec: FieldSpec) {
 }
 
 export class ColumnQueryMapper<T> {
-    constructor(chart: BaseChart<T>) {
+    // constructor(chart: BaseChart<T>) {
 
-    }
+    // }
 }
 
 export function serialiseQueries(chart: BaseChart<any>) {
@@ -107,12 +109,17 @@ export function initialiseConfig<T extends BaseChart<any>>(originalConfig: any, 
         const colorBy = isArray(originalConfig.color_by) ? deserialiseParam(chart.dataStore, originalConfig.color_by[0]) : config.color_by = deserialiseParam(chart.dataStore, originalConfig.color_by);
         config.color_by = undefined;
         setTimeout(() => {
+            if (!chart.colorByColumn) {
+                console.error('chart does not have colorByColumn method, but had color_by in config');
+                return;
+            }
             //@ts-expect-error the method itself takes a string - but our decorated version takes what we're giving it...
             chart.colorByColumn?.(colorBy);
         })
     }
     console.log(config.type, 'processed config:', config);
     //temporary way of prototyping query
+    //may return to something like this for non-react charts as it requires less boilerplate & chart specific code
     // setTimeout(action(() => {
     //     const c = config as any;
     //     const queries = c.queries;

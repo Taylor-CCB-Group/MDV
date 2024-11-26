@@ -1,21 +1,10 @@
 import type { Param } from "@/charts/ChartTypes";
-import type { CategoricalDataType, DataColumn, DataType, GuiSpec, GuiSpecType, GuiValueTypes, NumberDataType } from "@/charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, GuiSpec, GuiSpecType, GuiValueTypes, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
-}
-export function columnMatchesType(column: DataColumn<DataType>, type?: Param | Param[]): boolean {
-    if (type === undefined) return true;
-    if (isArray(type)) return type.some(t => columnMatchesType(column, t));
-    if (type === "_multi_column:all") return true;
-    // this was allowing a "text" column to be selected for "number" without the '!!'?
-    // we should unit-test this function...
-    const isNumeric = !!column.datatype.match(/double|float|int/);
-    if (type === "_multi_column:number") return isNumeric;
-    if (type === "number" && isNumeric) return true;
-    return column.datatype === type;
 }
 /**
  * Check whether given value {@param v} is an array.
@@ -26,6 +15,10 @@ export function isArray(v: unknown): v is any[] {
 }
 export function toArray<T>(v: T | T[]) {
     return isArray(v) ? v : [v];
+}
+//https://github.com/microsoft/TypeScript/issues/45097#issuecomment-882526325
+export function notEmpty<TValue>(value: TValue | null | undefined): value is TValue {
+    return value !== null && value !== undefined;
 }
 type Entries<T> = {
     [K in keyof T]: [K, T[K]];

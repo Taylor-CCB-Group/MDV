@@ -1,6 +1,6 @@
 import BaseChart from "@/charts/BaseChart";
 import type { FieldName } from "@/charts/charts";
-import type { FieldSpec } from "@/lib/columnTypeHelpers";
+import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
 import type { IReactionDisposer } from "mobx";
 
 /**
@@ -96,9 +96,7 @@ export function loadColumnData<This extends BaseChart<unknown>, Args extends any
             // how do we specify which params this will operate on?
             this.activeQueries[target.name] = [...colsOriginalArr, ...args];
             disposer = this.mobxAutorun(() => {
-                const cols = colsOriginalArr.flatMap(
-                    (v: FieldSpec) => (Array.isArray(v) || typeof v === "string" ? v : v.fields)
-                ).filter(v => v);
+                const cols = flattenFields(colsOriginalArr);
                 const a = multiCol ? cols : cols[0];
                 // const newArgs = [a, ...args.slice(1)];
                 const cm = window.mdv.chartManager;

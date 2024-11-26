@@ -40,13 +40,12 @@ class DataStore {
         this.size = size;
         /** @type {number} */
         this.filterSize = size;
-        /** why doesn't this annotation work?
+        /**
          * @typedef {import("@/charts/charts.js").DataType} DataType
-         * @typedef {import("@/charts/charts.js").DataColumn} DataColumn
-         * @type {Array.<DataColumn<DataType>>} */
+         * @type {Array<import("@/charts/charts.js").DataColumn<DataType>>} */
         this.columns = [];
         /**
-         * @type {{[k: string]: DataColumn<DataType> | undefined}} */
+         * @type {{[k: string]: import("@/charts/charts.js").DataColumn<DataType> | undefined}} */
         this.columnIndex = {};
         this.listeners = {};
         this.indexes = {};

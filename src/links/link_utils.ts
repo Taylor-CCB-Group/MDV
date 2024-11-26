@@ -3,6 +3,7 @@ import type ChartManager from "../charts/ChartManager";
 import type { ColumnName, DataColumn, DataType, FieldName } from "../charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import type { loadColumnData } from "../datastore/decorateColumnMethod";
+import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 // zod?
 
 type ChartLink = {
@@ -58,6 +59,10 @@ export function addHighlightColumnLink(
         );
         return;
     }
+    if (!isColumnLoaded(srcCol)) {
+        console.error(`${srcCol} not loaded`);
+        return;
+    }
 
     async function updateValue(newValue: string) {
         for (const target of link.targets) {
@@ -107,10 +112,14 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
     const ds = chart.dataSource.dataStore;
     const srcCol = ds.columnIndex[link.column];
     if (!srcCol) {
-        console.log(
+        console.error(
             `"chart_columnval_link" link column "${link.column}" not found in dataStore "${ds.name}"`,
         );
-        // return;
+        return;
+    }
+    if (!isColumnLoaded(srcCol)) {
+        console.error(`${srcCol} not loaded`);
+        return;
     }
 
     async function updateValue(newValue: string) {
