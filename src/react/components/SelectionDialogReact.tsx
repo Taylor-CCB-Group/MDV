@@ -32,7 +32,7 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         }
         // makeAutoObservable(config); //super will do this
         //nb, considered `this.mobxAutorun` for showing/hiding reset button, but we use a hook.
-        super(dataStore, div, config, observer(SelectionDialogComponent));
+        super(dataStore, div, config, SelectionDialogComponent);
     }
     removeFilter(): void {
         action(() => {

@@ -561,7 +561,7 @@ function useResetButton() {
     }, [hasFilter, chart.resetButton]);
 }
 
-const SelectionDialogComponent = () => {
+const SelectionDialogComponent = observer(() => {
     //!! this component doesn't update with HMR and introducing another wrapper component makes things worse
     //(currently changes here aren't reflected in the browser, but the rest of the components are
     //if we wrap this, then any change causes whole page to reload)
@@ -574,5 +574,5 @@ const SelectionDialogComponent = () => {
             <ForeignRows />
         </div>
     );
-};
+});
 export default SelectionDialogComponent;
