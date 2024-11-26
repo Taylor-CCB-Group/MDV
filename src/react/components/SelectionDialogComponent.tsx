@@ -20,10 +20,7 @@ import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import { TextFieldExtended } from "./TextFieldExtended";
-import { useOuterContainer } from "../screen_state";
 import * as d3 from 'd3';
-import { brushX } from "d3-brush";
-import { isArray } from "@/lib/utils";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -254,7 +251,7 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
     histoHeight: number, //height of the histogram
 };
 
-export const useBrushX = (
+const useBrushX = (
     ref: React.RefObject<SVGSVGElement>,
     { value, setValue, minMax, histoWidth, histoHeight }: RangeProps //consider different typing here
 ) => {
