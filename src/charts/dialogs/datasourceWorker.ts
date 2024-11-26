@@ -1,18 +1,35 @@
 import { parse, type ParseResult } from "papaparse";
 
+type ColumnType = "float" | "integer" | "boolean" | "date" | "string" | "unknown";
+type DataValue = string | number | boolean | null;
+type FileType = 'csv' | 'tsv';
+
+interface FileMessage {
+    file: File;
+    fileType?: FileType;
+}
+
 interface PreviewData {
     columnNames: string[];
-    columnTypes: string[];
-    secondRowValues: (string | number | boolean | null)[];
+    columnTypes: ColumnType[];
+    secondRowValues: DataValue[];
     previewRowCount: number;
     columnCount: number;
     rowCount?: number;
 }
 
-self.onmessage = (event: MessageEvent) => {
-    const file: File = event.data;
+interface ErrorResponse {
+    error: string;
+}
 
-    // Initialize variables for row counting
+type WorkerResponse = PreviewData | ErrorResponse;
+type ParsedRow = Record<string | number, DataValue>;
+
+self.onmessage = (event: MessageEvent<File | FileMessage>) => {
+    const file: File = 'file' in event.data ? event.data.file : event.data;
+    const fileType: FileType = ('fileType' in event.data ? event.data.fileType : 'csv') as FileType;
+    const delimiter: string = fileType === 'tsv' ? '\t' : ',';
+
     let totalRowCount = 0;
     let previewData: PreviewData = {
         columnNames: [],
@@ -22,59 +39,53 @@ self.onmessage = (event: MessageEvent) => {
         columnCount: 0,
     };
 
-    // Function to count the total number of rows
     const countRows = (): Promise<number> => {
         return new Promise((resolve, reject) => {
             parse(file, {
                 worker: true,
+                delimiter,
                 step: () => {
                     totalRowCount++;
                 },
-                complete: () => {
-                    resolve(totalRowCount);
-                },
-                error: (error) => {
-                    reject(error);
-                },
+                complete: () => resolve(totalRowCount),
+                error: (error: Error) => reject(error),
             });
         });
     };
 
-    // Function to get the preview rows and column information
     const getPreview = (): Promise<void> => {
         return new Promise((resolve, reject) => {
             parse(file, {
                 header: true,
+                delimiter,
                 dynamicTyping: true,
                 worker: true,
-                preview: 2, // Parse the first two rows
-                complete: (results: ParseResult<any>) => {
+                preview: 2,
+                complete: (results: ParseResult<ParsedRow>) => {
                     const columnNames = results.meta.fields || [];
-                    const columnTypes: string[] = [];
+                    const columnTypes: ColumnType[] = [];
                     const secondRowValues = results.data[1] || {};
                     const previewRowCount = results.data.length;
                     const columnCount = columnNames.length;
 
-                    // Infer column types based on the first few rows
-                    columnNames.forEach((name) => {
-                        const columnValues = results.data.map(
-                            (row: any) => row[name],
-                        );
+                    columnNames.forEach((name: string | number) => {
+                        const columnValues = results.data.map(row => row[name]);
                         const uniqueTypes = new Set(
-                            columnValues.map((value: any) => typeof value),
+                            columnValues.map(value => typeof value)
                         );
 
                         if (uniqueTypes.has("number")) {
                             const isFloat = columnValues.some(
-                                (value) =>
-                                    Number(value) !== Math.floor(Number(value)),
+                                value => typeof value === 'number' && 
+                                value !== Math.floor(value)
                             );
                             columnTypes.push(isFloat ? "float" : "integer");
                         } else if (uniqueTypes.has("boolean")) {
                             columnTypes.push("boolean");
                         } else if (uniqueTypes.has("string")) {
                             const isDate = columnValues.every(
-                                (value) => !Number.isNaN(Date.parse(value)),
+                                value => typeof value === 'string' && 
+                                !Number.isNaN(Date.parse(value))
                             );
                             columnTypes.push(isDate ? "date" : "string");
                         } else {
@@ -83,7 +94,7 @@ self.onmessage = (event: MessageEvent) => {
                     });
 
                     const secondRowValuesArray = columnNames.map(
-                        (name) => secondRowValues[name],
+                        name => secondRowValues[name]
                     );
 
                     previewData = {
@@ -96,22 +107,18 @@ self.onmessage = (event: MessageEvent) => {
 
                     resolve();
                 },
-                error: (error) => {
-                    reject(error);
-                },
+                error: (error: Error) => reject(error),
             });
         });
     };
 
-    // Perform row counting and get the preview in sequence
     getPreview()
         .then(() => countRows())
         .then((totalRowCount) => {
-            // Update the rowCount with totalRowCount
             previewData.rowCount = totalRowCount;
-            self.postMessage(previewData);
+            self.postMessage(previewData as WorkerResponse);
         })
-        .catch((error) => {
-            self.postMessage({ error: error.message });
+        .catch((error: Error) => {
+            self.postMessage({ error: error.message } as WorkerResponse);
         });
 };
