@@ -61,7 +61,8 @@ def register_global_routes(app, db, project_dir):
     
     @app.route("/delete_project/<project_id>", methods=["DELETE"])
     def delete_project(project_id: int):
-        """Soft delete a project by setting the deleted flag."""
+        "Soft delete a project by setting the deleted flag."
+        # nb, nested long string caused problems parsing this file.
         try:
             print(f"Deleting project '{project_id}'")
             
