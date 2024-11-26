@@ -32,7 +32,7 @@ import { Dialog, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
 
 // Use dynamic import for the worker
-const CsvWorker = new Worker(new URL("./csvWorker.ts", import.meta.url), {
+const DatasourceWorker = new Worker(new URL("./datasourceWorker.ts", import.meta.url), {
     type: "module",
 });
 
@@ -245,7 +245,7 @@ const DEFAULT_REDUCER_STATE = {
     validationResult: null as unknown,
     success: false,
     error: null as unknown,
-    fileType: null as "csv" | "tiff" | null,
+    fileType: null as "csv" | "tiff" | "tsv" | null,
     tiffMetadata: null as unknown,
 } as const;
 type ReducerState = typeof DEFAULT_REDUCER_STATE;
@@ -258,7 +258,7 @@ type ReducerPayload<T extends UploadActionType> = T extends "SET_SELECTED_FILES"
 : T extends "SET_ERROR" ? { message: string, status: number, traceback?: string }
 : T extends "SET_IS_VALIDATING" ? boolean
 : T extends "SET_VALIDATION_RESULT" ? { columnNames: string[], columnTypes: string[] }
-: T extends "SET_FILE_TYPE" ? "csv" | "tiff" | null
+: T extends "SET_FILE_TYPE" ? "csv" | "tiff" | "tsv" | null
 : T extends "SET_TIFF_METADATA" ? unknown
 : never;
 type ReducerAction<T extends UploadActionType> = { type: T, payload: ReducerPayload<T> };
@@ -316,6 +316,18 @@ const FILE_TYPES: Record<string, FileTypeConfig> = {
         type: 'csv',
         extensions: ['.csv'],
         mimeTypes: ['text/csv'],
+        maxSize: 10000 * 1024 * 1024, // 10 GB
+        processingConfig: {
+            defaultWidth: 800,
+            defaultHeight: 745,
+            requiresMetadata: false,
+            endpoint: 'add_datasource'
+        }
+    },
+    TSV: {
+        type: 'tsv',
+        extensions: ['.tsv', '.tab', '.txt'],
+        mimeTypes: ['text/tab-separated-values'],
         maxSize: 10000 * 1024 * 1024, // 10 GB
         processingConfig: {
             defaultWidth: 800,
@@ -406,7 +418,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         setShowMetadata((prevState) => !prevState);
     };
 
-    const [csvSummary, setCsvSummary] = useState({
+    const [datasourceSummary, setDatasourceSummary] = useState({
         datasourceName: "",
         fileName: "",
         fileSize: "",
@@ -457,10 +469,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     
                 // Handle file based on its type
                 switch (fileConfig.type) {
+                    case 'tsv':
                     case 'csv': {
                         const newDatasourceName = file.name;
                         setDatasourceName(newDatasourceName);
-                        setCsvSummary({
+                        setDatasourceSummary({
                             datasourceName: newDatasourceName,
                             fileName: file.name,
                             fileSize: (file.size / (1024 * 1024)).toFixed(2),
@@ -469,8 +482,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         });
     
                         // Process CSV with Web Worker
-                        CsvWorker.postMessage(file);
-                        CsvWorker.onmessage = (event: MessageEvent) => {
+                        DatasourceWorker.postMessage({
+                            file: file,
+                            fileType: fileConfig.type
+                        });
+                        DatasourceWorker.onmessage = (event: MessageEvent) => {
                             const {
                                 columnNames,
                                 columnTypes,
@@ -496,8 +512,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                                 setColumnNames(columnNames);
                                 setColumnTypes(columnTypes);
                                 setSecondRowValues(secondRowValues);
-                                setCsvSummary((prevCsvSummary) => ({
-                                    ...prevCsvSummary,
+                                setDatasourceSummary((prevDatasrouceSummary) => ({
+                                    ...prevDatasrouceSummary,
                                     rowCount,
                                     columnCount,
                                 }));
@@ -635,8 +651,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     const handleDatasourceNameChange = useCallback((event: any) => {
         const { value } = event.target;
         setDatasourceName(value); // Update the state with the new value
-        setCsvSummary((prevCsvSummary) => ({
-            ...prevCsvSummary,
+        setDatasourceSummary((prevDatasrouceSummary) => ({
+            ...prevDatasrouceSummary,
             datasourceName: value, // Update datasourceName in the summary object
         }));
     }, []);
@@ -650,7 +666,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
 
     const rejectionMessage =
         fileRejections.length > 0
-            ? "Only CSV and TIFF files can be selected"
+            ? "Only CSV, TSV, and TIFF files can be selected"
             : "Drag and drop files here or click the button below to upload";
 
     const rejectionMessageStyle =
@@ -757,6 +773,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
 
             // Add type-specific form data
             switch (fileConfig.type) {
+                case 'tsv':
                 case 'csv':
                     formData.append("name", datasourceName);
                     formData.append("replace", "");
@@ -876,7 +893,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 </StatusContainer>
             ) : state.validationResult ? (
                 <>
-                    {state.fileType === "csv" && (
+                    {(state.fileType === "csv" || state.fileType === "tsv") && (
                         <>
                             <FileSummary>
                                 <FileSummaryHeading>
@@ -893,19 +910,19 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                                 </FileSummaryText>
                                 <FileSummaryText>
                                     <strong>{"File name"}</strong>{" "}
-                                    {csvSummary.fileName}
+                                    {datasourceSummary.fileName}
                                 </FileSummaryText>
                                 <FileSummaryText>
                                     <strong>{"Number of rows"}</strong>{" "}
-                                    {csvSummary.rowCount}
+                                    {datasourceSummary.rowCount}
                                 </FileSummaryText>
                                 <FileSummaryText>
                                     <strong>{"Number of columns"}</strong>{" "}
-                                    {csvSummary.columnCount}
+                                    {datasourceSummary.columnCount}
                                 </FileSummaryText>
                                 <FileSummaryText>
                                     <strong>{"File size"}</strong>{" "}
-                                    {csvSummary.fileSize} MB
+                                    {datasourceSummary.fileSize} MB
                                 </FileSummaryText>
                             </FileSummary>
                             <ColumnPreview
