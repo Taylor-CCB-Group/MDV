@@ -164,7 +164,7 @@ def prepare_code(result: str, data: str | pd.DataFrame, log: callable = print, m
 
     # Find the starting line index
     start_index = next(
-        (i for i, line in enumerate(lines) if line.strip().startswith("def")), None
+        (i for i, line in enumerate(lines) if not line.strip().startswith(('import', 'from'))), None
     )
 
     if start_index is not None:
@@ -186,7 +186,9 @@ else:
     final_code = final_code.replace("project.serve()", "# project.serve()")
     if modify_existing_project:
         # not at all robust... won't be needed in future
-        #final_code = final_code.replace("project.add_datasource", "# project.add_datasource")
+        final_code = final_code.replace("project.add_datasource", "# project.add_datasource")
+        # make sure the final code does not contain p.static
+        final_code = final_code.replace("project.convert_to_static_page", "# project.convert_to_static_page")
         # all lines that include `data_frame` can be somewhat safely removed with the current template
         final_code = re.sub(r".*data_frame.*", "", final_code)
         final_code = final_code.replace("delete_existing=True", "delete_existing=False")
