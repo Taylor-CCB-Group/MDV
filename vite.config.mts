@@ -38,6 +38,7 @@ function getRollupOptions(): RollupOptions {
             input: {
                 'mdv': 'src/modules/static_index.ts',
                 'catalog': 'src/catalog/catalog_index.tsx',
+                'login': 'src/login/login_index.tsx',
             },
             output: {
                 entryFileNames: 'js/[name].js',
