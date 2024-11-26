@@ -9,7 +9,7 @@ import { point, type Feature as TurfFeature, type Geometry as TurfGeometry } fro
  * Each position in coordinates is transformed by calling the provided function.
  * @param coords Coordinates of a feature.
  * @param callback A function to transform each coordinate.
- * @retuns Transformed coordinates.
+ * @returns Transformed coordinates.
  */
 export function mapCoords(
   coords: AnyCoordinates,
@@ -71,6 +71,9 @@ function translate(feature: TurfFeature<TurfGeometry>, dp: [number, number]) {
 }
 
 
+/**
+ * This is an edit mode for translating GeoJSON features with non-geographic coordinates.
+ */
 export default class TranslateModeEx extends TranslateMode {
   getTranslateAction(startDragPoint: Position, currentPoint: Position, editType: string, props: ModeProps<FeatureCollection>): GeoJsonEditAction | null | undefined {
     if (!this._geometryBeforeTranslate) {
