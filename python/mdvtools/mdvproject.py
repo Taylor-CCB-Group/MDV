@@ -17,7 +17,7 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
-from .charts.view import View
+from mdvtools.charts.view import View
 import time
 import copy
 from mdvtools.image_view_prototype import create_image_view_prototype
@@ -1208,7 +1208,7 @@ class MDVProject:
         # create the static binary files
         self.convert_data_to_binary(outdir)
         # write out the index file
-        page = "page.html"
+        page = "static_page.html"
         template = join(tdir, page)
         page = open(template).read()
         # make sure the static files are referenced correctly
