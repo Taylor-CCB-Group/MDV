@@ -23,10 +23,14 @@ class AuthProvider(ABC):
         pass
 
     @abstractmethod
-    def handle_callback(self, code: str, redirect_uri: str) -> Optional[str]:
-        """Handles the callback and exchanges the code for a token."""
+    def handle_callback(self) -> Optional[str]:
+        """
+        Handles the callback and exchanges the code for a token (implemented by the provider).
+        
+        :return: Access token if successfully retrieved, else None
+        """
         pass
-
+    
     @abstractmethod
     def is_authenticated(self, token: str) -> bool:
         """Verifies if the user is authenticated using the token."""

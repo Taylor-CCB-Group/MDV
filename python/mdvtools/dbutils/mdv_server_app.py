@@ -16,7 +16,11 @@ from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService
+from flask import redirect, url_for, session, jsonify
+from mdvtools.auth.auth0_provider import Auth0Provider
+from authlib.integrations.flask_client import OAuth 
 
+oauth = OAuth()  
 
 def create_flask_app(config_name=None):
     """Create and configure the Flask app."""
@@ -25,6 +29,7 @@ def create_flask_app(config_name=None):
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
     app.url_map.strict_slashes = False
     app.after_request(add_safe_headers)
+    app.secret_key = os.getenv('FLASK_SECRET_KEY', 'a-very-secret-key')
 
     
     try:
@@ -72,6 +77,17 @@ def create_flask_app(config_name=None):
         print(f"Error during app setup: {e}")
         exit(1)
 
+    # Register OAuth with the app
+    oauth.init_app(app)
+    # Register routes for authentication (login, callback, etc.)
+    try:
+        print(" Registering authentication routes")
+        register_auth0_routes(app)  # Register Auth0-related routes like /login and /callback
+    except Exception as e:
+        print(f"Error registering authentication routes: {e}")
+        exit(1)
+
+    # Register other routes (base routes like /, /projects, etc.)
     try:
         # Register routes
         print("Registering base routes: /, /projects, /create_project, /delete_project")
@@ -318,6 +334,86 @@ def serve_projects_from_filesystem(app, base_dir):
     except Exception as e:
         print(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
         raise
+
+
+# The function that registers the Auth0 routes
+def register_auth0_routes(app):
+    """
+    Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
+    with centralized and route-specific error handling.
+    """
+    print("Registering AUTH routes...")
+
+    try:
+        # Initialize the Auth0Provider
+        auth0_provider = Auth0Provider(
+            app,
+            oauth=oauth,
+            client_id=app.config['AUTH0_CLIENT_ID'],
+            client_secret=app.config['AUTH0_CLIENT_SECRET'],
+            domain=app.config['AUTH0_DOMAIN']
+        )
+
+        # Route for login (redirects to Auth0 for authentication)
+        @app.route('/login')
+        def login():
+            try:
+                print("$$$$$$$$$$$$$$$ app-login")
+                return auth0_provider.login()
+            except Exception as e:
+                print(f"In register_auth0_routes : Error during login: {e}")
+                return jsonify({"error": "Failed to start login process."}), 500
+
+        # Route for the callback after login (handles the callback from Auth0)
+        @app.route('/callback')
+        def callback():
+            try:
+                print("$$$$$$$$$$$$$$$ app-callback")
+                code = request.args.get('code')  # Get the code from the callback URL
+                if not code:
+                    print("Missing 'code' parameter in the callback URL.")
+                    return jsonify({"error": "Authorization code not provided."}), 400
+                print("$$$$$$$$$$$$$$$ app-callback  1")
+                token = auth0_provider.handle_callback()
+                print("$$$$$$$$$$$$$$$ app-callback 2")
+                session['token'] = token  # Store the token in session
+                return redirect(url_for('index'))  # Redirect to the home page or any protected page
+            except Exception as e:
+                print(f"In register_auth0_routes : Error during callback: {e}")
+                return jsonify({"error": "Failed to complete authentication process."}), 500
+
+        # Route for logout (clears the session and redirects to home)
+        @app.route('/logout')
+        def logout():
+            try:
+                auth0_provider.logout()
+                print("logged out")
+                return redirect(url_for('index'))  # Redirect to home after logout
+            except Exception as e:
+                print(f"In register_auth0_routes: Error during logout: {e}")
+                return jsonify({"error": "Failed to log out."}), 500
+
+        # You can also add a sample route to check the user's profile or token
+        @app.route('/profile')
+        def profile():
+            try:
+                token = session.get('token')
+                if token:
+                    user_info = auth0_provider.get_user(token)
+                    return jsonify(user_info)
+                else:
+                    print("Token not found in session.")
+                    return jsonify({"error": "Not authenticated."}), 401
+            except Exception as e:
+                print(f"In register_auth0_routes: Error during profile retrieval: {e}")
+                return jsonify({"error": "Failed to retrieve user profile."}), 500
+
+        print("Auth0 routes registered successfully!")
+
+    except Exception as e:
+        print(f"Error registering AUTH routes: {e}")
+        raise
+
 
 
 def register_routes(app):
