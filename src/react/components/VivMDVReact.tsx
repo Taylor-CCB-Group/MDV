@@ -128,13 +128,13 @@ export type VivMdvReactConfig = ScatterPlotConfig &
     //     overviewOn: boolean,
     //     image_properties: ChannelsState
     // }
-    VivRoiConfig & { channel: number };
+    VivRoiConfig & BaseConfig;
 export type VivMDVReact = VivMdvReact;
 
 function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
     const config = { ...scatterDefaults, ...originalConfig };
-    if (!config.channel) config.channel = 0;
     // in future we might have something like an array of layers with potentially ways of describing parameters...
+    //@ts-expect-error this needs fixing
     if (!config.contourParameter) config.contourParameter = config.param[2];
     // === some dead code ===
     // if (config.type === 'VivMdvRegionReact') {
@@ -166,7 +166,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
-    constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: VivMdvReactConfig & BaseConfig) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: VivMdvReactConfig) {
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
         const config = adaptConfig(originalConfig);
@@ -211,6 +211,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
+        //@ts-expect-error needs fixing
         const ocats = this.dataStore.getColumnValues(c.param[2]).slice() || [];
         const cats = ocats.map((x) => {
             return { t: x };
@@ -227,7 +228,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const filters = c.category_filters.map((f) => {
             // what we really want is to have a type that is fairly specific to category filters...
             // able to handle an array of them with controls for adding/removing...
-            const values = this.dataStore.columnIndex[f.column].values.slice();
+            const values = this.dataStore.columnIndex[f.column]?.values?.slice();
+            if (!values) throw `failed assertion that we should have a categorical '${f.column}' here`;
             values.unshift("all");
             return g({
                 type: "multidropdown",
@@ -373,12 +375,14 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                 //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
                                 label: "Contour parameter",
                                 // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
+                                //@ts-expect-error needs fixing
                                 current_value: c.contourParameter || c.param[2],
                                 values: [catCols, "name", "field"],
                                 func: (x) => {
                                     if (x === c.contourParameter) return;
                                     // could we change 'cats' and have the dropdowns update?
                                     // was thinking this might mean a more general refactoring of the settings...
+                                    //@ts-expect-error needs fixing
                                     c.contourParameter = c.param[2] = x; //this isn't causing useParamColumns to update...
                                     // but maybe it's not necessary if 'cats' is observable... fiddly to get right...
                                     const newCats = (

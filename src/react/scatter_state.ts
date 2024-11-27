@@ -160,6 +160,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const getTooltipVal = useCallback(
         (i: number) => {
             // if (!tooltipCol?.data) return '#'+i;
+            if (!tooltipCol) return null;
             return tooltipCol.getValue(data[i]);
         },
         [tooltipCol, data],

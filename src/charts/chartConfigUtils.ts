@@ -6,6 +6,7 @@ import { RowsAsColsQuery, type RowsAsColsQuerySerialized } from "@/links/link_ut
 import type { DataSource, FieldName } from "./charts";
 import type DataStore from "@/datastore/DataStore";
 import { isArray } from "@/lib/utils";
+import type { BaseConfig } from "./BaseChart";
 
 // const ParamSpec = {
 //     "linkedDsName": "genes",
@@ -87,8 +88,8 @@ export function serialiseConfig<T extends BaseChart<any>>(chart: T) {
     return serialized;
 }
 
-export function initialiseConfig<T extends BaseChart<any>>(originalConfig: any, chart: T) {
-    let config = JSON.parse(JSON.stringify(originalConfig));
+export function initialiseConfig<C extends BaseConfig, T extends BaseChart<C>>(originalConfig: C, chart: T) {
+    let config: C = JSON.parse(JSON.stringify(originalConfig));
     if (!config.id) {
         // what about when we duplicate a chart?
         config.id = getRandomString();
@@ -101,11 +102,13 @@ export function initialiseConfig<T extends BaseChart<any>>(originalConfig: any, 
     //for now, only operating on the param property of the config object
     //also we move around where actual loading of column data currently done by ChartManager happens
     //todo process entire config object, not just param
+    //@ts-expect-error todo distinguish type of serialised vs runtime config
     const param: SerialisedParams = config.param;
     const processed = isArray(param) ? param.map(p => deserialiseParam(chart.dataStore, p)) : deserialiseParam(chart.dataStore, param);
     config.param = processed;
     //pending more generic approach to serialising queries...
     if (originalConfig.color_by) {
+        //@ts-expect-error
         const colorBy = isArray(originalConfig.color_by) ? deserialiseParam(chart.dataStore, originalConfig.color_by[0]) : config.color_by = deserialiseParam(chart.dataStore, originalConfig.color_by);
         config.color_by = undefined;
         setTimeout(() => {
@@ -120,14 +123,14 @@ export function initialiseConfig<T extends BaseChart<any>>(originalConfig: any, 
     console.log(config.type, 'processed config:', config);
     //temporary way of prototyping query
     //may return to something like this for non-react charts as it requires less boilerplate & chart specific code
-    // setTimeout(action(() => {
-    //     const c = config as any;
-    //     const queries = c.queries;
-    //     for (const method in queries) {
-    //         const q = queries[method].map((v: any) => deserialiseParam(chart.dataStore, v));
-    //         (chart as any)[method](q);
-    //     }
-    // }));
+    setTimeout(action(() => {
+        const c = config as any;
+        const queries = c.queries;
+        for (const method in queries) {
+            const q = queries[method].map((v: any) => deserialiseParam(chart.dataStore, v));
+            (chart as any)[method](q);
+        }
+    }));
 
     // makeAutoObservable(config);
     Object.defineProperty(chart, "config", {

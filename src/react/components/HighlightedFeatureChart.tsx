@@ -3,11 +3,11 @@ import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
 import { BaseReactChart } from "./BaseReactChart";
 import { HighlightedFeatureComponent } from "./HighlightedFeatureComponent";
-import type { GuiSpec } from "@/charts/charts";
+import { g } from "@/lib/utils";
 
 type HighlightedFeatureConfig = {
     text: string;
-};
+} & BaseConfig;
 
 class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureConfig> {
     constructor(
@@ -22,26 +22,28 @@ class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureCo
         const c = this.config;
         return [
             ...super.getSettings(),
-            {
+            g({
                 type: "dropdown",
                 // name: "Column",
                 label: "Column",
+                //@ts-expect-error needs fixing
                 current_value: this.config.param[0],
                 values: [this.dataSource.dataStore.columns.map((c) => c.name)],
                 func: action((v: string) => {
+                    //@ts-expect-error needs fixing
                     this.config.param[0] = v;
                 }),
-            },
-            {
+            }),
+            g({
                 label: "Markdown Text",
                 // name: "text",
                 type: "textbox",
                 current_value: c.text || "",
-                func: action((x) => {
+                func(x) {
                     c.text = x;
-                }),
-            },
-        ] as GuiSpec<any>[];
+                },
+            }),
+        ];
     }
 }
 

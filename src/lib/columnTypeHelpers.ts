@@ -74,7 +74,11 @@ type GuiStateProps = {
     isAutocompleteFocused: boolean;
     setIsAutocompleteFocused: setBoolean;
 }
-
+/**
+ * This is for filtering columns based on some relatively complex type specification potentially including things like `"_multi_column:number"`...
+ * as of this writing, it is not able to function as a type-predicate. For more type-narrowing in more simple cases where you want to assert
+ * that a column is of a particular @link {DataType}, @see {isColumnOfType}
+ */
 export function columnMatchesType(column: DataColumn<DataType>, type?: Param | Param[]): boolean {
     if (type === undefined) return true;
     if (Array.isArray(type)) return type.some(t => columnMatchesType(column, t));
@@ -87,11 +91,17 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
     return column.datatype === type;
 }
 /**
- * Checks whether the given @param column has `data`, also acting as a type-predicate such that
+ * Checks whether @param column has a `datatype` precisely matching the given @param datatype
+ */
+export function isColumnOfType<T extends DataType>(column: DataColumn<DataType>, datatype: T): column is DataColumn<T> {
+    return column.datatype === datatype;
+}
+/**
+ * Checks whether the given @param column exists and has `data`, also acting as a type-predicate such that
  * subsequent references to that column can safely use it.
  */
-export function isColumnLoaded(column: DataColumn<DataType>): column is LoadedDataColumn<DataType> {
-    return column.data !== undefined;
+export function isColumnLoaded(column?: DataColumn<DataType>): column is LoadedDataColumn<DataType> {
+    return column?.data !== undefined;
 }
 export function allColumnsLoaded(columns: DataColumn<DataType>[]): columns is LoadedDataColumn<DataType>[] {
     return columns.every(isColumnLoaded);

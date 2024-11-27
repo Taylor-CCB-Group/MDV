@@ -13,6 +13,7 @@ import { g } from "@/lib/utils";
 import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
 import type { MulticolumnQuery } from "@/links/link_utils";
 import { decorateChartColumnMethods } from "@/datastore/decorateColumnMethod";
+import type { FieldSpec } from "@/lib/columnTypeHelpers";
 type ChartEventType = string;
 type Listener = (type: ChartEventType, data: any) => void;
 type LegacyColorBy = { column: DataColumn<any> }
@@ -22,15 +23,22 @@ export type BaseConfig = {
     title: string;
     legend: string;
     type: string;
-    param: FieldName[]; // | string,
-    //nb we might want to represent columns as something other than string soon, in which case this will need to be updated
-    color_by?: FieldName | LegacyColorBy;
+    param: FieldSpec; // | string,
     title_color?: string;
+} & ColorConfig;
+type ColorConfig = {
+    //nb this needs to be updated
+    color_by?: FieldName | LegacyColorBy;
+    color_legend?: any;
+    log_color_scale?: boolean;
+    trim_color_scale?: keyof Quantiles | "none";
+    color_overlay?: number;
+    fallbackOnZero?: boolean;    
 };
 type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
 type ColorOptions = any;
-class BaseChart<T> {
-    config: any;
+class BaseChart<T extends BaseConfig> {
+    config: T;
     __doc__: Document;
     dataStore: DataStore;
     listeners: Record<string, Listener>;
@@ -57,7 +65,7 @@ class BaseChart<T> {
      * @param {string | HTMLDivElement} div - The id of the div element or the element itself to house the chart
      * @param {Object} config - The config describing the chart
      */
-    constructor(dataStore: DataStore, div: HTMLDivElement | string, config: T & BaseConfig) {
+    constructor(dataStore: DataStore, div: HTMLDivElement | string, config: T) {
         //******adapt legacy configs
         if (config.color_by) {
             const { color_by } = config;
@@ -371,7 +379,8 @@ class BaseChart<T> {
         //update any charts which use data from the columns
         //(if they haven't already been updated by the filter changing)
         if (!data.hasFiltered) {
-            let cols = this.config.param;
+            //@ts-expect-error needs fixing
+            let cols: string | string[] = this.config.param;
             let isDirty = false;
             if (typeof this.config.param === "string") {
                 cols = [this.config.param];
@@ -387,26 +396,30 @@ class BaseChart<T> {
             }
         }
         //recolor any charts coloured by the column
+        //@ts-expect-error needs fixing
         if (columns.indexOf(this.config.color_by) !== -1) {
+            //@ts-expect-error needs fixing
             this.colorByColumn?.(this.config.color_by);
         }
     }
-
+    
     getColorLegend() {
         const conf = {
             overideValues: {
                 colorLogScale: this.config.log_color_scale,
             },
         };
+        //@ts-expect-error needs fixing
         this._addTrimmedColor(this.config.color_by, conf);
-
+        
+        //@ts-expect-error needs fixing
         return this.dataStore.getColorLegend(this.config.color_by, conf);
     }
 
     // getQunatile;
 
     _addTrimmedColor(column: FieldName, conf: any) {
-        const tr: keyof Quantiles | "none" = this.config.trim_color_scale;
+        const tr = this.config.trim_color_scale;
         const col = this.dataStore.columnIndex[column];
         if (!col) throw "expected color column to h"
         if (tr && tr !== "none") {
@@ -495,6 +508,7 @@ class BaseChart<T> {
         if (typeof this.config.param === "string") {
             cols = [this.config.param];
         }
+        //@ts-ignore ! @ts-expect-error is inconsistent between editor & cli???
         for (const p of cols) {
             if (column === p) {
                 isDirty = true;
@@ -633,6 +647,7 @@ class BaseChart<T> {
             colorSettings.push(g({
                 label: "Color By",
                 type: "column",
+                //@ts-expect-error needs fixing
                 current_value: c.color_by,
                 columnSelection: { filter },
                 func: (x) => {
@@ -649,9 +664,11 @@ class BaseChart<T> {
                 colorSettings.push({
                     label: "Color Overlay",
                     type: "slider",
-                    current_value: c.color_overlay,
+                    //@ts-expect -error default 0 probably ok here, but maybe review
+                    current_value: c.color_overlay || 0,
                     func: (x) => {
                         c.color_overlay = x;
+                        //@ts-expect-error needs fixing
                         this.colorByColumn?.(c.color_by);
                     },
                 });
@@ -673,10 +690,11 @@ class BaseChart<T> {
                 label: "SymLog Color Scale",
                 type: "check",
 
-                current_value: c.log_color_scale,
+                current_value: c.log_color_scale || false,
                 func: (x) => {
                     c.log_color_scale = x;
                     if (c.color_by) {
+                        //@ts-expect-error needs fixing
                         this.colorByColumn?.(c.color_by);
                     }
                 },
@@ -685,10 +703,11 @@ class BaseChart<T> {
                 label: "Treat zero as missing",
                 type: "check",
 
-                current_value: c.fallbackOnZero,
+                current_value: c.fallbackOnZero || false,
                 func: (x) => {
                     c.fallbackOnZero = x;
                     if (c.color_by) {
+                        //@ts-expect-error needs fixing
                         this.colorByColumn?.(c.color_by);
                     }
                 },
@@ -702,10 +721,12 @@ class BaseChart<T> {
                     ["0.001", "0.001"],
                     ["0.01", "0.01"],
                     ["0.05", "0.05"],
-                ],
+                ] as const,
                 func: (v) => {
+                    //@ts-ignore we could type this, but it's a bit fussy
                     c.trim_color_scale = v;
                     if (c.color_by) {
+                        //@ts-expect-error needs fixing
                         this.colorByColumn?.(c.color_by);
                     }
                 },

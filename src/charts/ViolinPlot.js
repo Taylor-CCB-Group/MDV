@@ -18,13 +18,13 @@ class ViolinPlot extends WGLChart {
                 y: { size: 45, label: y_name, textsize: 13 },
             };
         }
+        super(dataStore, div, config, { x: { type: "band" }, y: {} });
+        this.config.type = "violin_plot"; //<<< I don't like the look of this
         if (!config.title) {
             // --- causes some nasty exception... let's not do that for now
-            // this.useDefaultTitle = true;
+            this.useDefaultTitle = true;
             config.title = `${x_name} x ${y_name}`;
         }
-        super(dataStore, div, config, { x: { type: "band" }, y: {} });
-        this.config.type = "violin_plot";
 
         //todo review general design around mutation of config in constructor / mobx
         const c = this.config;

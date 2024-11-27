@@ -20,8 +20,9 @@ import JsonView from "react18-json-view";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { g, isArray } from "@/lib/utils";
+import { g, isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
+import type { BaseConfig } from "@/charts/BaseChart";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>
@@ -230,7 +231,7 @@ function useDropdownOptions(props: DropdownSpec) {
     //map from 'value' string to option object
     const okOption = (isArray(okValue)
         ? okValue.map((v) => options.find((o) => o.value === v))
-        : [options.find((o) => o.value === v)])
+        : [options.find((o) => o.value === v)]).filter(notEmpty);
     // : options.find((o) => o.value === v); //not-multiple...
 
     return {options, single, label, val, okOption};
@@ -542,7 +543,7 @@ export const AbstractComponent = observer(
     },
 );
 
-export default observer(<T,>({ chart }: { chart: BaseChart<T> }) => {
+export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
     const settings = useMemo(() => {
         // is the id just for a key in this component, or should the type passed to the component recognise it?
         // for now, I don't think there's a benefit to including it in the type.

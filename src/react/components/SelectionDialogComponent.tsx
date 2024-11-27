@@ -21,6 +21,7 @@ import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import { TextFieldExtended } from "./TextFieldExtended";
 import * as d3 from 'd3';
+import { isArray } from "@/lib/utils";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -448,6 +449,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
         e.stopPropagation();
         runInAction(() => {
             delete filters[column.field];
+            if (!isArray(config.param)) throw "expected param array";
             config.param = config.param.filter((p) => p !== column.field);
         });
         console.log('Delete item');
@@ -497,6 +499,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
 const AddRowComponent = observer(() => {
     const config = useConfig<SelectionDialogConfig>();
     const { filters, param } = useConfig<SelectionDialogConfig>();
+    if (!isArray(param)) throw "expected param array";
     const setSelectedColumn = useCallback((column: string) => {
         if (!column) return;
         if (param.includes(column)) return;
@@ -512,6 +515,7 @@ const AddRowComponent = observer(() => {
                 //@ts-expect-error this is hinting at what we need to work on
                 setSelectedColumn={setSelectedColumn}
                 placeholder="Add a filter column"
+                //@ts-expect-error needs fixing
                 exclude={param}
                 // type="_multi_column:all" //not sure about this...
                 type={["text", "text16", "multitext", "unique", "integer", "double", "int32"]}

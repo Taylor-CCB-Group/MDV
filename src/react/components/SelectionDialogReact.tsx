@@ -15,12 +15,13 @@ export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFil
 export type SelectionDialogConfig = {
     type: "selection_dialog";
     filters: Record<string, SelectionDialogFilter | null>;
-};
+} & BaseConfig;
 
 class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
     constructor(dataStore: DataStore, div: HTMLDivElement, config: SelectionDialogConfig & BaseConfig) {
         if (!config.filters) {
             config.filters = {};
+            //@ts-ignore ! @ts-expect-error is inconsistent between editor & cli???
             for (const col of config.param) {
                 config.filters[col] = null;
             }

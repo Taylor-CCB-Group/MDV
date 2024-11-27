@@ -73,7 +73,7 @@ const project_name = dir.split("/").pop();
 /// --- end of messy section ---
 
 // set title of page to the data directory
-document.title = `MDV - ${project_name}`;
+document.title = `MDV<> - ${project_name}`;
 if (isPopout) document.title = "MDV popout";
 
 // TODO make a better type for this, put it somewhere more sensible.

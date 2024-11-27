@@ -4,15 +4,16 @@ import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./SettingsDialogComponent";
 import type BaseChart from "@/charts/BaseChart";
+import type { BaseConfig } from "@/charts/BaseChart";
 
-const SettingsDialog = observer(<T,>({ chart }: { chart: BaseChart<T> }) => {
+const SettingsDialog = observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
     // const config = chart.getConfig(); //instrument with mobx etc
     return <Gui chart={chart} />;
 });
 
 // don't necessarily want to inherit from BaseDialog, could consider different approach.
 // this will be more consistent / less work in short-term, and a basis for refactoring later.
-class SettingsDialogReactWrapper<T> extends BaseDialog {
+class SettingsDialogReactWrapper<T extends BaseConfig> extends BaseDialog {
     _root?: ReturnType<typeof createMdvPortal>;
     get root() {
         return this._root;

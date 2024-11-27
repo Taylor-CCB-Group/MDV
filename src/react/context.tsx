@@ -4,11 +4,12 @@ import { createContext, useContext } from "react";
 import type DataStore from "../datastore/DataStore";
 import type { VivConfig } from "./components/avivatorish/state";
 import type BaseChart from "@/charts/BaseChart";
+import type { BaseConfig } from "@/charts/BaseChart";
 
 const ChartContext = createContext<BaseChart<any>>(null as any);
 export const DataStoreContext = createContext<DataStore>(null as any);
 
-export function ChartProvider<T = any>({
+export function ChartProvider<T extends BaseConfig>({
     chart,
     children,
 }: { chart: BaseChart<T> } & React.PropsWithChildren) {

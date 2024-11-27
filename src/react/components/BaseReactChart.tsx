@@ -40,8 +40,8 @@ type TComponent<T extends BaseConfig> = () => JSX.Element;
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
  */
-export abstract class BaseReactChart<T> extends BaseChart<T> {
-    declare config: T & BaseConfig; // would be good to review this T & BaseConfig thing...
+export abstract class BaseReactChart<T extends BaseConfig> extends BaseChart<T> {
+    // declare config: T & BaseConfig; // would be good to review this T & BaseConfig thing...
     declare popoutIcon: HTMLElement;
     // get dataSource(): DataSource {
     //     return window.mdv.chartManager.charts[this.config.id].dataSource;
@@ -49,12 +49,12 @@ export abstract class BaseReactChart<T> extends BaseChart<T> {
     useMobx = true;
     root?: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
-    ComponentFn: TComponent<T & BaseConfig>;
+    ComponentFn: TComponent<T>;
     protected constructor(
         dataStore: DataStore,
         div: string | HTMLDivElement,
-        config: T & BaseConfig,
-        ReactComponentFunction: TComponent<T & BaseConfig> = Fallback,
+        config: T,
+        ReactComponentFunction: TComponent<T> = Fallback,
     ) {
         super(dataStore, div, config);
         config = this.config; //original config will be copied by super, before doing things like adding id to it...

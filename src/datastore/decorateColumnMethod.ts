@@ -61,7 +61,7 @@ export function decorateChartColumnMethods<T extends BaseChart<any>>(chart: T) {
  * Considering the possibility that this might also take arguments about how this will map to the config object / params....
  * Maybe it's enough in the short term to remember which method will be called with associated column specifications.
  */
-export function loadColumnData<This extends BaseChart<unknown>, Args extends any[], Return>(
+export function loadColumnData<This extends BaseChart<any>, Args extends any[], Return>(
     target: (this: This, inputCol: FieldName | FieldName[], ...args: Args) => void, // we could probably type this to have first argument specified...
     // context: ClassMethodDecoratorContext<This, (this: This, inputCol: FieldSpec, ...args: Args) => void> | { target: This },
 ) {

@@ -419,6 +419,7 @@ export function useRangeDimension2D() {
     }, [rangeDimension.destroy]);
     // encapsulating a bit more of the Dimension API here so I'm less likely to forget it.
     const { param } = useConfig();
+    //@ts-expect-error this needs fixing
     const cols = useMemo(() => [param[0], param[1]], [param]); //todo: 3d...
     const filterPoly = useCallback((coords: [number, number][]) => {
         // const transformed = coords.map((c) => modelMatrix.transformAsPoint(c));

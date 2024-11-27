@@ -1,5 +1,6 @@
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
+import type { BaseConfig } from "./BaseChart";
 import type { DataType, ExtraControl, GuiSpecType } from "./charts";
 
 //new Set(Object.values(BaseChart.types).flatMap(t => t.params).filter(Boolean).flatMap(p => p.type))
@@ -8,11 +9,11 @@ import type { DataType, ExtraControl, GuiSpecType } from "./charts";
 export type Param = "text" | "number" | "multitext" | "text16" | "_multi_column:number" | "_multi_column:all";
 
 //chatGPT to the rescue
-type BaseChartConstructor<TProps = any> = new (...args: any[]) => BaseChart<TProps>;
+type BaseChartConstructor<TProps extends BaseConfig> = new (...args: any[]) => BaseChart<TProps>;
 /**
  * Describes how a chart will be displayed in the 'add chart' dialog etc.
  */
-export type ChartType<T> = {
+export type ChartType<T extends BaseConfig> = {
     /** A class extending BaseChart */
     class: BaseChartConstructor<T>;
     /** The human-readable name that will appear in the 'add chart' dialog etc. */
