@@ -17,7 +17,7 @@ const Login: React.FC = () => {
         try {
             // Redirects to Auth0's login interface
             // The correct backend endpoint must be set here
-            window.location.href = "/auth/login";
+            window.location.href = "login";
         } catch (err) {
             console.error("Login error:", err);
         }
