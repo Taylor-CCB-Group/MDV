@@ -22,10 +22,13 @@ import {
 import { PopoverPicker } from "./ColorPicker";
 import { type Raster, getSingleSelectionStats } from "./avivatorish/utils";
 import { X } from "lucide-react";
+import JsonView from "react18-json-view";
 
 export default function MainVivColorDialog({
     vivStores,
-}: { vivStores: VivContextType }) {
+}: {
+    vivStores: VivContextType;
+}) {
     return (
         <VivProvider vivStores={vivStores}>
             <Test />
@@ -115,12 +118,15 @@ const ChannelChooser = ({ index }: { index: number }) => {
                             c: Number.parseInt(e.target.value),
                         };
                         setIsChannelLoading(index, true);
-                        const { domain: domains, contrastLimits, raster } =
-                            await getSingleSelectionStats({
-                                loader,
-                                selection,
-                                use3d,
-                            });
+                        const {
+                            domain: domains,
+                            contrastLimits,
+                            raster,
+                        } = await getSingleSelectionStats({
+                            loader,
+                            selection,
+                            use3d,
+                        });
                         const newProps = {
                             domains,
                             contrastLimits, //, leaving out colors for now - keep existing color
@@ -207,16 +213,28 @@ const BrightnessContrast = ({ index }: { index: number }) => {
 /**
  * React component to render a thumbnail with contrast adjustment.
  */
-function Thumbnail({ raster, contrastLimits, thumbWidth = 100, thumbHeight = 100 }: {
-    raster: Raster, contrastLimits: [number, number], thumbWidth?: number, thumbHeight?: number
+function Thumbnail({
+    raster,
+    contrastLimits,
+    thumbWidth = 100,
+    thumbHeight = 100,
+}: {
+    raster: Raster;
+    contrastLimits: [number, number];
+    thumbWidth?: number;
+    thumbHeight?: number;
 }) {
-    if (!raster) return null;
-    const { data, width, height } = raster;
     const canvasRef = useRef<HTMLCanvasElement>(null);
-
+    // consider passing the long side of thumbnail and calculating the other side
+    // if (raster) {
+    //     thumbWidth = raster.width;
+    //     thumbHeight = raster.height;
+    // }
     useEffect(() => {
+        if (!raster) return;
+        const { data, width, height } = raster;
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext("2d");
 
         // Calculate the scaling factors
         const scaleX = width / thumbWidth;
@@ -236,24 +254,32 @@ function Thumbnail({ raster, contrastLimits, thumbWidth = 100, thumbHeight = 100
                 // Get the original image coordinates
                 const origX = Math.floor(x * scaleX);
                 const origY = Math.floor(y * scaleY);
+                //=> there seems to be something wrong with this index computation
+                //or perhaps some wrong assumptions about the original data...
+                //but AFAICT, when viv makes a texture in luma, it passes something like this `data`
+                //it's not like I'm missing a decoding step etc.
                 const index = origY * width + origX;
+                const i = index;
 
                 // Apply contrast mapping
-                const value = data[index];
-                const contrastValue = Math.max(0, Math.min(255, (value - low) * contrastFactor));
+                const value = data[i];
+                const contrastValue = Math.max(
+                    0,
+                    Math.min(255, (value - low) * contrastFactor),
+                );
 
                 // Set pixel data in the ImageData (grayscale to RGB)
                 const pixelIndex = (y * thumbWidth + x) * 4;
-                thumbData[pixelIndex] = contrastValue;     // Red
+                thumbData[pixelIndex] = contrastValue; // Red
                 thumbData[pixelIndex + 1] = contrastValue; // Green
                 thumbData[pixelIndex + 2] = contrastValue; // Blue
-                thumbData[pixelIndex + 3] = 255;           // Alpha (opaque)
+                thumbData[pixelIndex + 3] = 255; // Alpha (opaque)
             }
         }
 
         // Draw the processed ImageData to the canvas
         ctx.putImageData(imageData, 0, 0);
-    }, [data, width, height, contrastLimits, thumbWidth, thumbHeight]);
+    }, [raster, contrastLimits, thumbWidth, thumbHeight]);
 
     return <canvas ref={canvasRef} width={thumbWidth} height={thumbHeight} />;
 }
@@ -319,7 +345,6 @@ const ChannelController = ({ index }: { index: number }) => {
                         channelsStore.setState({ colors: newColors });
                     }}
                 />
-                <Thumbnail raster={raster[index] as any} contrastLimits={limits[index]} />
                 <Slider
                     size="small"
                     //slotProps={{ thumb: {  } }} //todo smaller thumb
@@ -344,6 +369,10 @@ const ChannelController = ({ index }: { index: number }) => {
                 >
                     <X />
                 </button>
+                <Thumbnail
+                    raster={raster[index] as any}
+                    contrastLimits={limits[index]}
+                />
                 <BrightnessContrast index={index} />
             </div>
         </>
