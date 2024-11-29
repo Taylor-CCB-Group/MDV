@@ -13,7 +13,7 @@ import { g } from "@/lib/utils";
 import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
 import type { MultiColumnQuery } from "@/links/link_utils";
 import { decorateChartColumnMethods } from "@/datastore/decorateColumnMethod";
-import type { FieldSpec } from "@/lib/columnTypeHelpers";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 type ChartEventType = string;
 type Listener = (type: ChartEventType, data: any) => void;
 type LegacyColorBy = { column: DataColumn<any> }
@@ -23,7 +23,7 @@ export type BaseConfig = {
     title: string;
     legend: string;
     type: string;
-    param: FieldSpec; // | string,
+    param: FieldSpecs;
     title_color?: string;
 } & ColorConfig;
 type ColorConfig = {

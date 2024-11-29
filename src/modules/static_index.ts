@@ -147,7 +147,11 @@ async function loadData() {
             const views = await fetchJsonConfig(`${root}/views.json`, root);
             const state = await fetchJsonConfig(`${root}/state.json`, root);
 
-            new DebugJsonReactWrapper({ datasources, views, state });
+            const chartTypes = Object.entries(BaseChart.types).map(([k, v]) => {
+                const { class: omit, ...props } = v;
+                return [k, props];
+            })
+            new DebugJsonReactWrapper({ chartTypes, datasources, views, state });
         },
     );
     debugButton.style.float = "right";

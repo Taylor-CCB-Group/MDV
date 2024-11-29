@@ -1203,13 +1203,15 @@ class ChartManager {
             //*but there could be other config entries / methods that refer to columns*
             // return [];
         } else if (typeof p === "string") {
-            set.add(p);
+            // pretty sure there's nothing in BaseChart.types that would get here - single param is ["string"]
+            throw `Unexpected param string '${config.param}' for ${config.name} - expected array`;
         } else {
             for (const i of p) {
                 set.add(i);
             }
         }
         if (config.color_by) {
+            // LegacyColorBy - can we nip it in the bud so we can use narrower types elsehwere?
             if (config.color_by.column) {
                 set.add(config.color_by.column.field);
             } else {
