@@ -10,7 +10,7 @@ import type { IReactionDisposer } from "mobx";
 function decorateColumnMethod<T extends BaseChart<any>>(method: string, chart: T) {
     // could try to make `method: keyof T`, but that would require a more type juggling...
     // passing { target: chart } as context is not full information - what difference does it make?
-    //@ts-expect-error
+    //@ts-expect-error metaprogramming - will ignore, but should specify the type in each associated method in some way
     chart[method] = loadColumnData(chart[method], { target: chart, name: method });
 }
 

@@ -194,13 +194,12 @@ export type RowsAsColslink = {
     //^^ what if it was iterator instead of Array? and/or `column` can be a computed value?
     // observableColumns: DataColumn<DataType>[]; //computed?
 }
-
 /**
  * Represents an active query for a set of columns based on the currently highlighted or filtered rows.
  * ? in cases where only a single (virtual) column is needed, we can still use this interface 
  * but only access the first element of the `columns` array?
  */
-export interface MulticolumnQuery {
+export interface MultiColumnQuery {
     columns: DataColumn<DataType>[]; //could have a generic type for this?
     fields: FieldName[];
 }
@@ -229,7 +228,7 @@ export type RowsAsColsQuerySerialized = {
  * 
  * 
  */
-export class RowsAsColsQuery implements MulticolumnQuery {
+export class RowsAsColsQuery implements MultiColumnQuery {
     // it may be logical to make this class be the thing that encapsulates a listener,
     // don't want to introduce extra overhead... but it's probably small.
     // perhaps if rather than just link.observableFields, we have two separate arrays (!or iterators!)

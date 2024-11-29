@@ -58,7 +58,7 @@ const useJsonLayer = () => {
                   lineWidthMinPixels: 1,
                   pickable: true,
                   autoHighlight: true,
-                  //@ts-expect-error - might think about using zod to type/validate this
+                  //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
                   getText: (f) => f.properties.DN,
                   getTextColor: [255, 255, 255, 255],
                   getTextSize: 12,
@@ -173,7 +173,7 @@ const Main = observer(() => {
             contrast,
         ],
     );
-    //@ts-expect-error - this is WIP
+    //@ts-expect-error Partial<DeckGLProps> should be fixed
     const deckProps: Partial<DeckGLProps> = useMemo(
         () => ({
             getTooltip,

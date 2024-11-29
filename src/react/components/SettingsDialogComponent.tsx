@@ -123,19 +123,18 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
 
     const setSelectedColumn = useCallback(action((v: string) => {
         props.current_value = v;
-        //@ts-expect-error //! this is genuinely not fully implemented yet, when it is, types should be right
         props.func?.(v);
     }), []); //as of this writing, biome is right that props is not a dependency
     const filter = props.columnSelection?.filter;
     // not only is the filter not working, but we need to decide how to express "multiple"
     const props2 = useMemo(() => inferGenericColumnSelectionProps({
         // fixing this stuff is high priority
-        //@ts-expect-error
+        //@ts-expect-error ColumnSelection setSelectedColumn type
         setSelectedColumn,
-        //@ts-expect-error
+        //@ts-expect-error ColumnSelection `type` type
         type: filter,
         multiple: props.type === "multicolumn",
-        //@ts-expect-error
+        //@ts-expect-error ColumnSelection current_value type
         current_value: props.current_value
         // current_value: props.current_value... maybe want to be more mobx-y about this
     }), [setSelectedColumn, props.type, filter, props.current_value]);
@@ -442,7 +441,7 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
         <Button
             variant="contained"
             onClick={() => {
-                //@ts-expect-error `undefined as never` works, is there a nicer way to write this / define GuiValueTypes?
+                //@ts-expect-error button `func(v: never)` - passing `undefined as never` works, is there a nicer way to write this / define GuiValueTypes?
                 if (props.func) props.func();
             }}
         >

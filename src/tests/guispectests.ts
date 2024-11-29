@@ -17,7 +17,7 @@ const untyped = {
 const a: GuiSpec<'dropdown'> = {
     type: 'dropdown',
     label: 'label',
-    //@ts-expect-error
+    //@ts-expect-error there is no 'name' property - used to mistakenly think there was
     name: 'name',
     current_value: 'current_value',
     func: (v) => {},

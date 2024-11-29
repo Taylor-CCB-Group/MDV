@@ -512,10 +512,10 @@ const AddRowComponent = observer(() => {
     return (
         <div className="p-5">
             <ColumnSelectionComponent
-                //@ts-expect-error this is hinting at what we need to work on
+                //@ts-expect-error !!! setSelectedColumn needs appropriate type
                 setSelectedColumn={setSelectedColumn}
                 placeholder="Add a filter column"
-                //@ts-expect-error needs fixing
+                //@ts-expect-error 'exclude' design still under review?
                 exclude={param}
                 // type="_multi_column:all" //not sure about this...
                 type={["text", "text16", "multitext", "unique", "integer", "double", "int32"]}

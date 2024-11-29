@@ -108,7 +108,7 @@ export function initialiseConfig<C extends BaseConfig, T extends BaseChart<C>>(o
     config.param = processed;
     //pending more generic approach to serialising queries...
     if (originalConfig.color_by) {
-        //@ts-expect-error
+        //@ts-expect-error color_by
         const colorBy = isArray(originalConfig.color_by) ? deserialiseParam(chart.dataStore, originalConfig.color_by[0]) : config.color_by = deserialiseParam(chart.dataStore, originalConfig.color_by);
         config.color_by = undefined;
         setTimeout(() => {
@@ -116,7 +116,7 @@ export function initialiseConfig<C extends BaseConfig, T extends BaseChart<C>>(o
                 console.error('chart does not have colorByColumn method, but had color_by in config');
                 return;
             }
-            //@ts-expect-error the method itself takes a string - but our decorated version takes what we're giving it...
+            //@ts-expect-error color_by the method itself takes a string - but our decorated version takes what we're giving it...
             chart.colorByColumn?.(colorBy);
         })
     }

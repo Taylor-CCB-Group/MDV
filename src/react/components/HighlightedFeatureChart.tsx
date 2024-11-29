@@ -3,7 +3,7 @@ import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
 import { BaseReactChart } from "./BaseReactChart";
 import { HighlightedFeatureComponent } from "./HighlightedFeatureComponent";
-import { g } from "@/lib/utils";
+import { g, isArray } from "@/lib/utils";
 
 type HighlightedFeatureConfig = {
     text: string;
@@ -20,19 +20,17 @@ class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureCo
     }
     getSettings() {
         const c = this.config;
+        if (!isArray(this.config.param)) throw "expected param array";
         return [
             ...super.getSettings(),
             g({
-                type: "dropdown",
-                // name: "Column",
+                // untested / chart is generally unused
+                type: "multicolumn",
                 label: "Column",
-                //@ts-expect-error needs fixing
-                current_value: this.config.param[0],
-                values: [this.dataSource.dataStore.columns.map((c) => c.name)],
-                func: action((v: string) => {
-                    //@ts-expect-error needs fixing
-                    this.config.param[0] = v;
-                }),
+                current_value: this.config.param,
+                func: (v) => {
+                    this.config.param = v;
+                },
             }),
             g({
                 label: "Markdown Text",

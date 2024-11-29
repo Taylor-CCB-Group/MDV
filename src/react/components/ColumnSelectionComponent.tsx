@@ -135,7 +135,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
 
     const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
-    //@ts-expect-error nonsense about setBoolean type
+    //@ts-ignore nonsense about setBoolean type
     if (!linkProps) return <ColumnDropdown {...props} {...guiProps} />;
     // In general, this should (probably) be using our "(multi)dropdown" component
     // and the <LinksComponent /> can select which column options to show.
@@ -150,7 +150,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                 <Grid className="w-full items-center" container>
                     <Grid size={"grow"}>
                         {/* we may want to show something different, especially if special value is selected... */}                        
-                        {/* @ts-expect-error */}
+                        {/* @ts-ignore setExpanded type */}
                         <ColumnDropdown {...props} {...guiProps} />
                     </Grid>
                 </Grid>

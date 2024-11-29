@@ -45,19 +45,19 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
     getSettings() {
         // todo: add settings widget for 'column' with some properties somewhat similar to params type.
         const settings = super.getSettings();
-        // //@ts-expect-error seems like some dodgy jsdoc typing issue? why only here?
         // >>> it is indeed broken at runtime - need general development of multi-column settings
         // and how they relate to the mobx config store.
-        // settings.push(g({
-        //     //!!this should be properly implemented...
-        //     type: "multicolumn",
-        //     label: "Columns To filter",
-        //     current_value: this.config.param,
-        //     func: (v) => {
-        //         this.config.param = v;
-        //         // this.removeFilter();
-        //     }
-        // }));
+        settings.push(g({
+            //!!this should be properly implemented...
+            type: "multicolumn",
+            label: "Columns To filter",
+            //@ts-expect-error multicolumn vs config.param - do we need non-array param?
+            current_value: this.config.param,
+            func: (v) => {
+                this.config.param = v;
+                // this.removeFilter();
+            }
+        }));
         return settings;
     }
 }

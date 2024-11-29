@@ -23,7 +23,7 @@ import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
-import { g, toArray } from "@/lib/utils";
+import { g, isArray, toArray } from "@/lib/utils";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -134,7 +134,7 @@ export type VivMDVReact = VivMdvReact;
 function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
     const config = { ...scatterDefaults, ...originalConfig };
     // in future we might have something like an array of layers with potentially ways of describing parameters...
-    //@ts-expect-error this needs fixing
+    //@ts-expect-error contourParameter type
     if (!config.contourParameter) config.contourParameter = config.param[2];
     // === some dead code ===
     // if (config.type === 'VivMdvRegionReact') {
@@ -211,7 +211,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
-        //@ts-expect-error needs fixing
+        //@ts-expect-error category column values...
         const ocats = this.dataStore.getColumnValues(c.param[2]).slice() || [];
         const cats = ocats.map((x) => {
             return { t: x };
@@ -375,14 +375,14 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                 //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
                                 label: "Contour parameter",
                                 // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
-                                //@ts-expect-error needs fixing
+                                //@ts-expect-error contourParameter type
                                 current_value: c.contourParameter || c.param[2],
                                 values: [catCols, "name", "field"],
                                 func: (x) => {
                                     if (x === c.contourParameter) return;
                                     // could we change 'cats' and have the dropdowns update?
                                     // was thinking this might mean a more general refactoring of the settings...
-                                    //@ts-expect-error needs fixing
+                                    if (!isArray(c.param)) throw "expected param array";
                                     c.contourParameter = c.param[2] = x; //this isn't causing useParamColumns to update...
                                     // but maybe it's not necessary if 'cats' is observable... fiddly to get right...
                                     const newCats = (

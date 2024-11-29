@@ -1,6 +1,6 @@
 import type { DataColumn, FieldName, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
-import type { MulticolumnQuery } from "@/links/link_utils.js";
+import type { MultiColumnQuery } from "@/links/link_utils.js";
 import type { useState } from "react";
 import type { DataType } from "../charts/charts";
 import { isArray } from "./utils";
@@ -14,7 +14,9 @@ export type Param = DataType | "number" | MultiColumnPrefix;
 
 // we should be able to describe what permutation of multiple / virtual columns we allow
 // the assumption that if we have an array it will only be strings is wrong.
-export type FieldSpec = FieldName | MulticolumnQuery | (FieldName | MulticolumnQuery)[];
+export type FieldSpecs = (MultiColumnQuery | FieldName)[]; // | MultiColumnQuery - as single element array?
+//@ts-expect- error we need to be more basic & explicit about things that are and are not arrays
+export type FieldSpec = FieldName | MultiColumnQuery | (FieldName | MultiColumnQuery)[];
 /**
  * @returns an array of strings representing 'field names' - column IDs.
  */
@@ -29,7 +31,7 @@ type IsMultiParam<T extends CTypes> = T extends Param[] ? true
 : false;
 
 export type ColumnSelectionProps<T extends CTypes,
-    V = IsMultiParam<T> extends true ? FieldSpec : FieldName | MulticolumnQuery> = {
+    V = IsMultiParam<T> extends true ? FieldSpec : FieldName | MultiColumnQuery> = {
         type: T; //wary of using 'type' as a name - not reserved, but could be confusing
         multiple?: boolean; //also interacts with type "_multi...", perhaps simpler to avoid having both
         setSelectedColumn: (column: V) => void; //what about multiple? also, special values...

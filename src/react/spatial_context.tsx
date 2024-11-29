@@ -143,7 +143,7 @@ function useCreateMeasure() {
     const [endPixels, setEnd] = useState<P>([0, 0]);
     return { startPixels, setStart, endPixels, setEnd };
 }
-//@ts-expect-error maybe we can have a generic that describes appropriate types of chart
+//@ts-expect-error add generic that extends SpatialConfig?
 function useCreateSpatialAnnotationState(chart: BaseChart) {
     // should we use zustand for this state?
     // doesn't matter too much as it's just used once by SpatialAnnotationProvider
@@ -156,7 +156,7 @@ function useCreateSpatialAnnotationState(chart: BaseChart) {
 export function SpatialAnnotationProvider({
     chart,
     children,
-//@ts-expect-error maybe we can have a generic that describes appropriate types of chart
+    //@ts-expect-error add generic that extends SpatialConfig?
 }: { chart: BaseChart } & React.PropsWithChildren) {
     const annotationState = useCreateSpatialAnnotationState(chart);
     return (
