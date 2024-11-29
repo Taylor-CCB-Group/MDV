@@ -103,6 +103,10 @@ def main():
     # Add datasource
     project.add_datasource('cells', cells_df)
     project.add_datasource('genes', genes_df)
+
+    # Update datasource with the new columns provided through the scanpy object
+    project.set_column('cells', "UMAP 1", cells_df["UMAP 1"])
+    project.set_column('cells', "UMAP 2", cells_df["UMAP 2"])
     
     # StackedRowChart parameters
     stacked_title = "Abundance of Cell States per Patient"
@@ -133,8 +137,10 @@ def main():
     )
     
     # DotPlot parameters
-    dot_title = "Gene expression for TNF per cell state dot plot"
-    dot_params = ["cell state", "Gene expression|TNF(Gene expression)|10452"]
+    gene_name = "TNF"
+    gene_index = genes_df.index.get_loc("gene_name")
+    dot_title = f"Gene expression for {gene_name} per cell state dot plot"
+    dot_params = ["cell state", f"Gene expression|{gene_name}(Gene expression)|{gene_index}"]
     dot_size = [400, 250]
     dot_position = [10, 500]
     

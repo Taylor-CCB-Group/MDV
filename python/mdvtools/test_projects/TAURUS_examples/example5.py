@@ -8,7 +8,6 @@
 import os
 import pandas as pd
 import scanpy as sc
-import sys
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.table_plot import TablePlot
 import json 

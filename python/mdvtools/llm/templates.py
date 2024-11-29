@@ -67,11 +67,11 @@ You are a top-class Python developer. Based on the question: {question}, decide 
 If no script is relevant, guided by the context generate a new script. 
 
 This list """ + final_answer + """ specifies the names of the data fields that need to be plotted, for example in the params field. Get the structure of params definition from the context.
-
-NO DATA SHOULD BE LOADED. 
+DO NOT forget to use the f-string, or formatted string literal, python structure in the parameters, params or param.
 
 If the prompt asks for a gene, make sure you load this datasource and that you create a link between the two datasets.
 
+The path to data are given by this variable """ + path_to_data + """
 """
     )
     return prompt_RAG
