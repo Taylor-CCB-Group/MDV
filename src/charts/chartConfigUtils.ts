@@ -16,7 +16,7 @@ import type { BaseConfig } from "./BaseChart";
 // consider having synthetic columns that can be used for testing...
 // possibly including things like multi-text columns that automatically mutate over time...
 type SerialisedColumnParam = (FieldName | RowsAsColsQuerySerialized);
-type SerialisedParams = SerialisedColumnParam | SerialisedColumnParam[];
+type SerialisedParams = SerialisedColumnParam[];
 export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
     const result = typeof param === "string" ? param : RowsAsColsQuery.fromSerialized(ds, param);
     if (!result) {
@@ -104,7 +104,7 @@ export function initialiseConfig<C extends BaseConfig, T extends BaseChart<C>>(o
     //todo process entire config object, not just param
     //@ts-expect-error todo distinguish type of serialised vs runtime config
     const param: SerialisedParams = config.param;
-    const processed = isArray(param) ? param.map(p => deserialiseParam(chart.dataStore, p)) : deserialiseParam(chart.dataStore, param);
+    const processed = param.map(p => deserialiseParam(chart.dataStore, p));
     config.param = processed;
     //pending more generic approach to serialising queries...
     if (originalConfig.color_by) {

@@ -123,6 +123,7 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
 
     const setSelectedColumn = useCallback(action((v: string) => {
         props.current_value = v;
+        //@ts-expect-error string is not assignable to FieldSpecs, type of v is wrong here
         props.func?.(v);
     }), []); //as of this writing, biome is right that props is not a dependency
     const filter = props.columnSelection?.filter;

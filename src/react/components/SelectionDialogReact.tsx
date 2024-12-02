@@ -21,13 +21,16 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
     constructor(dataStore: DataStore, div: HTMLDivElement, config: SelectionDialogConfig & BaseConfig) {
         if (!config.filters) {
             config.filters = {};
-            //@ts-ignore ! @ts-expect-error is inconsistent between editor & cli???
+            //@ts -ignore ! @ts-expect-error is inconsistent between editor & cli???
             for (const col of config.param) {
+                //@ts-expect-error MultiColumnQuery cannot be used as index
                 config.filters[col] = null;
             }
         }
         for (const col of config.param) {
+            //@ts-expect-error MultiColumnQuery cannot be used as index
             if (!config.filters[col]) {
+                //@ts-expect-error MultiColumnQuery cannot be used as index
                 config.filters[col] = null;
             }
         }
@@ -51,7 +54,6 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
             //!!this should be properly implemented...
             type: "multicolumn",
             label: "Columns To filter",
-            //@ts-expect-error multicolumn vs config.param - do we need non-array param?
             current_value: this.config.param,
             func: (v) => {
                 this.config.param = v;
