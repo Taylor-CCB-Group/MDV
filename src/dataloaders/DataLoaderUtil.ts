@@ -1,10 +1,9 @@
 import { createEl } from "@/utilities/ElementsTyped";
-import type { Datasource } from "../modules/static_index";
 import {
     getArrayBufferDataLoader,
     getLocalCompressedBinaryDataLoader,
 } from "./DataLoaders";
-import type { DataType, LoadedDataColumn } from "@/charts/charts";
+import type { DataSource, DataType, LoadedDataColumn } from "@/charts/charts";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 
 let projectRoot = "";
@@ -59,7 +58,7 @@ export function getProjectURL(url: string, trailingSlash = true) {
 
 export function getDataLoader(
     isStaticFolder: boolean,
-    datasources: Datasource[],
+    datasources: DataSource[],
     views: any,
     url: string,
 ) {

@@ -6,26 +6,36 @@
  *
  **/
 
+import type {
+    DataColumn,
+    DataSource,
+    DataSourceName,
+    DataType,
+    FieldName,
+} from "@/charts/charts";
+import type { TypedArrayConstructor } from "@luma.gl/core";
+
+type Columns = DataColumn<DataType>[];
+
 /**
  * @memberof module:DataLoaders
- * @param data {ArrayBuffer} - an array buffer containing raw concatenated
+ * @param data - an array buffer containing raw concatenated
  * column data
- * @param {object} columns - any array of column objects
- * <ul>
- *   <li> field </li>
- *   <li> datatype </li>
- *   <li> sgtype </li>
- * </ul>
- * @param size {integer} - the size of the columns
- * @returns {object[]} a list of objects containing each colums's field name
+ * @param columns - any array of column objects
+ *   - field
+ *   - datatype
+ *   - sgtype
+ * @param size - the size of the columns
+ * @returns a list of objects containing each colums's field name
  * and data
  **/
-function processArrayBuffer(data, columns, size) {
+function processArrayBuffer(data: ArrayBuffer, columns: Columns, size: number) {
     const dataList = [];
     let offset = 0;
     for (const column of columns) {
         //default values for numbers
-        let arrayType = column.datatype === "int32" ? Int32Array : Float32Array;
+        let arrayType: TypedArrayConstructor =
+            column.datatype === "int32" ? Int32Array : Float32Array;
         //the length of the typed array
         let arr_len = size;
         //the number of bytes for each item in the column's data
@@ -97,19 +107,23 @@ function processArrayBuffer(data, columns, size) {
  * Gets bytes from an API. The data loader will send a post request
  * to the url with with a jsonified object containing the datasource
  * and column information
- * <pre>
+ * ```js
  * {
  *    "data_source":"mydataource"
  *    "columns":[{"field":"x1","datatype":"integer"}]
  * }
- * </pre>
+ * ```
  * returns a dataloader
  * @memberof module:DataLoaders
- * @param url {string} - The url of the api
- * @returns {function} a dataloader that can be used to construct {@link ChartManager}
+ * @param url - The url of the api
+ * @returns a dataloader that can be used to construct {@link ChartManager}
  **/
-function getArrayBufferDataLoader(url, decompress = false) {
-    return async (columns, dataSource, size) => {
+function getArrayBufferDataLoader(url: string, decompress = false) {
+    return async (
+        columns: DataColumn<DataType>[],
+        dataSource: DataSourceName,
+        size: number,
+    ) => {
         //get the data
         const response = await fetch(url, {
             method: "POST",
@@ -121,7 +135,7 @@ function getArrayBufferDataLoader(url, decompress = false) {
         //the data is any arraybuffer containing each individual
         //column's raw data
         let data = await response.arrayBuffer();
-        data = decompress ? await decompressData(data) : data;
+        data = decompress ? await decompressData(new Uint8Array(data)) : data;
         return processArrayBuffer(data, columns, size);
     };
 }
@@ -133,30 +147,41 @@ function getArrayBufferDataLoader(url, decompress = false) {
  *
  * returns a dataLoader
  * @memberof module:DataLoaders
- * @param {string} - The url of the remote folder
- * @returns {function} a dataloader that can be used to construct {@link ChartManager}
+ * @param
+ * @param The url of the remote folder
+ * @returns a dataloader that can be used to construct {@link ChartManager}
  **/
 
-function getLocalCompressedBinaryDataLoader(dataSources, folder) {
-    const loaders = {};
+function getLocalCompressedBinaryDataLoader(
+    dataSources: DataSource[],
+    folder: string,
+) {
+    const loaders: Record<DataSourceName, CompressedBinaryDataLoader> = {};
     for (const ds of dataSources) {
         loaders[ds.name] = new CompressedBinaryDataLoader(
             `${folder}/${ds.name}.gz`,
             ds.size,
         );
     }
-    return async (columns, dataSource, size) => {
+    return async (
+        columns: Columns,
+        dataSource: DataSourceName,
+        size: number,
+    ) => {
         return await loaders[dataSource].getColumnData(columns, size);
     };
 }
 
 class CompressedBinaryDataLoader {
-    constructor(url, size) {
+    url: string;
+    index: Record<FieldName, any> | null;
+    size: number;
+    constructor(url: string, size: number) {
         this.url = url;
         this.index = null;
         this.size = size;
     }
-    async getColumnData(cols, size) {
+    async getColumnData(cols: Columns, size: number) {
         const { default: pako } = await import("pako");
         if (!this.index) {
             const iurl = this.url.replace(".gz", ".json");
@@ -172,6 +197,7 @@ class CompressedBinaryDataLoader {
                     const arr = c.field.split("|");
                     lu = arr[0] + arr[2];
                 }
+                if (!this.index) throw "expected index to be present";
                 const i = this.index[lu];
 
                 let resp = null;
@@ -179,6 +205,7 @@ class CompressedBinaryDataLoader {
                     headers: {
                         responseType: "arraybuffer",
                         range: `bytes=${i[0]}-${i[1]}`,
+                        "Content-Type": "application/gzip",
                     },
                 };
                 try {
@@ -195,7 +222,8 @@ class CompressedBinaryDataLoader {
                     );
                 }
                 try {
-                    const output = pako.inflate(bytes);
+                    //nb - this had been working without `new Uint8Array`, but pako types & examples use it
+                    const output = pako.inflate(new Uint8Array(bytes));
 
                     if (c.sgtype === "sparse") {
                         const b = output.buffer;
@@ -226,7 +254,7 @@ class CompressedBinaryDataLoader {
     }
 }
 
-async function decompressData(buffer) {
+async function decompressData(buffer: Uint8Array) {
     const { default: pako } = await import("pako");
     return pako.inflate(buffer).buffer;
 }

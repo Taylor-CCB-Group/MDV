@@ -27,6 +27,7 @@ type DataStructureTypes = {
     unique: Uint8Array; //raw bytes of strings to be decoded
     int32: Int32Array;
 };
+export type ColumnData = DataStructureTypes[keyof DataStructureTypes];
 // even if they're just aliases, these could be useful for documentation / clarity
 export type ColumnName = string; //this will probably change to ColumnSpecifier with more structured data
 // ^^ I'd prefer that to having to reason about the string format everywhere
@@ -55,7 +56,7 @@ export type DataColumn<T extends DataType> = {
      */
     datatype: T;
     /** whether the column's data can be changed */
-    editable?: boolean,
+    editable?: boolean;
     /**In the case of a double/integer (number) column, the array
      * buffer should be the appropriate size to contain float32s. For text it should be Uint8
      * and contain numbers corresponding to the indexes in the values parameter. For a column of
@@ -89,7 +90,8 @@ export type DataColumn<T extends DataType> = {
     sgindex?: number;
     sgtype?: "dense" | "sparse"; //?? any other options?
 };
-export type LoadedDataColumn<T extends DataType> = DataColumn<T> & Required<Pick<DataColumn<T>, "data">>;
+export type LoadedDataColumn<T extends DataType> = DataColumn<T> &
+    Required<Pick<DataColumn<T>, "data">>;
 function test(column: LoadedDataColumn<"text">) {
     column.data;
     column.values; //why does this degrade to 'any'?
@@ -107,10 +109,16 @@ function test(column: LoadedDataColumn<"text">) {
 export type RowsAsColumnsLink = {
     name: string;
     name_column: FieldName;
-    subgroups: Record<string, { label: string, name: string, type: "dense" | string }>;
-}
+    subgroups: Record<
+        string,
+        { label: string; name: string; type: "dense" | string }
+    >;
+};
 
-export type DataSourceLinks = Record<DataSourceName, {rows_as_columns?: RowsAsColumnsLink}>;
+export type DataSourceLinks = Record<
+    DataSourceName,
+    { rows_as_columns?: RowsAsColumnsLink }
+>;
 
 export type DataSource = {
     name: DataSourceName;
@@ -121,6 +129,8 @@ export type DataSource = {
     images?: Record<string, any>;
     regions?: Record<string, any>;
     links?: DataSourceLinks;
+    size: number;
+    columns: DataColumn<DataType>[];
 };
 
 type DropdownMappedValue<T extends string, V extends string> = {
@@ -170,11 +180,11 @@ export type ColumnSelectionParameters = {
     filter?: DataType[];
     multiple?: boolean;
     exclude?: string[];
-}
+};
 // type GuiFunc<T extends GuiSpecType, V = GuiValueTypes<T>, F = (v: V) => void> = F;//T extends "folder" ? never : (v: V) => void;
 // export type GuiSpec<T extends GuiSpecType, V = GuiValueTypes<T>, F = GuiFunc<T>> = {
 type GV<T extends GuiSpecType> = GuiValueTypes[T];
-type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => (void | Promise<void>);
+type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => void | Promise<void>;
 // type GuiSpecExperiment<T extends keyof GuiSpecType> = T extends infer K
 //     ? K extends keyof GuiValueTypes
 //         ? {
@@ -197,12 +207,28 @@ export type GuiSpec<T extends GuiSpecType> = {
     // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
     choices?: T extends "radiobuttons" ? [string, string][] : never;
     //thouht we could make these non-optional and only have it insist for number types, but that's not happening for some reason
-    min?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
-    max?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
-    step?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
-    continuous?: GV<T> extends number ? boolean : GV<T> extends [number, number] ? boolean : never;
+    min?: GV<T> extends number
+        ? number
+        : GV<T> extends [number, number]
+          ? number
+          : never;
+    max?: GV<T> extends number
+        ? number
+        : GV<T> extends [number, number]
+          ? number
+          : never;
+    step?: GV<T> extends number
+        ? number
+        : GV<T> extends [number, number]
+          ? number
+          : never;
+    continuous?: GV<T> extends number
+        ? boolean
+        : GV<T> extends [number, number]
+          ? boolean
+          : never;
     defaultVal?: GV<T>;
-    columnSelection?: T extends "column" ? ColumnSelectionParameters : never;//what about multicolumn?
+    columnSelection?: T extends "column" ? ColumnSelectionParameters : never; //what about multicolumn?
 };
 // export type GuiSpecs = Array<GuiSpec<GuiSpecType>>;
 // This creates a union of `GuiSpec<"folder"> | GuiSpec<"slider"> | ...`

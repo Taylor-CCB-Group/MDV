@@ -14,6 +14,7 @@ import {
 import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
 import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
+import type { DataSource } from "@/charts/charts";
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
 declare global {
@@ -76,15 +77,6 @@ const project_name = dir.split("/").pop();
 document.title = `MDV<> - ${project_name}`;
 if (isPopout) document.title = "MDV popout";
 
-// TODO make a better type for this, put it somewhere more sensible.
-export type Datasource = {
-    name: string;
-    columns: { name: string; type: string }[];
-    images?: any;
-    size: number;
-    columnGroups?: any[];
-};
-
 async function loadData() {
     // setupDebug();
     if (isPopout) return;
@@ -93,7 +85,7 @@ async function loadData() {
     const datasources = (await fetchJsonConfig(
         `${root}/datasources.json`,
         root,
-    )) as Datasource[];
+    )) as DataSource[];
     const config = await fetchJsonConfig(`${root}/state.json`, root);
     config.popouturl = undefined;
     const views = await fetchJsonConfig(`${root}/views.json`, root);
