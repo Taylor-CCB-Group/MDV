@@ -359,6 +359,7 @@ def register_auth0_routes(app):
         def login():
             try:
                 print("$$$$$$$$$$$$$$$ app-login")
+                session.clear()  
                 return auth0_provider.login()
             except Exception as e:
                 print(f"In register_auth0_routes : Error during login: {e}")
@@ -388,7 +389,7 @@ def register_auth0_routes(app):
             try:
                 auth0_provider.logout()
                 print("logged out")
-                return redirect(url_for('index'))  # Redirect to home after logout
+                return redirect(url_for('login'))  # Redirect to home after logout
             except Exception as e:
                 print(f"In register_auth0_routes: Error during logout: {e}")
                 return jsonify({"error": "Failed to log out."}), 500
