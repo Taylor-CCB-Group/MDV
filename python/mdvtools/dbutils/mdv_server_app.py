@@ -432,6 +432,11 @@ def register_routes(app):
 
         print("Route registered: /")
 
+        @app.route('/login_dev')
+        def login_dev():
+            return render_template('login.html')
+        print("Route registered: /login_dev")
+
         @app.route('/projects')
         def get_projects():
             print('/projects queried...')
