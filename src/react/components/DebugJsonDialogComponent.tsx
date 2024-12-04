@@ -5,6 +5,7 @@ import "react18-json-view/src/style.css";
 import "react18-json-view/src/dark.css";
 import { useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
+import "../../utilities/css/JsonDialogStyles.css";
 
 type JSONObject = { [key: string]: any };
 
@@ -65,16 +66,25 @@ export default function ({ json, header }: { json: any; header?: string }) {
         () => filterJSON(json, debouncedFilter),
         [json, debouncedFilter]
     );
+
     return (
-        <div className="max-h-[90vh] overflow-auto">
-            {header && <h2>{header}</h2>}
+        <div className="max-h-[90vh] overflow-auto p-4">
+            {header && <h2 className="text-lg font-semibold mb-4">{header}</h2>}
             <input
                 type="text"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 placeholder="Filter..."
+                className="w-full mb-4 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             />
-            <JsonView src={filteredJson} />
+            <JsonView 
+                src={filteredJson} 
+                style={{
+                    backgroundColor: 'transparent',
+                    fontSize: '0.875rem',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+                }}
+            />
         </div>
     );
 }
