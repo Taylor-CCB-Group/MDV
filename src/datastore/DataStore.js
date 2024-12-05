@@ -40,13 +40,12 @@ class DataStore {
         this.size = size;
         /** @type {number} */
         this.filterSize = size;
-        /** why doesn't this annotation work?
+        /**
          * @typedef {import("@/charts/charts.js").DataType} DataType
-         * @typedef {import("@/charts/charts.js").DataColumn} DataColumn
-         * @type {Array.<DataColumn<DataType>>} */
+         * @type {Array<import("@/charts/charts.js").DataColumn<DataType>>} */
         this.columns = [];
         /**
-         * @type {{[k: string]: DataColumn<DataType> | undefined}} */
+         * @type {{[k: string]: import("@/charts/charts.js").DataColumn<DataType> | undefined}} */
         this.columnIndex = {};
         this.listeners = {};
         this.indexes = {};
@@ -111,6 +110,7 @@ class DataStore {
             }
         }
 
+        /** @type {string[]} column names */
         this.columnsWithData = [];
         this.dirtyColumns = {
             added: {},
@@ -731,6 +731,10 @@ class DataStore {
         for (const c of columns) {
             //todo invert this to use col.getValue(index)
             const col = this.columnIndex[c];
+            if (!col.data) {
+                console.error(`Column ${c} has no data`);
+                continue;
+            }
             let v = col.data[index];
             if (col.datatype === "text" || col.datatype === "text16") {
                 v = col.values[v];
@@ -1473,7 +1477,7 @@ class DataStore {
         const ov = config.overideValues || {};
         const colors = this.getColumnColors(column, config);
         function isFallback(v) {
-            return Number.isNaN(v) || (ov.fallbackOnZero && v === 0);
+            return !Number.isFinite(v) || (ov.fallbackOnZero && v === 0);
         }
         //simply return the color associated with the value
         if (
@@ -1494,34 +1498,28 @@ class DataStore {
             const interval_size = (max - min) / bins;
             const fallbackColor = config.asArray ? [255, 255, 255] : "#ffffff";
             //the actual function - bins the value and returns the color for that bin
-            if (config.useValue) {
-                return (v) => {
-                    if (isFallback(v)) {
-                        return fallbackColor;
-                    }
-                    let bin = Math.floor((v - min) / interval_size);
-                    if (bin < 0) {
-                        bin = 0;
-                    } else if (bin >= colors.length) {
-                        bin = colors.length - 1;
-                    }
-                    return colors[bin];
-                };
-            }
-            return (x) => {
-                const v = data[x];
-                //missing data
-                if (isFallback(v)) {
-                    return fallbackColor;
-                }
+            function getColor(v) {
+                if (isFallback(v)) return fallbackColor;
+                // interval_size will be 0 for e.g. column containing only zeros.
+                // don't want to use fallbackColor, just the zero-th color
+                if (interval_size <= Number.EPSILON) return colors[0];
                 let bin = Math.floor((v - min) / interval_size);
                 if (bin < 0) {
                     bin = 0;
                 } else if (bin >= colors.length) {
                     bin = colors.length - 1;
                 }
+                /// we could go belt-and-braces on error checking here, but should be robust now and this will have some overhead.
+                // if (!Number.isFinite(bin)) {
+                //     console.error('numerical issue computing color bin');
+                //     bin = 0;
+                // }
                 return colors[bin];
-            };
+            }
+            if (config.useValue) {
+                return getColor;
+            }
+            return x => getColor(data[x]);
         }
     }
 

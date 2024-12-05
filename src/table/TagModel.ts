@@ -2,9 +2,10 @@ import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import type { LoadedDataColumn } from "../charts/charts";
 import type DataStore from "../datastore/DataStore";
 import { DataModel } from "./DataModel";
+import { isColumnLoaded, isColumnOfType } from "@/lib/columnTypeHelpers";
 
 //multitext was buggy (empty data buffer after loading project)
-const COL_TYPE = "multitext";
+const COL_TYPE = "multitext" as const;
 export type TagColumn = LoadedDataColumn<"multitext">;
 
 const SEP = /\W*\;\W*/; //separate by semi-colon with whitespace trimmed
@@ -84,12 +85,14 @@ export default class TagModel {
                 this.callListeners();
             });
         }
-        //! col is `any` here...
         const col = dataStore.columnIndex[columnName];
-        if (col.datatype !== COL_TYPE)
+        if (!col) throw `expected columnIndex['${columnName}'] to be present in DataStore '${dataStore.name}'`;
+        if (!isColumnOfType(col, COL_TYPE)) {
             throw new Error(
                 `column '${columnName}' is not of type '${COL_TYPE}'`,
             );
+        }
+        if (!isColumnLoaded(col)) throw "expected column to be loaded";
         this.tagColumn = col;
     }
     private callListeners() {

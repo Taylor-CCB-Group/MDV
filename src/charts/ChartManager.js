@@ -59,7 +59,7 @@ import { addChartLink } from "../links/link_utils";
 import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
-//import { AddChartDialog } from "./dialogs/AddChartDialog";
+import { AddChartDialog } from "./dialogs/AddChartDialog";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1203,13 +1203,15 @@ class ChartManager {
             //*but there could be other config entries / methods that refer to columns*
             // return [];
         } else if (typeof p === "string") {
-            set.add(p);
+            // pretty sure there's nothing in BaseChart.types that would get here - single param is ["string"]
+            throw `Unexpected param string '${config.param}' for ${config.name} - expected array`;
         } else {
             for (const i of p) {
                 set.add(i);
             }
         }
         if (config.color_by) {
+            // LegacyColorBy - can we nip it in the bud so we can use narrower types elsehwere?
             if (config.color_by.column) {
                 set.add(config.color_by.column.field);
             } else {
@@ -1539,6 +1541,11 @@ class ChartManager {
      * @param {number} [threads=2]  the number of concurrent requests
      */
     loadColumnSet(columns, dataSource, callback, split = 10, threads = 2) {
+        const ds = this.getDataSource(dataSource);
+        // nb, if any items are in columnsLoading, we don't filter them here
+        // because we'd have to think of how to listen for their completion before calling the callback
+        // !! could be an issue if a column has been edited by another user and this method is supposed to reload it?
+        columns = columns.filter((x) => !ds.columnsWithData.includes(x));
         if (columns.length === 0) {
             callback(); //should there be any args? hard to tell without types
             return;
@@ -1579,6 +1586,11 @@ class ChartManager {
         for (let n = 0; n < max; n++) {
             this._loadColumnData(t, dataSource);
         }
+    }
+    loadColumnSetAsync(columns, dataSource, split = 10, threads = 2) {
+        return new Promise((resolve, reject) => {
+            this.loadColumnSet(columns, dataSource, resolve, split, threads);
+        });
     }
 
     _loadColumnData(trans, dataSource) {
@@ -1666,9 +1678,9 @@ class ChartManager {
                     position: "bottom-right",
                 },
                 func: () => {
-                    // new AddChartDialog(ds, (config) =>
-                    //     this.addChart(ds.name, config, true),
-                    // );
+                    new AddChartDialog(ds, (config) =>
+                        this.addChart(ds.name, config, true),
+                    );
                     new BaseDialog.experiment["AddChartDialogReact"](dataStore);
                 },
             },
@@ -2072,8 +2084,15 @@ class ChartManager {
             const col = dStore.columnIndex[x];
             //no record of column- need to load it (plus metadata)
             if (!col) {
-                dStore.addColumnFromField(x);
-                return true;
+                // what if x is something like a MulticolumnQuery?
+                if (typeof x !== "string") {
+                    // we could make dataStore understand it as a 'field'...
+                    // or if we return false to filter it out, chart deserialise can handle it?
+                    return false;
+                } else {
+                    dStore.addColumnFromField(x);
+                    return true;
+                }
             }
             //only load if has no data
             return !col.data;
@@ -2103,40 +2122,6 @@ class ChartManager {
         })
 
     }*/
-
-    //need to ensure that column data is loaded before calling method
-    _decorateColumnMethod(method, chart, dataSource) {
-        const newMethod = `_${method}`;
-        chart[newMethod] = chart[method];
-        //if original method is called check whether column has data
-        chart[method] = (column) => {
-            this._getColumnsThen(dataSource, [column], () =>
-                chart[newMethod](column),
-            );
-        };
-    }
-
-    //supercedes previous method - more genric
-    //method must be specified in the method UsingColumns in types of dictionary
-    __decorateColumnMethod(method, chart, dataSource) {
-        const newMethod = `_${method}`;
-        chart[newMethod] = chart[method];
-        //if original method is called check whether column has data
-        //first argument must be column(s) needed
-        chart[method] = () => {
-            //column not needed
-            if (arguments[0] == null) {
-                chart[newMethod](...arguments);
-            } else {
-                const cols = Array.isArray(arguments[0])
-                    ? arguments[0]
-                    : [arguments[0]];
-                this._getColumnsThen(dataSource, cols, () =>
-                    chart[newMethod](...arguments),
-                );
-            }
-        };
-    }
 
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
@@ -2185,40 +2170,6 @@ class ChartManager {
                 this._removeLinks(chart);
                 this._callListeners("chart_removed", chart);
             });
-
-        //need to decorate any method that uses column data as data may
-        //have to be loaded before method can execute
-        // @ts-ignore
-        if (chart.colorByColumn) {
-            this._decorateColumnMethod("colorByColumn", chart, dataSource);
-        }
-        // @ts-ignore
-        if (chart.setToolTipColumn) {
-            this._decorateColumnMethod("setToolTipColumn", chart, dataSource);
-        }
-        // @ts-ignore
-        if (chart.setBackgroundFilter) {
-            this._decorateColumnMethod(
-                "setBackgroundFilter",
-                chart,
-                dataSource,
-            );
-        }
-        // @ts-ignore
-        if (chart.changeContourParameter) {
-            this._decorateColumnMethod(
-                "changeContourParameter",
-                chart,
-                dataSource,
-            );
-        }
-
-        //new preferred way to decorate column methods
-        if (chartType.methodsUsingColumns) {
-            for (const meth of chartType.methodsUsingColumns) {
-                this.__decorateColumnMethod(meth, chart, dataSource);
-            }
-        }
 
         // @ts-ignore
         if (chart.setupLinks) {

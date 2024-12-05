@@ -3,7 +3,7 @@ import { GridStack } from "gridstack";
 import { debounce } from "../utilities/Utilities";
 import type { ChartManager, DataSource } from "./charts";
 import type BaseChart from "./BaseChart";
-type Chart = BaseChart<unknown>;
+type Chart = BaseChart<any>;
 function clearPosition(div: HTMLElement) {
     div.style.position = "";
     div.style.left = "";

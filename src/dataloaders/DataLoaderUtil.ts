@@ -1,10 +1,10 @@
 import { createEl } from "@/utilities/ElementsTyped";
-import type { Datasource } from "../modules/static_index";
 import {
     getArrayBufferDataLoader,
     getLocalCompressedBinaryDataLoader,
 } from "./DataLoaders";
-import type { DataType, LoadedDataColumn } from "@/charts/charts";
+import type { DataSource, DataType, LoadedDataColumn } from "@/charts/charts";
+import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 
 let projectRoot = "";
 export async function fetchJsonConfig(url: string, root: string) {
@@ -58,7 +58,7 @@ export function getProjectURL(url: string, trailingSlash = true) {
 
 export function getDataLoader(
     isStaticFolder: boolean,
-    datasources: Datasource[],
+    datasources: DataSource[],
     views: any,
     url: string,
 ) {
@@ -156,13 +156,18 @@ export async function loadColumn(datasourceName: string, columnName: string): Pr
         try {
             const ds = window.mdv.chartManager.getDataSource(datasourceName);
             const column = ds.columnIndex[columnName];
+            if (!column) throw `no columnIndex['${columnName}'] record`;
             if (ds.columnsWithData.includes(columnName)) {
+                if (!isColumnLoaded(column)) throw "assertion failed..."
                 resolve(column); //hopefully this is trustworthy
             } else {
                 window.mdv.chartManager.loadColumnSet(
                     [columnName],
                     datasourceName,
-                    () => resolve(column),
+                    () => {
+                        if (!isColumnLoaded(column)) throw "broken promise for loading column"
+                        return resolve(column);
+                    },
                 );
             }
         } catch (e) {

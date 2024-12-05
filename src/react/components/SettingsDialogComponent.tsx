@@ -18,13 +18,17 @@ import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import JsonView from "react18-json-view";
 import { ChartProvider } from "../context";
-import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
-import { g, isArray } from "@/lib/utils";
+import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
+import { g, isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
+import type { BaseConfig } from "@/charts/BaseChart";
 
-export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<any>, htmlFor?: string }) => (
-    <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>{props.label}</Typography>
+export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
+    <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>
+        {props.label} 
+        {/* <em className="opacity-30"> ({props.type})</em> */}
+    </Typography>
     // todo fix justifySelf - it's not working as expected
     // <FormControlLabel
     //     sx={{ justifySelf: "right" }}
@@ -108,21 +112,33 @@ type ColumnSelectionSpec = GuiSpec<"column"> | GuiSpec<"multicolumn">;
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSelectionSpec }) => {
+    // multiple...
     // proably want to change the type of ColumnSelectionProps anyway...
     // perhaps we should be looking at other places where it's used & make them use this,
     // with a different evolution of the API.
     // currently this is not showing the current_value, among other missing features...
+    /** this needs fixing... and we should be able to observe mobx state for column queries 
+     * which should persist when the dialog (entire react root) is closed.
+    */
+
     const setSelectedColumn = useCallback(action((v: string) => {
         props.current_value = v;
-        //@ts-expect-error //! this is genuinely not fully implemented yet, when it is, types should be right
+        //@ts-expect-error string is not assignable to FieldSpecs, type of v is wrong here
         props.func?.(v);
     }), []); //as of this writing, biome is right that props is not a dependency
-
-    const props2: ColumnSelectionProps = useMemo(() => ({
+    const filter = props.columnSelection?.filter;
+    // not only is the filter not working, but we need to decide how to express "multiple"
+    const props2 = useMemo(() => inferGenericColumnSelectionProps({
+        // fixing this stuff is high priority
+        //@ts-expect-error ColumnSelection setSelectedColumn type
         setSelectedColumn,
-        // type: props.type,
-        multiple: false,
-    }), [setSelectedColumn]);
+        //@ts-expect-error ColumnSelection `type` type
+        type: filter,
+        multiple: props.type === "multicolumn",
+        //@ts-expect-error ColumnSelection current_value type
+        current_value: props.current_value
+        // current_value: props.current_value... maybe want to be more mobx-y about this
+    }), [setSelectedColumn, props.type, filter, props.current_value]);
     return (
         <>
             <MLabel props={props} />
@@ -215,7 +231,7 @@ function useDropdownOptions(props: DropdownSpec) {
     //map from 'value' string to option object
     const okOption = (isArray(okValue)
         ? okValue.map((v) => options.find((o) => o.value === v))
-        : [options.find((o) => o.value === v)])
+        : [options.find((o) => o.value === v)]).filter(notEmpty);
     // : options.find((o) => o.value === v); //not-multiple...
 
     return {options, single, label, val, okOption};
@@ -426,8 +442,8 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
         <Button
             variant="contained"
             onClick={() => {
-                //is there a nicer way to write this / define GuiValueTypes?
-                if (props.func) props.func(undefined as never);
+                //@ts-expect-error button `func(v: never)` - passing `undefined as never` works, is there a nicer way to write this / define GuiValueTypes?
+                if (props.func) props.func();
             }}
         >
             {props.label}
@@ -527,7 +543,7 @@ export const AbstractComponent = observer(
     },
 );
 
-export default observer(<T,>({ chart }: { chart: BaseChart<T> }) => {
+export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
     const settings = useMemo(() => {
         // is the id just for a key in this component, or should the type passed to the component recognise it?
         // for now, I don't think there's a benefit to including it in the type.
