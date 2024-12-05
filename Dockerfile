@@ -33,7 +33,7 @@ RUN apt-get install -y iputils-ping || (cat /var/log/apt/term.log && exit 1)
 #RUN pip install gunicorn
 # Install Python dependencies using Poetry
 WORKDIR /app/python
-RUN poetry install --with dev,backend 
+RUN poetry install --with dev,backend,auth 
 
 # Expose the port that Flask will run on
 EXPOSE 5055 
