@@ -54,6 +54,8 @@ def test_bad_data():
         assert (
             len(p.datasources[3]["columns"][0]["values"]) == 3
         )  # expect ['0', '1', 'nan']
+        df_really_not_a_number = pd.DataFrame({"a": [1, 2, float("nan"), "ERROR"]})
+        bad_columns = p.add_datasource("really bad data", df_really_not_a_number, columns=[{"name": "a", "datatype": "double"}])
 
         # expect `ValueError('zero-size array to reduction operation minimum which has no identity')`
         p.add_datasource("bad data", df_bad)

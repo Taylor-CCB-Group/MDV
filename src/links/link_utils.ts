@@ -4,42 +4,45 @@ import type { ColumnName } from "../charts/charts";
 // zod?
 
 type ChartLink = {
-    type: "chart_columnval_link",
-    id: string,
-    source_chart: string,
-    column: ColumnName,
-    target_charts: string[],
-    set_color: boolean,
-    set_title: boolean,
-    set_tooltip: boolean,
-    set_legend: boolean,
+    type: "chart_columnval_link";
+    id: string;
+    source_chart: string;
+    column: ColumnName;
+    target_charts: string[];
+    set_color: boolean;
+    set_title: boolean;
+    set_tooltip: boolean;
+    set_legend: boolean;
     /** if true, the parm at given parm_index will be set...*/
-    set_param: boolean,
-    param_index?: number,
-}
+    set_param: boolean;
+    param_index?: number;
+};
 
 type LinkTarget = {
-    target_chart: string,
+    target_chart: string;
     //maybe we might want to allow for a different column in the source chart to be used to set the target chart's properties...
     //not for now though...
     // source_column: string,
-    set_color: boolean,
-    set_title: boolean,
-    set_tooltip: boolean,
-    set_legend: boolean,
-    set_param: boolean,
-    param_index?: number,
-}
+    set_color: boolean;
+    set_title: boolean;
+    set_tooltip: boolean;
+    set_legend: boolean;
+    set_param: boolean;
+    param_index?: number;
+};
 
 type HighlightColumnLink = {
-    type: "highlight_column_link",
-    id: string,
-    source_ds: string,
-    source_column: ColumnName,
-    targets: LinkTarget[],
-}
+    type: "highlight_column_link";
+    id: string;
+    source_ds: string;
+    source_column: ColumnName;
+    targets: LinkTarget[];
+};
 
-export function addHighlightColumnLink(link: HighlightColumnLink, cm: ChartManager) {
+export function addHighlightColumnLink(
+    link: HighlightColumnLink,
+    cm: ChartManager,
+) {
     /// this implementation filled in by copilot & not yet read / used...
     const ds = cm.getDataSource(link.source_ds);
     if (!ds) {
@@ -48,7 +51,9 @@ export function addHighlightColumnLink(link: HighlightColumnLink, cm: ChartManag
     }
     const srcCol = ds.columnIndex[link.source_column];
     if (!srcCol) {
-        console.error(`Column ${link.source_column} not found in DataStore ${link.source_ds}`);
+        console.error(
+            `Column ${link.source_column} not found in DataStore ${link.source_ds}`,
+        );
         return;
     }
 
@@ -62,20 +67,24 @@ export function addHighlightColumnLink(link: HighlightColumnLink, cm: ChartManag
             if (target.set_color) targetChart.colorByColumn(newValue);
             if (target.set_title) targetChart.setTitle(newValue);
             if (target.set_tooltip) {
-                if (targetChart.setToolTipColumn) targetChart.setToolTipColumn(newValue);
+                if (targetChart.setToolTipColumn)
+                    targetChart.setToolTipColumn(newValue);
                 else if (targetChart.config.tooltip) {
-                    runInAction(() => targetChart.config.tooltip.column = newValue);
+                    runInAction(
+                        () => (targetChart.config.tooltip.column = newValue),
+                    );
                 }
             }
             if (target.set_param) {
                 runInAction(() => {
+                    if (target.param_index === undefined) return;
                     targetChart.config.param[target.param_index] = newValue;
                 });
             }
         }
     }
 
-    ds.addListener(link.id, async (type, data) => {
+    ds.addListener(link.id, async (type: string, data: any) => {
         if (type === "data_highlighted") {
             const newValue = srcCol.values[srcCol.data[data.indexes[0]]];
             updateValue(newValue);
@@ -96,7 +105,9 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
     const ds = chart.dataSource.dataStore;
     const srcCol = ds.columnIndex[link.column];
     if (!srcCol) {
-        console.log(`"chart_columnval_link" link column "${link.column}" not found in dataStore "${ds.name}"`);
+        console.log(
+            `"chart_columnval_link" link column "${link.column}" not found in dataStore "${ds.name}"`,
+        );
         // return;
     }
 
@@ -109,13 +120,17 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
             if (link.set_title) target.setTitle(newValue);
             // if (link.set_legend) chart.setLegend(newValue); //todo
             if (link.set_tooltip) {
-                if (target.setToolTipColumn) target.setToolTipColumn(link.column);
+                if (target.setToolTipColumn)
+                    target.setToolTipColumn(link.column);
                 else if (target.config.tooltip) {
-                    runInAction(() => target.config.tooltip.column = newValue);
+                    runInAction(
+                        () => (target.config.tooltip.column = newValue),
+                    );
                 }
             }
             if (link.set_param) {
                 runInAction(() => {
+                    if (link.param_index === undefined) return;
                     target.config.param[link.param_index] = newValue;
                     //not sure what the most appropriate way to update non-react charts is... needs some work
                     if (target.config.type === "table_chart") {
@@ -133,8 +148,8 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
             }
         }
     }
-    
-    chart.chart.addListener(link.id, async (type, data) => {
+
+    chart.chart.addListener(link.id, async (type: string, data: any) => {
         if (type === "cell_clicked") {
             // this is specific to HeatMap cells...
             updateValue(data.row);

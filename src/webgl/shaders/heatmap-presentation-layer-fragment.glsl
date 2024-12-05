@@ -2,15 +2,15 @@
 #define SHADER_NAME triangle-layer-fragment-contour-shader
 
 precision highp float;
-
+out vec4 fragColor;
 uniform float opacity;
-uniform sampler2D weightTexture; //using name 'texture' caused indirect glsl compiler errors with version 300 es(?)
+uniform sampler2D weightsTexture; //using name 'texture' caused indirect glsl compiler errors with version 300 es(?)
 uniform sampler2D colorTexture;
 uniform float aggregationMode;
 
-varying vec2 vTexCoords;
-varying float vIntensityMin;
-varying float vIntensityMax;
+in vec2 vTexCoords;
+in float vIntensityMin;
+in float vIntensityMax;
 
 // todo more structured uniforms, array of structs...
 uniform float contourOpacity;
@@ -38,14 +38,14 @@ float smoothContour(float value) {
 
 vec4 getLinearColor(float value) {
   float factor = clamp(value * vIntensityMax, 0., 1.);
-  vec4 color = texture2D(colorTexture, vec2(factor, 0.5));
+  vec4 color = texture(colorTexture, vec2(factor, 0.5));
   color.a *= min(value * vIntensityMin, 1.0);
   return color;
 }
 
 
 void main(void) {
-  vec4 weights = texture2D(weightTexture, vTexCoords);
+  vec4 weights = texture(weightsTexture, vTexCoords);
   float weight = weights.r;
 
   if (aggregationMode > 0.5) {
@@ -58,12 +58,12 @@ void main(void) {
 
   vec4 linearColor = getLinearColor(weight);
   // todo allow for multiple contours, with different properties
-  float c = smoothContour(weight);
-  vec4 fullColor = texture2D(colorTexture, vec2(1.0, 0.5)); //should be a uniform
+  float c = smoothContour(weight) * contourOpacity;
+  vec4 fullColor = texture(colorTexture, vec2(1.0, 0.5)); //should be a uniform
   //fullColor = vec4(1.);
   linearColor = mix(linearColor, fullColor, c);
   //   linearColor = c * vec4(1.);
   linearColor.a *= opacity;
   linearColor.a = max(linearColor.a, c*2.);
-  gl_FragColor =linearColor;
+  fragColor = linearColor;
 }

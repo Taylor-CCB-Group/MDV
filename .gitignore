@@ -27,7 +27,6 @@ python/mdvtools/llm/timing_results.log
 python/mdvtools/tests/temp/*
 python/mdvtools/test_projects/cache/*
 python/mdvtools/static/*
-python/mdvtools/template/page.html
 .ipynb_checkpoints
 
 python/dist/
@@ -43,6 +42,8 @@ data/
 
 .idea
 xvenv/
+secrets/
+app_logs/
 
 LLM/cache
 LLM/key.json

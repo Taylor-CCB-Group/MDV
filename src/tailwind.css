@@ -100,3 +100,7 @@ ol {
 textarea {
     @apply p-1
 }
+
+blockquote {
+    @apply border-l-4 p-2
+}

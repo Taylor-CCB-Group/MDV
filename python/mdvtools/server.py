@@ -16,7 +16,10 @@ import re
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
 from mdvtools.mdvproject import MDVProject
-from mdvtools.project_router import ProjectBlueprint as Blueprint
+from mdvtools.project_router import (
+    ProjectBlueprint as Blueprint,
+    SingleProjectShim
+)
 import os
 import pandas as pd
 from typing import Optional, Callable, Any
@@ -83,6 +86,7 @@ def create_app(
     websocket=True, # todo - pass something back to client in `state.json` that indicates whether this is enabled.
     use_reloader=False,
     app: Optional[Flask] = None,
+    backend_db=False,
     chat_fn: Optional[Callable[[str], str]]=None,
     chat_welcome: Optional[str]=None,
 ):
@@ -93,7 +97,7 @@ def create_app(
         print(f"created Flask {app}")
         # add headers to allow web workers
         app.after_request(add_safe_headers)
-        project_bp = app
+        project_bp = SingleProjectShim(app)
         multi_project = False
         ### 'MEW' in Unity is using IWeb PostMessage, not WebSockets.
         ### but this will be used for local testing in short-term, and potentially other things later.
@@ -108,9 +112,21 @@ def create_app(
         # this is to allow multiple projects to be served from the same server.
         multi_project = True
         route = "/project/" + project.id + "/"
-        project_bp = Blueprint(project.id, __name__, url_prefix=route)
+        
+
+        if backend_db:
+            from mdvtools.project_router import ProjectBlueprint_v2 as Blueprint_v2
+            print("backend_db is True")
+            project_bp = Blueprint_v2(project.id, __name__, url_prefix=route)
+        else:
+            project_bp = Blueprint(project.id, __name__, url_prefix=route)
         if websocket:
-            print('todo: websocket for multi-project')
+            print("todo: websocket for multi-project")
+
+    # if route in routes:
+    #     raise Exception(
+    #         "Route already exists - can't have two projects with the same name"
+    #     )
     routes.add(route)
 
     if websocket:
@@ -149,8 +165,11 @@ def create_app(
     @project_bp.route("/")
     def project_index():
         print("recieved request to project_index")
-        # `_mdvInit('{{route}}')` in template...
-        return render_template("page.html", route=route)
+        # the backend page currently needs to be different to workaround a server config issue
+        # some requests were being downgraded to http, which caused problems with the backend
+        # but if we always add the header it messes up localhost development.
+        # todo if necessary, apply equivalent change to index.html / any other pages we might have
+        return render_template("page.html", route=route, backend=backend_db)
 
     @project_bp.route("/<file>.b")
     def get_binary_file(file):
@@ -181,7 +200,7 @@ def create_app(
                 state = json.load(f)
                 state["websocket"] = websocket
                 return state
-        return send_file(path)
+        return _send_file(path)
 
     # gets the raw byte data and packages it in the correct response
     @project_bp.route("/get_data", methods=["POST"])
@@ -269,7 +288,7 @@ def create_app(
             return _send_file(file_name)
         return get_range(file_name, range_header)
 
-    @project_bp.route("/save_state", methods=["POST"])
+    @project_bp.route("/save_state", access_level='editable', methods=["POST"])
     def save_data():
         success = True
         try:
@@ -279,12 +298,46 @@ def create_app(
             success = False
 
         return jsonify({"success": success})
+    
+    @project_bp.route("/add_or_update_image_datasource", access_level='editable', methods=["POST"])
+    def add_or_update_image_datasource():
+        try:
+            # Check if request has a file part
+            if 'file' not in request.files:
+                return "No file part in the request", 400
 
-    @project_bp.route("/add_datasource", methods=["POST"])
+            # Get the file from the request
+            file = request.files['file']
+            
+            # Get the text fields from the request form
+            datasource_name = request.form.get('datasourceName') # ""
+            tiff_metadata = request.form.get('tiffMetadata')
+            # Validate the presence of required fields
+            if not file or not tiff_metadata:
+                return "Missing file or tiffMetadata", 400
+            # If tiff_metadata is sent as JSON string, deserialize it
+            try:
+                tiff_metadata = json.loads(tiff_metadata)
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Invalid JSON format for tiffMetadata: {e}"}), 400
+            
+            # Call the method to add or update the image datasource
+            view_name = project.add_or_update_image_datasource(tiff_metadata, datasource_name, file)
+            
+            # If no exception is raised, the operation was successful. let the client know which view will show the image.
+            print(f">>> notify client that image datasource updated and file uploaded successfully, view: {view_name}")
+            return jsonify({"status": "success", "message": "Image datasource updated and file uploaded successfully", "view": view_name}), 200
+
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+
+    @project_bp.route("/add_datasource", access_level='editable', methods=["POST"])
     def add_datasource():
-        if "backend" in request.form:
-            response = add_datasource_backend(project)
-            return response
+        # we shouldn't be passing "backend" in request.form, the logic should only be on server
+        #if backend:
+        #    response = add_datasource_backend(project)
+        #    return response
 
         if (
             "permission" not in project.state
@@ -294,6 +347,9 @@ def create_app(
         success = True
         try:
             name = request.form["name"]
+
+            print("In server.py add_datasource")
+
             if not name:
                 return "Request must contain 'name'", 400
             # xxx - not how column metadata should be passed, todo fix
@@ -306,7 +362,8 @@ def create_app(
             # I'm not sure we really want to add to default view by default - could mess up existing views in a project with multiple datasources
             # but probably ok for now (famous last words)
             view = request.form["view"] if "view" in request.form else "default"
-            replace = True if "replace" in request.form else False
+            # replace = True if "replace" in request.form else False
+            replace = False
             if not replace and name in [ds["name"] for ds in project.datasources]:
                 return (
                     f"Datasource '{name}' already exists, and 'replace' was not set in request",
@@ -321,15 +378,18 @@ def create_app(
             file.seek(0)
             # will this work? can we return progress to the client?
             df = pd.read_csv(file.stream)
+            print("In server.py add_datasource- df created")
+            print("df is ready, calling project.add_datasource")
             project.add_datasource(
+                #project.id,
                 name,
                 df,
                 # cols,
                 add_to_view=view,
                 supplied_columns_only=supplied_only,
-                replace_data=replace,
-            )
-
+                replace_data=replace
+                )
+            print("added df - project.add_datasource completed")
         except Exception as e:
             # success = False
             return str(e), 400
@@ -340,10 +400,10 @@ def create_app(
     if open_browser:
         webbrowser.open(f"http://localhost:{port}/{route}")
 
-    if multi_project:
-        if not isinstance(project_bp, Blueprint):
+    if not multi_project:
+        if not isinstance(app, Flask):
             raise Exception(
-                "assert: project_bp must be a Flask instance when multi_project is True"
+                "assert: serving single project should have made a Flask app instance by now"
             )
         if route in app.blueprints:
             print(f"there is already a blueprint at {route}")
@@ -355,119 +415,3 @@ def create_app(
         app.run(host="0.0.0.0", port=port, debug=True, use_reloader=use_reloader)
 
 
-def add_datasource_backend(project):
-    from mdvtools.dbutils.dbmodels import db, Project, File
-    from sqlalchemy.exc import SQLAlchemyError
-
-    try:
-        if (
-            "permission" not in project.state
-            or not project.state["permission"] == "edit"
-        ):
-            return jsonify({"error": "Project is read-only"}), 400
-
-        name = request.form["name"]
-        if not name:
-            return jsonify({"error": "Request must contain 'name'"}), 400
-
-        # Check if project exists
-        project_db = Project.query.filter_by(name=name).first()
-        if not project_db:
-            return jsonify({"project does not exist in database"}), 400
-
-        view = request.form["view"] if "view" in request.form else None
-        replace = True if "replace" in request.form else False
-        if not replace and name in [ds["name"] for ds in project.datasources]:
-            return (
-                f"Datasource '{name}' already exists, and 'replace' was not set in request",
-                400,
-            )
-        if "file" not in request.files:
-            return "No 'file' provided in request form data", 400
-        file = request.files["file"]
-        supplied_only = True if "supplied_only" in request.form else False
-
-        # Validate the file
-        is_valid, error_message = validate_file(file)
-        if not is_valid:
-            return jsonify({"error": error_message}), 400
-
-        # Read file and add the datasource
-        file.seek(0)
-        # will this work? can we return progress to the client?
-        df = pd.read_csv(file.stream)
-        project.add_datasource(
-            name,
-            df,
-            # cols,
-            add_to_view=view,
-            supplied_columns_only=supplied_only,
-            replace_data=replace,
-        )
-
-        # database operations
-        file_set = [project.h5file, project.datasourcesfile]
-        if view:
-            file_set.append(project.viewsfile)
-
-        for file in file_set:
-            existing_file = File.query.filter_by(
-                name=os.path.basename(file), project_id=project_db.id
-            ).first()
-
-            if existing_file:
-                # Update the database entry with new file path and update timestamp
-                existing_file.update_timestamp = datetime.now()
-
-            else:
-                # Create a new file entry
-                new_file = File()
-                new_file.name = os.path.basename(
-                    file
-                )  # Assign value to the name attribute
-                new_file.file_path = None  # Assign value to the file_path attribute
-                new_file.project_id = project_db.id
-                db.session.add(new_file)
-
-        db.session.commit()
-        return jsonify(
-            {
-                "message": f'File Validation Status: Success. Successfully added csv as a new datasource and files {file_set} have been modified under project "{name}"'
-            }
-        ), 200
-
-    except SQLAlchemyError:
-        # Rollback transaction on database error
-        db.session.rollback()
-        return jsonify({"error": "Database error occurred"}), 500
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-
-def validate_file(file):
-    try:
-        if not file:
-            return False, "File is missing"
-
-        """Validate the CSV file."""
-        file_dir = os.path.dirname(os.path.abspath(__file__))
-        dbutils_dir = os.path.join(file_dir, "dbutils")
-        validation_rules_path = os.path.join(dbutils_dir, "validation_rules.json")
-
-        with open(validation_rules_path, "r") as f:
-            validation_rules = json.load(f)
-
-        # Check file type
-        if file.mimetype not in validation_rules["file_type"]["allowed_types"]:
-            return False, validation_rules["file_type"]["error_message"]
-
-        # Check file size
-        max_size = validation_rules["file_size"]["max_size"]
-        if file.content_length > max_size:
-            return False, validation_rules["file_size"]["error_message"]
-
-        return True, None
-
-    except Exception as e:
-        return False, f"An error occurred during file validation: {str(e)}"

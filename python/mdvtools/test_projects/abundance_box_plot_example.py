@@ -31,20 +31,17 @@ def main():
     """Main function to create the project and serve it."""
     # Constants
     project_path = os.path.expanduser('~/mdv/project')
+    data_path = "path_to_data"
     view_name = "default"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
     
     # Load data
-    data_path = '/Users/mariak/Documents/MDVmk/MDV/python/mdvtools/data/data_genes.csv'
     data_frame = load_data(data_path)
-
-    # Set the name of the dataframe
-    data_frame.name = 'Data source 1'
     
     # Add datasource
-    project.add_datasource('Data source 1', data_frame)
+    project.add_datasource(data_path, data_frame)
     
     # AbundanceBoxPlot parameters
     title = "PBMC3k gene expression"
@@ -64,7 +61,7 @@ def main():
     
     # Convert plot to JSON and set view
     abundance_chart_json = convert_plot_to_json(abundance_box_plot)
-    abundance_view = {'initialCharts': {'Data source 1': [abundance_chart_json]}}
+    abundance_view = {'initialCharts': {data_path: [abundance_chart_json]}}
     
     project.set_view(view_name, abundance_view)
     project.set_editable(True)
