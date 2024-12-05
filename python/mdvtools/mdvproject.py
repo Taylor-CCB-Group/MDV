@@ -17,7 +17,7 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 from shutil import copytree, ignore_patterns, copyfile
 from typing import Optional, NewType, List, Union, Any
-from mdvtools.charts.view import View
+# from mdvtools.charts.view import View 
 from mdvtools.llm.chatlog import log_chat
 import time
 import copy
@@ -1317,7 +1317,7 @@ class MDVProject:
         views = self.views
         return views.get(view)
 
-    def set_view(self, name: str, view: Optional[View | Any], make_default=False):
+    def set_view(self, name: str, view: Optional[Any], make_default=False):
         """Sets the view with the given name to the supplied view data.
         If the view is None, then the view will be deleted.
         """
