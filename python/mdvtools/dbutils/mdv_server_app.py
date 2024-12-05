@@ -80,6 +80,40 @@ def create_flask_app(config_name=None):
     # Register OAuth with the app
     oauth.init_app(app)
     # Register routes for authentication (login, callback, etc.)
+
+    # Authentication check function
+    def is_authenticated() -> bool:
+        """Check if the user is authenticated."""
+        return 'token' in session and session['token']  # Validate presence of token in session
+
+    # Whitelist of routes that do not require authentication
+    whitelist_routes = [
+        '/login_dev',
+        '/login',
+        '/callback',
+        '/favicon.ico',        # Allow access to favicon
+        '/flask/js/',  # Allow access to login JS
+        '/static',
+        '/flask/assets'
+    ]
+
+    @app.before_request
+    def enforce_authentication():
+        """Redirect unauthenticated users to /login_dev for non-whitelisted routes."""
+        
+        requested_path = request.path
+        
+        # If the requested path is in the whitelist, allow access without authentication
+        if any(requested_path.startswith(whitelisted) for whitelisted in whitelist_routes):
+            return None  # No need to check authentication
+        
+        # Redirect unauthenticated users to /login_dev
+        if not is_authenticated():
+            print(f"Unauthorized access attempt to {requested_path}. Redirecting to /login_dev.")
+            return redirect(url_for('login_dev'))  # Redirect to login page
+        
+        return None
+
     try:
         print(" Registering authentication routes")
         register_auth0_routes(app)  # Register Auth0-related routes like /login and /callback
