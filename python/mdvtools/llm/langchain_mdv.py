@@ -24,6 +24,7 @@ from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import prepare_code
 from .code_execution import execute_code
 
+import matplotlib
 
 # create logger
 logger = logging.getLogger('timing_results')
@@ -49,7 +50,6 @@ def time_block(name):
 # sometimes this tries to draw with matplotlib... which causes an error that we can't catch
 # we don't control the code that's being run by the agent...
 # but we can call `matplotlib.use('Agg')` before calling the agent (and any other code that might try to draw)
-import matplotlib
 matplotlib.use('Agg') # this should prevent it making any windows etc
 
 print('# setting keys and variables')
@@ -189,7 +189,9 @@ class ProjectChat():
             with time_block("b13: Chat logging by MDV"):
                 self.project.log_chat_item(output, prompt_RAG, final_code)
             with time_block("b14: Execute code"):
-                execute_code(final_code, open_code=False, log=self.log)
+                ok = execute_code(final_code, open_code=False, log=self.log)
+            if not ok:
+                return f"# ===Error: code execution failed===\n```python{final_code}```"
                 self.log(final_code)
                 return f"I ran some code for you:\n\n```python\n{final_code}```"
         except Exception as e:
@@ -256,7 +258,9 @@ def project_wizard(user_question: Optional[str], project_name: str = 'project', 
     final_code = prepare_code(result, df, log)
     log(final_code)
     # passing `log` around is a chore, would be nice to know if there's a better way
-    execute_code(final_code, log=log)
+    ok = execute_code(final_code, log=log)
+    if not ok:
+        return "Error: code execution failed"
 
 
 if __name__ == "__main__":
