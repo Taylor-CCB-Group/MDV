@@ -192,6 +192,7 @@ class ProjectChat():
                 ok = execute_code(final_code, open_code=False, log=self.log)
             if not ok:
                 return f"# ===Error: code execution failed===\n```python{final_code}```"
+            else:
                 self.log(final_code)
                 return f"I ran some code for you:\n\n```python\n{final_code}```"
         except Exception as e:
