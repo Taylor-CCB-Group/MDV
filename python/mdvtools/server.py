@@ -400,7 +400,7 @@ def create_app(
     if open_browser:
         webbrowser.open(f"http://localhost:{port}/{route}")
 
-    if not multi_project:
+    if multi_project:
         if not isinstance(app, Flask):
             raise Exception(
                 "assert: serving single project should have made a Flask app instance by now"
