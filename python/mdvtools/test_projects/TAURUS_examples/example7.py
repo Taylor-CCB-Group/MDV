@@ -77,6 +77,10 @@ def main():
     
     # Add datasource
     project.add_datasource('cells', cells_df)
+
+    # Update datasource with the new columns provided through the scanpy object
+    project.set_column('cells', "UMAP 1", cells_df["UMAP 1"])
+    project.set_column('cells', "UMAP 2", cells_df["UMAP 2"])
     
     # StackedRowChart parameters
     stacked_title = "Abundance of Cell States per Patient"

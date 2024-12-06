@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 mypath = os.path.dirname(__file__)
-json_keyfile_path = os.path.join(mypath, "../../../chat_log.json")
+json_keyfile_path = os.path.join(mypath, "../../../chatlog.json")
 
 # Function to ensure the JSON log file exists
 def initialize_json_log():

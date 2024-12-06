@@ -58,6 +58,7 @@ load_dotenv()
 # OPENAI_API_KEY environment variable will be used internally by OpenAI modules
 
 mypath = os.path.dirname(__file__)
+path_to_data = os.path.join(mypath, "sample_data/bcell_viz_ready_revised.h5ad")
 
 print('# Crawl the local repository to get a list of relevant file paths')
 with time_block("b1: Local repo crawling"):
@@ -164,7 +165,7 @@ class ProjectChat():
                 assert('output' in response)
             #!!! csv_path is not wanted - the code tries to use that as data source name which is all wrong
             with time_block("b10: RAG prompt preparation"):
-                prompt_RAG = get_createproject_prompt_RAG(self.project.id, self.ds_name, response['output'])
+                prompt_RAG = get_createproject_prompt_RAG(self.project.id, path_to_data, response['output']) #self.ds_name, response['output'])
                 prompt_RAG_template = PromptTemplate(
                     template=prompt_RAG,
                     input_variables=["context", "question"]
