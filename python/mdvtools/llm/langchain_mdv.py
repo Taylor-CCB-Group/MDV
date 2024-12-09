@@ -58,6 +58,7 @@ load_dotenv()
 # OPENAI_API_KEY environment variable will be used internally by OpenAI modules
 
 mypath = os.path.dirname(__file__)
+path_to_data = os.path.join(mypath, "sample_data/bcell_viz_ready_revised.h5ad")
 
 print('# Crawl the local repository to get a list of relevant file paths')
 with time_block("b1: Local repo crawling"):
@@ -164,7 +165,7 @@ class ProjectChat():
                 assert('output' in response)
             #!!! csv_path is not wanted - the code tries to use that as data source name which is all wrong
             with time_block("b10: RAG prompt preparation"):
-                prompt_RAG = get_createproject_prompt_RAG(self.project.id, self.ds_name, response['output'])
+                prompt_RAG = get_createproject_prompt_RAG(self.project.id, path_to_data, response['output']) #self.ds_name, response['output'])
                 prompt_RAG_template = PromptTemplate(
                     template=prompt_RAG,
                     input_variables=["context", "question"]
@@ -198,71 +199,3 @@ class ProjectChat():
         except Exception as e:
             return f"Error: {str(e)[:100]}"
 
-
-def project_wizard(user_question: Optional[str], project_name: str = 'project', log: Callable[[str], None] = print):
-
-    print('# Initialize an instance of the ChatOpenAI class with specified parameters')
-    # Set the temperature to 0.1 for more deterministic responses
-    # Specify the model to use as "gpt-4o"
-
-    code_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
-    dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
-
-    #user_question = "Create a heatmap plot of the localisation status vs the UTR length"
-    if user_question is None:
-        user_question = input("What would you like to ask the LLM?")
-
-    path_to_data = os.path.join(mypath, "sample_data/data_cells.csv")
-    df = pd.read_csv(path_to_data)
-    df_short = df#.dropna().iloc[:2,1:]
-
-    # could we get this to log with the log function?
-    agent = lp.create_pandas_dataframe_agent(
-        dataframe_llm, df_short, verbose=True, handle_parse_errors=True, allow_dangerous_code=True
-    )
-
-    full_prompt = prompt_data + "\nQuestion: " + user_question
-
-    log('# the agent might raise an error. Sometimes repeating the same prompt helps...')
-    response = agent.invoke(full_prompt) # agent.run is deprecated
-    assert('output' in response)
-    final_answer = response['output']
-
-    prompt_RAG = get_createproject_prompt_RAG(project_name, path_to_data, final_answer)
-
-    #The plot you should create is the same as the plot created in the context. Specify the parameters according to the respective files in the context for each plot type. DO NOT add any parameters that have not been defined previously.
-
-    log('# Create a PromptTemplate object using the defined RAG prompt')
-    prompt_RAG_template = PromptTemplate(
-        template=prompt_RAG,          # Specify the template string
-        input_variables=["context", "question"]  # Define the input variables for the template
-    )
-
-    # Initialize a RetrievalQA chain using the specified language model, prompt template, and retriever
-    qa_chain = RetrievalQA.from_llm(
-        llm=code_llm,                 # Specify the language model to use
-        prompt=prompt_RAG_template,   # Use the defined prompt template
-        retriever=retriever,          # Use the initialized retriever for context retrieval
-        return_source_documents=True  # Configure the chain to return source documents
-    )
-
-    # Define the context for the question (this should be retrieved by the retriever, but showing as an example)
-    context = retriever
-
-    log('# Invoke the QA chain with the query and context')
-    output = qa_chain.invoke({"context": context, "query": user_question})
-    result = output["result"]
-
-    # extract and process the code from the response
-    # nb - what was path_to_data is currently only used within reorder_parameters here.
-    # the actual string is not used in the generated code, so we can pass df instead
-    final_code = prepare_code(result, df, log)
-    log(final_code)
-    # passing `log` around is a chore, would be nice to know if there's a better way
-    ok = execute_code(final_code, log=log)
-    if not ok:
-        return "Error: code execution failed"
-
-
-if __name__ == "__main__":
-    project_wizard(None)

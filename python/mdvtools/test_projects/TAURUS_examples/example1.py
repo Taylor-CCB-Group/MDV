@@ -10,7 +10,6 @@ import os
 import pandas as pd
 import scanpy as sc
 import json 
-import sys
 
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.histogram_plot import HistogramPlot
