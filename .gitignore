@@ -49,3 +49,4 @@ LLM/cache
 LLM/key.json
 
 timing_results.log
+docker-local-chat.yml
