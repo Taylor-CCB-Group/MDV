@@ -107,7 +107,8 @@ When the above script is run and the page is loaded you will see something like 
 
 ![image](https://github.com/user-attachments/assets/db22272e-37f4-497b-a914-ee415508ca45)
 
-You can now add Charts (scatterplots, rowcharts etc) and Views (contains the charts) to allow visualisation and querying of the data.
+You can now add Charts (scatterplots, rowcharts etc) and Views (contains the charts) to allow visualisation and querying of the data. A further tutorial on creating simple charts and tables is shown in [this tutorial](docs/tutorials/scanpy_python_tutorial_1.md).
+
 
 ### Displaying a subset of the data from the original MDV publication (Single cell spatial analysis reveals inflammatory foci of immature neutrophil and CD8 T cells in COVID-19 lungs)
 
