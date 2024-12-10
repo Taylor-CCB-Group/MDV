@@ -1,7 +1,10 @@
 
 # **Simple Guide to Creating Views in MDV**
 
-This step-by-step guide will walk you through creating an MDV (Multi-Dimensional Visualization) project, adding a table view, and then a scatterplot view.
+This step-by-step guide will walk you through creating an MDV (Multi-Dimensional Viewer) project, adding a table view, and then a scatterplot view. This tutorial will take you through the various steps and the full code is shown at the end. It is also available to run from the GitHub repo:
+```
+python python/mdvtools/test_projects/scanpy_pbmc3k_tutorial.py
+```
 
 ---
 
@@ -51,12 +54,12 @@ p.set_editable(True)
 
 ## **Step 2: Adding a Table View**
 
-Now that the project is set up, lets add a table view to display metadata about the cells.
+Now that the project is set up, let's add a table view to display metadata about the cells.
 
 ### **Code**:
 
 ```python
-# Add visualizations
+# Add table
 def setup_views():
     global p
     # Get the cells dataframe
@@ -96,13 +99,13 @@ def setup_views():
 
 ## **Step 3: Adding a Scatterplot View**
 
-In addition to the table, add a scatterplot view for visualizing UMAP data.
+In addition to the table, add a scatterplot view for visualising UMAP data.
 
 ### **Code**:
 
 ```python
     umap_plot = ScatterPlot(
-        title="UMAP 2D Visualization",
+        title="UMAP 2D Visualisation",
         params=["X_umap_1", "X_umap_2"],
         size=[400, 400],
         position=[10, 10],
@@ -174,7 +177,7 @@ else:
 
 p.set_editable(True)
 
-# Add visualizations
+# Add visualisations
 def setup_views():
     global p
     # Get the cells dataframe
@@ -190,7 +193,7 @@ def setup_views():
 
     # Add a scatterplot for UMAP visualization
     umap_plot = ScatterPlot(
-        title="UMAP 2D Visualization",
+        title="UMAP 2D Visualisation",
         params=["X_umap_1", "X_umap_2"],
         size=[400, 400],
         position=[10, 10],
@@ -219,9 +222,9 @@ p.serve(port=5052)
 
 ## **Conclusion**
 
-Congratulations! You have successfully created an MDV project with a table and scatterplot view. Open your browser at `http://localhost:5052` to interact with your visualizations.
+Congratulations! You have successfully created an MDV project with a table and scatterplot view. Open your browser at `http://localhost:5052` to interact with your visualisations.
 
 ### **Next Steps**
-- Experiment with adding more visualizations (e.g., histograms, 3D scatterplots).
+- Experiment with adding more visualisations (e.g., histograms, 3D scatterplots).
 - Link additional datasources for enhanced interactivity.
-- Customize the configuration to suit your analysis needs.
+- Customise the configuration to suit your analysis needs.
