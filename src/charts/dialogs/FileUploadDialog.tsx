@@ -30,6 +30,8 @@ import { DatasourceDropdown } from "./DatasourceDropdown";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { Dialog, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
+import processH5File from "./utils/h5Processing";
+import H5MetadataPreview from "./H5MetadataPreview";
 
 // Use dynamic import for the worker
 const DatasourceWorker = new Worker(new URL("./datasourceWorker.ts", import.meta.url), {
@@ -235,7 +237,8 @@ const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
 
 type UploadActionType = "SET_SELECTED_FILES" | "SET_IS_UPLOADING" 
 | "SET_IS_INSERTING" | "SET_SUCCESS" | "SET_ERROR" | "SET_IS_VALIDATING" 
-| "SET_VALIDATION_RESULT" | "SET_FILE_TYPE" | "SET_TIFF_METADATA" | "SET_FILE_SUMMARY";
+| "SET_VALIDATION_RESULT" | "SET_FILE_TYPE" | "SET_TIFF_METADATA"
+| "SET_H5_METADATA" | "SET_FILE_SUMMARY";
 // Reducer function
 const DEFAULT_REDUCER_STATE = {
     selectedFiles: [] as File[],
@@ -245,8 +248,9 @@ const DEFAULT_REDUCER_STATE = {
     validationResult: null as unknown,
     success: false,
     error: null as unknown,
-    fileType: null as "csv" | "tiff" | "tsv" | null,
+    fileType: null as "csv" | "tiff" | "tsv" | "h5" | null,
     tiffMetadata: null as unknown,
+    h5Metadata: null as H5Metadata | unknown,
 } as const;
 type ReducerState = typeof DEFAULT_REDUCER_STATE;
 // TODO - would be good to type this, this is not how I should be spending my weekend.
@@ -282,6 +286,8 @@ const reducer = <T extends UploadActionType,>(state: ReducerState, action: { typ
             return { ...state, fileType: action.payload };
         case "SET_TIFF_METADATA":
             return { ...state, tiffMetadata: action.payload };
+        case "SET_H5_METADATA":
+            return { ...state, h5Metadata: action.payload };
         default:
             return state;
     }
@@ -347,8 +353,26 @@ const FILE_TYPES: Record<string, FileTypeConfig> = {
             requiresMetadata: true,
             endpoint: 'add_or_update_image_datasource'
         }
+    },
+    H5: {
+        type: 'h5',
+        extensions: ['.h5', '.h5ad'],
+        mimeTypes: ['application/x-hdf5', 'application/x-hdf'],
+        maxSize: 10000 * 1024 * 1024,
+        processingConfig: {
+            defaultWidth: 1000,
+            defaultHeight: 800,
+            requiresMetadata: true,
+            endpoint: 'add_anndata'
+        }
     }
 };
+
+interface H5Metadata {
+    uns: Record<string, any>;
+    obs: Record<string, any>;
+    var: Record<string, any>;
+}
 
 // Helper functions for file type checking
 const getFileTypeFromExtension = (fileName: string): FileTypeConfig | null => {
@@ -445,7 +469,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
     const onDrop = useCallback(
-        (acceptedFiles: File[]) => {
+        async (acceptedFiles: File[]) => {
             if (acceptedFiles.length > 0) {
                 const file = acceptedFiles[0];
                 const fileConfig = getFileTypeFromExtension(file.name);
@@ -558,7 +582,33 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         });
                         break;
                     }
-    
+                    case 'h5': {
+                        try {
+                            const h5Metadata = await processH5File(file);
+                            dispatch({ type: "SET_H5_METADATA", payload: h5Metadata });
+                            
+                            const newDatasourceName = file.name;
+                            setDatasourceName(newDatasourceName);
+                            
+                            onResize(fileConfig.processingConfig.defaultWidth, fileConfig.processingConfig.defaultHeight);
+                            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+                            dispatch({
+                                type: "SET_VALIDATION_RESULT",
+                                payload: { metadata: h5Metadata }
+                            });
+                        } catch (error) {
+                            console.error('H5 processing error:', error);
+                            dispatch({
+                                type: "SET_ERROR",
+                                payload: {
+                                    message: "Error processing H5 file",
+                                    traceback: error instanceof Error ? error.message : String(error),
+                                },
+                            });
+                            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+                        }
+                        break;
+                    }
                     default:
                         console.warn('Unhandled file type:', fileConfig.type);
                         return;
@@ -789,14 +839,16 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         }
                     }
                     break;
-            }
+                case 'h5':
+                    // Payload content depends on backend implementation
+                    break;
+        }
 
             const response = await axios.post(
                 `${root}/${fileConfig.processingConfig.endpoint}`,
                 formData,
                 config
             );
-
             if (response.status === 200) {
                 dispatch({ type: "SET_IS_UPLOADING", payload: false });
                 dispatch({ type: "SET_SUCCESS", payload: true });
@@ -1032,6 +1084,36 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </>
+                    )}
+
+                    {state.fileType === "h5" && state.h5Metadata && (
+                        <>
+                            <FileSummary>
+                                <FileSummaryHeading>H5 File Summary</FileSummaryHeading>
+                                <FileSummaryText>
+                                    <strong>File name:</strong> {state.selectedFiles[0].name}
+                                </FileSummaryText>
+                                <FileSummaryText>
+                                    <strong>File size:</strong> {(state.selectedFiles[0].size / (1024 * 1024)).toFixed(2)} MB
+                                </FileSummaryText>
+                            </FileSummary>
+                            
+                            <H5MetadataPreview metadata={state.h5Metadata} />
+
+                            <div className="flex justify-center items-center gap-6 mt-4">
+                                <Button marginTop="mt-1" onClick={handleUploadClick}>
+                                    Upload
+                                </Button>
+                                <Button
+                                    color="red"
+                                    size="px-6 py-2.5"
+                                    marginTop="mt-1"
+                                    onClick={handleClose}
+                                >
+                                    Cancel
+                                </Button>
                             </div>
                         </>
                     )}
