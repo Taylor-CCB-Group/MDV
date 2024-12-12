@@ -1,0 +1,14 @@
+{
+    "name": "MDV Dev Container",
+    "dockerComposeFile": "../docker-secrets.yml",
+    "service": "mdv_app",
+    "workspaceFolder": "/app",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    }
+}
