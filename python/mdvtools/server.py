@@ -256,6 +256,24 @@ def create_app(
 
         return jsonify({"success": success})
     
+    @project_bp.route("/add_anndata", access_level='editable', methods=["POST"])
+    def add_anndata():
+        from mdvtools.conversions import convert_scanpy_to_mdv
+        try:
+            # Check if request has a file part
+            if 'file' not in request.files:
+                return "No file part in the request", 400
+            file = request.files['file']
+            import scanpy as sc
+            # "argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileStorage'"
+            file_name = project.dir + "/anndata.h5ad"
+            file.save(file_name)
+            anndata = sc.read(file_name)
+            convert_scanpy_to_mdv(project.dir, anndata)
+            return "Anndata added successfully", 200
+        except Exception as e:
+            return str(e), 500
+
     @project_bp.route("/add_or_update_image_datasource", access_level='editable', methods=["POST"])
     def add_or_update_image_datasource():
         try:
