@@ -582,7 +582,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         });
                         break;
                     }
-
                     case 'h5': {
                         try {
                             const h5Metadata = await processH5File(file);
@@ -610,7 +609,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         }
                         break;
                     }
-    
                     default:
                         console.warn('Unhandled file type:', fileConfig.type);
                         return;
@@ -851,7 +849,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 formData,
                 config
             );
-
             if (response.status === 200) {
                 dispatch({ type: "SET_IS_UPLOADING", payload: false });
                 dispatch({ type: "SET_SUCCESS", payload: true });
