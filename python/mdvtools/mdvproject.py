@@ -356,7 +356,7 @@ class MDVProject:
             raise
     
     def delete_uploaded_image(self, file_path):
-        """Delete the uploaded image file at the specified path."""
+        """Delete the uploaded image file at the specified path. """
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
