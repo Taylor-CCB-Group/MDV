@@ -379,7 +379,7 @@ class MDVProject:
             if existing_datasource:
                 # Overwrite the existing datasource with the backup values
                 existing_datasource.update(datasource_backup)  
-                print(f"Restored datasource '{datasource_backup['name']}' from backup.")
+                print(f"Restored datasource '{datasource_backup['name']}' from backup. ")
 
                 # Save the updated datasources to the JSON file
                 self.datasources = self.datasources  # This will call the setter and save the data
