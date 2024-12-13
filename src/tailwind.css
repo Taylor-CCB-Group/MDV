@@ -104,3 +104,6 @@ textarea {
 blockquote {
     @apply border-l-4 p-2
 }
+.selectable * {
+  user-select: text;
+}

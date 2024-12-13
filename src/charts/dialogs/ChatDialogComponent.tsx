@@ -16,8 +16,8 @@ const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => 
         text = JSON.parse(text);
     } catch (e) {
     }
-    return (
-        <div>
+    return (//setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
+        <div className='selectable'>
             {isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />}
             <div className={`mb-2 p-4 rounded-lg ${
                 isUser ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'
@@ -120,8 +120,9 @@ const MessageMarkdown = ({ text }: { text: string }) => {
                         <>
                         <SquareTerminal onClick={() => alert(children)} /> {match[1]}:
                         <SyntaxHighlighter
-                            className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto"
+                            className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto max-h-96"
                             children={String(children).replace(/\n$/, '')}
+                            //@ts-ignore - not sure what's wrong here - maybe @types/react-syntax-highlighter needs updating?
                             style={dracula}
                             language={match[1]}
                             PreTag="div"
