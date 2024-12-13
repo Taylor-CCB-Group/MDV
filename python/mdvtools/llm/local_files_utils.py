@@ -31,7 +31,7 @@ def crawl_local_repo(
     for root, dirs, file_names in os.walk(os.path.abspath(directory_path)):
         # Skip hidden directories (those starting with '.')
         dirs[:] = [d for d in dirs if not d.startswith('.')]
-        
+
         for file_name in file_names:
             # Check if the file meets the criteria for inclusion
             if file_name not in ignore_list and (file_name.endswith('.py') or file_name.endswith('.ipynb')):
@@ -61,7 +61,7 @@ def extract_python_code_from_ipynb(local_file_path, cell_type="code"):
     notebook = nbformat.reads(notebook_content, as_version=nbformat.NO_CONVERT)
 
     # Initialize a variable to store the extracted Python code
-    python_code = None
+    python_code: str = ""
 
     # Iterate over the cells in the notebook
     for cell in notebook.cells:
