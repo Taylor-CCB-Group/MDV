@@ -18,7 +18,7 @@ services:
       - DB_USER=my_db_user
       - DB_PASSWORD=my_db_password
       - DB_NAME=my_db_name
-      - DB_HOST=mdv_db  # Assuming the db service name is mdv_db, change if necessary
+      - DB_HOST=mdv_db  # Assuming the db service name is mdv_db, change if necessary 
     depends_on:
       - mdv_db
 
