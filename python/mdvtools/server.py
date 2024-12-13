@@ -24,6 +24,7 @@ import os
 import pandas as pd
 from typing import Optional
 from datetime import datetime
+from mdvtools.conversions import convert_scanpy_to_mdv
 
 routes = set()
 
@@ -366,3 +367,13 @@ def create_app(
         app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
 
 
+    @project_bp.route("/add_anndata", access_level='editable', methods=["POST"])
+    def add_anndata():
+        # Check if request has a file part
+        if 'file' not in request.files:
+            return "No file part in the request", 400
+
+        # Get the file from the request
+        file = request.files['file']
+        
+        p = convert_scanpy_to_mdv(project.dir, file)
