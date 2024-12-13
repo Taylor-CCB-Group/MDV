@@ -10,7 +10,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
 
-import axios, { type AxiosProgressEvent } from "axios";
+import axios, { type AxiosError, type AxiosProgressEvent } from "axios";
 import { useProject } from "../../modules/ProjectContext";
 import { ColumnPreview } from "./ColumnPreview";
 
@@ -865,22 +865,17 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         }
     };
 
-    const handleUploadError = useCallback((error: any) => {
-        const errorPayload = {
-            message: `Upload failed with status: ${error.response?.status || "unknown"}`,
+    const handleUploadError = useCallback((error: AxiosError | unknown) => {
+        const errorPayload = axios.isAxiosError(error) ? {
+            message: error.response?.data || "An error occurred while processing the upload.",
             status: error.response?.status || 500,
             traceback: error.message,
+        } : {
+            // message: `Upload failed with status: ${error.response?.status || "unknown"}`,
+            message: "An error occurred while processing the upload.",
+            status: 500, //not strictly true, but matches previous behavior
+            traceback: (error as Error).message,
         };
-
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 400) {
-                errorPayload.message = "Bad Request: The server could not process the uploaded file.";
-                errorPayload.status = 400;
-            } else if (error.response?.status === 500) {
-                errorPayload.message = "Server Error: An error occurred while processing the upload.";
-                errorPayload.status = 500;
-            }
-        }
 
         dispatch({
             type: "SET_ERROR",

@@ -50,3 +50,8 @@ LLM/key.json
 
 timing_results.log
 docker-local-chat.yml
+
+
+# as seen inside devcontainer
+mdv/
+logs/
