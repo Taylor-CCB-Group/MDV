@@ -1,4 +1,4 @@
-import { Close as CloseIcon, Edit as EditIcon } from "@mui/icons-material";
+import { Close as CloseIcon } from "@mui/icons-material";
 import {
     Box,
     Button,
@@ -10,7 +10,7 @@ import {
     TextField,
 } from "@mui/material";
 import type React from "react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 interface ProjectRenameModalProps {
     id: string;
@@ -28,18 +28,12 @@ const ProjectRenameModal: React.FC<ProjectRenameModalProps> = ({
     onClose,
 }) => {
     const [newName, setNewName] = useState(name);
-    const [isEditingName, setIsEditingName] = useState(false);
-
-    const handleSave = () => {
+    const handleSave = useCallback(() => {
         if (newName !== name) {
             onRename(id, newName);
         }
         onClose();
-    };
-
-    const toggleEditName = () => {
-        setIsEditingName((prev) => !prev);
-    };
+    }, [id, name, newName, onRename, onClose]);
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -67,13 +61,11 @@ const ProjectRenameModal: React.FC<ProjectRenameModalProps> = ({
                         fullWidth
                         variant="outlined"
                         margin="normal"
-                        InputProps={{
-                            readOnly: !isEditingName,
-                            endAdornment: (
-                                <IconButton onClick={toggleEditName} edge="end">
-                                    <EditIcon />
-                                </IconButton>
-                            ),
+                        autoFocus
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                handleSave();
+                            }
                         }}
                     />
                 </Box>
