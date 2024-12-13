@@ -327,7 +327,7 @@ class MDVProject:
             try:
                 # Rollback the file upload
                 if os.path.exists(upload_file_path):  # Check the existence of the file at the upload path
-                    print("Reverting file upload....")
+                    print("Reverting file upload...")
                     self.delete_uploaded_image(upload_file_path) 
                 
                 # Rollback datasource creation if it was new
