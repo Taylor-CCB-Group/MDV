@@ -19,6 +19,8 @@ WORKDIR /app
 COPY python/pyproject.toml ./python/
 COPY python/poetry.lock ./python/
 WORKDIR /app/python
+# trouble with this is that it doesn't have the mdvtools code yet...
+# still worth installing heavy dependencies here
 RUN poetry install --with dev,backend 
 
 WORKDIR /app
@@ -41,6 +43,10 @@ RUN npm run build-flask-dockerjs
 
 
 WORKDIR /app/python
+# installing again so we have mdvtools as a module, on top of the previous install layer with dependencies
+# this step should be very fast
+# if we don't have this, the server itself runs, but anything that doesn't run from this workdir will fail to import mdvtools
+RUN poetry install --with dev,backend 
 
 # Expose the port that Flask will run on
 EXPOSE 5055 
