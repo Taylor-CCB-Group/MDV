@@ -66,6 +66,48 @@ class NonAnnDataError extends Error {
   }
 }
 
+class CompressionError extends Error {
+  constructor(message: string, public compressionType: string) {
+    super(message);
+    this.name = 'CompressionError';
+  }
+}
+
+const detectCompression = async (
+  h5File: hdf5.File,
+  groupName: string
+): Promise<string | null> => {
+  try {
+    const group = h5File.get(groupName);
+    if (!group) return null;
+    if (group instanceof hdf5.Dataset) {
+      const filters = (group as any).filters;
+      if (filters && filters.length > 0) {
+        // Common compression filters and their IDs
+        const compressionTypes: Record<number, string> = {
+          32000: 'lzf',
+          1: 'gzip',
+          2: 'szip',
+          3: 'szip',
+          4: 'nbit',
+          5: 'scaleoffset',
+        };
+        
+        for (const filter of filters) {
+          const filterId = filter.id;
+          if (compressionTypes[filterId]) {
+            return compressionTypes[filterId];
+          }
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.warn(`Error checking compression for ${groupName}:`, error);
+    return null;
+  }
+};
+
 const isNonEmptyObject = (obj: unknown): obj is Record<string, unknown> => {
   return typeof obj === 'object' && 
          obj !== null && 
@@ -424,6 +466,18 @@ const processH5File = async (
     const h5File = new hdf5.File(virtualPath, 'r');
     entities.push(h5File);
 
+    // Check for compression before processing
+    const groupsToCheck = ['X', 'layers', 'obsm', 'varm', 'obsp', 'varp'];
+    for (const group of groupsToCheck) {
+      const compression = await detectCompression(h5File, group);
+      if (compression) {
+        throw new CompressionError(
+          `The system currently supports only uncompressed AnnData files. However, this file uses ${compression} compression, which is not supported.`,
+          compression
+        );
+      }
+    }
+
     const metadata: H5Metadata = {
       uns: {},
       obs: {},
@@ -537,11 +591,14 @@ const processH5File = async (
     onProgress?.(1);
     return metadata;
   } catch (error) {
+    if (error instanceof NonAnnDataError || error instanceof CompressionError) {
+        throw error;
+    }
     throw new Error(`Failed to process H5 file: ${error}`);
   } finally {
     await cleanup(entities, virtualPath, await hdf5.FS);
   }
 };
 
-export { NonAnnDataError };
+export { NonAnnDataError, CompressionError };
 export default processH5File;
