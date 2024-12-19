@@ -80,7 +80,7 @@ const ErrorDisplay = ({
             <p style={{ 
               margin: '0 0 12px 0',
               lineHeight: '1.5',
-              color: 'rgba(0, 0, 0, 0.87)',
+              // color: 'rgba(0, 0, 0, 0.87)', // not appropriate for dark mode
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word'
             }}>
