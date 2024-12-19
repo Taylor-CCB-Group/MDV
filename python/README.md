@@ -7,7 +7,7 @@
 
 It is recommended, but not essential to create a virtual environment so there are no conflicts with modules in the global python.
 
-To create and activate an environment in Linux:-
+To create and activate an environment in a Unix-like system:-
 ```
 python -m venv /path/to/myenv
 source /path/to/myenv/bin/activate
