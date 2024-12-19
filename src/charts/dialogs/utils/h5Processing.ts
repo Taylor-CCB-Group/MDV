@@ -59,6 +59,90 @@ interface ExtendedPerformance extends Performance {
   };
 }
 
+class NonAnnDataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NonAnnDataError';
+  }
+}
+
+class CompressionError extends Error {
+  constructor(message: string, public compressionType: string) {
+    super(message);
+    this.name = 'CompressionError';
+  }
+}
+
+const detectCompression = async (
+  h5File: hdf5.File,
+  groupName: string
+): Promise<string | null> => {
+  try {
+    const group = h5File.get(groupName);
+    if (!group) return null;
+    if (group instanceof hdf5.Dataset) {
+      const filters = (group as any).filters;
+      if (filters && filters.length > 0) {
+        // Common compression filters and their IDs
+        const compressionTypes: Record<number, string> = {
+          32000: 'lzf',
+          1: 'gzip',
+          2: 'szip',
+          3: 'szip',
+          4: 'nbit',
+          5: 'scaleoffset',
+        };
+        
+        for (const filter of filters) {
+          const filterId = filter.id;
+          if (compressionTypes[filterId]) {
+            return compressionTypes[filterId];
+          }
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.warn(`Error checking compression for ${groupName}:`, error);
+    return null;
+  }
+};
+
+const isNonEmptyObject = (obj: unknown): obj is Record<string, unknown> => {
+  return typeof obj === 'object' && 
+         obj !== null && 
+         Object.keys(obj).length > 0;
+};
+
+const isNonEmptyMatrix = (matrix: MatrixValue): boolean => {
+  if (!matrix) return false;
+  if (Array.isArray(matrix)) {
+    return matrix.length > 0 && matrix[0].length > 0;
+  }
+  return matrix.length > 0;
+};
+
+const validateAnnData = (metadata: H5Metadata): void => {
+  const hasData = 
+    isNonEmptyObject(metadata.uns) ||
+    isNonEmptyObject(metadata.obs) ||
+    isNonEmptyObject(metadata.var) ||
+    isNonEmptyMatrix(metadata.X) ||
+    isNonEmptyObject(metadata.layers) ||
+    isNonEmptyObject(metadata.obsm) ||
+    isNonEmptyObject(metadata.varm) ||
+    isNonEmptyObject(metadata.obsp) ||
+    isNonEmptyObject(metadata.varp);
+
+  if (!hasData) {
+    throw new NonAnnDataError(
+      'Invalid AnnData file: File appears to be empty or not in AnnData format. ' +
+      'Expected at least one of the following groups to contain data: ' +
+      'uns, obs, var, X, layers, obsm, varm, obsp, varp'
+    );
+  }
+};
+
 const checkMemoryUsage = (threshold: number): void => {
   const performance = window.performance as ExtendedPerformance;
   if (performance?.memory) {
@@ -85,6 +169,41 @@ const isCloseable = (entity: unknown): entity is H5Entity => {
          typeof (entity as any).close === 'function';
 };
 
+// Optimized helper function to handle different TypedArray conversions
+const convertTypedArrayToNumbers = (value: TypedArray): number[] => {
+  const length = value.length;
+  const result = new Array(length);
+  
+  if (value instanceof BigInt64Array || value instanceof BigUint64Array) {
+    for (let i = 0; i < length; i++) {
+      result[i] = Number(value[i]);
+    }
+    return result;
+  }
+  
+  if (value instanceof Float64Array) {
+    for (let i = 0; i < length; i++) {
+      result[i] = value[i];
+    }
+  } else if (
+    value instanceof Float32Array ||
+    value instanceof Int8Array ||
+    value instanceof Uint8Array ||
+    value instanceof Int16Array ||
+    value instanceof Uint16Array ||
+    value instanceof Int32Array ||
+    value instanceof Uint32Array
+  ) {
+    for (let i = 0; i < length; i++) {
+      result[i] = value[i];
+    }
+  } else {
+    throw new Error('Unsupported TypedArray type');
+  }
+  
+  return result;
+};
+
 const readMatrix = async (
   dataset: H5Dataset,
   chunkSize: number,
@@ -100,20 +219,59 @@ const readMatrix = async (
       return null;
     }
 
-    // Convert to 2D array if the data is a flat array
     if (dataset.shape.length === 1) {
-      const result = Array.isArray(value) ? value : Array.from(new Float64Array(value.buffer));
+      const length = value.length;
+      const result = new Array(length);
+      
+      if (Array.isArray(value)) {
+        for (let i = 0; i < length; i++) {
+          result[i] = Number(value[i]);
+        }
+      } else {
+        result.push(...convertTypedArrayToNumbers(value));
+      }
+      
       tracker?.onProgress?.(1);
-      return [result.map(Number)];
+      return [result];
     }
 
-    // Handle 2D array
     const [rows, cols] = dataset.shape;
-    const flatArray = Array.isArray(value) ? value : Array.from(new Float64Array(value.buffer));
+    let flatArray: number[];
     
-    const matrix: number[][] = [];
+    if (ArrayBuffer.isView(value)) {
+      try {
+        if (value.buffer.byteLength % 8 === 0 && 
+            !(value instanceof BigInt64Array) && 
+            !(value instanceof BigUint64Array)) {
+          const float64Array = new Float64Array(value.buffer);
+          flatArray = new Array(float64Array.length);
+          for (let i = 0; i < float64Array.length; i++) {
+            flatArray[i] = float64Array[i];
+          }
+        } else {
+          flatArray = convertTypedArrayToNumbers(value);
+        }
+      } catch (error) {
+        console.warn('Failed to convert typed array:', error);
+        flatArray = convertTypedArrayToNumbers(value);
+      }
+    } else {
+      const length = value.length;
+      flatArray = new Array(length);
+      for (let i = 0; i < length; i++) {
+        flatArray[i] = Number(value[i]);
+      }
+    }
+    
+    const matrix: number[][] = new Array(rows);
     for (let i = 0; i < rows; i++) {
-      matrix[i] = flatArray.slice(i * cols, (i + 1) * cols).map(Number);
+      const row = new Array(cols);
+      const startIdx = i * cols;
+      for (let j = 0; j < cols; j++) {
+        row[j] = flatArray[startIdx + j];
+      }
+      matrix[i] = row;
+      
       if (tracker) {
         tracker.onProgress?.((i + 1) / rows);
       }
@@ -308,6 +466,18 @@ const processH5File = async (
     const h5File = new hdf5.File(virtualPath, 'r');
     entities.push(h5File);
 
+    // Check for compression before processing
+    const groupsToCheck = ['X', 'layers', 'obsm', 'varm', 'obsp', 'varp'];
+    for (const group of groupsToCheck) {
+      const compression = await detectCompression(h5File, group);
+      if (compression) {
+        throw new CompressionError(
+          `The system currently supports only uncompressed AnnData files. However, this file uses ${compression} compression, which is not supported.`,
+          compression
+        );
+      }
+    }
+
     const metadata: H5Metadata = {
       uns: {},
       obs: {},
@@ -415,14 +585,20 @@ const processH5File = async (
     metadata.varp = matrixData[5] as Record<string, MatrixValue>;
     console.log(metadata);
 
+    // Validate that the file is a valid AnnData file
+    validateAnnData(metadata);
+
     onProgress?.(1);
     return metadata;
   } catch (error) {
+    if (error instanceof NonAnnDataError || error instanceof CompressionError) {
+        throw error;
+    }
     throw new Error(`Failed to process H5 file: ${error}`);
   } finally {
     await cleanup(entities, virtualPath, await hdf5.FS);
   }
 };
 
-
+export { NonAnnDataError, CompressionError };
 export default processH5File;
