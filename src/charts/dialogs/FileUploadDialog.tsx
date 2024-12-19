@@ -30,8 +30,9 @@ import { DatasourceDropdown } from "./DatasourceDropdown";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { Dialog, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
-import processH5File from "./utils/h5Processing";
+import processH5File, { CompressionError } from "./utils/h5Processing";
 import H5MetadataPreview from "./H5MetadataPreview";
+import ErrorDisplay from "./ErrorDisplay";
 
 // Use dynamic import for the worker
 const DatasourceWorker = new Worker(new URL("./datasourceWorker.ts", import.meta.url), {
@@ -922,17 +923,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                     </Button>
                 </>
             ) : state.error ? (
-                <>
-                    <ErrorContainer>
-                        <ErrorHeading>
-                            An error occurred while uploading the file:
-                        </ErrorHeading>
-                        <p>{state.error.message}</p>
-                        {state.error.traceback && (
-                            <pre>{state.error.traceback}</pre>
-                        )}
-                    </ErrorContainer>
-                </>
+                <ErrorDisplay error={state.error} />
             ) : state.isValidating ? (
                 <StatusContainer>
                     <Message>{"Validating data, please wait..."}</Message>
