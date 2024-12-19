@@ -28,7 +28,7 @@ def create_flask_app(config_name=None):
 
     
     try:
-        print("**Adding config.json details to app config")
+        print("***Adding config.json details to app config")
         load_config(app, config_name)
     except Exception as e:
         print(f"Error loading configuration: {e}")
