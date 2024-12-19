@@ -10,12 +10,9 @@ on:
   push:
     branches:
       - dev
-    # Trigger when the commit message contains the keyword '[deploy]'
-    paths-ignore:  # Ignore other pushes unless they contain this keyword
-      - "**/*"
-    filters:
-      message:
-        contains: '[deploy]'
+    paths-ignore:
+      - '**.github/workflows/**' # Ignore changes to workflow files
+    if: "contains(github.event.head_commit.message, '[deploy]')"
 
 jobs:
   build-and-push:
