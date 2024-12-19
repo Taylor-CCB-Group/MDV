@@ -35,7 +35,7 @@ def create_flask_app(config_name=None):
         exit(1)
     
     try:
-        print("Creating base directory")
+        print("***Creating base directory")
         create_base_directory(app)
     except Exception as e:
         print(f"Error creating base directory: {e}")
