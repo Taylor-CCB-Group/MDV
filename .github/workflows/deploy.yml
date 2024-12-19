@@ -1,15 +1,25 @@
-name: Build and Deploy to Dockerhub- on PR Merge
+name: Build and Deploy to Dockerhub - on PR Merge or [deploy] Push
 
 on:
   pull_request:
     branches:
       - dev
     types:
-      - closed  # This will trigger only when a PR is closed (merged or not)
+      - closed  # Trigger when a PR is closed
+
+  push:
+    branches:
+      - dev
+    # Trigger when the commit message contains the keyword '[deploy]'
+    paths-ignore:  # Ignore other pushes unless they contain this keyword
+      - "**/*"
+    filters:
+      message:
+        contains: '[deploy]'
 
 jobs:
   build-and-push:
-    if: ${{ github.event.pull_request.merged }} # Only run if the PR was merged
+    if: ${{ github.event.pull_request.merged || contains(github.event.head_commit.message, '[deploy]') }} # Only run for PR merge or push with "[deploy]"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -56,3 +66,4 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+x
