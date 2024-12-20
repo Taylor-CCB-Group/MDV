@@ -68,11 +68,11 @@ def execute_code(final_code: str, open_code=False, log: callable = print):
                     log(f"UserWarning encountered: {warning.message}")
             if stdout:
                 log(f"Standard Output: {stdout}")
-                return True
+                return True, stdout, stderr
             else:
                 log("--- No standard output - overall execution failed ---")
                 log(final_code)
-                return False
+                return False, stdout, stderr
 
 
 def run_subprocess(command: list[str]) -> tuple[str, str]:

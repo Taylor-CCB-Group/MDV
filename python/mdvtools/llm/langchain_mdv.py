@@ -3,9 +3,7 @@ import logging
 from contextlib import contextmanager
 
 # Code Generation using Retrieval Augmented Generation + LangChain
-import os
-import pandas as pd
-from typing import Optional, Callable
+from typing import Callable
 from mdvtools.mdvproject import MDVProject
 
 from langchain_openai import ChatOpenAI
@@ -14,13 +12,20 @@ from langchain.schema.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import Language
-from langchain.chains import RetrievalQA # why can't I see the type for this?
+# https://python.langchain.com/api_reference/langchain/chains/langchain.chains.retrieval_qa.base.RetrievalQA.html
+# Deprecated since version 0.1.17: This class is deprecated.
+# Use the create_retrieval_chain constructor instead.
+# See migration guide here: https://python.langchain.com/docs/versions/migrating_chains/retrieval_qa/
+from langchain.chains import RetrievalQA # why can't I see the type for this? see above comment...
+# from langchain_core.output_parsers import StrOutputParser
+# from langchain_core.runnables import RunnablePassthrough
+
 from langchain.prompts import PromptTemplate
 import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 from dotenv import load_dotenv
 
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
-from .templates import get_createproject_prompt_RAG, prompt_data
+from .templates import get_createproject_prompt_RAG, prompt_data, get_updateproject_prompt_RAG
 from .code_manipulation import prepare_code
 from .code_execution import execute_code
 
@@ -57,8 +62,9 @@ print('# setting keys and variables')
 load_dotenv()
 # OPENAI_API_KEY environment variable will be used internally by OpenAI modules
 
-mypath = os.path.dirname(__file__)
-path_to_data = os.path.join(mypath, "sample_data/bcell_viz_ready_revised.h5ad")
+# todo - add some testing so that we notice if we introduce breaking changes like this
+# mypath = os.path.dirname(__file__)
+# path_to_data = os.path.join(mypath, "sample_data/bcell_viz_ready_revised.h5ad")
 
 print('# Crawl the local repository to get a list of relevant file paths')
 with time_block("b1: Local repo crawling"):
@@ -119,6 +125,9 @@ with time_block("b5: Retriever creating"):
         search_kwargs={"k": 5},        # Set search parameters, in this case, return the top 5 results
     )
 
+# ... for testing basic mechanics without invoking the agent
+mock_agent = False
+
 class ProjectChat():
     def __init__(self, project: MDVProject, log: Callable[[str], None] = print):
         self.project = project
@@ -126,6 +135,7 @@ class ProjectChat():
         if len(project.datasources) == 0:
             raise ValueError("The project does not have any datasources")
         elif len(project.datasources) > 1:
+            # tempting to think we should just give the agent all of the datasources here
             log("The project has more than one datasource, only the first one will be used")
             self.ds_name1 = project.datasources[1]['name']
             self.df1 = project.get_datasource_as_dataframe(self.ds_name1)
@@ -133,26 +143,31 @@ class ProjectChat():
         try:
             self.df = project.get_datasource_as_dataframe(self.ds_name)
             with time_block("b6: Initialising LLM for RAG"):
-                self.code_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
+                self.code_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
             with time_block("b7: Initialising LLM for agent"):
-                self.dataframe_llm = ChatOpenAI(temperature=0.1, model_name="gpt-4o")
+                self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
             with time_block("b8: Pandas agent creating"):
                 if len(project.datasources) == 1:
-                    self.agent = lp.create_pandas_dataframe_agent(
-                        self.dataframe_llm, self.df, verbose=True, handle_parse_errors=True, allow_dangerous_code=True
+                    self.agent = lp.create_pandas_dataframe_agent( # handle_parse_errors no longer supported
+                        self.dataframe_llm, self.df, verbose=True, allow_dangerous_code=True
                     )
                 elif len(project.datasources) == 2:
                     self.agent = lp.create_pandas_dataframe_agent(
-                        self.dataframe_llm, [self.df, self.df1], verbose=True, handle_parse_errors=True, allow_dangerous_code=True
+                        self.dataframe_llm, [self.df, self.df1], verbose=True, allow_dangerous_code=True
                     )
             self.ok = True
         except Exception as e:
             # raise ValueError(f"An error occurred while trying to create the agent: {e[:100]}")
             log(f"An error occurred while trying to create the agent: {str(e)[:100]}")
             self.ok = False
-    
+
     def ask_question(self, question: str): # async?
+        if mock_agent:
+            ok, strdout, stderr = execute_code('import mdvtools\nprint("mdvtools import ok")')
+            return f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}"
         with time_block("b9a: Pandas agent invoking"):
+            # shortly after this...
+            # Error in StdOutCallbackHandler.on_chain_start callback: AttributeError("'NoneType' object has no attribute 'get'")
             self.log(f"Asking the LLM: '{question}'")
             if not self.ok:
                 return "This agent is not ready to answer questions"
@@ -161,10 +176,15 @@ class ProjectChat():
             logger.info(f"Question asked by user: {question}")
         try:
             with time_block("b9b: Pandas agent invoking"):
-                response = self.agent.invoke(full_prompt)
-                assert('output' in response)
+                # Argument of type "str" cannot be assigned to parameter "input" of type "Dict[str, Any]"
+                response = self.agent.invoke(full_prompt) # type: ignore for now
+                assert('output' in response) # we might allow
             #!!! csv_path is not wanted - the code tries to use that as data source name which is all wrong
             with time_block("b10: RAG prompt preparation"):
+                #! todo - allow for the ability to pass a path to some data that may not already be in the project?
+                # at least we should allow for multiple datasources. Do we even need to pass ds_name(s), or should the script look it (them) up for itself?
+                path_to_data = self.project.dir + "/anndata.h5ad"
+                #!!!!!! for now, assuming there will be an anndata.h5ad file in the project directory and will fail ungacefully if there isn't!!!!
                 prompt_RAG = get_createproject_prompt_RAG(self.project.id, path_to_data, response['output']) #self.ds_name, response['output'])
                 prompt_RAG_template = PromptTemplate(
                     template=prompt_RAG,
@@ -190,12 +210,11 @@ class ProjectChat():
             with time_block("b13: Chat logging by MDV"):
                 self.project.log_chat_item(output, prompt_RAG, final_code)
             with time_block("b14: Execute code"):
-                ok = execute_code(final_code, open_code=False, log=self.log)
+                ok, stdout, stderr = execute_code(final_code, open_code=False, log=self.log)
             if not ok:
-                return f"# ===Error: code execution failed===\n```python{final_code}```"
+                return f"# Error: code execution failed\n> {stderr}"
             else:
                 self.log(final_code)
                 return f"I ran some code for you:\n\n```python\n{final_code}```"
         except Exception as e:
             return f"Error: {str(e)[:100]}"
-
