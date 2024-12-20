@@ -160,6 +160,7 @@ def create_app(
                 return {"message": bot.ask_question(message)}
             except Exception as e:
                 print(e)
+                return str(e), 500
             return {"message": f"bleep bloop I'm a robot, you said: {message}"}
 
     @project_bp.route("/")
