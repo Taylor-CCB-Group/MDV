@@ -12,5 +12,5 @@
             ]
         }
     },
-    // "postCreateCommand": "npm run dev"
+    "postCreateCommand": "npm run dev"
 }
