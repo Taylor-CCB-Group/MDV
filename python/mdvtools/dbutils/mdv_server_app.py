@@ -97,6 +97,7 @@ def wait_for_database():
             print("*************** Database is ready! *************")
             return
         except OperationalError as oe:
+            print(f"OperationalError: {oe}")
             print(f"Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1} of {max_retries})")
             time.sleep(delay)
         except Exception as e:
