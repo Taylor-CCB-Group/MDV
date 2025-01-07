@@ -470,12 +470,13 @@ const processH5File = async (
     const groupsToCheck = ['X', 'layers', 'obsm', 'varm', 'obsp', 'varp'];
     for (const group of groupsToCheck) {
       const compression = await detectCompression(h5File, group);
-      if (compression) {
-        throw new CompressionError(
-          `The system currently supports only uncompressed AnnData files. However, this file uses ${compression} compression, which is not supported.`,
-          compression
-        );
-      }
+      //PJT - skipping this check pending better fix
+      // if (compression) {
+      //   throw new CompressionError(
+      //     `The system currently supports only uncompressed AnnData files. However, this file uses ${compression} compression, which is not supported.`,
+      //     compression
+      //   );
+      // }
     }
 
     const metadata: H5Metadata = {
