@@ -45,13 +45,24 @@ const ErrorDisplay = ({
 
     return (
         <div style={{ maxWidth: 800, margin: "20px auto", width: "90%" }}>
-            <Paper elevation={3}>
+            <Paper
+                elevation={3}
+                sx={{
+                    bgcolor: "var(--background_color_error)",
+                    color: "var(--text_color)",
+                }}
+            >
                 <Alert
                     severity="error"
                     icon={<ErrorIcon />}
                     sx={{
                         "& .MuiAlert-message": {
                             width: "100%",
+                        },
+                        bgcolor: "transparent",
+                        color: "var(--text_color)",
+                        "& .MuiAlert-icon": {
+                            color: "var(--icon_color_error)",
                         },
                     }}
                 >
@@ -62,6 +73,7 @@ const ErrorDisplay = ({
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
+                            color: "var(--text_color_error)",
                         }}
                     >
                         {title}
@@ -70,7 +82,14 @@ const ErrorDisplay = ({
                                 <IconButton
                                     size="small"
                                     onClick={handleCopy}
-                                    sx={{ ml: 1 }}
+                                    sx={{
+                                        ml: 1,
+                                        color: "var(--text_color_error)",
+                                        "&:hover": {
+                                            backgroundColor:
+                                                "var(--background_color)",
+                                        },
+                                    }}
                                 >
                                     {copied ? <Check /> : <ContentCopy />}
                                 </IconButton>
@@ -83,7 +102,7 @@ const ErrorDisplay = ({
                             style={{
                                 margin: "0 0 12px 0",
                                 lineHeight: "1.5",
-                                // color: 'rgba(0, 0, 0, 0.87)', // not appropriate for dark mode
+                                color: "var(--text_color_error)",
                                 whiteSpace: "pre-wrap",
                                 wordBreak: "break-word",
                             }}
@@ -102,10 +121,10 @@ const ErrorDisplay = ({
                                         display: "flex",
                                         alignItems: "center",
                                         gap: "4px",
-                                        color: "error.main",
+                                        color: "var(--icon_color_error)",
                                         "&:hover": {
-                                            backgroundColor: "error.light",
-                                            opacity: 0.1,
+                                            backgroundColor:
+                                                "var(--background_color)",
                                         },
                                     }}
                                 >
@@ -117,7 +136,7 @@ const ErrorDisplay = ({
                                     <pre
                                         style={{
                                             backgroundColor:
-                                                "rgba(211, 47, 47, 0.05)",
+                                                "var(--background_color)",
                                             padding: "16px",
                                             borderRadius: "4px",
                                             margin: 0,
@@ -128,9 +147,10 @@ const ErrorDisplay = ({
                                             lineHeight: 1.5,
                                             fontFamily:
                                                 "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                                            border: "1px solid rgba(211, 47, 47, 0.1)",
+                                            border: "1px solid var(--input_border_color)",
                                             whiteSpace: "pre-wrap",
                                             wordBreak: "break-word",
+                                            color: "var(--text_color)",
                                         }}
                                     >
                                         {error.traceback}
