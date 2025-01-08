@@ -98,27 +98,27 @@ class CompressionError extends Error {
 const detectCompression = async (
     h5File: hdf5.File,
     groupName: string,
-): Promise<string | null> => {
+): Promise<{ type: string; supported: boolean } | null> => {
     try {
         const group = h5File.get(groupName);
         if (!group) return null;
+
         if (group instanceof hdf5.Dataset) {
             const filters = (group as any).filters;
             if (filters && filters.length > 0) {
-                // Common compression filters and their IDs
-                const compressionTypes: Record<number, string> = {
-                    32000: "lzf",
-                    1: "gzip",
-                    2: "szip",
-                    3: "szip",
-                    4: "nbit",
-                    5: "scaleoffset",
+                const compressionTypes: Record<number, [string, boolean]> = {
+                    1: ["gzip", true],
+                    2: ["szip", true],
+                    4: ["nbit", false],
+                    5: ["scaleoffset", false],
+                    32000: ["lzf", false],
                 };
 
                 for (const filter of filters) {
                     const filterId = filter.id;
                     if (compressionTypes[filterId]) {
-                        return compressionTypes[filterId];
+                        const [type, supported] = compressionTypes[filterId];
+                        return { type, supported };
                     }
                 }
             }
@@ -241,8 +241,7 @@ const readMatrix = async (
         if (!dataset.shape || dataset.shape.length === 0) {
             return null;
         }
-
-        const value = dataset.value;
+        const value: TypedArray | H5DataType[] = dataset.value;
         if (!ArrayBuffer.isView(value) && !Array.isArray(value)) {
             return null;
         }
@@ -517,9 +516,14 @@ const processH5File = async (
         for (const group of groupsToCheck) {
             const compression = await detectCompression(h5File, group);
             if (compression) {
-                throw new CompressionError(
-                    `The system currently supports only uncompressed AnnData files. However, this file uses ${compression} compression, which is not supported.`,
-                    compression,
+                if (!compression.supported) {
+                    throw new CompressionError(
+                        `Unsupported compression type: ${compression.type}. Supported formats include gzip, szip, and uncompressed files.`,
+                        compression.type,
+                    );
+                }
+                console.log(
+                    `Found ${compression.type} compression in ${group} group`,
                 );
             }
         }
