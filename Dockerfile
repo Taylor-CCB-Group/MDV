@@ -19,6 +19,7 @@ WORKDIR /app
 COPY python/pyproject.toml ./python/
 COPY python/poetry.lock ./python/
 WORKDIR /app/python
+RUN poetry config virtualenvs.create false
 # trouble with this is that it doesn't have the mdvtools code yet...
 # still worth installing heavy dependencies here
 RUN poetry install --with dev,backend 
