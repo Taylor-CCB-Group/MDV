@@ -8,7 +8,8 @@
             "extensions": [
                 "ms-python.python",
                 "ms-azuretools.vscode-docker",
-                "biomejs.biome"
+                "biomejs.biome",
+                "ms-toolsai.jupyter"
             ]
         }
     }
