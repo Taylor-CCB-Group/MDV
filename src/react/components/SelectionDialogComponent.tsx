@@ -328,8 +328,11 @@ const useBrushX = (
 
     const [debouncedValue] = useDebounce(value, 100, { 
         equalityFn: (a, b) => {
-            if (a === null && b === null) return true;
-            if (a === null || b === null) return false;
+            //although the type of input argument is [number, number] | null - they are undefined when component is unmounted
+            //! which causes an exception here which breaks the whole chart
+            //so rather than checking === null, we check for falsy values
+            if (!a && !b) return true;
+            if (!a || !b) return false;
             return a[0] === b[0] && a[1] === b[1];
         }
     });
