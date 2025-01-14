@@ -326,6 +326,32 @@ const useBrushX = (
         };
     }, [ref, setValue, minMax, histoWidth, histoHeight, initialValue]);
 
+    const [debouncedValue] = useDebounce(value, 100, { 
+        equalityFn: (a, b) => {
+            if (a === null && b === null) return true;
+            if (a === null || b === null) return false;
+            return a[0] === b[0] && a[1] === b[1];
+        }
+    });
+    const setBrushValue = useCallback((v: [number, number] | null) => {
+        if (!brushRef.current || !ref.current) return;
+        const svg = d3.select(ref.current);
+
+        if (v === null) {
+            //@ts-ignore life is too short
+            svg.select(".brush").call(brushRef.current.move, null);
+            return;
+        }
+        const [start, end] = v;
+        const x0 = (start - minMax[0]) / (minMax[1] - minMax[0]) * histoWidth;
+        const x1 = (end - minMax[0]) / (minMax[1] - minMax[0]) * histoWidth;
+        //@ts-ignore life is too short
+        svg.select(".brush").call(brushRef.current.move, [x0, x1]);
+    }, [minMax, histoWidth, ref]);//why doesn't biome think we need brushRef?
+    useEffect(() => {
+        setBrushValue(debouncedValue);
+    }, [debouncedValue, setBrushValue]);
+
     const clearBrush = useCallback(() => {
         if (!ref.current || !brushRef.current) return;
 
@@ -388,7 +414,7 @@ const Histogram = observer((props: RangeProps) => {
             />
             {/* d3.brushX will add more elements as a side-effect, handled in hook */}
         </svg>
-        <p className="flex justify-between"><em>{`${v[0].toFixed(2)}<`}</em> <em>{`<${v[1].toFixed(2)}`}</em></p>
+        {/* <p className="flex justify-between"><em>{`${v[0].toFixed(2)}<`}</em> <em>{`<${v[1].toFixed(2)}`}</em></p> */}
         </>
     );
 });
@@ -397,28 +423,29 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
     const rangeProps = useRangeFilter(column);
     const { value, step } = rangeProps;
+    const [min, max] = column.minMax;
     const setValue = useCallback((newValue: [number, number] | null) => {
+        if (newValue) {
+            if (newValue[0] < min) newValue[0] = min;
+            if (newValue[1] > max) newValue[1] = max;
+        }
         action(() => filters[column.field] = newValue)();
-    }, [filters, column.field]);
+    }, [filters, column.field, min, max]);
+    const low = value ? value[0] : min;
+    const high = value ? value[1] : max;
     return (
         <div>
             <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} histoWidth={99} histoHeight={100} />
-            {/* <Slider
-                size="small"
-                value={value}
-                min={column.minMax[0]}
-                max={column.minMax[1]}
-                step={step}
-                onChange={(_, newValue) => setValue(newValue as [number, number])}
-            />
             <div>
                 <TextField size="small" className="max-w-20" type="number"
-                    value={value[0]}
-                    onChange={(e) => setValue([Number(e.target.value), value[1]])} />
+                    variant="standard"
+                    value={low}
+                    onChange={(e) => setValue([Number(e.target.value), high])} />
                 <TextField size="small" className="max-w-20 float-right" type="number"
-                    value={value[1]}
-                    onChange={(e) => setValue([value[0], Number(e.target.value)])} />
-            </div> */}
+                    variant="standard"
+                    value={high}
+                    onChange={(e) => setValue([low, Number(e.target.value)])} />
+            </div>
         </div>
     );
 });
