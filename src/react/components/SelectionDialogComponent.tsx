@@ -354,18 +354,6 @@ const useBrushX = (
     useEffect(() => {
         setBrushValue(debouncedValue);
     }, [debouncedValue, setBrushValue]);
-
-    const clearBrush = useCallback(() => {
-        if (!ref.current || !brushRef.current) return;
-
-        const svg = d3.select(ref.current);
-        //@ts-ignore life is too short
-        svg.select(".brush").call(brushRef.current.move, null);
-    }, [ref]);
-
-    // return { clearBrush };
-    // this seems to be working reasonably well 🤞
-    if (value === null) clearBrush();
 };
 const Histogram = observer((props: RangeProps) => {
     const { histogram: data, queryHistogram, value } = props;
@@ -443,11 +431,13 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
                 <TextField size="small" className="max-w-20" type="number"
                     variant="standard"
                     value={low}
-                    onChange={(e) => setValue([Number(e.target.value), high])} />
+                    onChange={(e) => setValue([Number(e.target.value), high])}
+                />
                 <TextField size="small" className="max-w-20 float-right" type="number"
                     variant="standard"
                     value={high}
-                    onChange={(e) => setValue([low, Number(e.target.value)])} />
+                    onChange={(e) => setValue([low, Number(e.target.value)])} 
+                />
             </div>
         </div>
     );
