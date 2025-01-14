@@ -259,7 +259,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     return { value, step, histogram, lowFraction, highFraction, queryHistogram };
 }
 // type set2d = ReturnType<typeof useState<[number, number]>>[1];
-type set2d = (v: [number, number]) => void;
+type set2d = (v: [number, number] | null) => void;
 type RangeProps = ReturnType<typeof useRangeFilter> & {
     setValue: set2d,
     minMax: [number, number],
@@ -268,18 +268,19 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
     histoHeight: number, //height of the histogram
 };
 
-export const useBrushX = (
+const useBrushX = (
     ref: React.RefObject<SVGSVGElement>,
     { value, setValue, minMax, histoWidth, histoHeight }: RangeProps //consider different typing here
 ) => {
     const brushRef = useRef<(ReturnType<typeof d3.brushX>) | null>(null);
+    // we need to be able to respond to changes in value - but without causing an infinite loop
+    // or having the brush reset on every render
     const [initialValue] = useState(value);
 
     useEffect(() => {
         if (!ref.current) return;
 
         const svg = d3.select(ref.current);
-        // const { clientWidth } = ref.current;//clientWidth can change, we need to respond to that...
         // Set up brush
         const brush = d3.brushX()
             .handleSize(1)
@@ -299,7 +300,7 @@ export const useBrushX = (
                     });
                     setValue([start, end]);
                 } else {
-                    setValue(minMax); // Reset to full range if brush is cleared
+                    setValue(null); // null - reset to full range if brush is cleared
                 }
             });
 
@@ -396,7 +397,7 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
     const rangeProps = useRangeFilter(column);
     const { value, step } = rangeProps;
-    const setValue = useCallback((newValue: [number, number]) => {
+    const setValue = useCallback((newValue: [number, number] | null) => {
         action(() => filters[column.field] = newValue)();
     }, [filters, column.field]);
     return (
