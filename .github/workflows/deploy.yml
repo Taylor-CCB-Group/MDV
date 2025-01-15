@@ -18,7 +18,8 @@ on:
 
 jobs:
   build-and-push:
-    if: ${{ github.event.pull_request.merged || contains(github.event.head_commit.message, '[deploy]') }} # Only run for PR merge or push with "[deploy]"
+    # testing with all dev pushes triggering the workflow - including this one.
+    # if: ${{ github.event.pull_request.merged || contains(github.event.head_commit.message, '[deploy]') }} # Only run for PR merge or push with "[deploy]"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
