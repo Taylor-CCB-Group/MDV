@@ -62,8 +62,8 @@ def main():
     title = "Doublet Scores Distribution"
     param = "doublet_scores"
     bin_number = 50
-    display_min = cells_df[param].min()
-    display_max = cells_df[param].max()
+    display_min = float(cells_df[param].min()) # Convert to Python float to ensure compatibility with JSON serialization
+    display_max = float(cells_df[param].max()) # Convert to Python float to ensure compatibility with JSON serialization
     size = [792, 472]
     position = [10, 10]
     

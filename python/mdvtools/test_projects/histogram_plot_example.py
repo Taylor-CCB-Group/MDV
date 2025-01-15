@@ -50,8 +50,8 @@ def main():
     title = "Number of cells"
     param = "n_cells" # When the variable is named as "param", it can only take one data field. If it was "params" it would take more than one.
     bin_number = 50
-    display_min = 0
-    display_max = 3000.035
+    display_min = float(data_frame[param].min()) # Convert to Python float to ensure compatibility with JSON serialization
+    display_max = float(data_frame[param].max()) # Convert to Python float to ensure compatibility with JSON serialization
     size = [792, 472]
     position = [10, 10]
     

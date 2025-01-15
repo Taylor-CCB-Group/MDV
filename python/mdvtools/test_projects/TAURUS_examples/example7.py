@@ -6,7 +6,6 @@
 ## By examining the cell state proportions for each patient, one can observe if there are unique patterns or 
 ## distributions specific to certain patients. For example, patients with particular conditions may show a higher abundance of certain cell states.
 ## The UMAP scatterplot shows clusters of cells grouped by similarity, which can reveal distinct cell populations or subtypes.
-## Coloring by final_analysis (cell state/type) allows easy identification of cell type clusters, giving insights into the diversity and structure of cellular populations in the dataset.
 ## UMAP is a dimensionality reduction technique commonly used in single-cell analysis to visualize high-dimensional data.
 
 
@@ -36,7 +35,7 @@ def create_stacked_row_plot(title, params, size, position, legend_display, xaxis
 
     return plot
 
-def create_scatter_plot(title, params, size, position, color, x_axis_settings, y_axis_settings):
+def create_scatter_plot(title, params, size, position, x_axis_settings, y_axis_settings):
     """Create and configure a ScatterPlot instance with the given parameters."""
     plot = ScatterPlot(
         title=title,
@@ -45,7 +44,6 @@ def create_scatter_plot(title, params, size, position, color, x_axis_settings, y
         position=position
     )
 
-    plot.set_color_by(color)
     plot.set_axis_properties("x", x_axis_settings)
     plot.set_axis_properties("y", y_axis_settings)
 
@@ -102,14 +100,13 @@ def main():
     scatter_params = ["UMAP 1", "UMAP 2"]
     scatter_size = [792, 472]
     scatter_position = [820, 10]
-    scatter_color = 'final_analysis'
     
     scatter_x_axis_settings = {'size': 30, 'label': "UMAP 1", 'textsize': 13, 'tickfont': 10}
     scatter_y_axis_settings = {'size': 45, 'label': "UMAP 2", 'textsize': 13, 'tickfont': 10, 'rotate_labels': False}
     
     # Create scatter plot
     scatter_plot = create_scatter_plot(
-        scatter_title, scatter_params, scatter_size, scatter_position, scatter_color, scatter_x_axis_settings, scatter_y_axis_settings
+        scatter_title, scatter_params, scatter_size, scatter_position, scatter_x_axis_settings, scatter_y_axis_settings
     )
     
     # Convert plots to JSON and set view
