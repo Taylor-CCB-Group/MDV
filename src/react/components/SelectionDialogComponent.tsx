@@ -1,6 +1,6 @@
 import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography, Select } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, TextField, type TextFieldProps, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef } from "react";
 
@@ -19,10 +19,7 @@ import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
-import { useOuterContainer } from "../screen_state";
 import * as d3 from 'd3';
-import { brushX } from "d3-brush";
-import { isArray } from "@/lib/utils";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
