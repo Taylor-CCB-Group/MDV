@@ -46,9 +46,6 @@ def main():
     genes_df = pd.DataFrame(adata.var)
     genes_df.name = 'genes'
     genes_df['gene_id'] = genes_df.index
-
-    # Rename 'final_analysis' to 'cell state'
-    cells_df.rename(columns={"final_analysis": "cell state"}, inplace=True)
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)

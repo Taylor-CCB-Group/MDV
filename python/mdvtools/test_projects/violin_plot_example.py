@@ -29,6 +29,7 @@ def main():
     project_path = os.path.expanduser('~/mdv/project')
     data_path = "path_to_data"
     view_name = "default"
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
@@ -37,7 +38,7 @@ def main():
     data_frame = load_data(data_path)
     
     # Add datasource
-    project.add_datasource(data_path, data_frame)
+    project.add_datasource(datasource_name, data_frame)
     
     # ViolinPlot parameters
     title = "Violin Plot Example"
@@ -50,7 +51,7 @@ def main():
     
     # Convert plot to JSON and set view
     ViolinPlot_chart_json = convert_plot_to_json(plot)
-    ViolinPlot_view = {'initialCharts': {data_path: [ViolinPlot_chart_json]}}
+    ViolinPlot_view = {'initialCharts': {datasource_name: [ViolinPlot_chart_json]}}
     
     project.set_view(view_name, ViolinPlot_view)
     project.set_editable(True)

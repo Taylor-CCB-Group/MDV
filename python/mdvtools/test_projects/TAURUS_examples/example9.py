@@ -8,7 +8,7 @@
 ## UMAP Scatter Plot uses UMAP 1 and UMAP 2 as coordinates. Points are colored by cell state to show different cell types or states.
 ## This UMAP plot reveals clusters of cells based on similarity, with each cluster representing specific cell types or states. 
 ## It helps visualize the cellular landscape and detect distinct cell populations.
-## The dot plot uses cell state on the x-axis, with n_genes_by_counts and total_counts as variables represented by dot size and color intensity.
+## The dot plot uses final_analysis on the x-axis, with n_genes_by_counts and total_counts as variables represented by dot size and color intensity.
 ## The dot plot gives an overview of gene expression levels per cell state. It helps identify cell types with high or low expression levels, indicating variations in cellular activity across states.
 ## The box plot shows Disease on the x-axis and n_genes_by_counts on the y-axis.
 ## The box plot compares gene expression levels across different disease states, highlighting differences in gene expression that may relate to disease pathology or severity.
@@ -88,10 +88,7 @@ def main():
 
     genes_df = pd.DataFrame(adata.var)
     genes_df['gene_id'] = genes_df.index
-    
-    # Rename 'final_analysis' to 'cell state'
-    cells_df.rename(columns={"final_analysis": "cell state"}, inplace=True)
-    
+ 
     # Add UMAP data to the dataframe
     umap_np = np.array(adata.obsm["X_umap"])
     cells_df["UMAP 1"] = umap_np[:, 0]
@@ -110,7 +107,7 @@ def main():
     
     # StackedRowChart parameters
     stacked_title = "Abundance of Cell States per Patient"
-    stacked_params = ["Patient", "cell state"]
+    stacked_params = ["Patient", "final_analysis"]
     stacked_size = [792, 472]
     stacked_position = [10, 10]
     stacked_legend_display = True
@@ -127,7 +124,7 @@ def main():
     scatter_params = ["UMAP 1", "UMAP 2"]
     scatter_size = [792, 472]
     scatter_position = [820, 10]
-    scatter_color = 'cell state'
+    scatter_color = 'final_analysis'
     scatter_x_axis_settings = {'size': 30, 'label': "UMAP 1", 'textsize': 13, 'tickfont': 10}
     scatter_y_axis_settings = {'size': 45, 'label': "UMAP 2", 'textsize': 13, 'tickfont': 10, 'rotate_labels': False}
     
@@ -140,7 +137,7 @@ def main():
     gene_name = "TNF"
     gene_index = genes_df.index.get_loc("gene_name")
     dot_title = f"Gene expression for {gene_name} per cell state dot plot"
-    dot_params = ["cell state", f"Gene expression|{gene_name}(Gene expression)|{gene_index}"]
+    dot_params = ["final_analysis", f"Gene expression|{gene_name}(Gene expression)|{gene_index}"]
     dot_size = [400, 250]
     dot_position = [10, 500]
     

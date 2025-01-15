@@ -1,23 +1,7 @@
-## This file creates a new MDV project named 'project' containing a view named 'default'
-## The datasource used is an h5ad file that was provided at run time
-## The view 'default' shows one stacked bar plot, one dot plot, one scatter plot and one box plot.
-## The h5ad file is an AnnData object and here the obs attribute was used.
-## The stacked bar plot shows the distribution of various cell states across different patients.
-## By examining the cell state proportions for each patient, one can observe if there are unique patterns or 
-## distributions specific to certain patients. For example, patients with particular conditions may show a higher abundance of certain cell states.
-## UMAP Scatter Plot uses UMAP 1 and UMAP 2 as coordinates. Points are colored by cell state to show different cell types or states.
-## This UMAP plot reveals clusters of cells based on similarity, with each cluster representing specific cell types or states. 
-## It helps visualize the cellular landscape and detect distinct cell populations.
-## The dot plot uses final_analysis on the x-axis, with n_genes_by_counts and total_counts as variables represented by dot size and color intensity.
-## The dot plot gives an overview of gene expression levels per cell state. It helps identify cell types with high or low expression levels, indicating variations in cellular activity across states.
-## The box plot shows Disease on the x-axis and n_genes_by_counts on the y-axis.
-## The box plot compares gene expression levels across different disease states, highlighting differences in gene expression that may relate to disease pathology or severity.
-
 import os
 import pandas as pd
 import scanpy as sc
-import sys
-import  numpy as np
+import numpy as np
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.dot_plot import DotPlot
 from mdvtools.charts.box_plot import BoxPlot
@@ -25,14 +9,14 @@ from mdvtools.charts.scatter_plot import ScatterPlot
 from mdvtools.charts.stacked_row_plot import StackedRowChart
 import json 
 
-def create_stacked_row_plot(title, params, size, position, legend_display, xaxis_properties, yaxis_properties):
+
+def create_stacked_row_plot(title, params, size, position, xaxis_properties, yaxis_properties):
     plot = StackedRowChart(
         title=title,
         params=params,
         size=size,
         position=position
     )
-    plot.set_color_legend(legend_display)
     plot.set_axis_properties("x", xaxis_properties)
     plot.set_axis_properties("y", yaxis_properties)
     return plot
@@ -71,7 +55,6 @@ def create_box_plot(title, params, size, position, plot_id):
         position=position,
         id=plot_id
     )
-
     return plot
 
 def convert_plot_to_json(plot):
@@ -86,7 +69,7 @@ def main():
     adata = sc.read_h5ad(data_path)
     cells_df = pd.DataFrame(adata.obs)
     cells_df.name = 'cells'
-    
+   
     # Add UMAP data to the dataframe
     umap_np = np.array(adata.obsm["X_umap"])
     cells_df["UMAP 1"] = umap_np[:, 0]
@@ -102,16 +85,16 @@ def main():
     project.set_column('cells', "UMAP 1", cells_df["UMAP 1"])
     project.set_column('cells', "UMAP 2", cells_df["UMAP 2"])
     
-    # StackedRowChart parameters
-    stacked_title = "Abundance of Cell States per Patient"
-    stacked_params = ["Patient", "final_analysis"]
+    # StackedRowChart parameters for cell phase distribution
+    stacked_title = "Distribution of Cell Phases"
+    stacked_params = ["phase", "final_analysis"]
     stacked_size = [792, 472]
     stacked_position = [10, 10]
     stacked_legend_display = True
-    stacked_xaxis_properties = {"label": "Patient", "textSize": 13, "tickfont": 10}
+    stacked_xaxis_properties = {"label": "Phase", "textSize": 13, "tickfont": 10}
     stacked_yaxis_properties = {"label": "Cell State", "textSize": 13, "tickfont": 10}
     
-    # Create stacked row plot
+    # Create stacked row plot for cell phase distribution
     stacked_row_plot = create_stacked_row_plot(
         stacked_title, stacked_params, stacked_size, stacked_position, stacked_legend_display, stacked_xaxis_properties, stacked_yaxis_properties
     )

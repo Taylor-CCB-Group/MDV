@@ -43,7 +43,7 @@ def convert_plot_to_json(plot):
 """
 
 # this is Maria's un-sullied prompt - apart from the project_id... and maybe some other stuff...
-def get_createproject_prompt_RAG(project_id: str, path_to_data: str, final_answer: str):
+def get_createproject_prompt_RAG(project_id: str, path_to_data: str, datasouce_name: any, final_answer: str):
     prompt_RAG = (
         """
 Context: {context}
@@ -59,8 +59,8 @@ Setup: Define the project path, data path, and view name, the project path shoul
         + """')
 Plot function definition: Define the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot) using a function in the same way as the context.
 Project Creation: Initialize an MDVProject instance using the method: MDVProject(project_path, delete_existing=True).
-Data Loading: Load data from the specified file into a pandas DataFrame using the load_data(path) function.
-Data adding: Add the data source to the project using the method: project.add_datasource(data_path, data).
+Data Loading: Load data from the specified file into a pandas DataFrame using the load_data(data_path) function.
+Data adding: Add the data source to the project using the method: project.add_datasource(datasource_name, data).
 Plot Creation: Create the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot) and define the plot paramaters in the same way as in the context.
 Data Conversion: Convert the plot data to JSON format for integration with the MDV project using the convert_plot_to_json(plot) function.
 Serving: Configure the project view, set it to editable, and serve the project using the .set_view(view_name, plot_view), .set_editable(True) and .serve() methods.
@@ -75,9 +75,8 @@ DO NOT forget to use the f-string, or formatted string literal, python structure
 
 If the prompt asks for a gene, make sure you load this datasource and that you create a link between the two datasets.
 
-The path to data are given by this variable `"""
-        + path_to_data
-        + """`
+The data_path are given by this variable `""" + path_to_data + """`
+The datasource_name is given by this variable `""" + datasouce_name + """`
 """
     )
     return prompt_RAG

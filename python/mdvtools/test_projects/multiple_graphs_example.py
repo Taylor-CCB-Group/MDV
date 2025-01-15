@@ -29,6 +29,7 @@ def main():
     project_path = os.path.expanduser('~/mdv/project')
     data_path = "path_to_data"
     view_name = "default"
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
@@ -37,7 +38,7 @@ def main():
     data_frame = load_data(data_path)
     
     # Add datasource
-    project.add_datasource(data_path, data_frame)
+    project.add_datasource(datasource_name, data_frame)
     
     # BoxPlot parameters
     title = "Box Plot Example"
@@ -55,7 +56,7 @@ def main():
         boxplot_charts_json = convert_plot_to_json(plot)
         list_boxplot_charts_json.append(boxplot_charts_json)
     
-    boxplot_view = {'initialCharts': {data_path: list_boxplot_charts_json}}
+    boxplot_view = {'initialCharts': {datasource_name: list_boxplot_charts_json}}
     
     project.set_view(view_name, boxplot_view)
     project.set_editable(True)

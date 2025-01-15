@@ -31,6 +31,7 @@ def main():
     project_path = os.path.expanduser('~/mdv/project')
     data_path = '/Users/mariak/Documents/MDVmk/MDV/python/mdvtools/data/data_cells.csv'
     view_name = "default"
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
@@ -42,7 +43,7 @@ def main():
     data_frame['leiden'] = data_frame['leiden'].apply(str)
     
     # Add datasource
-    project.add_datasource(data_path, data_frame)
+    project.add_datasource(datasource_name, data_frame)
     
     # DotPlot parameters
     title = "Dot Plot Example"
@@ -59,7 +60,7 @@ def main():
     
     # Convert plot to JSON and set view
     dot_plot_json = convert_plot_to_json(dot_plot)
-    dotplot_view = {'initialCharts': {data_path: [dot_plot_json]}}
+    dotplot_view = {'initialCharts': {datasource_name: [dot_plot_json]}}
     
     project.set_view(view_name, dotplot_view)
     project.set_editable(True)

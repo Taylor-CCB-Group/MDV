@@ -33,6 +33,7 @@ def main():
     project_path = os.path.expanduser('~/mdv/project')
     data_path = "path_to_data"
     view_name = "default"
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
@@ -44,7 +45,7 @@ def main():
     data_frame['leiden'] = data_frame['leiden'].apply(str)
     
     # Add datasource
-    project.add_datasource(data_path, data_frame)
+    project.add_datasource(datasource_name, data_frame)
     
     # HeatmapPlot parameters
     title = "Heatmap Plot Example"
@@ -72,7 +73,7 @@ def main():
 
     # Convert plot to JSON and set view
     heatmap_plot_json = convert_plot_to_json(heatmap_plot)
-    heatmap_view = {'initialCharts': {data_path: [heatmap_plot_json]}}
+    heatmap_view = {'initialCharts': {datasource_name: [heatmap_plot_json]}}
     
     project.set_view(view_name, heatmap_view)
     project.set_editable(True)

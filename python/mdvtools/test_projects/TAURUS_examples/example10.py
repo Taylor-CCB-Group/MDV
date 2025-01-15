@@ -2,8 +2,7 @@
 ## The datasource used is an h5ad file that was provided at run time
 ## The view 'default' shows one box plot.
 ## The h5ad file is an AnnData object and here the obs attribute was used.
-## The variable final_analysis is renamed to cell states to reflect the content of the variable.
-## The box plot shows cell state on the x-axis and the gene expression of gene TNF on the y-axis.
+## The box plot shows final_analysis on the x-axis and the gene expression of gene TNF on the y-axis.
 ## The Box Plot shows the distribution of TNF expression across cell states, highlighting variations that may correlate with cell identity or condition.
 
 import os
@@ -43,9 +42,6 @@ def main():
     genes_df = pd.DataFrame(adata.var)
     genes_df.name = 'genes'
     genes_df['gene_id'] = genes_df.index
-
-    # Rename 'final_analysis' to 'cell state'
-    cells_df.rename(columns={"final_analysis": "cell state"}, inplace=True)
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
@@ -62,8 +58,8 @@ def main():
     gene_name = "TNF" 
 
     # The format f"Gene expression|{gene_name}(Gene expression)|{genes_df.index.get_loc(gene_name)}" is used to get the gene expression data for that specific gene
-    box_title = f"Gene expression for {gene_name} per cell state"
-    box_params = ["cell state", f"Gene expression|{gene_name}(Gene expression)|{genes_df.index.get_loc(gene_name)}"]
+    box_title = f"Gene expression for {gene_name} per final_analysis"
+    box_params = ["final_analysis", f"Gene expression|{gene_name}(Gene expression)|{genes_df.index.get_loc(gene_name)}"]
     box_size = [792, 472]
     box_position = [10, 10]
     

@@ -396,7 +396,10 @@ def create_app(
                 return "File must be a CSV", 400
             file.seek(0)
             # will this work? can we return progress to the client?
-            df = pd.read_csv(file.stream)
+            file_name = project.dir + "/table.csv"
+            file.save(file_name)
+            #df = pd.read_csv(file.stream)
+            df = pd.read_csv(file_name)
             print("In server.py add_datasource- df created")
             print("df is ready, calling project.add_datasource")
             project.add_datasource(

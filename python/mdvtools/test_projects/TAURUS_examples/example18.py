@@ -1,8 +1,13 @@
 import os
-import json
 import pandas as pd
+import scanpy as sc
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.table_plot import TablePlot
+import json 
+
+def convert_plot_to_json(plot):
+    """Convert plot data to JSON format."""
+    return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
 
 def create_table_plot(title, params, size, position):
     """Create and configure a TablePlot instance with the given parameters."""
@@ -12,37 +17,33 @@ def create_table_plot(title, params, size, position):
         size=size,
         position=position
     )
-    
     return plot
-
-def load_data(path):
-    """Load data from the specified CSV file."""
-    return pd.read_csv(path, low_memory=False)
-
-def convert_plot_to_json(plot):
-    """Convert plot data to JSON format."""
-    return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
 
 def main():
     """Main function to create the project and serve it."""
     # Constants
     project_path = os.path.expanduser('~/mdv/project')
-    data_path = '/Users/mariak/Documents/MDVmk/MDV/python/mdvtools/llm/sample_data/data_cells.csv'
     view_name = "default"
-    datasource_name = "datasource_name"
+    
+    # Load data using scanpy
+    data_path = "file_path"
+    adata = sc.read_h5ad(data_path)
+    cells_df = pd.DataFrame(adata.obs)
+    cells_df.name = 'cells'
+    
+    # Create a summary table of cell counts per cell type
+    cell_type_counts = cells_df['final_analysis'].value_counts().reset_index()
+    cell_type_counts.columns = ['Cell Type', 'Number of Cells']
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
     
-    # Load data
-    data_frame = load_data(data_path)
-
     # Add datasource
-    project.add_datasource(datasource_name, data_frame)
+    project.add_datasource('cell_type_counts', cell_type_counts)
 
     # TablePlot parameters
-    title="sample_id",
-    params = ["leiden", "ARVCF", "DOK3", "FAM210B", "GBGT1", "NFE2L2", "UBE2D4", "YPEL2"]
+    title = "Cell Type Counts"
+    params = ['Cell Type', 'Number of Cells']
     size = [792, 472]
     position = [10, 10]
 
@@ -51,7 +52,7 @@ def main():
     
     # Convert plot to JSON and set view
     table_plot_json = convert_plot_to_json(table_plot)
-    tableplot_view = {'initialCharts': {datasource_name: [table_plot_json]}}
+    tableplot_view = {'initialCharts': {'cell_type_counts': [table_plot_json]}}
     
     project.set_view(view_name, tableplot_view)
     project.set_editable(True)

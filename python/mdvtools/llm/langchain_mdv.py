@@ -1,6 +1,7 @@
 import time
 import logging
 from contextlib import contextmanager
+import os
 
 # Code Generation using Retrieval Augmented Generation + LangChain
 from typing import Callable
@@ -183,9 +184,37 @@ class ProjectChat():
             with time_block("b10: RAG prompt preparation"):
                 #! todo - allow for the ability to pass a path to some data that may not already be in the project?
                 # at least we should allow for multiple datasources. Do we even need to pass ds_name(s), or should the script look it (them) up for itself?
-                path_to_data = self.project.dir + "/anndata.h5ad"
+                #path_to_data = self.project.dir + "/anndata.h5ad"
+                #path_to_data = os.path.join(self.project.dir, os.listdir(self.project.dir)[0])
+
+                # List all files in the directory
+                files_in_dir = os.listdir(self.project.dir)
+
+                # Initialize variables
+                csv_file = None
+                h5ad_file = None
+
+                # Identify the CSV or H5AD file
+                for file in files_in_dir:
+                    if file.endswith(".csv"):
+                        csv_file = file
+                    elif file.endswith(".h5ad"):
+                        h5ad_file = file
+
+                # Determine the path_to_data
+                if csv_file:
+                    path_to_data = os.path.join(self.project.dir, csv_file)
+                elif h5ad_file:
+                    path_to_data = os.path.join(self.project.dir, h5ad_file)
+                else:
+                    raise FileNotFoundError("No CSV or H5AD file found in the directory.")
+
+                # path_to_data now contains the correct file path
+                #path_to_data = "data_cells.csv"
+                datasource_name = self.ds_name
+
                 #!!!!!! for now, assuming there will be an anndata.h5ad file in the project directory and will fail ungacefully if there isn't!!!!
-                prompt_RAG = get_createproject_prompt_RAG(self.project.id, path_to_data, response['output']) #self.ds_name, response['output'])
+                prompt_RAG = get_createproject_prompt_RAG(self.project.id, path_to_data, datasource_name, response['output']) #self.ds_name, response['output'])
                 prompt_RAG_template = PromptTemplate(
                     template=prompt_RAG,
                     input_variables=["context", "question"]
