@@ -10,16 +10,10 @@ on:
   push:
     branches:
       - dev
-    # testing with all dev pushes triggering the workflow - including this one.
-    # paths-ignore:
-    #   - '**.github/workflows/**' # Ignore changes to workflow files
-    # this was highlighted as an error:
-    # if: "contains(github.event.head_commit.message, '[deploy]')"
 
 jobs:
   build-and-push:
-    # testing with all dev pushes triggering the workflow - including this one.
-    # if: ${{ github.event.pull_request.merged || contains(github.event.head_commit.message, '[deploy]') }} # Only run for PR merge or push with "[deploy]"
+    if: ${{ github.event.pull_request.merged || contains(github.event.head_commit.message, '[deploy]') }} # Only run for PR merge or push with "[deploy]"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
