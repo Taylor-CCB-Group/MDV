@@ -9,7 +9,8 @@
                 "ms-python.python",
                 "ms-azuretools.vscode-docker",
                 "biomejs.biome",
-                "ms-toolsai.jupyter"
+                "ms-toolsai.jupyter",
+                "github.vscode-github-actions"
             ]
         }
     }
