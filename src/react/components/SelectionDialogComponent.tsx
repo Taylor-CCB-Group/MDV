@@ -215,7 +215,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const value = fVal;
     // const value = fVal;
     const isInteger = column.datatype.match(/int/);
-    const step = isInteger ? 1 : 0.01;
+    const step = isInteger ? 1 : 0.001;
     const [debouncedValue] = useDebounce(value, 10);
 
     // Effect to manage the filter state
