@@ -1,6 +1,6 @@
 import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Slider, TextField, type TextFieldProps, Typography, Select } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, TextField, type TextFieldProps, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef } from "react";
 
@@ -19,10 +19,7 @@ import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
-import { useOuterContainer } from "../screen_state";
 import * as d3 from 'd3';
-import { brushX } from "d3-brush";
-import { isArray } from "@/lib/utils";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -259,7 +256,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     return { value, step, histogram, lowFraction, highFraction, queryHistogram };
 }
 // type set2d = ReturnType<typeof useState<[number, number]>>[1];
-type set2d = (v: [number, number]) => void;
+type set2d = (v: [number, number] | null) => void;
 type RangeProps = ReturnType<typeof useRangeFilter> & {
     setValue: set2d,
     minMax: [number, number],
@@ -268,18 +265,19 @@ type RangeProps = ReturnType<typeof useRangeFilter> & {
     histoHeight: number, //height of the histogram
 };
 
-export const useBrushX = (
+const useBrushX = (
     ref: React.RefObject<SVGSVGElement>,
     { value, setValue, minMax, histoWidth, histoHeight }: RangeProps //consider different typing here
 ) => {
     const brushRef = useRef<(ReturnType<typeof d3.brushX>) | null>(null);
+    // we need to be able to respond to changes in value - but without causing an infinite loop
+    // or having the brush reset on every render
     const [initialValue] = useState(value);
 
     useEffect(() => {
         if (!ref.current) return;
 
         const svg = d3.select(ref.current);
-        // const { clientWidth } = ref.current;//clientWidth can change, we need to respond to that...
         // Set up brush
         const brush = d3.brushX()
             .handleSize(1)
@@ -299,7 +297,7 @@ export const useBrushX = (
                     });
                     setValue([start, end]);
                 } else {
-                    setValue(minMax); // Reset to full range if brush is cleared
+                    setValue(null); // null - reset to full range if brush is cleared
                 }
             });
 
@@ -325,17 +323,34 @@ export const useBrushX = (
         };
     }, [ref, setValue, minMax, histoWidth, histoHeight, initialValue]);
 
-    const clearBrush = useCallback(() => {
-        if (!ref.current || !brushRef.current) return;
-
+    const [debouncedValue] = useDebounce(value, 100, { 
+        equalityFn: (a, b) => {
+            //although the type of input argument is [number, number] | null - they are undefined when component is unmounted
+            //! which causes an exception here which breaks the whole chart
+            //so rather than checking === null, we check for falsy values
+            if (!a && !b) return true;
+            if (!a || !b) return false;
+            return a[0] === b[0] && a[1] === b[1];
+        }
+    });
+    const setBrushValue = useCallback((v: [number, number] | null) => {
+        if (!brushRef.current || !ref.current) return;
         const svg = d3.select(ref.current);
-        //@ts-ignore life is too short
-        svg.select(".brush").call(brushRef.current.move, null);
-    }, [ref]);
 
-    // return { clearBrush };
-    // this seems to be working reasonably well 🤞
-    if (value === null) clearBrush();
+        if (v === null) {
+            //@ts-ignore life is too short
+            svg.select(".brush").call(brushRef.current.move, null);
+            return;
+        }
+        const [start, end] = v;
+        const x0 = (start - minMax[0]) / (minMax[1] - minMax[0]) * histoWidth;
+        const x1 = (end - minMax[0]) / (minMax[1] - minMax[0]) * histoWidth;
+        //@ts-ignore life is too short
+        svg.select(".brush").call(brushRef.current.move, [x0, x1]);
+    }, [minMax, histoWidth, ref]);//why doesn't biome think we need brushRef?
+    useEffect(() => {
+        setBrushValue(debouncedValue);
+    }, [debouncedValue, setBrushValue]);
 };
 const Histogram = observer((props: RangeProps) => {
     const { histogram: data, queryHistogram, value } = props;
@@ -387,7 +402,7 @@ const Histogram = observer((props: RangeProps) => {
             />
             {/* d3.brushX will add more elements as a side-effect, handled in hook */}
         </svg>
-        <p className="flex justify-between"><em>{`${v[0].toFixed(2)}<`}</em> <em>{`<${v[1].toFixed(2)}`}</em></p>
+        {/* <p className="flex justify-between"><em>{`${v[0].toFixed(2)}<`}</em> <em>{`<${v[1].toFixed(2)}`}</em></p> */}
         </>
     );
 });
@@ -396,28 +411,31 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
     const rangeProps = useRangeFilter(column);
     const { value, step } = rangeProps;
-    const setValue = useCallback((newValue: [number, number]) => {
+    const [min, max] = column.minMax;
+    const setValue = useCallback((newValue: [number, number] | null) => {
+        if (newValue) {
+            if (newValue[0] < min) newValue[0] = min;
+            if (newValue[1] > max) newValue[1] = max;
+        }
         action(() => filters[column.field] = newValue)();
-    }, [filters, column.field]);
+    }, [filters, column.field, min, max]);
+    const low = value ? value[0] : min;
+    const high = value ? value[1] : max;
     return (
         <div>
             <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} histoWidth={99} histoHeight={100} />
-            {/* <Slider
-                size="small"
-                value={value}
-                min={column.minMax[0]}
-                max={column.minMax[1]}
-                step={step}
-                onChange={(_, newValue) => setValue(newValue as [number, number])}
-            />
             <div>
                 <TextField size="small" className="max-w-20" type="number"
-                    value={value[0]}
-                    onChange={(e) => setValue([Number(e.target.value), value[1]])} />
+                    variant="standard"
+                    value={low}
+                    onChange={(e) => setValue([Number(e.target.value), high])}
+                />
                 <TextField size="small" className="max-w-20 float-right" type="number"
-                    value={value[1]}
-                    onChange={(e) => setValue([value[0], Number(e.target.value)])} />
-            </div> */}
+                    variant="standard"
+                    value={high}
+                    onChange={(e) => setValue([low, Number(e.target.value)])} 
+                />
+            </div>
         </div>
     );
 });

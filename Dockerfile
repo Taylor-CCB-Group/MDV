@@ -22,7 +22,16 @@ WORKDIR /app/python
 RUN poetry config virtualenvs.create false
 # trouble with this is that it doesn't have the mdvtools code yet...
 # still worth installing heavy dependencies here
-RUN poetry install --with dev,backend 
+# BUT - 
+#16 20.81 Installing the current project: mdvtools (0.0.1)
+#16 20.81 
+#16 20.81 Warning: The current project could not be installed: [Errno 2] No such file or directory: '/app/python/README.md'
+#16 20.81 If you do not want to install the current project use --no-root.
+#16 20.81 If you want to use Poetry only for dependency management but not for packaging, you can disable package mode by setting package-mode = false in your pyproject.toml file.
+#16 20.81 In a future version of Poetry this warning will become an error!
+# seems to be ok to first install with --no-root for dependencies, then install the root package later
+# we don't want to set package-mode = false in pyproject.toml
+RUN poetry install --with dev,backend --no-root
 
 WORKDIR /app
 # copy the package.json and package-lock.json as a separate step so npm install can be cached

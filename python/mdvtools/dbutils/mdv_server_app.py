@@ -103,6 +103,7 @@ def wait_for_database():
         except Exception as e:
             print(f"An unexpected error occurred while waiting for the database: {e}")
             raise  # Re-raise the exception to be handled by the parent
+            # ^^ should this be `raise e` instead?
 
     # If the loop completes without a successful connection
     error_message = "Error: Database did not become available in time."
@@ -223,7 +224,7 @@ def serve_projects_from_db(app):
 
                 except Exception as e:
                     print(f"Error serving project '{project.path}': {e}")
-                    raise
+                    # don't `raise` here; continue serving other projects
             else:
                 print(f"Error : Project path '{project.path}' does not exist.")
                 
