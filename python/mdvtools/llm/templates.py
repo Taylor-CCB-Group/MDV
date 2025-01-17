@@ -1,3 +1,4 @@
+from mdvtools.mdvproject import MDVProject
 
 prompt_data = """
 Based on the question asked and the dataframes provided, please perform the following steps:
@@ -42,8 +43,19 @@ def convert_plot_to_json(plot):
 
 """
 
-# this is Maria's un-sullied prompt - apart from the project_id... and maybe some other stuff...
-def get_createproject_prompt_RAG(project_id: str, path_to_data: str, datasouce_name: any, final_answer: str):
+def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasouce_name: any, final_answer: str) -> str:
+    """
+    Returns the prompt for the create project RAG.
+    
+    Args:
+    project: MDVProject we pass in the project object to get the project directory - previously we were passing the project id
+      and making (wrong) assumptions about the project directory based on that - while also being less.
+    path_to_data: str, path to an anndata object, subject to change
+    datasouce_name: any, we need to better clarify how we reason about multi-ds queries etc...
+    final_answer: str, output from the dataframe agent, which should contain a list of column names to be used in generating the view
+        - note: what does this mean in cases where we are trying to make multiple charts, belonging to different datasources, etc?
+    """
+    assert isinstance(project, MDVProject)
     prompt_RAG = (
         """
 Context: {context}
@@ -54,9 +66,9 @@ data from a file, creating a plot using specific parameters, and serving the vis
 
 All scripts in the context share a common workflow:
 
-Setup: Define the project path, data path, and view name, the project path should always be: project_path = os.path.expanduser('~/mdv/"""
-        + project_id
-        + """')
+Setup: Define the project path, data path, and view name, the project path should always be: project_path = '"""
+        + project.dir
+        + """'
 Plot function definition: Define the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot) using a function in the same way as the context.
 Project Creation: Initialize an MDVProject instance using the method: MDVProject(project_path, delete_existing=True).
 Data Loading: Load data from the specified file into a pandas DataFrame using the load_data(data_path) function.

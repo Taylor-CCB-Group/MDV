@@ -214,7 +214,9 @@ class ProjectChat():
                 datasource_name = self.ds_name
 
                 #!!!!!! for now, assuming there will be an anndata.h5ad file in the project directory and will fail ungacefully if there isn't!!!!
-                prompt_RAG = get_createproject_prompt_RAG(self.project.id, path_to_data, datasource_name, response['output']) #self.ds_name, response['output'])
+                # we pass a reference to the actual project object and let figuring out the path be an internal implementation detail...
+                # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
+                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_name, response['output']) #self.ds_name, response['output'])
                 prompt_RAG_template = PromptTemplate(
                     template=prompt_RAG,
                     input_variables=["context", "question"]
