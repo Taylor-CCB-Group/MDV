@@ -1127,7 +1127,7 @@ class MDVProject:
         label: Optional[str] = None,
         sparse=False,
     ):
-        """ """
+        """Add rows as columns in a subgroup."""
         name = name if name else stub
         label = label if label else name
         h5 = self._get_h5_handle()
@@ -1135,11 +1135,12 @@ class MDVProject:
         if not isinstance(ds, h5py.Group):
             raise AttributeError(f"{row_ds} is not a group")
         if name in ds:
-            raise
-        gr = ds.create_group(name)  # we could check for existing name first...
-        # sparse is passed as an argument - maybe we should infer it automatically from the data
-        # (isinstance of spmatrix)
+            raise ValueError(f"Group '{name}' already exists in {row_ds}.")
+        
+        gr = ds.create_group(name)
+        
         if sparse:
+            # Handle sparse matrix
             gr.create_dataset(
                 "x", (len(data.data),), data=data.data, dtype=numpy.float32
             )
@@ -1148,13 +1149,20 @@ class MDVProject:
             )
             gr.create_dataset("p", (len(data.indptr),), data=data.indptr)
         else:
-            length = data.shape[0]
-            # we should assert and test that the shape dimensions correspond to number of rows in row_ds & col_ds
-            total_len = data.shape[0] * data.shape[1]
+            # Handle dense matrix
+            if not hasattr(data, "toarray"):
+                raise TypeError("Dense data must be a NumPy array or convertible to one.")
+            
+            dense_data = data.toarray() if hasattr(data, "toarray") else data
+            total_len = dense_data.shape[0] * dense_data.shape[1]
             gr.create_dataset(
-                "x", (total_len,), data=data.flatten("F"), dtype=numpy.float32
+                "x", (total_len,),
+                data=dense_data.flatten(order="F"),
+                dtype=numpy.float32
             )
-            gr["length"] = [length]
+            gr["length"] = [dense_data.shape[0]]
+
+        # Update metadata
         ds = self.get_datasource_metadata(row_ds)
         ds["links"][col_ds]["rows_as_columns"]["subgroups"][stub] = {
             "name": name,
