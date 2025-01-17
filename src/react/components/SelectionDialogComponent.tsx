@@ -215,7 +215,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const value = fVal;
     // const value = fVal;
     const isInteger = column.datatype.match(/int/);
-    const step = isInteger ? 1 : 0.01;
+    const step = isInteger ? 1 : 0.001;
     const [debouncedValue] = useDebounce(value, 10);
 
     // Effect to manage the filter state
@@ -414,11 +414,14 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const [min, max] = column.minMax;
     const setValue = useCallback((newValue: [number, number] | null) => {
         if (newValue) {
+            // constrain with min, max and step
+            newValue[0] = Math.round(newValue[0] / step) * step;
+            newValue[1] = Math.round(newValue[1] / step) * step;
             if (newValue[0] < min) newValue[0] = min;
             if (newValue[1] > max) newValue[1] = max;
         }
         action(() => filters[column.field] = newValue)();
-    }, [filters, column.field, min, max]);
+    }, [filters, column.field, min, max, step]);
     const low = value ? value[0] : min;
     const high = value ? value[1] : max;
     return (
