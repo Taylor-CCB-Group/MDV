@@ -6,7 +6,7 @@ services:
     ports:
       - "5055:5055"
     volumes:
-      - mdv-data:/app/mdv 
+      - mdv-data:/root/mdv 
     depends_on:
       - mdv_db
     secrets:
