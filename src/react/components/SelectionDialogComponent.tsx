@@ -256,10 +256,11 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     return { value, step, histogram, lowFraction, highFraction, queryHistogram };
 }
 // type set2d = ReturnType<typeof useState<[number, number]>>[1];
-type set2d = (v: [number, number] | null) => void;
+type Range = [number, number];
+type set2d = (v: Range | null) => void; //nb, setting undefined can actually be problematic
 type RangeProps = ReturnType<typeof useRangeFilter> & {
     setValue: set2d,
-    minMax: [number, number],
+    minMax: Range,
     // probably want to review how these are specified / controlled
     histoWidth: number, //number of bins
     histoHeight: number, //height of the histogram
@@ -297,6 +298,8 @@ const useBrushX = (
                     });
                     setValue([start, end]);
                 } else {
+                    // warning - the null value here does behave distinctly differently from undefined
+                    // e.g. as of this writing, the reset button will be glitchy if we don't use null here
                     setValue(null); // null - reset to full range if brush is cleared
                 }
             });
@@ -333,7 +336,7 @@ const useBrushX = (
             return a[0] === b[0] && a[1] === b[1];
         }
     });
-    const setBrushValue = useCallback((v: [number, number] | null) => {
+    const setBrushValue = useCallback<set2d>((v) => {
         if (!brushRef.current || !ref.current) return;
         const svg = d3.select(ref.current);
 
@@ -412,7 +415,7 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const rangeProps = useRangeFilter(column);
     const { value, step } = rangeProps;
     const [min, max] = column.minMax;
-    const setValue = useCallback((newValue: [number, number] | null) => {
+    const setValue = useCallback<set2d>((newValue) => {
         if (newValue) {
             // constrain with min, max and step
             newValue[0] = Math.round(newValue[0] / step) * step;
@@ -457,7 +460,7 @@ const Components: {
 
 const AbstractComponent = observer(function AbstractComponent<K extends DataType>({ column }: Props<K>) {
     const Component = Components[column.datatype] as React.FC<Props<K>>;
-    //todo: consider reset (& delete / active toggle?) for each filter
+    //todo: consider reset (& invert / active toggle?) for each filter
     const config = useConfig<SelectionDialogConfig>();
     const { filters } = config;
     const f = filters[column.field];
