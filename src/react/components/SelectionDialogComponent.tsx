@@ -20,6 +20,8 @@ import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import * as d3 from 'd3';
+import { ErrorBoundary } from "react-error-boundary";
+import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -341,6 +343,7 @@ const useBrushX = (
         const svg = d3.select(ref.current);
 
         if (!v) {
+            // throw new Error("this is actually ok, but I want to test the error handling");
             //@ts-ignore life is too short
             svg.select(".brush").call(brushRef.current.move, null);
             return;
@@ -519,7 +522,11 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
                 </div>
             </AccordionSummary>
             <AccordionDetails>
-                <Component column={column} />
+                <ErrorBoundary FallbackComponent={
+                    ({ error }) => <ErrorDisplay error={error} title="Unexpected Error: please report to developers." />
+                    }>
+                    <Component column={column} />
+                </ErrorBoundary>
             </AccordionDetails>
         </Accordion>
     );
