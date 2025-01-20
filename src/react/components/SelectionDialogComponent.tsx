@@ -463,7 +463,6 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
     const f = filters[column.field];
     // todo: what about category filters with empty array?
     const hasFilter = (f !== null);
-    const [defaultExpanded] = useState(hasFilter);
     const [isHovered, setIsHovered] = useState(false);
     const clearFilter = useCallback(
         action((e: MouseEvent) => {
@@ -482,7 +481,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
         console.log('Delete item');
     }, [filters, column.field, config]);
     return (
-        <Accordion defaultExpanded={defaultExpanded}
+        <Accordion defaultExpanded={true}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
