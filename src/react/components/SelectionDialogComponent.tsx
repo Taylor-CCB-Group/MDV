@@ -337,7 +337,7 @@ const useBrushX = (
         if (!brushRef.current || !ref.current) return;
         const svg = d3.select(ref.current);
 
-        if (v === null) {
+        if (!v) {
             //@ts-ignore life is too short
             svg.select(".brush").call(brushRef.current.move, null);
             return;
