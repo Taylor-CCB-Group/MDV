@@ -15,6 +15,10 @@
         }
     },
     "postStartCommand": "git config --global --add safe.directory /app"
+    //Note: when setting up a new user's development environment, first we had to install
+    // a new WSL distro to clone the code into. Then we had some strange behaviour when
+    // first building the container, not sure how to reproduce it as it got resolved itself.
+    
     //"postCreateCommand": "npm run dev"
     //running a command that doesn't return will cause other issues
     //subsequent devcontainer steps like copying .gitconfig end up not happening...
