@@ -29,7 +29,7 @@ def main():
     data_path = "file_path"
     adata = sc.read_h5ad(data_path)
     cells_df = pd.DataFrame(adata.obs)
-    cells_df.name = 'cells'
+    datasource_name = "datasource_name"
     
     # Create a summary table of cell counts per cell type
     cell_type_counts = cells_df['final_analysis'].value_counts().reset_index()
@@ -39,7 +39,7 @@ def main():
     project = MDVProject(project_path, delete_existing=True)
     
     # Add datasource
-    project.add_datasource('cell_type_counts', cell_type_counts)
+    project.add_datasource(datasource_name, cell_type_counts)
 
     # TablePlot parameters
     title = "Cell Type Counts"
@@ -52,7 +52,7 @@ def main():
     
     # Convert plot to JSON and set view
     table_plot_json = convert_plot_to_json(table_plot)
-    tableplot_view = {'initialCharts': {'cell_type_counts': [table_plot_json]}}
+    tableplot_view = {'initialCharts': {datasource_name: [table_plot_json]}}
     
     project.set_view(view_name, tableplot_view)
     project.set_editable(True)

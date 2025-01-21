@@ -47,8 +47,7 @@ def main():
     cells_df = pd.DataFrame(adata.obs)
 
     # Name datasource
-    datasource_name = 'cells'
-    #cells_df.name = datasource_name
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)

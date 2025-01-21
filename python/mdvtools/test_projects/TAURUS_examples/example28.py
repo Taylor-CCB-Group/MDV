@@ -37,13 +37,13 @@ def main():
     data_path = "file_path"
     adata = sc.read_h5ad(data_path)
     cells_df = pd.DataFrame(adata.obs)
-    cells_df.name = 'cells'
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
     
     # Add datasource
-    project.add_datasource('cells', cells_df)
+    project.add_datasource(datasource_name, cells_df)
     
     # PieChart parameters
     pie_title = "Cell Type Composition in TAURUS Dataset"
@@ -56,7 +56,7 @@ def main():
     
     # Convert plot to JSON and set view
     pie_chart_json = convert_plot_to_json(pie_chart)
-    pie_chart_view = {'initialCharts': {'cells': [pie_chart_json]}}
+    pie_chart_view = {'initialCharts': {datasource_name: [pie_chart_json]}}
     
     project.set_view(view_name, pie_chart_view)
     project.set_editable(True)

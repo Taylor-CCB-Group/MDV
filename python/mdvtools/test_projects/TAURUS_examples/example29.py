@@ -28,13 +28,13 @@ def main():
     data_path = "file_path"
     adata = sc.read_h5ad(data_path)
     cells_df = pd.DataFrame(adata.obs)
-    cells_df.name = 'cells'
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
     
     # Add datasource
-    project.add_datasource('cells', cells_df)
+    project.add_datasource(datasource_name, cells_df)
     
     # StackedRowChart parameters
     stacked_title = "Number of Cells in Healthy vs Diseased Samples"
@@ -52,7 +52,7 @@ def main():
     # Convert plot to JSON and set view
     stacked_row_plot_json = convert_plot_to_json(stacked_row_plot)
     
-    view_config = {'initialCharts': {'cells': [stacked_row_plot_json]}}
+    view_config = {'initialCharts': {datasource_name: [stacked_row_plot_json]}}
     
     project.set_view(view_name, view_config)
     project.set_editable(True)

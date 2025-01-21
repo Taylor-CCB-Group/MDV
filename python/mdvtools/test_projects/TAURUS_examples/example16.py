@@ -67,7 +67,7 @@ def main():
     data_path = "file_path"
     adata = sc.read_h5ad(data_path)
     cells_df = pd.DataFrame(adata.obs)
-    cells_df.name = 'cells'
+    datasource_name = "datasource_name"
    
     # Add UMAP data to the dataframe
     umap_np = np.array(adata.obsm["X_umap"])
@@ -78,11 +78,11 @@ def main():
     project = MDVProject(project_path, delete_existing=True)
     
     # Add datasource
-    project.add_datasource('cells', cells_df)
+    project.add_datasource(datasource_name, cells_df)
 
     # Update datasource with the new columns provided through the scanpy object
-    project.set_column('cells', "UMAP 1", cells_df["UMAP 1"])
-    project.set_column('cells', "UMAP 2", cells_df["UMAP 2"])
+    project.set_column(datasource_name, "UMAP 1", cells_df["UMAP 1"])
+    project.set_column(datasource_name, "UMAP 2", cells_df["UMAP 2"])
     
     # StackedRowChart parameters for cell phase distribution
     stacked_title = "Distribution of Cell Phases"
@@ -137,7 +137,7 @@ def main():
     dot_plot_json = convert_plot_to_json(dot_plot)
     box_plot_json = convert_plot_to_json(box_plot)
     
-    view_config = {'initialCharts': {'cells': [stacked_row_plot_json, scatter_plot_json, dot_plot_json, box_plot_json]}}
+    view_config = {'initialCharts': {datasource_name: [stacked_row_plot_json, scatter_plot_json, dot_plot_json, box_plot_json]}}
     
     project.set_view(view_name, view_config)
     project.set_editable(True)

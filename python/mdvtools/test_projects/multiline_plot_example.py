@@ -20,7 +20,7 @@ def create_multi_line_plot(title, params, size, position, bandwith, intervals, s
     plot.set_bandwidth(bandwith)
     plot.set_intervals(intervals)
     plot.set_scaletrim(scale)
-        
+
     return plot
 
 def load_data(path):

@@ -61,13 +61,13 @@ def main():
     data_path = "file_path"
     adata = sc.read_h5ad(data_path)
     cells_df = pd.DataFrame(adata.obs)
-    cells_df.name = 'cells'
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
     
     # Add datasource
-    project.add_datasource('cells', cells_df)
+    project.add_datasource(datasource_name, cells_df)
     
     # Bar chart parameters
     title = "Number of samples per cell type"
@@ -92,7 +92,7 @@ def main():
     
     # Convert plot to JSON and set view
     bar_chart_json = convert_plot_to_json(bar_chart)
-    bar_chart_view = {'initialCharts': {'cells': [bar_chart_json]}}
+    bar_chart_view = {'initialCharts': {datasource_name: [bar_chart_json]}}
     
     project.set_view(view_name, bar_chart_view)
     project.set_editable(True)

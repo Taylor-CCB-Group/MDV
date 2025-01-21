@@ -21,9 +21,9 @@ def crawl_local_repo(
     """
 
     # List of files to ignore
-    ignore_list = ["__init__.py", "pbmc3k_tutorial.ipynb", "pbmc3k_tutorial.py", "dtypes_test.py", "TAURUS_example_copy.ipynb", "TAURUS_example.ipynb", "viv_mdv_plot_example.py"]
-#                   "example1.py",
-#                   "example2.py",
+    ignore_list = ["__init__.py", "pbmc3k_tutorial.ipynb", "pbmc3k_tutorial.py", "dtypes_test.py", "TAURUS_example_copy.ipynb", "TAURUS_example.ipynb", "viv_mdv_plot_example.py",
+                   "example1.py",
+                  "example2.py",
 #                   "example4.py",
 #                   "example3.py",
 #                   "example5.py",
@@ -41,12 +41,12 @@ def crawl_local_repo(
  #                  "example17.py",
 #                   "example18.py",
 #                   "example19.py",
-#                   "example20.py",
+                   "example20.py",
 #                   "example21.py",
 #                   "example22.py",
 #                   "example23.py",
 #                   "example24.py",
-#                   "example26.py",
+                   "example26.py"]
 #                   "example27.py",
 #                   "example25.py",
 #                   "example28.py",

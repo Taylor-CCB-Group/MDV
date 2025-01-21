@@ -49,7 +49,7 @@ def main():
     cells_df = pd.DataFrame(adata.obs)
 
     # Name datasource
-    datasource_name = 'cells'
+    datasource_name = "datasource_name"
     cells_df.name = datasource_name
     
     # Create project

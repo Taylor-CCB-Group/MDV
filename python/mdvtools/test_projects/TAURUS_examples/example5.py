@@ -48,13 +48,13 @@ def main():
     data_path = "file_path"
     adata = sc.read_h5ad(data_path)
     cells_df = pd.DataFrame(adata.obs)
-    cells_df.name = 'cells'
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
     
     # Add datasource
-    project.add_datasource(cells_df.name, cells_df)
+    project.add_datasource(datasource_name, cells_df)
 
     # TablePlot parameters
     title = "All Data Table"
@@ -71,7 +71,7 @@ def main():
     
     # Convert plot to JSON and set view
     table_plot_json = convert_plot_to_json(table_plot)
-    tableplot_view = {'initialCharts': {cells_df.name: [table_plot_json]}}
+    tableplot_view = {'initialCharts': {datasource_name: [table_plot_json]}}
     
     project.set_view(view_name, tableplot_view)
     project.set_editable(True)

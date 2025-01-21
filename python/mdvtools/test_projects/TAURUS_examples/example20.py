@@ -41,13 +41,13 @@ def main():
     data_path = "file_path"
     adata = sc.read_h5ad(data_path)
     cells_df = pd.DataFrame(adata.obs)
-    cells_df.name = 'cells'
+    datasource_name = "datasource_name"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
     
     # Add datasource
-    project.add_datasource('cells', cells_df)
+    project.add_datasource(datasource_name, cells_df)
 
     # Add UMAP data to the dataframe
     umap_np = np.array(adata.obsm["X_umap"])
@@ -55,8 +55,8 @@ def main():
     cells_df["UMAP 2"] = umap_np[:, 1]
 
     # Update datasource with the new columns provided through the scanpy object
-    project.set_column('cells', "UMAP 1", cells_df["UMAP 1"])
-    project.set_column('cells', "UMAP 2", cells_df["UMAP 2"])
+    project.set_column(datasource_name, "UMAP 1", cells_df["UMAP 1"])
+    project.set_column(datasource_name, "UMAP 2", cells_df["UMAP 2"])
 
     # ScatterPlot parameters
     scatter_title = "UMAP Scatter Plot Colored by Disease Condition"
@@ -75,7 +75,7 @@ def main():
     # Convert plots to JSON and set view
     scatter_plot_json = convert_plot_to_json(scatter_plot)
     
-    view_config = {'initialCharts': {'cells': [scatter_plot_json]}}
+    view_config = {'initialCharts': {datasource_name: [scatter_plot_json]}}
     
     project.set_view(view_name, view_config)
     project.set_editable(True)
