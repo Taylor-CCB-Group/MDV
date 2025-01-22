@@ -153,6 +153,15 @@ class MDVProject:
         all_cols = set([x["field"] for x in md["columns"]])
         return [x for x in columns if x not in all_cols]
 
+    def get_datasource_names(self) -> list[str]:
+        """
+        Get a list of all datasource names in the project.
+        
+        Returns:
+            list[str]: A list of datasource names
+        """
+        return [ds["name"] for ds in self.datasources]
+    
     def set_interactions(
         self,
         interaction_ds: str,
