@@ -399,8 +399,8 @@ class MDVProject:
 
             print("In update_datasource_for_tiff")
             print(datasource_name)
-            print(existing_datasource)
-            print(datasource)
+            # print(existing_datasource)
+            # print(datasource)
             #datasources empty template
             # If the datasource doesn't exist, create a new one
             if (existing_datasource is None):
