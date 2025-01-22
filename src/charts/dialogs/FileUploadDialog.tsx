@@ -33,6 +33,7 @@ import { isArray } from "@/lib/utils";
 import processH5File, { CompressionError } from "./utils/h5Processing";
 import H5MetadataPreview from "./H5MetadataPreview";
 import ErrorDisplay from "./ErrorDisplay";
+import AnndataConflictDialog from "./AnndataConflictDialog";
 
 // Use dynamic import for the worker
 const DatasourceWorker = new Worker(new URL("./datasourceWorker.ts", import.meta.url), {
@@ -239,7 +240,8 @@ const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
 type UploadActionType = "SET_SELECTED_FILES" | "SET_IS_UPLOADING" 
 | "SET_IS_INSERTING" | "SET_SUCCESS" | "SET_ERROR" | "SET_IS_VALIDATING" 
 | "SET_VALIDATION_RESULT" | "SET_FILE_TYPE" | "SET_TIFF_METADATA"
-| "SET_H5_METADATA" | "SET_FILE_SUMMARY";
+| "SET_H5_METADATA" | "SET_FILE_SUMMARY" | "SET_CONFLICT_DATA" | "SET_SHOW_CONFLICT_DIALOG";
+
 // Reducer function
 const DEFAULT_REDUCER_STATE = {
     selectedFiles: [] as File[],
@@ -252,6 +254,8 @@ const DEFAULT_REDUCER_STATE = {
     fileType: null as "csv" | "tiff" | "tsv" | "h5" | null,
     tiffMetadata: null as unknown,
     h5Metadata: null as H5Metadata | unknown,
+    showReplaceDialog: false,
+    conflictData: null as { tempFolder: string;} | null,
 } as const;
 type ReducerState = typeof DEFAULT_REDUCER_STATE;
 // TODO - would be good to type this, this is not how I should be spending my weekend.
@@ -265,6 +269,8 @@ type ReducerPayload<T extends UploadActionType> = T extends "SET_SELECTED_FILES"
 : T extends "SET_VALIDATION_RESULT" ? { columnNames: string[], columnTypes: string[] }
 : T extends "SET_FILE_TYPE" ? "csv" | "tiff" | "tsv" | null
 : T extends "SET_TIFF_METADATA" ? unknown
+: T extends "SET_CONFLICT_DATA" ? { temp_folder: string;} | null
+: T extends "SET_SHOW_CONFLICT_DIALOG" ? boolean
 : never;
 type ReducerAction<T extends UploadActionType> = { type: T, payload: ReducerPayload<T> };
 const reducer = <T extends UploadActionType,>(state: ReducerState, action: { type: T, payload: any }) => {
@@ -289,6 +295,10 @@ const reducer = <T extends UploadActionType,>(state: ReducerState, action: { typ
             return { ...state, tiffMetadata: action.payload };
         case "SET_H5_METADATA":
             return { ...state, h5Metadata: action.payload };
+        case "SET_CONFLICT_DATA":
+            return { ...state, conflictData: action.payload };
+        case "SET_SHOW_CONFLICT_DIALOG":
+            return { ...state, showReplaceDialog: action.payload };
         default:
             return state;
     }
@@ -861,8 +871,26 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 throw new Error(`Server responded with status ${response.status}`);
             }
         } catch (error) {
-            console.error("Error uploading file:", error);
-            handleUploadError(error);
+            if (
+                axios.isAxiosError(error) &&
+                error.response?.status === 409
+            ) {
+                dispatch({ type: "SET_IS_UPLOADING", payload: false });
+                dispatch({ type: "SET_SUCCESS", payload: false });
+                dispatch({
+                    type: "SET_CONFLICT_DATA",
+                    payload: {
+                        temp_folder: error.response.data.temp_folder,
+                    },
+                });
+                dispatch({
+                    type: "SET_SHOW_CONFLICT_DIALOG",
+                    payload: true,
+                });
+            } else {
+                console.error("Error uploading file:", error);
+                handleUploadError(error);
+            }
         }
     };
 
@@ -890,6 +918,76 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         onResize(450, 320);
         onClose();
     }, [onClose, onResize]);
+
+    const handleCombineConfirm = async () => {
+        if (!state.conflictData) return;
+
+        const formData = new FormData();
+        formData.append("temp_folder", state.conflictData.temp_folder);
+        formData.append("combine", "true");
+
+        try {
+            const response = await axios.patch(
+                `${root}/combine_anndata`,
+                formData,
+                {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
+                },
+            );
+
+            if (response.status === 200) {
+                dispatch({ type: "SET_SUCCESS", payload: true });
+                if (state.fileType === "h5") {
+                    chartManager.saveState();
+                }
+            }
+        } catch (error) {
+            console.error("Error replacing file:", error);
+            handleUploadError(error);
+        } finally {
+            dispatch({ type: "SET_SHOW_CONFLICT_DIALOG", payload: false });
+            dispatch({ type: "SET_CONFLICT_DATA", payload: null });
+        }
+    };
+
+    const handleCombineCancel = async () => {
+        if (!state.conflictData) return;
+
+        const formData = new FormData();
+        formData.append("temp_folder", state.conflictData.temp_folder);
+        formData.append("combine", "false");
+
+        try {
+            const fullPath = `${root}/combine_anndata`;
+
+            const response = await axios.patch(fullPath, formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                    Accept: "application/json, text/plain, */*",
+                },
+            });
+            console.log("Response:", response);
+        } catch (error) {
+            console.error(
+                "Full URL that failed:",
+                `${root}/combine_anndata`,
+            );
+            if (axios.isAxiosError(error)) {
+                console.error("Response data:", error.response?.data);
+                console.error("Response status:", error.response?.status);
+            }
+            throw error;
+        } finally {
+            dispatch({ type: "SET_SHOW_CONFLICT_DIALOG", payload: false });
+            dispatch({ type: "SET_CONFLICT_DATA", payload: null });
+            dispatch({ type: "SET_VALIDATION_RESULT", payload: null });
+            dispatch({ type: "SET_H5_METADATA", payload: null });
+            dispatch({ type: "SET_SELECTED_FILES", payload: [] });
+            dispatch({ type: "SET_FILE_TYPE", payload: null });
+        }
+    };
 
     return (
         <Container>
@@ -924,6 +1022,12 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 </>
             ) : state.error ? (
                 <ErrorDisplay error={state.error} />
+            ) : state.showReplaceDialog ? (
+                <AnndataConflictDialog 
+                    open={state.showReplaceDialog}
+                    onClose={handleCombineCancel}
+                    onConfirm={handleCombineConfirm}
+                />
             ) : state.isValidating ? (
                 <StatusContainer>
                     <Message>{"Validating data, please wait..."}</Message>
