@@ -5,7 +5,7 @@ import nbformat
 mypath = os.path.dirname(__file__)
 
 # Define the relative path
-DIRECTORY_PATH = os.path.join(mypath, "../test_projects/")#TAURUS_examples/")
+DIRECTORY_PATH = os.path.join(mypath, "../RAG_examples/")
 
 def crawl_local_repo(
     directory_path: str = DIRECTORY_PATH
@@ -21,45 +21,10 @@ def crawl_local_repo(
     """
 
     # List of files to ignore
-    ignore_list = ["__init__.py", "pbmc3k_tutorial.ipynb", "pbmc3k_tutorial.py", "dtypes_test.py", "TAURUS_example_copy.ipynb", "TAURUS_example.ipynb", "viv_mdv_plot_example.py",
-                   "example1.py",
-                  "example2.py",
-#                   "example4.py",
-#                   "example3.py",
-#                   "example5.py",
-#                   "example6.py",
-#                   "example7.py",
-#                   "example8.py",
-#                   "example9.py",
-#                   "example10.py"]
- #                  "example11.py",
- #                  "example12.py",
- #                  "example14.py",
- #                  "example13.py",
- #                  "example15.py",
- #                  "example16.py",
- #                  "example17.py",
-#                   "example18.py",
-#                   "example19.py",
-                   "example20.py",
-#                   "example21.py",
-#                   "example22.py",
-#                   "example23.py",
-#                   "example24.py",
-                   "example26.py"]
-#                   "example27.py",
-#                   "example25.py",
-#                   "example28.py",
-#                   "example29.py",
-#                   "example30.py",
-#                   "example31.py",
-#                   "example32.py",
-#                   "example33.py",
-#                   "example34.py",]
+    ignore_list = ["__init__.py"]
 
     # Initialize an empty list to store file URLs
     files = []
-
 
     # Walk through the directory tree
     for root, dirs, file_names in os.walk(os.path.abspath(directory_path)):
