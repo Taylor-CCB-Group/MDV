@@ -156,6 +156,12 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
     return script
 
 def prepare_code(result: str, data: str | pd.DataFrame, log: callable = print, modify_existing_project=False, view_name="default"):
+    """Given a response from the LLM, extract the code and post-process it, 
+    attempting to ensure that 
+    - parameters are appropriately ordered.
+    - it will not run a server for the project
+    - etc
+    """
     original_script = extract_code_from_response(result)
 
     log("# Apply the reorder transformation")
@@ -200,3 +206,10 @@ else:
         final_code = final_code.replace("view_name = \"default\"", f"view_name = \"{view_name}\"")
         
     return final_code
+
+def parse_view_name(code: str):
+    view_name = re.search(r"view_name = \"(.*?)\"", code)
+    if view_name:
+        return view_name.group(1)
+    print("View name assignment not found in code.")
+    return "default"

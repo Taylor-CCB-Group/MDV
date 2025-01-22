@@ -13,6 +13,7 @@ import mimetypes
 import json
 import sys
 import re
+from mdvtools.llm.code_manipulation import parse_view_name
 from werkzeug.security import safe_join
 from mdvtools.websocket import mdv_socketio
 from mdvtools.mdvproject import MDVProject
@@ -157,7 +158,12 @@ def create_app(
             try:
                 if bot is None:
                     bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
-                return {"message": bot.ask_question(message)}
+                # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
+                # probably want to change the return type of this function, but for now we do some string parsing here.
+                final_code = bot.ask_question(message)
+                view_name = parse_view_name(final_code)
+                bot.log(f"view_name: {view_name}")
+                return {"message": final_code, "view": view_name}
             except Exception as e:
                 print(e)
                 return str(e), 500

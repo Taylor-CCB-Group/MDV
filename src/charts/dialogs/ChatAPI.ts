@@ -5,7 +5,10 @@ import { z } from 'zod';
 
 const responseSchema = z.object({
     message: z.string(),
-    // viewName: z.string(),
+    /** 
+     * This should be a string that identifies newly created views.
+     */
+    view: z.optional(z.string()),
 });
 
 // nb this is going to want to change a lot
@@ -45,7 +48,7 @@ export const useChatLog = () => {
         fetchChatLog();
         const interval = setInterval(fetchChatLog, 2000);
         return () => clearInterval(interval);
-    }, []);
+    }, [route]);
 
     return { chatLog, isLoading };
 }
@@ -102,7 +105,7 @@ const useChat = () => {
             setIsInit(true);
         };
         if (!isSending && !isInit) chatInit();
-    }, [isSending]);
+    }, [isSending, isInit, routeInit]);
 
     const appendMessage = (message: string, sender: 'bot' | 'user') => {
         const msg = { text: message, sender, id: generateId() };
@@ -119,12 +122,32 @@ const useChat = () => {
             setIsSending(true);
             const response = await sendMessage(input, route);
             appendMessage(response.message, 'bot');
+            if (response.view) navigateToView(response.view);
         } catch (error) {
             appendMessage(`Error: ${error}`, 'bot');
         }
         setIsSending(false);
     };
     return { messages, isSending, sendAPI };
+}
+
+/**
+ * This function is used to navigate to a different view.
+ * 
+ * ! doesn't belong in this file, I intend to refactor soon, but for quick prototyping it's here
+ */
+async function navigateToView(view: string) {
+    //todo - use this, but make sure it works with updated datasources etc...
+    //window.mdv.chartManager.changeView(view);
+
+    const params = new URLSearchParams(window.location.search);
+    params.set("view", view);
+    window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}?${params}`,
+    );
+    window.location.reload();
 }
 
 export default useChat;
