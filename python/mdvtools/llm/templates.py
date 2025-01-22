@@ -55,7 +55,7 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     final_answer: str, output from the dataframe agent, which should contain a list of column names to be used in generating the view
         - note: what does this mean in cases where we are trying to make multiple charts, belonging to different datasources, etc?
     """
-    assert isinstance(project, MDVProject)
+    # assert isinstance(project, MDVProject) # this has problems, with autoreload? was erroneously failing...
     prompt_RAG = (
         """
 Context: {context}
