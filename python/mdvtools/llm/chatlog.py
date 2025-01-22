@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 mypath = os.path.dirname(__file__)
+# this needs to be reviewed - causing trouble when running in different contexts
 json_keyfile_path = os.path.join(mypath, "../../../chatlog.json")
 
 # Function to ensure the JSON log file exists
@@ -55,7 +56,10 @@ def log_chat(output: Any, prompt_template: str, response: str):
     context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
 
     if file is not None:
-        log_to_json(context_information_metadata_url, output['query'], prompt_template, response)
+        try:
+            log_to_json(context_information_metadata_url, output['query'], prompt_template, response)
+        except Exception as e:
+            print(f"Error logging to json file: {e}")
     else:
         print("Json file does not exist. Skipping logging...")
     
