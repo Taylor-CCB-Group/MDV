@@ -7,6 +7,7 @@ from flask import (
     send_file,
     Response,
     jsonify,
+    current_app
 )
 import webbrowser
 import mimetypes
@@ -23,8 +24,10 @@ from mdvtools.project_router import (
 import os
 import pandas as pd
 from typing import Optional
-from datetime import datetime
-
+from datetime import datetime, timedelta
+import threading
+import scanpy as sc
+from mdvtools.conversions import convert_scanpy_to_mdv
 routes = set()
 
 
@@ -255,25 +258,123 @@ def create_app(
             success = False
 
         return jsonify({"success": success})
-    
+
+    # Utility Functions
+    def create_temp_folder(base_path):
+        """Create a temporary folder with a timestamp and return its path."""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        temp_folder_name = f"temp_anndata_{timestamp}"
+        temp_folder_path = os.path.join(base_path, temp_folder_name)
+        os.makedirs(temp_folder_path, exist_ok=True)
+        return temp_folder_path
+
+    def cleanup_folder(folder_path):
+        """Recursively clean up a folder and its contents."""
+        try:
+            if os.path.exists(folder_path):
+                for file in os.listdir(folder_path):
+                    file_path = os.path.join(folder_path, file)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                os.rmdir(folder_path)
+        except Exception as e:
+            current_app.logger.error(f"Error cleaning up folder {folder_path}: {e}")
+
+    def get_next_label(datasources):
+        """Generate the next available label based on existing datasource names."""
+        import string
+        prefixes = [s.split("_")[0] for s in datasources if "_" in s and s.split("_")[0].isalpha()]
+        if not prefixes:
+            return "A"
+
+        max_letter = max(prefixes, key=lambda x: string.ascii_uppercase.index(x.upper()))
+        max_index = string.ascii_uppercase.index(max_letter.upper())
+
+        # If the next index exceeds 'Z', raise an error
+        if max_index + 1 >= len(string.ascii_uppercase):
+            raise ValueError("Exceeded maximum label limit (Z).")
+
+        return string.ascii_uppercase[max_index + 1]
+
     @project_bp.route("/add_anndata", access_level='editable', methods=["POST"])
     def add_anndata():
-        from mdvtools.conversions import convert_scanpy_to_mdv
         try:
-            # Check if request has a file part
             if 'file' not in request.files:
-                return "No file part in the request", 400
-            file = request.files['file']
-            import scanpy as sc
-            # "argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileStorage'"
-            file_name = project.dir + "/anndata.h5ad"
-            file.save(file_name)
-            anndata = sc.read(file_name)
-            convert_scanpy_to_mdv(project.dir, anndata)
-            return "Anndata added successfully", 200
-        except Exception as e:
-            return str(e), 500
+                return jsonify({'status': 'error', 'message': 'No file part in the request'}), 400
 
+            file = request.files['file']
+            if not file or not file.filename:
+                return jsonify({'status': 'error', 'message': 'No file selected'}), 400
+
+            if not file.filename.endswith('.h5ad'):
+                return jsonify({'status': 'error', 'message': 'Invalid file type. Only .h5ad files are allowed'}), 400
+
+            target_path = os.path.join(project.dir, "anndata.h5ad")
+            if os.path.exists(target_path):
+                temp_folder = create_temp_folder(project.dir)
+                temp_path = os.path.join(temp_folder, "anndata.h5ad")
+                file.save(temp_path)
+
+                threading.Timer(300, cleanup_folder, args=[temp_folder]).start()
+                return jsonify({
+                    'status': 'conflict',
+                    'message': 'File already exists',
+                    'temp_folder': temp_folder
+                }), 409
+
+            # Save file and process
+            file.save(target_path)
+            anndata = sc.read(target_path)
+            convert_scanpy_to_mdv(project.dir, anndata)
+            return jsonify({'status': 'success', 'message': 'Anndata added successfully'}), 200
+
+        except Exception as e:
+            current_app.logger.error(f"Unexpected error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    @project_bp.route("/combine_anndata", access_level='editable', methods=["PATCH"])
+    def combine_anndata():
+        try:
+            temp_folder = request.form.get('temp_folder')
+            combine = request.form.get('combine') == 'true'
+
+            if not temp_folder or not os.path.exists(temp_folder):
+                return jsonify({'status': 'error', 'message': 'Request timed out, please try uploading again'}), 408
+
+            if not combine:
+                cleanup_folder(temp_folder)
+                return jsonify({'status': 'success', 'message': 'Operation cancelled'}), 200
+
+            temp_path = os.path.join(temp_folder, "anndata.h5ad")
+            if not os.path.exists(temp_path):
+                return jsonify({'status': 'error', 'message': 'Temporary file not found'}), 400
+
+            # Process and replace the file
+            new_anndata = sc.read(temp_path)
+            mdv_project = MDVProject(project.dir)
+            next_label = get_next_label(mdv_project.get_datasource_names())
+
+            # Add label to original datasource if not labeled
+            if next_label == "A":
+                target_path = os.path.join(project.dir, "anndata.h5ad")
+                anndata = sc.read(target_path)
+                convert_scanpy_to_mdv(project.dir, anndata, delete_existing=True, label=f"{next_label}_")
+                next_label = "B"
+
+            # Process and replace the file
+            convert_scanpy_to_mdv(project.dir, new_anndata, delete_existing=False, label=f"{next_label}_")
+
+            new_anndata.write(os.path.join(project.dir, "anndata.h5ad"))
+            cleanup_folder(temp_folder)
+            return jsonify({'status': 'success', 'message': 'File replaced successfully'}), 200
+
+        except ValueError as ve:
+            current_app.logger.error(f"Label generation error: {str(ve)}")
+            return jsonify({'status': 'error', 'message': str(ve)}), 500
+        except Exception as e:
+            current_app.logger.error(f"Unexpected error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+    
     @project_bp.route("/add_or_update_image_datasource", access_level='editable', methods=["POST"])
     def add_or_update_image_datasource():
         try:
