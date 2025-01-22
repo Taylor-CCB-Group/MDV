@@ -191,12 +191,12 @@ class HistogramChart extends SVGChart {
     getSettings() {
         const settings = super.getSettings();
         const c = this.config;
-        const maxMin = this.dataStore.getMinMaxForColumn(c.param);
+        const minMax = this.dataStore.getMinMaxForColumn(c.param);
         return settings.concat([
             {
                 type: "doubleslider",
-                min: maxMin[0],
-                max: maxMin[1],
+                min: minMax[0],
+                max: minMax[1],
                 doc: this.__doc__ || document,
                 current_value: [c.display_min, c.display_max],
                 label: "max min values",
