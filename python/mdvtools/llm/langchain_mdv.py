@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data, get_updateproject_prompt_RAG
-from .code_manipulation import prepare_code
+from .code_manipulation import parse_view_name, prepare_code
 from .code_execution import execute_code
 
 import matplotlib
@@ -149,17 +149,20 @@ class ProjectChat():
                 self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
             with time_block("b8: Pandas agent creating"):
                 if len(project.datasources) == 1:
-                    self.agent = lp.create_pandas_dataframe_agent( # handle_parse_errors no longer supported
-                        self.dataframe_llm, self.df, verbose=True, allow_dangerous_code=True
+                    self.agent = lp.create_pandas_dataframe_agent( # handle_parsing_errors no longer supported
+                        self.dataframe_llm, self.df, verbose=True, allow_dangerous_code=True,
+                        # handle_parsing_errors="Error in pandas agent"
                     )
                 elif len(project.datasources) == 2:
                     self.agent = lp.create_pandas_dataframe_agent(
-                        self.dataframe_llm, [self.df, self.df1], verbose=True, allow_dangerous_code=True
+                        self.dataframe_llm, [self.df, self.df1], verbose=True, allow_dangerous_code=True,
+                        # handle_parsing_errors="Error in pandas agent"
                     )
             self.ok = True
         except Exception as e:
             # raise ValueError(f"An error occurred while trying to create the agent: {e[:100]}")
             log(f"An error occurred while trying to create the agent: {str(e)[:100]}")
+            # todo keep better track of the state of the agent, what went wrong etc
             self.ok = False
 
     def ask_question(self, question: str): # async?
@@ -216,6 +219,8 @@ class ProjectChat():
                 #!!!!!! for now, assuming there will be an anndata.h5ad file in the project directory and will fail ungacefully if there isn't!!!!
                 # we pass a reference to the actual project object and let figuring out the path be an internal implementation detail...
                 # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
+                # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
+                # and the assert in the function is being triggered even though it should be fine
                 prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_name, response['output']) #self.ds_name, response['output'])
                 prompt_RAG_template = PromptTemplate(
                     template=prompt_RAG,
@@ -235,6 +240,7 @@ class ProjectChat():
 
             with time_block("b12: Prepare code"):
                 final_code = prepare_code(result, self.df, self.log, modify_existing_project=True, view_name=question)
+                # view_name = parse_view_name(final_code)
             # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
             # todo - save code at various stages of processing...
             # log_chat(output, prompt_RAG, final_code)
@@ -246,6 +252,7 @@ class ProjectChat():
                 return f"# Error: code execution failed\n> {stderr}"
             else:
                 self.log(final_code)
+                # we want to know the view_name to navigate to as well... for now we do that in the calling code
                 return f"I ran some code for you:\n\n```python\n{final_code}```"
         except Exception as e:
             return f"Error: {str(e)[:100]}"
