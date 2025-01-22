@@ -17,16 +17,12 @@ class ChatLogDialog extends BaseDialog {
             },
             null
         );
-        if (this.dialog) {
-            this.root = createMdvPortal(
-                <ProjectProvider>
-                    <ChatLogDialogComponent />
-                </ProjectProvider>,
-                this.dialog
-            );
-        } else {
-            console.error("Dialog element not found");
-        }
+        this.root = createMdvPortal(
+            <ProjectProvider>
+                <ChatLogDialogComponent />
+            </ProjectProvider>,
+            this.dialog
+        );
     }
     close(): void {
         super.close();

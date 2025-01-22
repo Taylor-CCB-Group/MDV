@@ -36,39 +36,39 @@ const Code = ({ code }: { code: string }) => {
     )
 }
 
-const LogTableItem = ({ item }: { item: ChatLogItem }) => {
-    return (
-        <tr>
-            <td><Response response={item.context} /></td>
-            <td><Response response={item.query} /></td>
-            <td><Response response={item.prompt_template} /></td>
-            <td><Code code={item.response} /></td>
-        </tr>
-    )
-}
+// const LogTableItem = ({ item }: { item: ChatLogItem }) => {
+//     return (
+//         <tr>
+//             <td><Response response={item.context} /></td>
+//             <td><Response response={item.query} /></td>
+//             <td><Response response={item.prompt_template} /></td>
+//             <td><Code code={item.response} /></td>
+//         </tr>
+//     )
+// }
 
-const ChatLogTable = () => {
-    const { chatLog } = useChatLog();
-    return (
-        <div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Context</th>
-                        <th>Query</th>
-                        <th>Prompt template</th>
-                        <th>Response</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {chatLog.map((item, index) => (
-                        <LogTableItem key={index} item={item} />
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    )
-}
+// const ChatLogTable = () => {
+//     const { chatLog } = useChatLog();
+//     return (
+//         <div>
+//             <table>
+//                 <thead>
+//                     <tr>
+//                         <th>Context</th>
+//                         <th>Query</th>
+//                         <th>Prompt template</th>
+//                         <th>Response</th>
+//                     </tr>
+//                 </thead>
+//                 <tbody>
+//                     {chatLog.map((item, index) => (
+//                         <LogTableItem key={index} item={item} />
+//                     ))}
+//                 </tbody>
+//             </table>
+//         </div>
+//     )
+// }
 
 const LogItem = ({ item }: { item: ChatLogItem }) => {
     return (
@@ -84,7 +84,7 @@ const LogItem = ({ item }: { item: ChatLogItem }) => {
 const ChatLog = () => {
     const { chatLog } = useChatLog();
     return (
-        <Accordion type='multiple' collapsible>
+        <Accordion type='multiple'>
             {chatLog.map((item) => (
                 <LogItem key={item.query} item={item} />
             ))}
