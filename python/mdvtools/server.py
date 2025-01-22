@@ -366,7 +366,7 @@ def create_app(
 
             new_anndata.write(os.path.join(project.dir, "anndata.h5ad"))
             cleanup_folder(temp_folder)
-            return jsonify({'status': 'success', 'message': 'File replaced successfully'}), 200
+            return jsonify({'status': 'success', 'message': 'File merged successfully'}), 200
 
         except ValueError as ve:
             current_app.logger.error(f"Label generation error: {str(ve)}")
