@@ -423,3 +423,7 @@ select, input, textarea {
     bottom: 0 !important;
     right: 0 !important;
 }
+.invalid {
+    background-color: var(--background_color_error);
+    color: var(--text_color_error);
+}
