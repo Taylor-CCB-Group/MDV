@@ -48,13 +48,7 @@ def main():
     size = [792, 472]
     position = [10, 10]
 
-    bandwith = 0.1
-    intervals = 40
-    scale = "0.001"
-
-    legend_display = True
-    legend_position = [375,1]
-              
+    legend_display = True              
     
     xaxis_properties = {"label": "label1", 
              "textSize": 13, 
