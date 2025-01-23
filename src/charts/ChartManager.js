@@ -1028,6 +1028,8 @@ class ChartManager {
                 label: "name",
                 // todo have some better reusability for this kind of validation
                 // (also probably refactor this dialog into react)
+                // considered returning a string to set a tooltip or something, parked that idea for now pending more thought/refactoring
+                // validate: (v) => this.viewSelect.childNodes.values().some(e => e.value === v) ? "Name already exists" : null,
                 validate: (v) => !this.viewSelect.childNodes.values().some(e => e.value === v),
             },
         ];

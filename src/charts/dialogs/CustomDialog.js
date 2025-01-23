@@ -241,6 +241,16 @@ class CustomDialog extends BaseDialog {
         this.controls[s.id] = ch;
     }
 
+    /**
+     * Create a text input field
+     * @param {object} s - settings object
+     * @param {string} s.id - id of the control
+     * @param {string} s.defaultValue - default value (optional)
+     * @param {function} s.validate - function to validate the input (optional).
+     *  current implementation will check strict equality with true to determine if the input is valid,
+     *  returning a boolean. This value will be used to add or remove the 'invalid' class from the input field.
+     *  We may want to change this to allow for more complex behavior in the future (i.e. give the user some information).
+     */
     text(s, d) {
         const v = s.defaultValue || "";
         const t = createEl(
