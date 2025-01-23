@@ -5,7 +5,7 @@ import nbformat
 mypath = os.path.dirname(__file__)
 
 # Define the relative path
-DIRECTORY_PATH = os.path.join(mypath, "../RAG_examples/")
+DIRECTORY_PATH = os.path.join(mypath, "../test_projects/RAG_examples/")
 
 def crawl_local_repo(
     directory_path: str = DIRECTORY_PATH

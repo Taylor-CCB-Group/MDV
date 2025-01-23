@@ -29,6 +29,7 @@ from mdvtools.charts.violin_plot import ViolinPlot
 from mdvtools.charts.multi_line_plot import MultiLinePlot
 from mdvtools.charts.table_plot import TablePlot
 from mdvtools.charts.wordcloud_plot import WordcloudPlot
+from mdvtools.charts.text_box_plot import TextBox
 import json
 import numpy as np
 import sys
