@@ -1026,6 +1026,9 @@ class ChartManager {
                 type: "text",
                 id: "name",
                 label: "name",
+                // todo have some better reusability for this kind of validation
+                // (also probably refactor this dialog into react)
+                validate: (v) => !this.viewSelect.childNodes.values().some(e => e.value === v),
             },
         ];
         if (this.dataSources.length > 1) {

@@ -254,6 +254,14 @@ class CustomDialog extends BaseDialog {
         this.controlValues[s.id] = v;
         t.addEventListener("keyup", () => {
             this.controlValues[s.id] = t.value;
+            if (s.validate) {
+                const valid = s.validate(t.value);
+                if (valid === true) {
+                    t.classList.remove("invalid");
+                } else {
+                    t.classList.add("invalid");
+                }
+            }
         });
         this.controls[s.id] = t;
     }
