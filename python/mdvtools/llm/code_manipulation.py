@@ -161,6 +161,8 @@ def prepare_code(result: str, data: str | pd.DataFrame, log: callable = print, m
     - parameters are appropriately ordered.
     - it will not run a server for the project
     - etc
+    In the longer term, the intention is to move away from this approach, which is liable to break as the template changes,
+    or as soon as it gets into the hands of actual users...
     """
     original_script = extract_code_from_response(result)
 
@@ -208,6 +210,9 @@ else:
     return final_code
 
 def parse_view_name(code: str):
+    # when it it parses this - it should be more greedy about matching to the last \" in the line...
+    # and then as well as changing the view_name to be unique,
+    # it should try to escape e.g. any quotes or other special characters in the view_name...
     view_name = re.search(r"view_name = \"(.*?)\"", code)
     if view_name:
         return view_name.group(1)
