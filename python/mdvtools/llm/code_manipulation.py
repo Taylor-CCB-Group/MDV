@@ -1,6 +1,8 @@
 import pandas as pd
 import regex as re
 from .templates import packages_functions
+from mdvtools.mdvproject import MDVProject
+import json
 
 def extract_code_from_response(response: str):
     """Extracts Python code from a markdown string response."""
@@ -155,7 +157,8 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
 
     return script
 
-def prepare_code(result: str, data: str | pd.DataFrame, log: callable = print, modify_existing_project=False, view_name="default"):
+def prepare_code(result: str, data: str | pd.DataFrame, project: MDVProject, log: callable = print, 
+                 modify_existing_project=False, view_name="default"):
     """Given a response from the LLM, extract the code and post-process it, 
     attempting to ensure that 
     - parameters are appropriately ordered.
@@ -205,16 +208,44 @@ else:
         final_code = re.sub(r".*data_frame.*", "", final_code)
         final_code = final_code.replace("delete_existing=True", "delete_existing=False")
         # final_code = final_code.replace("\"default\"", f"\"{view_name}\"") # "default" was also used e.g. for `brush = "default"`
-        final_code = final_code.replace("view_name = \"default\"", f"view_name = \"{view_name}\"")
+        ## assumption of `view_name = "default"` being present in the code no longer holds - often it will include a nice view name
+        ## but sometimes there might be a problem with it clashing with existing views, or with quotes in the view name...
+        # final_code = final_code.replace("view_name = \"default\"", f"view_name = \"{view_name}\"")
+        # so we have a sticking plaster solution for this...
+        final_code = patch_viewname(final_code, project)
         
     return final_code
 
+def patch_viewname(code: str, project: MDVProject):
+    """Given a code string, replace the view_name with a unique name, 
+    attempting to escape any quotes that might have been in the original.
+    """
+    # Error: 'MDVProject' object is not callable... not sure where or why.
+    view_name = parse_view_name(code)
+    escaped_view_name = json.dumps(view_name) # this should escape any quotes in the view_name
+    existing_views = [k for k in project.views]
+    if view_name not in existing_views:
+        # just in case the view_name isn't a duplicate, but might have had quotes in it
+        return code.replace(view_name, escaped_view_name)
+    n = 1
+    new_view_name = f"{view_name} ({n})"
+    while new_view_name in existing_views:
+        n += 1
+        new_view_name = f"{view_name} ({n})"
+    return code.replace(view_name, new_view_name)
+
 def parse_view_name(code: str):
-    # when it it parses this - it should be more greedy about matching to the last \" in the line...
-    # and then as well as changing the view_name to be unique,
-    # it should try to escape e.g. any quotes or other special characters in the view_name...
-    view_name = re.search(r"view_name = \"(.*?)\"", code)
-    if view_name:
-        return view_name.group(1)
+    """Given a code string, extract the view_name from it.
+    This doesn't have any side-effects, but it's probably not very robust.
+    """
+    # when it it parses this - it should be greedy about matching to the last \" in the line...
+    name_match = re.search(r"view_name = \"(.+)\"", code)
+    if name_match:
+        view_name = name_match.group(1)
+        # try to escape e.g. any quotes or other special characters in the view_name...
+        # this seems to be a somewhat accepted method (at least, for this particular local problem)
+        # view_name = json.dumps(view_name) # this will be done in the patch_viewname function
+        return view_name
     print("View name assignment not found in code.")
+    print(code)
     return "default"

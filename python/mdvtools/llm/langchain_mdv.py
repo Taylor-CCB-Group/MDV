@@ -239,7 +239,7 @@ class ProjectChat():
                 result = output["result"]
 
             with time_block("b12: Prepare code"):
-                final_code = prepare_code(result, self.df, self.log, modify_existing_project=True, view_name=question)
+                final_code = prepare_code(result, self.df, self.project, self.log, modify_existing_project=True, view_name=question)
                 # view_name = parse_view_name(final_code)
             # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
             # todo - save code at various stages of processing...
