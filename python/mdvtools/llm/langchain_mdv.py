@@ -4,7 +4,7 @@ from contextlib import contextmanager
 import os
 
 # Code Generation using Retrieval Augmented Generation + LangChain
-from typing import Callable
+# from typing import Callable
 from mdvtools.mdvproject import MDVProject
 
 from langchain_openai import ChatOpenAI
@@ -29,6 +29,7 @@ from .local_files_utils import crawl_local_repo, extract_python_code_from_py, ex
 from .templates import get_createproject_prompt_RAG, prompt_data, get_updateproject_prompt_RAG
 from .code_manipulation import parse_view_name, prepare_code
 from .code_execution import execute_code
+from .chatlog import LangchainLoggingHandler
 
 import matplotlib
 
@@ -130,9 +131,11 @@ with time_block("b5: Retriever creating"):
 mock_agent = False
 
 class ProjectChat():
-    def __init__(self, project: MDVProject, log: Callable[[str], None] = print):
+    def __init__(self, project: MDVProject, logger: logging.Logger):
         self.project = project
-        self.log = log
+        self.langchain_logging_handler = LangchainLoggingHandler(logger)
+        self.config = {"callbacks": [self.langchain_logging_handler]}
+        log = self.log = logger.info
         if len(project.datasources) == 0:
             raise ValueError("The project does not have any datasources")
         elif len(project.datasources) > 1:
@@ -181,7 +184,7 @@ class ProjectChat():
         try:
             with time_block("b9b: Pandas agent invoking"):
                 # Argument of type "str" cannot be assigned to parameter "input" of type "Dict[str, Any]"
-                response = self.agent.invoke(full_prompt) # type: ignore for now
+                response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]}) # type: ignore for now
                 assert('output' in response) # we might allow
             #!!! csv_path is not wanted - the code tries to use that as data source name which is all wrong
             with time_block("b10: RAG prompt preparation"):

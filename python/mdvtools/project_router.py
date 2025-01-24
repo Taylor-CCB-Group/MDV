@@ -152,8 +152,8 @@ class ProjectBlueprint_v2:
 
         # find the item in self.routes that matches the subpath
         from mdvtools.dbutils.dbservice import ProjectService
-        print("***********************************")
-        print(subpath, project_id)
+        # print("***********************************")
+        # print(subpath, project_id)
         subpath = f"/{urlparse(subpath).path}"
         for rule, (method, options) in self.routes.items():
             match = rule.match(subpath)
@@ -175,10 +175,10 @@ class ProjectBlueprint_v2:
                 # - rather than iterating over (rule, method), we might have
                 # (rule, (method, permissionsFlags))
                 # we can check the request.token (or whatever it is) here...
-                print("options",options)
+                # print("options",options)
                 # Check for access level only if specified in options
                 if options and 'access_level' in options:
-                    print("match", match)
+                    # print("match", match)
                     #project_id = match.group(0).split('/')[2]  # Extract project_id from matched route
                     project = ProjectService.get_project_by_id(project_id)  # Fetch the project
                     

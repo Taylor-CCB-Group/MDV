@@ -102,6 +102,7 @@ const proxy = [
     '/projects',
     '/create_project',
     '/delete_project',
+    '/socket.io', //pending...
 // biome-ignore lint/performance/noAccumulatingSpread: don't care about performance in vite config
 ].reduce((acc, route) => ({...acc, [route]: proxyOptions}), {});
 // not sure how we should make the root route work with vite devserver...

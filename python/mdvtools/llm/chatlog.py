@@ -1,8 +1,13 @@
 import datetime
 import os
 import json
-from typing import Any
 from pathlib import Path
+import logging
+from typing import Any, Dict, List
+
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.messages import BaseMessage
+from langchain_core.outputs import LLMResult
 
 
 mypath = os.path.dirname(__file__)
@@ -62,4 +67,24 @@ def log_chat(output: Any, prompt_template: str, response: str):
             print(f"Error logging to json file: {e}")
     else:
         print("Json file does not exist. Skipping logging...")
-    
+
+class LangchainLoggingHandler(BaseCallbackHandler):
+    def __init__(self, logger: logging.Logger):
+        self.logger = logger
+        self.log = logger.info
+
+    def on_chat_model_start(
+        self, serialized: Dict[str, Any], messages: List[List[BaseMessage]], **kwargs
+    ) -> None:
+        self.log("Chat model started")
+
+    def on_llm_end(self, response: LLMResult, **kwargs) -> None:
+        self.log(f"Chat model ended, response: {response}")
+
+    def on_chain_start(
+        self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs
+    ) -> None:
+        self.log(f"Chain {serialized.get('name')} started")
+
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
+        self.log(f"Chain ended, outputs: {outputs}")

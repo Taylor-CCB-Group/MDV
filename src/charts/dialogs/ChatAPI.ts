@@ -91,8 +91,13 @@ const useChat = () => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isSending, setIsSending] = useState<boolean>(false);
     const [isInit, setIsInit] = useState<boolean>(false);
-
+    // console.log('chat route', route);
+    
     useEffect(() => {
+        window.mdv.chartManager.ipc.socket?.on(route, (data: any) => {
+            console.log('chat message', data);
+            //setMessages((prev) => [...prev, { text: data.message, sender: 'bot', id: generateId() }]);
+        });
         const chatInit = async () => {
             setIsSending(true);
             try {
@@ -105,7 +110,10 @@ const useChat = () => {
             setIsInit(true);
         };
         if (!isSending && !isInit) chatInit();
-    }, [isSending, isInit, routeInit]);
+        return () => {
+            window.mdv.chartManager.ipc.socket?.off(route);
+        }
+    }, [isSending, isInit, routeInit, route]);
 
     const appendMessage = (message: string, sender: 'bot' | 'user') => {
         const msg = { text: message, sender, id: generateId() };

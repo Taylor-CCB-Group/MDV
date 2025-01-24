@@ -51,13 +51,16 @@ type ChartMsgValue<T extends ChartEventNames> = T extends
 type MDVMessage = PopoutMessage | FilterMessage | ErrorMessage | PingMessage;
 
 /** initial experimental IPC support. As of this writing, will attempt to
- * - connect a 'vuplex' PostMessage interface for embedding in a VR environment in Unity
+ * - connect a 'vuplex' PostMessage interface for embedding in a VR environment in Unity (deprecated/no plans to use)
  * - connect a websocket to a socket.io server that will forward messages to other clients
- *    - started to use this for ai chatbot, but actually REST is probably better for that
+ *    - started to use this for ai chatbot, started using REST but may move back
  *    - could be useful for other things, like syncing views, or receiving updates from a server
  *      e.g. about new data (e.g. from some kind of data pipeline), or about new views to load.
  */
 export default async function connectIPC(cm: ChartManager) {
+    // not sure we'd get this from params - needs to match the server's socket.io endpoint
+    // which might need to be not at the root - but also at a higher level than us... 
+    // unless we have separate SocketIO instances for each project - may be reasonable.
     const params = new URLSearchParams(window.location.search);
     const url = params.get("socket") || undefined;
     let initialized = false;
@@ -77,14 +80,14 @@ export default async function connectIPC(cm: ChartManager) {
                     Object.keys(chartManager.charts),
                 );
                 if (!initialized) {
-                    setupVuplex();
+                    // setupVuplex();
                     initialized = true;
                 }
             }
         },
     );
-    //temporarily disable websocket connection
-    const socket = { on: (s: any, f: any) => {} }; //io(url);
+    // const socket = { on: (s: any, f: any) => {}, emit: (...args: any[])=>{} }; //io(url);
+    const socket = io(url);
 
     function sendMessage(msg: MDVMessage) {
         socket.emit("message", msg);
@@ -106,6 +109,9 @@ export default async function connectIPC(cm: ChartManager) {
             resolve();
         });
     });
+    /** the first prototype feature built with this was making a window popout in response
+     * to a message, so that in a VR environment in Unity we could see the chart in a separate window.
+     */
     function popout(chartID: string) {
         const chart = cm.charts[chartID];
         if (!chart) {

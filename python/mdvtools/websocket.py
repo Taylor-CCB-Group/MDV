@@ -2,19 +2,33 @@ from flask import Flask, request
 from flask_socketio import SocketIO
 from datetime import datetime
 import asyncio
+import logging
 
 def log(msg: str):
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d %H:%M:%S")
     print(f"[[[ socket.io ]]] [{date_str}] - {msg}")
 
+socketio: SocketIO = None
 
 def mdv_socketio(app: Flask):
+    """
+    Experimental and not to be trusted pending design work etc.
+    
+    Do we have a SocketIO for the entire app and route messages internally,
+    - yes probably.
+    What `path` should it use? We'll need to make sure it is compatible with
+    - the vite dev server proxy
+    - the app not being at the root of the domain
+
+    !! What about cors? We had a wildcard for previous experiment - should be reviewed before getting pushed online.
+    """
+    global socketio
     socketio = SocketIO(app, cors_allowed_origins="*")
-    print("socketio initialized")
+    log("socketio initialized")
 
     async def response(sid, message=""):
-        await asyncio.sleep(1)
+        # await asyncio.sleep(1)
         socketio.emit("message", {"type": "ping", "message": f"bleep bloop {message} I'm a robot"}, to=sid)
 
     @socketio.on("connect")
@@ -35,5 +49,36 @@ def mdv_socketio(app: Flask):
             # socketio.emit("message", {"type": "ping", "message": "bleep bloop I'm a robot"}, to=request.sid)
             # ... or maybe I should stick to REST for now.
             sid = request.args.get("sid")
-            asyncio.run(response(sid, data.get('message')))
+            # error asyncio.run() cannot be called from a running event loop
+            # asyncio.run(response(sid, data.get('message')))
+            # response(sid, data.get('message'))
 
+
+def get_socket_handler(event_name="log"):
+    handler = SocketIOHandler(socketio, event_name)
+    return handler
+
+def get_socket_logger(event_name="log"):
+    logger = logging.getLogger(event_name)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(get_socket_handler(event_name))
+    return logger
+
+class SocketIOHandler(logging.StreamHandler):
+    def __init__(self, socketio, event_name="log"):
+        super().__init__()
+        log(f"handler initialized for event: {event_name}")
+        self.socketio = socketio
+        self.event_name = event_name
+
+    def emit(self, record):
+        """
+        Emit a record - send it via socketio & also print it to the console.
+        subject to change.
+        """
+        try:
+            msg = self.format(record)
+            print(f"[[ {self.event_name} ]] {msg}")
+            self.socketio.emit(self.event_name, msg)
+        except Exception:
+            self.handleError(record)

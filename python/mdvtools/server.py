@@ -15,7 +15,8 @@ import sys
 import re
 from mdvtools.llm.code_manipulation import parse_view_name
 from werkzeug.security import safe_join
-from mdvtools.websocket import mdv_socketio
+from mdvtools.websocket import mdv_socketio, get_socket_logger
+import logging
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import (
     ProjectBlueprint as Blueprint,
@@ -88,8 +89,6 @@ def create_app(
     use_reloader=False,
     app: Optional[Flask] = None,
     backend_db=False,
-    chat_fn: Optional[Callable[[str], str]]=None,
-    chat_welcome: Optional[str]=None,
 ):
     if app is None:
         route = ""
@@ -100,9 +99,10 @@ def create_app(
         app.after_request(add_safe_headers)
         project_bp = SingleProjectShim(app)
         multi_project = False
-        ### 'MEW' in Unity is using IWeb PostMessage, not WebSockets.
-        ### but this will be used for local testing in short-term, and potentially other things later.
         if websocket:
+            # reviewing this... thinking about hooking up to ProjectChat logger...
+            # nb - we're in 'single project' mode here.
+            #! if we only want one SocketIO for the whole app, we probably initialise that elsewhere.
             mdv_socketio(app)
     else:
         ## nb - previous use of flask.Blueprint was not allowing new projects at runtime
@@ -136,15 +136,20 @@ def create_app(
         """
         bot: Optional[ProjectChat] = None
         print(f"websocket/chat enabled for {route}")
+        # could come from a config file - was passed as argument previously
+        # but I'm reducing how far this prototype reaches into wider code
+        chat_welcome = "Hello, I'm an AI assistant that has access to the data in this project and is designed to help build views for visualising it. What can I help you with?"
+        # what if we make `log` a thing that streams to the client via websocket?
+        log_name = f"/project/{project.id}/chat"
+        logger = get_socket_logger(log_name)
         @project_bp.route("/chat_init", methods=["POST"])
         def chat_init():
             print("chat_init")
+            logger.info("chat_init")
             nonlocal bot, chat_welcome
-            if chat_welcome is not None:
-                return {"message": chat_welcome}
             if bot is None:
-                bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
-            chat_welcome = "Hello, I'm an AI assistant that has access to the data in this project and is designed to help build views for visualising it. What can I help you with?"
+                # bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
+                bot = ProjectChat(project, logger=logger)
             return {"message": chat_welcome}
         @project_bp.route("/chat", methods=["POST"])
         def chat():
@@ -152,12 +157,10 @@ def create_app(
             if not request.json:
                 return {"error": "No JSON data in request"}, 500
             message = request.json.get("message")
-            if chat_fn is not None:
-                response = chat_fn(message)
-                return {"message": response}
             try:
                 if bot is None:
-                    bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
+                    # bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
+                    bot = ProjectChat(project, logger=logger)
                 # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
                 # probably want to change the return type of this function, but for now we do some string parsing here.
                 final_code = bot.ask_question(message)

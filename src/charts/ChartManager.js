@@ -209,8 +209,6 @@ class ChartManager {
             theme: observable,
             setTheme: action,
         });
-        //we may want to move this, for now I don't think it's doing any harm and avoids changes to multiple index files:
-        connectIPC(this);
         this.transactions = {};
 
         //set up container and top(main menu)
@@ -361,19 +359,21 @@ class ChartManager {
         }
 
         if (config.websocket) {
+            console.log('websocket is enabled');
             const fn = async () => {
                 // previously, we were always calling connectIPC - but it was only relevant to earlier experiment with Unity
                 // and we had disabled websocket on server.
                 // started experimenting with socketio for chatMDV - mechanism is working, to an extent... 
                 // but actually, REST is probably best for this (maybe a protocol agnostic abstraction).
                 // try/catch doesn't help when it gets stuck in await...
-                console.warn('websocket is not currently supported but used as flag for chat experiment - will be fixed very soon')
-                // try {
-                //     const { socket, sendMessage } = await connectIPC(this);
-                //     this.ipc = { socket, sendMessage };
-                // } catch (error) {
-                //     console.error('Failed to connect to websocket', error);
-                // }
+                // console.warn('websocket is not currently supported but used as flag for chat experiment - will be fixed very soon')
+                try {
+                    const { socket, sendMessage } = await connectIPC(this);
+                    console.log('connected to socketio');
+                    this.ipc = { socket, sendMessage };
+                } catch (error) {
+                    console.error('Failed to connect to websocket', error);
+                }
                 createMenuIcon("fas fa-comments", {
                     tooltip: {
                         text: "Open ChatMDV",

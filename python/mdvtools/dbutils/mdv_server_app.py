@@ -16,11 +16,12 @@ from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService
-
+from mdvtools.websocket import mdv_socketio
 
 def create_flask_app(config_name=None):
     """Create and configure the Flask app."""
     app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
+    mdv_socketio(app)
     # this was causing a number of issues with various routes, changing this here seems to be the best way to fix it
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
     app.url_map.strict_slashes = False
