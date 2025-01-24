@@ -214,6 +214,7 @@ else:
         # so we have a sticking plaster solution for this...
         final_code = patch_viewname(final_code, project)
         
+    compile(final_code, "<string>", "exec") # will raise an exception if there is a syntax error
     return final_code
 
 def patch_viewname(code: str, project: MDVProject):
