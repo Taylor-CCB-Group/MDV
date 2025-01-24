@@ -168,6 +168,8 @@ def prepare_code(result: str, data: str | pd.DataFrame, project: MDVProject, log
     or as soon as it gets into the hands of actual users...
     """
     original_script = extract_code_from_response(result)
+    log("# Extracted code from the response, without any modifications:")
+    log(original_script)
 
     log("# Apply the reorder transformation")
     modified_script = reorder_parameters(original_script, data)
@@ -214,7 +216,12 @@ else:
         # so we have a sticking plaster solution for this...
         final_code = patch_viewname(final_code, project)
         
-    compile(final_code, "<string>", "exec") # will raise an exception if there is a syntax error
+    try:
+        compile(final_code, "<string>", "exec") # will raise an exception if there is a syntax error
+    except Exception as e:
+        log(f"Error in the final code: {e}")
+        log(final_code)
+        # let it return anyway...
     return final_code
 
 def patch_viewname(code: str, project: MDVProject):
