@@ -13,7 +13,8 @@ Make a Flask app, and open all folders in ~/mdv/ as projects that can be served 
 """
 
 # todo: make this configurable
-project_dir = os.path.join(os.path.expanduser("~"), "mdv")
+# project_dir = os.path.join(os.path.expanduser("~"), "mdv")
+project_dir = "/app/mdv"
 # create the directory if it doesn't exist
 if not os.path.exists(project_dir):
     os.makedirs(project_dir)

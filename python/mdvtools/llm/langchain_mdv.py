@@ -240,6 +240,7 @@ class ProjectChat():
                 context = retriever
                 output = qa_chain.invoke({"context": context, "query": question})
                 result = output["result"]
+                print(result)
 
             with time_block("b12: Prepare code"):
                 final_code = prepare_code(result, self.df, self.project, self.log, modify_existing_project=True, view_name=question)
