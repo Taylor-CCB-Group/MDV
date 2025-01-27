@@ -15,6 +15,7 @@ packages_functions = """import os
 import pandas as pd
 import scanpy as sc
 from mdvtools.mdvproject import MDVProject
+from mdvtools.charts.density_scatter_plot import DensityScatterPlot
 from mdvtools.charts.heatmap_plot import HeatmapPlot
 from mdvtools.charts.histogram_plot import HistogramPlot
 from mdvtools.charts.dot_plot import DotPlot
@@ -30,6 +31,9 @@ from mdvtools.charts.multi_line_plot import MultiLinePlot
 from mdvtools.charts.table_plot import TablePlot
 from mdvtools.charts.wordcloud_plot import WordcloudPlot
 from mdvtools.charts.text_box_plot import TextBox
+from mdvtools.charts.row_summary_box_plot import RowSummaryBox
+from mdvtools.charts.selection_dialog_plot import SelectionDialogPlot
+
 import json
 import numpy as np
 import sys
