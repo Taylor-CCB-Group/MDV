@@ -895,16 +895,20 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     };
 
     const handleUploadError = useCallback((error: AxiosError | unknown) => {
-        const errorPayload = axios.isAxiosError(error) ? {
-            message: error.response?.data || "An error occurred while processing the upload.",
-            status: error.response?.status || 500,
-            traceback: error.message,
-        } : {
-            // message: `Upload failed with status: ${error.response?.status || "unknown"}`,
-            message: "An error occurred while processing the upload.",
-            status: 500, //not strictly true, but matches previous behavior
-            traceback: (error as Error).message,
-        };
+        const errorPayload = axios.isAxiosError(error)
+            ? {
+                  message:
+                      error.response?.data ||
+                      error.request?.responseText ||
+                      "An error occurred while processing the upload.",
+                  status: error.response?.status || 500,
+                  traceback: error.message,
+              }
+            : {
+                  message: "An error occurred while processing the upload.",
+                  status: 500,
+                  traceback: (error as Error).message,
+              };
 
         dispatch({
             type: "SET_ERROR",
