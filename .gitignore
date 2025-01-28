@@ -41,3 +41,8 @@ data/
 xvenv/
 secrets/
 app_logs/
+
+
+# as seen inside devcontainer
+mdv/
+logs/

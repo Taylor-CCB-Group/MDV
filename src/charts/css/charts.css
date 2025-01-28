@@ -11,6 +11,9 @@
         --input_border_color: #222;
         --input_background_color: #222;
         --dlg_background_color: #111;
+        --background_color_error: #fdeded;
+        --icon_color_error: #ff4c4c;
+        --text_color_error: #5f213b;
         --menu-gradient: linear-gradient(#444, #222);
     }
 }
@@ -27,6 +30,9 @@
         --input_border_color: rgb(230, 230, 230);
         --input_background_color: rgb(230, 230, 230);
         --dlg_background_color: white;
+        --background_color_error: #fdeded;
+        --icon_color_error: #ff4c4c;
+        --text_color_error: #5f213b;
         --menu-gradient: linear-gradient(white, darkgray);
     }
 }
@@ -43,6 +49,8 @@
     --input_border_color: #222;
     --input_background_color: #222;
     --dlg_background_color: #111;
+    --background_color_error: #4f3037;
+    --text_color_error: #ff8d91;
     --menu-gradient: linear-gradient(#444, #222);
 }
 
@@ -57,6 +65,8 @@
     --input_border_color: rgb(230, 230, 230);
     --input_background_color: rgb(230, 230, 230);
     --dlg_background_color: white;
+    --background_color_error: #fdeded;
+    --text_color_error: #5f213b;
     --menu-gradient: linear-gradient(white, darkgray);
 }
 :root {
@@ -412,4 +422,8 @@ select, input, textarea {
     /* not ideal but reduces clashes with other elements / scale-bar */
     bottom: 0 !important;
     right: 0 !important;
+}
+.invalid {
+    background-color: var(--background_color_error);
+    color: var(--text_color_error);
 }

@@ -13,6 +13,7 @@ import { getColorLegend, getColorBar } from "../utilities/Color.js";
 import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
+import { isDatatypeNumeric } from "@/lib/utils";
 
 /**
  * Creates an empty data structure
@@ -40,9 +41,11 @@ class DataStore {
         this.size = size;
         /** @type {number} */
         this.filterSize = size;
-        /**
+        //why doesn't this annotation work? (nb, not sure whether I'm merging the right way here)
+        /** 
          * @typedef {import("@/charts/charts.js").DataType} DataType
-         * @type {Array<import("@/charts/charts.js").DataColumn<DataType>>} */
+         * @typedef {import("@/charts/charts.js").DataColumn} DataColumn
+         * @type {Array.<DataColumn<DataType>>} */
         this.columns = [];
         /**
          * @type {{[k: string]: import("@/charts/charts.js").DataColumn<DataType> | undefined}} */
@@ -1726,11 +1729,17 @@ class DataStore {
 
     /**
      * Returns the min/max values for a given column
-     * @param {string} column The column id(field)
-     * @returns {number[]} An array - the first value being the min value and the second the max value
+     * @param {string} column The column id(field). Should be a numeric column, otherwise an error will be thrown
+     * @returns {[number, number]} An array - the first value being the min value and the second the max value
      */
     getMinMaxForColumn(column) {
         const c = this.columnIndex[column];
+        if (!isDatatypeNumeric(c.datatype)) {
+            throw new Error(`Trying to get minMax for non-numeric column '${column}'`);
+        }
+        if (!c.minMax) {
+            throw new Error(`no minMax for column '${column}' ${c}`);
+        }
         return c.minMax;
     }
 

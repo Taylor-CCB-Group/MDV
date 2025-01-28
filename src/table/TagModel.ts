@@ -85,6 +85,7 @@ export default class TagModel {
                 this.callListeners();
             });
         }
+        //! col is `any` here...
         const col = dataStore.columnIndex[columnName];
         if (!col) throw `expected columnIndex['${columnName}'] to be present in DataStore '${dataStore.name}'`;
         if (!isColumnOfType(col, COL_TYPE)) {

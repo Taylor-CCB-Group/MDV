@@ -6,6 +6,7 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
+// nb columnMatchesType has been moved to columnTypeHelpers.ts
 /**
  * Check whether given value {@param v} is an array.
  * Acts as a type-predicate, so can be used for narrowing the type of subsequent code.

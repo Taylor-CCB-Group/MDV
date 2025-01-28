@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { useMetadata, useViewerStoreApi } from "./components/avivatorish/state";
-import { useChartID } from "./hooks";
+import { useChartID, useDataSources } from "./hooks";
 import type { VivMDVReact } from "./components/VivMDVReact";
 import { useDataStore } from "./context";
 import type { DataColumn, DataType } from "@/charts/charts";

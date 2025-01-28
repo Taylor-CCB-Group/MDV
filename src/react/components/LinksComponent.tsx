@@ -30,6 +30,7 @@ const RowsAsCols = observer(<T extends CTypes,>(props : RowsAsColsProps<T>) => {
     // to some of the props not being of an appropriate type - but now I'm not sure.
     // ** the type of data where dealing with is the core thing we're trying to figure out how to represent from a user perspective
     // I'm just a bit burnt out on this right now.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: ! this needs review !
     const spec = useMemo(() => makeAutoObservable(g<"multidropdown">({
         type: 'multidropdown',
         // name: name_column,

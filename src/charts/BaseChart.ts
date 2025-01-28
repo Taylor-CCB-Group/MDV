@@ -1,7 +1,7 @@
 import { getRandomString } from "../utilities/Utilities";
 import { ContextMenu } from "../utilities/ContextMenu.js";
 import { createEl } from "../utilities/Elements.js";
-import { chartTypes } from "./ChartTypes";
+import { type ChartTypeMap, chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
 import { makeAutoObservable, action, autorun, type IReactionDisposer, type IAutorunOptions } from "mobx";
@@ -984,6 +984,7 @@ class BaseChart<T extends BaseConfig> {
      */
     static types = chartTypes;
 }
+
 
 function copyStylesInline(
     destinationNode: HTMLElement,

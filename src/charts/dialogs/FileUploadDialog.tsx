@@ -30,9 +30,12 @@ import { DatasourceDropdown } from "./DatasourceDropdown";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { Dialog, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
+import processH5File, { CompressionError } from "./utils/h5Processing";
+import H5MetadataPreview from "./H5MetadataPreview";
+import ErrorDisplay from "./ErrorDisplay";
 
 // Use dynamic import for the worker
-const CsvWorker = new Worker(new URL("./csvWorker.ts", import.meta.url), {
+const DatasourceWorker = new Worker(new URL("./datasourceWorker.ts", import.meta.url), {
     type: "module",
 });
 
@@ -235,7 +238,8 @@ const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
 
 type UploadActionType = "SET_SELECTED_FILES" | "SET_IS_UPLOADING" 
 | "SET_IS_INSERTING" | "SET_SUCCESS" | "SET_ERROR" | "SET_IS_VALIDATING" 
-| "SET_VALIDATION_RESULT" | "SET_FILE_TYPE" | "SET_TIFF_METADATA" | "SET_FILE_SUMMARY";
+| "SET_VALIDATION_RESULT" | "SET_FILE_TYPE" | "SET_TIFF_METADATA"
+| "SET_H5_METADATA" | "SET_FILE_SUMMARY";
 // Reducer function
 const DEFAULT_REDUCER_STATE = {
     selectedFiles: [] as File[],
@@ -245,8 +249,9 @@ const DEFAULT_REDUCER_STATE = {
     validationResult: null as unknown,
     success: false,
     error: null as unknown,
-    fileType: null as "csv" | "tiff" | null,
+    fileType: null as "csv" | "tiff" | "tsv" | "h5" | null,
     tiffMetadata: null as unknown,
+    h5Metadata: null as H5Metadata | unknown,
 } as const;
 type ReducerState = typeof DEFAULT_REDUCER_STATE;
 // TODO - would be good to type this, this is not how I should be spending my weekend.
@@ -258,7 +263,7 @@ type ReducerPayload<T extends UploadActionType> = T extends "SET_SELECTED_FILES"
 : T extends "SET_ERROR" ? { message: string, status: number, traceback?: string }
 : T extends "SET_IS_VALIDATING" ? boolean
 : T extends "SET_VALIDATION_RESULT" ? { columnNames: string[], columnTypes: string[] }
-: T extends "SET_FILE_TYPE" ? "csv" | "tiff" | null
+: T extends "SET_FILE_TYPE" ? "csv" | "tiff" | "tsv" | null
 : T extends "SET_TIFF_METADATA" ? unknown
 : never;
 type ReducerAction<T extends UploadActionType> = { type: T, payload: ReducerPayload<T> };
@@ -282,6 +287,8 @@ const reducer = <T extends UploadActionType,>(state: ReducerState, action: { typ
             return { ...state, fileType: action.payload };
         case "SET_TIFF_METADATA":
             return { ...state, tiffMetadata: action.payload };
+        case "SET_H5_METADATA":
+            return { ...state, h5Metadata: action.payload };
         default:
             return state;
     }
@@ -324,6 +331,18 @@ const FILE_TYPES: Record<string, FileTypeConfig> = {
             endpoint: 'add_datasource'
         }
     },
+    TSV: {
+        type: 'tsv',
+        extensions: ['.tsv', '.tab', '.txt'],
+        mimeTypes: ['text/tab-separated-values'],
+        maxSize: 10000 * 1024 * 1024, // 10 GB
+        processingConfig: {
+            defaultWidth: 800,
+            defaultHeight: 745,
+            requiresMetadata: false,
+            endpoint: 'add_datasource'
+        }
+    },
     TIFF: {
         type: 'tiff',
         extensions: ['.tiff', '.tif'],
@@ -335,8 +354,26 @@ const FILE_TYPES: Record<string, FileTypeConfig> = {
             requiresMetadata: true,
             endpoint: 'add_or_update_image_datasource'
         }
+    },
+    H5: {
+        type: 'h5',
+        extensions: ['.h5', '.h5ad'],
+        mimeTypes: ['application/x-hdf5', 'application/x-hdf'],
+        maxSize: 10000 * 1024 * 1024,
+        processingConfig: {
+            defaultWidth: 1000,
+            defaultHeight: 800,
+            requiresMetadata: true,
+            endpoint: 'add_anndata'
+        }
     }
 };
+
+interface H5Metadata {
+    uns: Record<string, any>;
+    obs: Record<string, any>;
+    var: Record<string, any>;
+}
 
 // Helper functions for file type checking
 const getFileTypeFromExtension = (fileName: string): FileTypeConfig | null => {
@@ -406,7 +443,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         setShowMetadata((prevState) => !prevState);
     };
 
-    const [csvSummary, setCsvSummary] = useState({
+    const [datasourceSummary, setDatasourceSummary] = useState({
         datasourceName: "",
         fileName: "",
         fileSize: "",
@@ -433,7 +470,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
     const onDrop = useCallback(
-        (acceptedFiles: File[]) => {
+        async (acceptedFiles: File[]) => {
             if (acceptedFiles.length > 0) {
                 const file = acceptedFiles[0];
                 const fileConfig = getFileTypeFromExtension(file.name);
@@ -457,10 +494,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     
                 // Handle file based on its type
                 switch (fileConfig.type) {
+                    case 'tsv':
                     case 'csv': {
                         const newDatasourceName = file.name;
                         setDatasourceName(newDatasourceName);
-                        setCsvSummary({
+                        setDatasourceSummary({
                             datasourceName: newDatasourceName,
                             fileName: file.name,
                             fileSize: (file.size / (1024 * 1024)).toFixed(2),
@@ -469,8 +507,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         });
     
                         // Process CSV with Web Worker
-                        CsvWorker.postMessage(file);
-                        CsvWorker.onmessage = (event: MessageEvent) => {
+                        DatasourceWorker.postMessage({
+                            file: file,
+                            fileType: fileConfig.type
+                        });
+                        DatasourceWorker.onmessage = (event: MessageEvent) => {
                             const {
                                 columnNames,
                                 columnTypes,
@@ -496,8 +537,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                                 setColumnNames(columnNames);
                                 setColumnTypes(columnTypes);
                                 setSecondRowValues(secondRowValues);
-                                setCsvSummary((prevCsvSummary) => ({
-                                    ...prevCsvSummary,
+                                setDatasourceSummary((prevDatasrouceSummary) => ({
+                                    ...prevDatasrouceSummary,
                                     rowCount,
                                     columnCount,
                                 }));
@@ -542,7 +583,33 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         });
                         break;
                     }
-    
+                    case 'h5': {
+                        try {
+                            const h5Metadata = await processH5File(file);
+                            dispatch({ type: "SET_H5_METADATA", payload: h5Metadata });
+                            
+                            const newDatasourceName = file.name;
+                            setDatasourceName(newDatasourceName);
+                            
+                            onResize(fileConfig.processingConfig.defaultWidth, fileConfig.processingConfig.defaultHeight);
+                            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+                            dispatch({
+                                type: "SET_VALIDATION_RESULT",
+                                payload: { metadata: h5Metadata }
+                            });
+                        } catch (error) {
+                            console.error('H5 processing error:', error);
+                            dispatch({
+                                type: "SET_ERROR",
+                                payload: {
+                                    message: "Error processing H5 file",
+                                    traceback: error instanceof Error ? error.message : String(error),
+                                },
+                            });
+                            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+                        }
+                        break;
+                    }
                     default:
                         console.warn('Unhandled file type:', fileConfig.type);
                         return;
@@ -635,8 +702,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     const handleDatasourceNameChange = useCallback((event: any) => {
         const { value } = event.target;
         setDatasourceName(value); // Update the state with the new value
-        setCsvSummary((prevCsvSummary) => ({
-            ...prevCsvSummary,
+        setDatasourceSummary((prevDatasrouceSummary) => ({
+            ...prevDatasrouceSummary,
             datasourceName: value, // Update datasourceName in the summary object
         }));
     }, []);
@@ -650,7 +717,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
 
     const rejectionMessage =
         fileRejections.length > 0
-            ? "Only CSV and TIFF files can be selected"
+            ? "Only CSV, TSV, and TIFF files can be selected"
             : "Drag and drop files here or click the button below to upload";
 
     const rejectionMessageStyle =
@@ -757,6 +824,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
 
             // Add type-specific form data
             switch (fileConfig.type) {
+                case 'tsv':
                 case 'csv':
                     formData.append("name", datasourceName);
                     formData.append("replace", "");
@@ -772,14 +840,16 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         }
                     }
                     break;
-            }
+                case 'h5':
+                    // Payload content depends on backend implementation
+                    break;
+        }
 
             const response = await axios.post(
                 `${root}/${fileConfig.processingConfig.endpoint}`,
                 formData,
                 config
             );
-
             if (response.status === 200) {
                 dispatch({ type: "SET_IS_UPLOADING", payload: false });
                 dispatch({ type: "SET_SUCCESS", payload: true });
@@ -796,22 +866,17 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         }
     };
 
-    const handleUploadError = useCallback((error: any) => {
-        const errorPayload = {
-            message: `Upload failed with status: ${error.response?.status || "unknown"}`,
+    const handleUploadError = useCallback((error: AxiosError | unknown) => {
+        const errorPayload = axios.isAxiosError(error) ? {
+            message: error.response?.data || "An error occurred while processing the upload.",
             status: error.response?.status || 500,
             traceback: error.message,
+        } : {
+            // message: `Upload failed with status: ${error.response?.status || "unknown"}`,
+            message: "An error occurred while processing the upload.",
+            status: 500, //not strictly true, but matches previous behavior
+            traceback: (error as Error).message,
         };
-
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 400) {
-                errorPayload.message = "Bad Request: The server could not process the uploaded file.";
-                errorPayload.status = 400;
-            } else if (error.response?.status === 500) {
-                errorPayload.message = "Server Error: An error occurred while processing the upload.";
-                errorPayload.status = 500;
-            }
-        }
 
         dispatch({
             type: "SET_ERROR",
@@ -858,17 +923,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                     </Button>
                 </>
             ) : state.error ? (
-                <>
-                    <ErrorContainer>
-                        <ErrorHeading>
-                            An error occurred while uploading the file:
-                        </ErrorHeading>
-                        <p>{state.error.message}</p>
-                        {state.error.traceback && (
-                            <pre>{state.error.traceback}</pre>
-                        )}
-                    </ErrorContainer>
-                </>
+                <ErrorDisplay error={state.error} />
             ) : state.isValidating ? (
                 <StatusContainer>
                     <Message>{"Validating data, please wait..."}</Message>
@@ -876,7 +931,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 </StatusContainer>
             ) : state.validationResult ? (
                 <>
-                    {state.fileType === "csv" && (
+                    {(state.fileType === "csv" || state.fileType === "tsv") && (
                         <>
                             <FileSummary>
                                 <FileSummaryHeading>
@@ -893,19 +948,19 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                                 </FileSummaryText>
                                 <FileSummaryText>
                                     <strong>{"File name"}</strong>{" "}
-                                    {csvSummary.fileName}
+                                    {datasourceSummary.fileName}
                                 </FileSummaryText>
                                 <FileSummaryText>
                                     <strong>{"Number of rows"}</strong>{" "}
-                                    {csvSummary.rowCount}
+                                    {datasourceSummary.rowCount}
                                 </FileSummaryText>
                                 <FileSummaryText>
                                     <strong>{"Number of columns"}</strong>{" "}
-                                    {csvSummary.columnCount}
+                                    {datasourceSummary.columnCount}
                                 </FileSummaryText>
                                 <FileSummaryText>
                                     <strong>{"File size"}</strong>{" "}
-                                    {csvSummary.fileSize} MB
+                                    {datasourceSummary.fileSize} MB
                                 </FileSummaryText>
                             </FileSummary>
                             <ColumnPreview
@@ -1015,6 +1070,36 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </>
+                    )}
+
+                    {state.fileType === "h5" && state.h5Metadata && (
+                        <>
+                            <FileSummary>
+                                <FileSummaryHeading>H5 File Summary</FileSummaryHeading>
+                                <FileSummaryText>
+                                    <strong>File name:</strong> {state.selectedFiles[0].name}
+                                </FileSummaryText>
+                                <FileSummaryText>
+                                    <strong>File size:</strong> {(state.selectedFiles[0].size / (1024 * 1024)).toFixed(2)} MB
+                                </FileSummaryText>
+                            </FileSummary>
+                            
+                            <H5MetadataPreview metadata={state.h5Metadata} />
+
+                            <div className="flex justify-center items-center gap-6 mt-4">
+                                <Button marginTop="mt-1" onClick={handleUploadClick}>
+                                    Upload
+                                </Button>
+                                <Button
+                                    color="red"
+                                    size="px-6 py-2.5"
+                                    marginTop="mt-1"
+                                    onClick={handleClose}
+                                >
+                                    Cancel
+                                </Button>
                             </div>
                         </>
                     )}
