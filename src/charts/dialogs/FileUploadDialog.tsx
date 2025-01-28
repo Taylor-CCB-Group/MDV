@@ -879,7 +879,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 dispatch({ type: "SET_SUCCESS", payload: false });
                 dispatch({
                     type: "SET_CONFLICT_DATA",
-                    payload: {
+                    payload: {AnndataConflictDialog,
                         temp_folder: error.response.data.temp_folder,
                     },
                 });
@@ -919,12 +919,13 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         onClose();
     }, [onClose, onResize]);
 
-    const handleCombineConfirm = async () => {
+    const handleCombineConfirm = async (label: string) => {
         if (!state.conflictData) return;
 
         const formData = new FormData();
         formData.append("temp_folder", state.conflictData.temp_folder);
         formData.append("combine", "true");
+        formData.append("label", label);
 
         try {
             const response = await axios.patch(
@@ -989,6 +990,11 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         }
     };
 
+    const handleCombineError = (error: { message: string; status?: number }) => {
+        console.error("Conflict dialog error:", error);
+        dispatch({ type: "SET_ERROR", payload: error });
+    };
+
     return (
         <Container>
             {state.isUploading ? (
@@ -1026,7 +1032,8 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 <AnndataConflictDialog 
                     open={state.showReplaceDialog}
                     onClose={handleCombineCancel}
-                    onConfirm={handleCombineConfirm}
+                    onConfirm={(label) => handleCombineConfirm(label)}
+                    onError={handleCombineError}
                 />
             ) : state.isValidating ? (
                 <StatusContainer>
