@@ -15,16 +15,15 @@ def convert_scanpy_to_mdv(
 ) -> MDVProject:
     mdv = MDVProject(folder, delete_existing=delete_existing)
     
-    # If not deleting existing, preserve current state and views
-    current_state = None
+    # If not deleting existing, preserve current views
     current_views = None
     if not delete_existing:
-        current_state = mdv.state
         current_views = mdv.views
 
     # create datasource 'cells'
     cell_table = scanpy_object.obs
     cell_table["cell_id"] = cell_table.index
+
     # add any dimension reduction
     _add_dims(cell_table, scanpy_object.obsm, max_dims)
     mdv.add_datasource(f"{label}cells", cell_table)
@@ -46,6 +45,7 @@ def convert_scanpy_to_mdv(
     if delete_existing:
         # If we're deleting existing, create new default view
         mdv.set_view("default", {"initialCharts": {"cells": [], "genes": []}}, True)
+        mdv.set_editable(True)
     else:
         # If we're not deleting existing, update existing views with new datasources
         new_views = {}
@@ -70,16 +70,6 @@ def convert_scanpy_to_mdv(
             
             new_views[view_name] = new_view_data
         
-        # Save updated views
-        mdv.views = new_views
-        
-        # Restore state
-        if current_state:
-            new_state = mdv.state
-            new_state["permission"] = current_state.get("permission", "edit")
-            new_state["all_views"] = current_state.get("all_views", ["default"])
-            mdv.state = new_state
-
     return mdv
 
 
