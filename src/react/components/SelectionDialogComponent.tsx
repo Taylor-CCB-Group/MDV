@@ -608,7 +608,11 @@ const SelectionDialogComponent = () => {
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
             <AddRowComponent />
-            <ForeignRows />
+            <ErrorBoundary FallbackComponent={
+                ({ error }) => <ErrorDisplay error={error} title="Error displaying linked rows." />
+            }>
+                <ForeignRows />
+            </ErrorBoundary>
         </div>
     );
 };

@@ -275,7 +275,21 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
     makeObservable(link, { observableFields: true });
     
     await cm.loadColumnSetAsync([link.name_column], tds.name);
+    //! we have an assumption here that there is only one subgroup
+    //(nb, I think this is the thing that there'd be a radio-button for in the UI)
+    //(whereas if there were multiple linked dataSources, they'd appear as different buttons for opening the dialog)
+    const sgKeys = Object.keys(link.subgroups);
     const sg = Object.keys(link.subgroups)[0];
+    if (sgKeys.length > 1) {
+        //! this should be fixed!
+        console.warn("Multiple subgroups not supported", link);
+        console.warn("Using first subgroup", sg);
+        //return;
+    }
+    if (!sg) {
+        console.error("No subgroups found for link", link);
+        // return;
+    }
     /** ephemeral object representing a virtual column entry in a rows_as_columns link.
      * accessing the `column` property will add the column to the parent DataStore.
      */
