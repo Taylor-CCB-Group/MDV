@@ -280,22 +280,6 @@ def create_app(
         except Exception as e:
             current_app.logger.error(f"Error cleaning up folder {folder_path}: {e}")
 
-    def get_next_label(datasources):
-        """Generate the next available label based on existing datasource names."""
-        import string
-        prefixes = [s.split("_")[0] for s in datasources if "_" in s and s.split("_")[0].isalpha()]
-        if not prefixes:
-            return "A"
-
-        max_letter = max(prefixes, key=lambda x: string.ascii_uppercase.index(x.upper()))
-        max_index = string.ascii_uppercase.index(max_letter.upper())
-
-        # If the next index exceeds 'Z', raise an error
-        if max_index + 1 >= len(string.ascii_uppercase):
-            raise ValueError("Exceeded maximum label limit (Z).")
-
-        return string.ascii_uppercase[max_index + 1]
-
     @project_bp.route("/add_anndata", access_level='editable', methods=["POST"])
     def add_anndata():
         try:
@@ -337,6 +321,7 @@ def create_app(
         try:
             temp_folder = request.form.get('temp_folder')
             combine = request.form.get('combine') == 'true'
+            label = request.form.get('label')
 
             if not temp_folder or not os.path.exists(temp_folder):
                 return jsonify({'status': 'error', 'message': 'Request timed out, please try uploading again'}), 408
@@ -344,28 +329,22 @@ def create_app(
             if not combine:
                 cleanup_folder(temp_folder)
                 return jsonify({'status': 'success', 'message': 'Operation cancelled'}), 200
+            
+            if not label:
+                cleanup_folder(temp_folder)
+                return jsonify({'status': 'error', 'message': 'Label field not found'}), 400
 
             temp_path = os.path.join(temp_folder, "anndata.h5ad")
             if not os.path.exists(temp_path):
                 return jsonify({'status': 'error', 'message': 'Temporary file not found'}), 400
 
-            # Process and replace the file
+
+            # Process and combine the file
             new_anndata = sc.read(temp_path)
-            mdv_project = MDVProject(project.dir)
-            next_label = get_next_label(mdv_project.get_datasource_names())
-
-            # Add label to original datasource if not labeled
-            if next_label == "A":
-                target_path = os.path.join(project.dir, "anndata.h5ad")
-                anndata = sc.read(target_path)
-                convert_scanpy_to_mdv(project.dir, anndata, delete_existing=True, label=f"{next_label}_")
-                next_label = "B"
-
-            # Process and replace the file
-            convert_scanpy_to_mdv(project.dir, new_anndata, delete_existing=False, label=f"{next_label}_")
-
+            convert_scanpy_to_mdv(project.dir, new_anndata, delete_existing=False, label=f"{label}_")
             new_anndata.write(os.path.join(project.dir, "anndata.h5ad"))
             cleanup_folder(temp_folder)
+
             return jsonify({'status': 'success', 'message': 'File merged successfully'}), 200
 
         except ValueError as ve:
