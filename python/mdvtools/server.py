@@ -417,6 +417,75 @@ def create_app(
 
     @project_bp.route("/combine_anndata", access_level='editable', methods=["PATCH"])
     def combine_anndata():
+        """
+        Combine a temporary AnnData file with an existing project file.
+
+        This endpoint handles the resolution of file conflicts when uploading AnnData files.
+        It can either combine the temporary file with the existing project file (adding a label prefix
+        to distinguish the data) or cancel the operation and clean up the temporary files.
+
+        HTTP Methods:
+            PATCH
+
+        Request Parameters:
+            temp_folder (str): Path to the temporary folder containing the AnnData file
+            combine (bool): Whether to combine the files (true) or cancel the operation (false)
+            label (str): Prefix label to distinguish the new data when combining files
+
+        Returns:
+            tuple: A tuple containing:
+                - JSON response with status and message
+                - HTTP status code
+
+            Success Responses:
+                200:
+                    - Successful merge:
+                        {
+                            'status': 'success',
+                            'message': 'File merged successfully'
+                        }
+                    - Operation cancelled:
+                        {
+                            'status': 'success',
+                            'message': 'Operation cancelled'
+                        }
+
+            Error Responses:
+                400:
+                    - Missing label:
+                        {
+                            'status': 'error',
+                            'message': 'Label field not found'
+                        }
+                    - Missing temporary file:
+                        {
+                            'status': 'error',
+                            'message': 'Temporary file not found'
+                        }
+                408:
+                    - Timeout:
+                        {
+                            'status': 'error',
+                            'message': 'Request timed out, please try uploading again'
+                        }
+                500:
+                    - Label generation error:
+                        {
+                            'status': 'error',
+                            'message': '<specific ValueError message>'
+                        }
+                    - Other errors:
+                        {
+                            'status': 'error',
+                            'message': '<specific error message>'
+                        }
+
+        Notes:
+            - This endpoint is typically called after a conflict is detected in the /add_anndata endpoint
+            - The temporary folder is cleaned up regardless of whether the operation succeeds or fails
+            - When combining files, the new data is prefixed with the provided label followed by an underscore
+            - The combined file maintains the original filename 'anndata.h5ad' in the project directory
+        """
         try:
             temp_folder = request.form.get('temp_folder')
             combine = request.form.get('combine') == 'true'
