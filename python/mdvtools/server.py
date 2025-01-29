@@ -261,7 +261,30 @@ def create_app(
 
     # Utility Functions
     def create_temp_folder(base_path):
-        """Create a temporary folder with a timestamp and return its path."""
+        """
+        Create a temporary folder with a timestamp-based name.
+
+        Creates a new directory within the specified base path using a timestamp-based naming
+        convention for temporary AnnData file storage. The folder name follows the pattern
+        'temp_anndata_YYYYMMDD_HHMMSS'.
+
+        Args:
+            base_path (str): The parent directory where the temporary folder will be created
+
+        Returns:
+            str: Absolute path to the created temporary folder
+
+        Notes:
+            - The folder is created with exist_ok=True to handle potential race conditions
+            - Timestamp format used: YYYYMMDD_HHMMSS (e.g., temp_anndata_20250129_143022)
+            - This function is typically used in conjunction with cleanup_folder() for
+            temporary file handling during AnnData uploads
+
+        Example:
+            >>> temp_path = create_temp_folder('/path/to/project')
+            >>> print(temp_path)
+            '/path/to/project/temp_anndata_20250129_143022'
+        """
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         temp_folder_name = f"temp_anndata_{timestamp}"
         temp_folder_path = os.path.join(base_path, temp_folder_name)
