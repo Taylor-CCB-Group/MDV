@@ -11,10 +11,63 @@ import gzip
 import copy
 
 def convert_scanpy_to_mdv(
-    folder: str, scanpy_object: AnnData, max_dims=3, delete_existing=False, label=""
+    folder: str, 
+    scanpy_object: AnnData, 
+    max_dims: int = 3, 
+    delete_existing: bool = False, 
+    label: str = ""
 ) -> MDVProject:
+    """
+    Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
+
+    This function transforms single-cell RNA sequencing data from AnnData format into 
+    the MDV project structure, handling both cells and genes as separate datasources 
+    with their associated dimensionality reductions and metadata.
+
+    Args:
+        folder (str): Path to the target MDV project folder
+        scanpy_object (AnnData): The AnnData object containing the single-cell data
+        max_dims (int, optional): Maximum number of dimensions to include from 
+            dimensionality reductions. Defaults to 3.
+        delete_existing (bool, optional): Whether to delete existing project data. 
+            If False, merges with existing data. Defaults to False.
+        label (str, optional): Prefix to add to datasource names and metadata columns
+            when merging with existing data. Defaults to "".
+
+    Returns:
+        MDVProject: The configured MDV project object with the converted data
+
+    Notes:
+        Data Structure Creation:
+        - Creates two main datasources: '{label}cells' and '{label}genes'
+        - Preserves all cell metadata from scanpy_object.obs
+        - Preserves all gene metadata from scanpy_object.var
+        - Transfers dimension reductions from obsm/varm matrices
+        - Links cells and genes through expression data
+        - Adds gene expression scores as a subgroup
+
+        View Handling:
+        - If delete_existing=True:
+            * Creates new default view with empty initial charts
+            * Sets project as editable
+        - If delete_existing=False:
+            * Preserves existing views
+            * Updates views with new datasources
+            * Maintains panel widths and other view settings
+            * Adds new datasources to each view's initialCharts
+
+        Dimension Reduction:
+        - Processes dimensionality reductions up to max_dims
+        - Supports standard formats (e.g., PCA, UMAP, t-SNE)
+        - Column names in the format: {reduction_name}_{dimension_number}
+
+    Raises:
+        ValueError: If the provided AnnData object is invalid or missing required components
+        IOError: If there are issues with file operations in the target folder
+        Exception: For other unexpected errors during conversion
+    """
     mdv = MDVProject(folder, delete_existing=delete_existing)
-    
+
     # If not deleting existing, preserve current views
     current_views = None
     if not delete_existing:
