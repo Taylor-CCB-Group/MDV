@@ -326,6 +326,61 @@ def create_app(
 
     @project_bp.route("/add_anndata", access_level='editable', methods=["POST"])
     def add_anndata():
+        """
+        Upload and process an AnnData file (.h5ad) for the project.
+
+        This endpoint handles the upload ofa single file in AnnData format,
+        converts it to MDV format, and saves it to the project directory. If a file already exists,
+        it will be saved to a temporary location that expires after 5 minutes.
+
+        HTTP Methods:
+            POST
+
+        Request Parameters:
+            file (FileStorage): The .h5ad file to be uploaded (multipart/form-data)
+
+        Returns:
+            tuple: A tuple containing:
+                - JSON response with status and message
+                - HTTP status code
+
+            Success Response (200):
+                {
+                    'status': 'success',
+                    'message': 'Anndata added successfully'
+                }
+
+            Error Responses:
+                400:
+                    - No file in request:
+                        {
+                            'status': 'error',
+                            'message': 'No file part in the request'
+                        }
+                    - No file selected:
+                        {
+                            'status': 'error',
+                            'message': 'No file selected'
+                        }
+                    - Invalid file type:
+                        {
+                            'status': 'error',
+                            'message': 'Invalid file type. Only .h5ad files are allowed'
+                        }
+                409:
+                    - File exists conflict:
+                        {
+                            'status': 'conflict',
+                            'message': 'File already exists',
+                            'temp_folder': '/path/to/temp/folder'
+                        }
+
+        Notes:
+            - The function creates a temporary folder for conflict resolution that is automatically
+            cleaned up after 5 minutes (300 seconds)
+            - Only .h5ad file extensions are accepted
+            - Successful upload will trigger conversion from Scanpy AnnData to MDV format
+        """
         try:
             if 'file' not in request.files:
                 return jsonify({'status': 'error', 'message': 'No file part in the request'}), 400
