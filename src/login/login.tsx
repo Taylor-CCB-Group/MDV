@@ -23,6 +23,15 @@ const Login: React.FC = () => {
         }
     };
 
+    // Needs to be changed later to standard routing
+    const handleLoginWithSSO = async () => {
+        try {
+            window.location.href = "login_sso";
+        } catch (err) {
+            console.error("Login error:", err);
+        }
+    };
+
     return (
         <Box
             sx={{
@@ -44,6 +53,7 @@ const Login: React.FC = () => {
                     alignItems: "center",
                     borderRadius: 2,
                     border: "1px solid #dadce0",
+                    backgroundColor: "unset",
                 }}
             >
                 <Box
@@ -97,6 +107,33 @@ const Login: React.FC = () => {
                 >
                     Sign in
                 </Button>
+                <Typography
+                    sx={{
+                        mt: 6,
+                        mb: 1,
+                        color: "#202124",
+                        fontSize: "16px",
+                    }}
+                >
+                    If you are a University User:
+                </Typography>
+
+                    <Button
+                        variant="contained"
+                        sx={{
+                            mt: 1.5,
+                            py: 1.5,
+                            px: 6,
+                            fontSize: "0.875rem",
+                            textTransform: "none",
+                            borderRadius: 5,
+                            minWidth: 200,
+                            color: "black",
+                        }}
+                        onClick={handleLoginWithSSO}
+                    >
+                        Sign in with SSO
+                    </Button>
             </Paper>
         </Box>
     );
