@@ -292,7 +292,28 @@ def create_app(
         return temp_folder_path
 
     def cleanup_folder(folder_path):
-        """Recursively clean up a folder and its contents."""
+        """
+        Recursively delete a folder and all its contents.
+
+        Safely removes all files within the specified folder and then removes the folder
+        itself. Any errors during the cleanup process are logged but do not raise exceptions
+        to the caller.
+
+        Args:
+            folder_path (str): Absolute path to the folder that needs to be cleaned up
+
+        Notes:
+            - First removes all files within the folder, then removes the empty folder
+            - Handles non-existent paths safely
+            - Logs errors to current_app.logger but does not propagate exceptions
+            - Only removes files (not subdirectories) within the specified folder
+            - Typically used to clean up temporary folders created by create_temp_folder()
+
+        Example:
+            >>> cleanup_folder('/path/to/temp/folder')
+            # Folder and its contents are deleted if they exist
+            # Any errors are logged but not raised
+        """
         try:
             if os.path.exists(folder_path):
                 for file in os.listdir(folder_path):
