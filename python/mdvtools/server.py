@@ -7,6 +7,7 @@ from flask import (
     send_file,
     Response,
     jsonify,
+    current_app
 )
 import webbrowser
 import mimetypes
@@ -23,8 +24,10 @@ from mdvtools.project_router import (
 import os
 import pandas as pd
 from typing import Optional
-from datetime import datetime
-
+from datetime import datetime, timedelta
+import threading
+import scanpy as sc
+from mdvtools.conversions import convert_scanpy_to_mdv
 routes = set()
 
 
@@ -255,25 +258,270 @@ def create_app(
             success = False
 
         return jsonify({"success": success})
-    
+
+    # Utility Functions
+    def create_temp_folder(base_path):
+        """
+        Create a temporary folder with a timestamp-based name.
+
+        Creates a new directory within the specified base path using a timestamp-based naming
+        convention for temporary AnnData file storage. The folder name follows the pattern
+        'temp_anndata_YYYYMMDD_HHMMSS'.
+
+        Args:
+            base_path (str): The parent directory where the temporary folder will be created
+
+        Returns:
+            str: Absolute path to the created temporary folder
+
+        Notes:
+            - The folder is created with exist_ok=True to handle potential race conditions
+            - Timestamp format used: YYYYMMDD_HHMMSS (e.g., temp_anndata_20250129_143022)
+            - This function is typically used in conjunction with cleanup_folder() for
+            temporary file handling during AnnData uploads
+
+        Example:
+            >>> temp_path = create_temp_folder('/path/to/project')
+            >>> print(temp_path)
+            '/path/to/project/temp_anndata_20250129_143022'
+        """
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        temp_folder_name = f"temp_anndata_{timestamp}"
+        temp_folder_path = os.path.join(base_path, temp_folder_name)
+        os.makedirs(temp_folder_path, exist_ok=True)
+        return temp_folder_path
+
+    def cleanup_folder(folder_path):
+        """
+        Recursively delete a folder and all its contents.
+
+        Safely removes all files within the specified folder and then removes the folder
+        itself. Any errors during the cleanup process are logged but do not raise exceptions
+        to the caller.
+
+        Args:
+            folder_path (str): Absolute path to the folder that needs to be cleaned up
+
+        Notes:
+            - First removes all files within the folder, then removes the empty folder
+            - Handles non-existent paths safely
+            - Logs errors to current_app.logger but does not propagate exceptions
+            - Only removes files (not subdirectories) within the specified folder
+            - Typically used to clean up temporary folders created by create_temp_folder()
+
+        Example:
+            >>> cleanup_folder('/path/to/temp/folder')
+            # Folder and its contents are deleted if they exist
+            # Any errors are logged but not raised
+        """
+        try:
+            if os.path.exists(folder_path):
+                for file in os.listdir(folder_path):
+                    file_path = os.path.join(folder_path, file)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                os.rmdir(folder_path)
+        except Exception as e:
+            current_app.logger.error(f"Error cleaning up folder {folder_path}: {e}")
+
     @project_bp.route("/add_anndata", access_level='editable', methods=["POST"])
     def add_anndata():
-        from mdvtools.conversions import convert_scanpy_to_mdv
-        try:
-            # Check if request has a file part
-            if 'file' not in request.files:
-                return "No file part in the request", 400
-            file = request.files['file']
-            import scanpy as sc
-            # "argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileStorage'"
-            file_name = project.dir + "/anndata.h5ad"
-            file.save(file_name)
-            anndata = sc.read(file_name)
-            convert_scanpy_to_mdv(project.dir, anndata)
-            return "Anndata added successfully", 200
-        except Exception as e:
-            return str(e), 500
+        """
+        Upload and process an AnnData file (.h5ad) for the project.
 
+        This endpoint handles the upload ofa single file in AnnData format,
+        converts it to MDV format, and saves it to the project directory. If a file already exists,
+        it will be saved to a temporary location that expires after 5 minutes.
+
+        HTTP Methods:
+            POST
+
+        Request Parameters:
+            file (FileStorage): The .h5ad file to be uploaded (multipart/form-data)
+
+        Returns:
+            tuple: A tuple containing:
+                - JSON response with status and message
+                - HTTP status code
+
+            Success Response (200):
+                {
+                    'status': 'success',
+                    'message': 'Anndata added successfully'
+                }
+
+            Error Responses:
+                400:
+                    - No file in request:
+                        {
+                            'status': 'error',
+                            'message': 'No file part in the request'
+                        }
+                    - No file selected:
+                        {
+                            'status': 'error',
+                            'message': 'No file selected'
+                        }
+                    - Invalid file type:
+                        {
+                            'status': 'error',
+                            'message': 'Invalid file type. Only .h5ad files are allowed'
+                        }
+                409:
+                    - File exists conflict:
+                        {
+                            'status': 'conflict',
+                            'message': 'File already exists',
+                            'temp_folder': '/path/to/temp/folder'
+                        }
+
+        Notes:
+            - The function creates a temporary folder for conflict resolution that is automatically
+            cleaned up after 5 minutes (300 seconds)
+            - Only .h5ad file extensions are accepted
+            - Successful upload will trigger conversion from Scanpy AnnData to MDV format
+        """
+        try:
+            if 'file' not in request.files:
+                return jsonify({'status': 'error', 'message': 'No file part in the request'}), 400
+
+            file = request.files['file']
+            if not file or not file.filename:
+                return jsonify({'status': 'error', 'message': 'No file selected'}), 400
+
+            if not file.filename.endswith('.h5ad'):
+                return jsonify({'status': 'error', 'message': 'Invalid file type. Only .h5ad files are allowed'}), 400
+
+            target_path = os.path.join(project.dir, "anndata.h5ad")
+            if os.path.exists(target_path):
+                temp_folder = create_temp_folder(project.dir)
+                temp_path = os.path.join(temp_folder, "anndata.h5ad")
+                file.save(temp_path)
+
+                threading.Timer(300, cleanup_folder, args=[temp_folder]).start()
+                return jsonify({
+                    'status': 'conflict',
+                    'message': 'File already exists',
+                    'temp_folder': temp_folder
+                }), 409
+
+            # Save file and process
+            file.save(target_path)
+            anndata = sc.read(target_path)
+            convert_scanpy_to_mdv(project.dir, anndata)
+            return jsonify({'status': 'success', 'message': 'Anndata added successfully'}), 200
+
+        except Exception as e:
+            current_app.logger.error(f"Unexpected error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    @project_bp.route("/combine_anndata", access_level='editable', methods=["PATCH"])
+    def combine_anndata():
+        """
+        Combine a temporary AnnData file with an existing project file.
+
+        This endpoint handles the resolution of file conflicts when uploading AnnData files.
+        It can either combine the temporary file with the existing project file (adding a label prefix
+        to distinguish the data) or cancel the operation and clean up the temporary files.
+
+        HTTP Methods:
+            PATCH
+
+        Request Parameters:
+            temp_folder (str): Path to the temporary folder containing the AnnData file
+            combine (bool): Whether to combine the files (true) or cancel the operation (false)
+            label (str): Prefix label to distinguish the new data when combining files
+
+        Returns:
+            tuple: A tuple containing:
+                - JSON response with status and message
+                - HTTP status code
+
+            Success Responses:
+                200:
+                    - Successful merge:
+                        {
+                            'status': 'success',
+                            'message': 'File merged successfully'
+                        }
+                    - Operation cancelled:
+                        {
+                            'status': 'success',
+                            'message': 'Operation cancelled'
+                        }
+
+            Error Responses:
+                400:
+                    - Missing label:
+                        {
+                            'status': 'error',
+                            'message': 'Label field not found'
+                        }
+                    - Missing temporary file:
+                        {
+                            'status': 'error',
+                            'message': 'Temporary file not found'
+                        }
+                408:
+                    - Timeout:
+                        {
+                            'status': 'error',
+                            'message': 'Request timed out, please try uploading again'
+                        }
+                500:
+                    - Label generation error:
+                        {
+                            'status': 'error',
+                            'message': '<specific ValueError message>'
+                        }
+                    - Other errors:
+                        {
+                            'status': 'error',
+                            'message': '<specific error message>'
+                        }
+
+        Notes:
+            - This endpoint is typically called after a conflict is detected in the /add_anndata endpoint
+            - The temporary folder is cleaned up regardless of whether the operation succeeds or fails
+            - When combining files, the new data is prefixed with the provided label followed by an underscore
+            - The combined file maintains the original filename 'anndata.h5ad' in the project directory
+        """
+        try:
+            temp_folder = request.form.get('temp_folder')
+            combine = request.form.get('combine') == 'true'
+            label = request.form.get('label')
+
+            if not temp_folder or not os.path.exists(temp_folder):
+                return jsonify({'status': 'error', 'message': 'Request timed out, please try uploading again'}), 408
+
+            if not combine:
+                cleanup_folder(temp_folder)
+                return jsonify({'status': 'success', 'message': 'Operation cancelled'}), 200
+            
+            if not label:
+                cleanup_folder(temp_folder)
+                return jsonify({'status': 'error', 'message': 'Label field not found'}), 400
+
+            temp_path = os.path.join(temp_folder, "anndata.h5ad")
+            if not os.path.exists(temp_path):
+                return jsonify({'status': 'error', 'message': 'Temporary file not found'}), 400
+
+
+            # Process and combine the file
+            new_anndata = sc.read(temp_path)
+            convert_scanpy_to_mdv(project.dir, new_anndata, delete_existing=False, label=f"{label}_")
+            new_anndata.write(os.path.join(project.dir, "anndata.h5ad"))
+            cleanup_folder(temp_folder)
+
+            return jsonify({'status': 'success', 'message': 'File merged successfully'}), 200
+
+        except ValueError as ve:
+            current_app.logger.error(f"Label generation error: {str(ve)}")
+            return jsonify({'status': 'error', 'message': str(ve)}), 500
+        except Exception as e:
+            current_app.logger.error(f"Unexpected error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+    
     @project_bp.route("/add_or_update_image_datasource", access_level='editable', methods=["POST"])
     def add_or_update_image_datasource():
         try:

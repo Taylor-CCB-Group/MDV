@@ -8,36 +8,121 @@ from .mdvproject import MDVProject
 import numpy as np
 import json
 import gzip
-
+import copy
 
 def convert_scanpy_to_mdv(
-    folder: str, scanpy_object: AnnData, max_dims=3, delete_existing=False
+    folder: str, 
+    scanpy_object: AnnData, 
+    max_dims: int = 3, 
+    delete_existing: bool = False, 
+    label: str = ""
 ) -> MDVProject:
+    """
+    Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
+
+    This function transforms single-cell RNA sequencing data from AnnData format into 
+    the MDV project structure, handling both cells and genes as separate datasources 
+    with their associated dimensionality reductions and metadata.
+
+    Args:
+        folder (str): Path to the target MDV project folder
+        scanpy_object (AnnData): The AnnData object containing the single-cell data
+        max_dims (int, optional): Maximum number of dimensions to include from 
+            dimensionality reductions. Defaults to 3.
+        delete_existing (bool, optional): Whether to delete existing project data. 
+            If False, merges with existing data. Defaults to False.
+        label (str, optional): Prefix to add to datasource names and metadata columns
+            when merging with existing data. Defaults to "".
+
+    Returns:
+        MDVProject: The configured MDV project object with the converted data
+
+    Notes:
+        Data Structure Creation:
+        - Creates two main datasources: '{label}cells' and '{label}genes'
+        - Preserves all cell metadata from scanpy_object.obs
+        - Preserves all gene metadata from scanpy_object.var
+        - Transfers dimension reductions from obsm/varm matrices
+        - Links cells and genes through expression data
+        - Adds gene expression scores as a subgroup
+
+        View Handling:
+        - If delete_existing=True:
+            * Creates new default view with empty initial charts
+            * Sets project as editable
+        - If delete_existing=False:
+            * Preserves existing views
+            * Updates views with new datasources
+            * Maintains panel widths and other view settings
+            * Adds new datasources to each view's initialCharts
+
+        Dimension Reduction:
+        - Processes dimensionality reductions up to max_dims
+        - Supports standard formats (e.g., PCA, UMAP, t-SNE)
+        - Column names in the format: {reduction_name}_{dimension_number}
+
+    Raises:
+        ValueError: If the provided AnnData object is invalid or missing required components
+        IOError: If there are issues with file operations in the target folder
+        Exception: For other unexpected errors during conversion
+    """
     mdv = MDVProject(folder, delete_existing=delete_existing)
 
-    # create datasources 'cells'
+    # If not deleting existing, preserve current views
+    current_views = None
+    if not delete_existing:
+        current_views = mdv.views
+
+    # create datasource 'cells'
     cell_table = scanpy_object.obs
     cell_table["cell_id"] = cell_table.index
+
     # add any dimension reduction
     _add_dims(cell_table, scanpy_object.obsm, max_dims)
-    mdv.add_datasource("cells", cell_table)
+    mdv.add_datasource(f"{label}cells", cell_table)
 
-    # create two datasources 'genes'
+    # create datasource 'genes'
     gene_table = scanpy_object.var
-    gene_table["name"] = gene_table.index
+    gene_table[f"{label}name"] = gene_table.index
     _add_dims(gene_table, scanpy_object.varm, max_dims)
-    mdv.add_datasource("genes", gene_table)
+    mdv.add_datasource(f"{label}genes", gene_table)
 
     # link the two datasets
-    mdv.add_rows_as_columns_link("cells", "genes", "name", "Gene Expr")
+    mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", f"{label}name", "Gene Expr")
 
     # add the gene expression
     mdv.add_rows_as_columns_subgroup(
-        "cells", "genes", "gs", scanpy_object.X, name="gene_scores", label="Gene Scores"
+        f"{label}cells", f"{label}genes", "gs", scanpy_object.X, name="gene_scores", label="Gene Scores"
     )
 
-    # create a default view
-    mdv.set_view("default", {"initialCharts": {"cells": [], "genes": []}}, True)
+    if delete_existing:
+        # If we're deleting existing, create new default view
+        mdv.set_view("default", {"initialCharts": {"cells": [], "genes": []}}, True)
+        mdv.set_editable(True)
+    else:
+        # If we're not deleting existing, update existing views with new datasources
+        new_views = {}
+        for view_name, view_data in current_views.items():
+            new_view_data = copy.deepcopy(view_data)
+            
+            # Initialize new charts if they don't exist
+            if "initialCharts" not in new_view_data:
+                new_view_data["initialCharts"] = {}
+            
+            # Add new datasources to initialCharts
+            new_view_data["initialCharts"][f"{label}cells"] = []
+            new_view_data["initialCharts"][f"{label}genes"] = []
+            
+            # Initialize dataSources if they don't exist
+            if "dataSources" not in new_view_data:
+                new_view_data["dataSources"] = {}
+            
+            # Add new datasources with panel widths
+            new_view_data["dataSources"][f"{label}cells"] = {"panelWidth": 50}
+            new_view_data["dataSources"][f"{label}genes"] = {"panelWidth": 50}
+            
+            new_views[view_name] = new_view_data
+        
     return mdv
 
 
