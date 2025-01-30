@@ -115,7 +115,7 @@ const Login: React.FC = () => {
                         fontSize: "16px",
                     }}
                 >
-                    If you are a University User:
+                    If you are an Oxford University User:
                 </Typography>
 
                     <Button
