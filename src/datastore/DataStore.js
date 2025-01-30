@@ -732,6 +732,9 @@ class DataStore {
         for (const c of columns) {
             //todo invert this to use col.getValue(index)
             const col = this.columnIndex[c];
+            if (!col.data) {
+                throw new Error(`Column '${c}' has no data`);
+            }
             let v = col.data[index];
             if (col.datatype === "text" || col.datatype === "text16") {
                 v = col.values[v];
@@ -1191,6 +1194,7 @@ class DataStore {
      * @param {SharedArrayBuffer|Array} data  either a javascript array or shared array buffer
      */
     setColumnData(column, data) {
+        // if (Math.random() < 0.1) throw new Error("This is a test error");
         const c = this.columnIndex[column];
         if (!c) {
             throw `column ${column} is not present in data store`;

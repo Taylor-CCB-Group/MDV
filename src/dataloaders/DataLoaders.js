@@ -111,18 +111,22 @@ function processArrayBuffer(data, columns, size) {
 function getArrayBufferDataLoader(url, decompress = false) {
     return async (columns, dataSource, size) => {
         //get the data
-        const response = await fetch(url, {
-            method: "POST",
-            body: JSON.stringify({ columns: columns, data_source: dataSource }),
-            headers: {
-                "Content-Type": "application/json",
-            },
-        });
-        //the data is any arraybuffer containing each individual
-        //column's raw data
-        let data = await response.arrayBuffer();
-        data = decompress ? await decompressData(data) : data;
-        return processArrayBuffer(data, columns, size);
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                body: JSON.stringify({ columns: columns, data_source: dataSource }),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+            //the data is any arraybuffer containing each individual
+            //column's raw data
+            let data = await response.arrayBuffer();
+            data = decompress ? await decompressData(data) : data;
+            return processArrayBuffer(data, columns, size);
+        } catch (e) {
+            console.warn(`Error fetching data: ${e}`);
+        }
     };
 }
 

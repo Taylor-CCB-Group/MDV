@@ -14,6 +14,7 @@ import {
 import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
 import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
+import type { DataColumn } from "@/charts/charts";
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
 declare global {
@@ -164,7 +165,10 @@ async function loadData() {
                 "Pre-Load Data",
                 async () => {
                     const columns = datasources[i].columns.map((c) => c.name);
-                    cm.loadColumnSet(columns, dsName, () => {
+                    cm.loadColumnSet(columns, dsName, (failedColumns: DataColumn<any>[]) => {
+                        if (failedColumns.length) {
+                            console.error(`Failed to load columns: ${failedColumns}`);
+                        }
                         console.log("done loadColumnSet");
                     });
                 },
