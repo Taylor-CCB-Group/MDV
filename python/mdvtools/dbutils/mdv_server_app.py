@@ -324,7 +324,7 @@ def register_routes(app):
         @app.route('/login_sso')
         def login_sso():
             # Redirect user to Shibboleth-protected login page on Apache
-            return redirect('https://localhost:2443')
+            return redirect('https://bia.cmd.ox.ac.uk:443')
 
         @app.route('/projects')
         def get_projects():
