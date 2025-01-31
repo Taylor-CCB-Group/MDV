@@ -4,7 +4,7 @@ import json
 import shutil
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
 # import random
@@ -320,6 +320,11 @@ def register_routes(app):
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /")
+
+        @app.route('/login_sso')
+        def login_sso():
+            # Redirect user to Shibboleth-protected login page on Apache
+            return redirect('https://localhost:2443')
 
         @app.route('/projects')
         def get_projects():
