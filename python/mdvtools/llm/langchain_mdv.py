@@ -24,6 +24,7 @@ from langchain.chains import RetrievalQA # why can't I see the type for this? se
 from langchain.prompts import PromptTemplate
 import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 from dotenv import load_dotenv
+from mdvtools.websocket import ChatSocketAPI
 
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data, get_updateproject_prompt_RAG
@@ -109,7 +110,7 @@ print('# Initialize an instance of the OpenAIEmbeddings class')
 with time_block("b3: Embeddings creating"):
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-large"  # Specify the model to use for generating embeddings
-        )
+    )
 
 print(embeddings)
 print('# Create an index from the embedded code chunks')
@@ -119,7 +120,7 @@ print('# Use FAISS (Facebook AI Similarity Search) to create a searchable index'
 with time_block("b4: FAISS database creating"):
     db = FAISS.from_documents(texts, embeddings)
 
-print('# Initialize the retriever from the FAISS index')
+print("# Initialize the retriever from the FAISS index")
 
 with time_block("b5: Retriever creating"):
     retriever = db.as_retriever(
@@ -130,9 +131,12 @@ with time_block("b5: Retriever creating"):
 # ... for testing basic mechanics without invoking the agent
 mock_agent = False
 
-class ProjectChat():
-    def __init__(self, project: MDVProject, logger: logging.Logger):
+
+class ProjectChat:
+    def __init__(self, project: MDVProject):
         self.project = project
+        self.socket_api = ChatSocketAPI(project)
+        logger = self.socket_api.logger
         self.langchain_logging_handler = LangchainLoggingHandler(logger)
         self.config = {"callbacks": [self.langchain_logging_handler]}
         log = self.log = logger.info
@@ -168,11 +172,26 @@ class ProjectChat():
             # todo keep better track of the state of the agent, what went wrong etc
             self.ok = False
 
-    def ask_question(self, question: str): # async?
+    def ask_question(self, question: str, id: str):  # async?
+        """
+        Ask a question, generate code to answer it, execute the code...
+
+        How should we stream updates on the progress of the code execution back to the user?
+        We have a log, connected to a websocket... but perhaps it would make sense to yield the output of the code execution
+        and feed that back to the http response as it comes in?
+
+        Then in the front-end, we can have a view of the verbose logging stuff, but not necessarily
+        """
+        progress = 0
         if mock_agent:
-            ok, strdout, stderr = execute_code('import mdvtools\nprint("mdvtools import ok")')
+            ok, strdout, stderr = execute_code(
+                'import mdvtools\nprint("mdvtools import ok")'
+            )
             return f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}"
-        with time_block("b9a: Pandas agent invoking"):
+        with time_block("b9a: Pandas agent invoking"):  # ~0.005% of time
+            self.socket_api.update_chat_progress(
+                "Pandas agent invoking", id, progress, 0
+            )
             # shortly after this...
             # Error in StdOutCallbackHandler.on_chain_start callback: AttributeError("'NoneType' object has no attribute 'get'")
             self.log(f"Asking the LLM: '{question}'")
@@ -180,19 +199,23 @@ class ProjectChat():
                 return "This agent is not ready to answer questions"
             full_prompt = prompt_data + "\nQuestion: " + question
             print(full_prompt)
+            # provide an update to the user that we're working on it, using provided id.
             logger.info(f"Question asked by user: {question}")
         try:
-            with time_block("b9b: Pandas agent invoking"):
+            with time_block("b9b: Pandas agent invoking"):  # ~31.4% of time
+                self.socket_api.update_chat_progress(
+                    "Pandas agent invoking...", id, progress, 31
+                )
+                progress += 31
                 # Argument of type "str" cannot be assigned to parameter "input" of type "Dict[str, Any]"
-                response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]}) # type: ignore for now
-                assert('output' in response) # we might allow
-            #!!! csv_path is not wanted - the code tries to use that as data source name which is all wrong
-            with time_block("b10: RAG prompt preparation"):
-                #! todo - allow for the ability to pass a path to some data that may not already be in the project?
-                # at least we should allow for multiple datasources. Do we even need to pass ds_name(s), or should the script look it (them) up for itself?
-                #path_to_data = self.project.dir + "/anndata.h5ad"
-                #path_to_data = os.path.join(self.project.dir, os.listdir(self.project.dir)[0])
-
+                response = self.agent.invoke(
+                    full_prompt, config={"callbacks": [self.langchain_logging_handler]}
+                )  # type: ignore for now
+                assert "output" in response  # we might allow
+            with time_block("b10: RAG prompt preparation"):  # ~0.003% of time
+                self.socket_api.update_chat_progress(
+                    "RAG prompt preparation...", id, progress, 1
+                )
                 # List all files in the directory
                 files_in_dir = os.listdir(self.project.dir)
 
@@ -201,6 +224,7 @@ class ProjectChat():
                 h5ad_file = None
 
                 # Identify the CSV or H5AD file
+                # subject to review at a later date
                 for file in files_in_dir:
                     if file.endswith(".csv"):
                         csv_file = file
@@ -230,32 +254,52 @@ class ProjectChat():
                     input_variables=["context", "question"]
                 )
 
-            with time_block("b11: RAG chain"):
+            with time_block("b11: RAG chain"):  # ~60% of time
+                self.socket_api.update_chat_progress(
+                    "Invoking RAG chain...", id, progress, 60
+                )
+                progress += 60
                 qa_chain = RetrievalQA.from_llm(
                     llm=self.code_llm,
                     prompt=prompt_RAG_template,
                     retriever=retriever,
-                    return_source_documents=True
+                    return_source_documents=True,
                 )
                 context = retriever
                 output = qa_chain.invoke({"context": context, "query": question})
                 result = output["result"]
                 print(result)
 
-            with time_block("b12: Prepare code"):
-                final_code = prepare_code(result, self.df, self.project, self.log, modify_existing_project=True, view_name=question)
+            with time_block("b12: Prepare code"):  # <0.1% of time
+                final_code = prepare_code(
+                    result,
+                    self.df,
+                    self.project,
+                    self.log,
+                    modify_existing_project=True,
+                    view_name=question,
+                )
                 # view_name = parse_view_name(final_code)
             # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
             # todo - save code at various stages of processing...
             # log_chat(output, prompt_RAG, final_code)
-            with time_block("b13: Chat logging by MDV"):
+            with time_block("b13: Chat logging by MDV"):  # <0.1% of time
                 self.project.log_chat_item(output, prompt_RAG, final_code)
-            with time_block("b14: Execute code"):
-                ok, stdout, stderr = execute_code(final_code, open_code=False, log=self.log)
+            with time_block("b14: Execute code"):  # ~9% of time
+                self.socket_api.update_chat_progress(
+                    "Executing code...", id, progress, 9
+                )
+                progress += 9
+                ok, stdout, stderr = execute_code(
+                    final_code, open_code=False, log=self.log
+                )
             if not ok:
                 return f"# Error: code execution failed\n> {stderr}"
             else:
                 self.log(final_code)
+                self.socket_api.update_chat_progress(
+                    "Finished processing query", id, 100, 0
+                )
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
                 return f"I ran some code for you:\n\n```python\n{final_code}```"
         except Exception as e:

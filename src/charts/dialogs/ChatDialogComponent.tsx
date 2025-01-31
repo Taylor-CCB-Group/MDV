@@ -1,15 +1,15 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen } from 'lucide-react';
-import useChat from './ChatAPI';
+import useChat, { type ChatProgress, type ChatMessage } from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
+import LinearProgress from '@mui/material/LinearProgress';
 
-
-const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => {
+const Message = ({ text, sender }: ChatMessage) => {
     const isUser = sender === 'user';
     const pythonSections = extractPythonSections(text);
     try {
@@ -25,10 +25,10 @@ const Message = ({ text, sender }: { text: string; sender: 'user' | 'bot' }) => 
                 {/* <JsonView src={text} /> */}
                 <MessageMarkdown text={text} />
             </div>
-            {pythonSections.map((section, index) => (
+            {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
-            ))}
-            {!isUser && <MessageFeedback />}
+            ))} */}
+            {(sender === 'bot') && <MessageFeedback />}
         </div>
     );
 }
@@ -93,7 +93,6 @@ function extractPythonSections(responseText: string) {
 }
 
 const PythonCode = ({ code }: { code: string }) => {
-    return null;
     return (
         <div className="p-4 bg-gray-200 dark:bg-gray-800 w-fit mb-4 rounded-lg">
             <SquareTerminal />
@@ -112,6 +111,7 @@ const MessageMarkdown = ({ text }: { text: string }) => {
     // Also the example image, but that was probably because it was a bad link.
     return (
         <ReactMarkdown
+            // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-markdown, not our code
             children={markdown}
             components={{
                 code({ node, className, children, ...props }) {
@@ -121,6 +121,7 @@ const MessageMarkdown = ({ text }: { text: string }) => {
                         <SquareTerminal onClick={() => alert(children)} /> {match[1]}:
                         <SyntaxHighlighter
                             className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto max-h-96"
+                            // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-syntax-highlighter, not our code
                             children={String(children).replace(/\n$/, '')}
                             //@ts-ignore - not sure what's wrong here - maybe @types/react-syntax-highlighter needs updating?
                             style={dracula}
@@ -140,8 +141,26 @@ const MessageMarkdown = ({ text }: { text: string }) => {
     );
 }
 
+const Progress = (props: ChatProgress & {verboseProgress: string[]}) => {
+    const verbose = props.verboseProgress.map(s => s.substring(s.length-100)).join('\n');
+    if (props.progress >= 100) return null;
+    return (
+        <div className="p-4">
+            <LinearProgress 
+                variant="buffer"
+                // consider some custom styling of the buffer
+                value={props.progress}
+                valueBuffer={props.progress + props.delta}
+            />
+            {props.message}
+            <pre className="">{verbose}</pre>
+        </div>
+    );
+}
+
+
 const Chatbot = () => {
-    const { messages, isSending, sendAPI } = useChat();
+    const { messages, isSending, sendAPI, requestProgress, verboseProgress } = useChat();
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -173,14 +192,17 @@ const Chatbot = () => {
         <div className="flex flex-col h-full mx-auto overflow-hidden">
             <div className="flex-1 p-1 w-full overflow-y-auto">
                 {messages.map((message) => (
-                    <Message key={message.id} text={message.text} sender={message.sender} />
+                    <Message key={message.id} {...message} />
                 ))}
-                {isSending && (<div className="animate-pulse flex justify-center p-4">...</div>)}
+                {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
+                {/* {
+                isSending && 
+                (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
                 <div ref={messagesEndRef} />
             </div>
-            {/* <div className='absolute opacity-10 pointer-events-none top-0 right-0'>
+            <div className='absolute opacity-10 pointer-events-none top-0 right-0'>
                 <RobotPandaSVG />
-            </div> */}
+            </div>
             <div className="flex p-4 border-t w-full border-gray-300">
                 <input
                     type="text"

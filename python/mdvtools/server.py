@@ -140,16 +140,13 @@ def create_app(
         # but I'm reducing how far this prototype reaches into wider code
         chat_welcome = "Hello, I'm an AI assistant that has access to the data in this project and is designed to help build views for visualising it. What can I help you with?"
         # what if we make `log` a thing that streams to the client via websocket?
-        log_name = f"/project/{project.id}/chat"
-        logger = get_socket_logger(log_name)
         @project_bp.route("/chat_init", methods=["POST"])
         def chat_init():
             print("chat_init")
-            logger.info("chat_init")
+            # logger.info("chat_init")
             nonlocal bot, chat_welcome
             if bot is None:
-                # bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
-                bot = ProjectChat(project, logger=logger)
+                bot = ProjectChat(project)
             return {"message": chat_welcome}
         @project_bp.route("/chat", methods=["POST"])
         def chat():
@@ -157,16 +154,16 @@ def create_app(
             if not request.json:
                 return {"error": "No JSON data in request"}, 500
             message = request.json.get("message")
+            id = request.json.get("id")
             try:
                 if bot is None:
-                    # bot = ProjectChat(project, log=lambda x: print(f'[llm {project.id}] {x}'))
-                    bot = ProjectChat(project, logger=logger)
+                    bot = ProjectChat(project)
                 # we need to know view_name as well as message - but also maybe there won't be one, if there's an error etc.
                 # probably want to change the return type of this function, but for now we do some string parsing here.
-                final_code = bot.ask_question(message)
+                final_code = bot.ask_question(message, id)
                 view_name = parse_view_name(final_code)
                 bot.log(f"view_name: {view_name}")
-                return {"message": final_code, "view": view_name}
+                return {"message": final_code, "view": view_name, "id": id}
             except Exception as e:
                 print(e)
                 return str(e), 500

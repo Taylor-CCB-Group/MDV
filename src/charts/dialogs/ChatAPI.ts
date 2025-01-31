@@ -1,15 +1,24 @@
 import { useProject } from "@/modules/ProjectContext";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { z } from 'zod';
 
-const responseSchema = z.object({
+const completedChatResponseSchema = z.object({
     message: z.string(),
     /** 
      * This should be a string that identifies newly created views.
      */
-    view: z.optional(z.string()),
+    view: z.optional(z.string()).describe('The name of the newly created view, if a view was created'),
 });
+
+const chatProgressSchema = z.object({
+    id: z.string().describe('The ID of the message this progress is associated with'),
+    progress: z.number(),
+    delta: z.number(),
+    message: z.string(),
+});
+
+export type ChatProgress = z.infer<typeof chatProgressSchema>;
 
 // nb this is going to want to change a lot
 // we want to know what version of code it based the training on as well as a bunch of other things
@@ -22,6 +31,7 @@ const chatLogItemSchema = z.object({
     query: z.string(),
     prompt_template: z.string(),
     response: z.string(),
+    // id: z.string(),
 });
 const chatLogSchema = z.array(chatLogItemSchema);
 
@@ -46,18 +56,20 @@ export const useChatLog = () => {
             setIsLoading(false);
         };
         fetchChatLog();
-        const interval = setInterval(fetchChatLog, 2000);
+        // refresh periodically - there may be a better way (quite possible involving useQuery,
+        // or socketio...).
+        const interval = setInterval(fetchChatLog, 5000);
         return () => clearInterval(interval);
     }, [route]);
 
     return { chatLog, isLoading };
 }
 
-type ChatResponse = z.infer<typeof responseSchema>;
+type ChatResponse = z.infer<typeof completedChatResponseSchema>;
 
-type Message = {
+export type ChatMessage = {
     text: string;
-    sender: 'user' | 'bot';
+    sender: 'user' | 'bot' | 'system';
     id: string;
 };
 
@@ -71,14 +83,15 @@ function getViewName(): string | null {
 }
 
 
-const sendMessage = async (message: string, route = '/chat') => {
+const sendMessage = async (message: string, id: string, route = '/chat') => {
     // we should send information about the context - in particular, which view we're in
-    const response = await axios.post<ChatResponse>(route, { message });
-    const parsed = responseSchema.parse(response.data); // may throw an error if the response is not valid
+    // could consider a streaming response here rather than socket
+    const response = await axios.post<ChatResponse>(route, { message, id });
+    const parsed = completedChatResponseSchema.parse(response.data); // may throw an error if the response is not valid
     return parsed;
 };
 
-const DefaultMessage: Message = {
+const DefaultMessage: ChatMessage = {
     text: 'Hello! How can I help you?',
     sender: 'bot',
     id: generateId(),
@@ -87,56 +100,89 @@ const DefaultMessage: Message = {
 const useChat = () => {
     const { root } = useProject(); //todo add viewName to ProjectProvider
     const route = `${root}/chat`;
+    const progressRoute = `${root}/chat_progress`;
     const routeInit = `${root}/chat_init`;
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isSending, setIsSending] = useState<boolean>(false);
+    const [currentRequestId, setCurrentRequestId] = useState<string>("");
     const [isInit, setIsInit] = useState<boolean>(false);
-    // console.log('chat route', route);
+    const [requestProgress, setRequestProgress] = useState<ChatProgress | null>(null);
+    const [verboseProgress, setVerboseProgress] = useState([""]);
+
+    const progressListener = useCallback((data: any) => {
+        console.log('chat message', data);
+        try {
+            const parsed = chatProgressSchema.parse(data);
+            if (parsed.id === currentRequestId) {
+                setRequestProgress(parsed);
+            }
+        } catch (error) {
+            console.error('Error parsing chat progress', error);
+            setRequestProgress({
+                id: currentRequestId,
+                progress: 0,
+                delta: 100,
+                message: data,
+            });
+        }
+    }, [currentRequestId]);
     
     useEffect(() => {
-        window.mdv.chartManager.ipc.socket?.on(route, (data: any) => {
-            console.log('chat message', data);
-            //setMessages((prev) => [...prev, { text: data.message, sender: 'bot', id: generateId() }]);
-        });
+        const { socket } = window.mdv.chartManager.ipc;
+        
+        // event-name like 'chat', room for project... id associated with original request.
+        socket?.on(progressRoute, progressListener);
+        const verboseProgress = (msg: string) => setVerboseProgress(v => [...v, msg].slice(-5));
+        socket?.on(route, verboseProgress);
         const chatInit = async () => {
             setIsSending(true);
             try {
-                const response = await sendMessage('', routeInit);
-                setMessages([{ text: response.message, sender: 'bot', id: generateId() }]);
+                const id = generateId();
+                setCurrentRequestId(id);
+                const response = await sendMessage('', id, routeInit);
+                setMessages([{ text: response.message, sender: 'system', id: generateId() }]);
             } catch (error) {
                 console.error('Error sending welcome message', error);
             }
             setIsSending(false);
+            setCurrentRequestId(''); //todo review react query etc
             setIsInit(true);
         };
         if (!isSending && !isInit) chatInit();
         return () => {
-            window.mdv.chartManager.ipc.socket?.off(route);
+            socket?.off(progressRoute, progressListener);
+            socket?.off(route, verboseProgress);
         }
-    }, [isSending, isInit, routeInit, route]);
+    }, [isSending, isInit, routeInit, progressRoute, route, progressListener]);
 
     const appendMessage = (message: string, sender: 'bot' | 'user') => {
+        //we should be using an id passed as part of the message, not generating one here
         const msg = { text: message, sender, id: generateId() };
         setMessages((prevMessages) => [...prevMessages, msg]);
     };
     
     const sendAPI = async (input: string) => {
         if (!input.trim()) return;
+        const id = generateId();
         const viewName = getViewName();
         console.log(`sending chat '${input}' from '${viewName}'`)
         appendMessage(input, 'user');
 
         try {
             setIsSending(true);
-            const response = await sendMessage(input, route);
+            setCurrentRequestId(id);
+            const response = await sendMessage(input, id, route);
             appendMessage(response.message, 'bot');
+            //todo - navigating via button rather than automatically
             if (response.view) navigateToView(response.view);
         } catch (error) {
             appendMessage(`Error: ${error}`, 'bot');
         }
+        setCurrentRequestId(id);
+        setRequestProgress(null);
         setIsSending(false);
     };
-    return { messages, isSending, sendAPI };
+    return { messages, isSending, sendAPI, requestProgress, verboseProgress };
 }
 
 /**
