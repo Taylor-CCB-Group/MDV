@@ -14,7 +14,7 @@ import {
 import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
 import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
-import type { DataSource } from "@/charts/charts";
+import type { DataColumn, DataSource } from "@/charts/charts";
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
 declare global {
