@@ -111,14 +111,14 @@ function listenPreferredColorScheme(callback) {
 }
 
 /**
-* The object to manage charts {@tutorial chartmanager}
+* The object to manage charts [Chart Manager](../../docs/extradocs/chartmanager.md)
 * 
 * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
-* @param {object[]} datasources - An array of datasource configs -see  {@tutorial datasource}.
+* @param {object[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
 * Each config must contain the size parameter, giving the number of rows in the DataStore.
 * @param {object} dataloader - An object containing the following
 * <ul>
-*   <li> function - The [function]{@tutorial datalaoder} to load the data
+*   <li> function - The data loader to load the data
     (can be omitted if data loaded from a file)</li>
 *   <li> viewLoader - The function that will load the each view  (not necessay if only one view)</li>
 *   <li> rowDataLoader - (optional) an asunc function which is given the datasource name and row index

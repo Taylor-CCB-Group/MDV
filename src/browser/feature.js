@@ -35,8 +35,8 @@ const MAX_GZIP_BLOCK_SIZE = (1 << 16);
     /**
      * feature source for "bed like" files (tab delimited files with 1 feature per line: bed, gff, vcf, etc)
      *
+     * @class
      * @param config
-     * @constructor
      */
 class FeatureSource{
     constructor(config) {
