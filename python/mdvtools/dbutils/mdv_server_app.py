@@ -185,6 +185,7 @@ def tables_exist():
         return inspector.get_table_names()
 
 def serve_projects_from_db(app):
+    failed_projects: list[tuple[int, str | Exception]] = []
     try:
         # Get all projects from the database
         print("Serving the projects present in both database and filesystem. Displaying the error if the path doesn't exist for a project")
@@ -224,14 +225,23 @@ def serve_projects_from_db(app):
 
 
                 except Exception as e:
-                    print(f"Error serving project '{project.path}': {e}")
+                    print(f"Error serving project #{project.id}'{project.path}': {e}")
                     # don't `raise` here; continue serving other projects
+                    # but keep track of failed projects & associated errors
+                    # nb keeping track via project.id rather than instance of Project, because ORM seems to make that not work
+                    failed_projects.append((project.id, e))
             else:
-                print(f"Error : Project path '{project.path}' does not exist.")
+                e = f"Error serving project #{project.id}: path '{project.path}' does not exist."
+                print(e)
+                failed_projects.append((project.id, e))
                 
     except Exception as e:
         print(f"Error serving projects from database: {e}")
         raise
+    print(f"{len(failed_projects)} projects failed to serve. ({len(projects)} projects served successfully)")
+    # nb using append rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
+    # so we really only expect this to run once, and the list to be empty
+    ProjectService.failed_projects.append(failed_projects)
 
 def serve_projects_from_filesystem(app, base_dir):
     try:

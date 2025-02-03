@@ -159,6 +159,15 @@ class MDVProject:
         all_cols = set([x["field"] for x in md["columns"]])
         return [x for x in columns if x not in all_cols]
 
+    def get_datasource_names(self) -> list[str]:
+        """
+        Get a list of all datasource names in the project.
+        
+        Returns:
+            list[str]: A list of datasource names
+        """
+        return [ds["name"] for ds in self.datasources]
+    
     def set_interactions(
         self,
         interaction_ds,
@@ -1155,18 +1164,18 @@ class MDVProject:
             )
             gr.create_dataset("p", (len(data.indptr),), data=data.indptr)
         else:
-            # Handle dense matrix
-            if not hasattr(data, "toarray"):
-                raise TypeError("Dense data must be a NumPy array or convertible to one.")
-            
-            dense_data = data.toarray() if hasattr(data, "toarray") else data
-            total_len = dense_data.shape[0] * dense_data.shape[1]
-            gr.create_dataset(
-                "x", (total_len,),
-                data=dense_data.flatten(order="F"),
-                dtype=numpy.float32
-            )
-            gr["length"] = [dense_data.shape[0]]
+            # Fallback to dense or convertible
+            try:
+                dense_data = data.toarray() if hasattr(data, 'toarray') else numpy.asarray(data)
+                total_len = dense_data.shape[0] * dense_data.shape[1]
+                gr.create_dataset(
+                    "x", (total_len,),
+                    data=dense_data.flatten(order="F"),
+                    dtype=numpy.float32
+                )
+                gr["length"] = [dense_data.shape[0]]
+            except Exception as e:
+                raise TypeError(f"Unsupported data type for dense processing: {type(data)}. Original error: {e}")
 
         # Update metadata
         ds = self.get_datasource_metadata(row_ds)

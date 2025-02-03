@@ -16,9 +16,9 @@ class ProjectBlueprint:
     @staticmethod
     def register_app(app: Flask) -> None:
         @app.route(
-            "/project/<project_id>/", defaults={"subpath": ""}, methods=["GET", "POST"]
+            "/project/<project_id>/", defaults={"subpath": ""}, methods=["GET", "POST", "PATCH"]
         )
-        @app.route("/project/<project_id>/<path:subpath>/", methods=["GET", "POST"])
+        @app.route("/project/<project_id>/<path:subpath>/", methods=["GET", "POST", "PATCH"])
         #incorporated below to resolve issue related to redirecting the request to http
         #@app.route("/project/<project_id>", defaults={'subpath': ''}, methods=["GET", "POST"])
         def project_route(project_id: str, subpath: str):
@@ -89,9 +89,9 @@ class ProjectBlueprint_v2:
     @staticmethod
     def register_app(app: Flask) -> None:
         @app.route(
-            "/project/<project_id>/", defaults={"subpath": ""}, methods=["GET", "POST"]
+            "/project/<project_id>/", defaults={"subpath": ""}, methods=["GET", "POST", "PATCH"]
         )
-        @app.route("/project/<project_id>/<path:subpath>/", methods=["GET", "POST"])
+        @app.route("/project/<project_id>/<path:subpath>/", methods=["GET", "POST", "PATCH"])
         #incorporated below to resolve issue related to redirecting the request to http
         #@app.route("/project/<project_id>", defaults={'subpath': ''}, methods=["GET", "POST"])
         def project_route(project_id: str, subpath: str):
