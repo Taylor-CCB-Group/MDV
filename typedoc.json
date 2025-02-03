@@ -11,6 +11,6 @@
         "src/",
     ],
     "entryPointStrategy": "expand",
-    "watch": true,
+    // "watch": true,
     "out": "docs/typedoc",
 }
