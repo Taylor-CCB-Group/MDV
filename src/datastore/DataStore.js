@@ -18,6 +18,9 @@ import { isDatatypeNumeric } from "@/lib/utils";
 /**
  * Creates an empty data structure
  * @tutorial datasource
+ * 
+ * See [Data Source](../../docs/extradocs/datasource.md)
+ *  
  * @param {number} size - the number of rows(items) of the data structure
  * @param {Object} [config] - setup information for the datastore.
  * @param {Object[]} [config.columns] - an array of column objects, specifying
