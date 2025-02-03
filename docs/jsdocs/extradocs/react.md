@@ -14,7 +14,7 @@ For each new chart type, an entry should be added to `BaseChart.types['ChartName
 `BaseReactChart` has a constructor similar to `BaseChart`, but with one additional `ReactComponentFunction` parameter.
 
 
-[^1]: It is possible to have multiple descriptions of chart-types that use the same `"class"`, but with different resulting configuration, which is interpreted by the same JS class to render a wide variation of actual charts. Where possible, it may be useful to try to adopt this approach more widely to avoid the need to create extra boilerplate for code that is mostly react-based, gradually re-factoring existing functionality in a way that suits the React paradigm.
+[^1] It is possible to have multiple descriptions of chart-types that use the same `"class"`, but with different resulting configuration, which is interpreted by the same JS class to render a wide variation of actual charts. Where possible, it may be useful to try to adopt this approach more widely to avoid the need to create extra boilerplate for code that is mostly react-based, gradually re-factoring existing functionality in a way that suits the React paradigm.
 
 ## State management
 

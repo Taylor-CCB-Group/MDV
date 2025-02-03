@@ -4,10 +4,10 @@ The ChartManager object links DataSources, loads column data on demand and manag
     const cm = new ChartManager("mydiv", datasources, dataloader, config, listener)
 ```
 * **mydiv** - the id or the element to house the app
-* **datasources** - list of `DataStore` [configs]{@tutorial datasource}, these configs should also include a size parameter showing the number of rows in the data set
+* **datasources** - list of `DataStore` [configs](./datasource.md), these configs should also include a size parameter showing the number of rows in the data set
 * **dataloader** - a dataloader which can have the following parameters
-    * **function** - this [function]{@tutorial dataloader} accepts a list of columns and returns a promise (not needed if all data is to be loaded from files)
-    * **viewLoader** - a function that will return the [view]{@tutorial views} given the view name
+    * **function** - this [function](./dataloader.md) accepts a list of columns and returns a promise (not needed if all data is to be loaded from files)
+    * **viewLoader** - a function that will return the [view](./views.md) given the view name
     * **rowDataLoader** - an optional function that accepts a datasource name and index and returns an an object with data. The
     function will be called if the datasource's config contains `row_data_loader:true` and `DataHighlighted` is invoked.
     * **binaryDataLoader** - an optional function that accepts a datasource name and the name of a the binary data to load. the datasource's config should contain `binary_data_laoder: true`

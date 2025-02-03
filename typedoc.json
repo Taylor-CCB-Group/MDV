@@ -6,11 +6,13 @@
         "**/docsenv/**",
         "**/venv/**",
         "**/docs/**",
+        "**/vendor/**",
     ],
     "entryPoints": [
         "src/",
     ],
     "entryPointStrategy": "expand",
-    // "watch": true,
+    // "watch": true,   
+    "projectDocuments": ["docs/**/extradocs/*.md"],
     "out": "docs/typedoc",
 }
