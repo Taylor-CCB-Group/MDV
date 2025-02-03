@@ -14,5 +14,6 @@
     "entryPointStrategy": "expand",
     // "watch": true,   
     "projectDocuments": ["docs/extradocs/*.md"],
+    "plugin": ["typedoc-plugin-rename-defaults"],
     "out": "docs/typedoc",
 }
