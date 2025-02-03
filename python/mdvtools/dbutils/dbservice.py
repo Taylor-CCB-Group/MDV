@@ -4,11 +4,16 @@ from mdvtools.dbutils.dbmodels import db, Project, File
 from datetime import datetime
 
 class ProjectService:
+    # list of tuples containing failed project IDs and associated error messages/exceptions
+    failed_projects: list[tuple[int, str | Exception]] = []
     @staticmethod
     #  Routes -> /projects
     def get_active_projects():
         try:
-            return Project.query.filter_by(is_deleted=False).all()
+            f = [f[0] for f in ProjectService.failed_projects]
+            all = Project.query.filter_by(is_deleted=False).all()
+            projects = [p for p in all if p.id not in f]
+            return projects
         except Exception as e:
             print(f"Error in dbservice: Error querying active projects: {e}")
             raise
