@@ -30,8 +30,8 @@ class RangeDimension extends Dimension {
                 v1 <= range1[1] &&
                 v2 >= range2[0] &&
                 v2 <= range2[1] &&
-                !Number.isFinite(v1) &&
-                !Number.isFinite(v2)
+                Number.isFinite(v1) &&
+                Number.isFinite(v2)
             );
         };
         return this.filterPredicate({ predicate }, columns);
