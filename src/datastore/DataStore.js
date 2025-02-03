@@ -17,9 +17,8 @@ import { isDatatypeNumeric } from "@/lib/utils";
 
 /**
  * Creates an empty data structure
- * @tutorial datasource
  * 
- * See [Data Source](../../docs/extradocs/datasource.md)
+ * [Data Source](../../docs/extradocs/datasource.md)
  *  
  * @param {number} size - the number of rows(items) of the data structure
  * @param {Object} [config] - setup information for the datastore.
@@ -428,7 +427,7 @@ class DataStore {
      *  */
     /**
      * Adds a column's metadata and optionally it's data to the DataStore
-     * @tutorial datasource
+     * [Data Source](../../docs/extradocs/datasource.md)
      * @param {Omit<Column, 'getValue'>} column An object describing the column
      * @param {Array|SharedArrayBuffer} [data] The data for the column
      * @param {boolean} [dirty=false] true for columns that are not synched with the backend,
@@ -1192,7 +1191,7 @@ class DataStore {
      * then it will be converted to the correct internal data structures and the only previously
      * supplied metadata required are field, name and datatype.
      * If the data is a shared array buffer then, the data should be in the correct
-     * format see [columns]{@tutorial datasource}
+     * format see [columns](../../docs/extradocs/datasource.md)
      * @param {string}  column - The field/id of the column.
      * @param {SharedArrayBuffer|Array} data  either a javascript array or shared array buffer
      */

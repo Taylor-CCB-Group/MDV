@@ -1,6 +1,6 @@
 class Dimension {
     /**
-     * @constructor
+     * @class
      * @param {DataStore} parent
      */
     constructor(parent) {

@@ -7,7 +7,7 @@
  **/
 
 /**
- * @memberof module:DataLoaders
+ * 
  * @param data {ArrayBuffer} - an array buffer containing raw concatenated
  * column data
  * @param {object} columns - any array of column objects
@@ -104,7 +104,7 @@ function processArrayBuffer(data, columns, size) {
  * }
  * </pre>
  * returns a dataloader
- * @memberof module:DataLoaders
+ * 
  * @param url {string} - The url of the api
  * @returns {function} a dataloader that can be used to construct {@link ChartManager}
  **/
@@ -136,7 +136,7 @@ function getArrayBufferDataLoader(url, decompress = false) {
  * named dsname1.gz dsname2.gz etc.
  *
  * returns a dataLoader
- * @memberof module:DataLoaders
+ * 
  * @param {string} - The url of the remote folder
  * @returns {function} a dataloader that can be used to construct {@link ChartManager}
  **/

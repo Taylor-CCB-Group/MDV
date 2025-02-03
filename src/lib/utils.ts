@@ -18,7 +18,7 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
     return column.datatype === type;
 }
 /**
- * Check whether given value {@param v} is an array.
+ * Check whether given value is an array
  * Acts as a type-predicate, so can be used for narrowing the type of subsequent code.
  */
 export function isArray(v: unknown): v is any[] {

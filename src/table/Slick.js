@@ -655,8 +655,6 @@
         /***
          * A global singleton editor lock.
          * @class GlobalEditorLock
-         * @static
-         * @constructor
          */
         "GlobalEditorLock": new EditorLock(),
         "TreeColumns": TreeColumns,
