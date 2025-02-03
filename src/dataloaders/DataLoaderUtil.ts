@@ -3,7 +3,7 @@ import {
     getArrayBufferDataLoader,
     getLocalCompressedBinaryDataLoader,
 } from "./DataLoaders";
-import type { DataSource, DataType, LoadedDataColumn } from "@/charts/charts";
+import type { DataSource, DataColumn, DataType, LoadedDataColumn } from "@/charts/charts";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 
 let projectRoot = "";
@@ -164,10 +164,14 @@ export async function loadColumn(datasourceName: string, columnName: string): Pr
                 window.mdv.chartManager.loadColumnSet(
                     [columnName],
                     datasourceName,
-                    () => {
+                    (failedColumns: DataColumn<any>[]) => {
                         if (!isColumnLoaded(column)) throw "broken promise for loading column"
+                        if (failedColumns.length) {
+                            // reject(new Error(`Failed to load column ${columnName}`));
+                            console.error(`Failed to load column ${columnName}`);
+                        }
                         return resolve(column);
-                    },
+                    }
                 );
             }
         } catch (e) {

@@ -1197,6 +1197,7 @@ class DataStore {
      * @param {SharedArrayBuffer|Array} data  either a javascript array or shared array buffer
      */
     setColumnData(column, data) {
+        // if (Math.random() < 0.1) throw new Error("This is a test error");
         const c = this.columnIndex[column];
         if (!c) {
             throw `column ${column} is not present in data store`;

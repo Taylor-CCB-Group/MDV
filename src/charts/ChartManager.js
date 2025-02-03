@@ -1541,7 +1541,8 @@ class ChartManager {
      * @param {string[]} columns An array of column fields/ids
      * @param {string} dataSource The name of the dataSource
      * @param {function} callback A function which will be run once all the
-     * columns are loaded
+     * columns are loaded, with any failed columns as an argument (although it's not clear that the underlying code actually does this, 
+     * or that any code that calls this function actually uses the argument)
      * @param {number} [split=10]  the number of columns to send with each request
      * @param {number} [threads=2]  the number of concurrent requests
      */
@@ -1622,6 +1623,8 @@ class ChartManager {
                 trans.columnsLoaded++;
             })
             .catch((error) => {
+                //! this is an error that is not being handled properly... what happens to trans.failedColumns?
+                //! they do get passed to a callback... what does that callback do?
                 console.log(error);
                 trans.columnsLoaded++;
                 trans.failedColumns.push(columns);
@@ -1633,14 +1636,18 @@ class ChartManager {
                 for (const col of col_list) {
                     delete this.columnsLoading[dataSource][col];
                 }
-                all_loaded =
-                    all_loaded > trans.totalColumns
-                        ? trans.totalColumns
-                        : all_loaded;
-                this.updateInfoAlert(
-                    trans.alertID,
-                    `Loading Columns:${all_loaded}/${trans.totalColumns}`,
-                );
+                all_loaded = all_loaded > trans.totalColumns
+                    ? trans.totalColumns
+                    : all_loaded;
+                if (trans.failedColumns.length > 0) {
+                    this.updateInfoAlert(trans.alertID, `Failed to load ${trans.failedColumns.length} columns`, { type: 'danger' });
+                    // return;
+                } else {
+                    this.updateInfoAlert(
+                        trans.alertID,
+                        `Loading Columns:${all_loaded}/${trans.totalColumns}`,
+                    );
+                }
                 if (loaded >= total) {
                     this.updateInfoAlert(
                         trans.alertID,
@@ -2110,7 +2117,10 @@ class ChartManager {
         }
         //load required columns, then check all requested are loaded
         else {
-            this.loadColumnSet(reqCols, dataSource, () => {
+            this.loadColumnSet(reqCols, dataSource, (failedColumns) => {
+                if (failedColumns.length) {
+                    console.warn('got columns with some failures', failedColumns);
+                }
                 this._haveColumnsLoaded(columns, dataSource, func);
             });
         }

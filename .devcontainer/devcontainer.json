@@ -10,7 +10,8 @@
                 "ms-azuretools.vscode-docker",
                 "biomejs.biome",
                 "ms-toolsai.jupyter",
-                "github.vscode-github-actions"
+                "github.vscode-github-actions",
+                "eamodio.gitlens"
             ]
         }
     },
