@@ -13,6 +13,6 @@
     ],
     "entryPointStrategy": "expand",
     // "watch": true,   
-    "projectDocuments": ["docs/**/extradocs/*.md"],
+    "projectDocuments": ["docs/extradocs/*.md"],
     "out": "docs/typedoc",
 }
