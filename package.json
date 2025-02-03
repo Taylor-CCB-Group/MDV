@@ -123,8 +123,8 @@
     "style-loader": "^3.3.1",
     "tailwindcss": "^3.4.3",
     "ts-loader": "^9.5.1",
-    "typedoc": "^0.26.1",
-    "typescript": "^5.5.2",
+    "typedoc": "^0.27.6",
+    "typescript": "^5.7.3",
     "vite": "^5.2.8"
   },
   "optionalDependencies": {
