@@ -7,7 +7,7 @@ import type { ExtraControl, GuiSpecType } from "./charts";
 export type Param = "text" | "number" | "multitext" | "text16" | "_multi_column:number" | "_multi_column:all";
 
 //chatGPT to the rescue
-type BaseChartConstructor<TProps = any> = new (...args: any[]) => BaseChart<TProps>;
+export type BaseChartConstructor<TProps = any> = new (...args: any[]) => BaseChart<TProps>;
 /**
  * Describes how a chart will be displayed in the 'add chart' dialog etc.
  */

@@ -137,7 +137,8 @@ function getArrayBufferDataLoader(url, decompress = false) {
  *
  * returns a dataLoader
  * 
- * @param {string} - The url of the remote folder
+ * @param dataSources - The url of the remote folder
+ * @param folder 
  * @returns {function} a dataloader that can be used to construct {@link ChartManager}
  **/
 

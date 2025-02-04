@@ -10,7 +10,7 @@ import { log } from '@luma.gl/core';
 // log.enable();
 log.level = 0;
 
-type ExtraContourProps = { contourOpacity: number };
+export type ExtraContourProps = { contourOpacity: number };
 
 // ---------- copied from deck.gl triangle-layer
 const triangleVs = /*glsl*/ `#version 300 es
@@ -40,7 +40,7 @@ void main(void) {
 }`;
 
 
-type _TriangleLayerProps = {
+export type _TriangleLayerProps = {
     data: { attributes: { positions: Buffer; texCoords: Buffer } };
     colorDomain: number[];
     aggregationMode: string;

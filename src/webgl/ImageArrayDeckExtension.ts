@@ -6,7 +6,7 @@ import {
 } from "@deck.gl/core";
 import type { ImageArray } from "./ImageArray";
 
-type ImageArrayExtensionProps = { imageArray: ImageArray; saturation: number };
+export type ImageArrayExtensionProps = { imageArray: ImageArray; saturation: number };
 export class ImageArrayDeckExtension<
     T extends ImageArrayExtensionProps = ImageArrayExtensionProps,
 > extends LayerExtension<T> {

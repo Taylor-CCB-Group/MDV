@@ -1,18 +1,18 @@
 import type React from 'react';
 import { useState, useMemo } from 'react';
 
-interface TiffMetadataTableProps {
+export interface TiffMetadataTableProps {
   metadata: Record<string, any>;
 }
 
-type FlattenedMetadata = {
+export type FlattenedMetadata = {
   element: string;
   attribute: string;
   tag: string;
   value: string;
 };
 
-const flattenObject = (obj: Record<string, any>, prefix: string[] = []): FlattenedMetadata[] => {
+export const flattenObject = (obj: Record<string, any>, prefix: string[] = []): FlattenedMetadata[] => {
   return Object.keys(obj).reduce((acc: FlattenedMetadata[], key) => {
     if (key === 'format') return acc; // Ignore the 'format' key
 

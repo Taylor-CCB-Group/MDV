@@ -3,7 +3,7 @@ import type ChartManager from "../charts/ChartManager";
 import type { ColumnName } from "../charts/charts";
 // zod?
 
-type ChartLink = {
+export type ChartLink = {
     type: "chart_columnval_link";
     id: string;
     source_chart: string;
@@ -18,7 +18,7 @@ type ChartLink = {
     param_index?: number;
 };
 
-type LinkTarget = {
+export type LinkTarget = {
     target_chart: string;
     //maybe we might want to allow for a different column in the source chart to be used to set the target chart's properties...
     //not for now though...
@@ -31,7 +31,7 @@ type LinkTarget = {
     param_index?: number;
 };
 
-type HighlightColumnLink = {
+export type HighlightColumnLink = {
     type: "highlight_column_link";
     id: string;
     source_ds: string;

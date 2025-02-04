@@ -27,7 +27,7 @@ export function isArray(v: unknown): v is any[] {
 export function toArray<T>(v: T | T[]) {
     return isArray(v) ? v : [v];
 }
-type Entries<T> = {
+export type Entries<T> = {
     [K in keyof T]: [K, T[K]];
 }[keyof T][];
 export function getEntries<T extends object>(o: T) {

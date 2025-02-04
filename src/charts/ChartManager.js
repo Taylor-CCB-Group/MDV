@@ -167,7 +167,6 @@ class ChartManager {
         //maybe better to stop listening once explicit option has been set
         //or to allow the user to explicitly say 'system default'
         listenPreferredColorScheme((t) => this.setTheme(t));
-
         /** !typed according to previous comments - but I was using it in a way that was working and doesn't match the comments...
          * each entry in dataSources will contain
          *  dataStore - the actual dataStore object (previously this comment erroneously referred to as 'dataSource')

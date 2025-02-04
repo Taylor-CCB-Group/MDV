@@ -12,7 +12,7 @@ import {
 import type React from "react";
 import { useCallback, useState } from "react";
 
-interface ProjectRenameModalProps {
+export interface ProjectRenameModalProps {
     id: string;
     name: string;
     open: boolean;

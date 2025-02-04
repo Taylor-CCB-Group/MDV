@@ -25,7 +25,7 @@ import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
 import { g, toArray } from "@/lib/utils";
 
-function VivScatterChartRoot() {
+export function VivScatterChartRoot() {
     // to make this look like Avivator...
     // we use a VivProvider, with hooks that are mofified versions of Avivator's
     // VivProvider makes the vivStores available to the chart so that the chart can update & use the viewerStore et al.
@@ -41,7 +41,7 @@ function VivScatterChartRoot() {
 }
 
 /** comparable to main `<Avivator />` component */
-const MainChart = observer(() => {
+export const MainChart = observer(() => {
     const imgUrl = useImgUrl();
     const isViewerLoading = useViewerStore((store) => store.isViewerLoading);
     const viewerStore = useViewerStoreApi();
@@ -64,7 +64,7 @@ export type TooltipConfig = {
         column?: ColumnName;
     };
 };
-type CategoryFilter = {
+export type CategoryFilter = {
     column: ColumnName;
     category: string | string[];
     // consider properties like 'invert' or 'exclude', or 'color'...
@@ -86,7 +86,7 @@ export type ScatterPlotConfig = {
     point_shape: "circle" | "square" | "gaussian";
 } & TooltipConfig &
     DualContourLegacyConfig;
-const scatterDefaults: ScatterPlotConfig = {
+export const scatterDefaults: ScatterPlotConfig = {
     course_radius: 1,
     radius: 10,
     opacity: 1,
@@ -131,7 +131,7 @@ export type VivMdvReactConfig = ScatterPlotConfig &
     VivRoiConfig & { channel: number };
 export type VivMDVReact = VivMdvReact;
 
-function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
+export function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
     const config = { ...scatterDefaults, ...originalConfig };
     if (!config.channel) config.channel = 0;
     // in future we might have something like an array of layers with potentially ways of describing parameters...
@@ -155,7 +155,7 @@ function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
     return config;
 }
 
-class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
+export class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog?: ColorChannelDialogReactWrapper;
     declare dataStore: DataStore;
 

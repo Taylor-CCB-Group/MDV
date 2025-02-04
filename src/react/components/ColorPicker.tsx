@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 
-type MyRgbColor = [number, number, number];
+export type MyRgbColor = [number, number, number];
 
 export const PopoverPicker = ({
     color,

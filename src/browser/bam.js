@@ -2357,4 +2357,4 @@ function decodeTags(ba) {
             return tags;
         }
 
-export {loadBamIndex,BamReader,BamSource,BamFilter,BamAlignment,AlignmentContainer,PairedAlignment,bgzBlockSize,CoverageMap,Coverage,BamFeatureReader};
+export {loadBamIndex,BamReader,BamSource,BamFilter,BamAlignment,AlignmentContainer,PairedAlignment,bgzBlockSize,CoverageMap,Coverage,BamFeatureReader, DownsampleBucket};

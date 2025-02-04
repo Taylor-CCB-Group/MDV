@@ -8,7 +8,7 @@ import {
     CssBaseline,
 } from "@mui/material";
 
-type ColorMode = {
+export type ColorMode = {
     toggleColorMode: () => void;
     mode: PaletteMode;
 };

@@ -6,7 +6,7 @@ import React, {
     useState,
 } from "react";
 
-type ProjectInfo = {
+export type ProjectInfo = {
     root: string;
     staticFolder: boolean;
     chartManager: ChartManager;
