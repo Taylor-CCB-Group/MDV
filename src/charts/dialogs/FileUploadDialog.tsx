@@ -27,8 +27,11 @@ import { TiffPreview } from "./TiffPreview";
 import { TiffMetadataTable } from "./TiffMetadataTable";
 import TiffVisualization from "./TiffVisualization";
 import { DatasourceDropdown } from "./DatasourceDropdown";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import { Dialog, Paper } from "@mui/material";
+import {
+    Close as CloseIcon,
+    CloudUpload as CloudUploadIcon,
+} from "@mui/icons-material";
+import { Dialog, IconButton, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
 import processH5File, { CompressionError } from "./utils/h5Processing";
 import H5MetadataPreview from "./H5MetadataPreview";
@@ -1274,9 +1277,36 @@ const Wrapper = (props: FileUploadDialogComponentProps) => {
             window.removeEventListener("keydown", handleKeyDown);
         };
     }, []);
-    //p-4 mt-2 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]
+
+    const handleClose = () => {
+        setOpen(false);
+    };
     return (
-        <Dialog open={open} fullScreen disableEscapeKeyDown={true}>
+        <Dialog
+            open={open}
+            fullScreen
+            disableEscapeKeyDown={true}
+            PaperProps={{
+                style: {
+                    backgroundColor: "var(--fade_background_color)",
+                    backdropFilter: "blur(1px)",
+                },
+            }}
+        >
+            <IconButton
+                onClick={handleClose}
+                className="absolute top-4 right-4"
+                sx={{
+                    position: "absolute",
+                    top: 16,
+                    right: 16,
+                    backgroundColor: "var(--background_color)",
+                    "&:hover": { backgroundColor: "var(--menu_bar_color)" },
+                }}
+            >
+                <CloseIcon />
+            </IconButton>
+
             <div className="h-screen flex items-center justify-center">
                 <Paper elevation={24} sx={{ p: 2 }}>
                     <FileUploadDialogComponent {...props} />
@@ -1284,6 +1314,6 @@ const Wrapper = (props: FileUploadDialogComponentProps) => {
             </div>
         </Dialog>
     );
-}
+};
 
 export default Wrapper;
