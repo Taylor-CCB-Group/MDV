@@ -138,7 +138,7 @@ function listenPreferredColorScheme(callback) {
 * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
 * 
 */
-class ChartManager {
+export class ChartManager {
     constructor(div, dataSources, dataLoader, config = {}, listener = null) {
         if (!window.isSecureContext) {
             alert(
@@ -173,7 +173,7 @@ class ChartManager {
          *  name - the name given to this data source
          *  menuBar the dom menu associated with this element
          *  contentDiv the div that the charts associated with the datastore will be added
-         * @typedef {{dataStore: DataStore, name: string, menuBar: HTMLElement, contentDiv: HTMLElement}} DataSource
+         * @typedef {import("@/charts/charts/DataSource")} DataSource
          * @type {DataSource[]} 
          */
         this.dataSources = [];

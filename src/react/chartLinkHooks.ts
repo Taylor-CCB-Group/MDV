@@ -149,7 +149,7 @@ export function useHighlightedForeignRows() {
                 // const vals = tds.getFilteredValues(link.name_column) as string[];
                 // setValues(vals); //this isn't right - we need the index too
                 // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-                const filteredIndices = await tds.getFilteredIndices();
+                const filteredIndices = await tds.getFilteredIndices() as number[];
                 //! this Array.from could be suboptimal for large numbers of indices
                 const vals = Array.from(filteredIndices).map(
                     // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
