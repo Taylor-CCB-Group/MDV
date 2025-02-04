@@ -960,6 +960,32 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         }
     };
 
+    const displayUploadDialog = async () => {
+        if (state.error) {
+            dispatch({ type: "SET_SELECTED_FILES", payload: [] });
+            dispatch({ type: "SET_IS_UPLOADING", payload: false });
+            dispatch({ type: "SET_IS_INSERTING", payload: false });
+            dispatch({ type: "SET_SUCCESS", payload: false });
+            dispatch({ type: "SET_ERROR", payload: null });
+            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+            dispatch({ type: "SET_VALIDATION_RESULT", payload: null });
+            dispatch({ type: "SET_FILE_TYPE", payload: null });
+            dispatch({ type: "SET_TIFF_METADATA", payload: null });
+            dispatch({ type: "SET_H5_METADATA", payload: null });
+            dispatch({ type: "SET_CONFLICT_DATA", payload: null });
+            dispatch({ type: "SET_SHOW_CONFLICT_DIALOG", payload: false });
+            setDatasourceName("");
+            setDatasourceSummary({
+                datasourceName: "",
+                fileName: "",
+                fileSize: "",
+                rowCount: 0,
+                columnCount: 0,
+            });
+            return;
+        }
+    };
+
     const handleCombineCancel = async () => {
         if (!state.conflictData) return;
 
@@ -1034,7 +1060,25 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                     </Button>
                 </>
             ) : state.error ? (
-                <ErrorDisplay error={state.error} />
+                <>
+                    <ErrorDisplay error={state.error} />
+                    <div className="flex justify-center items-center gap-6">
+                        <Button
+                            marginTop="mt-1"
+                            onClick={displayUploadDialog}
+                        >
+                            Upload Another File
+                        </Button>
+                        <Button
+                            color="red"
+                            size="px-14 py-2.5"
+                            marginTop="mt-1"
+                            onClick={handleClose}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                </> 
             ) : state.showReplaceDialog ? (
                 <AnndataConflictDialog 
                     open={state.showReplaceDialog}
