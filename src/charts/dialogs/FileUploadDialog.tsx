@@ -1020,6 +1020,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
             dispatch({ type: "SET_H5_METADATA", payload: null });
             dispatch({ type: "SET_SELECTED_FILES", payload: [] });
             dispatch({ type: "SET_FILE_TYPE", payload: null });
+            dispatch({ type: "SET_FILE_SUMMARY", payload: null });
+            onResize(450, 320);
+            onClose();
         }
     };
 
