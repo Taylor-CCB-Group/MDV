@@ -1,4 +1,5 @@
 /**
+ * @typedef {import("@/charts/ChartManager.js")} ChartManager
  *  A collection of dataloaders and helper functions that can
  * can be used with {@link ChartManager}
  * @module DataLoaders
@@ -11,11 +12,9 @@
  * @param data {ArrayBuffer} - an array buffer containing raw concatenated
  * column data
  * @param {object} columns - any array of column objects
- * <ul>
- *   <li> field </li>
- *   <li> datatype </li>
- *   <li> sgtype </li>
- * </ul>
+ *   - field
+ *   - datatype
+ *   - sgtype
  * @param size {integer} - the size of the columns
  * @returns {object[]} a list of objects containing each colums's field name
  * and data

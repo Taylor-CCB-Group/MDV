@@ -43,9 +43,9 @@ class DataStore {
         this.size = size;
         /** @type {number} */
         this.filterSize = size;
-        /** why doesn't this annotation work?
+        /** why doesn't this column annotation work?
          * @typedef {import("@/charts/charts.js").DataType} DataType
-         * @typedef {import("@/charts/charts.js").DataColumn} DataColumn
+         * @typedef {import("@/charts/charts.js").DataColumn<DataType>} DataColumn
          * @type {Array.<DataColumn<DataType>>} */
         this.columns = [];
         /**
