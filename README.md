@@ -73,7 +73,7 @@ npm i
 npm run build-flask-vite
 ```
 
-Now install Python libaries 
+Now install Python libraries 
 
 ## MacOS / Linux
 
