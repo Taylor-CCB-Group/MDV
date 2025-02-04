@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 
-interface User {
+export interface User {
     name: string;
     email: string;
     association: string;
     avatarUrl: string;
 }
 
-const mockUser: User = {
+export const mockUser: User = {
     name: "John Doe",
     email: "john.doe@example.com",
     association: "Example Corp",

@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import React, { useState } from "react";
 
-interface ErrorDisplayProps {
+export interface ErrorDisplayProps {
     error: {
         message: string;
         traceback?: string;

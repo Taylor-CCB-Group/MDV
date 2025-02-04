@@ -157,7 +157,7 @@ class BAMTrack extends MLVTrack{
      * Optional method to compute pixel height to accomodate the list of features.  The implementation below
      * has side effects (modifiying the samples hash).  This is unfortunate, but harmless.
      *
-     * @param features
+     * @param alignmentContainer
      * @returns {number}
      */
     computePixelHeight(alignmentContainer) {

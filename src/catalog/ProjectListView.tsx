@@ -29,14 +29,14 @@ import ProjectRenameModal from "./ProjectRenameModal";
 import type { Project } from "./utils/projectUtils";
 import type { ProjectAccessType } from "./utils/projectUtils";
 
-type Pvoid = Promise<void>;
-type ProjectListViewProps = {
+export type Pvoid = Promise<void>;
+export type ProjectListViewProps = {
     projects: Project[];
     onDelete: (id: string) => Pvoid;
     onRename: (id: string, name: string) => Pvoid;
     onChangeType: (id: string, type: ProjectAccessType) => Pvoid;
 };
-type MouseEv = React.MouseEvent<HTMLElement>;
+export type MouseEv = React.MouseEvent<HTMLElement>;
 const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: ProjectListViewProps) => {
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>();
     const [selectedProject, setSelectedProject] = useState<Project>();

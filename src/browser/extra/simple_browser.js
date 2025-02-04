@@ -165,8 +165,8 @@ class SinglePanelBrowser extends BaseBrowser{
 class SimpleBrowser extends BaseBrowser{
 	 /**
      * Creates a filter panel
-     * @param {string } parent_div- The id of the div element to house the browser
-     * @param {Object} [config] - config of how the browser is constructed
+     * @param {string} parent_div - The id of the div element to house the browser
+     * @param {Object} config - config of how the browser is constructed
      * <ul>
      * <li>add_controls - if true then a control bar is added (default false)</li>
      * <li>add_ruler - if true a ruler track will be added (default false)
@@ -335,7 +335,7 @@ class SimpleBrowser extends BaseBrowser{
      * @param {string } id - The id of track 
      * @param {Object[]} track_config - The config describing the tracks in the panel
      * @param {number} top - The position of the top of the panel(in pixels)
-     * @param {number} height- The height of the panel (in pixels)
+     * @param {number} height - The height of the panel (in pixels)
      */
 	addPanel(id,track_config,top,height,pan_config){
 		let ruler=false;

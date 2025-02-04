@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import H5JsonViewer from "./H5JsonViewer";
 import H5MatrixViewer from "./H5MatrixViewer";
 
-interface H5MetadataPreviewProps {
+export interface H5MetadataPreviewProps {
     metadata: {
         uns: Record<string, any>;
         obs: Record<string, any>;

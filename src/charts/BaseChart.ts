@@ -10,9 +10,9 @@ import type { BaseDialog } from "@/utilities/Dialog";
 import type { DataColumn, FieldName, GuiSpec, GuiSpecs } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
-type ChartEventType = string;
-type Listener = (type: ChartEventType, data: any) => void;
-type LegacyColorBy = { column: DataColumn<any> }
+export type ChartEventType = string;
+export type Listener = (type: ChartEventType, data: any) => void;
+export type LegacyColorBy = { column: DataColumn<any> }
 export type BaseConfig = {
     id: string;
     size: [x: number, y: number];
@@ -24,8 +24,9 @@ export type BaseConfig = {
     color_by?: FieldName | LegacyColorBy;
     title_color?: string;
 };
-type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
-type ColorOptions = any;
+export type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
+export type ColorOptions = any;
+export type ContextMenuItem = { text: string, icon: string, func: () => void };
 class BaseChart<T> {
     config: any;
     __doc__: Document;
@@ -707,7 +708,6 @@ class BaseChart<T> {
     */
     addToContextMenu?(): any;
     getContextMenu(data?: any) {
-        type ContextMenuItem = { text: string, icon: string, func: () => void };
         let menu: ContextMenuItem[] = [];
         if (this.getImage) {
             menu = menu.concat([

@@ -282,8 +282,8 @@ const F_MAX_GZIP_BLOCK_SIZE = (1 << 16);
     /**
      * Reader for "bed like" files (tab delimited files with 1 feature per line: bed, gff, vcf, etc)
      *
+     * @class
      * @param config
-     * @constructor
      */
 class FeatureFileReader{
     constructor(config,dec_function) {
@@ -561,8 +561,9 @@ class FeatureFileReader{
 
     /**
      *
-     * @param fulfill
-     * @param range -- genomic range to load.  For use with indexed source (optional)
+     * @param chr
+     * @param start 
+     * @param end 
      */
     readFeatures(chr, start, end) {
 
@@ -2086,4 +2087,4 @@ class FastaSequence{
 }
 
 
-export {FeatureSource,FastaSequence,BigBedFeatureSource,TabixBedFeatureSource}
+export {FeatureSource,FastaSequence,BigBedFeatureSource,TabixBedFeatureSource, FeatureFileReader}

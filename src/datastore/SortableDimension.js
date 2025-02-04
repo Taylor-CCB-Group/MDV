@@ -17,8 +17,6 @@ export default class SortableDimension extends Dimension {
     /**
      * Sorts the dimension based on the columns and order
      * @param {Array} sortColumns - An array of objects with the following properties
-     * @param {String} sortColumns.col - The name of the column to sort by
-     * @param {Boolean} sortColumns.desc - True if the sort is descending
      * @returns {Promise} - A promise that resolves to the new order
      */
     async sort(sortColumns) {

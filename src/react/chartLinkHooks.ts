@@ -5,8 +5,8 @@ import type { VivMDVReact } from "./components/VivMDVReact";
 import { useDataStore } from "./context";
 import type { DataColumn, DataType } from "@/charts/charts";
 
-type ChartID = string;
-type ViewStateLink = {
+export type ChartID = string;
+export type ViewStateLink = {
     type: "view_state";
     linked_charts: ChartID[];
 }
@@ -82,7 +82,7 @@ export const useViewStateLink = () => {
     ]);
 };
 
-type RowsAsColslink = {
+export type RowsAsColslink = {
     name_column: string;
     name: string;
     subgroups: {

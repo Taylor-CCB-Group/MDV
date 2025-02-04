@@ -2,7 +2,7 @@ import type React from 'react';
 import { useState, useCallback, type PropsWithChildren, useRef, useEffect } from 'react'
 import { observer } from 'mobx-react-lite';
 
-interface TiffChartWrapperProps {
+export interface TiffChartWrapperProps {
   metadata: any;
   file: File;
   config: any;

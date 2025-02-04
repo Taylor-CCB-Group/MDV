@@ -19,14 +19,14 @@ import { getEntries } from "@/lib/utils";
 const capitalize = (string: string) => string.charAt(0).toUpperCase() + string.slice(1);
 
 // typing for generateToggles... not the most useful ones to have, but it's a start.
-type BooleanKeys<T> = {
+export type BooleanKeys<T> = {
     [K in keyof T]: T[K] extends boolean ? K : never;
 }[keyof T];
-type TogglesReturnType<T> = {
+export type TogglesReturnType<T> = {
     [K in BooleanKeys<T> as `toggle${Capitalize<string & K>}`]: () => void;
 };
-type WithToggles<T> = T & TogglesReturnType<T>;
-type SetFunctionType<T> = (fn: (state: T) => T) => void;
+export type WithToggles<T> = T & TogglesReturnType<T>;
+export type SetFunctionType<T> = (fn: (state: T) => T) => void;
 
 function generateToggles<T extends {}>(
     defaults: T,
@@ -72,7 +72,7 @@ export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
     loader: [{ labels: [], shape: [] }],
     image: 0,
 };
-const DEFAUlT_CHANNEL_VALUES = {
+export const DEFAUlT_CHANNEL_VALUES = {
     channelsVisible: true,
     contrastLimits: [0, 65535],
     brightness: 0.5,
@@ -82,7 +82,7 @@ const DEFAUlT_CHANNEL_VALUES = {
     selections: { z: 0, c: 0, t: 0 },
     ids: "",
 };
-const DEFAULT_IMAGE_STATE = {
+export const DEFAULT_IMAGE_STATE = {
     lensSelection: 0,
     colormap: "",
     renderingMode: RENDERING_MODES.MAX_INTENSITY_PROJECTION,
@@ -97,8 +97,8 @@ const DEFAULT_IMAGE_STATE = {
     zSlice: null as [number, number] | null,
     onViewportLoad: () => {},
 } as const;
-type ImageState = typeof DEFAULT_IMAGE_STATE;
-const DEFAULT_VIEWER_STATE = {
+export type ImageState = typeof DEFAULT_IMAGE_STATE;
+export const DEFAULT_VIEWER_STATE = {
     isChannelLoading: [] as boolean[],
     isViewerLoading: true,
     pixelValues: [] as number[],
@@ -122,7 +122,7 @@ const DEFAULT_VIEWER_STATE = {
     source: undefined as { urlOrFile: string; description: string } | undefined,
     pyramidResolution: 0,
 };
-type ViewerState = typeof DEFAULT_VIEWER_STATE;
+export type ViewerState = typeof DEFAULT_VIEWER_STATE;
 
 // --- following how VivViewerMDV _parseChannels() works: (not used) ---
 // export type MdvVivChannelConfig = {
@@ -154,7 +154,7 @@ export type ROI = {
     max_x: number;
     max_y: number;
 };
-type NewChannelValues = Partial<typeof DEFAUlT_CHANNEL_VALUES>;
+export type NewChannelValues = Partial<typeof DEFAUlT_CHANNEL_VALUES>;
 /**
  * In Avivator, there is a zustand store for the channels, image settings, and viewers.
  * While there can be plural 'viewers', it is always of a single image, with shared channels and image settings.
@@ -298,10 +298,10 @@ export const VivProvider = observer(
     },
 );
 
-type StoreName = keyof VivContextType;
-type ImageSettingsStore = VivContextType["imageSettingsStore"];
-type ViewerStore = VivContextType["viewerStore"];
-type ChannelsStore = VivContextType["channelsStore"];
+export type StoreName = keyof VivContextType;
+export type ImageSettingsStore = VivContextType["imageSettingsStore"];
+export type ViewerStore = VivContextType["viewerStore"];
+export type ChannelsStore = VivContextType["channelsStore"];
 
 // I don't think it's possible to make things like useChannelsStore.setState() work...
 // so we have these extra functions...

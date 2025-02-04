@@ -41,7 +41,6 @@ class BufferedReader{
     /**
      *
      * @param requestedRange - byte rangeas {start, size}
-     * @param fulfill - function to receive result
      * @param asUint8 - optional flag to return result as an UInt8Array
      */
     dataViewForRange(requestedRange, asUint8) {
@@ -1054,6 +1053,6 @@ const BPTREE_HEADER_SIZE = 32;
 }
 
 
-export {BWSource,BinaryParser};
+export {BWSource,BinaryParser, BufferedReader, BWReader, BPTree, BWTotalSummary};
 
 
