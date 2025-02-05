@@ -72,7 +72,7 @@ export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
     loader: [{ labels: [], shape: [] }],
     image: 0,
 };
-export const DEFAUlT_CHANNEL_VALUES = {
+const DEFAUlT_CHANNEL_VALUES = {
     channelsVisible: true,
     contrastLimits: [0, 65535],
     brightness: 0.5,
@@ -82,7 +82,7 @@ export const DEFAUlT_CHANNEL_VALUES = {
     selections: { z: 0, c: 0, t: 0 },
     ids: "",
 };
-export const DEFAULT_IMAGE_STATE = {
+const DEFAULT_IMAGE_STATE = {
     lensSelection: 0,
     colormap: "",
     renderingMode: RENDERING_MODES.MAX_INTENSITY_PROJECTION,
@@ -98,7 +98,7 @@ export const DEFAULT_IMAGE_STATE = {
     onViewportLoad: () => {},
 } as const;
 export type ImageState = typeof DEFAULT_IMAGE_STATE;
-export const DEFAULT_VIEWER_STATE = {
+const DEFAULT_VIEWER_STATE = {
     isChannelLoading: [] as boolean[],
     isViewerLoading: true,
     pixelValues: [] as number[],

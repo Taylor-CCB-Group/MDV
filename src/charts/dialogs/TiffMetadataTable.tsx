@@ -12,7 +12,7 @@ export type FlattenedMetadata = {
   value: string;
 };
 
-export const flattenObject = (obj: Record<string, any>, prefix: string[] = []): FlattenedMetadata[] => {
+const flattenObject = (obj: Record<string, any>, prefix: string[] = []): FlattenedMetadata[] => {
   return Object.keys(obj).reduce((acc: FlattenedMetadata[], key) => {
     if (key === 'format') return acc; // Ignore the 'format' key
 

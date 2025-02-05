@@ -7,7 +7,7 @@ export interface User {
     avatarUrl: string;
 }
 
-export const mockUser: User = {
+const mockUser: User = {
     name: "John Doe",
     email: "john.doe@example.com",
     association: "Example Corp",

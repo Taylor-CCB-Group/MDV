@@ -14,7 +14,7 @@ export type ViewState = (OrthographicViewState | OrbitViewState) & { id: string 
 export type ViewStates = ViewState[];
 export type View = {id: string} & any; //placeholder
 export type VivPickInfo = PickingInfo<any, any> & { tile: any }; //placeholder
-export const areViewStatesEqual = (viewState: ViewState, otherViewState?: ViewState) => {
+const areViewStatesEqual = (viewState: ViewState, otherViewState?: ViewState) => {
     return (
         otherViewState === viewState ||
         (viewState?.zoom === otherViewState?.zoom &&
