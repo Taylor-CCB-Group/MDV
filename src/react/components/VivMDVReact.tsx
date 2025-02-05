@@ -25,7 +25,7 @@ import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
 import { g, toArray } from "@/lib/utils";
 
-export function VivScatterChartRoot() {
+function VivScatterChartRoot() {
     // to make this look like Avivator...
     // we use a VivProvider, with hooks that are mofified versions of Avivator's
     // VivProvider makes the vivStores available to the chart so that the chart can update & use the viewerStore et al.
@@ -41,7 +41,7 @@ export function VivScatterChartRoot() {
 }
 
 /** comparable to main `<Avivator />` component */
-export const MainChart = observer(() => {
+const MainChart = observer(() => {
     const imgUrl = useImgUrl();
     const isViewerLoading = useViewerStore((store) => store.isViewerLoading);
     const viewerStore = useViewerStoreApi();
@@ -86,7 +86,7 @@ export type ScatterPlotConfig = {
     point_shape: "circle" | "square" | "gaussian";
 } & TooltipConfig &
     DualContourLegacyConfig;
-export const scatterDefaults: ScatterPlotConfig = {
+const scatterDefaults: ScatterPlotConfig = {
     course_radius: 1,
     radius: 10,
     opacity: 1,
@@ -131,7 +131,7 @@ export type VivMdvReactConfig = ScatterPlotConfig &
     VivRoiConfig & { channel: number };
 export type VivMDVReact = VivMdvReact;
 
-export function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
+function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
     const config = { ...scatterDefaults, ...originalConfig };
     if (!config.channel) config.channel = 0;
     // in future we might have something like an array of layers with potentially ways of describing parameters...
@@ -155,7 +155,7 @@ export function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
     return config;
 }
 
-export class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
+class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
     colorDialog?: ColorChannelDialogReactWrapper;
     declare dataStore: DataStore;
 

@@ -4,7 +4,7 @@ import { debounce } from "../utilities/Utilities";
 import type { ChartManager, DataSource } from "./charts";
 import type BaseChart from "./BaseChart";
 export type Chart = BaseChart<unknown>;
-export function clearPosition(div: HTMLElement) {
+function clearPosition(div: HTMLElement) {
     div.style.position = "";
     div.style.left = "";
     div.style.right = "";
@@ -254,7 +254,7 @@ export default class GridStackManager {
 
 export type P = [number, number];
 export type Config = Partial<{ size: P; position: P; gssize: P; gsposition: P }>;
-export function getVisibleChartBounds(dataSource: DataSource) {
+function getVisibleChartBounds(dataSource: DataSource) {
     const charts = Object.entries(
         window.mdv.chartManager.charts,
     ) as unknown as [[string, { dataSource: DataSource; chart: Chart }]];
@@ -263,7 +263,7 @@ export function getVisibleChartBounds(dataSource: DataSource) {
         .map((c) => c[1].chart.getDiv().getBoundingClientRect());
 }
 
-export function getGridInfo(dataSource: DataSource) {
+function getGridInfo(dataSource: DataSource) {
     const [cellW, cellH] =
         window.mdv.chartManager.gridStack.getCellDimensions(dataSource);
     const rect = dataSource.contentDiv.getBoundingClientRect();
@@ -272,7 +272,7 @@ export function getGridInfo(dataSource: DataSource) {
     return { cellW, cellH: cellH / 2, rows, cols };
 }
 
-export function findFreeSpace(dataSource: DataSource) {
+function findFreeSpace(dataSource: DataSource) {
     const occupiedRects = getVisibleChartBounds(dataSource);
     const { cellW, cellH, rows, cols } = getGridInfo(dataSource);
     const mainRect = dataSource.contentDiv.getBoundingClientRect();
