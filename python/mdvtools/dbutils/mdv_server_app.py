@@ -111,17 +111,17 @@ def wait_for_database():
 
 
 
-def load_config(app,config_name=None):
+def load_config(app, config_name=None):
     try:
         config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
         with open(config_file_path) as config_file:
             config = json.load(config_file)
-            #app.config['PREFERRED_URL_SCHEME'] = 'https'
             app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.get('track_modifications', False)
             app.config['upload_folder'] = config.get('upload_folder', '')
             app.config['projects_base_dir'] = config.get('projects_base_dir', '')
-            app.config['db_host'] = config.get('db_container', '')
-            print("Configuration loaded successfully!")
+
+        print("Configuration loaded successfully!")
+
     except FileNotFoundError:
         print("Error: Configuration file not found.")
         raise
@@ -129,37 +129,28 @@ def load_config(app,config_name=None):
         print(f"An unexpected error occurred: {e}")
         raise
 
-    # Handle different environments
+    # Use SQLite as default, but allow PostgreSQL if explicitly configured
     try:
         if config_name == 'test':
-            app.config['PREFERRED_URL_SCHEME'] = 'http'
             app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        else:
-            app.config['PREFERRED_URL_SCHEME'] = 'http'
-            
-            # Load sensitive data from Docker secrets
-            def read_secret(secret_name):
-                secret_path = f'/run/secrets/{secret_name}'
-                try:
-                    with open(secret_path, 'r') as secret_file:
-                        return secret_file.read().strip()
-                except FileNotFoundError as fnf_error:
-                    print(f"Error: Secret '{secret_name}' not found. {fnf_error}")
-                    raise  # Re-raise the exception to be handled by the parent
-
-            db_user = os.getenv('DB_USER') or read_secret('db_user')
-            db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
-            db_name = os.getenv('DB_NAME') or read_secret('db_name')
-            db_host = os.getenv('DB_HOST') or app.config.get('db_host')
+        elif config.get('use_postgres', False):  # Add this flag in `config.json`
+            db_user = os.getenv('DB_USER') or config.get('db_user')
+            db_password = os.getenv('DB_PASSWORD') or config.get('db_password')
+            db_name = os.getenv('DB_NAME') or config.get('db_name')
+            db_host = os.getenv('DB_HOST') or config.get('db_host')
 
             if not all([db_user, db_password, db_name, db_host]):
-                raise ValueError("Error: One or more required secrets or configurations are missing.")
-            
+                raise ValueError("Error: Missing database credentials.")
+
             app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+        else:
+            db_path = os.path.join(os.path.dirname(__file__), 'mdv_metadata.db')
+            app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 
     except Exception as e:
-        print(f"An unexpected error occurred while configuring the database: {e}")
-        raise  # Re-raise the exception to be handled by the parent
+        print(f"Error configuring database: {e}")
+        raise
+
        
 
 
