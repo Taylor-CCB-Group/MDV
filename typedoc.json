@@ -14,6 +14,7 @@
     "entryPointStrategy": "expand",
     // "watch": true,   
     "projectDocuments": ["docs/extradocs/*.md"],
-    "plugin": ["typedoc-plugin-rename-defaults"],
+    // Remove the missing exports plugin to see the warnings
+    "plugin": ["typedoc-plugin-rename-defaults", "typedoc-plugin-missing-exports"],
     "out": "docs/typedoc",
 }
