@@ -60,11 +60,16 @@ const AnndataConflictDialog: React.FC<AnndataConflictDialogProps> = ({
             open={open}
             onClose={onClose}
             PaperComponent={Paper}
-            maxWidth="sm"
-            fullWidth
+            hideBackdrop={true}
             PaperProps={{
                 elevation: 24,
                 className: "rounded-lg",
+            }}
+            sx={{
+                pointerEvents: "none",
+                "& .MuiPaper-root": {
+                    pointerEvents: "auto",
+                },
             }}
         >
             <DialogTitle className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900 border-b px-6 py-4">

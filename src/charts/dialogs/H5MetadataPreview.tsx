@@ -123,7 +123,7 @@ const H5MetadataPreview = ({ metadata }: H5MetadataPreviewProps) => {
                         H5 File Metadata
                     </Typography>
 
-                    <Box sx={{ px: 2, pb: 2 }}>
+                    <Box sx={{ px: 2, pb: 2, pt: 2 }}>
                         <select
                             value={selectedMetadata}
                             onChange={(e) =>
