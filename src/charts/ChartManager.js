@@ -117,14 +117,12 @@ function listenPreferredColorScheme(callback) {
 * @param {object[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
 * Each config must contain the size parameter, giving the number of rows in the DataStore.
 * @param {object} dataloader - An object containing the following
-* <ul>
-*   <li> function - The data loader to load the data
-    (can be omitted if data loaded from a file)</li>
-*   <li> viewLoader - The function that will load the each view  (not necessay if only one view)</li>
-*   <li> rowDataLoader - (optional) an asunc function which is given the datasource name and row index
+*   - function - The [function](../../docs/extradocs/dataloader.md) to load the data
+    (can be omitted if data loaded from a file)
+*   - viewLoader - The function that will load the each view  (not necessay if only one view)
+*   - rowDataLoader - (optional) an asunc function which is given the datasource name and row index
 *     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
-*   <li> files - specifies the files to load the data </li>
-* </ul>
+*   - files - specifies the files to load the data 
 * @param {Object} config extra settings
 * @param {Object[]} [config.initialCharts] A list of chart configs to initially load if
 * no views are specified
