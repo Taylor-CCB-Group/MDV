@@ -10,7 +10,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
 
-import axios, { type AxiosProgressEvent } from "axios";
+import axios, { type AxiosError, type AxiosProgressEvent } from "axios";
 import { useProject } from "../../modules/ProjectContext";
 import { ColumnPreview } from "./ColumnPreview";
 
@@ -27,9 +27,16 @@ import { TiffPreview } from "./TiffPreview";
 import { TiffMetadataTable } from "./TiffMetadataTable";
 import TiffVisualization from "./TiffVisualization";
 import { DatasourceDropdown } from "./DatasourceDropdown";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import { Dialog, Paper } from "@mui/material";
+import {
+    Close as CloseIcon,
+    CloudUpload as CloudUploadIcon,
+} from "@mui/icons-material";
+import { Dialog, IconButton, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
+import processH5File, { CompressionError } from "./utils/h5Processing";
+import H5MetadataPreview from "./H5MetadataPreview";
+import ErrorDisplay from "./ErrorDisplay";
+import AnndataConflictDialog from "./AnndataConflictDialog";
 
 // Use dynamic import for the worker
 const DatasourceWorker = new Worker(new URL("./datasourceWorker.ts", import.meta.url), {
@@ -235,7 +242,9 @@ const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
 
 type UploadActionType = "SET_SELECTED_FILES" | "SET_IS_UPLOADING" 
 | "SET_IS_INSERTING" | "SET_SUCCESS" | "SET_ERROR" | "SET_IS_VALIDATING" 
-| "SET_VALIDATION_RESULT" | "SET_FILE_TYPE" | "SET_TIFF_METADATA" | "SET_FILE_SUMMARY";
+| "SET_VALIDATION_RESULT" | "SET_FILE_TYPE" | "SET_TIFF_METADATA"
+| "SET_H5_METADATA" | "SET_FILE_SUMMARY" | "SET_CONFLICT_DATA" | "SET_SHOW_CONFLICT_DIALOG";
+
 // Reducer function
 const DEFAULT_REDUCER_STATE = {
     selectedFiles: [] as File[],
@@ -245,8 +254,11 @@ const DEFAULT_REDUCER_STATE = {
     validationResult: null as unknown,
     success: false,
     error: null as unknown,
-    fileType: null as "csv" | "tiff" | "tsv" | null,
+    fileType: null as "csv" | "tiff" | "tsv" | "h5" | null,
     tiffMetadata: null as unknown,
+    h5Metadata: null as H5Metadata | unknown,
+    showReplaceDialog: false,
+    conflictData: null as { tempFolder: string;} | null,
 } as const;
 type ReducerState = typeof DEFAULT_REDUCER_STATE;
 // TODO - would be good to type this, this is not how I should be spending my weekend.
@@ -260,6 +272,8 @@ type ReducerPayload<T extends UploadActionType> = T extends "SET_SELECTED_FILES"
 : T extends "SET_VALIDATION_RESULT" ? { columnNames: string[], columnTypes: string[] }
 : T extends "SET_FILE_TYPE" ? "csv" | "tiff" | "tsv" | null
 : T extends "SET_TIFF_METADATA" ? unknown
+: T extends "SET_CONFLICT_DATA" ? { temp_folder: string;} | null
+: T extends "SET_SHOW_CONFLICT_DIALOG" ? boolean
 : never;
 type ReducerAction<T extends UploadActionType> = { type: T, payload: ReducerPayload<T> };
 const reducer = <T extends UploadActionType,>(state: ReducerState, action: { type: T, payload: any }) => {
@@ -282,6 +296,12 @@ const reducer = <T extends UploadActionType,>(state: ReducerState, action: { typ
             return { ...state, fileType: action.payload };
         case "SET_TIFF_METADATA":
             return { ...state, tiffMetadata: action.payload };
+        case "SET_H5_METADATA":
+            return { ...state, h5Metadata: action.payload };
+        case "SET_CONFLICT_DATA":
+            return { ...state, conflictData: action.payload };
+        case "SET_SHOW_CONFLICT_DIALOG":
+            return { ...state, showReplaceDialog: action.payload };
         default:
             return state;
     }
@@ -292,13 +312,13 @@ const UPLOAD_INTERVAL = 30;
 const UPLOAD_DURATION = 3000;
 const UPLOAD_STEP = 100 / (UPLOAD_DURATION / UPLOAD_INTERVAL);
 
-interface FileUploadDialogComponentProps {
+export interface FileUploadDialogComponentProps {
     onClose: () => void;
     onResize: (width: number, height: number) => void; // Add this prop
 }
 
 // Define supported file types and their configurations
-interface FileTypeConfig {
+export interface FileTypeConfig {
     type: string;
     extensions: string[];
     mimeTypes: string[];
@@ -347,8 +367,26 @@ const FILE_TYPES: Record<string, FileTypeConfig> = {
             requiresMetadata: true,
             endpoint: 'add_or_update_image_datasource'
         }
+    },
+    H5: {
+        type: 'h5',
+        extensions: ['.h5', '.h5ad'],
+        mimeTypes: ['application/x-hdf5', 'application/x-hdf'],
+        maxSize: 10000 * 1024 * 1024,
+        processingConfig: {
+            defaultWidth: 1000,
+            defaultHeight: 800,
+            requiresMetadata: true,
+            endpoint: 'add_anndata'
+        }
     }
 };
+
+interface H5Metadata {
+    uns: Record<string, any>;
+    obs: Record<string, any>;
+    var: Record<string, any>;
+}
 
 // Helper functions for file type checking
 const getFileTypeFromExtension = (fileName: string): FileTypeConfig | null => {
@@ -445,7 +483,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
     const { progress, resetProgress, setProgress } = useFileUploadProgress();
 
     const onDrop = useCallback(
-        (acceptedFiles: File[]) => {
+        async (acceptedFiles: File[]) => {
             if (acceptedFiles.length > 0) {
                 const file = acceptedFiles[0];
                 const fileConfig = getFileTypeFromExtension(file.name);
@@ -558,7 +596,33 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         });
                         break;
                     }
-    
+                    case 'h5': {
+                        try {
+                            const h5Metadata = await processH5File(file);
+                            dispatch({ type: "SET_H5_METADATA", payload: h5Metadata });
+                            
+                            const newDatasourceName = file.name;
+                            setDatasourceName(newDatasourceName);
+                            
+                            onResize(fileConfig.processingConfig.defaultWidth, fileConfig.processingConfig.defaultHeight);
+                            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+                            dispatch({
+                                type: "SET_VALIDATION_RESULT",
+                                payload: { metadata: h5Metadata }
+                            });
+                        } catch (error) {
+                            console.error('H5 processing error:', error);
+                            dispatch({
+                                type: "SET_ERROR",
+                                payload: {
+                                    message: "Error processing H5 file",
+                                    traceback: error instanceof Error ? error.message : String(error),
+                                },
+                            });
+                            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+                        }
+                        break;
+                    }
                     default:
                         console.warn('Unhandled file type:', fileConfig.type);
                         return;
@@ -789,14 +853,16 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                         }
                     }
                     break;
-            }
+                case 'h5':
+                    // Payload content depends on backend implementation
+                    break;
+        }
 
             const response = await axios.post(
                 `${root}/${fileConfig.processingConfig.endpoint}`,
                 formData,
                 config
             );
-
             if (response.status === 200) {
                 dispatch({ type: "SET_IS_UPLOADING", payload: false });
                 dispatch({ type: "SET_SUCCESS", payload: true });
@@ -808,27 +874,44 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 throw new Error(`Server responded with status ${response.status}`);
             }
         } catch (error) {
-            console.error("Error uploading file:", error);
-            handleUploadError(error);
+            if (
+                axios.isAxiosError(error) &&
+                error.response?.status === 409
+            ) {
+                dispatch({ type: "SET_IS_UPLOADING", payload: false });
+                dispatch({ type: "SET_SUCCESS", payload: false });
+                dispatch({
+                    type: "SET_CONFLICT_DATA",
+                    payload: {AnndataConflictDialog,
+                        temp_folder: error.response.data.temp_folder,
+                    },
+                });
+                dispatch({
+                    type: "SET_SHOW_CONFLICT_DIALOG",
+                    payload: true,
+                });
+            } else {
+                console.error("Error uploading file:", error);
+                handleUploadError(error);
+            }
         }
     };
 
-    const handleUploadError = useCallback((error: any) => {
-        const errorPayload = {
-            message: `Upload failed with status: ${error.response?.status || "unknown"}`,
-            status: error.response?.status || 500,
-            traceback: error.message,
-        };
-
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 400) {
-                errorPayload.message = "Bad Request: The server could not process the uploaded file.";
-                errorPayload.status = 400;
-            } else if (error.response?.status === 500) {
-                errorPayload.message = "Server Error: An error occurred while processing the upload.";
-                errorPayload.status = 500;
-            }
-        }
+    const handleUploadError = useCallback((error: AxiosError | unknown) => {
+        const errorPayload = axios.isAxiosError(error)
+            ? {
+                  message:
+                      error.response?.data ||
+                      error.request?.responseText ||
+                      "An error occurred while processing the upload.",
+                  status: error.response?.status || 500,
+                  traceback: error.message,
+              }
+            : {
+                  message: "An error occurred while processing the upload.",
+                  status: 500,
+                  traceback: (error as Error).message,
+              };
 
         dispatch({
             type: "SET_ERROR",
@@ -842,6 +925,111 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
         onResize(450, 320);
         onClose();
     }, [onClose, onResize]);
+
+    const handleCombineConfirm = async (label: string) => {
+        if (!state.conflictData) return;
+
+        const formData = new FormData();
+        formData.append("temp_folder", state.conflictData.temp_folder);
+        formData.append("combine", "true");
+        formData.append("label", label);
+
+        try {
+            const response = await axios.patch(
+                `${root}/combine_anndata`,
+                formData,
+                {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
+                },
+            );
+
+            if (response.status === 200) {
+                dispatch({ type: "SET_SUCCESS", payload: true });
+                if (state.fileType === "h5") {
+                    chartManager.saveState();
+                }
+            }
+        } catch (error) {
+            console.error("Error replacing file:", error);
+            handleUploadError(error);
+        } finally {
+            dispatch({ type: "SET_SHOW_CONFLICT_DIALOG", payload: false });
+            dispatch({ type: "SET_CONFLICT_DATA", payload: null });
+        }
+    };
+
+    const displayUploadDialog = async () => {
+        if (state.error) {
+            dispatch({ type: "SET_SELECTED_FILES", payload: [] });
+            dispatch({ type: "SET_IS_UPLOADING", payload: false });
+            dispatch({ type: "SET_IS_INSERTING", payload: false });
+            dispatch({ type: "SET_SUCCESS", payload: false });
+            dispatch({ type: "SET_ERROR", payload: null });
+            dispatch({ type: "SET_IS_VALIDATING", payload: false });
+            dispatch({ type: "SET_VALIDATION_RESULT", payload: null });
+            dispatch({ type: "SET_FILE_TYPE", payload: null });
+            dispatch({ type: "SET_TIFF_METADATA", payload: null });
+            dispatch({ type: "SET_H5_METADATA", payload: null });
+            dispatch({ type: "SET_CONFLICT_DATA", payload: null });
+            dispatch({ type: "SET_SHOW_CONFLICT_DIALOG", payload: false });
+            setDatasourceName("");
+            setDatasourceSummary({
+                datasourceName: "",
+                fileName: "",
+                fileSize: "",
+                rowCount: 0,
+                columnCount: 0,
+            });
+            return;
+        }
+    };
+
+    const handleCombineCancel = async () => {
+        if (!state.conflictData) return;
+
+        const formData = new FormData();
+        formData.append("temp_folder", state.conflictData.temp_folder);
+        formData.append("combine", "false");
+
+        try {
+            const fullPath = `${root}/combine_anndata`;
+
+            const response = await axios.patch(fullPath, formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                    Accept: "application/json, text/plain, */*",
+                },
+            });
+            console.log("Response:", response);
+        } catch (error) {
+            console.error(
+                "Full URL that failed:",
+                `${root}/combine_anndata`,
+            );
+            if (axios.isAxiosError(error)) {
+                console.error("Response data:", error.response?.data);
+                console.error("Response status:", error.response?.status);
+            }
+            throw error;
+        } finally {
+            dispatch({ type: "SET_SHOW_CONFLICT_DIALOG", payload: false });
+            dispatch({ type: "SET_CONFLICT_DATA", payload: null });
+            dispatch({ type: "SET_VALIDATION_RESULT", payload: null });
+            dispatch({ type: "SET_H5_METADATA", payload: null });
+            dispatch({ type: "SET_SELECTED_FILES", payload: [] });
+            dispatch({ type: "SET_FILE_TYPE", payload: null });
+            dispatch({ type: "SET_FILE_SUMMARY", payload: null });
+            onResize(450, 320);
+            onClose();
+        }
+    };
+
+    const handleCombineError = (error: { message: string; status?: number }) => {
+        console.error("Conflict dialog error:", error);
+        dispatch({ type: "SET_ERROR", payload: error });
+    };
 
     return (
         <Container>
@@ -876,16 +1064,31 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                 </>
             ) : state.error ? (
                 <>
-                    <ErrorContainer>
-                        <ErrorHeading>
-                            An error occurred while uploading the file:
-                        </ErrorHeading>
-                        <p>{state.error.message}</p>
-                        {state.error.traceback && (
-                            <pre>{state.error.traceback}</pre>
-                        )}
-                    </ErrorContainer>
-                </>
+                    <ErrorDisplay error={state.error} />
+                    <div className="flex justify-center items-center gap-6">
+                        <Button
+                            marginTop="mt-1"
+                            onClick={displayUploadDialog}
+                        >
+                            Upload Another File
+                        </Button>
+                        <Button
+                            color="red"
+                            size="px-14 py-2.5"
+                            marginTop="mt-1"
+                            onClick={handleClose}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                </> 
+            ) : state.showReplaceDialog ? (
+                <AnndataConflictDialog 
+                    open={state.showReplaceDialog}
+                    onClose={handleCombineCancel}
+                    onConfirm={(label) => handleCombineConfirm(label)}
+                    onError={handleCombineError}
+                />
             ) : state.isValidating ? (
                 <StatusContainer>
                     <Message>{"Validating data, please wait..."}</Message>
@@ -1035,6 +1238,36 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> = obse
                             </div>
                         </>
                     )}
+
+                    {state.fileType === "h5" && state.h5Metadata && (
+                        <>
+                            <FileSummary>
+                                <FileSummaryHeading>H5 File Summary</FileSummaryHeading>
+                                <FileSummaryText>
+                                    <strong>File name:</strong> {state.selectedFiles[0].name}
+                                </FileSummaryText>
+                                <FileSummaryText>
+                                    <strong>File size:</strong> {(state.selectedFiles[0].size / (1024 * 1024)).toFixed(2)} MB
+                                </FileSummaryText>
+                            </FileSummary>
+                            
+                            <H5MetadataPreview metadata={state.h5Metadata} />
+
+                            <div className="flex justify-center items-center gap-6 mt-4">
+                                <Button marginTop="mt-1" onClick={handleUploadClick}>
+                                    Upload
+                                </Button>
+                                <Button
+                                    color="red"
+                                    size="px-6 py-2.5"
+                                    marginTop="mt-1"
+                                    onClick={handleClose}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        </>
+                    )}
                 </>
             ) : (
                 <>
@@ -1091,9 +1324,36 @@ const Wrapper = (props: FileUploadDialogComponentProps) => {
             window.removeEventListener("keydown", handleKeyDown);
         };
     }, []);
-    //p-4 mt-2 z-50 text-center border-2 border-dashed rounded-lg ${isDragOver ? "bg-gray-300 dark:bg-slate-800" : "bg-white dark:bg-black"} min-w-[90%]
+
+    const handleClose = () => {
+        setOpen(false);
+    };
     return (
-        <Dialog open={open} fullScreen disableEscapeKeyDown={true}>
+        <Dialog
+            open={open}
+            fullScreen
+            disableEscapeKeyDown={true}
+            PaperProps={{
+                style: {
+                    backgroundColor: "var(--fade_background_color)",
+                    backdropFilter: "blur(1px)",
+                },
+            }}
+        >
+            <IconButton
+                onClick={handleClose}
+                className="absolute top-4 right-4"
+                sx={{
+                    position: "absolute",
+                    top: 16,
+                    right: 16,
+                    backgroundColor: "var(--background_color)",
+                    "&:hover": { backgroundColor: "var(--menu_bar_color)" },
+                }}
+            >
+                <CloseIcon />
+            </IconButton>
+
             <div className="h-screen flex items-center justify-center">
                 <Paper elevation={24} sx={{ p: 2 }}>
                     <FileUploadDialogComponent {...props} />
@@ -1101,6 +1361,6 @@ const Wrapper = (props: FileUploadDialogComponentProps) => {
             </div>
         </Dialog>
     );
-}
+};
 
 export default Wrapper;

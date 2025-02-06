@@ -13,10 +13,13 @@ import { getColorLegend, getColorBar } from "../utilities/Color.js";
 import { quantileSorted } from "d3-array";
 import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
+import { isDatatypeNumeric } from "@/lib/utils";
 
 /**
  * Creates an empty data structure
- * @tutorial datasource
+ * 
+ * [Data Source](../../docs/extradocs/datasource.md)
+ *  
  * @param {number} size - the number of rows(items) of the data structure
  * @param {Object} [config] - setup information for the datastore.
  * @param {Object[]} [config.columns] - an array of column objects, specifying
@@ -40,9 +43,9 @@ class DataStore {
         this.size = size;
         /** @type {number} */
         this.filterSize = size;
-        /** why doesn't this annotation work?
+        /** why doesn't this column annotation work?
          * @typedef {import("@/charts/charts.js").DataType} DataType
-         * @typedef {import("@/charts/charts.js").DataColumn} DataColumn
+         * @typedef {import("@/charts/charts.js").DataColumn<DataType>} DataColumn
          * @type {Array.<DataColumn<DataType>>} */
         this.columns = [];
         /**
@@ -424,7 +427,7 @@ class DataStore {
      *  */
     /**
      * Adds a column's metadata and optionally it's data to the DataStore
-     * @tutorial datasource
+     * [Data Source](../../docs/extradocs/datasource.md)
      * @param {Omit<Column, 'getValue'>} column An object describing the column
      * @param {Array|SharedArrayBuffer} [data] The data for the column
      * @param {boolean} [dirty=false] true for columns that are not synched with the backend,
@@ -731,6 +734,9 @@ class DataStore {
         for (const c of columns) {
             //todo invert this to use col.getValue(index)
             const col = this.columnIndex[c];
+            if (!col.data) {
+                throw new Error(`Column '${c}' has no data`);
+            }
             let v = col.data[index];
             if (col.datatype === "text" || col.datatype === "text16") {
                 v = col.values[v];
@@ -1185,11 +1191,12 @@ class DataStore {
      * then it will be converted to the correct internal data structures and the only previously
      * supplied metadata required are field, name and datatype.
      * If the data is a shared array buffer then, the data should be in the correct
-     * format see [columns]{@tutorial datasource}
+     * format see [columns](../../docs/extradocs/datasource.md)
      * @param {string}  column - The field/id of the column.
      * @param {SharedArrayBuffer|Array} data  either a javascript array or shared array buffer
      */
     setColumnData(column, data) {
+        // if (Math.random() < 0.1) throw new Error("This is a test error");
         const c = this.columnIndex[column];
         if (!c) {
             throw `column ${column} is not present in data store`;
@@ -1728,11 +1735,17 @@ class DataStore {
 
     /**
      * Returns the min/max values for a given column
-     * @param {string} column The column id(field)
-     * @returns {number[]} An array - the first value being the min value and the second the max value
+     * @param {string} column The column id(field). Should be a numeric column, otherwise an error will be thrown
+     * @returns {[number, number]} An array - the first value being the min value and the second the max value
      */
     getMinMaxForColumn(column) {
         const c = this.columnIndex[column];
+        if (!isDatatypeNumeric(c.datatype)) {
+            throw new Error(`Trying to get minMax for non-numeric column '${column}'`);
+        }
+        if (!c.minMax) {
+            throw new Error(`no minMax for column '${column}' ${c}`);
+        }
         return c.minMax;
     }
 

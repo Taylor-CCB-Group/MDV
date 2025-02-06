@@ -153,6 +153,15 @@ class MDVProject:
         all_cols = set([x["field"] for x in md["columns"]])
         return [x for x in columns if x not in all_cols]
 
+    def get_datasource_names(self) -> list[str]:
+        """
+        Get a list of all datasource names in the project.
+        
+        Returns:
+            list[str]: A list of datasource names
+        """
+        return [ds["name"] for ds in self.datasources]
+    
     def set_interactions(
         self,
         interaction_ds: str,
@@ -1127,7 +1136,7 @@ class MDVProject:
         label: Optional[str] = None,
         sparse=False,
     ):
-        """ """
+        """Add rows as columns in a subgroup."""
         name = name if name else stub
         label = label if label else name
         h5 = self._get_h5_handle()
@@ -1135,11 +1144,12 @@ class MDVProject:
         if not isinstance(ds, h5py.Group):
             raise AttributeError(f"{row_ds} is not a group")
         if name in ds:
-            raise
-        gr = ds.create_group(name)  # we could check for existing name first...
-        # sparse is passed as an argument - maybe we should infer it automatically from the data
-        # (isinstance of spmatrix)
+            raise ValueError(f"Group '{name}' already exists in {row_ds}.")
+        
+        gr = ds.create_group(name)
+        
         if sparse:
+            # Handle sparse matrix
             gr.create_dataset(
                 "x", (len(data.data),), data=data.data, dtype=numpy.float32
             )
@@ -1148,13 +1158,20 @@ class MDVProject:
             )
             gr.create_dataset("p", (len(data.indptr),), data=data.indptr)
         else:
-            length = data.shape[0]
-            # we should assert and test that the shape dimensions correspond to number of rows in row_ds & col_ds
-            total_len = data.shape[0] * data.shape[1]
-            gr.create_dataset(
-                "x", (total_len,), data=data.flatten("F"), dtype=numpy.float32
-            )
-            gr["length"] = [length]
+            # Fallback to dense or convertible
+            try:
+                dense_data = data.toarray() if hasattr(data, 'toarray') else numpy.asarray(data)
+                total_len = dense_data.shape[0] * dense_data.shape[1]
+                gr.create_dataset(
+                    "x", (total_len,),
+                    data=dense_data.flatten(order="F"),
+                    dtype=numpy.float32
+                )
+                gr["length"] = [dense_data.shape[0]]
+            except Exception as e:
+                raise TypeError(f"Unsupported data type for dense processing: {type(data)}. Original error: {e}")
+
+        # Update metadata
         ds = self.get_datasource_metadata(row_ds)
         ds["links"][col_ds]["rows_as_columns"]["subgroups"][stub] = {
             "name": name,

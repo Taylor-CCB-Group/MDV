@@ -7,11 +7,14 @@ from datetime import datetime
 class TestProjectService(unittest.TestCase):
     
     @patch('mdvtools.dbutils.dbmodels.Project.query')
+    @patch('mdvtools.dbutils.dbmodels.Project.query')
     def test_get_active_projects_success(self, mock_query):
         mock_query.filter_by.return_value.all.return_value = [MagicMock(), MagicMock()]
         result = ProjectService.get_active_projects()
         self.assertEqual(len(result), 2)
     
+    @patch('mdvtools.dbutils.dbmodels.db.session.query')
+    @patch('mdvtools.dbutils.dbmodels.db.func.max')
     @patch('mdvtools.dbutils.dbmodels.db.session.query')
     @patch('mdvtools.dbutils.dbmodels.db.func.max')
     def test_get_next_project_id_success(self, mock_max, mock_query):
@@ -20,6 +23,8 @@ class TestProjectService(unittest.TestCase):
         result = ProjectService.get_next_project_id()
         self.assertEqual(result, 6)
     
+    @patch('mdvtools.dbutils.dbmodels.db.session')
+    @patch('mdvtools.dbutils.dbmodels.Project')
     @patch('mdvtools.dbutils.dbmodels.db.session')
     @patch('mdvtools.dbutils.dbmodels.Project')
     def test_add_new_project_success(self, mock_project, mock_session):

@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
 
-const flaskURL = "http://127.0.0.1:5051";
+const flaskURL = "http://127.0.0.1:5055"; // default to docker flask server
+//const flaskURL_ = "http://127.0.0.1:5050"; // hack for single project mode / chat experiment
 const port = 5170;
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints

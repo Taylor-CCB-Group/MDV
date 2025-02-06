@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-interface User {
+export interface User {
     name: string;
     email: string;
     association: string;

@@ -1,0 +1,17 @@
+{
+    "chartmanager": {
+        "title": "The ChartManager Object"
+    },
+    "datasource": {
+        "title": "The DataStore Object"
+    },
+    "charts":{
+        "title":"Charts"
+    },
+    "dataloader":{
+        "title":"DataLoaders"
+    },
+    "views":{
+        "title":"Views"
+    }  
+}

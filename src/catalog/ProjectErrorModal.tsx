@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import type React from "react";
 
-interface ErrorModalProps {
+export interface ErrorModalProps {
     open: boolean;
     message: string;
     onClose: () => void;

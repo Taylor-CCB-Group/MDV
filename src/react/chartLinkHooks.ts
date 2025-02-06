@@ -5,8 +5,8 @@ import type { VivMDVReact } from "./components/VivMDVReact";
 import { useDataStore } from "./context";
 import type { DataColumn, DataType } from "@/charts/charts";
 
-type ChartID = string;
-type ViewStateLink = {
+export type ChartID = string;
+export type ViewStateLink = {
     type: "view_state";
     linked_charts: ChartID[];
 }
@@ -82,7 +82,7 @@ export const useViewStateLink = () => {
     ]);
 };
 
-type RowsAsColslink = {
+export type RowsAsColslink = {
     name_column: string;
     name: string;
     subgroups: {
@@ -149,7 +149,7 @@ export function useHighlightedForeignRows() {
                 // const vals = tds.getFilteredValues(link.name_column) as string[];
                 // setValues(vals); //this isn't right - we need the index too
                 // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-                const filteredIndices = await tds.getFilteredIndices();
+                const filteredIndices = await tds.getFilteredIndices() as number[];
                 //! this Array.from could be suboptimal for large numbers of indices
                 const vals = Array.from(filteredIndices).map(
                     // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'

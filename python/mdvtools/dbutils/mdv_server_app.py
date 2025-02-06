@@ -2,8 +2,10 @@ import os
 import time
 import json
 import shutil
+import shutil
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
+from flask import Flask, render_template, jsonify, request
 from flask import Flask, render_template, jsonify, request
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
@@ -12,6 +14,7 @@ from flask import Flask, render_template, jsonify, request
 # from flask import Flask, render_template, jsonify, request
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
+from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
@@ -24,6 +27,7 @@ oauth = OAuth()
 
 def create_flask_app(config_name=None):
     """Create and configure the Flask app."""
+    """Create and configure the Flask app."""
     app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
     # this was causing a number of issues with various routes, changing this here seems to be the best way to fix it
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
@@ -33,6 +37,7 @@ def create_flask_app(config_name=None):
 
     
     try:
+        print("**Adding config.json details to app config")
         print("**Adding config.json details to app config")
         load_config(app, config_name)
     except Exception as e:
@@ -61,6 +66,7 @@ def create_flask_app(config_name=None):
             if not tables_exist():
                 print("Creating database tables")
                 db.create_all()
+                print("************** Created database tables")
                 print("************** Created database tables")
             else:
                 print("Database tables already exist")
@@ -152,6 +158,7 @@ def wait_for_database():
         except Exception as e:
             print(f"An unexpected error occurred while waiting for the database: {e}")
             raise  # Re-raise the exception to be handled by the parent
+            # ^^ should this be `raise e` instead?
 
     # If the loop completes without a successful connection
     error_message = "Error: Database did not become available in time."
@@ -196,6 +203,10 @@ def load_config(app,config_name=None):
                     print(f"Error: Secret '{secret_name}' not found. {fnf_error}")
                     raise  # Re-raise the exception to be handled by the parent
 
+            db_user = os.getenv('DB_USER') or read_secret('db_user')
+            db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
+            db_name = os.getenv('DB_NAME') or read_secret('db_name')
+            db_host = os.getenv('DB_HOST') or app.config.get('db_host')
             db_user = os.getenv('DB_USER') or read_secret('db_user')
             db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
             db_name = os.getenv('DB_NAME') or read_secret('db_name')
@@ -247,6 +258,7 @@ def tables_exist():
         return inspector.get_table_names()
 
 def serve_projects_from_db(app):
+    failed_projects: list[tuple[int, str | Exception]] = []
     try:
         # Get all projects from the database
         print("Serving the projects present in both database and filesystem. Displaying the error if the path doesn't exist for a project")
@@ -261,8 +273,10 @@ def serve_projects_from_db(app):
             if os.path.exists(project.path):
                 try:
                     p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
+                    p = MDVProject(dir=project.path, id=str(project.id), backend_db= True)
                     p.set_editable(True)
                     # todo: look up how **kwargs works and maybe have a shared app config we can pass around
+                    p.serve(app=app, open_browser=False, backend_db=True)
                     p.serve(app=app, open_browser=False, backend_db=True)
                     print(f"Serving project: {project.path}")
 
@@ -284,16 +298,35 @@ def serve_projects_from_db(app):
                             except RuntimeError as file_error:
                                 print(f"Failed to add or update file '{file_name}' in the database: {file_error}")
 
+                            try:
+                                # Attempt to add or update the file in the database
+                                FileService.add_or_update_file_in_project(
+                                    file_name=file_name,
+                                    file_path=full_file_path,
+                                    project_id=project.id
+                                )
+                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
+
+                            except RuntimeError as file_error:
+                                print(f"Failed to add or update file '{file_name}' in the database: {file_error}")
+
 
                 except Exception as e:
-                    print(f"Error serving project '{project.path}': {e}")
-                    raise
+                    print(f"Error serving project #{project.id}'{project.path}': {e}")
+                    # don't `raise` here; continue serving other projects
+                    # but keep track of failed projects & associated errors
+                    # nb keeping track via project.id rather than instance of Project, because ORM seems to make that not work
+                    failed_projects.append((project.id, e))
             else:
                 print(f"Error : Project path '{project.path}' does not exist.")
                 
     except Exception as e:
         print(f"Error serving projects from database: {e}")
         raise
+    print(f"{len(failed_projects)} projects failed to serve. ({len(projects)} projects served successfully)")
+    # nb using append rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
+    # so we really only expect this to run once, and the list to be empty
+    ProjectService.failed_projects.append(failed_projects)
 
 def serve_projects_from_filesystem(app, base_dir):
     try:
@@ -328,7 +361,9 @@ def serve_projects_from_filesystem(app, base_dir):
                         next_id += 1
 
                     p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
+                    p = MDVProject(dir=project_path, id= str(next_id), backend_db= True)
                     p.set_editable(True)
+                    p.serve(app=app, open_browser=False, backend_db=True) 
                     p.serve(app=app, open_browser=False, backend_db=True) 
                     print(f"Serving project: {project_path}")
 
@@ -346,6 +381,18 @@ def serve_projects_from_filesystem(app, base_dir):
                             full_file_path = os.path.join(root, file_name)
                             
                             # Use the full file path when adding or updating the file in the database
+                            # Use the utility function to add or update the file in the database
+                            try:
+                                # Attempt to add or update the file in the database
+                                FileService.add_or_update_file_in_project(
+                                    file_name=file_name,
+                                    file_path=full_file_path,
+                                    project_id=new_project.id
+                                )
+                                #print(f"Processed file in DB: {file_name} at {full_file_path}")
+
+                            except RuntimeError as file_error:
+                                print(f"Failed to add or update file '{file_name}' in the database: {file_error}")
                             # Use the utility function to add or update the file in the database
                             try:
                                 # Attempt to add or update the file in the database
@@ -496,7 +543,21 @@ def register_routes(app):
                 # Return the list of projects as JSON
                 return jsonify(project_list)
             
+                
+                # Format each project with its id, name, and last modified timestamp as a string
+                project_list = [
+                    {
+                        "id": p.id,
+                        "name": p.name,
+                        "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S')  # Format datetime as string
+                    }
+                    for p in projects
+                ]
+                # Return the list of projects as JSON
+                return jsonify(project_list)
+            
             except Exception as e:
+                print(f"In register_routes - /projects : Error retrieving projects: {e}")
                 print(f"In register_routes - /projects : Error retrieving projects: {e}")
                 return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -506,12 +567,15 @@ def register_routes(app):
         def create_project():
             project_path = None
             next_id = None
+            project_path = None
+            next_id = None
             try:
                 print("Creating project")
                 
                 # Get the next available ID
                 next_id = ProjectService.get_next_project_id()
                 if next_id is None:
+                    print("In register_routes: Error- Failed to determine next project ID from db")
                     print("In register_routes: Error- Failed to determine next project ID from db")
                     return jsonify({"status": "error", "message": "Failed to determine next project ID from db"}), 500
 
@@ -528,6 +592,15 @@ def register_routes(app):
                 except Exception as e:
                     print(f"In register_routes: Error serving MDVProject: {e}")
                     return jsonify({"status": "error", "message": "Failed to serve MDVProject"}), 500
+                # Create and serve the MDVProject
+                try:
+                    print("Creating and serving the new project")
+                    p = MDVProject(project_path, backend_db= True)
+                    p.set_editable(True)
+                    p.serve(app=app, open_browser=False, backend_db=True)
+                except Exception as e:
+                    print(f"In register_routes: Error serving MDVProject: {e}")
+                    return jsonify({"status": "error", "message": "Failed to serve MDVProject"}), 500
 
                 # Create a new Project record in the database with the path
                 print("Adding new project to the database")
@@ -535,6 +608,7 @@ def register_routes(app):
 
                 if new_project:
                     return jsonify({"id": new_project.id, "name": new_project.name, "status": "success"})
+                
                 
 
             except Exception as e:
@@ -568,7 +642,14 @@ def register_routes(app):
 
                 if project is None:
                     print(f"In register_routes - /delete_project Error: Project with ID {project_id} not found in database")
+                    print(f"In register_routes - /delete_project Error: Project with ID {project_id} not found in database")
                     return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
+
+                
+                # Check if the project is editable before attempting to delete
+                if project.access_level != 'editable':
+                    print(f"In register_routes - /delete_project Error: Project with ID {project_id} is not editable.")
+                    return jsonify({"status": "error", "message": "This project is not editable and cannot be deleted."}), 403
 
                 
                 # Check if the project is editable before attempting to delete
@@ -589,13 +670,75 @@ def register_routes(app):
                     return jsonify({"status": "success"})
                 else:
                     print("In register_routes - /delete_project Error: Failed to soft delete project in db")
+                    print("In register_routes - /delete_project Error: Failed to soft delete project in db")
                     return jsonify({"status": "error", "message": "Failed to soft delete project in db"}), 500
 
             except Exception as e:
                 print(f"In register_routes - /delete_project: Error deleting project '{project_id}': {e}")
+                print(f"In register_routes - /delete_project: Error deleting project '{project_id}': {e}")
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /delete_project/<project_id>")
+
+        @app.route("/projects/<int:project_id>/rename", methods=["PUT"])
+        def rename_project(project_id: int):
+            # Retrieve the new project name from the multipart/form-data payload
+            new_name = request.form.get("name")
+            
+            if not new_name:
+                return jsonify({"status": "error", "message": "New name not provided"}), 400
+            
+            try:
+                # Check if the project exists
+                project = ProjectService.get_project_by_id(project_id)
+                if project is None:
+                    print(f"In register_routes - /rename_project Error: Project with ID {project_id} not found in database")
+                    return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
+                
+                # Check if the project is editable before attempting to rename
+                if project.access_level != 'editable':
+                    print(f"In register_routes - /rename_project Error: Project with ID {project_id} is not editable.")
+                    return jsonify({"status": "error", "message": "This project is not editable and cannot be renamed."}), 403
+      
+                # Attempt to rename the project
+                rename_status = ProjectService.update_project_name(project_id, new_name)
+
+                if rename_status:
+                    return jsonify({"status": "success", "id": project_id, "new_name": new_name}), 200
+                else:
+                    print(f"In register_routes - /rename_project Error: The project with ID '{project_id}' not found in db")
+                    return jsonify({"status": "error", "message": f"Failed to rename project '{project_id}' in db"}), 500
+
+            except Exception as e:
+                print(f"In register_routes - /rename_project : Error renaming project '{project_id}': {e}")
+                return jsonify({"status": "error", "message": str(e)}), 500
+
+        print("Route registered: /projects/<int:project_id>/rename")
+
+        @app.route("/projects/<int:project_id>/access", methods=["PUT"])
+        def change_project_access(project_id):
+            """API endpoint to change the access level of a project."""
+            try:
+                # Get the new access level from the request
+                new_access_level = request.form.get("type")
+
+                # Validate the new access level
+                if new_access_level not in ["read-only", "editable"]:
+                    return jsonify({"status": "error", "message": "Invalid access level. Must be 'read-only' or 'editable'."}), 400
+
+                # Call the service method to change the access level
+                access_level, message, status_code = ProjectService.change_project_access(project_id, new_access_level)
+
+                if access_level is None:
+                    return jsonify({"status": "error", "message": message}), status_code
+
+                return jsonify({"status": "success", "access_level": access_level}), 200
+
+            except Exception as e:
+                print(f"In register_routes - /access : Unexpected error while changing access level for project '{project_id}': {e}")
+                return jsonify({"status": "error", "message": "An unexpected error occurred."}), 500
+        
+        print("Route registered: /projects/<int:project_id>/access")
 
         @app.route("/projects/<int:project_id>/rename", methods=["PUT"])
         def rename_project(project_id: int):

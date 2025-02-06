@@ -13,7 +13,7 @@ import { useDebounce } from "use-debounce";
 /** need to be clearer on which prop types are for which parts of layer spec...
  *
  */
-type ContourProps = {
+export type ContourProps = {
     /** to be used as deck.gl sublayer id */
     id: string;
     /** the column - if not present, should we not filter the data? at the moment, we reduce to nothing

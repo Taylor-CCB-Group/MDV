@@ -13,7 +13,7 @@ class CatRangeDimension extends RangeDimension {
         const t = performance.now();
         const cat = this.parent.columnIndex[columns[0]];
         const val = this.parent.columnIndex[columns[1]];
-        const mm = this.parent.getMinMaxForColumn(columns[1]);
+        // const mm = this.parent.getMinMaxForColumn(columns[1]);
         //config.bandwidth=(mm[1]-mm[0])/10;
         config.type = "kernal_density";
 

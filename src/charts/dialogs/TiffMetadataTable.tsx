@@ -1,11 +1,11 @@
 import type React from 'react';
 import { useState, useMemo } from 'react';
 
-interface TiffMetadataTableProps {
+export interface TiffMetadataTableProps {
   metadata: Record<string, any>;
 }
 
-type FlattenedMetadata = {
+export type FlattenedMetadata = {
   element: string;
   attribute: string;
   tag: string;

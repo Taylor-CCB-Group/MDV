@@ -2,4 +2,11 @@ __pycache__
 .git
 node_modules
 venv
+docsenv
+# subject to review
+# docs/jsdocs/build
+# docs/typedoc
+# docs/maindocs/_build
+# docs/maindocs/autoapi
+dist
 python/mdvtools/static

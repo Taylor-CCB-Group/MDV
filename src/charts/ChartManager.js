@@ -111,20 +111,18 @@ function listenPreferredColorScheme(callback) {
 }
 
 /**
-* The object to manage charts {@tutorial chartmanager}
+* The object to manage charts [Chart Manager](../../docs/extradocs/chartmanager.md)
 * 
 * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
-* @param {object[]} datasources - An array of datasource configs -see  {@tutorial datasource}.
+* @param {object[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
 * Each config must contain the size parameter, giving the number of rows in the DataStore.
 * @param {object} dataloader - An object containing the following
-* <ul>
-*   <li> function - The [function]{@tutorial datalaoder} to load the data
-    (can be omitted if data loaded from a file)</li>
-*   <li> viewLoader - The function that will load the each view  (not necessay if only one view)</li>
-*   <li> rowDataLoader - (optional) an asunc function which is given the datasource name and row index
+*   - function - The [function](../../docs/extradocs/dataloader.md) to load the data
+    (can be omitted if data loaded from a file)
+*   - viewLoader - The function that will load the each view  (not necessay if only one view)
+*   - rowDataLoader - (optional) an asunc function which is given the datasource name and row index
 *     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
-*   <li> files - specifies the files to load the data </li>
-* </ul>
+*   - files - specifies the files to load the data 
 * @param {Object} config extra settings
 * @param {Object[]} [config.initialCharts] A list of chart configs to initially load if
 * no views are specified
@@ -138,7 +136,7 @@ function listenPreferredColorScheme(callback) {
 * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
 * 
 */
-class ChartManager {
+export class ChartManager {
     constructor(div, dataSources, dataLoader, config = {}, listener = null) {
         if (!window.isSecureContext) {
             alert(
@@ -167,14 +165,13 @@ class ChartManager {
         //maybe better to stop listening once explicit option has been set
         //or to allow the user to explicitly say 'system default'
         listenPreferredColorScheme((t) => this.setTheme(t));
-
         /** !typed according to previous comments - but I was using it in a way that was working and doesn't match the comments...
          * each entry in dataSources will contain
          *  dataStore - the actual dataStore object (previously this comment erroneously referred to as 'dataSource')
          *  name - the name given to this data source
          *  menuBar the dom menu associated with this element
          *  contentDiv the div that the charts associated with the datastore will be added
-         * @typedef {{dataStore: DataStore, name: string, menuBar: HTMLElement, contentDiv: HTMLElement}} DataSource
+         * @typedef {import("@/charts/charts/DataSource")} DataSource
          * @type {DataSource[]} 
          */
         this.dataSources = [];
@@ -1026,6 +1023,11 @@ class ChartManager {
                 type: "text",
                 id: "name",
                 label: "name",
+                // todo have some better reusability for this kind of validation
+                // (also probably refactor this dialog into react)
+                // considered returning a string to set a tooltip or something, parked that idea for now pending more thought/refactoring
+                // validate: (v) => this.viewSelect.childNodes.values().some(e => e.value === v) ? "Name already exists" : null,
+                validate: (v) => !this.viewSelect.childNodes.values().some(e => e.value === v),
             },
         ];
         if (this.dataSources.length > 1) {
@@ -1534,7 +1536,8 @@ class ChartManager {
      * @param {string[]} columns An array of column fields/ids
      * @param {string} dataSource The name of the dataSource
      * @param {function} callback A function which will be run once all the
-     * columns are loaded
+     * columns are loaded, with any failed columns as an argument (although it's not clear that the underlying code actually does this, 
+     * or that any code that calls this function actually uses the argument)
      * @param {number} [split=10]  the number of columns to send with each request
      * @param {number} [threads=2]  the number of concurrent requests
      */
@@ -1605,6 +1608,8 @@ class ChartManager {
                 trans.columnsLoaded++;
             })
             .catch((error) => {
+                //! this is an error that is not being handled properly... what happens to trans.failedColumns?
+                //! they do get passed to a callback... what does that callback do?
                 console.log(error);
                 trans.columnsLoaded++;
                 trans.failedColumns.push(columns);
@@ -1616,14 +1621,18 @@ class ChartManager {
                 for (const col of col_list) {
                     delete this.columnsLoading[dataSource][col];
                 }
-                all_loaded =
-                    all_loaded > trans.totalColumns
-                        ? trans.totalColumns
-                        : all_loaded;
-                this.updateInfoAlert(
-                    trans.alertID,
-                    `Loading Columns:${all_loaded}/${trans.totalColumns}`,
-                );
+                all_loaded = all_loaded > trans.totalColumns
+                    ? trans.totalColumns
+                    : all_loaded;
+                if (trans.failedColumns.length > 0) {
+                    this.updateInfoAlert(trans.alertID, `Failed to load ${trans.failedColumns.length} columns`, { type: 'danger' });
+                    // return;
+                } else {
+                    this.updateInfoAlert(
+                        trans.alertID,
+                        `Loading Columns:${all_loaded}/${trans.totalColumns}`,
+                    );
+                }
                 if (loaded >= total) {
                     this.updateInfoAlert(
                         trans.alertID,
@@ -1666,10 +1675,10 @@ class ChartManager {
                     position: "bottom-right",
                 },
                 func: () => {
-                    // new AddChartDialog(ds, (config) =>
-                    //     this.addChart(ds.name, config, true),
-                    // );
-                    new BaseDialog.experiment["AddChartDialogReact"](dataStore);
+                    new AddChartDialog(ds, (config) =>
+                        this.addChart(ds.name, config, true),
+                    );
+                    // new BaseDialog.experiment["AddChartDialogReact"](dataStore);
                 },
             },
             ds.menuBar,
@@ -2086,7 +2095,10 @@ class ChartManager {
         }
         //load required columns, then check all requested are loaded
         else {
-            this.loadColumnSet(reqCols, dataSource, () => {
+            this.loadColumnSet(reqCols, dataSource, (failedColumns) => {
+                if (failedColumns.length) {
+                    console.warn('got columns with some failures', failedColumns);
+                }
                 this._haveColumnsLoaded(columns, dataSource, func);
             });
         }

@@ -1,0 +1,25 @@
+{
+    "name": "MDV Dev Container",
+    "dockerComposeFile": "../docker-secrets.yml",
+    "service": "mdv_app",
+    "workspaceFolder": "/app",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-azuretools.vscode-docker",
+                "biomejs.biome",
+                "ms-toolsai.jupyter",
+                "github.vscode-github-actions",
+                "eamodio.gitlens"
+            ]
+        }
+    },
+    "postStartCommand": "git config --global --add safe.directory /app"
+    //"postCreateCommand": "npm run dev"
+    //running a command that doesn't return will cause other issues
+    //subsequent devcontainer steps like copying .gitconfig end up not happening...
+    //we could do something like this:
+    //"postStartCommand": "nohup bash -c 'npm run dev &'"
+    //& watch nohup.out for the output... but for now, we'll just run it manually
+}

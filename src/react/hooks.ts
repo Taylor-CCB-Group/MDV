@@ -249,7 +249,7 @@ export function useFilteredIndices() {
                     return;
                 }
             }
-            setFilteredIndices(indices);
+            setFilteredIndices(indices as Uint32Array<ArrayBuffer>);
         });
         // should I have a cleanup function to cancel the promise if it's not resolved
         // by the time the effect is triggered again?

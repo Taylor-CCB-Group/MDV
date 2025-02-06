@@ -17,7 +17,7 @@ import {
 import type React from "react";
 import { useState } from "react";
 
-interface ProjectShareModalProps {
+export interface ProjectShareModalProps {
     open: boolean;
     onClose: () => void;
     onAddCollaborator: (email: string) => void;

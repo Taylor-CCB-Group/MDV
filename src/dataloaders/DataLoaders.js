@@ -1,4 +1,5 @@
 /**
+ * @typedef {import("@/charts/ChartManager.js")} ChartManager
  *  A collection of dataloaders and helper functions that can
  * can be used with {@link ChartManager}
  * @module DataLoaders
@@ -7,15 +8,13 @@
  **/
 
 /**
- * @memberof module:DataLoaders
+ * 
  * @param data {ArrayBuffer} - an array buffer containing raw concatenated
  * column data
  * @param {object} columns - any array of column objects
- * <ul>
- *   <li> field </li>
- *   <li> datatype </li>
- *   <li> sgtype </li>
- * </ul>
+ *   - field
+ *   - datatype
+ *   - sgtype
  * @param size {integer} - the size of the columns
  * @returns {object[]} a list of objects containing each colums's field name
  * and data
@@ -104,25 +103,29 @@ function processArrayBuffer(data, columns, size) {
  * }
  * </pre>
  * returns a dataloader
- * @memberof module:DataLoaders
+ * 
  * @param url {string} - The url of the api
  * @returns {function} a dataloader that can be used to construct {@link ChartManager}
  **/
 function getArrayBufferDataLoader(url, decompress = false) {
     return async (columns, dataSource, size) => {
         //get the data
-        const response = await fetch(url, {
-            method: "POST",
-            body: JSON.stringify({ columns: columns, data_source: dataSource }),
-            headers: {
-                "Content-Type": "application/json",
-            },
-        });
-        //the data is any arraybuffer containing each individual
-        //column's raw data
-        let data = await response.arrayBuffer();
-        data = decompress ? await decompressData(data) : data;
-        return processArrayBuffer(data, columns, size);
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                body: JSON.stringify({ columns: columns, data_source: dataSource }),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+            //the data is any arraybuffer containing each individual
+            //column's raw data
+            let data = await response.arrayBuffer();
+            data = decompress ? await decompressData(data) : data;
+            return processArrayBuffer(data, columns, size);
+        } catch (e) {
+            console.warn(`Error fetching data: ${e}`);
+        }
     };
 }
 
@@ -132,8 +135,9 @@ function getArrayBufferDataLoader(url, decompress = false) {
  * named dsname1.gz dsname2.gz etc.
  *
  * returns a dataLoader
- * @memberof module:DataLoaders
- * @param {string} - The url of the remote folder
+ * 
+ * @param dataSources - The url of the remote folder
+ * @param folder 
  * @returns {function} a dataloader that can be used to construct {@link ChartManager}
  **/
 
