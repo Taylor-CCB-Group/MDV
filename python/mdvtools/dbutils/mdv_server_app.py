@@ -442,6 +442,12 @@ def register_auth0_routes(app):
             except Exception as e:
                 print(f"In register_auth0_routes: Error during profile retrieval: {e}")
                 return jsonify({"error": "Failed to retrieve user profile."}), 500
+        
+        @app.route('/login_sso')
+        def login_sso():
+            # Redirect user to Shibboleth-protected login page on Apache
+            return redirect('https://bia.cmd.ox.ac.uk:443')
+
 
         print("Auth0 routes registered successfully!")
 
