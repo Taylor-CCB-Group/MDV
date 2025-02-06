@@ -82,7 +82,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     df = project.get_datasource_as_dataframe(ds_name)
     agent = lp.create_pandas_dataframe_agent(dataframe_llm, df, verbose=True, allow_dangerous_code=True)
     
-    question_file = pd.read_csv(question_list_path, skipinitialspace=True)
+    question_file = pd.read_csv(question_list_path, skipinitialspace=True, index_col=False)
     question_list = question_file.columns.tolist()
     
     results = []
