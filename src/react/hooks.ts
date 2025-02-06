@@ -249,7 +249,8 @@ export function useFilteredIndices() {
                     return;
                 }
             }
-            setFilteredIndices(indices as Uint32Array<ArrayBuffer>);
+            //@ts-ignore ! there seems to be a discrepancy here after ts upgrade???
+            setFilteredIndices(indices);
         });
         // should I have a cleanup function to cancel the promise if it's not resolved
         // by the time the effect is triggered again?
