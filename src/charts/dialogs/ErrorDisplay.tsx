@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import React, { useState } from "react";
 
-interface ErrorDisplayProps {
+export interface ErrorDisplayProps {
     error: {
         message: string;
         traceback?: string;
@@ -44,7 +44,7 @@ const ErrorDisplay = ({
     };
 
     return (
-        <div style={{ maxWidth: 800, margin: "20px auto", width: "90%" }}>
+        <div style={{ maxWidth: 800, minWidth: 500, margin: "20px auto", width: "90%" }}>
             <Paper
                 elevation={3}
                 sx={{
@@ -54,7 +54,13 @@ const ErrorDisplay = ({
             >
                 <Alert
                     severity="error"
-                    icon={<ErrorIcon />}
+                    icon={
+                        <ErrorIcon sx={{ 
+                            fontSize: 25, 
+                            color: "red",
+                            marginTop: "1px", 
+                        }} />
+                    }
                     sx={{
                         "& .MuiAlert-message": {
                             width: "100%",
@@ -98,61 +104,63 @@ const ErrorDisplay = ({
                     </AlertTitle>
 
                     <div style={{ marginTop: "12px" }}>
-                        <p
-                            style={{
-                                margin: "0 0 12px 0",
-                                lineHeight: "1.5",
-                                color: "var(--text_color_error)",
-                                whiteSpace: "pre-wrap",
-                                wordBreak: "break-word",
-                            }}
-                        >
+                    <p
+                        style={{
+                            margin: "0 0 12px 0",
+                            lineHeight: "1.6",
+                            padding: "4px 8px",
+                            color: "var(--text_color_error)",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                        }}
+                    >
                             {error.message}
                         </p>
 
                         {error.traceback && (
                             <div>
-                                <IconButton
-                                    size="small"
-                                    onClick={() => setExpanded(!expanded)}
-                                    sx={{
-                                        mb: 1,
-                                        fontSize: "0.875rem",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "4px",
-                                        color: "var(--icon_color_error)",
-                                        "&:hover": {
-                                            backgroundColor:
-                                                "var(--background_color)",
-                                        },
-                                    }}
-                                >
-                                    {expanded ? <ExpandLess /> : <ExpandMore />}
+                            <IconButton
+                                size="medium"
+                                onClick={() => setExpanded(!expanded)}
+                                sx={{
+                                    mb: 1,
+                                    fontSize: "0.875rem",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    padding: "6px 12px",
+                                    borderRadius: "6px",
+                                    color: "var(--icon_color_error)",
+                                    "&:hover": {
+                                        backgroundColor: "var(--background_color_hover)",
+                                    },
+                                }}
+                            >
+                                {expanded ? <ExpandLess /> : <ExpandMore />}
+                                <span style={{ marginLeft: "6px" }}>
                                     {expanded ? "Hide Details" : "Show Details"}
-                                </IconButton>
+                                </span>
+                            </IconButton>
 
                                 <Collapse in={expanded}>
-                                    <pre
-                                        style={{
-                                            backgroundColor:
-                                                "var(--background_color)",
-                                            padding: "16px",
-                                            borderRadius: "4px",
-                                            margin: 0,
-                                            maxHeight: "400px",
-                                            overflowY: "auto",
-                                            overflowX: "hidden",
-                                            fontSize: "0.875rem",
-                                            lineHeight: 1.5,
-                                            fontFamily:
-                                                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                                            border: "1px solid var(--input_border_color)",
-                                            whiteSpace: "pre-wrap",
-                                            wordBreak: "break-word",
-                                            color: "var(--text_color)",
-                                        }}
-                                    >
+                                <pre
+                                    style={{
+                                        backgroundColor: "var(--background_color)",
+                                        padding: "16px",
+                                        borderRadius: "6px",
+                                        margin: "8px 0 0 0",
+                                        maxHeight: "400px",
+                                        overflowY: "auto",
+                                        overflowX: "auto",
+                                        fontSize: "0.9rem",
+                                        lineHeight: "1.5",
+                                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                                        border: "1px solid var(--input_border_color)",
+                                        whiteSpace: "pre-wrap",
+                                        wordBreak: "break-word",
+                                        color: "var(--text_color)",
+                                    }}
+                                >
                                         {error.traceback}
                                     </pre>
                                 </Collapse>

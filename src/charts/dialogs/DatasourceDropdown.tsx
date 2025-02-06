@@ -1,7 +1,7 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 
-interface DropdownProps {
+export interface DropdownProps {
     options: string[];
     onSelect: (value: string) => void;
 }

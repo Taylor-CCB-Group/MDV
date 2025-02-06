@@ -32,7 +32,7 @@ function isOmeTiff(urlOrFile: string | File) {
         name.includes(".companion.ome")
     );
 }
-type UrlOrFiles = string | File | File[];
+export type UrlOrFiles = string | File | File[];
 /**
  * Gets an array of filenames for a multi tiff input.
  * @param {string | File | File[]} urlOrFiles
@@ -551,7 +551,7 @@ export function getBoundingCube(loader: PixelSource) {
     return [xSlice, ySlice, zSlice];
 }
 
-type RenderingMode = RENDERING_MODES[keyof RENDERING_MODES];
+export type RenderingMode = RENDERING_MODES[keyof RENDERING_MODES];
 /**
  * Return an appropriate 3D extension for a given combination of `colormap` and `renderingMode`
  * @param colormap - supposedly a string but only used as a boolean

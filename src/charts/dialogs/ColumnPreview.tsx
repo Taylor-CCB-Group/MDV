@@ -1,7 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 
-interface ColumnPreviewProps {
+export interface ColumnPreviewProps {
     columnNames: string[];
     columnTypes: string[];
     secondRowValues: string[];
@@ -53,8 +53,8 @@ export const ColumnPreview: React.FC<ColumnPreviewProps> = ({
                     </thead>
                     <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                         {filteredColumns.length > 0 ? (
-                            filteredColumns.map((column, index) => (
-                                <tr key={index}>
+                            filteredColumns.map((column) => (
+                                <tr key={column.name}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 select-text">
                                         {column.name}
                                     </td>

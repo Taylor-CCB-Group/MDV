@@ -1,11 +1,11 @@
 import type React from 'react';
 import { useState, useMemo } from 'react';
 
-interface TiffMetadataTableProps {
+export interface TiffMetadataTableProps {
   metadata: Record<string, any>;
 }
 
-type FlattenedMetadata = {
+export type FlattenedMetadata = {
   element: string;
   attribute: string;
   tag: string;
@@ -93,6 +93,7 @@ export const TiffMetadataTable: React.FC<TiffMetadataTableProps> = ({ metadata }
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
             {filteredMetadata.length > 0 ? (
               filteredMetadata.map((item, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: not sure if there's an appropriate key to use here - may need to add one.
                 <tr key={index}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 select-text w-1/4">
                     {item.element || 'N/A'}

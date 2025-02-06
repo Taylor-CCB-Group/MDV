@@ -7,8 +7,6 @@ class WGL2DI {
     /**
      * Creates a new wg2di instance
      * @param {string|object} div - The id of the div to house the instance or jquery element
-     * @param {integer} width - The width of the instance (optional- will be the width of the parent div if not supplied)
-     * @param {integer} height - The height  of the instance (optional- will be the height of the parent div if not supplied)
      * @param {object} config (optional)
      * <ul>
      * <li> in_view_only - if true then only those objects in view will be drawn after panning/zooming.This will

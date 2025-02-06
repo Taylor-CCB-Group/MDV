@@ -24,7 +24,7 @@ export type ImageArrayEntry = {
 
 /**
  * @class ImageArray
- * @description
+ * @remarks
  * ImageArray is a class that holds a collection of images as a texture array, such that many images can be efficiently rendered
  * without requiring a lot of draw calls / GL state updates.
  *

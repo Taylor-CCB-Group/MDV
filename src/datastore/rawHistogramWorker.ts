@@ -15,6 +15,7 @@ self.onmessage = async (event: MessageEvent<HistogramConfig>) => {
     // this logic is ok for MDV columns as of this writing
     // but what about viv raster data for example?
     const arrType = isInt32 ? Int32Array : Float32Array;
+    //@ts-ignore !not sure why there's a discrepancy here between tsc & language server in vscode
     const dataArray = new arrType(data);
     const hist = new Array(bins).fill(0);
     const binWidth = (max - min) / bins;

@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 // nb columnMatchesType has been moved to columnTypeHelpers.ts
 /**
- * Check whether given value {@param v} is an array.
+ * Check whether given value is an array
  * Acts as a type-predicate, so can be used for narrowing the type of subsequent code.
  */
 export function isArray(v: unknown): v is any[] {
@@ -21,7 +21,7 @@ export function toArray<T>(v: T | T[]) {
 export function notEmpty<TValue>(value: TValue | null | undefined): value is TValue {
     return value !== null && value !== undefined;
 }
-type Entries<T> = {
+export type Entries<T> = {
     [K in keyof T]: [K, T[K]];
 }[keyof T][];
 export function getEntries<T extends object>(o: T) {

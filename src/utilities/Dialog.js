@@ -27,7 +27,6 @@ class BaseDialog {
      * (the button's label) and method (the name of  the method to call when the button is clicked)
      *  e.g [{text:"OK",method:"doSomething"}] - the method 'doSomething' needs to be in the
      * subclass. Buttons are added to the footer, so this needs to also be specified in the config
-     * @param {function} [onClose] A function called when the dialog is closed
      * @param {object|null} [content] The object passed to the init method
      */
 

@@ -284,6 +284,7 @@ export function useFilteredIndices() {
                     return;
                 }
             }
+            //@ts-ignore ! there seems to be a discrepancy here after ts upgrade???
             setFilteredIndices(indices);
         });
         // should I have a cleanup function to cancel the promise if it's not resolved

@@ -237,9 +237,9 @@ def serve_projects_from_db(app):
         print(f"Error serving projects from database: {e}")
         raise
     print(f"{len(failed_projects)} projects failed to serve. ({len(projects)} projects served successfully)")
-    # nb using append rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
+    # nb using extend rather than replacing the list, but as of now I haven't made corresponding `serve_projects_from_filesytem` changes etc
     # so we really only expect this to run once, and the list to be empty
-    ProjectService.failed_projects.append(failed_projects)
+    ProjectService.failed_projects.extend(failed_projects)
 
 def serve_projects_from_filesystem(app, base_dir):
     try:

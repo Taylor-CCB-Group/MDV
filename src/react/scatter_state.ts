@@ -129,7 +129,7 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
 }
 
 // type Tooltip = (PickingInfo) => string;
-type P = [number, number];
+export type P = [number, number];
 export function useScatterplotLayer(modelMatrix: Matrix4) {
     const id = useChartID();
     const chart = useChart();

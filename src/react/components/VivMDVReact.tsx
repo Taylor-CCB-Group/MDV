@@ -64,7 +64,7 @@ export type TooltipConfig = {
         column?: ColumnName;
     };
 };
-type CategoryFilter = {
+export type CategoryFilter = {
     column: ColumnName;
     category: string | string[];
     // consider properties like 'invert' or 'exclude', or 'color'...

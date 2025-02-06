@@ -6,7 +6,7 @@ import type { VivConfig } from "./components/avivatorish/state";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 
-const ChartContext = createContext<BaseChart<any>>(null as any);
+export const ChartContext = createContext<BaseChart<any>>(null as any);
 export const DataStoreContext = createContext<DataStore>(null as any);
 
 export function ChartProvider<T extends BaseConfig>({

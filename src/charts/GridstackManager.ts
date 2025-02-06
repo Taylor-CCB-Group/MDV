@@ -3,7 +3,7 @@ import { GridStack } from "gridstack";
 import { debounce } from "../utilities/Utilities";
 import type { ChartManager, DataSource } from "./charts";
 import type BaseChart from "./BaseChart";
-type Chart = BaseChart<any>;
+export type Chart = BaseChart<any>;
 function clearPosition(div: HTMLElement) {
     div.style.position = "";
     div.style.left = "";
@@ -20,7 +20,7 @@ declare global {
         gridstackPopoutCallback?: () => void;
     }
 }
-type GridInstance = {
+export type GridInstance = {
     grid: GridStack;
     charts: Set<Chart>;
     icon: HTMLElement;
@@ -252,8 +252,8 @@ export default class GridStackManager {
 
 /// some more layout stuff, subject to change / moving to a different file
 
-type P = [number, number];
-type Config = Partial<{ size: P; position: P; gssize: P; gsposition: P }>;
+export type P = [number, number];
+export type Config = Partial<{ size: P; position: P; gssize: P; gsposition: P }>;
 function getVisibleChartBounds(dataSource: DataSource) {
     const charts = Object.entries(
         window.mdv.chartManager.charts,

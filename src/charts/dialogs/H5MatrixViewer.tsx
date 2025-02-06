@@ -15,10 +15,10 @@ import {
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 
-type Matrix = number[][];
-type MatrixRecord = Record<string, Matrix | null>;
+export type Matrix = number[][];
+export type MatrixRecord = Record<string, Matrix | null>;
 
-interface MatrixData {
+export interface MatrixData {
     readonly X: Matrix | null;
     readonly layers: MatrixRecord;
     readonly obsm: MatrixRecord;
@@ -27,20 +27,20 @@ interface MatrixData {
     readonly varp: MatrixRecord;
 }
 
-interface MatrixStats {
+export interface MatrixStats {
     readonly min: number;
     readonly max: number;
     readonly mean: number;
     readonly dimensions: string;
 }
 
-interface SelectedCell {
+export interface SelectedCell {
     readonly row: number;
     readonly col: number;
     readonly value: number;
 }
 
-interface VisibleMatrixData {
+export interface VisibleMatrixData {
     readonly rows: ReadonlyArray<ReadonlyArray<number>>;
     readonly hasMoreRows: boolean;
     readonly hasMoreCols: boolean;
@@ -49,12 +49,12 @@ interface VisibleMatrixData {
     readonly colIndices: ReadonlyArray<number>;
 }
 
-interface H5MatrixViewerProps {
+export interface H5MatrixViewerProps {
     readonly matrices: Readonly<MatrixData>;
 }
 
-type MatrixEntry = readonly [string, Matrix | null];
-type MatrixEntries = ReadonlyArray<MatrixEntry>;
+export type MatrixEntry = readonly [string, Matrix | null];
+export type MatrixEntries = ReadonlyArray<MatrixEntry>;
 
 const DEFAULT_VISIBLE_ITEMS = 10;
 

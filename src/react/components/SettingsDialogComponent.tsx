@@ -105,7 +105,7 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
         />
     </>
 );
-type ColumnSelectionSpec = GuiSpec<"column"> | GuiSpec<"multicolumn">;
+export type ColumnSelectionSpec = GuiSpec<"column"> | GuiSpec<"multicolumn">;
 /**
  * Wrap the ColumnSelectionComponent in a setting GUI component.
  *
@@ -151,7 +151,7 @@ const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
 // nb this is not the same as `GuiSpec<"dropdown" | "multidropdown">`
-type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
+export type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
 // type DropdownSpec = GuiSpec<"dropdown" | "multidropdown">;
 function getOptionAsObjectHelper(values: DropDownValues) {
     const useObjectKeys = values.length === 3;

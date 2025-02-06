@@ -14,9 +14,9 @@ import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
 import type { MultiColumnQuery } from "@/links/link_utils";
 import { decorateChartColumnMethods } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
-type ChartEventType = string;
-type Listener = (type: ChartEventType, data: any) => void;
-type LegacyColorBy = { column: DataColumn<any> }
+export type ChartEventType = string;
+export type Listener = (type: ChartEventType, data: any) => void;
+export type LegacyColorBy = { column: DataColumn<any> }
 export type BaseConfig = {
     id: string;
     size: [x: number, y: number];
@@ -35,8 +35,9 @@ type ColorConfig = {
     color_overlay?: number;
     fallbackOnZero?: boolean;    
 };
-type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
-type ColorOptions = any;
+export type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
+export type ColorOptions = any;
+export type ContextMenuItem = { text: string, icon: string, func: () => void };
 class BaseChart<T extends BaseConfig> {
     config: T;
     __doc__: Document;
@@ -764,7 +765,6 @@ class BaseChart<T extends BaseConfig> {
     */
     addToContextMenu?(): any;
     getContextMenu(data?: any) {
-        type ContextMenuItem = { text: string, icon: string, func: () => void };
         let menu: ContextMenuItem[] = [];
         if (this.getImage) {
             menu = menu.concat([

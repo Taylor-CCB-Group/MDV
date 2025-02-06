@@ -202,7 +202,7 @@ class BamIndex{
      * @param refId  the sequence dictionary index of the chromosome
      * @param min  genomic start position
      * @param max  genomic end position
-     * @param return an array of {minv: {filePointer, offset}, {maxv: {filePointer, offset}}
+     * @returns an array of {minv: {filePointer, offset}, {maxv: {filePointer, offset}}
      */
     blocksForRange(refId, min, max) {
 
@@ -262,7 +262,10 @@ class BamIndex{
 
     /**
      * Calculate the list of bins that may overlap with region [beg, end]
-     *
+     * 
+     * @param beg
+     * @param end
+     * @returns a list of numbers
      */
     static reg2bins(beg, end) {
         var i = 0, k, list = [];
@@ -783,8 +786,9 @@ class BamFeatureReader{
 /**
 * Class for reading a bam file
 *
+* @class
 * @param config
-* @constructor
+* @param parent
 */
 class BamReader{
      constructor(config,parent) {
@@ -2353,4 +2357,4 @@ function decodeTags(ba) {
             return tags;
         }
 
-export {loadBamIndex,BamReader,BamSource,BamFilter,BamAlignment,AlignmentContainer,PairedAlignment,bgzBlockSize,CoverageMap,Coverage,BamFeatureReader};
+export {loadBamIndex,BamReader,BamSource,BamFilter,BamAlignment,AlignmentContainer,PairedAlignment,bgzBlockSize,CoverageMap,Coverage,BamFeatureReader, DownsampleBucket};

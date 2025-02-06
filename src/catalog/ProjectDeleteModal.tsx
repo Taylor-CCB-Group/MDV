@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import type React from "react";
 
-interface ProjectDeleteModalProps {
+export interface ProjectDeleteModalProps {
     id: string;
     open: boolean;
     onDelete: (id: string) => Promise<void>;
