@@ -1,6 +1,6 @@
 class Dimension {
     /**
-     * @constructor
+     * @class
      * @param {DataStore} parent
      */
     constructor(parent) {
@@ -125,7 +125,7 @@ class Dimension {
 
     /**
      * Filters  the data
-     * @param {string} method- The name of the filter method.
+     * @param {string} method - The name of the filter method.
      * if 'filterPredicate' then the args should contain a predicate function
      * @param {string[]} columns - a list of column ids used in the filtering
      * @param {object|string} args - any extra arguments for filtering
@@ -228,8 +228,8 @@ class Dimension {
 
     /**
      * sets a permenant filter on the chart
-     * @param {string} column- The column of the filter
-     * @param {string}  cat - the category in the column to filter on
+     * @param {string} column - The column of the filter
+     * @param {string} cat - the category in the column to filter on
      */
     setBackgroundFilter(column, cat) {
         const col = this.parent.columnIndex[column];

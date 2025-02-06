@@ -17,7 +17,7 @@ import type React from "react";
 import { useState } from "react";
 import type { ProjectAccessType } from "./utils/projectUtils";
 
-interface ProjectSettingsModalProps {
+export interface ProjectSettingsModalProps {
     id: string;
     name: string;
     type: ProjectAccessType;

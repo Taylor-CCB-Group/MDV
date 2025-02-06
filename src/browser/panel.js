@@ -285,8 +285,8 @@ class MLVPanel {
         /**
     * Sets the highlighted region
     * @param {Object} location - An object containing chr, start and end
-    * @param {name} The name(id) of the region (used to remove the region)
-    * @param {String} The color to give the highlighted region
+    * @param {String} name - The name(id) of the region (used to remove the region)
+    * @param {String} color - The color to give the highlighted region
     */
     setHighlightedRegion(location,name,color){
         this.highlighted_regions[name]={
@@ -326,7 +326,6 @@ class MLVPanel {
 
     /**
     * Adds a listener to the panel
-    * @param {string} type - The type of listener - track_empty
     * @param {function} func - The function to call 
     * @param {string} id - The id of the handler (can be used to remove the handler)
     * Optional - an id will be assigned (and returned) if not supplied
@@ -338,7 +337,6 @@ class MLVPanel {
 
     /**
     * Removes a listener to the panel
-    * @param {string} type - The type of listener - track_empty 
     * @param {string} id - The id of the handler to remove
     * @returns{boolean} true if the listener was removed, otherwise false 
     */
@@ -351,6 +349,7 @@ class MLVPanel {
     * Removes a listener to the panel
     * @param {object} config - The config of the track to addTrack
     * @param {integer} index - Optional, the vertical order of the track
+    * @param {*} no_propagate
     */
     addTrack(config,index,no_propagate){
         let track=MLVTrack.getTrack(config);
@@ -384,7 +383,9 @@ class MLVPanel {
     
     /**
     * Removes a listener to the panel
-    * @param {object} config - The config of the track to add 
+    * @param {integer} track_id
+    * @param {*} not_repaint  
+    * @param {*} not_propagate 
     */
     removeTrack(track_id,not_repaint,not_propagate){
         if (!this.tracks[track_id]){
@@ -459,7 +460,7 @@ class MLVPanel {
 
     /**
     * Sets the filter  function for track. 
-    * @param {string} track_id- The id of the track
+    * @param {string} track_id - The id of the track
     * @param {string} func - The filter function. It should accept the feature
     * and return true to dispaly the feature and false to hide it. Use null 
     * to cancel the filter
@@ -471,7 +472,7 @@ class MLVPanel {
 
     /**
     * Sets the filter  function for track 
-    * @param {string} track_id- The id of the track
+    * @param {string} track_id - The id of the track
     * @param {string} func - The color function. It should accept the feature
     * and return the feature color. Use null to go back to default colors 
     */
@@ -516,9 +517,10 @@ class MLVPanel {
     * it will go to this location. If no parameters are given the panel
     * will be redrawn at the same location e.g after the color, scale or another
     * paramter has been set
-    * @param {string} force - If true then a cached image will not be used
+    * @param {string} chr
     * @param {integer} start of the region to draw
     * @param {integer} end of the region to draw
+    * @param {*} no_propagation 
     */
 
     update (chr,start,end,no_propagation) {

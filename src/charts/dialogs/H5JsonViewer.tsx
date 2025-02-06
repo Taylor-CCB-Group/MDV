@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import DebugJsonDialogComponent from '@/react/components/DebugJsonDialogComponent';
 
-interface JsonViewerProps {
+export interface JsonViewerProps {
   data: Record<string, any>;
   title?: string;
   initiallyExpanded?: boolean;

@@ -29,7 +29,7 @@ import ProjectSettingsModal from "./ProjectSettingsModal";
 import ProjectShareModal from "./ProjectShareModal";
 import type { ProjectAccessType } from "./utils/projectUtils";
 
-interface ProjectCardProps {
+export interface ProjectCardProps {
     id: string;
     name: string;
     type: ProjectAccessType;

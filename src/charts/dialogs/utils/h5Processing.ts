@@ -692,5 +692,5 @@ const processH5File = async (
     }
 };
 
-export { NonAnnDataError, CompressionError };
+export { NonAnnDataError, CompressionError, H5Metadata, MatrixValue, DatasetValue, ProcessOptions, H5DataType, TypedArray };
 export default processH5File;

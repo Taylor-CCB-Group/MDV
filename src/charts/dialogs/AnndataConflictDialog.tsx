@@ -14,7 +14,7 @@ import {
 import { useState } from "react";
 import type React from "react";
 
-interface AnndataConflictDialogProps {
+export interface AnndataConflictDialogProps {
     open: boolean;
     onClose: () => void;
     onConfirm: (prefix: string) => void;

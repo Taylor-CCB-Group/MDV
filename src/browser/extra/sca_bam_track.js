@@ -335,4 +335,4 @@ class SCACoverageTrack extends CoverageTrack{
             "class":SCABAMTrack	
      	}
 
-export {SCABAMTrack};
+export {SCABAMTrack, SCACoverageMap};

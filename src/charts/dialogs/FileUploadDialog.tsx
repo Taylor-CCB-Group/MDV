@@ -312,13 +312,13 @@ const UPLOAD_INTERVAL = 30;
 const UPLOAD_DURATION = 3000;
 const UPLOAD_STEP = 100 / (UPLOAD_DURATION / UPLOAD_INTERVAL);
 
-interface FileUploadDialogComponentProps {
+export interface FileUploadDialogComponentProps {
     onClose: () => void;
     onResize: (width: number, height: number) => void; // Add this prop
 }
 
 // Define supported file types and their configurations
-interface FileTypeConfig {
+export interface FileTypeConfig {
     type: string;
     extensions: string[];
     mimeTypes: string[];

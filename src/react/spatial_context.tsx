@@ -14,8 +14,8 @@ import type BaseChart from "@/charts/BaseChart";
  * Probably going to be a zustand store in not too long.
  */
 
-type P = [number, number];
-type RangeState = {
+export type P = [number, number];
+export type RangeState = {
     rangeDimension: RangeDimension;
     selectionFeatureCollection: FeatureCollection;
     editableLayer: EditableGeoJsonLayer;
@@ -23,13 +23,13 @@ type RangeState = {
     setSelectionMode: (mode: GeoJsonEditMode) => void;
     modelMatrix: Matrix4;
 };
-type MeasureState = {
+export type MeasureState = {
     startPixels: P;
     setStart: (p: P) => void;
     endPixels: P;
     setEnd: (p: P) => void;
 };
-type SpatialAnnotationState = {
+export type SpatialAnnotationState = {
     rectRange: RangeState;
     measure: MeasureState;
 };

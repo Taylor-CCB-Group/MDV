@@ -8,7 +8,7 @@ import { shallow } from 'zustand/shallow';
 import MDVivViewer from '../../react/components/avivatorish/MDVivViewer';
 import { useOuterContainer } from '@/react/screen_state';
 
-interface SimpleTiffViewerProps {
+export interface SimpleTiffViewerProps {
   width: number;
   height: number;
   isFullscreen: boolean;
