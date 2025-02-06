@@ -84,6 +84,7 @@ export default function ({ json, header }: { json: any; header?: string }) {
                     fontSize: '0.875rem',
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
                 }}
+                collapsed={1}
             />
         </div>
     );
