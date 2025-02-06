@@ -1,6 +1,5 @@
-//the following causes errors in jsdoc as the ] is nor parsed
-//does not seem to affect the output
-/**
+// the following causes is not parsed by the typedoc
+/*
  * @param {SharedArrayBuffer} e.data[0] - local filterBuffer
  * @param {SharedArrayBuffer} e.data[1] - global filterBuffer
  * @param {SharedArrayBuffer} e.data[2] - data
@@ -9,6 +8,7 @@
  * @param {Number} e.data[3].min - min value
  * @param {Number} e.data[3].max - max value
  */
+
 const func = (e) => {
     const arrType = e.data[2][1] === "int32" ? Int32Array : Float32Array;
     const data = new arrType(e.data[2][0]);

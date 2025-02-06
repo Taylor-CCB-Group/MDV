@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import type React from "react";
 
-interface ProjectInfoModalProps {
+export interface ProjectInfoModalProps {
     open: boolean;
     name: string;
     createdAt: string;

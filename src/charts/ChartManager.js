@@ -113,20 +113,18 @@ function listenPreferredColorScheme(callback) {
 }
 
 /**
-* The object to manage charts {@tutorial chartmanager}
+* The object to manage charts [Chart Manager](../../docs/extradocs/chartmanager.md)
 * 
 * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
-* @param {object[]} datasources - An array of datasource configs -see  {@tutorial datasource}.
+* @param {object[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
 * Each config must contain the size parameter, giving the number of rows in the DataStore.
 * @param {object} dataloader - An object containing the following
-* <ul>
-*   <li> function - The [function]{@tutorial datalaoder} to load the data
-    (can be omitted if data loaded from a file)</li>
-*   <li> viewLoader - The function that will load the each view  (not necessay if only one view)</li>
-*   <li> rowDataLoader - (optional) an asunc function which is given the datasource name and row index
+*   - function - The [function](../../docs/extradocs/dataloader.md) to load the data
+    (can be omitted if data loaded from a file)
+*   - viewLoader - The function that will load the each view  (not necessay if only one view)
+*   - rowDataLoader - (optional) an asunc function which is given the datasource name and row index
 *     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
-*   <li> files - specifies the files to load the data </li>
-* </ul>
+*   - files - specifies the files to load the data 
 * @param {Object} config extra settings
 * @param {Object[]} [config.initialCharts] A list of chart configs to initially load if
 * no views are specified
@@ -140,7 +138,7 @@ function listenPreferredColorScheme(callback) {
 * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
 * 
 */
-class ChartManager {
+export class ChartManager {
     constructor(div, dataSources, dataLoader, config = {}, listener = null) {
         if (!window.isSecureContext) {
             alert(
@@ -169,14 +167,13 @@ class ChartManager {
         //maybe better to stop listening once explicit option has been set
         //or to allow the user to explicitly say 'system default'
         listenPreferredColorScheme((t) => this.setTheme(t));
-
         /** !typed according to previous comments - but I was using it in a way that was working and doesn't match the comments...
          * each entry in dataSources will contain
          *  dataStore - the actual dataStore object (previously this comment erroneously referred to as 'dataSource')
          *  name - the name given to this data source
          *  menuBar the dom menu associated with this element
          *  contentDiv the div that the charts associated with the datastore will be added
-         * @typedef {{dataStore: DataStore, name: string, menuBar: HTMLElement, contentDiv: HTMLElement}} DataSource
+         * @typedef {import("@/charts/charts/DataSource")} DataSource
          * @type {DataSource[]} 
          */
         this.dataSources = [];

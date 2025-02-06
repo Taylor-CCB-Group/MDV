@@ -4,6 +4,7 @@
         --main_panel_color: black;
         --text_color: white;
         --background_color: #f5f5f5;
+        --fade_background_color: rgba(245, 245, 245, 0.4);
         --menu_bar_color: #D6D8DB;
         --border_menu_bar_color: #c9c9c9;
         --primary_background: #ecf0f1;
@@ -23,6 +24,7 @@
         --main_panel_color: #f1f1f1;
         --text_color: black;
         --background_color: #f5f5f5;
+        --fade_background_color: rgba(245, 245, 245, 0.4);
         --menu_bar_color: #D6D8DB;
         --border_menu_bar_color: #c9c9c9;
         --primary_background: #ecf0f1;
@@ -42,6 +44,7 @@
     --main_panel_color: black;
     --text_color: white;
     --background_color: #252525;
+    --fade_background_color: rgba(37, 37, 37, 0.4);
     --menu_bar_color: #404040;
     --border_menu_bar_color: #727272;
     --primary_background: #353536;
@@ -59,6 +62,7 @@
     --main_panel_color: #f1f1f1;
     --text_color: black;
     --background_color: #f5f5f5;
+    --fade_background_color: rgba(245, 245, 245, 0.4);
     --menu_bar_color: #D6D8DB;
     --primary_background: #ecf0f1;
     --shadow_color: #888;

@@ -1,7 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 
-interface ColumnPreviewProps {
+export interface ColumnPreviewProps {
     columnNames: string[];
     columnTypes: string[];
     secondRowValues: string[];

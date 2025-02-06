@@ -1,8 +1,8 @@
 import { addElProps } from "./Elements";
 
-type TagKey = keyof HTMLElementTagNameMap;
+export type TagKey = keyof HTMLElementTagNameMap;
 
-type Attrs = {
+export type Attrs = {
     styles?: Partial<CSSStyleDeclaration>;
     classes?: string[];
     text?: string;

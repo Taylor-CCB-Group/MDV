@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import H5JsonViewer from "./H5JsonViewer";
 import H5MatrixViewer from "./H5MatrixViewer";
 
-interface H5MetadataPreviewProps {
+export interface H5MetadataPreviewProps {
     metadata: {
         uns: Record<string, any>;
         obs: Record<string, any>;
@@ -123,7 +123,7 @@ const H5MetadataPreview = ({ metadata }: H5MetadataPreviewProps) => {
                         H5 File Metadata
                     </Typography>
 
-                    <Box sx={{ px: 2, pb: 2 }}>
+                    <Box sx={{ px: 2, pb: 2, pt: 2 }}>
                         <select
                             value={selectedMetadata}
                             onChange={(e) =>

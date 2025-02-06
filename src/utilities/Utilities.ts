@@ -25,7 +25,7 @@ export function NPOT(n: number) {
 
 /**
  * Debounce function. Return a function that, as long as it continues to be invoked, 
- * will not be called until {@param timeout}ms have passed since the last call.
+ * will not be called until `timeout` ms have passed since the last call.
  * based on https://www.freecodecamp.org/news/javascript-debounce-example/
  */
 export function debounce<A extends any[]>(fn: (...args: A) => void, timeout: number) {

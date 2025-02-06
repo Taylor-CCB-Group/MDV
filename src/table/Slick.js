@@ -9,15 +9,13 @@
      * An event object for passing data to event handlers and letting them control propagation.
      * <p>This is pretty much identical to how W3C and jQuery implement events.</p>
      * @class EventData
-     * @constructor
      */
-    function EventData() {
+    export function EventData() {
       let isPropagationStopped = false;
       let isImmediatePropagationStopped = false;
   
       /***
        * Stops event from propagating up the DOM tree.
-       * @method stopPropagation
        */
       this.stopPropagation = () => {
         isPropagationStopped = true;
@@ -25,14 +23,12 @@
   
       /***
        * Returns whether stopPropagation was called on this event object.
-       * @method isPropagationStopped
        * @return {Boolean}
        */
       this.isPropagationStopped = () => isPropagationStopped;
   
       /***
        * Prevents the rest of the handlers from being executed.
-       * @method stopImmediatePropagation
        */
       this.stopImmediatePropagation = () => {
         isImmediatePropagationStopped = true;
@@ -40,7 +36,6 @@
   
       /***
        * Returns whether stopImmediatePropagation was called on this event object.\
-       * @method isImmediatePropagationStopped
        * @return {Boolean}
        */
       this.isImmediatePropagationStopped = () => isImmediatePropagationStopped;
@@ -49,16 +44,14 @@
     /***
      * A simple publisher-subscriber implementation.
      * @class Event
-     * @constructor
      */
-    function Event() {
+    export function Event() {
       const handlers = [];
   
       /***
        * Adds an event handler to be called when the event is fired.
        * <p>Event handler will receive two arguments - an <code>EventData</code> and the <code>data</code>
        * object the event was fired with.<p>
-       * @method subscribe
        * @param fn {Function} Event handler.
        */
       this.subscribe = (fn) => {
@@ -67,7 +60,6 @@
   
       /***
        * Removes an event handler added with <code>subscribe(fn)</code>.
-       * @method unsubscribe
        * @param fn {Function} Event handler to be removed.
        */
       this.unsubscribe = (fn) => {
@@ -80,7 +72,6 @@
   
       /***
        * Fires an event notifying all subscribers.
-       * @method notify
        * @param args {Object} Additional data object to be passed to all handlers.
        * @param e {EventData}
        *      Optional.
@@ -104,7 +95,7 @@
       };
     }
   
-    function EventHandler() {
+    export function EventHandler() {
       let handlers = [];
   
       this.subscribe = function (event, handler) {
@@ -145,13 +136,12 @@
     /***
      * A structure containing a range of cells.
      * @class Range
-     * @constructor
      * @param fromRow {Integer} Starting row.
      * @param fromCell {Integer} Starting cell.
      * @param toRow {Integer} Optional. Ending row. Defaults to <code>fromRow</code>.
      * @param toCell {Integer} Optional. Ending cell. Defaults to <code>fromCell</code>.
      */
-    function Range(fromRow, fromCell, toRow, toCell) {
+    export function Range(fromRow, fromCell, toRow, toCell) {
       if (toRow === undefined && toCell === undefined) {
         toRow = fromRow;
         toCell = fromCell;
@@ -183,7 +173,6 @@
   
       /***
        * Returns whether a range represents a single row.
-       * @method isSingleRow
        * @return {Boolean}
        */
       this.isSingleRow = function () {
@@ -192,7 +181,6 @@
   
       /***
        * Returns whether a range represents a single cell.
-       * @method isSingleCell
        * @return {Boolean}
        */
       this.isSingleCell = function () {
@@ -201,7 +189,6 @@
   
       /***
        * Returns whether a range contains a given cell.
-       * @method contains
        * @param row {Integer}
        * @param cell {Integer}
        * @return {Boolean}
@@ -213,7 +200,6 @@
   
       /***
        * Returns a readable representation of a range.
-       * @method toString
        * @return {String}
        */
       this.toString = function () {
@@ -229,9 +215,8 @@
     /***
      * A base class that all special / non-data rows (like Group and GroupTotals) derive from.
      * @class NonDataItem
-     * @constructor
      */
-    function NonDataItem() {
+    export function NonDataItem() {
       this.__nonDataRow = true;
     }
   
@@ -240,9 +225,8 @@
      * Information about a group of rows.
      * @class Group
      * @extends Slick.NonDataItem
-     * @constructor
      */
-    function Group() {
+    export function Group() {
       this.__group = true;
   
       /**
@@ -321,7 +305,6 @@
   
     /***
      * Compares two Group instances.
-     * @method equals
      * @return {Boolean}
      * @param group {Group} Group instance to compare to.
      */
@@ -339,9 +322,8 @@
      * formatters during the display.
      * @class GroupTotals
      * @extends Slick.NonDataItem
-     * @constructor
      */
-    function GroupTotals() {
+    export function GroupTotals() {
       this.__groupTotals = true;
   
       /***
@@ -368,15 +350,13 @@
      * issues.  An edit controller (such as SlickGrid) can query if an active edit is in progress
      * and attempt a commit or cancel before proceeding.
      * @class EditorLock
-     * @constructor
      */
-    function EditorLock() {
+    export function EditorLock() {
       let activeEditController = null;
   
       /***
        * Returns true if a specified edit controller is active (has the edit lock).
        * If the parameter is not specified, returns true if any edit controller is active.
-       * @method isActive
        * @param editController {EditController}
        * @return {Boolean}
        */
@@ -385,7 +365,6 @@
       /***
        * Sets the specified edit controller as the active edit controller (acquire edit lock).
        * If another edit controller is already active, and exception will be throw new Error(.
-       * @method activate
        * @param editController {EditController} edit controller acquiring the lock
        */
       this.activate = (editController) => {
@@ -407,7 +386,6 @@
       /***
        * Unsets the specified edit controller as the active edit controller (release edit lock).
        * If the specified edit controller is not the active one, an exception will be throw new Error(.
-       * @method deactivate
        * @param editController {EditController} edit controller releasing the lock
        */
       this.deactivate = (editController) => {
@@ -425,7 +403,6 @@
        * controller and returns whether the commit attempt was successful (commit may fail due to validation
        * errors, etc.).  Edit controller's "commitCurrentEdit" must return true if the commit has succeeded
        * and false otherwise.  If no edit controller is active, returns true.
-       * @method commitCurrentEdit
        * @return {Boolean}
        */
       this.commitCurrentEdit = () => (activeEditController ? activeEditController.commitCurrentEdit() : true);
@@ -434,7 +411,6 @@
        * Attempts to cancel the current edit by calling "cancelCurrentEdit" method on the active edit
        * controller and returns whether the edit was successfully cancelled.  If no edit controller is
        * active, returns true.
-       * @method cancelCurrentEdit
        * @return {Boolean}
        */
       this.cancelCurrentEdit = function cancelCurrentEdit() {
@@ -446,9 +422,8 @@
      *
      * @param {Array} treeColumns Array com levels of columns
      * @returns {{hasDepth: 'hasDepth', getTreeColumns: 'getTreeColumns', extractColumns: 'extractColumns', getDepth: 'getDepth', getColumnsInDepth: 'getColumnsInDepth', getColumnsInGroup: 'getColumnsInGroup', visibleColumns: 'visibleColumns', filter: 'filter', reOrder: reOrder}}
-     * @constructor
      */
-    function TreeColumns(treeColumns) {
+    export function TreeColumns(treeColumns) {
   
       const columnsById = {};
   
@@ -597,47 +572,8 @@
     /***
      * Polyfill for Map to support old browsers but
      * benefit of the Map speed in modern browsers.
-     * @class Map
-     * @constructor
      */
-    const Map = 'Map' in window ? window.Map : function Map() {
-      const data = {};
-      
-      /***
-       * Gets the item with the given key from the map or undefined if
-       * the map does not contain the item. 
-       * @method get
-       * @param key {Map} The key of the item in the map.
-       */
-      this.get = (key) => data[key];
-  
-      /***
-       * Adds or updates the item with the given key in the map. 
-       * @method set
-       * @param key The key of the item in the map.
-       * @param value The value to insert into the map of the item in the map.
-       */
-      this.set = (key, value) => {
-        data[key] = value;
-      };
-      
-      /***
-       * Gets a value indicating whether the given key is present in the map.
-       * @method has
-       * @param key The key of the item in the map.
-       * @return {Boolean}
-       */    
-      this.has = (key) => key in data;
-      
-      /***
-       * Removes the item with the given key from the map. 
-       * @method delete
-       * @param key The key of the item in the map.
-       */
-      this.delete = (key) => {
-        delete data[key];
-      };
-    };
+    export const Map = window.Map;
     
     // exports
     
@@ -655,8 +591,6 @@
         /***
          * A global singleton editor lock.
          * @class GlobalEditorLock
-         * @static
-         * @constructor
          */
         "GlobalEditorLock": new EditorLock(),
         "TreeColumns": TreeColumns,

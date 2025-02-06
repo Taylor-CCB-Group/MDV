@@ -420,7 +420,6 @@ const jQuery = $;
   /**
    * Creates a new instance of the grid.
    * @class SlickGrid
-   * @constructor
    * @param {Node}              container   Container node to create the grid in.
    * @param {Object[]}          data        An array of objects for databinding.
    * @param {Array}             columns     An array of column definitions.

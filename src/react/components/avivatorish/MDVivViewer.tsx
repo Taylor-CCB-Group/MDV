@@ -9,11 +9,11 @@ import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } 
 export function getVivId(id: string) {
     return `-#${id}#`;
 }
-type ViewState = (OrthographicViewState | OrbitViewState) & { id: string }; //questionable
+export type ViewState = (OrthographicViewState | OrbitViewState) & { id: string }; //questionable
 // type ViewStates = { [id: string]: ViewState } & { find: any }; //highly questionable - should look at runtime/docs...
-type ViewStates = ViewState[];
-type View = {id: string} & any; //placeholder
-type VivPickInfo = PickingInfo<any, any> & { tile: any }; //placeholder
+export type ViewStates = ViewState[];
+export type View = {id: string} & any; //placeholder
+export type VivPickInfo = PickingInfo<any, any> & { tile: any }; //placeholder
 const areViewStatesEqual = (viewState: ViewState, otherViewState?: ViewState) => {
     return (
         otherViewState === viewState ||
@@ -60,7 +60,7 @@ const areViewStatesEqual = (viewState: ViewState, otherViewState?: ViewState) =>
  * @ignore
  */
 
-type VivViewerWrapperProps = {
+export type VivViewerWrapperProps = {
     views: View[];
     // viewStates: { [id: string]: ViewState & { id: string } }; //todo
     viewStates: ViewStates; //Map<string, ViewState & { id: string }>;
@@ -73,7 +73,7 @@ type VivViewerWrapperProps = {
     useDevicePixels?: boolean;
     outerContainer?: HTMLElement;
 };
-type VivViewerWrapperState = {
+export type VivViewerWrapperState = {
     viewStates: any;
     //@ts-expect-error --- issue with new deck.gl - check up on this / review viv PR? ---
     deckRef?: React.MutableRefObject<DeckGL>;

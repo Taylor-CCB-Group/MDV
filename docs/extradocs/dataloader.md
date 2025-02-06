@@ -13,7 +13,7 @@ async function dataloader(columns, data, size){
 }
 ```
 
-For more complex examples see the [DataLoaders]{@link module:DataLoaders}
+For more complex examples see the [DataLoaders]{@link DataLoaders}
 
 
 ## rowDataLoader

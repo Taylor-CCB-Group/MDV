@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "cross-env build=dev_pt vite --host",
     "vite-build": "tsc && cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=dev_pt vite build --outDir ./vite-dist",
-    "build": "cross-env build=desktop vite build --outDir ./dist",
+    "build": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop vite build --outDir ./dist",
     "build-nofont": "cross-env build=production nofont=true vite build --outDir ./dist/basic",
     "build-flask-vite": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop_pt vite build --outDir ./python/mdvtools/static",
     "build-flask-dockerjs": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" build=desktop_pt vite build --outDir ./dist/flask",
@@ -97,6 +97,7 @@
     "styled-components": "^6.1.8",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
+    "typedoc-plugin-missing-exports": "^3.1.0",
     "use-debounce": "^10.0.2",
     "uuid": "^11.0.3",
     "wordcloud": "^1.2.2",
@@ -127,8 +128,9 @@
     "style-loader": "^3.3.1",
     "tailwindcss": "^3.4.3",
     "ts-loader": "^9.5.1",
-    "typedoc": "^0.26.1",
-    "typescript": "^5.5.2",
+    "typedoc": "^0.27.6",
+    "typedoc-plugin-rename-defaults": "^0.7.2",
+    "typescript": "^5.7.3",
     "vite": "^5.2.8"
   },
   "optionalDependencies": {

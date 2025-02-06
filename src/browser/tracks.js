@@ -79,8 +79,8 @@ class MLVTrack{
 	* Retrieves the features requested, the default is just to get the features
 	* from the feature source 
 	* @param {string} chr - The chromosome 
-	* @param {integer} start - The start of the range from which to obtain features
-	* @param {integer} end - The end of the range from which to obtain features 
+	* @param {integer} bpStart - The start of the range from which to obtain features
+	* @param {integer} bpEnd - The end of the range from which to obtain features 
 	* @param {boolean} force - If true then cached features should not be used
 	* but fresh features retrieved
 	* @param {Object} data - contains bp  ber pixel and width of the canvas 
@@ -457,7 +457,7 @@ MLVTrack.track_types["ruler"]={
 
 }
 
-class TickSpacing{
+export class TickSpacing{
 	constructor(majorTick, majorUnit, unitMultiplier) {
         this.majorTick = majorTick;
         this.majorUnit = majorUnit;
