@@ -3,7 +3,7 @@ name: Build and Deploy to Dockerhub - on PR Merge or [deploy] Push
 on:
   pull_request:
     branches:
-      - dev
+      - feature/upload-154
     types:
       - closed  # Trigger when a PR is closed
 
