@@ -17,4 +17,20 @@
     // Remove the missing exports plugin to see the warnings
     "plugin": ["typedoc-plugin-rename-defaults", "typedoc-plugin-missing-exports"],
     "out": "docs/typedoc",
+    "highlightLanguages": [
+        "bash",
+        "console",
+        "css",
+        "html",
+        "javascript",
+        "json",
+        "jsonc",
+        "json5",
+        "yaml",
+        "tsx",
+        "jsx",
+        "typescript",
+        "python",
+        "toml"
+    ]
 }
