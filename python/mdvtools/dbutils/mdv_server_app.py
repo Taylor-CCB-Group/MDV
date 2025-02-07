@@ -8,8 +8,6 @@ from flask import Flask, render_template, jsonify, request
 from flask import Flask, render_template, jsonify, request
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
-# import random
-# import string
 # from flask import Flask, render_template, jsonify, request
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
