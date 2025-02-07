@@ -587,12 +587,6 @@ def register_routes(app):
                     print(f"In register_routes - /delete_project Error: Project with ID {project_id} is not editable.")
                     return jsonify({"status": "error", "message": "This project is not editable and cannot be deleted."}), 403
 
-                
-                # Check if the project is editable before attempting to delete
-                if project.access_level != 'editable':
-                    print(f"In register_routes - /delete_project Error: Project with ID {project_id} is not editable.")
-                    return jsonify({"status": "error", "message": "This project is not editable and cannot be deleted."}), 403
-
                 # Remove the project from the ProjectBlueprint.blueprints dictionary
                 if str(project_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(project_id)]
