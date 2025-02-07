@@ -9,6 +9,7 @@ from flask import (
     jsonify,
     current_app
 )
+from flask.typing import ResponseReturnValue
 import webbrowser
 import mimetypes
 import json
@@ -129,7 +130,7 @@ def create_app(
     routes.add(route)
 
     @project_bp.route("/")
-    def project_index():
+    def project_index() -> ResponseReturnValue:
         print("recieved request to project_index")
         # the backend page currently needs to be different to workaround a server config issue
         # some requests were being downgraded to http, which caused problems with the backend
@@ -138,7 +139,7 @@ def create_app(
         return render_template("page.html", route=route, backend=backend_db)
 
     @project_bp.route("/<file>.b")
-    def get_binary_file(file):
+    def get_binary_file(file) -> ResponseReturnValue:
         # should this now b '.gz'?
         file_name = safe_join(project.dir, file + ".b")
         range_header = request.headers.get("Range", None)
@@ -148,13 +149,13 @@ def create_app(
     # (there was some reason for changing to this, but I can't fully remember the status
     # so maybe better to support both for now)
     @project_bp.route("/<file>.gz")
-    def get_binary_file_gz(file):
+    def get_binary_file_gz(file) -> ResponseReturnValue:
         file_name = safe_join(project.dir, file + ".gz")
         range_header = request.headers.get("Range", None)
         return get_range(file_name, range_header)
 
     @project_bp.route("/<file>.json")
-    def get_json_file(file: str):
+    def get_json_file(file: str) -> ResponseReturnValue:
         if project.dir is None:
             return "Project directory not found", 404
         path = safe_join(project.dir, file + ".json")
@@ -164,7 +165,7 @@ def create_app(
 
     # gets the raw byte data and packages it in the correct response
     @project_bp.route("/get_data", methods=["POST"])
-    def get_data():
+    def get_data() -> ResponseReturnValue:
         try:
             data = request.json
             if not data or "columns" not in data or "data_source" not in data:
@@ -181,7 +182,7 @@ def create_app(
 
     # images contained in the project
     @project_bp.route("/images/<path:path>")
-    def images(path):
+    def images(path) -> ResponseReturnValue:
         try:
             return _send_file(project.get_image(path))
         except Exception:
@@ -189,12 +190,12 @@ def create_app(
 
     # All the project's metadata
     @project_bp.route("/get_configs", methods=["GET", "POST"])
-    def get_configs():
+    def get_configs() -> ResponseReturnValue:
         return jsonify(project.get_configs())
 
     # gets a particular view
     @project_bp.route("/get_view", methods=["POST"])
-    def get_view():
+    def get_view() -> ResponseReturnValue:
         data = request.json
         if not data or "view" not in data:
             return "Request must contain JSON with 'view'", 400
@@ -202,7 +203,7 @@ def create_app(
 
     # get any custom row data
     @project_bp.route("/get_row_data", methods=["POST"])
-    def get_row_data():
+    def get_row_data() -> ResponseReturnValue:
         req = request.json
         if req is None:
             return json.dumps({"data": None})
@@ -218,7 +219,7 @@ def create_app(
 
     # get arbitrary data
     @project_bp.route("/get_binary_data", methods=["POST"])
-    def get_binary_data():
+    def get_binary_data() -> ResponseReturnValue:
         req = request.json
         try:
             if req is None or "datasource" not in req or "name" not in req:
@@ -241,7 +242,7 @@ def create_app(
     # only the specified region of track files (bam,bigbed,tabix)
     # needs to be returned
     @project_bp.route("/tracks/<path:path>")
-    def send_track(path):
+    def send_track(path) -> ResponseReturnValue:
         file_name = safe_join(project.trackfolder, path)
         range_header = request.headers.get("Range", None)
         if not range_header:
@@ -249,7 +250,7 @@ def create_app(
         return get_range(file_name, range_header)
 
     @project_bp.route("/save_state", access_level='editable', methods=["POST"])
-    def save_data():
+    def save_data() -> ResponseReturnValue:
         success = True
         try:
             state = request.json
@@ -325,7 +326,7 @@ def create_app(
             current_app.logger.error(f"Error cleaning up folder {folder_path}: {e}")
 
     @project_bp.route("/add_anndata", access_level='editable', methods=["POST"])
-    def add_anndata():
+    def add_anndata() -> ResponseReturnValue:
         """
         Upload and process an AnnData file (.h5ad) for the project.
 
@@ -416,7 +417,7 @@ def create_app(
             return jsonify({'status': 'error', 'message': str(e)}), 500
 
     @project_bp.route("/combine_anndata", access_level='editable', methods=["PATCH"])
-    def combine_anndata():
+    def combine_anndata() -> ResponseReturnValue:
         """
         Combine a temporary AnnData file with an existing project file.
 
@@ -523,7 +524,7 @@ def create_app(
             return jsonify({'status': 'error', 'message': str(e)}), 500
     
     @project_bp.route("/add_or_update_image_datasource", access_level='editable', methods=["POST"])
-    def add_or_update_image_datasource():
+    def add_or_update_image_datasource() -> ResponseReturnValue:
         try:
             # Check if request has a file part
             if 'file' not in request.files:
@@ -556,7 +557,7 @@ def create_app(
 
 
     @project_bp.route("/add_datasource", access_level='editable', methods=["POST"])
-    def add_datasource():
+    def add_datasource() -> ResponseReturnValue:
         # we shouldn't be passing "backend" in request.form, the logic should only be on server
         #if backend:
         #    response = add_datasource_backend(project)

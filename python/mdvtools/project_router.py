@@ -1,4 +1,5 @@
-from flask import Flask, Response, jsonify
+from flask import Flask, jsonify
+from flask.typing import ResponseReturnValue as Response
 from typing import Dict, Any, Callable, Tuple
 import re
 from urllib.parse import urlparse
