@@ -20,11 +20,11 @@ class User(db.Model):
     last_name: Mapped[str] = mapped_column(String(50), nullable=False, default='')
     administrator: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     institution: Mapped[str] = mapped_column(Text, nullable=True)
-    projects = db.relationship('UserProject', backref='user', lazy=True)
-    jobs = db.relationship('Job', backref='user', lazy=True)
-    permissions = db.relationship('Permission', backref='user', lazy=True)
-    preferences = db.relationship('UserPreference', backref='user', lazy=True)
-    #shared_objects = db.relationship('SharedObject', foreign_keys='SharedObject.shared_with', backref='shared_with_user', lazy=True)
+    projects = relationship('UserProject', backref='user', lazy=True)
+    jobs = relationship('Job', backref='user', lazy=True)
+    permissions = relationship('Permission', backref='user', lazy=True)
+    preferences = relationship('UserPreference', backref='user', lazy=True)
+    #shared_objects = relationship('SharedObject', foreign_keys='SharedObject.shared_with', backref='shared_with_user', lazy=True)
 
 class Project(db.Model):
     __tablename__ = 'projects'
@@ -42,12 +42,12 @@ class Project(db.Model):
     is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     date_made_public: Mapped[datetime] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(Text)
-    genome: Mapped[str] = mapped_column(String, db.ForeignKey('genomes.name'))
+    genome: Mapped[str] = mapped_column(String, ForeignKey('genomes.name'))
     parent: Mapped[str] = mapped_column(Integer)
     description: Mapped[str] = mapped_column(Text)
     access_level: Mapped[str] = mapped_column(String(50), nullable=False, default='editable')  # Default access level
-    users = db.relationship('UserProject', backref='project', lazy=True)
-    files = db.relationship('File', backref='project', lazy=True)
+    users = relationship('UserProject', backref='project', lazy=True)
+    files = relationship('File', backref='project', lazy=True)
 
     __table_args__ = (
         db.Index('idx_projects_genome', 'genome'),
@@ -62,14 +62,14 @@ class File(db.Model):
     file_path: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     upload_timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
     update_timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
-    project_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('projects.id'), nullable=False)
-    #project = db.relationship('Project', backref=db.backref('files', lazy=True))
+    project_id: Mapped[int] = mapped_column(Integer, ForeignKey('projects.id'), nullable=False)
+    #project = relationship('Project', backref=db.backref('files', lazy=True))
     
 class UserProject(db.Model):
     __tablename__ = 'user_projects'
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('users.id'), nullable=False)
-    project_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('projects.id'), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=False)
+    project_id: Mapped[int] = mapped_column(Integer, ForeignKey('projects.id'), nullable=False)
     can_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     can_write: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
@@ -86,13 +86,13 @@ class Genome(db.Model):
     is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     chrom_sizes: Mapped[Any] = mapped_column(JSON)
     small_icon: Mapped[str] = mapped_column(Text)
-    projects = db.relationship('Project', backref='genomes', lazy=True)
+    projects = relationship('Project', backref='genomes', lazy=True)
 
 class Job(db.Model):
     __tablename__ = 'jobs'
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     inputs: Mapped[Any] = mapped_column(JSON)
-    user_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('users.id'), nullable=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=True)
     outputs: Mapped[Any] = mapped_column(JSON)
     sent_on: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
     status: Mapped[str] = mapped_column(String(200))
@@ -105,7 +105,7 @@ class Job(db.Model):
 class Permission(db.Model):
     __tablename__ = 'permissions'
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('users.id'), nullable=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=True)
     permission: Mapped[str] = mapped_column(String(200), nullable=False)
     value: Mapped[str] = mapped_column(String(200), nullable=False)
 
@@ -123,7 +123,7 @@ class UserPreference(db.Model):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     preference: Mapped[str] = mapped_column(Text, nullable=False)
     data: Mapped[Any] = mapped_column(JSON)
-    user_id: Mapped[int] = mapped_column(Integer, db.ForeignKey('users.id'), nullable=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=True)
 
 class ViewSet(db.Model):
     __tablename__ = 'view_sets'
