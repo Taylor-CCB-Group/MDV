@@ -1,19 +1,25 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from sqlalchemy import String, Integer, DateTime, Boolean, Text, JSON
+from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, MappedAsDataclass
 
-db = SQLAlchemy()
+# https://flask-sqlalchemy.readthedocs.io/en/stable/models/
+class Base(DeclarativeBase):
+    pass
+
+db = SQLAlchemy(model_class=Base)
 
 class User(db.Model):
     __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    email = db.Column(db.String(255), unique=True, nullable=False, default='')
-    confirmed_at = db.Column(db.DateTime, nullable=True)
-    password = db.Column(db.String(255), nullable=False, default='')
-    is_active = db.Column(db.Boolean, nullable=False, default=False)
-    first_name = db.Column(db.String(50), nullable=False, default='')
-    last_name = db.Column(db.String(50), nullable=False, default='')
-    administrator = db.Column(db.Boolean, nullable=False, default=False)
-    institution = db.Column(db.Text, nullable=True)
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email = mapped_column(String(255), unique=True, nullable=False, default='')
+    confirmed_at = mapped_column(DateTime, nullable=True)
+    password = mapped_column(String(255), nullable=False, default='')
+    is_active = mapped_column(Boolean, nullable=False, default=False)
+    first_name = mapped_column(String(50), nullable=False, default='')
+    last_name = mapped_column(String(50), nullable=False, default='')
+    administrator = mapped_column(Boolean, nullable=False, default=False)
+    institution = mapped_column(Text, nullable=True)
     projects = db.relationship('UserProject', backref='user', lazy=True)
     jobs = db.relationship('Job', backref='user', lazy=True)
     permissions = db.relationship('Permission', backref='user', lazy=True)
@@ -22,24 +28,24 @@ class User(db.Model):
 
 class Project(db.Model):
     __tablename__ = 'projects'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(255), nullable=False, default='unnamed_project')
-    path = db.Column(db.String(1024), nullable=False, unique=True)
-    created_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
-    deleted_timestamp = db.Column(db.DateTime, nullable=True)
-    update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    accessed_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    owner = db.Column(db.Integer)
-    type = db.Column(db.Text)
-    data = db.Column(db.JSON)
-    is_public = db.Column(db.Boolean, nullable=False, default=False)
-    date_made_public = db.Column(db.DateTime)
-    status = db.Column(db.Text)
-    genome = db.Column(db.String, db.ForeignKey('genomes.name'))
-    parent = db.Column(db.Integer)
-    description = db.Column(db.Text)
-    access_level = db.Column(db.String(50), nullable=False, default='editable')  # Default access level
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name = mapped_column(String(255), nullable=False, default='unnamed_project')
+    path = mapped_column(String(1024), nullable=False, unique=True)
+    created_timestamp = mapped_column(DateTime, nullable=False, default=datetime.now)
+    is_deleted = mapped_column(Boolean, nullable=False, default=False)
+    deleted_timestamp = mapped_column(DateTime, nullable=True)
+    update_timestamp = mapped_column(DateTime, nullable=False, default=datetime.now)
+    accessed_timestamp = mapped_column(DateTime, nullable=False, default=datetime.now)
+    owner = mapped_column(Integer)
+    type = mapped_column(Text)
+    data = mapped_column(JSON)
+    is_public = mapped_column(Boolean, nullable=False, default=False)
+    date_made_public = mapped_column(DateTime)
+    status = mapped_column(Text)
+    genome = mapped_column(String, db.ForeignKey('genomes.name'))
+    parent = mapped_column(Integer)
+    description = mapped_column(Text)
+    access_level = mapped_column(String(50), nullable=False, default='editable')  # Default access level
     users = db.relationship('UserProject', backref='project', lazy=True)
     files = db.relationship('File', backref='project', lazy=True)
 
@@ -51,100 +57,100 @@ class Project(db.Model):
 
 class File(db.Model):
     __tablename__ = 'files'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(255), nullable=False)
-    file_path = db.Column(db.String(255), nullable=False, unique=True)
-    upload_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    update_timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name = mapped_column(String(255), nullable=False)
+    file_path = mapped_column(String(255), nullable=False, unique=True)
+    upload_timestamp = mapped_column(DateTime, nullable=False, default=datetime.now)
+    update_timestamp = mapped_column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    project_id = mapped_column(Integer, db.ForeignKey('projects.id'), nullable=False)
     #project = db.relationship('Project', backref=db.backref('files', lazy=True))
     
 class UserProject(db.Model):
     __tablename__ = 'user_projects'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    can_read = db.Column(db.Boolean, nullable=False, default=False)
-    can_write = db.Column(db.Boolean, nullable=False, default=False)
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id = mapped_column(Integer, db.ForeignKey('users.id'), nullable=False)
+    project_id = mapped_column(Integer, db.ForeignKey('projects.id'), nullable=False)
+    can_read = mapped_column(Boolean, nullable=False, default=False)
+    can_write = mapped_column(Boolean, nullable=False, default=False)
 
 class Genome(db.Model):
     __tablename__ = 'genomes'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(50), nullable=False, unique=True)
-    label = db.Column(db.Text)
-    data = db.Column(db.JSON)
-    database = db.Column(db.Text)
-    date_added = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    connections = db.Column(db.Integer)
-    icon = db.Column(db.Text)
-    is_public = db.Column(db.Boolean, nullable=False, default=True)
-    chrom_sizes = db.Column(db.JSON)
-    small_icon = db.Column(db.Text)
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name = mapped_column(String(50), nullable=False, unique=True)
+    label = mapped_column(Text)
+    data = mapped_column(JSON)
+    database = mapped_column(Text)
+    date_added = mapped_column(DateTime, nullable=False, default=datetime.now)
+    connections = mapped_column(Integer)
+    icon = mapped_column(Text)
+    is_public = mapped_column(Boolean, nullable=False, default=True)
+    chrom_sizes = mapped_column(JSON)
+    small_icon = mapped_column(Text)
     projects = db.relationship('Project', backref='genomes', lazy=True)
 
 class Job(db.Model):
     __tablename__ = 'jobs'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    inputs = db.Column(db.JSON)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    outputs = db.Column(db.JSON)
-    sent_on = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    status = db.Column(db.String(200))
-    class_name = db.Column(db.String(200))
-    genome = db.Column(db.String(100))
-    finished_on = db.Column(db.DateTime)
-    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
-    type = db.Column(db.String(200))
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    inputs = mapped_column(JSON)
+    user_id = mapped_column(Integer, db.ForeignKey('users.id'), nullable=True)
+    outputs = mapped_column(JSON)
+    sent_on = mapped_column(DateTime, nullable=False, default=datetime.now)
+    status = mapped_column(String(200))
+    class_name = mapped_column(String(200))
+    genome = mapped_column(String(100))
+    finished_on = mapped_column(DateTime)
+    is_deleted = mapped_column(Boolean, nullable=False, default=False)
+    type = mapped_column(String(200))
 
 class Permission(db.Model):
     __tablename__ = 'permissions'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    permission = db.Column(db.String(200), nullable=False)
-    value = db.Column(db.String(200), nullable=False)
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id = mapped_column(Integer, db.ForeignKey('users.id'), nullable=True)
+    permission = mapped_column(String(200), nullable=False)
+    value = mapped_column(String(200), nullable=False)
 
 class SharedObject(db.Model):
     __tablename__ = 'shared_objects'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    owner = db.Column(db.Integer)
-    shared_with = db.Column(db.Integer)
-    object_id = db.Column(db.Integer)
-    date_shared = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    level = db.Column(db.Text, nullable=False, default='view')
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner = mapped_column(Integer)
+    shared_with = mapped_column(Integer)
+    object_id = mapped_column(Integer)
+    date_shared = mapped_column(DateTime, nullable=False, default=datetime.now)
+    level = mapped_column(Text, nullable=False, default='view')
 
 class UserPreference(db.Model):
     __tablename__ = 'user_preferences'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    preference = db.Column(db.Text, nullable=False)
-    data = db.Column(db.JSON)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    preference = mapped_column(Text, nullable=False)
+    data = mapped_column(JSON)
+    user_id = mapped_column(Integer, db.ForeignKey('users.id'), nullable=True)
 
 class ViewSet(db.Model):
     __tablename__ = 'view_sets'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    table_name = db.Column(db.String(100))
-    name = db.Column(db.String(200))
-    description = db.Column(db.Text)
-    date_added = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    date_modified = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
-    owner = db.Column(db.Integer, default=0)
-    is_public = db.Column(db.Boolean, default=False)
-    fields = db.Column(db.JSON)
-    data = db.Column(db.JSON)
-    date_made_public = db.Column(db.DateTime)
-    status = db.Column(db.Text)
-    is_deleted = db.Column(db.Boolean, default=False)
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    table_name = mapped_column(String(100))
+    name = mapped_column(String(200))
+    description = mapped_column(Text)
+    date_added = mapped_column(DateTime, nullable=False, default=datetime.now)
+    date_modified = mapped_column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    owner = mapped_column(Integer, default=0)
+    is_public = mapped_column(Boolean, default=False)
+    fields = mapped_column(JSON)
+    data = mapped_column(JSON)
+    date_made_public = mapped_column(DateTime)
+    status = mapped_column(Text)
+    is_deleted = mapped_column(Boolean, default=False)
 
 class GeneSet(db.Model):
     __tablename__ = 'gene_sets'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(100), nullable=False)
-    table_name = db.Column(db.String(150))
-    data = db.Column(db.JSON)
-    date_added = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    date_modified = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
-    is_deleted = db.Column(db.Boolean, default=False)
-    description = db.Column(db.Text)
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name = mapped_column(String(100), nullable=False)
+    table_name = mapped_column(String(150))
+    data = mapped_column(JSON)
+    date_added = mapped_column(DateTime, nullable=False, default=datetime.now)
+    date_modified = mapped_column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    is_deleted = mapped_column(Boolean, default=False)
+    description = mapped_column(Text)
 
 # Indexes
 db.Index('idx_genes_name', GeneSet.name)
