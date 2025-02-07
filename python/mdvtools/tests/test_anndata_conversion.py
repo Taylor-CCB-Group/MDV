@@ -9,7 +9,7 @@ from pathlib import Path
 
 def get_h5ad_files():
     """Helper function to get all h5ad files from test_datasets folder."""
-    test_folder = Path("test_datasets")
+    test_folder = Path(os.path.dirname(__file__), "test_datasets")
     if not test_folder.exists():
         raise FileNotFoundError(f"Test datasets folder not found at: {test_folder}")
 
