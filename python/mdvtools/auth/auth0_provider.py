@@ -76,7 +76,8 @@ class Auth0Provider(AuthProvider):
         try:
             print("$$$$$$$$$$$$$$$ -login-1")
             logging.info("Initiating login process.")
-            redirect_uri = url_for('callback', _external=True)
+            #redirect_uri = url_for('callback', _external=True)
+            redirect_uri = "https://bia.cmd.ox.ac.uk/carroll/callback"
             print(redirect_uri)
             print(self.oauth.auth0.authorize_redirect(redirect_uri))
             return self.oauth.auth0.authorize_redirect(redirect_uri)

@@ -88,12 +88,14 @@ def create_flask_app(config_name=None):
     # Whitelist of routes that do not require authentication
     whitelist_routes = [
         '/login_dev',
+        '/login_sso',
         '/login',
         '/callback',
         '/favicon.ico',        # Allow access to favicon
         '/flask/js/',  # Allow access to login JS
         '/static',
-        '/flask/assets'
+        '/flask/assets',
+        '/flask/img'
     ]
 
     @app.before_request
@@ -109,7 +111,8 @@ def create_flask_app(config_name=None):
         # Redirect unauthenticated users to /login_dev
         if not is_authenticated():
             print(f"Unauthorized access attempt to {requested_path}. Redirecting to /login_dev.")
-            return redirect(url_for('login_dev'))  # Redirect to login page
+            redirect_uri = "https://bia.cmd.ox.ac.uk/carroll/login_dev"
+            return redirect(redirect_uri)  # Redirect to login page
         
         return None
 
@@ -184,7 +187,7 @@ def load_config(app,config_name=None):
             app.config['PREFERRED_URL_SCHEME'] = 'http'
             app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
         else:
-            app.config['PREFERRED_URL_SCHEME'] = 'http'
+            app.config['PREFERRED_URL_SCHEME'] = 'https'
             
             # Load sensitive data from Docker secrets
             def read_secret(secret_name):
