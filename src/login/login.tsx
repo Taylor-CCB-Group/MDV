@@ -128,6 +128,7 @@ const Login: React.FC = () => {
                             textTransform: "none",
                             borderRadius: 5,
                             minWidth: 200,
+                            backgroundColor: "white",
                             color: "black",
                         }}
                         onClick={handleLoginWithSSO}
