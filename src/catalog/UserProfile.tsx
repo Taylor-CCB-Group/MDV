@@ -25,6 +25,14 @@ const UserProfile: React.FC = () => {
         setAnchorEl(null);
     };
 
+    const handleSignOut = () => {
+        try {
+            window.location.href = "/logout";
+        } catch (err) {
+            console.error("Logout error:", err);
+        }
+    }
+
     if (isLoading) {
         return <CircularProgress size={32} />;
     }
@@ -105,7 +113,7 @@ const UserProfile: React.FC = () => {
                     <Divider />
                 </Box>
                 <MenuItem onClick={handleClose}>Manage your Account</MenuItem>
-                <MenuItem onClick={handleClose}>Sign out</MenuItem>
+                <MenuItem onClick={handleSignOut}>Sign out</MenuItem>
             </Menu>
         </>
     );
