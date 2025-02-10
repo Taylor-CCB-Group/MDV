@@ -49,7 +49,7 @@ class Auth0Provider(AuthProvider):
 
             # Parse and check the existence of jwks_uri in the metadata
             metadata = response.json()
-            print("@@@@@@")
+            print("@@@@@@@")
             print(metadata)
             jwks_uri = metadata.get('jwks_uri')
             if not jwks_uri:
