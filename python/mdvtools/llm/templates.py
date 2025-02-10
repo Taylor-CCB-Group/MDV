@@ -1,13 +1,32 @@
 from mdvtools.mdvproject import MDVProject
 
 prompt_data = """
-Based on the question asked and the dataframes provided, please perform the following steps:
-
-1. Identify the data asked for in the question.
-2. Based on step 1, find the relevant column names in the dataframes provided based on the information identified earlier in the question asked regarding data.
-3. The relevant column names can be a combination from the two dataframes.
-4. Provide the relevant column names from step 2 in a list.
-5. If the question asks for a gene name, do provide a gene name in addition to the relevant columns names.
+    Your task is to:
+    1. Identify the type of data the user needs (e.g., categorical, numerical, etc.).
+    2. Select the most relevant column names based on the dataset.
+    3. Ensure that the selected columns match the visualization requirements:
+        - Abundance Box plot: Requires three categorical columns.
+        - Box plot: Requires one categorical column and one numerical column.
+        - Density Scatter plot: Requires two numerical columns and one categorical column. 
+        - Dot plot: Requires one categorical column and any number of numerical columns.
+        - Heat map: Requires one categorical column and any number of numerical columns.
+        - Histogram: Requires one numerical column.
+        - Multiline chart: Requires one numerical column and one categorical column.
+        - Pie Chart: Requires one categorical column.
+        - Row Chart: Requires one categorical column.
+        - Row summary box: Requires any column.
+        - Sankey diagram:
+        - Scatter plot (2D): Requires two numerical columns.
+        - Scatter plot (3D): Requires three numerical columns. Additionally one categorical column for the category colour.
+        - Selection dialog plot: Requires any column.
+        - Stacked row chart: Requires two categorical columns.
+        - Table: Requires any column.
+        - Text box: Requires no columns. Just text.
+        - Violin plot: Requires one categorical column and one numerical column.
+        - Wordcloud: Requires one categorical column.
+    4. Return the column names in a Python list format, e.g., `["col1", "col2"]`.
+    5. Gene-related queries: If the question pertains to a specific gene, ensure that the gene name is included alongside the relevant column names.
+    6. Do not provide additional explanations—only return the Python list.
 """
 
 
@@ -89,6 +108,16 @@ This list """
         + final_answer
         + """ specifies the names of the data fields that need to be plotted, for example in the params field. Get the structure of params definition from the context.
 DO NOT forget to use the f-string, or formatted string literal, python structure in the parameters, params or param.
+
+Generate Python code that correctly uses formatted string literals.
+Ensure all strings requiring variable substitution use the 'f' prefix.
+
+Example:
+# Correct:
+message = f"Hello, {question}!"
+
+Incorrect:
+message = "Hello, {question}!"
 
 If the prompt asks for a gene, make sure you load this datasource and that you create a link between the two datasets.
 

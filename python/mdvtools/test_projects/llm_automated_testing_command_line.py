@@ -83,7 +83,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     agent = lp.create_pandas_dataframe_agent(dataframe_llm, df, verbose=True, allow_dangerous_code=True)
     
     question_file = pd.read_csv(question_list_path, skipinitialspace=True, index_col=False)
-    question_list = question_file.columns.tolist()
+    question_list = question_file['requests'].tolist()
     
     results = []
     for question in question_list:
@@ -101,6 +101,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
                 "question": question,
                 "pandas_input": response.get('input', ''),
                 "pandas_output": response.get('output', ''),
+                "context": response.get('context', ''),
                 "final_code": result_code,
                 "stdout": stdout,
                 "stderr": stderr,

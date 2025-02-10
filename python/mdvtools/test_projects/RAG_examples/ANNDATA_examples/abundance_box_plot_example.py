@@ -44,7 +44,7 @@ def main():
     
     # AbundanceBoxPlot parameters
     title = "Example title"
-    params = ["param1", "param2", "param3"] #param1, param2 and param3 should all be categorical variables
+    params = ["param1", "param2", "param3"] #param1, param2 and param3 should all be categorical variables. Params take only 3 arguments.
     size = [615, 557]
     position = [341, 49]
     plot_id = "tGa0CF"

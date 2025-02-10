@@ -50,7 +50,7 @@ def main():
     
     # ScatterPlot parameters
     title = "Density Scatter Plot Example"
-    params = ["param1", "param2", "param3"] #param1 and param2 should be a numerical variables, param3 should be categorical variables
+    params = ["param1", "param2", "param3"] #param1 and param2 should be a numerical variables, param3 should be a categorical variable
     size = [792, 472]
     position = [10, 10]
 
