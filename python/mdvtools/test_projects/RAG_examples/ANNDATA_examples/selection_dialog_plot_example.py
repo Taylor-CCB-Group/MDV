@@ -5,11 +5,11 @@ import scanpy as sc
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.selection_dialog_plot import SelectionDialogPlot
 
-def create_selection_dialog_plot(title, param, size, position):
+def create_selection_dialog_plot(title, params, size, position):
     """Create and configure a SelectionDialogPlot instance with the given parameters."""
     plot = SelectionDialogPlot(
         title=title,
-        param=param,
+        params=params,
         size=size,
         position=position
     )
@@ -40,12 +40,12 @@ def main():
 
     # SelectionDialogPlot parameters
     title="Example title",
-    param = ["param1", "param2", "param3", "param4", "param5", "param6", "param7", "param8"] # The 'param' list can accept any number of arguments, where each argument can be of any type, including categorical or variable types.
+    params = ["param1", "param2", "param3", "param4", "param5", "param6", "param7", "param8"] # The 'param' list can accept any number of arguments, where each argument can be of any type, including categorical or variable types.
     size = [792, 472]
     position = [10, 10]
 
     # Create plot
-    selection_dialog_plot = create_selection_dialog_plot(title, param, size, position)
+    selection_dialog_plot = create_selection_dialog_plot(title, params, size, position)
     
     # Convert plot to JSON and set view
     selection_dialog_plot_json = convert_plot_to_json(selection_dialog_plot)
