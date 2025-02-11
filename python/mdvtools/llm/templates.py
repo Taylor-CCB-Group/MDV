@@ -15,7 +15,7 @@ prompt_data = """
         - Pie Chart: Requires one categorical column.
         - Row Chart: Requires one categorical column.
         - Row summary box: Requires any column.
-        - Sankey diagram:
+        - Sankey diagram: Requires two categorical columns.
         - Scatter plot (2D): Requires two numerical columns.
         - Scatter plot (3D): Requires three numerical columns. Additionally one categorical column for the category colour.
         - Selection dialog plot: Requires any column.
@@ -53,6 +53,7 @@ from mdvtools.charts.wordcloud_plot import WordcloudPlot
 from mdvtools.charts.text_box_plot import TextBox
 from mdvtools.charts.row_summary_box_plot import RowSummaryBox
 from mdvtools.charts.selection_dialog_plot import SelectionDialogPlot
+from mdvtools.charts.sankey_plot import SankeyPlot
 
 import json
 import numpy as np
