@@ -17,12 +17,25 @@ import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from 
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType } from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
+import { isArray } from "@/lib/utils.js";
+import { serialiseConfig } from "../chartConfigUtils.js";
+
+// how do I match this with the type in link_utils?
+//! using zod here is an extra layer of complexity and it's not at all clear that this is the place for it
+// we're not validating data coming in, we're just using it to define the shape of the data 
+// - the whole schema-isation is really a separate concern that I very much want to have - but in the right place/time
+// we don't want a schema for the live version of the object, only for the serialised version
+const RowsAsColsQuerySchema = z.object({
+
+});
+
+const ParamzSchema = z.optional(z.array(z.union([z.string(), z.array(z.string())])));
+type Paramz = z.infer<typeof ParamzSchema>;
 
 const ChartConfigSchema = z.object({
     title: z.string(),
     legend: z.string(),
-    // in future, allow for "virtual" / "computed" / "smart" columns
-    param: z.optional(z.array(z.string())), //...
+    param: ParamzSchema,
     type: z.string(),
     // in the original AddChartDialog, extra props are on the root object, not nested
     // so when we pass this to ChartManager, we'll need to flatten it
@@ -42,6 +55,13 @@ function actionWithUpdate<T extends any[]>(
     });
 }
 
+function flattenParams(param: Paramz) {
+    if (!param) return []; //would quite like it to remain undefined
+    //! todo change the type so that it can also include column-query... probably not defined by zod
+    const result = param?.flatMap(p => isArray(p) ? [...p] : p);
+    return result;
+}
+
 const ChartPreview = observer(({config}: {config: ChartConfig}) => {
     const dataStore = useDataStore();
     const chartType = useMemo(() => {
@@ -53,6 +73,7 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
     // todo rearrange so that the same code is used for adding actual chart
     const scratchProps = useMemo(() => {
         const scratchConfig = toJS(config);
+        scratchConfig.param = flattenParams(scratchConfig.param);
         const { extra, _updated, ...props } = scratchConfig;
         // flatten the config into props
         chartType?.extra_controls?.(dataStore).forEach(control => {
@@ -174,7 +195,8 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     const paramColumns = useMemo(
-        () => config.param ? config.param.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
+        //@ts- expect-error - this isn't final, we need to handle MultiColumnQuery
+        () => config.param ? flattenParams(config.param)?.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
     [config.param, dataStore]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
     const setChartTypeName = useCallback(action((chartTypeName: string) => {
@@ -227,6 +249,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 // if (!control.defaultVal)
             }
         });
+        props.param = flattenParams(props.param);
         for (const [k, v] of Object.entries(extra)) {
             //@ts-ignore
             props[k] = v;
@@ -245,7 +268,8 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
 
         // this is where we'd call the chart manager to add the chart
         if (!window.mdv.chartManager) throw new Error("chartManager not found");
-        window.mdv.chartManager.addChart(dataStore.name, props, true);
+        const finalConfig = serialiseConfig(props);
+        window.mdv.chartManager.addChart(dataStore.name, finalConfig, true);
         // and then close the dialog...
         onDone();
     }, [config, dataStore, onDone, chartType]);
@@ -286,12 +310,15 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                                 // !! in the original AddChartDialog, we use a "ChooseColumnDialog" for multi-column
                                 // that sets `this.multiColumns` which in `submit` is concatenated to `config.param`
                                 if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
+                                
                                 // the type of config.param is string[] - but this could be a multi-column or virtual column query...
                                 // we need to decide at which point to apply these transformations.
                                 // - to deal with string[] we should be able to specify multiple={false} which could change the return type
                                 //... could we set up a reaction to update the config when the column changes?
-                                if (typeof column !== "string") throw new Error("Expected string column name");
-                                config.param[i] = column; //legit type error - will fail at runtime
+
+                                // if (typeof column !== "string") throw new Error("Expected string column name");
+                                //@ts-expect-error - we should be handling array ok now, but MultiColumnQuery is tbd
+                                config.param[i] = column; //issue now is that because ref is stable, we don't re-flatten the param
                                 // grumble grumble
                                 config._updated = new Date();
                             })}
@@ -370,7 +397,14 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
         return <AddChartDialogComponent {...props} config={config} />;
     }
     return (
-        <Dialog open={open} fullScreen disableEscapeKeyDown={true}>
+        <Dialog open={open} fullScreen disableEscapeKeyDown={true}
+            PaperProps={{
+                style: { //copied from FileUploadDialog, should maybe be part of theme.
+                    backgroundColor: "var(--fade_background_color)",
+                    backdropFilter: "blur(1px)",
+                },
+            }}
+        >
             <div className="h-screen flex items-center justify-center">
                 <Paper elevation={2} sx={{ p: 2 }}>
                     <h1>Add Chart in "{props.dataStore.name}"...</h1>
@@ -391,7 +425,7 @@ class AddChartDialogReact extends BaseDialog {
             },
             null,
         );
-        const modal = false; //doesn't work on fullscreen panel as of writing, also needs some redesign of "add chart" button in particular
+        const modal = true; //doesn't work on fullscreen panel as of writing, also needs some redesign of "add chart" button in particular
         this.root = createMdvPortal(
             <Wrapper dataStore={dataStore} modal={modal} onDone={() => this.close()}/>,
             this.dialog,

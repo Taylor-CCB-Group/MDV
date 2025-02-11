@@ -10,7 +10,7 @@ import type { BaseDialog } from "@/utilities/Dialog";
 import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
-import { serialiseConfig, initialiseConfig } from "./chartConfigUtils";
+import { serialiseChart, initialiseChartConfig } from "./chartConfigUtils";
 import type { MultiColumnQuery } from "@/links/link_utils";
 import { decorateChartColumnMethods } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -38,6 +38,12 @@ type ColorConfig = {
 export type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
 export type ColorOptions = any;
 export type ContextMenuItem = { text: string, icon: string, func: () => void };
+/**
+ * A JSON string representing a chart configuration.
+ * 
+ * The generic parameter `T` is the type of the chart configuration - maybe overkill, or maybe useful at some point.
+ */
+export type SerialString<T extends BaseConfig> = string;
 class BaseChart<T extends BaseConfig> {
     config: T;
     __doc__: Document;
@@ -86,7 +92,7 @@ class BaseChart<T extends BaseConfig> {
         //   we've been experimenting with applying this to all charts
         //   but there are issues with mobx actions that result in mutations to the config
         //... so perhaps the idea of keeping that property to react charts is a good one?
-        this.config = initialiseConfig(config, this);
+        this.config = initialiseChartConfig(config, this);
         //this needs to be called after we initialise the config
         decorateChartColumnMethods(this);
 
@@ -422,7 +428,7 @@ class BaseChart<T extends BaseConfig> {
     _addTrimmedColor(column: FieldName, conf: any) {
         const tr = this.config.trim_color_scale;
         const col = this.dataStore.columnIndex[column];
-        if (!col) throw "expected color column to h"
+        if (!col) throw `expected color column '${column}' in columnIndex for ${this.dataStore.name}`;
         if (tr && tr !== "none") {
             if (col.quantiles) {
                 if (col.quantiles as any === "NA") return;
@@ -849,6 +855,11 @@ class BaseChart<T extends BaseConfig> {
         }
     }
 
+    /**
+     * Only used by HistogramChart as of this writing.
+     * Should probably be removed?
+     * @deprecated
+     */
     _setConfigValue(conf: T, value: keyof T, def: any) {
         if (conf[value] === undefined) {
             conf[value] = def;
@@ -859,7 +870,8 @@ class BaseChart<T extends BaseConfig> {
     drawChart() {}
 
     /**
-     * Returns a copy of the chart's config
+     * Returns a copy of the chart's config in serialized form
+     * (todo central place for documentation describing this)
      */
     getConfig() {
         if (this.legend) {
@@ -868,7 +880,18 @@ class BaseChart<T extends BaseConfig> {
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
             };
         }
-        return serialiseConfig(this);
+        return serialiseChart(this);
+    }
+    
+    /**
+     * Returns a string representation of the chart's config, such that a simple call
+     * a simple call to `JSON.stringify(chart)` will return the config.
+     * 
+     * The type alias is hoped to allow for code involved in manipulating the config to be able
+     * to know what it is dealing with.
+     */
+    toString(): SerialString<T> {
+        return JSON.stringify(this.getConfig());
     }
 
     getColorOptions(): ColorOptions {

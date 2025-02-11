@@ -15,6 +15,7 @@ import type { BaseConfig } from "./BaseChart";
 // }
 // consider having synthetic columns that can be used for testing...
 // possibly including things like multi-text columns that automatically mutate over time...
+// - maybe serialised if it's loaded from a file, but internally do we allow it to be a live RowAsColsQuery?
 type SerialisedColumnParam = (FieldName | RowsAsColsQuerySerialized);
 type SerialisedParams = SerialisedColumnParam[];
 export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
@@ -53,7 +54,52 @@ export function serialiseQueries(chart: BaseChart<any>) {
     return serialized;
 }
 
-export function serialiseConfig<T extends BaseChart<any>>(chart: T) {
+export function serialiseConfig(config: any) {
+    // we should find any mapped column queries and replace relevant values with a representation of that
+    //the idea is that anywhere we previously had a column name, we can have a query object
+    // Is this enough?
+    // (as long as we don't have some vanilla chart with column query nonsense in it...)
+    const serialized = JSON.parse(JSON.stringify(config));
+    
+    //! pending more generic approach to serialising queries...
+    //in principle, react-based charts shouldn't have any trouble with the above...
+    // if (config.color_by) {
+    //     serialized.color_by = getConcreteFieldName(config.color_by);
+    // }
+    console.log('processed config:', serialized);
+    return serialized;
+}
+/**
+ * 
+ * ! this may be precisely the kind of place where zod would be appropriate.
+ * 
+ * @returns resulting `config` object if there were no errors, otherwise an object with
+ *  the potentially compromised result, and a list of err
+ */
+export function deserialiseConfig(ds: DataStore, serialConfig: any) {
+    // we need to know which DataSource this is associated with to be able to deserialize
+    const exceptions: { error: Error | unknown, key: string, value: any }[] = [];
+    const config = JSON.parse(serialConfig, (key, value) => {
+        // not sure we can have a general purpose Serializable interface with a static factory method
+        // but there should be something simple along those lines we could consider...
+        // ... for now, we are looking specifically for RowsAsColumnsQuerySerialized
+        if (value.type === "RowsAsColsQuery") {
+            try {
+                return deserialiseParam(ds, value)
+            } catch (error) {
+                exceptions.push({
+                    error,
+                    key,
+                    value
+                });
+                return value;
+            }
+        }
+    });
+    return exceptions.length ? { config, exceptions } : config;
+}
+
+export function serialiseChart<T extends BaseChart<any>>(chart: T) {
     const { config } = chart;
     // thinking about config vs state, in the context of dynamic virtual columns...
     // if we just have a record of paramSpecs, then we can use those in this representation
@@ -88,7 +134,20 @@ export function serialiseConfig<T extends BaseChart<any>>(chart: T) {
     return serialized;
 }
 
-export function initialiseConfig<C extends BaseConfig, T extends BaseChart<C>>(originalConfig: C, chart: T) {
+/**
+ * This will be called by the chart constructor to set up the config object, as well as properties on the chart object
+ * for observing changes to the config object.
+ * 
+ * Implementation notes in progress:
+ * - should we have functions that only operate on config objects?
+ *   (in future we might not even need Chart objects, just config objects and components that can render them)
+ * - is the config.set property safe?
+ * - we should definitely have clearer expression of the notion of SerialisedConfig vs RuntimeConfig types.
+ * 
+ * @param originalConfig
+ * @param chart
+ */
+export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<C>>(originalConfig: C, chart: T) {
     let config: C = JSON.parse(JSON.stringify(originalConfig));
     if (!config.id) {
         // what about when we duplicate a chart?
