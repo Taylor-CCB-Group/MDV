@@ -53,15 +53,15 @@ def main():
     params = ["param1", "param2", "param3"] #param1, param2 and param3 should all be a numerical variables
     size = [300, 300]
     position = [10, 10]
-    center = [0,0,0]
+    center = [0,2000,2000]
 
     color = "#377eb8"
     brush = "default"
-    radius = 0.9
+    radius = 9.0
     opacity = 0.8
     category_color = "categorial variable"
     
-    camera={"distance": 37, "theta": -1.038, "phi": 0.261}
+    camera={"distance": 0.05, "theta": 0.1, "phi": 0.261}
 
 
     # Create plot

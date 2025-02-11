@@ -95,13 +95,17 @@ def main(project_path, dataset_path, question_list_path, output_csv):
             qa_chain = RetrievalQA.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, return_source_documents=True)
             output = qa_chain.invoke({"context": retriever, "query": question})
             result_code = prepare_code(output["result"], df, project, logger.info, modify_existing_project=True, view_name=question)
+
+            context_information = output['source_documents']
+            context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
+            context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
             
             ok, stdout, stderr = execute_code(result_code, open_code=False, log=logger.info)
             results.append({
                 "question": question,
                 "pandas_input": response.get('input', ''),
                 "pandas_output": response.get('output', ''),
-                "context": response.get('context', ''),
+                "context": context_information_metadata_url,
                 "final_code": result_code,
                 "stdout": stdout,
                 "stderr": stderr,

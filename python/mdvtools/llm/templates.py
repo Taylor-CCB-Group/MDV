@@ -45,6 +45,7 @@ from mdvtools.charts.scatter_plot import ScatterPlot
 from mdvtools.charts.abundance_box_plot import AbundanceBoxPlot
 from mdvtools.charts.stacked_row_plot import StackedRowChart
 from mdvtools.charts.ring_chart import RingChart
+from mdvtools.charts.pie_chart import PieChart
 from mdvtools.charts.violin_plot import ViolinPlot
 from mdvtools.charts.multi_line_plot import MultiLinePlot
 from mdvtools.charts.table_plot import TablePlot
