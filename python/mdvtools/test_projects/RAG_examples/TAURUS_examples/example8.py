@@ -25,14 +25,14 @@ from mdvtools.charts.scatter_plot import ScatterPlot
 from mdvtools.charts.stacked_row_plot import StackedRowChart
 import json 
 
-def create_stacked_row_plot(title, params, size, position, legend_display, xaxis_properties, yaxis_properties):
+def create_stacked_row_plot(title, params, size, position, color_legend, xaxis_properties, yaxis_properties):
     plot = StackedRowChart(
         title=title,
         params=params,
         size=size,
         position=position
     )
-    plot.set_color_legend(legend_display)
+    plot.set_color_legend(color_legend["display"], color_legend["pos"])
     plot.set_axis_properties("x", xaxis_properties)
     plot.set_axis_properties("y", yaxis_properties)
     return plot
@@ -106,13 +106,14 @@ def main():
     stacked_params = ["Patient", "final_analysis"]
     stacked_size = [792, 472]
     stacked_position = [10, 10]
-    stacked_legend_display = True
+    stacked_color_legend = {"display" : True,
+                    "pos" : [375,1]}
     stacked_xaxis_properties = {"label": "Patient", "textSize": 13, "tickfont": 10}
     stacked_yaxis_properties = {"label": "Cell State", "textSize": 13, "tickfont": 10}
     
     # Create stacked row plot
     stacked_row_plot = create_stacked_row_plot(
-        stacked_title, stacked_params, stacked_size, stacked_position, stacked_legend_display, stacked_xaxis_properties, stacked_yaxis_properties
+        stacked_title, stacked_params, stacked_size, stacked_position, stacked_color_legend, stacked_xaxis_properties, stacked_yaxis_properties
     )
     
     # ScatterPlot parameters

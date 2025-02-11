@@ -32,7 +32,7 @@ def convert_plot_to_json(plot):
     return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\", ""))
     
 
-def create_bar_chart(title, params, size, position, legend_display, xaxis_properties, yaxis_properties):
+def create_bar_chart(title, params, size, position, color_legend, xaxis_properties, yaxis_properties):
     """Create and configure a StackedRowChart instance as a bar chart with the given parameters."""
     plot = StackedRowChart(
         title=title,
@@ -41,7 +41,7 @@ def create_bar_chart(title, params, size, position, legend_display, xaxis_proper
         position=position
     )
 
-    #plot.set_color_legend(legend_display)
+    plot.set_color_legend(color_legend["display"], color_legend["pos"])
     plot.set_axis_properties("x", xaxis_properties)
     plot.set_axis_properties("y", yaxis_properties)
 
@@ -75,7 +75,8 @@ def main():
     size = [792, 472]
     position = [10, 10]
 
-    legend_display = False
+    color_legend = {"display" : True,
+                    "pos" : [375,1]}
     
     xaxis_properties = {"label": "Cell type", 
                         "textSize": 13, 
@@ -88,7 +89,7 @@ def main():
     }
 
     # Create bar chart
-    bar_chart = create_bar_chart(title, params, size, position, legend_display, xaxis_properties, yaxis_properties)
+    bar_chart = create_bar_chart(title, params, size, position, color_legend, xaxis_properties, yaxis_properties)
     
     # Convert plot to JSON and set view
     bar_chart_json = convert_plot_to_json(bar_chart)

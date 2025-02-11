@@ -5,7 +5,7 @@ import scanpy as sc
 from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.stacked_row_plot import StackedRowChart
 
-def create_stacked_row_plot(title, params, size, position, legend_display, xaxis_properties, yaxis_properties):
+def create_stacked_row_plot(title, params, size, position, color_legend, xaxis_properties, yaxis_properties):
     """Create and configure a StackedRowChart instance with the given parameters."""
     plot = StackedRowChart(
         title=title,
@@ -14,7 +14,7 @@ def create_stacked_row_plot(title, params, size, position, legend_display, xaxis
         position=position
     )
 
-    plot.set_color_legend(legend_display)
+    plot.set_color_legend(color_legend["display"], color_legend["pos"])
     plot.set_axis_properties("x", xaxis_properties)
     plot.set_axis_properties("y", yaxis_properties)
 
@@ -48,7 +48,8 @@ def main():
     size = [792, 472]
     position = [10, 10]
 
-    legend_display = True              
+    color_legend = {"display" : True,
+                    "pos" : [375,1]}         
     
     xaxis_properties = {"label": "label1", 
              "textSize": 13, 
@@ -61,7 +62,7 @@ def main():
     }
 
     # Create plot
-    stacked_row_plot = create_stacked_row_plot(title, params, size, position, legend_display, xaxis_properties, yaxis_properties)
+    stacked_row_plot = create_stacked_row_plot(title, params, size, position, color_legend, xaxis_properties, yaxis_properties)
     
     # Convert plot to JSON and set view
     stacked_row_plot_json = convert_plot_to_json(stacked_row_plot)
