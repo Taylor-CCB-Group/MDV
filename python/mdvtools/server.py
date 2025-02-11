@@ -561,7 +561,7 @@ def create_app(
             # Process and combine the file
             new_anndata = sc.read(temp_path)
             convert_scanpy_to_mdv(project.dir, new_anndata, delete_existing=False, label=f"{label}_")
-            new_anndata.write(os.path.join(project.dir, "anndata.h5ad"))
+            new_anndata.write(os.path.join(project.dir, "anndata.h5ad")) # type: ignore - str output from os.path.join should be reliably PathLike
             cleanup_folder(temp_folder)
 
             return jsonify({'status': 'success', 'message': 'File merged successfully'}), 200

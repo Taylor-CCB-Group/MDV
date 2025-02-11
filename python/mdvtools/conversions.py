@@ -72,7 +72,8 @@ def convert_scanpy_to_mdv(
     current_views = None
     if not delete_existing:
         current_views = mdv.views
-
+    else:
+        current_views = {}
     # create datasource 'cells'
     cell_table = scanpy_object.obs
     cell_table["cell_id"] = cell_table.index
