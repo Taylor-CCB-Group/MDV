@@ -24,9 +24,9 @@ prompt_data = """
         - Text box: Requires no columns. Just text.
         - Violin plot: Requires one categorical column and one numerical column.
         - Wordcloud: Requires one categorical column.
-    4. Return the column names in a Python list format, e.g., `["col1", "col2"]`.
+    4. Return the column names in a string format, e.g., "col1", "col2".
     5. Gene-related queries: If the question pertains to a specific gene, ensure that the gene name is included alongside the relevant column names.
-    6. Do not provide additional explanations—only return the Python list.
+    6. Do not provide additional explanations—only return the string.
 """
 
 
