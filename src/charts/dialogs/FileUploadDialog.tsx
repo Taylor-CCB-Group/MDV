@@ -37,6 +37,7 @@ import processH5File, { CompressionError } from "./utils/h5Processing";
 import H5MetadataPreview from "./H5MetadataPreview";
 import ErrorDisplay from "./ErrorDisplay";
 import AnndataConflictDialog from "./AnndataConflictDialog";
+import ReusableDialog from "./ReusableDialog";
 
 // Use dynamic import for the worker
 const DatasourceWorker = new Worker(
@@ -1468,37 +1469,7 @@ const Wrapper = (props: FileUploadDialogComponentProps) => {
         setOpen(false);
     };
     return (
-        <Dialog
-            open={open}
-            fullScreen
-            disableEscapeKeyDown={true}
-            PaperProps={{
-                style: {
-                    backgroundColor: "var(--fade_background_color)",
-                    backdropFilter: "blur(1px)",
-                },
-            }}
-        >
-            <IconButton
-                onClick={handleClose}
-                className="absolute top-4 right-4"
-                sx={{
-                    position: "absolute",
-                    top: 16,
-                    right: 16,
-                    backgroundColor: "var(--background_color)",
-                    "&:hover": { backgroundColor: "var(--menu_bar_color)" },
-                }}
-            >
-                <CloseIcon />
-            </IconButton>
-
-            <div className="h-screen flex items-center justify-center">
-                <Paper elevation={24} sx={{ p: 2 }}>
-                    <FileUploadDialogComponent {...props} />
-                </Paper>
-            </div>
-        </Dialog>
+        <ReusableDialog open={open} handleClose={handleClose} component={<FileUploadDialogComponent {...props} />} />
     );
 };
 

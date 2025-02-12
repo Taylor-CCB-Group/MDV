@@ -60,6 +60,8 @@ import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { AddChartDialog } from "./dialogs/AddChartDialog";
+import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
+import { createMdvPortal } from "@/react/react_utils";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -1501,14 +1503,16 @@ export class ChartManager {
 
     updateInfoAlert(id, msg, config = {}) {
         const al = this.infoAlerts[id];
-        if (config.type && al.type !== config.type) {
-            al.div.classList.remove(`ciview-alert-${al.type}`);
-            al.div.classList.add(`ciview-alert-${config.type}`);
-            al.type = config.type;
-        }
-        al.text.textContent = msg;
-        if (config.duration) {
-            this.removeInfoAlert(id, config.duration);
+        if (al) {
+            if (config.type && al.type !== config.type) {
+                al.div.classList.remove(`ciview-alert-${al.type}`);
+                al.div.classList.add(`ciview-alert-${config.type}`);
+                al.type = config.type;
+            }
+            al.text.textContent = msg;
+            if (config.duration) {
+                this.removeInfoAlert(id, config.duration);
+            }
         }
     }
 
@@ -1917,7 +1921,7 @@ export class ChartManager {
             },
             ds.contentDiv,
         );
-        createEl(
+        const spinner = createEl(
             "i",
             {
                 classes: ["fas", "fa-circle-notch", "fa-spin"],
@@ -1929,7 +1933,7 @@ export class ChartManager {
             },
             div,
         );
-        createEl(
+        const ellipsis = createEl(
             "div",
             {
                 styles: {
@@ -1954,28 +1958,32 @@ export class ChartManager {
             this._addChart(dataSource, config, div, notify);
         } catch (error) {
             this.clearInfoAlerts();
-            const id = this.createInfoAlert(
-                `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
-                {
-                    type: "warning",
-                },
-            );
-            console.error(error);
-            const idiv = this.infoAlerts[id].div;
-            idiv.onclick = () => idiv.remove();
-            // div.remove();
+            spinner.remove();
+            ellipsis.remove();
+            // const id = this.createInfoAlert(
+            //     `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
+            //     {
+            //         type: "warning",
+            //     },
+            // );
+            // const idiv = this.infoAlerts[id].div;
+            // idiv.onclick = () => idiv.remove();
             const debugNode = createEl(
                 "div",
                 {
                     styles: {
                         position: "absolute",
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
                         backdropFilter: "blur(10px)",
                     },
                 },
-                div.lastElementChild,
+                div,
             );
-            debugNode.innerHTML = `<div><h2>Error creating chart</h2><pre>${error.stack}</pre></div>`;
-            debugNode.onclick = () => debugNode.remove();
+            createMdvPortal(ErrorComponentReactWrapper({error, height, width, extraMetaData: {config}}), debugNode);
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
         }
