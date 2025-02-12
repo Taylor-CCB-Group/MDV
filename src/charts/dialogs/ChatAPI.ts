@@ -69,6 +69,7 @@ type ChatResponse = z.infer<typeof completedChatResponseSchema>;
 
 export type ChatMessage = {
     text: string;
+    view?: string; //maybe this type should be more assocated with ChatResponse
     sender: 'user' | 'bot' | 'system';
     id: string;
 };
@@ -155,9 +156,10 @@ const useChat = () => {
         }
     }, [isSending, isInit, routeInit, progressRoute, route, progressListener]);
 
-    const appendMessage = (message: string, sender: 'bot' | 'user') => {
-        //we should be using an id passed as part of the message, not generating one here
-        const msg = { text: message, sender, id: generateId() };
+    const appendMessage = (message: string, sender: 'bot' | 'user', view?: string) => {
+        //we should be using an id passed as part of the message, not generating one here.
+        //also - id as react key if we have an id shared between query and response may be a conflict
+        const msg = { text: message, sender, id: generateId(), view };
         setMessages((prevMessages) => [...prevMessages, msg]);
     };
     
@@ -172,9 +174,12 @@ const useChat = () => {
             setIsSending(true);
             setCurrentRequestId(id);
             const response = await sendMessage(input, id, route);
-            appendMessage(response.message, 'bot');
-            //todo - navigating via button rather than automatically
-            if (response.view) navigateToView(response.view);
+            // we should be appending more stuff, and then rendering appropriately, 
+            // with things like a button to navigate to the view if view property is present.
+            appendMessage(response.message, 'bot', response.view);
+            //todo - navigating via button rather than automatically.
+            
+            // if (response.view) navigateToView(response.view);
         } catch (error) {
             appendMessage(`Error: ${error}`, 'bot');
         }
@@ -190,7 +195,7 @@ const useChat = () => {
  * 
  * ! doesn't belong in this file, I intend to refactor soon, but for quick prototyping it's here
  */
-async function navigateToView(view: string) {
+export async function navigateToView(view: string) {
     //todo - use this, but make sure it works with updated datasources etc...
     //window.mdv.chartManager.changeView(view);
 

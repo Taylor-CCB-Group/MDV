@@ -1,6 +1,6 @@
 import { BotMessageSquare, SquareTerminal } from 'lucide-react';
 import { MessageCircleQuestion, ThumbsUp, ThumbsDown, Star, NotebookPen } from 'lucide-react';
-import useChat, { type ChatProgress, type ChatMessage } from './ChatAPI';
+import useChat, { type ChatProgress, type ChatMessage, navigateToView } from './ChatAPI';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import JsonView from 'react18-json-view';
 import ReactMarkdown from 'react-markdown';
@@ -8,8 +8,9 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
+import { Button } from '@mui/material';
 
-const Message = ({ text, sender }: ChatMessage) => {
+const Message = ({ text, sender, view }: ChatMessage) => {
     const isUser = sender === 'user';
     const pythonSections = extractPythonSections(text);
     try {
@@ -29,6 +30,7 @@ const Message = ({ text, sender }: ChatMessage) => {
                 <PythonCode key={index} code={section} />
             ))} */}
             {(sender === 'bot') && <MessageFeedback />}
+            {view && <Button variant="contained" color="primary" onClick={() => navigateToView(view)}>Load view...</Button>}
         </div>
     );
 }
