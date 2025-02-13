@@ -1,9 +1,10 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useMetadata, useViewerStoreApi } from "./components/avivatorish/state";
 import { useChartID, useDataSources } from "./hooks";
 import type { VivMDVReact } from "./components/VivMDVReact";
 import { useDataStore } from "./context";
 import type { DataColumn, DataType } from "@/charts/charts";
+import { getRowsAsColumnsLinks } from "@/links/link_utils";
 
 export type ChartID = string;
 export type ViewStateLink = {
@@ -94,37 +95,16 @@ export type RowsAsColslink = {
     }
 }
 
+/** returns information about any `rows_as_columns_link`s that exist in the context `dataSource` */
 export function useRowsAsColumnsLinks() {
-    const dataSources = useDataSources();
     //- we should have useDataSource() which would work in dialogs not associated with a particular chart.
     //(test in AddChartDialog)
     const dataStore = useDataStore(); //! this whole dataSource vs dataStore thing still confuses me
     if (!dataStore) {
         throw "no dataStore!!!";
     }
-    if (dataStore.links) {
-        for (const linkedDsName in dataStore.links) {
-            const links = dataStore.links[linkedDsName];
-            if (links.rows_as_columns) {
-                // first pass... there can be only one or zero.
-                // how often will users actually want to link multiple dataSources in this way?
-                // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
-                // UI should be simpler for the common case with a single linked dataSource.
-                // Are there any crazy edge cases we should consider - like indirect links? links to self?
-                // !! before pull - change find to filter and deal with the array of links
-                const linkedDs = dataSources.find(
-                    (ds) => ds.name === linkedDsName,
-                );
-                if (!linkedDs) {
-                    throw new Error();
-                }
-                // todo make sure the link is reasonably typed
-                
-                return { linkedDs, link: links.rows_as_columns as RowsAsColslink};
-            }
-        }
-    }
-    return null;
+    // if it was possible for user to edit this at runtime, we'd want this to be reactive
+    return getRowsAsColumnsLinks(dataStore);
 }
 
 /** design of this will need to change to account for n-links
@@ -134,37 +114,9 @@ export function useRowsAsColumnsLinks() {
  */
 export function useHighlightedForeignRows() {
     const id = useId();
-    const racLink = useRowsAsColumnsLinks();
-    // const { linkedDs, link } = racLink;
-    const [values, setValues] = useState<{index: number, value: string}[]>([]);
-    useEffect(() => {
-        if (!racLink) return;
-        const { linkedDs, link } = racLink;
-        const tds = linkedDs.dataStore;
-        tds.addListener(`highlightedRows:${id}`, async (eventType: string, data: any) => {
-            if (eventType === "data_highlighted") {
-                const vals = data.indexes.map((index: number) => ({index, value: tds.getRowText(index, link.name_column)}));
-                setValues(vals); //if there are huge numbers, we may want to deal with that downstream, or here.
-            } else if (eventType === "filtered") {
-                // const vals = tds.getFilteredValues(link.name_column) as string[];
-                // setValues(vals); //this isn't right - we need the index too
-                // 'data' is a Dimension in this case - so we want to zip filteredIndices with the values
-                const filteredIndices = await tds.getFilteredIndices() as number[];
-                //! this Array.from could be suboptimal for large numbers of indices
-                const vals = Array.from(filteredIndices).map(
-                    // if I don't have `as string` here, it's inferred as string | number, incompatible with the type of 'value'
-                    // so there's a type error on the setValues line.
-                    // why doesn't that happen in the "data_highlighted" case above?
-                    index => ({index, value: tds.getRowText(index, link.name_column) as string})
-                );
-                setValues(vals);
-            }
-        });
-        return () => {
-            tds.removeListener(`highlightedRows:${id}`);
-        };
-    }, [id, racLink]);
-    return values;
+    const racLink = useRowsAsColumnsLinks()[0];
+    const values = racLink?.link.observableFields || [];
+    return values; //maybe don't useState version of this but return the mobx observable directly
 }
 /** design of this will need to change to account for n-links
  * 
@@ -185,14 +137,18 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
     const cols = useHighlightedForeignRows(); //not actual cols
     //would like not to have this here - might have some more logic in above hook
     //in particular want to redesign the fieldName being what determines the column
-    const racLink = useRowsAsColumnsLinks();
-    const { link } = racLink || { link: null }; //!! passing the whole racLink object lead to an infinite loop
+    const racLink = useRowsAsColumnsLinks()[0];
+    //! this next line may be problematic - useMemo is important
+    const { link } = useMemo(() => racLink || { link: null }, [racLink]);
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
     const ds = useDataStore();
     useEffect(() => {
         // todo - check whether checking link for null here means we can clean up ForeignRows component
         // (which currently breaks rules of hooks)
-        if (cols.length === 0 || !link) {
+        if (!link) {
+            return;
+        }
+        if (cols.length === 0) {
             setColumns([]);
             return;
         }
@@ -201,10 +157,8 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
         const sg = Object.keys(link.subgroups)[0];
         const f = filter.toLowerCase();
         // todo: consider pagination... pass in a page number, return information about total number of columns etc.
-        const c = cols.filter(({value}) => value.toLowerCase().includes(f)).slice(0, max).map(v => {
-            const f = `${sg}|${v.value}(${sg})|${v.index}`;
-            return ds.addColumnFromField(f);
-        });
+        // moving ds.addColumnsFromFields() up the stack...
+        const c = cols.filter(({name}) => name.toLowerCase().includes(f)).slice(0, max).map(({column}) => column);
         // don't setColumns until we have the data...
         // alternatively, they could be lazy-loaded by consuming components.
         // that could be implemented relatively easily, but would lack some batching of requests,

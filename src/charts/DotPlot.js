@@ -5,6 +5,7 @@ import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
+import { serialiseQueries } from "./chartConfigUtils";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -14,9 +15,16 @@ class DotPlot extends SVGChart {
             y: { type: "band" },
             ry: {},
         });
-        const p = this.config.param;
-        const yLabels = [];
-        const c = this.config;
+        //! this.config is not the object that was passed in, it's been processed by super()
+        const c = this.config; 
+        
+        this.addToolTip();
+        this.dim = this.dataStore.getDimension("catcol_dimension");
+        this.colorScheme = schemeReds[8];
+        console.log('setting fields for dot plot', c.param.slice(1));
+        //this works ok because the method is decorated... which I think means if there's a query object,
+        //`setFields` won't actually be called until the link is properly initialised
+        this.setFields(c.param.slice(1));
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
         if (!c.color_legend) {
@@ -25,15 +33,25 @@ class DotPlot extends SVGChart {
         if (!c.fraction_legend) {
             c.fraction_legend = { display: true };
         }
-        this.fractionScale = scaleSqrt().domain([0, 100]);
-        for (let x = 1; x < p.length; x++) {
-            yLabels.push(this.dataStore.getColumnName(p[x]));
-        }
+        //this.fractionScale = scaleSqrt().domain([0, 100]);
+    }
+    
+    // todo figure out why annotation version isn't fully working - need methodsUsingColumns as well???
+    //if called with objects representing queries, this will cause the method to be called with column names
+    //and again whenever the column data changes
+    //but when we clone a chart like that, at the moment the old chart stops responding to changes
+    // @loadColumnData 
+    setFields(fieldNames) {
+        const cm = window.mdv.chartManager;
+        //! we don't want to mutate the config object... 
+        // we want to have a special value which signifies that it should use this behaviour.
+        // then when we save state, it will have the appropriate value.
+        //this.config.param = [p0, ...fieldNames]; //first is the category column
+        this.fieldNames = fieldNames;
+        // await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
+        const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
         this.x_scale.domain(yLabels);
-        this.dim = this.dataStore.getDimension("catcol_dimension");
-        this.addToolTip();
         this.onDataFiltered();
-        this.colorScheme = schemeReds[8];
     }
 
     remove(notify = true) {
@@ -48,7 +66,7 @@ class DotPlot extends SVGChart {
     }
 
     setColorFunction() {
-        const p = this.config.param;
+        const f = this.fieldNames[0];
         const mm = this.data.mean_range;
         const conf = {
             useValue: true,
@@ -59,7 +77,7 @@ class DotPlot extends SVGChart {
                 min: mm[0],
             },
         };
-        this.colorFunction = this.dataStore.getColorFunction(p[1], conf);
+        this.colorFunction = this.dataStore.getColorFunction(f, conf);
         this.setColorLegend();
     }
 
@@ -75,7 +93,7 @@ class DotPlot extends SVGChart {
             },
             name: "Mean Expression",
         };
-        return this.dataStore.getColorLegend(this.config.param[1], conf);
+        return this.dataStore.getColorLegend(this.fieldNames[0], conf);
     }
 
     showFractionLegend() {
@@ -105,7 +123,30 @@ class DotPlot extends SVGChart {
         if (l) {
             config.fraction_legend.position = [l.offsetLeft, l.offsetTop];
         }
+        // it looks as though individual charts may be on the hook to serialise their queries
+        // because only they really know how they relate to order of params in the config
+        // in the case of react charts, they should hypothetically respond to changes in the config already
+        // - we just need to make that aware of queries in appropriate hooks?
+        // as for non-react... I suppose if they all have a contract whereby setConfig method will set appropriate state
+        const fieldQuery = serialiseQueries(this)['setFields'];
+        // if we have a way of interpreting this we'd be good to go
+        if (fieldQuery) {
+            console.log('DotPlot fieldQuery', fieldQuery);
+            config.param = [config.param[0], ...fieldQuery];
+        }
         return config;
+    }
+    normaliseFractionScale() {
+        const { data } = this.data;
+        const getMaxFrac = () => {
+            let maxFraction = 0;
+            for (const d of data) {
+                const f = d.values.map(x => x.frac);
+                maxFraction = Math.max(maxFraction, ...f);
+            }
+            return maxFraction;
+        }
+        this.fractionScale = scaleSqrt().domain([0, getMaxFrac()]);
     }
 
     onDataFiltered(dim) {
@@ -122,15 +163,16 @@ class DotPlot extends SVGChart {
             method: "averages_simple",
             threshold: this.config.threshold_value,
         };
-
+        const p = [this.config.param[0], ...this.fieldNames];
         this.dim.getAverages(
             (data) => {
                 this.data = data;
-
+                //perhaps normalise should be optional
+                this.normaliseFractionScale();
                 this.setColorFunction();
                 this.drawChart();
             },
-            this.config.param,
+            p,
             config,
         );
     }
@@ -150,7 +192,7 @@ class DotPlot extends SVGChart {
             .duration(tTime)
             .ease(easeLinear);
         const dim = this._getContentDimensions();
-        const cWidth = dim.width / (this.config.param.length - 1);
+        const cWidth = dim.width / (this.fieldNames.length);
         const fa = this.dim.filterMethod;
         this.setColorFunction();
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
@@ -206,8 +248,9 @@ class DotPlot extends SVGChart {
                     .on("mouseover pointermove", (e, d) => {
                         // ['id', 'total', 'count', 'frac', 'mean', 'cat_id']
                         //const tip = { category: vals[d.cat_id], value: d.id, fraction: d.frac };
-                        this.showToolTip(e, `(<em>${d.id}, ${vals[d.cat_id]}</em>)<br>percentage: ${d.frac.toFixed(0)}%`);
-                        // this.showToolTip(e, `fraction: <em>${d.frac}</em>`);
+                        const category = this.dataStore.columnIndex[this.config.param[0]].name;
+                        const id = this.dataStore.columnIndex[d.id].name;
+                        this.showToolTip(e, `${d.id}<br />${category}: ${vals[d.cat_id]}<br>percentage: ${d.frac.toFixed(0)}%`);
                     })
                     .on("mouseout", () => {
                         this.hideToolTip();
@@ -228,7 +271,7 @@ class DotPlot extends SVGChart {
 
             .attr("cx", (d, i) => i * cWidth + 0.5 * cWidth)
             .attr("cy", cyPos)
-            .attr("r", (d) => this.fractionScale(d.frac))
+            .attr("r", (d) => this.fractionScale(d.frac)) // 
             .attr("fill", (d, i) => {
                 return this.colorFunction(d.mean);
             });
@@ -312,6 +355,26 @@ class DotPlot extends SVGChart {
                     this.drawChart();
                 },
             },
+            {
+                // perhaps the GuiType should be more aligned with params type - i.e. _multi_column:number
+                // * we should then be able to expose all params in the settings in a more consistent way *
+                // then we wouldn't want current_value to be this.fieldNames, but the entries in config.param
+                // corresponding to fields... as defined in BaseChart.types["dot_plot"].params
+                // - param is a flat array - so we'd need to mimic the behaviour of spreading values from here
+                // there's a more general question of whether settings operates on the mobx mutable config object
+                // ... in many cases we could avoid having a `func`...
+                type: "multicolumn", //maybe this should be `"_multi_column:number"`
+                label: "Fields on x axis",
+                // this is more of a nuisance than type: "_multi_column:number"
+                columnSelection: {
+                    filter: ["double", "integer", "int32"]
+                },
+                current_value: this.fieldNames,
+                func: (v) => {
+                    // given that this is "multicolumn", we should be able to assume that v is an array
+                    this.setFields(Array.isArray(v) ? v : [v]);
+                },
+            },
         ]);
     }
 }
@@ -319,14 +382,16 @@ class DotPlot extends SVGChart {
 BaseChart.types["dot_plot"] = {
     name: "Dot Plot",
     class: DotPlot,
+    methodsUsingColumns: ["setFields"],
     params: [
         {
             type: "text",
-            name: "Categories on x-axis",
+            name: "Categories on y-axis",
         },
         {
             type: "_multi_column:number",
-            name: "Fields on y axis",
+            name: "Fields on x axis",
+            //maybe we could have some information here about which method this corresponds to
         },
     ],
 };

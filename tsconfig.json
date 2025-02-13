@@ -12,6 +12,8 @@
         "moduleResolution": "node",
         "noUnusedParameters": false,
         "noUnusedLocals": false,
+        //https://mobx.js.org/installation.html#use-spec-compliant-transpilation-for-class-properties
+        "useDefineForClassFields": true,
         "allowSyntheticDefaultImports": true,
         "sourceMap": true,
         "noEmit": false,

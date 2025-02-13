@@ -5,7 +5,7 @@ import {
     getLocalCompressedBinaryDataLoader,
     processArrayBuffer,
     decompressData,
-} from "../dataloaders/DataLoaders.js";
+} from "../dataloaders/DataLoaders";
 window.mdv = {
     ChartManager,
     getArrayBufferDataLoader,
