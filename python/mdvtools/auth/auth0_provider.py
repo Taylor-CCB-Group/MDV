@@ -50,7 +50,7 @@ class Auth0Provider(AuthProvider):
             # Parse and check the existence of jwks_uri in the metadata
             metadata = response.json()
             print("@@@@@@")
-            print(metadata)
+            #print(metadata)
             jwks_uri = metadata.get('jwks_uri')
             if not jwks_uri:
                 logging.error(f"The OpenID configuration is missing 'jwks_uri': {metadata}")
@@ -80,7 +80,8 @@ class Auth0Provider(AuthProvider):
             redirect_uri = self.app.config["AUTH0_CALLBACK_URL"]
             print(redirect_uri)
             print(self.oauth.auth0.authorize_redirect(redirect_uri))
-            return self.oauth.auth0.authorize_redirect(redirect_uri)
+            return self.oauth.auth0.authorize_redirect(redirect_uri=redirect_uri)
+        
         except Exception as e:
             logging.error(f"Error during login process: {e}")
             raise RuntimeError("Login failed.") from e
@@ -125,7 +126,7 @@ class Auth0Provider(AuthProvider):
         """
         try:
             logging.info("Retrieving token from session.")
-            return session.get('token')
+            return session.get('token', {}).get('access_token')
         except Exception as e:
             logging.error(f"Error while retrieving token: {e}")
             return None
