@@ -13,7 +13,6 @@ const ReusableDialog = ({
     handleClose,
     component,
 }: ReusableDialogProps) => {
-
     return (
         <Dialog
             open={open}
@@ -23,7 +22,7 @@ const ReusableDialog = ({
             PaperProps={{
                 style: {
                     backgroundColor: "var(--fade_background_color)",
-                    backdropFilter: "blur(1px)",
+                    backdropFilter: "blur(1px)"
                 },
             }}
         >
@@ -43,7 +42,10 @@ const ReusableDialog = ({
                 <Close />
             </IconButton>
 
-            <div className="h-screen flex items-center justify-center">
+            <div
+                className="flex items-center justify-center"
+                style={{marginTop: "20vh"}}
+            >
                 <Paper elevation={24} sx={{ p: 2 }}>
                     <Container>{component}</Container>
                 </Paper>
