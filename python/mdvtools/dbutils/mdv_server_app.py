@@ -16,10 +16,20 @@ from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 from flask import redirect, url_for, session, jsonify
-from mdvtools.auth.auth0_provider import Auth0Provider
-from authlib.integrations.flask_client import OAuth 
 
-oauth = OAuth()  
+# Read environment flag for authentication
+ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
+
+if ENABLE_AUTH:
+    try:
+        from authlib.integrations.flask_client import OAuth
+        from mdvtools.auth.auth0_provider import Auth0Provider
+
+        oauth = OAuth()  # Initialize OAuth only if auth is enabled
+    except ImportError:
+        print("Auth library not found. Ensure poetry installs `auth` dependencies when ENABLE_AUTH=1.")
+        exit(1)  # Fail early if auth is enabled but libraries are missing
+
 
 def create_flask_app(config_name=None):
     """Create and configure the Flask app."""
@@ -33,7 +43,7 @@ def create_flask_app(config_name=None):
     
     try:
         print("**Adding config.json details to app config")
-        load_config(app, config_name)
+        load_config(app, config_name, ENABLE_AUTH)
     except Exception as e:
         print(f"Error loading configuration: {e}")
         exit(1)
@@ -67,8 +77,6 @@ def create_flask_app(config_name=None):
             # Routes registration and application setup
             print("Registering the blueprint (register_app)")
             ProjectBlueprint.register_app(app)
-            
-
     except OperationalError as oe:
         print(f"OperationalError: {oe}")
         exit(1)
@@ -77,13 +85,19 @@ def create_flask_app(config_name=None):
         exit(1)
 
     # Register OAuth with the app
-    oauth.init_app(app)
-    # Register routes for authentication (login, callback, etc.)
+    if ENABLE_AUTH:
+        try:
+            print("Initializing OAuth for authentication")
+            oauth.init_app(app)
+        except Exception as e:
+            print(f"Error initializing OAuth: {e}")
+            exit(1)
+
 
     # Authentication check function
-    def is_authenticated() -> bool:
-        """Check if the user is authenticated."""
-        return 'token' in session and session['token']  # Validate presence of token in session
+    def is_authenticated():
+        """Check if the user is authenticated (only when auth is enabled)."""
+        return ENABLE_AUTH and 'token' in session and session['token']
 
     # Whitelist of routes that do not require authentication
     whitelist_routes = [
@@ -100,28 +114,27 @@ def create_flask_app(config_name=None):
 
     @app.before_request
     def enforce_authentication():
-        """Redirect unauthenticated users to /login_dev for non-whitelisted routes."""
-        
+        """Redirect unauthenticated users to login if required."""
+        if not ENABLE_AUTH:
+            return None  # Skip authentication check if auth is disabled
+
         requested_path = request.path
-        
-        # If the requested path is in the whitelist, allow access without authentication
-        if any(requested_path.startswith(whitelisted) for whitelisted in whitelist_routes):
-            return None  # No need to check authentication
-        
-        # Redirect unauthenticated users to /login_dev
+        if any(requested_path.startswith(route) for route in whitelist_routes):
+            return None  # Allow access to whitelisted routes
+
         if not is_authenticated():
             print(f"Unauthorized access attempt to {requested_path}. Redirecting to /login_dev.")
-            redirect_uri = "https://bia.cmd.ox.ac.uk/carroll/login_dev"
-            return redirect(redirect_uri)  # Redirect to login page
-        
+            return redirect("https://bia.cmd.ox.ac.uk/carroll/login_dev")
+
         return None
 
-    try:
-        print(" Registering authentication routes")
-        register_auth0_routes(app)  # Register Auth0-related routes like /login and /callback
-    except Exception as e:
-        print(f"Error registering authentication routes: {e}")
-        exit(1)
+    if ENABLE_AUTH:
+        try:
+            print("Registering authentication routes")
+            register_auth0_routes(app)  # Register Auth0-related routes like /login and /callback
+        except Exception as e:
+            print(f"Error registering authentication routes: {e}")
+            exit(1)
 
     # Register other routes (base routes like /, /projects, etc.)
     try:
@@ -163,7 +176,7 @@ def wait_for_database():
 
 
 
-def load_config(app,config_name=None):
+def load_config(app, config_name=None, enable_auth=False):
     try:
         config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
         with open(config_file_path) as config_file:
@@ -209,20 +222,21 @@ def load_config(app,config_name=None):
             
             app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
 
-            # Auth0 specific configuration
-            auth0_domain = os.getenv('AUTH0_DOMAIN') or app.config.get('AUTH0_DOMAIN')
-            auth0_client_id = os.getenv('AUTH0_CLIENT_ID') or app.config.get('AUTH0_CLIENT_ID')
-            auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET') or app.config.get('AUTH0_CLIENT_SECRET')
 
-            if not all([auth0_domain, auth0_client_id, auth0_client_secret]):
-                raise ValueError("Error: One or more required secrets or configurations are missing for Auth0.")
+            # Only configure Auth0 if ENABLE_AUTH is True
+            if enable_auth:
+                auth0_domain = os.getenv('AUTH0_DOMAIN')
+                auth0_client_id = os.getenv('AUTH0_CLIENT_ID')
+                auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET')
 
-            app.config['AUTH0_DOMAIN'] = auth0_domain
-            app.config['AUTH0_CLIENT_ID'] = auth0_client_id
-            app.config['AUTH0_CLIENT_SECRET'] = auth0_client_secret
+                if not all([auth0_domain, auth0_client_id, auth0_client_secret]):
+                    raise ValueError("Error: Missing Auth0 configuration.")
 
-            # If you're using a callback URL, make sure it's configured
-            app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL') or app.config.get('AUTH0_CALLBACK_URL')
+                app.config['AUTH0_DOMAIN'] = auth0_domain
+                app.config['AUTH0_CLIENT_ID'] = auth0_client_id
+                app.config['AUTH0_CLIENT_SECRET'] = auth0_client_secret
+                app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL')
+
 
     except Exception as e:
         print(f"An unexpected error occurred while configuring the database: {e}")
@@ -383,13 +397,15 @@ def serve_projects_from_filesystem(app, base_dir):
 
 
 # The function that registers the Auth0 routes
-from flask import request, session, jsonify
-
 def register_auth0_routes(app):
-    """Registers authentication routes and enforces session expiration."""
+    """
+    Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
+    with centralized and route-specific error handling.
+    """
     print("Registering AUTH routes...")
 
     try:
+        # Initialize the Auth0Provider
         auth0_provider = Auth0Provider(
             app,
             oauth=oauth,
@@ -398,49 +414,73 @@ def register_auth0_routes(app):
             domain=app.config['AUTH0_DOMAIN']
         )
 
-        @app.before_request
-        def enforce_session_expiry():
-            """Check if the session is expired before handling requests."""
-            if request.endpoint not in ['login', 'callback', 'logout']:  # Exclude login/logout
-                if not auth0_provider.is_authenticated():
-                    logging.warning(f"Session expired for {request.path}. Redirecting to login.")
-                    return redirect(url_for('login'))
-
+        # Route for login (redirects to Auth0 for authentication)
         @app.route('/login')
         def login():
             try:
                 print("$$$$$$$$$$$$$$$ app-login")
+                session.clear()  
                 return auth0_provider.login()
             except Exception as e:
-                print(f"In register_auth0_routes: Error during login: {e}")
+                print(f"In register_auth0_routes : Error during login: {e}")
                 return jsonify({"error": "Failed to start login process."}), 500
 
+        # Route for the callback after login (handles the callback from Auth0)
         @app.route('/callback')
         def callback():
             try:
                 print("$$$$$$$$$$$$$$$ app-callback")
+                code = request.args.get('code')  # Get the code from the callback URL
+                if not code:
+                    print("Missing 'code' parameter in the callback URL.")
+                    return jsonify({"error": "Authorization code not provided."}), 400
+                print("$$$$$$$$$$$$$$$ app-callback  1")
                 token = auth0_provider.handle_callback()
+                print("$$$$$$$$$$$$$$$ app-callback 2")
                 session['token'] = token  # Store the token in session
-                return redirect(url_for('index'))  # Redirect to home page
+                return redirect(url_for('index'))  # Redirect to the home page or any protected page
             except Exception as e:
-                print(f"In register_auth0_routes: Error during callback: {e}")
+                print(f"In register_auth0_routes : Error during callback: {e}")
                 return jsonify({"error": "Failed to complete authentication process."}), 500
 
+        # Route for logout (clears the session and redirects to home)
         @app.route('/logout')
         def logout():
             try:
                 auth0_provider.logout()
                 print("logged out")
-                return redirect(url_for('login'))
+                return redirect(url_for('login_dev'))  # Redirect to home after logout
             except Exception as e:
                 print(f"In register_auth0_routes: Error during logout: {e}")
                 return jsonify({"error": "Failed to log out."}), 500
 
+        # You can also add a sample route to check the user's profile or token
+        @app.route('/profile')
+        def profile():
+            try:
+                token = session.get('token')
+                if token:
+                    user_info = auth0_provider.get_user(token)
+                    return jsonify(user_info)
+                else:
+                    print("Token not found in session.")
+                    return jsonify({"error": "Not authenticated."}), 401
+            except Exception as e:
+                print(f"In register_auth0_routes: Error during profile retrieval: {e}")
+                return jsonify({"error": "Failed to retrieve user profile."}), 500
+        
+        @app.route('/login_sso')
+        def login_sso():
+            # Redirect user to Shibboleth-protected login page on Apache
+            return redirect('https://bia.cmd.ox.ac.uk:443')
+
+
         print("Auth0 routes registered successfully!")
-    
+
     except Exception as e:
         print(f"Error registering AUTH routes: {e}")
         raise
+
 
 
 def register_routes(app):
