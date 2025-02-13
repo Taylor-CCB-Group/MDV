@@ -22,7 +22,7 @@ class ProjectBlueprint:
         @app.route("/project/<project_id>/<path:subpath>/", methods=["GET", "POST", "PATCH"])
         #incorporated below to resolve issue related to redirecting the request to http
         #@app.route("/project/<project_id>", defaults={'subpath': ''}, methods=["GET", "POST"])
-        def project_route(project_id: str, subpath: str):
+        def project_route(project_id: str, subpath: str) -> Response:
             """This generic route should call the appropriate method on the project with the given id.
 
             It will look up the project_id in ProjectBlueprint.blueprints and call the method with the given subpath.
@@ -83,6 +83,10 @@ class ProjectBlueprint:
         raise ValueError(f"no matching route for {subpath}")
     
 class ProjectBlueprint_v2:
+    """
+    Different version of ProjectBlueprint that includes access level checks for routes,
+    and updates the accessed timestamp for a project when a route is accessed.
+    """
     blueprints: Dict[str, "ProjectBlueprint_v2"] = {}
     # Class-level constant for the timestamp update interval
     TIMESTAMP_UPDATE_INTERVAL = timedelta(hours=1)
@@ -115,6 +119,7 @@ class ProjectBlueprint_v2:
     def __init__(self, name: str, _ignored: str, url_prefix: str) -> None:
         self.name = name
         self.url_prefix = url_prefix  # i.e. /project/<project_id>/
+        # this is different from the original ProjectBlueprint because we use it to store permissions flags
         self.routes: Dict[re.Pattern[str], Tuple[Callable, Dict[str, Any]]] = {}
         ProjectBlueprint_v2.blueprints[name] = self
 

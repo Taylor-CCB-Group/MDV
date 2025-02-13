@@ -24,6 +24,34 @@ Attempting to view a project in Safari, I get something like this:
 
 Couldn't see much by stopping on a breakpoint and examining the request object.  I'm not sure what's going on here.
 But it's good to have a way to run the server in a debugger.
+
+Things I've tried:
+- narrowing down the problem to whether it occurs:
+ - when gunicorn is not involved (running this version of the server, still has the problem)
+ - when running the mdv_desktop script
+    - this seems to work, whether in the container or not
+
+I haven't tried non-localhost servers at all so far.
+Figuring out what is different between mdv_desktop and mdv_server_app
+
+The main thing is the SQLAlchemy layer - not sure how likely to be implicated, 
+so focusing on first eliminating anything else that could be different.
+
+- "upgrade-insecure-requests" header in page.html
+- ProjectBlueprint_V2 vs ProjectBlueprint
+- changing how Flask constructor & run() are called
+
+As of this writing, I see inconsisent behaviour between the server_debug script and mdv_server_app.py
+Could've sworn they behaved the same way before.
+As of now, the site is not rendering usefully in Safari with this script
+: but it is not causing the server to crash, either.
+
+It is also both the catalog and the project view that are not rendering.
+
+Catalog has 
+"Failed to load resource: An SSL error has occurred and a secure connection to the server cannot be made."
+for catalog.css and catalog.js
+This is accomponied by similar indecipherable messages in the terminal as documented above.
 """
 
 
