@@ -13,9 +13,6 @@ const ReusableDialog = ({
     handleClose,
     component,
 }: ReusableDialogProps) => {
-    useEffect(() => {
-        console.log("render");
-    });
 
     return (
         <Dialog
