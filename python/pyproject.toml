@@ -65,6 +65,7 @@ optional = true
 flask-sqlalchemy = "^3.1.1"
 psycopg2 = "^2.9.9"
 gunicorn = "^22.0.0"
+flask-testing = "^0.8.1"
 
 [tool.pyright]
 venvPath = "../venv/"

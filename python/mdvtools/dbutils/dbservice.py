@@ -1,4 +1,4 @@
-# project_service.py
+# dbservice.py
 
 from mdvtools.dbutils.dbmodels import db, Project, File
 from datetime import datetime
@@ -34,9 +34,12 @@ class ProjectService:
 
     @staticmethod
     #  Routes -> /create_project
-    def add_new_project(path, name='unnamed_project'):
+    def add_new_project(path, name='unnamed project'):
         try:
-            new_project = Project(name=name, path=path)
+            # can't see simple way to make type check happy with kwargs here
+            new_project = Project()
+            new_project.name = name
+            new_project.path = path
             db.session.add(new_project)
             db.session.commit()
             return new_project
@@ -169,13 +172,12 @@ class FileService:
                     print(f"Updated file name in DB: {existing_file}")
             else:
                 # Add new file to the database
-                new_file = File(
-                    name=file_name,
-                    file_path=file_path,
-                    project_id=project_id,
-                    upload_timestamp=datetime.now(),
-                    update_timestamp=datetime.now()
-                )
+                new_file = File()
+                new_file.name = file_name
+                new_file.file_path = file_path
+                new_file.project_id = project_id
+                new_file.upload_timestamp = datetime.now()
+                new_file.update_timestamp = datetime.now()
                 db.session.add(new_file)
                 print(f"Added new file to DB: {new_file}")
 
