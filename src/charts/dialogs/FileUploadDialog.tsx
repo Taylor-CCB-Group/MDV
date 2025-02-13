@@ -1453,17 +1453,6 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
 
 const Wrapper = (props: FileUploadDialogComponentProps) => {
     const [open, setOpen] = useState(true);
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
-                setOpen(false);
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => {
-            window.removeEventListener("keydown", handleKeyDown);
-        };
-    }, []);
 
     const handleClose = () => {
         setOpen(false);

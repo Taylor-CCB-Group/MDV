@@ -1,5 +1,6 @@
 import { Close } from "@mui/icons-material";
 import { Container, Dialog, IconButton, Paper } from "@mui/material";
+import { useEffect } from "react";
 
 export interface ReusableDialogProps {
     open: boolean;
@@ -12,12 +13,16 @@ const ReusableDialog = ({
     handleClose,
     component,
 }: ReusableDialogProps) => {
+    useEffect(() => {
+        console.log("render");
+    });
+
     return (
         <Dialog
             open={open}
             onClose={handleClose}
             fullScreen
-            disableEscapeKeyDown={true}
+            disableRestoreFocus
             PaperProps={{
                 style: {
                     backgroundColor: "var(--fade_background_color)",
