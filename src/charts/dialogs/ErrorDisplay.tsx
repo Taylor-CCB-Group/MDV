@@ -61,7 +61,7 @@ const ErrorDisplay = ({
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(
-                `Error: ${error.message}\n\nTraceback:\n${error.traceback}`,
+                `Error: ${error.message}\n\nTraceback:\n${error.traceback}${extraMetadata ? `\n\nMetaData:\n${JSON.stringify(extraMetadata, null, 2)}` : ""}`,
             );
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
