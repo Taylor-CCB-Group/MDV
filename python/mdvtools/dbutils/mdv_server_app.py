@@ -123,8 +123,9 @@ def create_flask_app(config_name=None):
             return None  # Allow access to whitelisted routes
 
         if not is_authenticated():
+            redirect_uri = app.config["LOGIN_REDIRECT_URL"]
             print(f"Unauthorized access attempt to {requested_path}. Redirecting to /login_dev.")
-            return redirect("https://bia.cmd.ox.ac.uk/carroll/login_dev")
+            return redirect(redirect_uri)
 
         return None
 
@@ -225,9 +226,9 @@ def load_config(app, config_name=None, enable_auth=False):
 
             # Only configure Auth0 if ENABLE_AUTH is True
             if enable_auth:
-                auth0_domain = os.getenv('AUTH0_DOMAIN')
-                auth0_client_id = os.getenv('AUTH0_CLIENT_ID')
-                auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET')
+                auth0_domain = os.getenv('AUTH0_DOMAIN') or config.get('AUTH0_DOMAIN')
+                auth0_client_id = os.getenv('AUTH0_CLIENT_ID') or config.get('AUTH0_CLIENT_ID')
+                auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET') or read_secret("auth0_client_secret")
 
                 if not all([auth0_domain, auth0_client_id, auth0_client_secret]):
                     raise ValueError("Error: Missing Auth0 configuration.")
@@ -235,7 +236,8 @@ def load_config(app, config_name=None, enable_auth=False):
                 app.config['AUTH0_DOMAIN'] = auth0_domain
                 app.config['AUTH0_CLIENT_ID'] = auth0_client_id
                 app.config['AUTH0_CLIENT_SECRET'] = auth0_client_secret
-                app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL')
+                app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL') or config.get('AUTH0_CALLBACK_URL')
+                app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
 
 
     except Exception as e:
@@ -449,7 +451,8 @@ def register_auth0_routes(app):
             try:
                 auth0_provider.logout()
                 print("logged out")
-                return redirect(url_for('login_dev'))  # Redirect to home after logout
+                redirect_uri = app.config["LOGIN_REDIRECT_URL"]
+                return redirect(redirect_uri)  # Redirect to home after logout
             except Exception as e:
                 print(f"In register_auth0_routes: Error during logout: {e}")
                 return jsonify({"error": "Failed to log out."}), 500
