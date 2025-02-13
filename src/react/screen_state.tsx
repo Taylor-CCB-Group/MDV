@@ -2,7 +2,7 @@ import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { observer } from "mobx-react-lite";
 import { createContext, useContext, useEffect, useState } from "react";
-import { type createMdvPortal } from './react_utils';
+import type { createMdvPortal } from './react_utils';
 /** All charts and dialogs have this as an `observable` property that can be passed to
  * {@link createMdvPortal} to allow access to the container they should render things like
  * which allows Mobx Observer components to {@link useOuterContainer} for access to the container they should render things like

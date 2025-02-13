@@ -10,7 +10,7 @@ from typing import Literal, Any
 # from .chart_dicts import BaseChart
 
 
-class Panel(TypedDict):
+class Panel(TypedDict, total=False):
     """This describes a panel in a view."""
 
     layout: Literal["gridstack", "absolute"]

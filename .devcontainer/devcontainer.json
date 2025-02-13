@@ -12,7 +12,12 @@
                 "ms-toolsai.jupyter",
                 "github.vscode-github-actions",
                 "eamodio.gitlens"
-            ]
+            ],
+            "settings": {
+                "python.analysis.typeCheckingMode": "basic",
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "typescript.tsdk": "/app/node_modules/typescript/lib"
+            }
         }
     },
     "postStartCommand": "git config --global --add safe.directory /app"

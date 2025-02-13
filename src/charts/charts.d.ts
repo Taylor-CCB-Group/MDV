@@ -89,10 +89,10 @@ export type DataColumn<T extends DataType> = {
     sgtype?: "dense" | "sparse"; //?? any other options?
 };
 export type LoadedDataColumn<T extends DataType> = DataColumn<T> & Required<Pick<DataColumn<T>, "data">>;
-function test(column: LoadedDataColumn<"text">) {
-    column.data;
-    column.values; //why does this degrade to 'any'?
-}
+// function test(column: LoadedDataColumn<"text">) {
+//     column.data;
+//     column.values; //why does this degrade to 'any'?
+// }
 // export type DataStore = {
 //     size: number;
 //     filterSize: number;
