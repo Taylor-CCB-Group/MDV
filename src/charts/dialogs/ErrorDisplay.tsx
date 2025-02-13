@@ -8,33 +8,60 @@ import {
 import {
     Alert,
     AlertTitle,
+    Button,
     Collapse,
+    Container,
+    Divider,
     IconButton,
     Paper,
     Snackbar,
+    TextareaAutosize,
     Tooltip,
+    Typography,
 } from "@mui/material";
-import React, { useState } from "react";
+import { useState } from "react";
+import JsonView from "react18-json-view";
 
+/** Any extra information we may want to use
+ *
+ * @remarks Only an object is expected, large objects like data store will break the ErrorDisplay component
+ */
+//! Don't send large objects like DataStore which will break the ErrorDisplay component, also look for an alternative way to handle this issue
+export type ErrorMetadata = object;
 export interface ErrorDisplayProps {
     error: {
         message: string;
         traceback?: string;
     };
     title?: string;
+    extraMetadata?: ErrorMetadata;
 }
 
 const ErrorDisplay = ({
     error,
     title = "Error Occurred",
+    extraMetadata,
 }: ErrorDisplayProps) => {
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [userComments, setUserComments] = useState<string>();
+
+    // Send the error details and the user's comments (if any) to the support email address
+    const handleSend = () => {
+        const errorDetails = {
+            message: error.message,
+            traceback: error?.traceback,
+            userComments: userComments ? userComments : null,
+            extraMetadata: extraMetadata ? extraMetadata : null
+        };
+        //todo: Add the logic to send the error details to the email address and display the corresponding message to user
+        console.log("Send", errorDetails);
+    };
 
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(
-                `Error: ${error.message}\n\nTraceback:\n${error.traceback}`,
+                `Error: ${error.message}\n\nTraceback:\n${error.traceback}${extraMetadata ? `\n\nMetaData:\n${JSON.stringify(extraMetadata, null, 2)}` : ""}`,
             );
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
@@ -44,7 +71,14 @@ const ErrorDisplay = ({
     };
 
     return (
-        <div style={{ maxWidth: 800, minWidth: 500, margin: "20px auto", width: "90%" }}>
+        <div
+            style={{
+                maxWidth: 800,
+                minWidth: 500,
+                margin: "20px auto",
+                width: "90%",
+            }}
+        >
             <Paper
                 elevation={3}
                 sx={{
@@ -55,11 +89,13 @@ const ErrorDisplay = ({
                 <Alert
                     severity="error"
                     icon={
-                        <ErrorIcon sx={{ 
-                            fontSize: 25, 
-                            color: "red",
-                            marginTop: "1px", 
-                        }} />
+                        <ErrorIcon
+                            sx={{
+                                fontSize: 25,
+                                color: "red",
+                                marginTop: "1px",
+                            }}
+                        />
                     }
                     sx={{
                         "& .MuiAlert-message": {
@@ -104,70 +140,98 @@ const ErrorDisplay = ({
                     </AlertTitle>
 
                     <div style={{ marginTop: "12px" }}>
-                    <p
-                        style={{
-                            margin: "0 0 12px 0",
-                            lineHeight: "1.6",
-                            padding: "4px 8px",
-                            color: "var(--text_color_error)",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                        }}
-                    >
+                        <p
+                            style={{
+                                margin: "0 0 12px 0",
+                                lineHeight: "1.6",
+                                padding: "4px 8px",
+                                color: "var(--text_color_error)",
+                                whiteSpace: "pre-wrap",
+                                wordBreak: "break-word",
+                            }}
+                        >
                             {error.message}
                         </p>
 
                         {error.traceback && (
                             <div>
-                            <IconButton
-                                size="medium"
-                                onClick={() => setExpanded(!expanded)}
-                                sx={{
-                                    mb: 1,
-                                    fontSize: "0.875rem",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    padding: "6px 12px",
-                                    borderRadius: "6px",
-                                    color: "var(--icon_color_error)",
-                                    "&:hover": {
-                                        backgroundColor: "var(--background_color_hover)",
-                                    },
-                                }}
-                            >
-                                {expanded ? <ExpandLess /> : <ExpandMore />}
-                                <span style={{ marginLeft: "6px" }}>
-                                    {expanded ? "Hide Details" : "Show Details"}
-                                </span>
-                            </IconButton>
-
-                                <Collapse in={expanded}>
-                                <pre
-                                    style={{
-                                        backgroundColor: "var(--background_color)",
-                                        padding: "16px",
+                                <IconButton
+                                    size="medium"
+                                    onClick={() => setExpanded(!expanded)}
+                                    sx={{
+                                        mb: 1,
+                                        fontSize: "0.875rem",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        padding: "6px 12px",
                                         borderRadius: "6px",
-                                        margin: "8px 0 0 0",
-                                        maxHeight: "400px",
-                                        overflowY: "auto",
-                                        overflowX: "auto",
-                                        fontSize: "0.9rem",
-                                        lineHeight: "1.5",
-                                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                                        border: "1px solid var(--input_border_color)",
-                                        whiteSpace: "pre-wrap",
-                                        wordBreak: "break-word",
-                                        color: "var(--text_color)",
+                                        color: "var(--icon_color_error)",
+                                        "&:hover": {
+                                            backgroundColor:
+                                                "var(--background_color_hover)",
+                                        },
                                     }}
                                 >
-                                        {error.traceback}
-                                    </pre>
+                                    {expanded ? <ExpandLess /> : <ExpandMore />}
+                                    <span style={{ marginLeft: "6px" }}>
+                                        {expanded
+                                            ? "Hide Details"
+                                            : "Show Details"}
+                                    </span>
+                                </IconButton>
+
+                                <Collapse in={expanded}>
+                                    {extraMetadata && (
+                                        <JsonView
+                                            src={{
+                                                ...extraMetadata,
+                                                stackTrace: error?.traceback,
+                                            }}
+                                            collapsed={1}
+                                        />
+                                    )}
                                 </Collapse>
                             </div>
                         )}
                     </div>
                 </Alert>
+                <Divider />
+                <Container
+                    sx={{
+                        pt: 2,
+                    }}
+                >
+                    <Typography variant="h6" sx={{ mb: 2 }}>
+                        We are sorry for the inconvenience.
+                    </Typography>
+                    <Typography sx={{ mb: 2 }}>
+                        To help us diagnose and fix the problem, please click on
+                        the send button below to send error details.
+                    </Typography>
+                    <TextareaAutosize
+                        minRows={3}
+                        style={{
+                            width: "100%",
+                            padding: "10px 10px",
+                            marginTop: 2,
+                            backgroundColor: "var(--input_background_color)",
+                            borderWidth: 2,
+                            borderColor: "var(--input_border_color)",
+                        }}
+                        placeholder="Please provide any additional comments (optional)"
+                        value={userComments}
+                        onChange={(e) => setUserComments(e.target.value)}
+                    />
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        sx={{ mt: 2, mb: 3, justifySelf: "flex-start" }}
+                        onClick={handleSend}
+                    >
+                        Send
+                    </Button>
+                </Container>
             </Paper>
 
             <Snackbar
