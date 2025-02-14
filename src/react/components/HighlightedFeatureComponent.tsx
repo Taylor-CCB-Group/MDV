@@ -4,6 +4,7 @@ import { observer } from "mobx-react-lite";
 // should maybe be FieldName rather than ColumnName here
 import type { DataColumn, ColumnName } from "../../charts/charts";
 import { useHighlightedIndex } from "../selectionHooks";
+import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 
 function useColumnData(columnName: ColumnName, maxItems = 100) {
     const ds = useDataStore();
@@ -25,6 +26,7 @@ function useColumnData(columnName: ColumnName, maxItems = 100) {
             console.log("useColumnData promise resolved");
             if (cancel) return;
             const column = ds.columnIndex[columnName];
+            if (!isColumnLoaded(column)) throw "expected loaded column";
             setColumn(column);
             const newColumnData = new Float32Array(indices.length);
             for (let j = 0; j < indices.length; j++) {

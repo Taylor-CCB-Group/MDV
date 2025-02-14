@@ -40,8 +40,8 @@ export type TComponent<T extends BaseConfig> = () => JSX.Element;
  * We may also want to consider a different approach to the React root, i.e. a single root with portals for each chart, in
  * which case it should be handled in this class and should not (hopefully) require child classes/components to change.
  */
-export abstract class BaseReactChart<T> extends BaseChart<T> {
-    declare config: T & BaseConfig; // would be good to review this T & BaseConfig thing...
+export abstract class BaseReactChart<T extends BaseConfig> extends BaseChart<T> {
+    // declare config: T & BaseConfig; // would be good to review this T & BaseConfig thing...
     declare popoutIcon: HTMLElement;
     // get dataSource(): DataSource {
     //     return window.mdv.chartManager.charts[this.config.id].dataSource;
@@ -49,33 +49,15 @@ export abstract class BaseReactChart<T> extends BaseChart<T> {
     useMobx = true;
     root?: ReturnType<typeof createMdvPortal>;
     reactEl: HTMLDivElement;
-    ComponentFn: TComponent<T & BaseConfig>;
-    private reactionDisposers: IReactionDisposer[] = [];
+    ComponentFn: TComponent<T>;
     protected constructor(
         dataStore: DataStore,
         div: string | HTMLDivElement,
-        config: T & BaseConfig,
-        ReactComponentFunction: TComponent<T & BaseConfig> = Fallback,
+        config: T,
+        ReactComponentFunction: TComponent<T> = Fallback,
     ) {
         super(dataStore, div, config);
         config = this.config; //original config will be copied by super, before doing things like adding id to it...
-        makeAutoObservable(config);
-        Object.defineProperty(this, "config", {
-            get: () => config,
-            set: (v) => {
-                config = v; // re-assigning config ref in this closure is not really relevant now;
-                //we are using makeAutoObservable and not referring to config directly...
-                makeAutoObservable(config);
-            },
-        });
-        this.mobxAutorun(() => {
-            // setTitle also sets config.title - which is what we're observing here...
-            // so we got warnings about setTitle mutating config.title 'outside an action' (at least it didn't go into infinite loop).
-            // perhaps title.textContent could be a computed value and we may not need this autorun at all...
-            // this.title.textContent = config.title;
-            // we can now safely call this.setTitle() without warnings as it avoids unnecessary config.title changes.
-            this.setTitle(config.title);
-        });
         // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
         // that worked, with extra extraneous number that changed to be observed by the hook...
         // What I have now done is change DataStore to be observable, and added a method for getting filtered indices
@@ -92,17 +74,6 @@ export abstract class BaseReactChart<T> extends BaseChart<T> {
         ); //other things may still be added to contentDiv outside react (e.g. legend)
         this.ComponentFn = ReactComponentFunction;
         this.mountReact();
-    }
-    /**
-     * On rare occasions where you need to run a function that depends on mobx state, outside of a React component.
-     * This is a convenience method for creating a mobx autorun reaction that will be dispsed when the chart is removed.
-     * @param fn - The function to run
-     * @param opts - Options for the autorun.
-     * According to the docs you can pass an `equals` option to specify a mobx comparer...
-     * but it isn't in IAutorunOptions type, and it doesn't seem to be in the code either.
-     */
-    mobxAutorun(fn: () => void, opts?: IAutorunOptions) {
-        this.reactionDisposers.push(autorun(fn, opts));
     }
     private mountReact() {
         const ReactComponentFunction = this.ComponentFn;
@@ -132,8 +103,9 @@ export abstract class BaseReactChart<T> extends BaseChart<T> {
         // **is there any React teardown we should be considering?**
         this.root?.unmount();
         super.remove();
-        for (const disposer of this.reactionDisposers) {
-            disposer();
-        }
+        // this is handled by super.remove()
+        // for (const disposer of this.reactionDisposers) {
+        //     disposer();
+        // }
     }
 }

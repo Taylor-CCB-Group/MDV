@@ -1,6 +1,6 @@
 import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, TextField, type TextFieldProps, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef } from "react";
 
@@ -22,6 +22,8 @@ import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../ch
 import * as d3 from 'd3';
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
+import { TextFieldExtended } from "./TextFieldExtended";
+import { isArray } from "@/lib/utils";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -43,21 +45,6 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
         : RangeFilter) | null;
     return filter;
 }
-
-/** Modified version of TextField that allows a `customEndAdornment`
- * along with the standard endAdornment passed in `InputProps`.
- */
-const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: JSX.Element }) => {
-    const { InputProps, customEndAdornment, ...rest } = props;
-    const inputProps = {
-        ...InputProps,
-        endAdornment: (
-            <>{customEndAdornment} {InputProps?.endAdornment}</>
-        )
-    };
-    return <TextField {...rest} InputProps={inputProps} />;
-}
-
 const filterOptions = createFilterOptions<any>({ limit: 100 });
 const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     const dim = useDimensionFilter(column);
@@ -377,8 +364,17 @@ const Histogram = observer((props: RangeProps) => {
 
     const [hasQueried, setHasQueried] = useState(false);
     useEffect(() => {
-        queryHistogram();
-    }, [queryHistogram]);
+        if (!ref.current) return;
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && !hasQueried) {
+                setHasQueried(true);
+                queryHistogram();
+            }
+        }, { rootMargin: '0px 0px 100px 0px' });
+        observer.observe(ref.current);
+        // queryHistogram();
+        return () => observer.disconnect();
+    }, [queryHistogram, hasQueried]);
 
     // Generate the points for the polyline
     // ??? useMemo was wrong ????
@@ -482,6 +478,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
         e.stopPropagation();
         runInAction(() => {
             delete filters[column.field];
+            if (!isArray(config.param)) throw "expected param array";
             config.param = config.param.filter((p) => p !== column.field);
         });
         console.log('Delete item');
@@ -535,6 +532,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
 const AddRowComponent = observer(() => {
     const config = useConfig<SelectionDialogConfig>();
     const { filters, param } = useConfig<SelectionDialogConfig>();
+    if (!isArray(param)) throw "expected param array";
     const setSelectedColumn = useCallback((column: string) => {
         if (!column) return;
         if (param.includes(column)) return;
@@ -546,23 +544,31 @@ const AddRowComponent = observer(() => {
     }, [filters, param, config]);
     return (
         <div className="p-5">
-        <ColumnSelectionComponent
-        setSelectedColumn={setSelectedColumn}
-        placeholder="Add a filter column"
-        exclude={param}
-        />
+            <ColumnSelectionComponent
+                //@ts-expect-error !!! setSelectedColumn needs appropriate type
+                setSelectedColumn={setSelectedColumn}
+                placeholder="Add a filter column"
+                //@ts-expect-error 'exclude' design still under review?
+                exclude={param}
+                // type="_multi_column:all" //not sure about this...
+                type={["text", "text16", "multitext", "unique", "integer", "double", "int32"]}
+            />
         </div>
     )
 })
 
-const ForeignRows = () => {
+const ForeignRows = observer(() => {
+    // const rlink = useRowsAsColumnsLinks();
+    // //!breaking rule of hooks here, but in a way that should be ok at runtime as of now
+    // //! (just testing "infinte loop with no link" fix)
+    // if (rlink.length === 0) return null; //todo: 30sec video clip
     const [filter, setFilter] = useState("");
     const [max, setMax] = useState(10);
     const [debouncedFilter] = useDebounce(filter, 300);
     const rlink = useRowsAsColumnsLinks();
     const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter);
-    if (!rlink) return null;
-    const { linkedDs, link } = rlink;
+    if (!rlink[0]) return null;
+    const { linkedDs, link } = rlink[0];
     return (
         <div className="p-3">
             <Typography variant="h6" sx={{ marginBottom: '0.5em' }}>Columns associated with selected '{linkedDs.name}':</Typography>
@@ -576,7 +582,7 @@ const ForeignRows = () => {
             {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );
-}
+});
 
 /**
  * This will control the behaviour of the reset menuIcon in the chart header - not rendered with react.
@@ -602,7 +608,11 @@ const SelectionDialogComponent = () => {
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
             <AddRowComponent />
-            <ForeignRows />
+            <ErrorBoundary FallbackComponent={
+                ({ error }) => <ErrorDisplay error={error} title="Error displaying linked rows." />
+            }>
+                <ForeignRows />
+            </ErrorBoundary>
         </div>
     );
 };
