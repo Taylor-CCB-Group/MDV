@@ -30,7 +30,7 @@ const Message = ({ text, sender, view }: ChatMessage) => {
                 <PythonCode key={index} code={section} />
             ))} */}
             {(sender === 'bot') && <MessageFeedback />}
-            {view && <Button variant="contained" color="primary" onClick={() => navigateToView(view)}>Load view...</Button>}
+            {view && <Button variant="contained" color="primary" onClick={() => navigateToView(view)}>Load view '{view}'...</Button>}
         </div>
     );
 }
