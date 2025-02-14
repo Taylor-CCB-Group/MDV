@@ -24,7 +24,7 @@ const useUser = () => {
             setIsLoading(true);
             try {
                 // Endpoint yet to be implemented
-                const response = await fetch("/user");
+                const response = await fetch("profile");
                 if (!response.ok) {
                     throw new Error("Failed to fetch user data");
                 }

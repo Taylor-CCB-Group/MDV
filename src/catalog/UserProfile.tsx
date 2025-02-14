@@ -27,7 +27,7 @@ const UserProfile: React.FC = () => {
 
     const handleSignOut = () => {
         try {
-            window.location.href = "/logout";
+            window.location.href = "logout";
         } catch (err) {
             console.error("Logout error:", err);
         }
