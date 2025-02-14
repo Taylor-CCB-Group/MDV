@@ -122,7 +122,7 @@ const MessageMarkdown = ({ text }: { text: string }) => {
                         <>
                         <SquareTerminal onClick={() => alert(children)} /> {match[1]}:
                         <SyntaxHighlighter
-                            className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto max-h-96"
+                            className="rounded-lg border dark:border-gray-800 p-4 overflow-x-auto"
                             // biome-ignore lint/correctness/noChildrenProp: this is an issue with react-syntax-highlighter, not our code
                             children={String(children).replace(/\n$/, '')}
                             //@ts-ignore - not sure what's wrong here - maybe @types/react-syntax-highlighter needs updating?
