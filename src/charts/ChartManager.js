@@ -377,9 +377,25 @@ export class ChartManager {
                         position: "bottom-left"
                     },
                     func: async () => {
-                        new ChatDialog();
+                        if (this.chatDialog) {
+                            this.chatDialog.close();                            
+                        } else {
+                            this.chatDialog = new ChatDialog();
+                            localStorage.setItem('chatMDV', true);
+                            this.chatDialog.config.onclose = () => {
+                                this.chatDialog = null;
+                                localStorage.removeItem('chatMDV');
+                            }
+                        }
                     }
                 }, this.rightMenuBar);
+                if (localStorage.getItem('chatMDV')) {
+                    this.chatDialog = new ChatDialog();
+                    this.chatDialog.config.onclose = () => {
+                        this.chatDialog = null;
+                        localStorage.removeItem('chatMDV');
+                    }
+                }
                 // chatButton.setAttribute('data-lucide', 'bot-message-square'); //didn't work
                 createMenuIcon("fas fa-file-alt", {
                     tooltip: {
