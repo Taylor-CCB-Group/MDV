@@ -26,8 +26,8 @@ class ServiceTestCase(TestCase):
 
     def test_get_active_projects(self):
         # Add sample projects
-        project1 = Project(name='Project 1', path='/path1', is_deleted=False)
-        project2 = Project(name='Project 2', path='/path2', is_deleted=True)
+        project1 = Project(name='Project 1', path='/path1', is_deleted=False) # type: ignore
+        project2 = Project(name='Project 2', path='/path2', is_deleted=True) # type: ignore
         db.session.add(project1)
         db.session.add(project2)
         db.session.commit()
@@ -40,7 +40,7 @@ class ServiceTestCase(TestCase):
 
     def test_get_next_project_id(self):
         # Add a sample project
-        project = Project(name='Sample Project', path='/sample/path')
+        project = Project(name='Sample Project', path='/sample/path') # type: ignore
         db.session.add(project)
         db.session.commit()
 
@@ -59,7 +59,7 @@ class ServiceTestCase(TestCase):
 
     def test_get_project_by_id(self):
         # Add a sample project
-        project = Project(name='Find Me', path='/find/me')
+        project = Project(name='Find Me', path='/find/me') # type: ignore
         db.session.add(project)
         db.session.commit()
 
@@ -67,11 +67,11 @@ class ServiceTestCase(TestCase):
         found_project = ProjectService.get_project_by_id(project.id)
 
         self.assertIsNotNone(found_project)
-        self.assertEqual(found_project.name, 'Find Me')
+        self.assertEqual(found_project.name, 'Find Me') # type: ignore
 
     def test_soft_delete_project(self):
         # Add a sample project
-        project = Project(name='Delete Me', path='/delete/me')
+        project = Project(name='Delete Me', path='/delete/me') # type: ignore
         db.session.add(project)
         db.session.commit()
 
@@ -80,40 +80,45 @@ class ServiceTestCase(TestCase):
 
         self.assertTrue(success)
         project = Project.query.get(project.id)
+        assert(project is not None)
         self.assertTrue(project.is_deleted)
         self.assertIsNotNone(project.deleted_timestamp)
 
     def test_add_or_update_file_in_project(self):
         # Add a sample project
-        project = Project(name='Project Files', path='/files/project')
+        # project = Project(name='Project Files', path='/files/project')
+        project = Project()
+        project.name = 'Project Files'
+        project.path = '/files/project'
         db.session.add(project)
         db.session.commit()
 
         # Call service method to add a file
         file = FileService.add_or_update_file_in_project('file1.txt', '/files/project/file1.txt', project.id)
 
-        self.assertIsNotNone(file)
+        self.assertIsNotNone(file) # is there a way to make the type checker understand this?
+        assert(file is not None) 
         self.assertEqual(file.name, 'file1.txt')
 
         # Call service method to update the file
         updated_file = FileService.add_or_update_file_in_project('file1_renamed.txt', '/files/project/file1.txt', project.id)
 
         self.assertIsNotNone(updated_file)
+        assert(updated_file is not None)
         self.assertEqual(updated_file.name, 'file1_renamed.txt')
 
     def test_get_file_by_path_and_project(self):
         # Add a sample project and file
-        project = Project(name='Project Files', path='/files/project')
+        project = Project(name='Project Files', path='/files/project') # type: ignore
         db.session.add(project)
         db.session.commit()
         
-        file = File(
-            name='file1.txt',
-            file_path='/files/project/file1.txt',
-            project_id=project.id,
-            upload_timestamp=datetime.now(),
-            update_timestamp=datetime.now()
-        )
+        file = File()
+        file.name='file1.txt'
+        file.file_path='/files/project/file1.txt'
+        file.project_id=project.id
+        file.upload_timestamp=datetime.now()
+        file.update_timestamp=datetime.now()
         db.session.add(file)
         db.session.commit()
 
@@ -121,28 +126,28 @@ class ServiceTestCase(TestCase):
         found_file = FileService.get_file_by_path_and_project('/files/project/file1.txt', project.id)
 
         self.assertIsNotNone(found_file)
+        assert(found_file is not None)
         self.assertEqual(found_file.name, 'file1.txt')
 
     def test_delete_files_by_project(self):
         # Add a sample project and files
-        project = Project(name='Project Files', path='/files/project')
+        project = Project(name='Project Files', path='/files/project') # type: ignore
         db.session.add(project)
         db.session.commit()
 
-        file1 = File(
-            name='file1.txt',
-            file_path='/files/project/file1.txt',
-            project_id=project.id,
-            upload_timestamp=datetime.now(),
-            update_timestamp=datetime.now()
-        )
-        file2 = File(
-            name='file2.txt',
-            file_path='/files/project/file2.txt',
-            project_id=project.id,
-            upload_timestamp=datetime.now(),
-            update_timestamp=datetime.now()
-        )
+        file1 = File()
+        file1.name='file1.txt'
+        file1.file_path='/files/project/file1.txt'
+        file1.project_id=project.id
+        file1.upload_timestamp=datetime.now()
+        file1.update_timestamp=datetime.now()
+        
+        file2 = File()
+        file2.name='file2.txt'
+        file2.file_path='/files/project/file2.txt'
+        file2.project_id=project.id
+        file2.upload_timestamp=datetime.now()
+        file2.update_timestamp=datetime.now()
         db.session.add(file1)
         db.session.add(file2)
         db.session.commit()
@@ -156,17 +161,17 @@ class ServiceTestCase(TestCase):
 
     def test_update_file_timestamp(self):
         # Add a sample project and file
-        project = Project(name='Project Files', path='/files/project')
+        project = Project(name='Project Files', path='/files/project') # type: ignore
         db.session.add(project)
         db.session.commit()
 
-        file = File(
-            name='file1.txt',
-            file_path='/files/project/file1.txt',
-            project_id=project.id,
-            upload_timestamp=datetime.now(),
-            update_timestamp=datetime.now()
-        )
+        file = File()
+        file.name='file1.txt'
+        file.file_path='/files/project/file1.txt'
+        file.project_id=project.id
+        file.upload_timestamp=datetime.now()
+        file.update_timestamp=datetime.now()
+
         db.session.add(file)
         db.session.commit()
 
@@ -175,21 +180,23 @@ class ServiceTestCase(TestCase):
 
         self.assertTrue(success)
         updated_file = File.query.get(file.id)
+        self.assertIsNotNone(updated_file)
+        assert(updated_file is not None)
         self.assertGreater(updated_file.update_timestamp, file.update_timestamp)
     
     def test_file_exists_in_project(self):
         # Add a sample project and file
-        project = Project(name='Project Files', path='/files/project')
+        project = Project(name='Project Files', path='/files/project') # type: ignore
         db.session.add(project)
         db.session.commit()
 
-        file = File(
-            name='file1.txt',
-            file_path='/files/project/file1.txt',
-            project_id=project.id,
-            upload_timestamp=datetime.now(),
-            update_timestamp=datetime.now()
-        )
+        file = File()
+        file.name='file1.txt'
+        file.file_path='/files/project/file1.txt'
+        file.project_id=project.id
+        file.upload_timestamp=datetime.now()
+        file.update_timestamp=datetime.now()
+
         db.session.add(file)
         db.session.commit()
 
@@ -203,24 +210,24 @@ class ServiceTestCase(TestCase):
 
     def test_get_files_by_project(self):
         # Add a sample project and files
-        project = Project(name='Project Files', path='/files/project')
+        project = Project(name='Project Files', path='/files/project') # type: ignore
         db.session.add(project)
         db.session.commit()
 
-        file1 = File(
-            name='file1.txt',
-            file_path='/files/project/file1.txt',
-            project_id=project.id,
-            upload_timestamp=datetime.now(),
-            update_timestamp=datetime.now()
-        )
-        file2 = File(
-            name='file2.txt',
-            file_path='/files/project/file2.txt',
-            project_id=project.id,
-            upload_timestamp=datetime.now(),
-            update_timestamp=datetime.now()
-        )
+        file1 = File()
+        file1.name='file1.txt'
+        file1.file_path='/files/project/file1.txt'
+        file1.project_id=project.id
+        file1.upload_timestamp=datetime.now()
+        file1.update_timestamp=datetime.now()
+
+        file2 = File()
+        file2.name='file2.txt'
+        file2.file_path='/files/project/file2.txt'
+        file2.project_id=project.id
+        file2.upload_timestamp=datetime.now()
+        file2.update_timestamp=datetime.now()
+
         db.session.add(file1)
         db.session.add(file2)
         db.session.commit()
@@ -233,7 +240,7 @@ class ServiceTestCase(TestCase):
         self.assertEqual(files[1].name, 'file2.txt')
 
         # Test with a project that has no files
-        empty_project = Project(name='Empty Project', path='/empty/project')
+        empty_project = Project(name='Empty Project', path='/empty/project') # type: ignore
         db.session.add(empty_project)
         db.session.commit()
 
