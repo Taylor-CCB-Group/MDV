@@ -384,19 +384,19 @@ export class ChartManager {
                             this.chatDialog.close();                            
                         } else {
                             this.chatDialog = new ChatDialog();
-                            localStorage.setItem('chatMDV', true);
+                            sessionStorage.setItem('chatMDV', true);
                             this.chatDialog.config.onclose = () => {
                                 this.chatDialog = null;
-                                localStorage.removeItem('chatMDV');
+                                sessionStorage.removeItem('chatMDV');
                             }
                         }
                     }
                 }, this.rightMenuBar);
-                if (localStorage.getItem('chatMDV')) {
+                if (sessionStorage.getItem('chatMDV')) {
                     this.chatDialog = new ChatDialog();
                     this.chatDialog.config.onclose = () => {
                         this.chatDialog = null;
-                        localStorage.removeItem('chatMDV');
+                        sessionStorage.removeItem('chatMDV');
                     }
                 }
                 // chatButton.setAttribute('data-lucide', 'bot-message-square'); //didn't work

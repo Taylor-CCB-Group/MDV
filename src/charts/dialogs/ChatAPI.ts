@@ -9,6 +9,7 @@ const completedChatResponseSchema = z.object({
      * This should be a string that identifies newly created views.
      */
     view: z.optional(z.string()).describe('The name of the newly created view, if a view was created'),
+    // timestamp: z.string(),
 });
 
 const chatProgressSchema = z.object({
@@ -103,7 +104,9 @@ const useChat = () => {
     const route = `${root}/chat`;
     const progressRoute = `${root}/chat_progress`;
     const routeInit = `${root}/chat_init`;
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    // use sessionStorage to remember things like whether the chat is open or closed... localStorage for preferences like theme,
+    //! but this might not be such a good idea for things like chat logs with sensitive information
+    const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
     const [isSending, setIsSending] = useState<boolean>(false);
     const [currentRequestId, setCurrentRequestId] = useState<string>("");
     const [isInit, setIsInit] = useState<boolean>(false);
@@ -127,10 +130,10 @@ const useChat = () => {
             });
         }
     }, [currentRequestId]);
-    
+
     useEffect(() => {
         const { socket } = window.mdv.chartManager.ipc;
-        
+
         // event-name like 'chat', room for project... id associated with original request.
         socket?.on(progressRoute, progressListener);
         const verboseProgress = (msg: string) => setVerboseProgress(v => [...v, msg].slice(-5));
@@ -141,7 +144,7 @@ const useChat = () => {
                 const id = generateId();
                 setCurrentRequestId(id);
                 const response = await sendMessage('', id, routeInit);
-                setMessages([{ text: response.message, sender: 'system', id: generateId() }]);
+                setMessages(messages => messages.length ? messages : [{ text: response.message, sender: 'system', id: generateId() }]);
             } catch (error) {
                 console.error('Error sending welcome message', error);
             }
@@ -155,6 +158,9 @@ const useChat = () => {
             socket?.off(route, verboseProgress);
         }
     }, [isSending, isInit, routeInit, progressRoute, route, progressListener]);
+    useEffect(() => {
+        sessionStorage.setItem('chatMessages', JSON.stringify(messages));
+    }, [messages]);
 
     const appendMessage = (message: string, sender: 'bot' | 'user', view?: string) => {
         //we should be using an id passed as part of the message, not generating one here.
@@ -162,7 +168,7 @@ const useChat = () => {
         const msg = { text: message, sender, id: generateId(), view };
         setMessages((prevMessages) => [...prevMessages, msg]);
     };
-    
+
     const sendAPI = async (input: string) => {
         if (!input.trim()) return;
         const id = generateId();
@@ -178,7 +184,7 @@ const useChat = () => {
             // with things like a button to navigate to the view if view property is present.
             appendMessage(response.message, 'bot', response.view);
             //todo - navigating via button rather than automatically.
-            
+
             // if (response.view) navigateToView(response.view);
         } catch (error) {
             appendMessage(`Error: ${error}`, 'bot');

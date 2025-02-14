@@ -12,7 +12,7 @@ class ChatDialog extends BaseDialog {
             {
                 title: "ChatMDV",
                 width: 450,
-                height: 295,
+                height: 600,
             },
             null
         );
