@@ -1,0 +1,43 @@
+from flask import Flask, redirect, session, url_for
+from flask_saml import SAML
+from flask_saml import SAMLAttributes
+from flask import render_template
+
+app = Flask(__name__)
+app.secret_key = ""
+
+saml = SAML(app)
+
+@app.route('/login_sso')
+def login_sso():
+    # Initiates the Shibboleth authentication process
+    return saml.login()
+
+@app.route('/sso/callback')
+def sso_callback():
+    # This will handle the response from Shibboleth
+    user_info = saml.process_saml_response()
+    # Here we could save the user info to session or store it as needed
+    session['user_info'] = user_info
+    return redirect(url_for('profile'))
+
+@app.route('/profile')
+def profile():
+    # Display user info or handle authenticated users
+    if 'user_info' not in session:
+        return redirect(url_for('login_sso'))
+    user_info = session['user_info']
+    return render_template('profile.html', user_info=user_info)
+
+@app.route('/login_sso')
+def login_sso():
+    # Redirect user to Shibboleth-protected login page on Apache
+    return redirect('https://bia.cmd.ox.ac.uk:2443')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('https://<your-apache-server>:2443/Shibboleth.sso/Logout')
+
+if __name__ == '__main__':
+    app.run(debug=True)
