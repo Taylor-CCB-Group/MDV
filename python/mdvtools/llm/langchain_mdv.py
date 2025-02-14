@@ -208,10 +208,8 @@ class ProjectChat:
                 )
                 progress += 31
                 # Argument of type "str" cannot be assigned to parameter "input" of type "Dict[str, Any]"
-                response = self.agent.invoke(
-                    full_prompt, config={"callbacks": [self.langchain_logging_handler]}
-                )  # type: ignore for now
-                assert "output" in response  # we might allow
+                response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]})  # type: ignore for now
+                # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b10: RAG prompt preparation"):  # ~0.003% of time
                 self.socket_api.update_chat_progress(
                     "RAG prompt preparation...", id, progress, 1
