@@ -270,6 +270,8 @@ export class ChartManager {
                 },
                 this.menuBar,
             );
+
+            // Filter view component
             createMdvPortal(
                 FilterComponentReactWrapper(),
                 filterWrapperNode,
@@ -412,7 +414,7 @@ export class ChartManager {
         //  chart - the actual chart
         //  win - the popout window it is in (or null)
         //  dataSource - the data source associated with it
-        /** @type {{[id: string]: {chart: import("./charts").Chart, win: Window | null, dataSource: import("./charts").DataSource} */
+        /** @type {{[id: string]: {chart: import("./charts").Chart, win: Window | null, dataSource: import("./charts").DataSource}}} */
         this.charts = {};
 
         this.config = config;
@@ -805,8 +807,7 @@ export class ChartManager {
     _loadView(config, dataLoader, firstTime = false) {
         //load view, then initialize
         if (config.all_views) {
-            const currentView = config.initial_view || config.all_views[0];
-            
+            const currentView = config.initial_view || config.all_views[0];            
             this.viewManager.setView(currentView);
             dataLoader.viewLoader(currentView).then((data) => {
                 this._init(data, firstTime);
@@ -1025,9 +1026,8 @@ export class ChartManager {
                 // todo have some better reusability for this kind of validation
                 // (also probably refactor this dialog into react)
                 // considered returning a string to set a tooltip or something, parked that idea for now pending more thought/refactoring
-                // validate: (v) => this.viewSelect.childNodes.values().some(e => e.value === v) ? "Name already exists" : null,
-                // validate: (v) => !this.viewSelect.childNodes.values().some(e => e.value === v),
-                validate: (v) => !this.viewManager.all_views.some(e => e === v),
+                // validate: (v) => this.viewManager.all_views.some(view => view.value === v) ? "Name already exists" : null,
+                validate: (v) => !this.viewManager.all_views.some(view => view === v),
             },
         ];
         if (this.dataSources.length > 1) {
@@ -1047,8 +1047,6 @@ export class ChartManager {
                     text: "Create New View",
                     method: (vals) => {
                         //create new view option
-                        
-                        const newViewName = vals["name"];
                         this.viewManager.setAllViews([
                         ...this.viewManager.all_views,
                         vals["name"]
@@ -1056,7 +1054,6 @@ export class ChartManager {
 
                         // Optionally make it the current view
                         this.viewManager.setView(vals["name"]);
-                        this.showSaveViewDialog(() => this.changeView(newViewName));
                         if (!vals["clone-view"]) {
                             //remove all charts and links
                             for (const ds in this.viewData.dataSources) {
@@ -1093,6 +1090,7 @@ export class ChartManager {
                             this._init(state.view);
                         } else {
                             const state = this.getState();
+                            console.log("state add new: ", state);
                             this._callListeners("state_saved", state);
                         }
                     },
@@ -1160,26 +1158,29 @@ export class ChartManager {
     deleteCurrentView() {
         //remove the view choice and change view to the next one
         const view = this.viewManager.current_view;
-        if (view) {
+
+        // update the views
         const updatedViews = this.viewManager.all_views.filter((v) => v !== view);
         this.viewManager.setAllViews(updatedViews);
-
-        // this.viewManager.setView(nextView);
+        
         const state = this.getState();
+
         //want to delete view and update any listeners
         state.view = null;
+
         this._callListeners("state_saved", state);
 
         if (updatedViews.length > 0) {
+            // set current view to initial view
             const nextView = updatedViews[0];
             this.viewManager.setView(nextView);
             this.changeView(nextView);
         } else {
+            // no other views exist
             this.removeAllCharts();
             this.viewData = {};
             this.showAddViewDialog();
         }
-    }
     }
 
     _columnRemoved(ds, col) {
@@ -1411,7 +1412,6 @@ export class ChartManager {
 
         const view = JSON.parse(JSON.stringify(this.viewData));
         view.initialCharts = initialCharts;
-
         const all_views = this.viewManager.all_views ? this.viewManager.all_views : null;
         return {
             view: view,
