@@ -526,8 +526,8 @@ def register_auth0_routes(app):
 
                 if auth_method == 'auth0':
                     # If the user logged in via Auth0, log them out from Auth0
-                    auth0_provider.logout()
-                    print("----------- logout 1")
+                    return auth0_provider.logout()
+                    
 
                 # If the user logged in via Shibboleth, redirect to Shibboleth IdP's logout URL
                 elif auth_method == 'shibboleth':
