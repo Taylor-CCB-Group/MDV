@@ -60,6 +60,9 @@ import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { AddChartDialog } from "./dialogs/AddChartDialog";
+import { createMdvPortal } from "@/react/react_utils";
+import FilterComponentReactWrapper from "@/react/components/FilterComponentReactWrapper";
+import ViewManager from "./ViewManager";
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -208,6 +211,9 @@ export class ChartManager {
         connectIPC(this);
         this.transactions = {};
 
+        // View Manager
+        this.viewManager = new ViewManager(config.initial_view, config.all_views);
+
         //set up container and top(main menu)
         /** @type {HTMLElement} */
         this.containerDiv =
@@ -254,28 +260,46 @@ export class ChartManager {
         );
         homeButton.style.marginRight = "20px";
 
+        // if (config.all_views) {
+        //     this.viewSelect = createEl(
+        //         "select",
+        //         { style: { maxWidth: "50em" } },
+        //         this.menuBar,
+        //     );
+        //     for (const v of config.all_views) {
+        //         createEl("option", { text: v, value: v }, this.viewSelect);
+        //     }
+        //     createFilterElement(this.viewSelect, this.menuBar);
+        //     this.viewSelect.addEventListener("change", (e) => {
+        //         if (
+        //             this.config.show_save_view_dialog &&
+        //             config.permission === "edit"
+        //         ) {
+        //             this.showSaveViewDialog(() =>
+        //                 this.changeView(this.viewSelect.value),
+        //             );
+        //         } else {
+        //             this.changeView(this.viewSelect.value);
+        //         }
+        //     });
+
+        //     // this.viewSelect.style.display = "none";
+        // }
+
         if (config.all_views) {
-            this.viewSelect = createEl(
-                "select",
-                { style: { maxWidth: "50em" } },
+            const filterWrapperNode = createEl(
+                "span",
+                {
+                    style: {
+                        marginRight: "4px",
+                    },
+                },
                 this.menuBar,
             );
-            for (const v of config.all_views) {
-                createEl("option", { text: v, value: v }, this.viewSelect);
-            }
-            createFilterElement(this.viewSelect, this.menuBar);
-            this.viewSelect.addEventListener("change", (e) => {
-                if (
-                    this.config.show_save_view_dialog &&
-                    config.permission === "edit"
-                ) {
-                    this.showSaveViewDialog(() =>
-                        this.changeView(this.viewSelect.value),
-                    );
-                } else {
-                    this.changeView(this.viewSelect.value);
-                }
-            });
+            createMdvPortal(
+                FilterComponentReactWrapper(),
+                filterWrapperNode,
+            );
         }
 
         if (config.permission === "edit") {
@@ -807,9 +831,12 @@ export class ChartManager {
     _loadView(config, dataLoader, firstTime = false) {
         //load view, then initialize
         if (config.all_views) {
-            this.currentView = config.initial_view || config.all_views[0];
-            this.viewSelect.value = this.currentView;
-            dataLoader.viewLoader(this.currentView).then((data) => {
+            // this.currentView = config.initial_view || config.all_views[0];
+            const currentView = config.initial_view || config.all_views[0];
+            // this.viewSelect.value = this.currentView;
+            
+            this.viewManager.setView(currentView);
+            dataLoader.viewLoader(currentView).then((data) => {
                 this._init(data, firstTime);
             });
         }
@@ -968,14 +995,16 @@ export class ChartManager {
         //nothing to load - call any listeners
         if (this._toLoadCharts.size === 0) {
             this._toLoadCharts = undefined;
-            if (this.currentView === undefined) {
+            // if (this.currentView === undefined) {
+            if (this.viewManager.current_view === undefined) {
                 if (this.dataSources.length === 0) new FileUploadDialogReact();
                 else {
                     // todo - separate out view code, with a solid model and start making some nice ui etc...
                     this.showAddViewDialog();
                 }
             } else {
-                this._callListeners("view_loaded", this.currentView);
+                // this._callListeners("view_loaded", this.currentView);
+                this._callListeners("view_loaded", this.viewManager.current_view);
             }
         }
         //add charts - any columns will be added dynamically
@@ -1027,7 +1056,8 @@ export class ChartManager {
                 // (also probably refactor this dialog into react)
                 // considered returning a string to set a tooltip or something, parked that idea for now pending more thought/refactoring
                 // validate: (v) => this.viewSelect.childNodes.values().some(e => e.value === v) ? "Name already exists" : null,
-                validate: (v) => !this.viewSelect.childNodes.values().some(e => e.value === v),
+                // validate: (v) => !this.viewSelect.childNodes.values().some(e => e.value === v),
+                validate: (v) => !this.viewManager.all_views.some(e => e === v),
             },
         ];
         if (this.dataSources.length > 1) {
@@ -1047,13 +1077,23 @@ export class ChartManager {
                     text: "Create New View",
                     method: (vals) => {
                         //create new view option
-                        createEl(
-                            "option",
-                            { text: vals["name"], value: vals["name"] },
-                            this.viewSelect,
-                        );
-                        this.viewSelect.value = vals["name"];
-                        this.currentView = vals["name"];
+                        // createEl(
+                        //     "option",
+                        //     { text: vals["name"], value: vals["name"] },
+                        //     this.viewSelect,
+                        // );
+                        // this.viewSelect.value = vals["name"];
+                        // this.currentView = vals["name"];
+                        
+                        const newViewName = vals["name"];
+                        this.viewManager.setAllViews([
+                        ...this.viewManager.all_views,
+                        vals["name"]
+                        ]);
+
+                        // Optionally make it the current view
+                        this.viewManager.setView(vals["name"]);
+                        this.showSaveViewDialog(() => this.changeView(newViewName));
                         if (!vals["clone-view"]) {
                             //remove all charts and links
                             for (const ds in this.viewData.dataSources) {
@@ -1067,6 +1107,7 @@ export class ChartManager {
                             this.removeAllCharts();
                             this.viewData.links = [];
                             const state = this.getState();
+                            console.log("state add new: ", state);
                             state.view.initialCharts = {};
                             state.view.dataSources = {};
                             //only one datasource
@@ -1090,6 +1131,7 @@ export class ChartManager {
                             this._init(state.view);
                         } else {
                             const state = this.getState();
+                            console.log("state add new: ", state);
                             this._callListeners("state_saved", state);
                         }
                     },
@@ -1107,6 +1149,7 @@ export class ChartManager {
                     text: "YES",
                     method: () => {
                         const state = this.getState();
+                        console.log("state save: ", state);
                         this._callListeners("state_saved", state);
                         action();
                     },
@@ -1140,6 +1183,21 @@ export class ChartManager {
         });
     }
 
+    // changeView(view) {
+        // for (const ds in this.viewData.dataSources) {
+        //     if (this.viewData.dataSources[ds].layout === "gridstack") {
+        //         this.gridStack.destroy(this.dsIndex[ds]);
+        //     }
+        // }
+        // this.removeAllCharts();
+        // this.contentDiv.innerHTML = "";
+        // this.currentView = view;
+        // this.viewManager.setView(view);
+        // this.viewLoader(view).then((data) => {
+        //     this._init(data);
+        // });
+    // }
+
     changeView(view) {
         for (const ds in this.viewData.dataSources) {
             if (this.viewData.dataSources[ds].layout === "gridstack") {
@@ -1148,25 +1206,64 @@ export class ChartManager {
         }
         this.removeAllCharts();
         this.contentDiv.innerHTML = "";
-        this.currentView = view;
+        // this.currentView = view;
+        this.viewManager.setView(view);
         this.viewLoader(view).then((data) => {
             this._init(data);
         });
     }
 
+    // deleteCurrentView() {
+    //     //remove the view choice and change view to the next one
+    //     const opt = this.viewSelect.querySelector(
+    //         `option[value='${this.viewSelect.value}']`,
+    //     );
+    //     // const opt = this.viewSelect.querySelector(
+    //     //     `option[value='${this.viewManager.current_view}']`,
+    //     // );
+    //     opt.remove();
+
+    //     const updatedViews = this.viewManager.all_views.filter((v) => v !== this.viewSelect.value);
+    //     this.viewManager.setAllViews(updatedViews);
+    //     const state = this.getState();
+    //     //want to delete view and update any listeners
+    //     state.view = null;
+    //     this._callListeners("state_saved", state);
+
+    //     this.currentView = this.viewSelect.value;
+    //     this.viewManager.setView(nextView);
+    //     this.changeView(this.viewSelect.value);
+    //     // this.currentView = this.viewManager.current_view;
+    //     // this.changeView(this.viewManager.current_view);
+    // }
     deleteCurrentView() {
         //remove the view choice and change view to the next one
-        const opt = this.viewSelect.querySelector(
-            `option[value='${this.viewSelect.value}']`,
-        );
-        opt.remove();
-        const state = this.getState();
-        //want to delete view and update any listeners
-        state.view = null;
-        this._callListeners("state_saved", state);
+        const view = this.viewManager.current_view;
+        console.log("view delete: ", view);
+        if (view) {
+        const updatedViews = this.viewManager.all_views.filter((v) => v !== view);
+        console.log("updatedViews:", updatedViews);
+        this.viewManager.setAllViews(updatedViews);
 
-        this.currentView = this.viewSelect.value;
-        this.changeView(this.viewSelect.value);
+        if (updatedViews.length > 0) {
+            this.viewManager.setView(updatedViews[0]);
+        } else {
+            this.viewManager.setView(null);
+        }
+
+        console.log("updated: ", this.viewManager.current_view, this.viewManager.all_views);
+
+        // this.viewManager.setView(nextView);
+        const state = this.getState();
+        console.log("state: ", state);
+        //want to delete view and update any listeners
+        // state.view = null;
+        this._callListeners("state_saved", state);
+        console.log("again state: ", state);
+
+        // this.currentView = nextView;
+        this.changeView(this.viewManager.current_view ?? "");
+    }
     }
 
     _columnRemoved(ds, col) {
@@ -1397,15 +1494,20 @@ export class ChartManager {
         }
 
         const view = JSON.parse(JSON.stringify(this.viewData));
+        console.log("view: ", view);
         view.initialCharts = initialCharts;
-        const all_views = this.viewSelect
-            // @ts-ignore do we know that we actually have elements with 'value'?
-            ? Array.from(this.viewSelect.children, (x) => x.value)
-            : null;
+        // const all_views = this.viewSelect
+        //     // @ts-ignore do we know that we actually have elements with 'value'?
+        //     ? Array.from(this.viewSelect.children, (x) => x.value)
+        //     : null;
 
+        const all_views = this.viewManager.all_views ? this.viewManager.all_views : null;
+        console.log("all: ", all_views);
+        console.log("curr: ", this.viewManager.current_view);
         return {
             view: view,
-            currentView: this.currentView,
+            // currentView: this.currentView,
+            currentView: this.viewManager.current_view,
             all_views: all_views,
             updatedColumns: updatedColumns,
             metadata: metadata,
@@ -2280,7 +2382,8 @@ export class ChartManager {
                         this._setUpLink(l);
                     }
                 }
-                this._callListeners("view_loaded", this.currentView);
+                // this._callListeners("view_loaded", this.currentView);
+                this._callListeners("view_loaded", this.viewManager.current_view);
             }
         }
         return chart;

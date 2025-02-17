@@ -120,7 +120,7 @@ async function loadData() {
             }
         }
         if (type === "view_loaded") {
-            changeURLParam("view", cm.currentView);
+            changeURLParam("view", cm.viewManager.current_view);
         }
     };
     // this will assign itself to `window.mdv.chartManager` in constructor
