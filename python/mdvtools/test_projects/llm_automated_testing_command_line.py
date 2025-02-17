@@ -69,19 +69,28 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     logger.info(f"Loading dataset from {dataset_path}")
     adata = sc.read_h5ad(dataset_path)
     cells_df = pd.DataFrame(adata.obs)
+    genes_df = pd.DataFrame(adata.var).reset_index()
     
     logger.info("Creating MDV project...")
     project = MDVProject(project_path, delete_existing=False)
     project.add_datasource("datasource_name", cells_df)
+    project.add_datasource("datasource_name2", genes_df)
     
     logger.info("Setting up LLM interaction...")
     code_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
     dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
     
-    ds_name = project.datasources[0]['name']
-    df = project.get_datasource_as_dataframe(ds_name)
-    agent = lp.create_pandas_dataframe_agent(dataframe_llm, df, verbose=True, allow_dangerous_code=True)
-    
+    if len(project.datasources) >= 2:
+        df_list = [project.get_datasource_as_dataframe(ds['name']) for ds in project.datasources[:2]]
+        logger.info("Using two data sources for the pandas agent.")
+    else:
+        df_list = [project.get_datasource_as_dataframe(project.datasources[0]['name'])]
+        logger.info("Using one data source for the pandas agent.")
+
+    datasource_names = [ds['name'] for ds in project.datasources[:2]]  # Get names of up to 2 datasources
+
+    agent = lp.create_pandas_dataframe_agent(dataframe_llm, df_list, verbose=True, allow_dangerous_code=True)
+
     question_file = pd.read_csv(question_list_path, skipinitialspace=True, index_col=False)
     question_list = question_file['requests'].tolist()
     
@@ -89,12 +98,12 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     for question in question_list:
         try:
             response = agent.invoke(prompt_data + "\nQuestion: " + question)
-            prompt_RAG = get_createproject_prompt_RAG(project, dataset_path, ds_name, response['output'])
+            prompt_RAG = get_createproject_prompt_RAG(project, dataset_path, datasource_names[0], response['output'])
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
             
             qa_chain = RetrievalQA.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, return_source_documents=True)
             output = qa_chain.invoke({"context": retriever, "query": question})
-            result_code = prepare_code(output["result"], df, project, logger.info, modify_existing_project=True, view_name=question)
+            result_code = prepare_code(output["result"], df_list[0], project, logger.info, modify_existing_project=True, view_name=question)
 
             context_information = output['source_documents']
             context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
