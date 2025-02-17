@@ -12,32 +12,26 @@ const FilterDropdown = observer(() => {
     const options = viewManager.all_views;
     return (
         <Autocomplete
-        options={options}
-        value={viewManager.current_view || null}
-        onChange={(_event, newValue) => {
-            if (newValue) {
-              cm.changeView(newValue);
-            }
-          }}
-        renderInput={(params) => <TextField {...params} label="Select View" />}
-        sx={{display: "inline-flex", width: "20vw",
-            margin: "0.2em",}}
+            options={options}
+            value={viewManager.current_view || null}
+            onChange={(_event, newValue) => {
+                if (newValue) {
+                    // Updating state and changing view
+                    const state = cm.getState();
+                    cm._callListeners("state_saved", state);
+                    cm.changeView(newValue);
+                }
+            }}
+            renderInput={(params) => (
+                <TextField {...params} label="Select View" />
+            )}
+            sx={{ display: "inline-flex", width: "20vw", margin: "0.2em" }}
         />
     );
 });
 
 const FilterComponentReactWrapper = () => {
-    return (
-            <FilterDropdown />
-        // <div style={{maxWidth: '10em', display: 'inline-flex'}}>
-        // {/* <DropdownAutocompleteComponent props={g({
-        //     label: '',
-        //     current_value: "default",
-        //     type: 'dropdown',
-        //     values: values,
-        // })} /> */}
-        // </div>
-    );
+    return <FilterDropdown />;
 };
 
 export default FilterComponentReactWrapper;

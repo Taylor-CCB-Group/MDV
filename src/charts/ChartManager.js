@@ -260,32 +260,6 @@ export class ChartManager {
         );
         homeButton.style.marginRight = "20px";
 
-        // if (config.all_views) {
-        //     this.viewSelect = createEl(
-        //         "select",
-        //         { style: { maxWidth: "50em" } },
-        //         this.menuBar,
-        //     );
-        //     for (const v of config.all_views) {
-        //         createEl("option", { text: v, value: v }, this.viewSelect);
-        //     }
-        //     createFilterElement(this.viewSelect, this.menuBar);
-        //     this.viewSelect.addEventListener("change", (e) => {
-        //         if (
-        //             this.config.show_save_view_dialog &&
-        //             config.permission === "edit"
-        //         ) {
-        //             this.showSaveViewDialog(() =>
-        //                 this.changeView(this.viewSelect.value),
-        //             );
-        //         } else {
-        //             this.changeView(this.viewSelect.value);
-        //         }
-        //     });
-
-        //     // this.viewSelect.style.display = "none";
-        // }
-
         if (config.all_views) {
             const filterWrapperNode = createEl(
                 "span",
@@ -831,9 +805,7 @@ export class ChartManager {
     _loadView(config, dataLoader, firstTime = false) {
         //load view, then initialize
         if (config.all_views) {
-            // this.currentView = config.initial_view || config.all_views[0];
             const currentView = config.initial_view || config.all_views[0];
-            // this.viewSelect.value = this.currentView;
             
             this.viewManager.setView(currentView);
             dataLoader.viewLoader(currentView).then((data) => {
@@ -995,7 +967,6 @@ export class ChartManager {
         //nothing to load - call any listeners
         if (this._toLoadCharts.size === 0) {
             this._toLoadCharts = undefined;
-            // if (this.currentView === undefined) {
             if (this.viewManager.current_view === undefined) {
                 if (this.dataSources.length === 0) new FileUploadDialogReact();
                 else {
@@ -1003,7 +974,6 @@ export class ChartManager {
                     this.showAddViewDialog();
                 }
             } else {
-                // this._callListeners("view_loaded", this.currentView);
                 this._callListeners("view_loaded", this.viewManager.current_view);
             }
         }
@@ -1077,13 +1047,6 @@ export class ChartManager {
                     text: "Create New View",
                     method: (vals) => {
                         //create new view option
-                        // createEl(
-                        //     "option",
-                        //     { text: vals["name"], value: vals["name"] },
-                        //     this.viewSelect,
-                        // );
-                        // this.viewSelect.value = vals["name"];
-                        // this.currentView = vals["name"];
                         
                         const newViewName = vals["name"];
                         this.viewManager.setAllViews([
@@ -1107,7 +1070,6 @@ export class ChartManager {
                             this.removeAllCharts();
                             this.viewData.links = [];
                             const state = this.getState();
-                            console.log("state add new: ", state);
                             state.view.initialCharts = {};
                             state.view.dataSources = {};
                             //only one datasource
@@ -1131,7 +1093,6 @@ export class ChartManager {
                             this._init(state.view);
                         } else {
                             const state = this.getState();
-                            console.log("state add new: ", state);
                             this._callListeners("state_saved", state);
                         }
                     },
@@ -1149,7 +1110,6 @@ export class ChartManager {
                     text: "YES",
                     method: () => {
                         const state = this.getState();
-                        console.log("state save: ", state);
                         this._callListeners("state_saved", state);
                         action();
                     },
@@ -1183,21 +1143,6 @@ export class ChartManager {
         });
     }
 
-    // changeView(view) {
-        // for (const ds in this.viewData.dataSources) {
-        //     if (this.viewData.dataSources[ds].layout === "gridstack") {
-        //         this.gridStack.destroy(this.dsIndex[ds]);
-        //     }
-        // }
-        // this.removeAllCharts();
-        // this.contentDiv.innerHTML = "";
-        // this.currentView = view;
-        // this.viewManager.setView(view);
-        // this.viewLoader(view).then((data) => {
-        //     this._init(data);
-        // });
-    // }
-
     changeView(view) {
         for (const ds in this.viewData.dataSources) {
             if (this.viewData.dataSources[ds].layout === "gridstack") {
@@ -1206,63 +1151,34 @@ export class ChartManager {
         }
         this.removeAllCharts();
         this.contentDiv.innerHTML = "";
-        // this.currentView = view;
         this.viewManager.setView(view);
         this.viewLoader(view).then((data) => {
             this._init(data);
         });
     }
 
-    // deleteCurrentView() {
-    //     //remove the view choice and change view to the next one
-    //     const opt = this.viewSelect.querySelector(
-    //         `option[value='${this.viewSelect.value}']`,
-    //     );
-    //     // const opt = this.viewSelect.querySelector(
-    //     //     `option[value='${this.viewManager.current_view}']`,
-    //     // );
-    //     opt.remove();
-
-    //     const updatedViews = this.viewManager.all_views.filter((v) => v !== this.viewSelect.value);
-    //     this.viewManager.setAllViews(updatedViews);
-    //     const state = this.getState();
-    //     //want to delete view and update any listeners
-    //     state.view = null;
-    //     this._callListeners("state_saved", state);
-
-    //     this.currentView = this.viewSelect.value;
-    //     this.viewManager.setView(nextView);
-    //     this.changeView(this.viewSelect.value);
-    //     // this.currentView = this.viewManager.current_view;
-    //     // this.changeView(this.viewManager.current_view);
-    // }
     deleteCurrentView() {
         //remove the view choice and change view to the next one
         const view = this.viewManager.current_view;
-        console.log("view delete: ", view);
         if (view) {
         const updatedViews = this.viewManager.all_views.filter((v) => v !== view);
-        console.log("updatedViews:", updatedViews);
         this.viewManager.setAllViews(updatedViews);
-
-        if (updatedViews.length > 0) {
-            this.viewManager.setView(updatedViews[0]);
-        } else {
-            this.viewManager.setView(null);
-        }
-
-        console.log("updated: ", this.viewManager.current_view, this.viewManager.all_views);
 
         // this.viewManager.setView(nextView);
         const state = this.getState();
-        console.log("state: ", state);
         //want to delete view and update any listeners
-        // state.view = null;
+        state.view = null;
         this._callListeners("state_saved", state);
-        console.log("again state: ", state);
 
-        // this.currentView = nextView;
-        this.changeView(this.viewManager.current_view ?? "");
+        if (updatedViews.length > 0) {
+            const nextView = updatedViews[0];
+            this.viewManager.setView(nextView);
+            this.changeView(nextView);
+        } else {
+            this.removeAllCharts();
+            this.viewData = {};
+            this.showAddViewDialog();
+        }
     }
     }
 
@@ -1494,19 +1410,11 @@ export class ChartManager {
         }
 
         const view = JSON.parse(JSON.stringify(this.viewData));
-        console.log("view: ", view);
         view.initialCharts = initialCharts;
-        // const all_views = this.viewSelect
-        //     // @ts-ignore do we know that we actually have elements with 'value'?
-        //     ? Array.from(this.viewSelect.children, (x) => x.value)
-        //     : null;
 
         const all_views = this.viewManager.all_views ? this.viewManager.all_views : null;
-        console.log("all: ", all_views);
-        console.log("curr: ", this.viewManager.current_view);
         return {
             view: view,
-            // currentView: this.currentView,
             currentView: this.viewManager.current_view,
             all_views: all_views,
             updatedColumns: updatedColumns,
@@ -2382,7 +2290,6 @@ export class ChartManager {
                         this._setUpLink(l);
                     }
                 }
-                // this._callListeners("view_loaded", this.currentView);
                 this._callListeners("view_loaded", this.viewManager.current_view);
             }
         }
