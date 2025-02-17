@@ -17,18 +17,18 @@ from mdvtools.dbutils.dbmodels import db, Project
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 from flask import redirect, url_for, session, jsonify
 
-# Read environment flag for authentication
+#Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 
 if ENABLE_AUTH:
-    try:
+    
         from authlib.integrations.flask_client import OAuth
         from mdvtools.auth.auth0_provider import Auth0Provider
 
         oauth = OAuth()  # Initialize OAuth only if auth is enabled
-    except ImportError:
-        print("Auth library not found. Ensure poetry installs `auth` dependencies when ENABLE_AUTH=1.")
-        exit(1)  # Fail early if auth is enabled but libraries are missing
+    #except ImportError:
+    #    print("Auth library not found. Ensure poetry installs `auth` dependencies when ENABLE_AUTH=1.")
+    #    exit(1)  # Fail early if auth is enabled but libraries are missing
 
 
 def create_flask_app(config_name=None):
@@ -107,15 +107,18 @@ def create_flask_app(config_name=None):
         """Check if the user is authenticated (works for both Auth0 and Shibboleth)."""
         # Check if auth0_provider is initialized
         if not auth0_provider:
+            print("<<<<<<1")
             # If auth0_provider is not available, return False as we can't check authentication for Auth0 yet
             return False
         
         # Check if Auth0 is enabled and if the token is in session
         if session.get('auth_method') == 'auth0' and 'token' in session:
+            print("<<<<<<1")
             # For Auth0, we need to validate the token to ensure it's not expired or invalid
             try:
                 # Validate the token with Auth0 (this will depend on your token structure and verification method)
                 if auth0_provider.is_token_valid(session['token']):
+                    print("--------88888")
                     return True  # Token is valid, user is authenticated
                 else:
                     # Token is invalid or expired
@@ -157,13 +160,16 @@ def create_flask_app(config_name=None):
     def enforce_authentication():
         """Redirect unauthenticated users to login if required."""
         if not ENABLE_AUTH:
+            print(":::::1")
             return None  # Skip authentication check if auth is disabled
 
         requested_path = request.path
         if any(requested_path.startswith(route) for route in whitelist_routes):
+            print(":::::2")
             return None  # Allow access to whitelisted routes
 
         if not is_authenticated():
+            print(":::::3")
             redirect_uri = app.config["LOGIN_REDIRECT_URL"]
             print(f"Unauthorized access attempt to {requested_path}. Redirecting to /login_dev.")
             return redirect(redirect_uri)
@@ -511,6 +517,7 @@ def register_auth0_routes(app):
                 if auth_method == 'auth0':
                     # If the user logged in via Auth0, log them out from Auth0
                     auth0_provider.logout()
+                    print("----------- logout 1")
 
                 # If the user logged in via Shibboleth, redirect to Shibboleth IdP's logout URL
                 elif auth_method == 'shibboleth':

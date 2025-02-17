@@ -194,6 +194,7 @@ class Auth0Provider(AuthProvider):
             unverified_header = jwt.get_unverified_header(token)
             
             if unverified_header is None:
+                print("++++++++1")
                 logging.error("Invalid token header.")
                 return False
 
@@ -205,6 +206,7 @@ class Auth0Provider(AuthProvider):
                     response = requests.get(self.app.config['AUTH0_PUBLIC_KEY_URI'])
                     if response.status_code != 200:
                         logging.error(f"Failed to fetch JWKS: {response.status_code}")
+                        print("++++++++2")
                         return False
                     jwks = response.json()
 
@@ -225,6 +227,7 @@ class Auth0Provider(AuthProvider):
             
             if not rsa_key:
                 logging.error("No valid key found in JWKS for token verification.")
+                print("++++++++3")
                 return False
 
             # Step 3: Verify the JWT token using the public key
@@ -235,12 +238,14 @@ class Auth0Provider(AuthProvider):
                 audience=self.app.config["AUTH0_AUDIENCE"],  # Your API audience
                 issuer=f"https://{self.app.config['AUTH0_DOMAIN']}/"
             )
-
+            print("++++++++4")
             # Step 4: Check the expiration of the token
             if payload['exp'] > time.time():
+                print("++++++++5")
                 return True
             else:
                 logging.error("Token is expired.")
+                print("++++++++6")
                 return False
 
         except ExpiredSignatureError:
