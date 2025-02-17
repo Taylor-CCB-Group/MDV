@@ -113,7 +113,7 @@ def create_flask_app(config_name=None):
         
         # Check if Auth0 is enabled and if the token is in session
         if session.get('auth_method') == 'auth0' and 'token' in session:
-            print("<<<<<<1")
+            print("<<<<<<2")
             # For Auth0, we need to validate the token to ensure it's not expired or invalid
             try:
                 # Validate the token with Auth0 (this will depend on your token structure and verification method)
