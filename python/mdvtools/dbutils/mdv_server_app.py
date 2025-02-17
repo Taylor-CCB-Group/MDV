@@ -510,7 +510,7 @@ def register_auth0_routes(app):
                     session.clear()  # Clear session in case of failure
                     return jsonify({"error": "Authentication failed."}), 401
                 
-                print("$$$$$$$$$$$$$$$ app-callback 2")
+                print(" $$$$$$$$$$$$$$$ app-callback 2")
                 return redirect(url_for('index'))  # Redirect to the home page or any protected page
             except Exception as e:
                 print(f"In register_auth0_routes : Error during callback: {e}")
