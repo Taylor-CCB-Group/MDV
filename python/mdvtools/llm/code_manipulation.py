@@ -234,7 +234,7 @@ def patch_viewname(code: str, project: MDVProject):
     escaped_view_name = json.dumps(view_name) # this should escape any quotes in the view_name
     # but it also adds quotes around the view_name, so we need to remove them...
     escaped_view_name = escaped_view_name[1:-1]
-    existing_views = [k for k in project.views]
+    existing_views = set(project.views) # sometimes existing views do not capture all the existing view - trying a set instead of list to test if that works better [k for k in project.views]
     
     if view_name not in existing_views:
         # just in case the view_name isn't a duplicate, but might have had quotes in it
