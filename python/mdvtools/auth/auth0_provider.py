@@ -1,9 +1,13 @@
+import time
 import requests
 from authlib.integrations.flask_client import OAuth
 from flask import session, redirect, url_for
 from typing import Optional
 from mdvtools.auth.auth_provider import AuthProvider
 import logging
+from jose import jwt
+from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
+
 
 
 class Auth0Provider(AuthProvider):
@@ -88,14 +92,28 @@ class Auth0Provider(AuthProvider):
 
     def logout(self) -> None:
         """
-        Logs the user out by clearing the session.
+        Logs the user out by clearing the session and redirecting to Auth0's logout endpoint.
         """
         try:
-            logging.info("Logging out user.")
+            logging.info("Logging out user from Auth0.")
+            
+            # Clear the server-side session to remove any stored tokens and user data
             session.clear()
+            
+            # Prepare the redirect URL after logout (i.e., where the user is sent after logging out of Auth0)
+            redirect_url = self.app.config["LOGIN_REDIRECT_URL"]  # The URL to redirect after logout
+            
+            # Redirect the user to Auth0's logout URL, which will handle the Auth0-side logout
+            # This will log the user out of Auth0 and redirect them to the provided URL
+            logout_url = f"https://{self.app.config['AUTH0_DOMAIN']}/v2/logout?returnTo={redirect_url}&client_id={self.app.config['AUTH0_CLIENT_ID']}"
+            
+            logging.info(f"Redirecting to Auth0 logout URL: {logout_url}")
+            return redirect(logout_url)
+
         except Exception as e:
             logging.error(f"Error during logout process: {e}")
-            raise RuntimeError("Logout failed.") from e
+            raise RuntimeError("Auth0 logout failed.") from e
+
 
     def get_user(self, token: str) -> Optional[dict]:
         """
@@ -143,10 +161,12 @@ class Auth0Provider(AuthProvider):
             if 'access_token' not in token:
                 raise ValueError("Access token not found in the response.")
             session['token'] = token
+            session["auth_method"] = "auth0"
             logging.info("Access token retrieved and stored in session.")
             return token['access_token']
         except Exception as e:
             logging.error(f"Error during callback handling: {e}")
+            session.clear() # Clear session in case of failure
             raise RuntimeError("Callback handling failed.") from e
 
     def is_authenticated(self, token: str) -> bool:
@@ -162,4 +182,76 @@ class Auth0Provider(AuthProvider):
             return user_info is not None
         except Exception as e:
             logging.error(f"Error while checking authentication: {e}")
+            return False
+        
+    def is_token_valid(self, token):
+        """
+        Validates the provided token by verifying its signature using Auth0's public keys
+        and ensuring it's not expired.
+        """
+        try:
+            # Step 1: Decode the token header without verification to extract the 'kid'
+            unverified_header = jwt.get_unverified_header(token)
+            
+            if unverified_header is None:
+                logging.error("Invalid token header.")
+                return False
+
+            # Step 2: Get the public key from Auth0's JWKS (JSON Web Key Set) endpoint
+            rsa_key = {}
+            if 'kid' in unverified_header:
+                try:
+                    # Fetch Auth0 public keys from jwks_uri
+                    response = requests.get(self.app.config['AUTH0_PUBLIC_KEY_URI'])
+                    if response.status_code != 200:
+                        logging.error(f"Failed to fetch JWKS: {response.status_code}")
+                        return False
+                    jwks = response.json()
+
+                    # Find the key in the JWKS that matches the 'kid' in the token header
+                    for key in jwks['keys']:
+                        if key['kid'] == unverified_header['kid']:
+                            rsa_key = {
+                                'kty': key['kty'],
+                                'kid': key['kid'],
+                                'use': key['use'],
+                                'n': key['n'],
+                                'e': key['e']
+                            }
+                            break
+                except Exception as e:
+                    logging.error(f"Error getting public keys from Auth0: {e}")
+                    return False
+            
+            if not rsa_key:
+                logging.error("No valid key found in JWKS for token verification.")
+                return False
+
+            # Step 3: Verify the JWT token using the public key
+            payload = jwt.decode(
+                token,
+                rsa_key,
+                algorithms=["RS256"],
+                audience=self.app.config["AUTH0_AUDIENCE"],  # Your API audience
+                issuer=f"https://{self.app.config['AUTH0_DOMAIN']}/"
+            )
+
+            # Step 4: Check the expiration of the token
+            if payload['exp'] > time.time():
+                return True
+            else:
+                logging.error("Token is expired.")
+                return False
+
+        except ExpiredSignatureError:
+            logging.error("Token is expired.")
+            return False
+        except JWTClaimsError:
+            logging.error("Invalid claims in token.")
+            return False
+        except JWTError as e:
+            logging.error(f"Error decoding token: {e}")
+            return False
+        except Exception as e:
+            logging.error(f"Error during token validation: {e}")
             return False

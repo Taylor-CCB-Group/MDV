@@ -38,6 +38,12 @@ def create_flask_app(config_name=None):
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
     app.url_map.strict_slashes = False
     app.after_request(add_safe_headers)
+    
+    app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,   # Prevent JavaScript from accessing cookies
+    SESSION_COOKIE_SECURE=True,     # Only send cookies over HTTPS
+    SESSION_COOKIE_SAMESITE="Lax"   # Prevent cross-site cookie usage
+)
     app.secret_key = os.getenv('FLASK_SECRET_KEY', 'a-very-secret-key')
 
     
@@ -93,11 +99,46 @@ def create_flask_app(config_name=None):
             print(f"Error initializing OAuth: {e}")
             exit(1)
 
+    # Global variable for Auth0 provider
+    auth0_provider = None  # This should be set when Auth0 routes are registered
 
     # Authentication check function
     def is_authenticated():
-        """Check if the user is authenticated (only when auth is enabled)."""
-        return ENABLE_AUTH and 'token' in session and session['token']
+        """Check if the user is authenticated (works for both Auth0 and Shibboleth)."""
+        # Check if auth0_provider is initialized
+        if not auth0_provider:
+            # If auth0_provider is not available, return False as we can't check authentication for Auth0 yet
+            return False
+        
+        # Check if Auth0 is enabled and if the token is in session
+        if session.get('auth_method') == 'auth0' and 'token' in session:
+            # For Auth0, we need to validate the token to ensure it's not expired or invalid
+            try:
+                # Validate the token with Auth0 (this will depend on your token structure and verification method)
+                if auth0_provider.is_token_valid(session['token']):
+                    return True  # Token is valid, user is authenticated
+                else:
+                    # Token is invalid or expired
+                    print("Auth0 token is invalid or expired.")
+                    session.clear()  # Clear session if token is invalid
+                    return False
+            except Exception as e:
+                print(f"Error during Auth0 token validation: {e}")
+                session.clear()  # Clear session if there was an error during validation
+                return False
+        
+        # Check for Shibboleth authentication
+        elif session.get('auth_method') == 'shibboleth':
+            # For Shibboleth, if the token is not available in the session, we cannot validate like Auth0
+            # So, we assume that the presence of 'auth_method' is the sign of successful authentication
+            # You may adjust this depending on your specific Shibboleth setup.
+            if 'auth_method' in session and session['auth_method'] == 'shibboleth':
+                return True  # Assume user is authenticated after successful Shibboleth login
+            
+            return False  # If no 'auth_method' is found for Shibboleth, user is not authenticated
+        
+        return False  # Default to False if neither Auth0 nor Shibboleth is used
+
 
     # Whitelist of routes that do not require authentication
     whitelist_routes = [
@@ -237,7 +278,15 @@ def load_config(app, config_name=None, enable_auth=False):
                 app.config['AUTH0_CLIENT_ID'] = auth0_client_id
                 app.config['AUTH0_CLIENT_SECRET'] = auth0_client_secret
                 app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL') or config.get('AUTH0_CALLBACK_URL')
+                app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
+                app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
+
                 app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
+
+                app.config["SHIBBOLETH_LOGIN_URL"] = os.getenv('SHIBBOLETH_LOGIN_URL') or config.get('SHIBBOLETH_LOGIN_URL')
+                app.config["SHIBBOLETH_LOGOUT_URL"] = os.getenv('SHIBBOLETH_LOGOUT_URL') or config.get('SHIBBOLETH_LOGOUT_URL')
+
+                
 
 
     except Exception as e:
@@ -435,27 +484,59 @@ def register_auth0_routes(app):
                 code = request.args.get('code')  # Get the code from the callback URL
                 if not code:
                     print("Missing 'code' parameter in the callback URL.")
+                    session.clear()  # Clear session if there's no code
                     return jsonify({"error": "Authorization code not provided."}), 400
+                
                 print("$$$$$$$$$$$$$$$ app-callback  1")
-                token = auth0_provider.handle_callback()
+                access_token = auth0_provider.handle_callback()
+                if not access_token:  # If token retrieval fails, prevent redirecting
+                    print("Authentication failed: No valid token received.")
+                    session.clear()  # Clear session in case of failure
+                    return jsonify({"error": "Authentication failed."}), 401
+                
                 print("$$$$$$$$$$$$$$$ app-callback 2")
-                session['token'] = token  # Store the token in session
                 return redirect(url_for('index'))  # Redirect to the home page or any protected page
             except Exception as e:
                 print(f"In register_auth0_routes : Error during callback: {e}")
+                session.clear()  # Clear session on error
                 return jsonify({"error": "Failed to complete authentication process."}), 500
 
         # Route for logout (clears the session and redirects to home)
         @app.route('/logout')
         def logout():
             try:
-                auth0_provider.logout()
-                print("logged out")
-                redirect_uri = app.config["LOGIN_REDIRECT_URL"]
-                return redirect(redirect_uri)  # Redirect to home after logout
+                # Check what authentication method was used (Auth0 or Shibboleth)
+                auth_method = session.get('auth_method', None)
+
+                if auth_method == 'auth0':
+                    # If the user logged in via Auth0, log them out from Auth0
+                    auth0_provider.logout()
+
+                # If the user logged in via Shibboleth, redirect to Shibboleth IdP's logout URL
+                elif auth_method == 'shibboleth':
+                    # Shibboleth does not handle the session clearing, so we first clear the session
+                    session.clear()
+                    # Then, redirect to the Shibboleth IdP logout URL
+                    shibboleth_logout_url = app.config.get('SHIBBOLETH_LOGOUT_URL', None)
+
+                    if shibboleth_logout_url:
+                        # Redirect to the provided Shibboleth IdP logout URL
+                        return redirect(shibboleth_logout_url)
+                    else:
+                        # If no Shibboleth logout URL is configured, return an error
+                        return jsonify({"error": "Shibboleth logout URL not provided."}), 500
+
+                # Clear the session data after logging out from either Auth0 or Shibboleth
+                session.clear()
+
+                # No need to redirect here if auth0_provider.logout() already handles redirection
+                return jsonify({"message": "Logged out successfully"}), 200
+
             except Exception as e:
                 print(f"In register_auth0_routes: Error during logout: {e}")
+                session.clear()
                 return jsonify({"error": "Failed to log out."}), 500
+
 
         # You can also add a sample route to check the user's profile or token
         @app.route('/profile')
@@ -472,11 +553,34 @@ def register_auth0_routes(app):
                 print(f"In register_auth0_routes: Error during profile retrieval: {e}")
                 return jsonify({"error": "Failed to retrieve user profile."}), 500
         
+
         @app.route('/login_sso')
         def login_sso():
-            # Redirect user to Shibboleth-protected login page on Apache
-            return redirect('https://bia.cmd.ox.ac.uk:443')
+            """Redirect user to Shibboleth-protected login page on Apache."""
+            try:
+                # Clear any existing session data to ensure we start with a fresh session
+                session.clear()
+                
+                # Store the authentication method as Shibboleth
+                session["auth_method"] = "shibboleth"  # Indicate Shibboleth login
 
+                # Check if the Shibboleth login URL is provided in the environment
+                shibboleth_login_url = app.config.get('SHIBBOLETH_LOGIN_URL', None)
+
+                if shibboleth_login_url:
+                    # Redirect the user to Shibboleth login page if the URL is configured
+                    print("Redirecting to Shibboleth login page...")
+                    return redirect(shibboleth_login_url)
+                else:
+                    # If Shibboleth URL is not provided, inform the user
+                    print("Shibboleth login URL not provided.")
+                    return jsonify({"error": "Shibboleth login URL not provided."}), 500
+
+            except Exception as e:
+                # In case of error, clear the session and handle the error
+                session.clear()  # Ensure session is cleared in case of failure
+                print(f"In login_sso: Error during login: {e}")
+                return jsonify({"error": "Failed to start login process using SSO."}), 500
 
         print("Auth0 routes registered successfully!")
 
