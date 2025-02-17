@@ -63,6 +63,8 @@ import { AddChartDialog } from "./dialogs/AddChartDialog";
 import { createMdvPortal } from "@/react/react_utils";
 import FilterComponentReactWrapper from "@/react/components/FilterComponentReactWrapper";
 import ViewManager from "./ViewManager";
+import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
+
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -175,7 +177,7 @@ export class ChartManager {
          *  menuBar the dom menu associated with this element
          *  contentDiv the div that the charts associated with the datastore will be added
          * @typedef {import("@/charts/charts/DataSource")} DataSource
-         * @type {DataSource[]} 
+         * @type {DataSource[]}
          */
         this.dataSources = [];
         /** @type {{[k: string]: DataSource | undefined}} */
@@ -241,7 +243,6 @@ export class ChartManager {
 
         createEl("span", { classes: ["mdv-divider"] }, this.menuBar);
 
-        
         /** @type {HTMLSpanElement} */
         const homeButton = createMenuIcon(
             "fas fa-home",
@@ -253,7 +254,9 @@ export class ChartManager {
                 func: () => {
                     // const state = this.getState();
                     // this._callListeners("state_saved", state);
-                    window.location.href = import.meta.env.DEV ? `${window.location.origin}/catalog_dev` : `${window.location.origin}/../`;
+                    window.location.href = import.meta.env.DEV
+                        ? `${window.location.origin}/catalog_dev`
+                        : `${window.location.origin}/../`;
                 },
             },
             this.menuBar,
@@ -1507,14 +1510,16 @@ export class ChartManager {
 
     updateInfoAlert(id, msg, config = {}) {
         const al = this.infoAlerts[id];
-        if (config.type && al.type !== config.type) {
-            al.div.classList.remove(`ciview-alert-${al.type}`);
-            al.div.classList.add(`ciview-alert-${config.type}`);
-            al.type = config.type;
-        }
-        al.text.textContent = msg;
-        if (config.duration) {
-            this.removeInfoAlert(id, config.duration);
+        if (al) {
+            if (config.type && al.type !== config.type) {
+                al.div.classList.remove(`ciview-alert-${al.type}`);
+                al.div.classList.add(`ciview-alert-${config.type}`);
+                al.type = config.type;
+            }
+            al.text.textContent = msg;
+            if (config.duration) {
+                this.removeInfoAlert(id, config.duration);
+            }
         }
     }
 
@@ -1546,7 +1551,7 @@ export class ChartManager {
      * @param {string[]} columns An array of column fields/ids
      * @param {string} dataSource The name of the dataSource
      * @param {function} callback A function which will be run once all the
-     * columns are loaded, with any failed columns as an argument (although it's not clear that the underlying code actually does this, 
+     * columns are loaded, with any failed columns as an argument (although it's not clear that the underlying code actually does this,
      * or that any code that calls this function actually uses the argument)
      * @param {number} [split=10]  the number of columns to send with each request
      * @param {number} [threads=2]  the number of concurrent requests
@@ -1631,11 +1636,16 @@ export class ChartManager {
                 for (const col of col_list) {
                     delete this.columnsLoading[dataSource][col];
                 }
-                all_loaded = all_loaded > trans.totalColumns
-                    ? trans.totalColumns
-                    : all_loaded;
+                all_loaded =
+                    all_loaded > trans.totalColumns
+                        ? trans.totalColumns
+                        : all_loaded;
                 if (trans.failedColumns.length > 0) {
-                    this.updateInfoAlert(trans.alertID, `Failed to load ${trans.failedColumns.length} columns`, { type: 'danger' });
+                    this.updateInfoAlert(
+                        trans.alertID,
+                        `Failed to load ${trans.failedColumns.length} columns`,
+                        { type: "danger" },
+                    );
                     // return;
                 } else {
                     this.updateInfoAlert(
@@ -1918,7 +1928,7 @@ export class ChartManager {
             },
             ds.contentDiv,
         );
-        createEl(
+        const spinner = createEl(
             "i",
             {
                 classes: ["fas", "fa-circle-notch", "fa-spin"],
@@ -1930,7 +1940,7 @@ export class ChartManager {
             },
             div,
         );
-        createEl(
+        const ellipsis = createEl(
             "div",
             {
                 styles: {
@@ -1955,28 +1965,32 @@ export class ChartManager {
             this._addChart(dataSource, config, div, notify);
         } catch (error) {
             this.clearInfoAlerts();
-            const id = this.createInfoAlert(
-                `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
-                {
-                    type: "warning",
-                },
-            );
-            console.error(error);
-            const idiv = this.infoAlerts[id].div;
-            idiv.onclick = () => idiv.remove();
-            // div.remove();
+            spinner.remove();
+            ellipsis.remove();
+            // const id = this.createInfoAlert(
+            //     `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
+            //     {
+            //         type: "warning",
+            //     },
+            // );
+            // const idiv = this.infoAlerts[id].div;
+            // idiv.onclick = () => idiv.remove();
             const debugNode = createEl(
                 "div",
                 {
                     styles: {
                         position: "absolute",
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
                         backdropFilter: "blur(10px)",
                     },
                 },
-                div.lastElementChild,
+                div,
             );
-            debugNode.innerHTML = `<div><h2>Error creating chart</h2><pre>${error.stack}</pre></div>`;
-            debugNode.onclick = () => debugNode.remove();
+            createMdvPortal(ErrorComponentReactWrapper({error, height, width, extraMetaData: {config}}), debugNode);
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
         }
@@ -2107,7 +2121,10 @@ export class ChartManager {
         else {
             this.loadColumnSet(reqCols, dataSource, (failedColumns) => {
                 if (failedColumns.length) {
-                    console.warn('got columns with some failures', failedColumns);
+                    console.warn(
+                        "got columns with some failures",
+                        failedColumns,
+                    );
                 }
                 this._haveColumnsLoaded(columns, dataSource, func);
             });
