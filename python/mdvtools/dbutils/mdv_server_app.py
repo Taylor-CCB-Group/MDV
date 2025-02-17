@@ -102,8 +102,18 @@ def create_flask_app(config_name=None):
     # Global variable for Auth0 provider
     auth0_provider = None  # This should be set when Auth0 routes are registered
 
-    # Authentication check function
     def is_authenticated():
+        """Check if the user is authenticated, considering Auth0 and Shibboleth."""
+        if not ENABLE_AUTH:
+            return True  # Authentication is disabled, allow access
+        
+        if session.get("auth_method") == "shibboleth":
+            return True  # Shibboleth users are already authenticated
+        
+        return "token" in session and session["token"]
+
+    # Authentication check function
+    def is_authenticated_token():
         """Check if the user is authenticated (works for both Auth0 and Shibboleth)."""
         # Check if auth0_provider is initialized
         if not auth0_provider:
