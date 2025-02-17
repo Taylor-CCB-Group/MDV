@@ -17,7 +17,7 @@ from mdvtools.dbutils.dbmodels import db, Project
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 from flask import redirect, url_for, session, jsonify
 
-#Read environment flag for authentication
+# Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 
 if ENABLE_AUTH:
