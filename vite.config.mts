@@ -135,6 +135,16 @@ export default defineConfig(env => ({
     plugins: [
         react({
             include: [/\.tsx?$/, /\.jsx?$/],
+            babel: {
+                plugins: [
+                    [
+                        "@babel/plugin-proposal-decorators",
+                        {
+                            version: "2023-05"
+                        }
+                    ]
+                ]
+            }
         })
     ],
     worker: {
