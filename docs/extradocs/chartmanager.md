@@ -65,8 +65,8 @@ The types of listeners are:-
 
 Called when the user saves the data. The object passed to the listener consists of the following:-
 
-* `view` - A config containing all data for the view
-* `currentView` - 
+* `view` - A config containing all data for the view, or `null` if the view is to be deleted
+* `currentView` - the name of a view to be updated, or `null` if the state being saved is not a view
 * `all_views` -  A list of views 
 * `updatedColumns` -  a dictionary with a entry for each datasource 
     * `columns` - a list of all columns that have either been updated or added containing:
