@@ -452,7 +452,7 @@ class BaseChart<T extends BaseConfig> {
      * get colorLegend method
      */
     setColorLegend() {
-        if (!this.config.color_legend.display) {
+        if (!this.config.color_legend?.display) {
             if (this.legend) {
                 this.config.color_legend.pos = [
                     this.legend.offsetLeft,
