@@ -17,6 +17,7 @@ function decorateColumnMethod<T extends BaseChart<any>>(method: string, chart: T
 /**
  * Apply start @{link loadColumnData} decorator to all methods on a chart class that require column data to be loaded
  * and which don't specify this with the `@loadColumnData` syntax.
+ * @deprecated - use {@link loadColumnData} directly on the method.
  */
 export function decorateChartColumnMethods<T extends BaseChart<any>>(chart: T) {
     const chartType = BaseChart.types[chart.config.type];
@@ -41,6 +42,7 @@ export function decorateChartColumnMethods<T extends BaseChart<any>>(chart: T) {
     }
 
     if (!chartType.methodsUsingColumns) return;
+    console.warn("Decorating chart column methods - todo, test with @loadColumnData", chartType.methodsUsingColumns);
     for (const m of chartType.methodsUsingColumns) {
         decorateColumnMethod(m, chart);
     }

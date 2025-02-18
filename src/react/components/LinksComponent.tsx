@@ -21,6 +21,7 @@ const RowsAsCols = observer(<T extends CTypes,>(props : RowsAsColsProps<T>) => {
     // const dataSources = useDataSources();
     const cm = window.mdv.chartManager;
     const targetColumn = cm.getDataSource(linkedDs.name).columnIndex[name_column] as DataColumn<DataType>;
+    //@ts-expect-error need to review isMultiType logic
     const isMultiType = isMultiColumn(props.type);
     // potential symbols for live link ➤ ⌁ ⇢ ⍆ ⚡︎ ► ◎ ▷ ☑︎ ⦿
     const liveSelectionName = `⦿⌁ active '${name}' selection`;
@@ -67,6 +68,7 @@ export const RAComponent = observer(<T extends CTypes,>(props: ColumnSelectionPr
         return <div>Error! expected RowsAsColsQuery</div>;
     }
     const { link, linkedDsName, maxItems } = current_value;
+    //@ts-expect-error need to review isMultiType logic
     const multiple = isMultiColumn(props.type);
     return <Paper 
     onClick={(e) => {

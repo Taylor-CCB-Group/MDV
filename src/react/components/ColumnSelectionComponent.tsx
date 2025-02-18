@@ -26,10 +26,16 @@ type GuiStateProps = {
     isAutocompleteFocused: boolean;
     setIsAutocompleteFocused: setBoolean;
 }
-
-
+// todo - all kinds of things to do here...
+// - fix multi columns
+// - column groups
+// - think about how to present the links, including selecting subgroups etc.
+// - maybe when more complex UI is involved, this should be displayed in a dialog.
 /**
- * A component for selecting a column from the data store.
+ * A component for selecting columns from the data store.
+ * Depending on the type, this may be a single column or multiple columns.
+ * As well as concrete columns, these columns may be 'virtual' columns representing properties that may
+ * change dynamically (e.g. based on selection in a linked data source).
  * Must be in a context where `useDataStore` is available
  * (e.g. if we're in a more global dialog etc rather than a chart context,
  * this would be ambiguous).
@@ -38,8 +44,10 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
     const props = inferGenericColumnGuiProps(gProps);
     const { setSelectedColumn, placeholder, type } = props;
     const { setIsAutocompleteFocused, setIsExpanded, current_value } = props;
-    const isMultiType = isMultiColumn(type);
-    // const multiple = props.multiple || isMultiType;
+    
+    // - this is starting to do the right thing, still a bit confusing
+    const isMultiType = props.multiple || type && isMultiColumn(type);
+
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
     const columns: DataColumn<DataType>[] = useMemo(
@@ -50,14 +58,7 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
             ,
         [dataStore, props.exclude, type],
     );
-    // const [isExpanded, setIsExpanded] = useState(false);
-    // const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
-
-    // const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
-    // const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
-    // if (!linkProps) return <ColumnDropdown {...props} {...guiProps} />;
-    // In general, this should (probably) be using our "(multi)dropdown" component
-    // and the <LinksComponent /> can select which column options to show.
+    // const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links, and subgroups within links
     if (current_value && typeof current_value !== "string" && !Array.isArray(current_value)) {
         return <RAComponent {...props} />;
     };
@@ -70,6 +71,7 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
                     multiple={isMultiType}
                     // value={current_value ? columns.find(c => c.name === current_value) : null}
                     onChange={(_, value) => {
+                        //! fixme
                         if (!value) return; //! check if this is correct
                         if (!(isMultiType === isArray(value))) throw "type mismatch";
                         if (isMultiType) {

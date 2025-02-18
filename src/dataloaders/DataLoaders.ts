@@ -29,7 +29,7 @@ type Columns = DataColumn<DataType>[];
  * @returns a list of objects containing each colums's field name
  * and data
  **/
-function processArrayBuffer(data: ArrayBuffer, columns: Columns, size: number) {
+function processArrayBuffer(data: ArrayBufferLike, columns: Columns, size: number) {
     const dataList = [];
     let offset = 0;
     for (const column of columns) {
@@ -92,8 +92,10 @@ function processArrayBuffer(data: ArrayBuffer, columns: Columns, size: number) {
             const len = size * bytes;
             //get the data from the arraybuffer into a SharedArrayBuffer
             //unfortunately cannot be copied directly-  have to via a typed Array
+            //@ts-ignore todo better TypedArrayConstructor typing
             const arr = new arrayType(data, offset, arr_len);
             const sab = new SharedArrayBuffer(len);
+            //@ts-ignore todo better TypedArrayConstructor typing
             const new_arr = new arrayType(sab);
             new_arr.set(arr, 0);
             dataList.push({ data: sab, field: column.field });
@@ -134,7 +136,7 @@ function getArrayBufferDataLoader(url: string, decompress = false) {
         });
         //the data is any arraybuffer containing each individual
         //column's raw data
-        let data = await response.arrayBuffer();
+        let data: ArrayBufferLike = await response.arrayBuffer();
         data = decompress ? await decompressData(new Uint8Array(data)) : data;
         return processArrayBuffer(data, columns, size);
     };

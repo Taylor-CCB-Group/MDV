@@ -4,7 +4,7 @@
 //   partly just using them as a form of documentation / notes-to-self.
 
 // todo rearrange - maybe have a datastore.d.ts etc
-import type { FieldSpecs } from "@/lib/columnTypeHelpers";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
 export type DataType =
@@ -172,7 +172,7 @@ export type GuiValueTypes = {
     // (and we have several keys for different types of column references)
     // There should also be a general way of expressing that a property (like radius) can be set to a
     // number or a column (with modifiers) - this is where the node editor comes in...
-    column: FieldName;
+    column: FieldSpec;
     multicolumn: FieldSpecs; //easier to have distinct 'multicolumn' type than overly generic 'column'?
 };
 export type GuiSpecType = keyof GuiValueTypes;

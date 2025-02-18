@@ -8,6 +8,28 @@ import type DataStore from "@/datastore/DataStore";
 import { isArray } from "@/lib/utils";
 import type { BaseConfig } from "./BaseChart";
 
+/**
+ * This is a utility module for handling the serialisation and deserialisation of chart configurations.
+ * 
+ * In particular, with the introduction of dynamic column queries, we need to be able to represent these.
+ * There are essentially three lifecycle stages for something that specifies a column in a chart configuration:
+ * - A `string` representing a concrete column name (which may have special formatting to indicate it's a linked column)
+ * - A live object representing a query that will return observable column (e.g. RowsAsColsQuery)
+ * - A serialised object representing the query that can be stored in a JSON object.
+ * 
+ * A lot of existing charts expect strings, and we have mechanisms for instrumenting these to accept a query object - 
+ * but this requires manual adaptation of the code in a way that can be error-prone.
+ * 
+ * It is hoped that in most cases newer charts based on React will be able to handle the query objects directly,
+ * as long as it is clear at what point the configuration object is serialised and deserialised, they should be able
+ * to use simple hooks, which will transparently return appropriate column objects (as in, with actual column data)
+ * without being too concerned about the serialisation format etc.
+ * 
+ * ! as well as RowsAsColsQuery, I may implement some synthetic mock column types that can be used for testing.
+ * ^^ perhaps we could try to design the error-reporting mechanism to describe something that we could reproduce without the original data???
+ */
+
+
 // const ParamSpec = {
 //     "linkedDsName": "genes",
 //         "maxItems": 10,
@@ -33,6 +55,19 @@ export function getConcreteFieldName(fieldSpec: FieldSpec) {
     }
     return typeof fieldSpec === "string" ? fieldSpec : fieldSpec.fields[0];
 }
+
+/**
+ * For charts that aren't able to accept observable props for columns,
+ * this function will replace any query objects with the corresponding field name(s).
+ * 
+ * It takes as input a config object that may contain serialised queries, and returns a new object
+ * with the queries replaced by the field names as of the moment at which the method is run.
+ * 
+ * @param config object in serialised form
+ */
+// export function getConcreteConfig(config: any) {
+//     // return concrete;
+// }
 
 export class ColumnQueryMapper<T> {
     // constructor(chart: BaseChart<T>) {

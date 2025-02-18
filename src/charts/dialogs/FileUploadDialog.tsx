@@ -10,7 +10,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
 
-import axios, { type AxiosProgressEvent } from "axios";
+import axios, { type AxiosError, type AxiosProgressEvent } from "axios";
 import { useProject } from "../../modules/ProjectContext";
 import { ColumnPreview } from "./ColumnPreview";
 

@@ -14,33 +14,38 @@ export type Param = DataType | "number" | MultiColumnPrefix;
 
 // we should be able to describe what permutation of multiple / virtual columns we allow
 // the assumption that if we have an array it will only be strings is wrong.
-export type FieldSpecs = (MultiColumnQuery | FieldName)[]; // | MultiColumnQuery - as single element array?
-//@ts-expect- error we need to be more basic & explicit about things that are and are not arrays
-export type FieldSpec = FieldName | MultiColumnQuery | (FieldName | MultiColumnQuery)[];
+// up for review & documentation...
+export type FieldSpecs = (MultiColumnQuery | FieldName)[];
+//@ts-expect- error we need to be more basic & explicit about things that are and are not arrays (should have SingleColumnQuery)
+export type FieldSpec = FieldName | MultiColumnQuery;// | (FieldName | MultiColumnQuery)[];
 /**
+ * Should the type of spec be more restricted...
  * @returns an array of strings representing 'field names' - column IDs.
  */
-export function flattenFields(spec: FieldSpec): FieldName[] {
+export function flattenFields(spec: FieldSpec | FieldSpecs): FieldName[] {
     return isArray(spec) ? spec.flatMap(flattenFields) : typeof spec === "string" ? [spec] : spec.fields;
 }
 /** annotation of what kind of column type a given param will accept */
 export type CTypes = Param | Param[];
 // type MultiPrefix = `_multi_column:${string}`;
-type IsMultiParam<T extends CTypes> = T extends Param[] ? true 
+export type IsMultiParam<T extends CTypes> = T extends Param[] ? true 
 : T extends MultiColumnPrefix ? true 
 : false;
 
 export type ColumnSelectionProps<T extends CTypes,
     V = IsMultiParam<T> extends true ? FieldSpec : FieldName | MultiColumnQuery> = {
-        type: T; //wary of using 'type' as a name - not reserved, but could be confusing
+        type?: T; //wary of using 'type' as a name - not reserved, but could be confusing. also wary of optional type
         multiple?: boolean; //also interacts with type "_multi...", perhaps simpler to avoid having both
-        setSelectedColumn: (column: V) => void; //what about multiple? also, special values...
+        setSelectedColumn: (column: V) => void; //wip - type is right - implementation is not
         current_value?: V;
         placeholder?: string;
         exclude?: string[];
         dataStore?: DataStore;
     };
 
+/** 
+ * Given a `ColumnSelectionProps` object, this function should return the same object with the correct type annotations.
+ */
 export function inferGenericColumnSelectionProps<T extends CTypes>(
     props: ColumnSelectionProps<T>
 ): ColumnSelectionProps<T> {

@@ -670,7 +670,9 @@ class BaseChart<T extends BaseConfig> {
                         c.color_by = undefined;
                         this.colorByDefault?.();
                     } else {
+                        //@ts-expect-error color_by will have been co-erced to string by here as of now
                         c.color_by = x;
+                        //@ts-expect-error color_by will have been co-erced to string by here as of now
                         this.colorByColumn?.(x);
                     }
                 },

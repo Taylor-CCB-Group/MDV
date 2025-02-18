@@ -5,7 +5,11 @@ import { observer } from "mobx-react-lite";
 import type { DataColumn, ColumnName } from "../../charts/charts";
 import { useHighlightedIndex } from "../selectionHooks";
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
+import type { HighlightedFeatureConfig } from "./HighlightedFeatureChart";
 
+/** 
+ * @deprecated if we resurrect this chart, we should review which hook gets used - there should be something more general
+ */
 function useColumnData(columnName: ColumnName, maxItems = 100) {
     const ds = useDataStore();
     const [columnData, setColumnData] = useState<Float32Array | null>();
@@ -82,10 +86,13 @@ function useMarkdownText(md: string) {
 }
 
 export const HighlightedFeatureComponent = observer(() => {
-    const chart = useChart();
+    const chart = useChart<HighlightedFeatureConfig>();
     const html = useMarkdownText(chart.config.text);
+    //@ts-expect-error only understands string param, chart is unused & would need to be updated
+    const param: string = chart.config.param[0];
+    if (typeof param !== "string") throw "non-string param not supported";
     const { columnData, indices, column } = useColumnData(
-        chart.config.param[0],
+        param,
         8,
     );
     const highlightedIndex = useHighlightedIndex();
@@ -97,7 +104,7 @@ export const HighlightedFeatureComponent = observer(() => {
         <div style={{ fontSize: "0.8rem" }}>
             {/* biome-ignore lint/security/noDangerouslySetInnerHtml: todo use ReactMarkdown component instead */}
             <div dangerouslySetInnerHTML={{ __html: html }} />
-            <em>"{chart.config.param[0]}"</em>
+            <em>"{param}"</em>
             <br />
             {highlightInRange
                 ? `Highlighted value (one of the top values): ${highlightValue}`

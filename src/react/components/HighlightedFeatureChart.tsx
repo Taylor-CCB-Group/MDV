@@ -5,7 +5,7 @@ import { BaseReactChart } from "./BaseReactChart";
 import { HighlightedFeatureComponent } from "./HighlightedFeatureComponent";
 import { g, isArray } from "@/lib/utils";
 
-type HighlightedFeatureConfig = {
+export type HighlightedFeatureConfig = {
     text: string;
 } & BaseConfig;
 

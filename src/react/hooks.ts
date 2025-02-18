@@ -94,14 +94,16 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
     const chart = useChart();
     const { columnIndex } = chart.dataStore;
     const columns = useMemo(() => {
-        const param: FieldSpec = chart.config.param;
+        const param = chart.config.param;
         if (!param) return [];
         if (typeof param === "string")
             return [columnIndex[param]];
         // we could make sure they are loaded as well...
         if (!isArray(param)) {
             //must be a query object...
-            return param.columns;
+            //!no - in that case, it should be a one-element array with a query object
+            // return param.columns;
+            throw new Error("config.param should always be an array");
         }
         // const param = chart.config.param as FieldName[]; // up for review with query objects etc.
         //@ts-expect-error non-string 'name' as index
@@ -143,50 +145,21 @@ export function useParamColumnsExperimental(): LoadedDataColumn<DataType>[] {
     // const columns = useMemo(() => {
     useEffect(() => {
         return autorun(() => {
-            // this should be simpler if we start with `flattenFields(chart.config.param)` so we know we have a string[].
-            const param: FieldSpec = chart.config.param;
+            const param = chart.config.param;
+            if (!isArray(param)) throw "config.param should always be an array";
             const cm = window.mdv.chartManager;
             const dsName = chart.dataStore.name;
-            if (isArray(param)) {
-                if (!param || param.length === 0) {
-                    setColumns([]);
-                    return;
-                }
-                const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
-                cm.loadColumnSet(renderedParam, dsName, () => {
-                    const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
-                    if (!allColumnsLoaded(cols)) throw "bad column state";
-                    setColumns(cols);
-                });
+            if (!param || param.length === 0) {
+                setColumns([]);
                 return;
             }
-            if (typeof param === "string") {
-                const col = columnIndex[param];
-                // I trust this method about as far as I can throw it...
-                // actually I think it kinda works a bit better with DataStore caching rowDataPromises
-                cm.loadColumnSet([param], dsName, () => {
-                    if (!notEmpty(col)) throw "no column info found";
-                    if (!isColumnLoaded(col)) throw "column should be loaded by now";
-                    setColumns([col]);
-                });
-                return;
-            }
-            // in this case, we're dealing with a query - what would happen if we setColumns to the computed property???
-            // setColumns(param.columns) //ts doesn't like that - but just because they're not `LoadedDataColumn`s...
-            // (not sure whether or not it would respond reactively otherwise - to test with lazy version)
-            
-            // we can do something similar to decorated column methods here...
-            //safeColumns copy should avoid race condition
-            //but I wouldn't want to trust it without testing
-            //probably better to use lazy columns and let users (components) do their own accounting
-            const safeColumns = [...param.columns]; 
-            //nb loadColumnSet may have issues with row-as-column fields
-            cm._getColumnsThen(dsName, param.fields, () => {
-                if (!allColumnsLoaded(safeColumns)) {
-                    throw "bad column state";
-                }
-                setColumns(safeColumns);
+            const renderedParam = param.flatMap(p => typeof p === "string" ? p : p.fields)
+            cm.loadColumnSet(renderedParam, dsName, () => {
+                const cols = renderedParam.map(name => columnIndex[name]).filter(notEmpty);
+                if (!allColumnsLoaded(cols)) throw "bad column state";
+                setColumns(cols);
             });
+            return;
         });
     }, [chart.config.param, columnIndex, chart.dataStore]);
     return columns;

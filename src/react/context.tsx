@@ -24,10 +24,10 @@ export function ChartProvider<T extends BaseConfig>({
 }
 // infer?
 function typedChart<T extends BaseConfig>(chart: BaseChart<T>) {
-    const t = chart.config.type;
+    const t = chart.config.type; //would need to look up the type in the chart registry to infer the type.
     return chart;
 }
-export function useChart() {
+export function useChart<T extends BaseConfig>(): BaseChart<T> {
     //todo: typing...
     const chart = typedChart(useContext(ChartContext));
     if (!chart) throw new Error("no chart context");

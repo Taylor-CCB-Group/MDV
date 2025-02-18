@@ -602,6 +602,8 @@ const SelectionDialogComponent = () => {
     //!! this component doesn't update with HMR and introducing another wrapper component makes things worse
     //(currently changes here aren't reflected in the browser, but the rest of the components are
     //if we wrap this, then any change causes whole page to reload)
+    //! since this is outside the ErrorBoundary, problems in this hook are not well handled
+    //we could consider returning some kind of `Result` object from this hook...
     const cols = useParamColumnsExperimental();
     useResetButton();
     return (
