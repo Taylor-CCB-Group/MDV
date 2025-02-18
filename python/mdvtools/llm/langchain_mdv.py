@@ -168,7 +168,7 @@ class ProjectChat:
             self.ok = True
         except Exception as e:
             # raise ValueError(f"An error occurred while trying to create the agent: {e[:100]}")
-            log(f"An error occurred while trying to create the agent: {str(e)[:100]}")
+            log(f"An error occurred while trying to create the agent: {str(e)[:500]}")
             # todo keep better track of the state of the agent, what went wrong etc
             self.ok = False
 
@@ -301,4 +301,4 @@ class ProjectChat:
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
                 return f"I ran some code for you:\n\n```python\n{final_code}```"
         except Exception as e:
-            return f"Error: {str(e)[:100]}"
+            return f"Error: {str(e)[:500]}"
