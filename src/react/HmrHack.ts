@@ -5,8 +5,6 @@ import SideEffect from "../charts/dialogs/AnnotationDialogReact";
 arr.push(SideEffect);
 import addChart from "../charts/dialogs/AddChartDialogReact";
 arr.push(addChart);
-import wc from "./components/WordCloudChart";
-arr.push(wc);
 import hfc from "./components/HighlightedFeatureChart";
 arr.push(hfc);
 import "./components/SelectionDialogReact";
