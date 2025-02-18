@@ -810,7 +810,7 @@ export class ChartManager {
     _loadView(config, dataLoader, firstTime = false) {
         //load view, then initialize
         if (config.all_views) {
-            const currentView = config.initial_view || config.all_views[0];            
+            const currentView = config.initial_view || config.all_views[0];
             this.viewManager.setView(currentView);
             dataLoader.viewLoader(currentView).then((data) => {
                 this._init(data, firstTime);
@@ -1051,8 +1051,8 @@ export class ChartManager {
                     method: (vals) => {
                         //create new view option
                         this.viewManager.setAllViews([
-                        ...this.viewManager.all_views,
-                        vals["name"]
+                            ...this.viewManager.all_views,
+                            vals["name"]
                         ]);
 
                         // Optionally make it the current view
@@ -1138,7 +1138,7 @@ export class ChartManager {
                 },
                 {
                     text: "NO",
-                    method: () => {},
+                    method: () => { },
                 },
             ],
         });
@@ -1165,7 +1165,7 @@ export class ChartManager {
         // update the views
         const updatedViews = this.viewManager.all_views.filter((v) => v !== view);
         this.viewManager.setAllViews(updatedViews);
-        
+
         const state = this.getState();
 
         //want to delete view and update any listeners
@@ -1990,7 +1990,7 @@ export class ChartManager {
                 },
                 div,
             );
-            createMdvPortal(ErrorComponentReactWrapper({error, height, width, extraMetaData: {config}}), debugNode);
+            createMdvPortal(ErrorComponentReactWrapper({ error, height, width, extraMetaData: { config } }), debugNode);
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
         }
