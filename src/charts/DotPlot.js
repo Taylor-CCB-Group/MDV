@@ -6,6 +6,7 @@ import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
 import { serialiseQueries } from "./chartConfigUtils";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -40,7 +41,7 @@ class DotPlot extends SVGChart {
     //if called with objects representing queries, this will cause the method to be called with column names
     //and again whenever the column data changes
     //but when we clone a chart like that, at the moment the old chart stops responding to changes
-    // @loadColumnData 
+    @loadColumnData 
     setFields(fieldNames) {
         const cm = window.mdv.chartManager;
         //! we don't want to mutate the config object... 
@@ -382,7 +383,7 @@ class DotPlot extends SVGChart {
 BaseChart.types["dot_plot"] = {
     name: "Dot Plot",
     class: DotPlot,
-    methodsUsingColumns: ["setFields"],
+    // methodsUsingColumns: ["setFields"], //no longer necessary, @loadColumnData decorator will handle this
     params: [
         {
             type: "text",
