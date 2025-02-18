@@ -46,15 +46,11 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
         })();
     }
     getSettings() {
-        // todo: add settings widget for 'column' with some properties somewhat similar to params type.
         const settings = super.getSettings();
-        // >>> it is indeed broken at runtime - need general development of multi-column settings
-        // and how they relate to the mobx config store.
         settings.push(g({
-            //!!this should be properly implemented...
-            type: "multicolumn",
+            type: "multicolumn", //this `type` wasn't make it through to `ColumnDropdown` earlier, but ok now.
             label: "Columns To filter",
-            current_value: this.config.param,
+            current_value: this.config.param,//! this doesn't seem to appear sensibly in the UI atm.
             func: (v) => {
                 this.config.param = v;
                 // this.removeFilter();

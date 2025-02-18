@@ -106,6 +106,19 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
     </>
 );
 export type ColumnSelectionSpec = GuiSpec<"column"> | GuiSpec<"multicolumn">;
+
+/**
+ * 
+ * 
+ * The situation with trying to marshall types of column widgets, for settings vs addChartDialog,
+ * is making this all a bit of a mess. There should be a simpler way to express this stuff - which
+ * may reviewing the ways widgets are defined in different contexts.
+ */
+function isMultiSpec(props: ColumnSelectionSpec): props is GuiSpec<"multicolumn"> {
+    return props.type === "multicolumn";
+}
+
+
 /**
  * Wrap the ColumnSelectionComponent in a setting GUI component.
  *
@@ -120,25 +133,29 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
     /** this needs fixing... and we should be able to observe mobx state for column queries 
      * which should persist when the dialog (entire react root) is closed.
     */
+   const multiple = isMultiSpec(props);
 
-    const setSelectedColumn = useCallback(action((v: string) => {
-        props.current_value = v;
-        //@ts-expect-error string is not assignable to FieldSpecs, type of v is wrong here
-        props.func?.(v);
-    }), []); //as of this writing, biome is right that props is not a dependency
+    // const setSelectedColumn = useCallback(action((v: FieldSpec | FieldSpecs) => {
+    //     props.current_value = v;
+    //     //@ts -expect-error string is not assignable to FieldSpecs, type of v is wrong here
+    //     props.func?.(v);
+    // }), [multiple]); //as of this writing, biome is right that props is not a dependency
     const filter = props.columnSelection?.filter;
     // not only is the filter not working, but we need to decide how to express "multiple"
     const props2 = useMemo(() => inferGenericColumnSelectionProps({
         // fixing this stuff is high priority
-        //@ts-expect-error ColumnSelection setSelectedColumn type
-        setSelectedColumn,
-        //@ts-expect-error ColumnSelection `type` type
-        type: filter,
-        multiple: props.type === "multicolumn",
+        //@ts -expect-error ColumnSelection setSelectedColumn type
+        setSelectedColumn: action((v) => {
+            props.current_value = v;
+            //@ts-expect-error setSelectedColumn type
+            props.func?.(v);
+        }),
+        type: filter, //is it ok for this to be optional?
+        multiple,
         //@ts-expect-error ColumnSelection current_value type
-        current_value: props.current_value
+        current_value: props.current_value //! ideally this would also react to changes in the mobx store, why doesn't it?
         // current_value: props.current_value... maybe want to be more mobx-y about this
-    }), [setSelectedColumn, props.type, filter, props.current_value]);
+    }), [filter, props, props.current_value, multiple]);
     return (
         <>
             <MLabel props={props} />
