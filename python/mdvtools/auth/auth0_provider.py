@@ -115,27 +115,50 @@ class Auth0Provider(AuthProvider):
             raise RuntimeError("Auth0 logout failed.") from e
 
 
-    def get_user(self, token: str) -> Optional[dict]:
+    def get_user(self, token: dict) -> Optional[dict]:
         """
         Retrieves the user information using the provided token.
 
-        :param token: Access token
+        :param token: Dictionary containing access token and user details
         :return: User information dictionary or None
         """
         try:
             logging.info("Fetching user information.")
-            user_info_url = f'https://{self.domain}/userinfo'
-            response = requests.get(user_info_url, headers={'Authorization': f'Bearer {token}'})
+
+            # Extract access token
+            access_token = token.get("access_token")
+            if not access_token:
+                logging.error("Access token is missing.")
+                return None
+
+            # Correct Authorization Header
+            headers = {"Authorization": f"Bearer {access_token}"}
+
+            user_info_url = f"https://{self.domain}/userinfo"
+            response = requests.get(user_info_url, headers=headers)
+
             if response.status_code == 200:
                 logging.debug("User information retrieved successfully.")
-                return response.json()
+                raw_data = response.json()
+
+                # Transform response to match frontend expectations
+                user_data = {
+                    "name": raw_data.get("name", "Unknown User"),
+                    "email": raw_data.get("email", ""),
+                    "association": "Example Corp",  # Static or extract from another source
+                    "avatarUrl": raw_data.get("picture", ""),
+                }
+                print("!!!!!!")
+                print(user_data)
+                return user_data
             else:
                 logging.warning(f"Failed to fetch user information: {response.status_code} {response.text}")
                 return None
+
         except requests.RequestException as e:
             logging.error(f"Error while fetching user information: {e}")
             return None
-
+        
     def get_token(self) -> Optional[str]:
         """
         Retrieves the token from the session.

@@ -13,7 +13,7 @@ class AuthProvider(ABC):
         pass
 
     @abstractmethod
-    def get_user(self, token: str) -> Optional[dict]:
+    def get_user(self, token: dict) -> Optional[dict]:
         """Fetches the user profile using the provided token."""
         pass
 

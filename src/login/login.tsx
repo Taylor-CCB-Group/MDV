@@ -130,6 +130,9 @@ const Login: React.FC = () => {
                             minWidth: 200,
                             backgroundColor: "white",
                             color: "black",
+                            "&:hover": {
+                                bgcolor: "grey",
+                            },
                         }}
                         onClick={handleLoginWithSSO}
                     >
