@@ -70,7 +70,7 @@ function _mdvInit(routeFromTemplate) {
                     });
                     break;
                 case "view_loaded":
-                    changeURLParam("view", cm.currentView);
+                    changeURLParam("view", cm.viewManager.current_view);
                     break;
             }
         };

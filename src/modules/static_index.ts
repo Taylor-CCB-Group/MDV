@@ -111,7 +111,7 @@ async function loadData() {
             }
         }
         if (type === "view_loaded") {
-            changeURLParam("view", cm.currentView);
+            changeURLParam("view", cm.viewManager.current_view);
         }
     };
     // this will assign itself to `window.mdv.chartManager` in constructor
@@ -145,8 +145,9 @@ async function loadData() {
             })
             new DebugJsonReactWrapper({ chartTypes, datasources, views, state });
         },
+        true //
     );
-    debugButton.style.float = "right";
+    // debugButton.style.float = "right";
     debugButton.setAttribute("data-microtip-position", "bottom-left");
 
     function extraFeatures(i: number) {

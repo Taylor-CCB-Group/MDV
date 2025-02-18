@@ -250,6 +250,14 @@ class BaseChart<T extends BaseConfig> {
 
         //work out width and height based on container
         this._setDimensions();
+        setTimeout(() => {
+            try {
+                //some charts weren't properly initialising the color legend, so doing it here may help that to be more consistent.
+                //there is an implementation of the method here in BaseChart, but we wrap in a try/catch as it assumes other associated methods are also implemented.
+                //Calling this in a timeout helps ensure that the chart is fully constructed before we try to do this.
+                this.setColorLegend();
+            } catch (e) { }
+        });
         // provide some observable mobx state for useOuterContainer()
         this.observable = makeAutoObservable({
             container: this.__doc__.body,

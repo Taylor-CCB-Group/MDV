@@ -60,6 +60,11 @@ import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { AddChartDialog } from "./dialogs/AddChartDialog";
+import { createMdvPortal } from "@/react/react_utils";
+import FilterComponentReactWrapper from "@/react/components/FilterComponentReactWrapper";
+import ViewManager from "./ViewManager";
+import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
+
 
 //order of column data in an array buffer
 //doubles and integers (both represented by float32) and int32 need to be first
@@ -172,7 +177,7 @@ export class ChartManager {
          *  menuBar the dom menu associated with this element
          *  contentDiv the div that the charts associated with the datastore will be added
          * @typedef {import("@/charts/charts/DataSource")} DataSource
-         * @type {DataSource[]} 
+         * @type {DataSource[]}
          */
         this.dataSources = [];
         /** @type {{[k: string]: DataSource | undefined}} */
@@ -208,6 +213,9 @@ export class ChartManager {
         connectIPC(this);
         this.transactions = {};
 
+        // View Manager
+        this.viewManager = new ViewManager(config.initial_view, config.all_views);
+
         //set up container and top(main menu)
         /** @type {HTMLElement} */
         this.containerDiv =
@@ -226,16 +234,11 @@ export class ChartManager {
 
         /** @type {HTMLSpanElement} */
         this.leftMenuBar = createEl("span", {}, this.menuBar);
-        /** @type {HTMLSpanElement} */
-        this.rightMenuBar = createEl(
-            "span",
-            { styles: { float: "right" } },
-            this.menuBar,
-        );
-
         createEl("span", { classes: ["mdv-divider"] }, this.menuBar);
+        /** @type {HTMLSpanElement} */
+        this.rightMenuBar = createEl("span", {}, this.menuBar);
 
-        
+
         /** @type {HTMLSpanElement} */
         const homeButton = createMenuIcon(
             "fas fa-home",
@@ -247,35 +250,31 @@ export class ChartManager {
                 func: () => {
                     // const state = this.getState();
                     // this._callListeners("state_saved", state);
-                    window.location.href = import.meta.env.DEV ? `${window.location.origin}/catalog_dev` : `${window.location.origin}/../`;
+                    window.location.href = import.meta.env.DEV
+                        ? `${window.location.origin}/catalog_dev`
+                        : `${window.location.origin}/../`;
                 },
             },
-            this.menuBar,
+            this.leftMenuBar,
         );
         homeButton.style.marginRight = "20px";
 
         if (config.all_views) {
-            this.viewSelect = createEl(
-                "select",
-                { style: { maxWidth: "50em" } },
-                this.menuBar,
+            const filterWrapperNode = createEl(
+                "span",
+                {
+                    style: {
+                        marginRight: "4px",
+                    },
+                },
+                this.leftMenuBar,
             );
-            for (const v of config.all_views) {
-                createEl("option", { text: v, value: v }, this.viewSelect);
-            }
-            createFilterElement(this.viewSelect, this.menuBar);
-            this.viewSelect.addEventListener("change", (e) => {
-                if (
-                    this.config.show_save_view_dialog &&
-                    config.permission === "edit"
-                ) {
-                    this.showSaveViewDialog(() =>
-                        this.changeView(this.viewSelect.value),
-                    );
-                } else {
-                    this.changeView(this.viewSelect.value);
-                }
-            });
+
+            // Filter view component
+            createMdvPortal(
+                FilterComponentReactWrapper(),
+                filterWrapperNode,
+            );
         }
 
         if (config.permission === "edit") {
@@ -291,7 +290,7 @@ export class ChartManager {
                         this._callListeners("state_saved", state);
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
         }
 
@@ -307,7 +306,7 @@ export class ChartManager {
                         this.showSaveViewDialog(() => this.showAddViewDialog());
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
             createMenuIcon(
                 "fas fa-minus",
@@ -320,7 +319,7 @@ export class ChartManager {
                         this.showDeleteViewDialog();
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
         }
 
@@ -350,7 +349,7 @@ export class ChartManager {
                         new FileUploadDialogReact(); //.open();
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
             uploadButton.style.margin = "3px";
         }
@@ -379,7 +378,7 @@ export class ChartManager {
                         document.body.appendChild(img);
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
         }
         // createMenuIcon("fas fa-question",{
@@ -390,7 +389,7 @@ export class ChartManager {
         //     func:()=>{
         //         //todo
         //     }
-        // },this.menuBar).style.margin = "3px";
+        // },this.leftMenuBar).style.margin = "3px";
 
         this._setupThemeContextMenu();
 
@@ -414,7 +413,7 @@ export class ChartManager {
         //  chart - the actual chart
         //  win - the popout window it is in (or null)
         //  dataSource - the data source associated with it
-        /** @type {{[id: string]: {chart: import("./charts").Chart, win: Window | null, dataSource: import("./charts").DataSource} */
+        /** @type {{[id: string]: {chart: import("./charts").Chart, win: Window | null, dataSource: import("./charts").DataSource}}} */
         this.charts = {};
 
         this.config = config;
@@ -807,9 +806,9 @@ export class ChartManager {
     _loadView(config, dataLoader, firstTime = false) {
         //load view, then initialize
         if (config.all_views) {
-            this.currentView = config.initial_view || config.all_views[0];
-            this.viewSelect.value = this.currentView;
-            dataLoader.viewLoader(this.currentView).then((data) => {
+            const currentView = config.initial_view || config.all_views[0];
+            this.viewManager.setView(currentView);
+            dataLoader.viewLoader(currentView).then((data) => {
                 this._init(data, firstTime);
             });
         }
@@ -968,14 +967,14 @@ export class ChartManager {
         //nothing to load - call any listeners
         if (this._toLoadCharts.size === 0) {
             this._toLoadCharts = undefined;
-            if (this.currentView === undefined) {
+            if (this.viewManager.current_view === undefined) {
                 if (this.dataSources.length === 0) new FileUploadDialogReact();
                 else {
                     // todo - separate out view code, with a solid model and start making some nice ui etc...
                     this.showAddViewDialog();
                 }
             } else {
-                this._callListeners("view_loaded", this.currentView);
+                this._callListeners("view_loaded", this.viewManager.current_view);
             }
         }
         //add charts - any columns will be added dynamically
@@ -1026,8 +1025,8 @@ export class ChartManager {
                 // todo have some better reusability for this kind of validation
                 // (also probably refactor this dialog into react)
                 // considered returning a string to set a tooltip or something, parked that idea for now pending more thought/refactoring
-                // validate: (v) => this.viewSelect.childNodes.values().some(e => e.value === v) ? "Name already exists" : null,
-                validate: (v) => !this.viewSelect.childNodes.values().some(e => e.value === v),
+                // validate: (v) => this.viewManager.all_views.some(view => view.value === v) ? "Name already exists" : null,
+                validate: (v) => !this.viewManager.all_views.some(view => view === v),
             },
         ];
         if (this.dataSources.length > 1) {
@@ -1047,13 +1046,13 @@ export class ChartManager {
                     text: "Create New View",
                     method: (vals) => {
                         //create new view option
-                        createEl(
-                            "option",
-                            { text: vals["name"], value: vals["name"] },
-                            this.viewSelect,
-                        );
-                        this.viewSelect.value = vals["name"];
-                        this.currentView = vals["name"];
+                        this.viewManager.setAllViews([
+                            ...this.viewManager.all_views,
+                            vals["name"]
+                        ]);
+
+                        // Optionally make it the current view
+                        this.viewManager.setView(vals["name"]);
                         if (!vals["clone-view"]) {
                             //remove all charts and links
                             for (const ds in this.viewData.dataSources) {
@@ -1090,6 +1089,7 @@ export class ChartManager {
                             this._init(state.view);
                         } else {
                             const state = this.getState();
+                            console.log("state add new: ", state);
                             this._callListeners("state_saved", state);
                         }
                     },
@@ -1134,7 +1134,7 @@ export class ChartManager {
                 },
                 {
                     text: "NO",
-                    method: () => {},
+                    method: () => { },
                 },
             ],
         });
@@ -1148,7 +1148,7 @@ export class ChartManager {
         }
         this.removeAllCharts();
         this.contentDiv.innerHTML = "";
-        this.currentView = view;
+        this.viewManager.setView(view);
         this.viewLoader(view).then((data) => {
             this._init(data);
         });
@@ -1156,17 +1156,30 @@ export class ChartManager {
 
     deleteCurrentView() {
         //remove the view choice and change view to the next one
-        const opt = this.viewSelect.querySelector(
-            `option[value='${this.viewSelect.value}']`,
-        );
-        opt.remove();
+        const view = this.viewManager.current_view;
+
+        // update the views
+        const updatedViews = this.viewManager.all_views.filter((v) => v !== view);
+        this.viewManager.setAllViews(updatedViews);
+
         const state = this.getState();
+
         //want to delete view and update any listeners
         state.view = null;
+
         this._callListeners("state_saved", state);
 
-        this.currentView = this.viewSelect.value;
-        this.changeView(this.viewSelect.value);
+        if (updatedViews.length > 0) {
+            // set current view to initial view
+            const nextView = updatedViews[0];
+            this.viewManager.setView(nextView);
+            this.changeView(nextView);
+        } else {
+            // no other views exist
+            this.removeAllCharts();
+            this.viewData = {};
+            this.showAddViewDialog();
+        }
     }
 
     _columnRemoved(ds, col) {
@@ -1400,14 +1413,10 @@ export class ChartManager {
 
         const view = JSON.parse(JSON.stringify(this.viewData));
         view.initialCharts = initialCharts;
-        const all_views = this.viewSelect
-            // @ts-ignore do we know that we actually have elements with 'value'?
-            ? Array.from(this.viewSelect.children, (x) => x.value)
-            : null;
-
+        const all_views = this.viewManager.all_views ? this.viewManager.all_views : null;
         return {
             view: view,
-            currentView: this.currentView,
+            currentView: this.viewManager.current_view,
             all_views: all_views,
             updatedColumns: updatedColumns,
             metadata: metadata,
@@ -1434,12 +1443,13 @@ export class ChartManager {
      * @param {string} icon The class name(s) of the icon
      * @param {string} text Text that will be displayed in a tooltip
      * @param {function} func The function that will be called when the icon is pressed
+     * @param {boolean} right If true (and `dataSource = "_main"`) the icon will be added to the right of the menu bar
      */
-    addMenuIcon(dataSource, icon, text, func) {
+    addMenuIcon(dataSource, icon, text, func, right = false) {
         const pos = dataSource === "_main" ? "bottom-right" : "bottom";
         const el =
             dataSource === "_main"
-                ? this.leftMenuBar
+                ? right ? this.rightMenuBar : this.leftMenuBar
                 : this.dsIndex[dataSource].menuBar;
         return createMenuIcon(
             icon,
@@ -1499,14 +1509,16 @@ export class ChartManager {
 
     updateInfoAlert(id, msg, config = {}) {
         const al = this.infoAlerts[id];
-        if (config.type && al.type !== config.type) {
-            al.div.classList.remove(`ciview-alert-${al.type}`);
-            al.div.classList.add(`ciview-alert-${config.type}`);
-            al.type = config.type;
-        }
-        al.text.textContent = msg;
-        if (config.duration) {
-            this.removeInfoAlert(id, config.duration);
+        if (al) {
+            if (config.type && al.type !== config.type) {
+                al.div.classList.remove(`ciview-alert-${al.type}`);
+                al.div.classList.add(`ciview-alert-${config.type}`);
+                al.type = config.type;
+            }
+            al.text.textContent = msg;
+            if (config.duration) {
+                this.removeInfoAlert(id, config.duration);
+            }
         }
     }
 
@@ -1538,7 +1550,7 @@ export class ChartManager {
      * @param {string[]} columns An array of column fields/ids
      * @param {string} dataSource The name of the dataSource
      * @param {function} callback A function which will be run once all the
-     * columns are loaded, with any failed columns as an argument (although it's not clear that the underlying code actually does this, 
+     * columns are loaded, with any failed columns as an argument (although it's not clear that the underlying code actually does this,
      * or that any code that calls this function actually uses the argument)
      * @param {number} [split=10]  the number of columns to send with each request
      * @param {number} [threads=2]  the number of concurrent requests
@@ -1633,11 +1645,16 @@ export class ChartManager {
                 for (const col of col_list) {
                     delete this.columnsLoading[dataSource][col];
                 }
-                all_loaded = all_loaded > trans.totalColumns
-                    ? trans.totalColumns
-                    : all_loaded;
+                all_loaded =
+                    all_loaded > trans.totalColumns
+                        ? trans.totalColumns
+                        : all_loaded;
                 if (trans.failedColumns.length > 0) {
-                    this.updateInfoAlert(trans.alertID, `Failed to load ${trans.failedColumns.length} columns`, { type: 'danger' });
+                    this.updateInfoAlert(
+                        trans.alertID,
+                        `Failed to load ${trans.failedColumns.length} columns`,
+                        { type: "danger" },
+                    );
                     // return;
                 } else {
                     this.updateInfoAlert(
@@ -1920,7 +1937,7 @@ export class ChartManager {
             },
             ds.contentDiv,
         );
-        createEl(
+        const spinner = createEl(
             "i",
             {
                 classes: ["fas", "fa-circle-notch", "fa-spin"],
@@ -1932,7 +1949,7 @@ export class ChartManager {
             },
             div,
         );
-        createEl(
+        const ellipsis = createEl(
             "div",
             {
                 styles: {
@@ -1957,28 +1974,32 @@ export class ChartManager {
             this._addChart(dataSource, config, div, notify);
         } catch (error) {
             this.clearInfoAlerts();
-            const id = this.createInfoAlert(
-                `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
-                {
-                    type: "warning",
-                },
-            );
-            console.error(error);
-            const idiv = this.infoAlerts[id].div;
-            idiv.onclick = () => idiv.remove();
-            // div.remove();
+            spinner.remove();
+            ellipsis.remove();
+            // const id = this.createInfoAlert(
+            //     `Error creating chart with columns [${neededCols.join(", ")}]: '${error}'`,
+            //     {
+            //         type: "warning",
+            //     },
+            // );
+            // const idiv = this.infoAlerts[id].div;
+            // idiv.onclick = () => idiv.remove();
             const debugNode = createEl(
                 "div",
                 {
                     styles: {
                         position: "absolute",
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
                         backdropFilter: "blur(10px)",
                     },
                 },
-                div.lastElementChild,
+                div,
             );
-            debugNode.innerHTML = `<div><h2>Error creating chart</h2><pre>${error.stack}</pre></div>`;
-            debugNode.onclick = () => debugNode.remove();
+            createMdvPortal(ErrorComponentReactWrapper({ error, height, width, extraMetaData: { config } }), debugNode);
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
         }
@@ -2116,7 +2137,10 @@ export class ChartManager {
         else {
             this.loadColumnSet(reqCols, dataSource, (failedColumns) => {
                 if (failedColumns.length) {
-                    console.warn('got columns with some failures', failedColumns);
+                    console.warn(
+                        "got columns with some failures",
+                        failedColumns,
+                    );
                 }
                 this._haveColumnsLoaded(columns, dataSource, func);
             });
@@ -2231,7 +2255,7 @@ export class ChartManager {
                         this._setUpLink(l);
                     }
                 }
-                this._callListeners("view_loaded", this.currentView);
+                this._callListeners("view_loaded", this.viewManager.current_view);
             }
         }
         return chart;
