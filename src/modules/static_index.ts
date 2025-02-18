@@ -150,8 +150,9 @@ async function loadData() {
 
             new DebugJsonReactWrapper({ datasources, views, state });
         },
+        true //
     );
-    debugButton.style.float = "right";
+    // debugButton.style.float = "right";
     debugButton.setAttribute("data-microtip-position", "bottom-left");
 
     function extraFeatures(i: number) {

@@ -234,14 +234,10 @@ export class ChartManager {
 
         /** @type {HTMLSpanElement} */
         this.leftMenuBar = createEl("span", {}, this.menuBar);
-        /** @type {HTMLSpanElement} */
-        this.rightMenuBar = createEl(
-            "span",
-            { styles: { float: "right" } },
-            this.menuBar,
-        );
-
         createEl("span", { classes: ["mdv-divider"] }, this.menuBar);
+        /** @type {HTMLSpanElement} */
+        this.rightMenuBar = createEl("span", {}, this.menuBar);
+
 
         /** @type {HTMLSpanElement} */
         const homeButton = createMenuIcon(
@@ -259,7 +255,7 @@ export class ChartManager {
                         : `${window.location.origin}/../`;
                 },
             },
-            this.menuBar,
+            this.leftMenuBar,
         );
         homeButton.style.marginRight = "20px";
 
@@ -271,7 +267,7 @@ export class ChartManager {
                         marginRight: "4px",
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
 
             // Filter view component
@@ -294,7 +290,7 @@ export class ChartManager {
                         this._callListeners("state_saved", state);
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
         }
 
@@ -310,7 +306,7 @@ export class ChartManager {
                         this.showSaveViewDialog(() => this.showAddViewDialog());
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
             createMenuIcon(
                 "fas fa-minus",
@@ -323,7 +319,7 @@ export class ChartManager {
                         this.showDeleteViewDialog();
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
         }
 
@@ -353,7 +349,7 @@ export class ChartManager {
                         new FileUploadDialogReact(); //.open();
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
             uploadButton.style.margin = "3px";
         }
@@ -382,7 +378,7 @@ export class ChartManager {
                         document.body.appendChild(img);
                     },
                 },
-                this.menuBar,
+                this.leftMenuBar,
             );
         }
         // createMenuIcon("fas fa-question",{
@@ -393,7 +389,7 @@ export class ChartManager {
         //     func:()=>{
         //         //todo
         //     }
-        // },this.menuBar).style.margin = "3px";
+        // },this.leftMenuBar).style.margin = "3px";
 
         this._setupThemeContextMenu();
 
@@ -1445,12 +1441,13 @@ export class ChartManager {
      * @param {string} icon The class name(s) of the icon
      * @param {string} text Text that will be displayed in a tooltip
      * @param {function} func The function that will be called when the icon is pressed
+     * @param {boolean} right If true (and `dataSource = "_main"`) the icon will be added to the right of the menu bar
      */
-    addMenuIcon(dataSource, icon, text, func) {
+    addMenuIcon(dataSource, icon, text, func, right = false) {
         const pos = dataSource === "_main" ? "bottom-right" : "bottom";
         const el =
             dataSource === "_main"
-                ? this.leftMenuBar
+                ? right ? this.rightMenuBar : this.leftMenuBar
                 : this.dsIndex[dataSource].menuBar;
         return createMenuIcon(
             icon,
