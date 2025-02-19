@@ -62,7 +62,7 @@ const ErrorComponent = ({error, extraMetaData}: ErrorComponentType) => {
                             },
                         }}
                     >
-                        ERROR: Click to view details
+                        {error.message} (click to view details or submit a bug report)
                     </Button>
                 </Alert>
                 <ReusableDialog
