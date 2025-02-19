@@ -20,7 +20,7 @@ const filterOptions = createFilterOptions<any>({ limit: 256 });
 const MaterialWrapper = observer(function MaterialWrapper({
     children,
 }: PropsWithChildren) {
-    const prefersDarkMode = window.mdv.chartManager.theme === "dark";
+    const prefersDarkMode = window.mdv?.chartManager?.theme === "dark";
     const container = useOuterContainer();
     const defaultProps = useMemo(() => ({ container }), [container]);
 
