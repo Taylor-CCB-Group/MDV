@@ -1,0 +1,66 @@
+import requests
+
+def get_management_api_token(domain, client_id, client_secret):
+    url = f"https://{domain}/oauth/token"
+    payload = {
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "audience": f"https://{domain}/api/v2/"
+    }
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
+    return response.json()["access_token"]
+
+def send_invitation(email, connection_id, management_api_token, domain, redirect_url=None):
+    """
+    Send an Auth0 invitation.
+    """
+    url = f'https://{domain}/api/v2/tickets/password-change'
+    headers = {
+        "Authorization": f"Bearer {management_api_token}",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "email": email,
+        "connection_id": connection_id,
+    }
+    if redirect_url:
+        data["result_url"] = redirect_url
+
+    response = requests.post(url, json=data, headers=headers)
+    response.raise_for_status()
+    return response.json()["ticket"]
+
+def automate_invitations(domain, client_id, client_secret, connection_id, users, redirect_url=None):
+    """
+    Automate sending invitations for a list of whitelisted users.
+    """
+    # Get API token
+    token = get_management_api_token(domain, client_id, client_secret)
+
+    for user in users:
+        try:
+            email = user.get("email")
+            print(f"Sending invitation to {email}...")
+            ticket = send_invitation(email, connection_id, token, domain, redirect_url)
+            print(f"Invitation sent to {email}: {ticket}")
+        except Exception as e:
+            print(f"Failed to send invitation to {email}: {e}")
+
+# Usage example
+if __name__ == "__main__":
+    DOMAIN = "" 
+    CLIENT_ID = ""
+    CLIENT_SECRET = ""
+    CONNECTION_ID = ""
+    REDIRECT_URL = "https://mdv.com/login" 
+    # Example whitelist of users
+    WHITELISTED_USERS = [
+        {"email": "user1@example.com"},
+        {"email": "user2@example.com"},
+        {"email": "user3@example.com"},
+    ]
+
+    automate_invitations(DOMAIN, CLIENT_ID, CLIENT_SECRET, CONNECTION_ID, WHITELISTED_USERS, REDIRECT_URL)
