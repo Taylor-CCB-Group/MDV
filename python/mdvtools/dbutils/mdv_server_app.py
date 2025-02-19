@@ -22,10 +22,10 @@ ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 
 if ENABLE_AUTH:
     
-        from authlib.integrations.flask_client import OAuth
-        from mdvtools.auth.auth0_provider import Auth0Provider
+    from authlib.integrations.flask_client import OAuth
+    from mdvtools.auth.auth0_provider import Auth0Provider
 
-        oauth = OAuth()  # Initialize OAuth only if auth is enabled
+    oauth = OAuth()  # Initialize OAuth only if auth is enabled
     #except ImportError:
     #    print("Auth library not found. Ensure poetry installs `auth` dependencies when ENABLE_AUTH=1.")
     #    exit(1)  # Fail early if auth is enabled but libraries are missing
