@@ -44,7 +44,10 @@ def create_flask_app(config_name=None):
     SESSION_COOKIE_SECURE=True,     # Only send cookies over HTTPS
     SESSION_COOKIE_SAMESITE="Lax"   # Prevent cross-site cookie usage
 )
-    app.secret_key = os.getenv('FLASK_SECRET_KEY', 'a-very-secret-key')
+    app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+    if not app.secret_key:
+        raise ValueError("FLASK_SECRET_KEY environment variable is not set!")
 
     
     try:
