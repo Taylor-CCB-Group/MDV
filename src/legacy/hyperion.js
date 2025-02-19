@@ -1364,7 +1364,7 @@ function scListener(type, cm, data, proj) {
             })
             break;
         case "view_loaded":
-            scChangeURLParam("view", cm.currentView);
+            scChangeURLParam("view", cm.viewManager.current_view);
             scInitApp(cm, proj);
             break;
         case "chart_added":

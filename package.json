@@ -102,6 +102,7 @@
     "zustand": "^4.4.5"
   },
   "devDependencies": {
+    "@babel/plugin-proposal-decorators": "^7.25.9",
     "@biomejs/biome": "1.8.3",
     "@types/d3": "^7.4.3",
     "@types/d3-ease": "^3.0.2",

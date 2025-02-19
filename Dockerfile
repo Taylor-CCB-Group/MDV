@@ -61,6 +61,9 @@ RUN poetry install --with dev,backend,auth
 # Expose the port that Flask will run on
 EXPOSE 5055 
 
+# something changed causing npm to need this in order for `source` to work in npm scripts
+RUN npm config set script-shell "/bin/bash"
+
 # Command to run Gunicorn
 CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.mdv_server_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
