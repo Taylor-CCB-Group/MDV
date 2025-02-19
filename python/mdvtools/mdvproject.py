@@ -1819,7 +1819,7 @@ def add_column_to_group(
         or col["datatype"] == "text16"
     ):
         
-        if data.dtype == "category":
+        if str(data.dtype) == "category":
             data = data.cat.add_categories("ND")
             data = data.fillna("ND")
         else:
@@ -1873,7 +1873,7 @@ def add_column_to_group(
             b = i * maxv
             try:
                 v = data[i]  # may raise KeyError if data is None at this index
-                if v == "" or not isinstance(v, str):
+                if not isinstance(v, str) or v == "":
                     continue
                 vs = v.split(delim)
                 vs = [x.strip() for x in vs]
