@@ -207,10 +207,12 @@ def create_app(
             return "File not found", 404
         if file == "state":
             with open(path) as f:
-                print("processing state response. websocket:", websocket)
-                state = json.load(f)
-                state["websocket"] = websocket
-                return state
+                try:
+                    state = json.load(f)
+                    state["websocket"] = websocket
+                    return state
+                except Exception as e:
+                    return f"Problem parsing state file: {e}", 500
         return _send_file(path)
 
     # gets the raw byte data and packages it in the correct response
