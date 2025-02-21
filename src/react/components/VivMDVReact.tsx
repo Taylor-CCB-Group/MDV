@@ -75,18 +75,20 @@ export type ScatterPlotConfig = {
     course_radius: number;
     radius: number;
     opacity: number;
-    color_by?: ColumnName;
-    color_legend: {
-        display: boolean;
-        // todo: add more options here...
-    };
+    // part of ColorConfig
+    // color_by?: ColumnName; 
+    // color_legend: {
+    //     display: boolean;
+    //     // todo: add more options here...
+    // };
     category_filters: Array<CategoryFilter>;
     //on_filter: "hide" | "grey", //todo
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
 } & TooltipConfig &
-    DualContourLegacyConfig;
-const scatterDefaults: ScatterPlotConfig = {
+    DualContourLegacyConfig & BaseConfig;
+//@ts- expect-error things like 'id' are expected... subject to review.
+const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
     course_radius: 1,
     radius: 10,
     opacity: 1,
@@ -128,10 +130,10 @@ export type VivMdvReactConfig = ScatterPlotConfig &
     //     overviewOn: boolean,
     //     image_properties: ChannelsState
     // }
-    VivRoiConfig & BaseConfig;
+    VivRoiConfig;
 export type VivMDVReact = VivMdvReact;
 
-function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
+function adaptConfig(originalConfig: VivMdvReactConfig) {
     const config = { ...scatterDefaults, ...originalConfig };
     // in future we might have something like an array of layers with potentially ways of describing parameters...
     //@ts-expect-error contourParameter type
@@ -171,6 +173,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         // this.vivStores = createVivStores(this);
         const config = adaptConfig(originalConfig);
         super(dataStore, div, config, VivScatterChartRoot);
+        //@ts-expect-error color_by legacy options
         this.colorByColumn(config.color_by);
         makeObservable(this, {
             colorBy: observable,

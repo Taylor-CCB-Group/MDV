@@ -1,7 +1,7 @@
 import { getRandomString } from "../utilities/Utilities";
 import { ContextMenu } from "../utilities/ContextMenu.js";
 import { createEl } from "../utilities/Elements.js";
-import { type ChartTypeMap, chartTypes } from "./ChartTypes";
+import { chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
 import { makeAutoObservable, action, autorun, type IReactionDisposer, type IAutorunOptions } from "mobx";
@@ -26,9 +26,15 @@ export type BaseConfig = {
     param: FieldSpecs;
     title_color?: string;
 } & ColorConfig;
-type ColorConfig = {
-    //nb this needs to be updated
-    color_by?: FieldName | LegacyColorBy;
+/**
+ * All chart config types include a color configuration, (although not all charts use it).
+ * 
+ * It may also be possible to have nested properties of this kind - such as a chart with multiple layers, 
+ * each with its own color config.
+ */
+export type ColorConfig = {
+    //nb this needs to be updated...
+    color_by?: FieldSpec | LegacyColorBy;
     color_legend?: any;
     log_color_scale?: boolean;
     trim_color_scale?: keyof Quantiles | "none";
@@ -77,7 +83,9 @@ class BaseChart<T extends BaseConfig> {
         if (config.color_by) {
             const { color_by } = config;
             //nb we might want to represent columns as something other than string soon, in which case this will need to be updated
+            //@ts-expect-error color_by.column type
             if (typeof color_by !== "string" && color_by.column) {
+                //@ts-expect-error color_by.column type
                 config.color_by = color_by.column.field;
             }
         }
@@ -670,7 +678,7 @@ class BaseChart<T extends BaseConfig> {
                         c.color_by = undefined;
                         this.colorByDefault?.();
                     } else {
-                        //@ts-expect-error color_by will have been co-erced to string by here as of now
+                        //@ts -expect-error color_by will have been co-erced to string by here as of now, and colorByColumn expects that
                         c.color_by = x;
                         //@ts-expect-error color_by will have been co-erced to string by here as of now
                         this.colorByColumn?.(x);

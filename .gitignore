@@ -6,6 +6,7 @@ avocato.config.js
 mlv.dev.config.js
 mlv.dev.stream.js
 .vscode
+*.obsidian
 _mlv/
 _avocato/
 project1/

@@ -198,10 +198,15 @@ export type RowsAsColslink = {
  * Represents an active query for a set of columns based on the currently highlighted or filtered rows.
  * ? in cases where only a single (virtual) column is needed, we can still use this interface 
  * but only access the first element of the `columns` array?
+ * probably better to have a distinct interface for that.
  */
 export interface MultiColumnQuery {
     columns: DataColumn<DataType>[]; //could have a generic type for this?
     fields: FieldName[];
+}
+export interface ColumnQuery {
+    column: DataColumn<DataType>;
+    field: FieldName;
 }
 
 type RowsAsColsPrefs = {
@@ -267,7 +272,8 @@ export class RowsAsColsQuery implements MultiColumnQuery {
 
 /** 
  * a given {@param link} will currently have a single listener associated with it,
- * instantiated by this function. If the
+ * instantiated by this function.
+ * ! design needs review to account for multiple subgroups
  */
 async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
     if (link.observableFields !== undefined) return;

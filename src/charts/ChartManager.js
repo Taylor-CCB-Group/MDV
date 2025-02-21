@@ -1244,6 +1244,9 @@ export class ChartManager {
 
         //are there any config entries that refer to column(s)
         const t = BaseChart.types[config.type];
+        // this will probably be handled differently in the (near) future
+        // maybe later we could use a decorator to add this to the config?
+        // (not sure it'd be necessary - as long as they have a consistent interface)
         if (t.configEntriesUsingColumns) {
             t.configEntriesUsingColumns.forEach((x) => {
                 let e = config[x];
@@ -2181,6 +2184,22 @@ export class ChartManager {
         div.style.alignItems = "";
         div.style.justifyContent = "";
         const chartType = BaseChart.types[config.type];
+        // if (!chartType.allowDynamicColumns) {
+            // turn the config into a static one...
+            // the above property name is not the way I'm currently thinking of approaching this...
+        // }
+        const newParams = chartType.params?.map((param, i) => {
+            if (!param.reactive) {
+                // try to find the corresponding entry in `config.param`...
+                // issue with that being that multicolumn params will be arbitrarily long, 
+                // so we can't really 'know' that we are doing the right thing here...
+                // most charts with _multi params, it's at index 0. 
+                // 15 (heat_map) & 24 (dot_plot) are exceptions (both have two params, with 'something else' first).
+                // Anyway - importantly, there are no charts with more than one _multi param.
+                
+                // param.type.startsWith('_multi')
+            }
+        });
         const chart = new chartType.class(ds.dataStore, div, config);
         this.charts[chart.config.id] = {
             chart: chart,

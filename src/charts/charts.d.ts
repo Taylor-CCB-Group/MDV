@@ -7,6 +7,9 @@
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
+/**
+ * The are the names used to refer to the types of data can be stored in a column.
+ */
 export type DataType =
     | "integer"
     | "double"
@@ -15,9 +18,20 @@ export type DataType =
     | "unique"
     | "multitext"
     | "int32";
+/**
+ * To denote cases where any categorical data can be used,
+ * this is the union of the {@link DataType}s that share related properties.
+ */
 export type CategoricalDataType = "text" | "text16" | "multitext";
+/**
+ * To denote cases where any numerical data can be used,
+ * this is the union of the {@link DataType}s that share related properties.
+ */
 export type NumberDataType = "integer" | "double" | "int32";
 
+/**
+ * Associates a {@link DataType} with the corresponding `TypedArray` type that will be used to store the data.
+ */
 type DataStructureTypes = {
     integer: Uint32Array;
     double: Float32Array; //why is it called 'double'???
@@ -27,6 +41,9 @@ type DataStructureTypes = {
     unique: Uint8Array; //raw bytes of strings to be decoded
     int32: Int32Array;
 };
+/**
+ * Union of all the possible data structures that can be used to store column data.
+ */
 export type ColumnData = DataStructureTypes[keyof DataStructureTypes];
 // even if they're just aliases, these could be useful for documentation / clarity
 export type ColumnName = string; //this will probably change to ColumnSpecifier with more structured data
@@ -41,8 +58,11 @@ type Quantiles = {
 };
 type Colors = (string | number[])[];
 type SubgroupName = string;
+/**
+ * Represents a column of data in a {@link DataStore}.
+ */
 export type DataColumn<T extends DataType> = {
-    /** human-readable column */
+    /** human-readable column name, to be displayed in GUI etc */
     name: ColumnName; //nb - we should check use of 'name' vs 'field'
     /** id of the column, used internally */
     field: FieldName;
@@ -241,6 +261,9 @@ type GuiSpecs = Array<AnyGuiSpec>;
 // type TestFunc<T extends GuiSpecType> = GuiSpec<T>['func'];
 // const f: TestFunc<'multidropdown'> = (v) => { };
 // todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
+/**
+ * This represents widgets used by Add Chart dialog of charts with `extra_controls` specified.
+ */
 export type ExtraControl<T extends GuiSpecType> = {
     type: T;
     name: string;
