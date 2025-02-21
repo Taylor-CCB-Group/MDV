@@ -3,7 +3,7 @@
 Your data should contain an x and y column , which is the centroid for each cell/item and a column specifying which region each cell/item is from e.g. sample_id, roi, slide_number. In addition it needs to contain a column that will be used to color centroid plots e.g. annotations, cell types, cluster designations.
 
 ### Adding Regions
-use the `set_region_data` method of the MDVProject. For example to set regions for the cell's datasource
+Use the `set_region_data` method of the MDVProject. For example to set regions for the `"cells"` datasource
  ```python
 p.set_region_data("cells", "/path/to/file",
                 region_field="sample_id",
@@ -14,15 +14,15 @@ p.set_region_data("cells", "/path/to/file",
 ```
 The first argument is the name of the datasource and the second is a path to a tab delimited table or a dictionary describing the regions e.g.
 
-|sample_id|width|height|
-|---------|-----|------|
-|sample_1_roi_1|2000|2000|
-|sample_1_roi_2|1250|1500|
+| sample_id      | width | height |
+| -------------- | ----- | ------ |
+| sample_1_roi_1 | 2000  | 2000   |
+| sample_1_roi_2 | 1250  | 1500   |
 
 The first column should contain the name of the region (can be any header). The other columns are:-
-* width - the width of the region 
-* height -the height of the region
-* x_offset, y_offset - usually these are 0 and in such cases, these columns can be missing. In some circumstances however the region may be part of a larger region and the hence the x, y co-ordinates will not be 0 and need to be supplied.
+* `width` - the width of the region 
+* `height` -the height of the region
+* `x_offset`, `y_offset` - usually these are 0 and in such cases, these columns can be missing. In some circumstances however the region may be part of a larger region and the hence the x, y co-ordinates will not be 0 and need to be supplied.
 
 Alternatively instead of a path to a file, a dictionary of region name to data can be used e.g.
 ```json
@@ -35,16 +35,16 @@ Alternatively instead of a path to a file, a dictionary of region name to data c
 ```
 The other arguments are:-
 
-* *region_field* - the column in your data specifying regions e.g. ROI, sample_id
-* *default_color* - the default color of the  centroid plots, usually annotations or cluster designations
-* *position_fields* - the fields describing the x, y co-ordinates of each cell/object
-* *scale unit* - the unit you want the data described in
-* *scale* - the actual value of x and y in terms of the scale unit
+* `region_field` - the column in your data specifying regions e.g. ROI, sample_id
+* `default_color` - the default color of the  centroid plots, usually annotations or cluster designations
+* `position_fields` - the fields describing the x, y co-ordinates of each cell/object
+* `scale_unit` - the unit you want the data described in, e.g. `"mm"`, `"µm"`.
+* `scale` - the actual value of x and y in terms of the scale unit
 
 
 ### Adding Images
 
-Use `add_region_images' to add background images:-
+Use `add_region_images` to add background images:-
 ```python
 p.add_region_images("cells", "examples/data/spatial/images.tsv")
 ```
@@ -64,7 +64,7 @@ If a local file path is given in 'path', the image will be copied to the project
 
 ## Adding a Viv view
 
-Use `add_viv_viewer` of the `MDVProject'
+Use `add_viv_viewer` method of `MDVProject` to configure a datasource in such a way that it is able to use Viv to view images (this does not add a concrete instance of an actual chart to the project, but makes the option available):
 
 ```python
 p.add_viv_viewer("cells",
@@ -119,11 +119,11 @@ p.set_interactions("my_interactions","cells",
                     add_view=True)
 ```
 
- * interaction_columns - a list of the two columns which specify the two cell types/items
- * node_size - the name of column in the interaction dataset that describes the number of cells/items in the interaction e.g. cell 1 number 
- * parent_column - the name of the column in the parent dataset that defines the  interacting items e.g. annotation, cell type
- * pivot_column - the column in both the interaction and parent dataset that specifies the extent of the interaction e.g.sample_id, condition, roi, disease
- * is_single_region - if True, the pivot column specifies a single roi i.e. it is not composed of several regions e.g.condition,disease state
+ * `interaction_columns` - a list of the two columns which specify the two cell types/items.
+ * `node_size` - the name of column in the interaction dataset that describes the number of cells/items in the interaction e.g. cell 1 number.
+ * `parent_column` - the name of the column in the parent dataset that defines the  interacting items e.g. annotation, cell type.
+ * `pivot_column` - the column in both the interaction and parent dataset that specifies the extent of the interaction e.g. sample_id, condition, ROI, disease.
+ * `is_single_region` - if `True`, the pivot column specifies a single ROI i.e. it is not composed of several regions e.g. condition, disease state.
 
 
 
