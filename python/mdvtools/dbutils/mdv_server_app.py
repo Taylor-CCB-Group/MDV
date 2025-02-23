@@ -44,9 +44,9 @@ def create_flask_app(config_name=None):
     SESSION_COOKIE_SECURE=True,     # Only send cookies over HTTPS
     SESSION_COOKIE_SAMESITE="Lax"   # Prevent cross-site cookie usage
 )
-    app.secret_key = os.getenv('FLASK_SECRET_KEY')
+    app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
 
-    if not app.secret_key:
+    if ENABLE_AUTH and not app.secret_key:
         raise ValueError("FLASK_SECRET_KEY environment variable is not set!")
 
     
@@ -235,7 +235,15 @@ def wait_for_database():
     print(error_message)
     raise TimeoutError(error_message)
 
-
+# Load sensitive data from Docker secrets
+def read_secret(secret_name):
+    secret_path = f'/run/secrets/{secret_name}'
+    try:
+        with open(secret_path, 'r') as secret_file:
+            return secret_file.read().strip()
+    except FileNotFoundError as fnf_error:
+        print(f"Error: Secret '{secret_name}' not found. {fnf_error}")
+        raise  # Re-raise the exception to be handled by the parent
 
 def load_config(app, config_name=None, enable_auth=False):
     try:
@@ -263,15 +271,7 @@ def load_config(app, config_name=None, enable_auth=False):
         else:
             app.config['PREFERRED_URL_SCHEME'] = 'https'
             
-            # Load sensitive data from Docker secrets
-            def read_secret(secret_name):
-                secret_path = f'/run/secrets/{secret_name}'
-                try:
-                    with open(secret_path, 'r') as secret_file:
-                        return secret_file.read().strip()
-                except FileNotFoundError as fnf_error:
-                    print(f"Error: Secret '{secret_name}' not found. {fnf_error}")
-                    raise  # Re-raise the exception to be handled by the parent
+            
 
             db_user = os.getenv('DB_USER') or read_secret('db_user')
             db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
