@@ -40,10 +40,10 @@ def create_flask_app(config_name=None):
     app.after_request(add_safe_headers)
     
     app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,   # Prevent JavaScript from accessing cookies
-    SESSION_COOKIE_SECURE=True,     # Only send cookies over HTTPS
-    SESSION_COOKIE_SAMESITE="Lax"   # Prevent cross-site cookie usage
-)
+        SESSION_COOKIE_HTTPONLY=True,   # Prevent JavaScript from accessing cookies
+        SESSION_COOKIE_SECURE=True,     # Only send cookies over HTTPS
+        SESSION_COOKIE_SAMESITE="Lax"   # Prevent cross-site cookie usage
+    )
     app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
 
     if ENABLE_AUTH and not app.secret_key:
