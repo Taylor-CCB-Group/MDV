@@ -141,11 +141,14 @@ class Auth0Provider(AuthProvider):
                 logging.debug("User information retrieved successfully.")
                 raw_data = response.json()
 
-                # Transform response to match frontend expectations
+                # Extract user metadata if present
+                user_metadata = raw_data.get("user_metadata", {})
+
                 user_data = {
-                    "name": raw_data.get("name", "Unknown User"),
+                    "first_name": user_metadata.get("first_name", "Unknown"),
+                    "last_name": user_metadata.get("last_name", "Unknown"),
                     "email": raw_data.get("email", ""),
-                    "association": "Example Corp",  # Static or extract from another source
+                    "association": user_metadata.get("association", "Unknown Organization"),
                     "avatarUrl": raw_data.get("picture", ""),
                 }
                 print("!!!!!!")
