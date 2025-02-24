@@ -10,3 +10,4 @@ docsenv
 # docs/maindocs/autoapi
 dist
 python/mdvtools/static
+.env
