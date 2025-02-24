@@ -6,11 +6,12 @@ on:
       - auth_rbac
     paths-ignore:
       - '**.github/workflows/**' # Ignore changes to workflow files
-    if: "contains(github.event.head_commit.message, '[deploy]')"
-    
+  workflow_dispatch: # Allows manual trigger for testing
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[deploy]') # Condition to check the commit message
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,12 +44,13 @@ jobs:
 
       - name: Build and push multi-architecture image
         run: |
-          echo "Building multi-architecture image for linux/amd64, linux/arm64, and windows/amd64..."
-          if ! docker buildx build --platform linux/amd64,linux/arm64,windows/amd64 -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} --push .; then
+          echo "Building multi-architecture image for linux/amd64 and linux/arm64..."
+          # Remove windows/amd64 since it fails in your current setup
+          if ! docker buildx build --platform linux/amd64,linux/arm64 -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} --push .; then
             echo "Error: Failed to build and push the Docker image."
             exit 1
           fi
-          # Tag the image with the latest tag as well
+          # Tag the image with the latest tag
           docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest
 
