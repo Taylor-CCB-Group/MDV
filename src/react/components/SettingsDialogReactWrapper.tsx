@@ -3,7 +3,7 @@ import { BaseDialog } from "../../utilities/Dialog";
 import { createEl } from "../../utilities/ElementsTyped";
 import { createMdvPortal } from "@/react/react_utils";
 import Gui from "./SettingsDialogComponent";
-import type BaseChart from "@/charts/BaseChart";
+import BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 
 const SettingsDialog = observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {

@@ -31,6 +31,17 @@ type GuiStateProps = {
 // - column groups
 // - think about how to present the links, including selecting subgroups etc.
 // - maybe when more complex UI is involved, this should be displayed in a dialog.
+
+/**
+ * Check if a column selection prop is for multiple columns...
+ * I do wish that there weren't so many layers of indirection etc here.
+ * !Probably one of the most confusing parts of the codebase at the moment.
+ */
+function isMultiColProp(p: ColumnSelectionProps<any>): boolean {
+    if (p.multiple === false) return false;
+    return p.multiple || p.type && isMultiColumn(p.type);
+}
+
 /**
  * A component for selecting columns from the data store.
  * Depending on the type, this may be a single column or multiple columns.
@@ -45,8 +56,8 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
     const { setSelectedColumn, placeholder, type } = props;
     const { setIsAutocompleteFocused, setIsExpanded, current_value } = props;
     
-    // - this is starting to do the right thing, still a bit confusing
-    const isMultiType = props.multiple || type && isMultiColumn(type);
+    // - this is starting to do the right thing, still massively confusing
+    const isMultiType = isMultiColProp(props);
 
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
