@@ -44,15 +44,13 @@ jobs:
 
       - name: Build and push multi-architecture image
         run: |
-          echo "Building multi-architecture image for linux/amd64 and linux/arm64..."
-          # Remove windows/amd64 since it fails in your current setup
-          if ! docker buildx build --platform linux/amd64,linux/arm64 -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} --push .; then
-            echo "Error: Failed to build and push the Docker image."
-            exit 1
-          fi
-          # Tag the image with the latest tag
-          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest
+          echo "Building and pushing multi-architecture image for linux/amd64 and linux/arm64..."
+          
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest \
+            --push .
+
 
       - name: Commit and push new version
         run: |
