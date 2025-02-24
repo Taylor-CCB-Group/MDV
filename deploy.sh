@@ -164,21 +164,36 @@ create_or_validate_env_file() {
       echo "# Shibboleth Configuration"
       echo "SHIBBOLETH_LOGIN_URL=$SHIBBOLETH_LOGIN_URL"
       echo "SHIBBOLETH_LOGOUT_URL=$SHIBBOLETH_LOGOUT_URL"
-  } > "$env_file"
+  } > "$env_file" || {
+    echo "Error: Failed to create $env_file."
+    exit 1
+  }
 
   echo "Environment variables saved to $env_file."
 
 }
+
 # Function to download and run docker-compose
 run_docker_compose() {
   local compose_url=$1
   local compose_file=$(basename $compose_url)
-  
-  echo "Downloading $compose_file from $compose_url..."
-  curl -O $compose_url  # Download the file
-  
+
+  # Check if the compose file already exists
+  if [ -f "$compose_file" ]; then
+    echo "$compose_file already exists. Skipping download."
+  else
+    echo "Downloading $compose_file from $compose_url..."
+    if ! curl -O "$compose_url"; then
+      echo "Error: Failed to download $compose_file from $compose_url."
+      exit 1
+    fi
+  fi
+
   echo "Running docker-compose with $compose_file..."
-  docker compose -f $compose_file up -d  # Run docker-compose with the downloaded file
+  if ! docker-compose -f $compose_file up -d; then
+    echo "Error: Failed to run docker-compose."
+    exit 1
+  fi
 }
 
 # Main execution starts here
