@@ -12,8 +12,9 @@ import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
 import { serialiseChart, initialiseChartConfig } from "./chartConfigUtils";
 import type { MultiColumnQuery } from "@/links/link_utils";
-import { decorateChartColumnMethods } from "@/datastore/decorateColumnMethod";
+import { decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;
 export type LegacyColorBy = { column: DataColumn<any> }
@@ -604,6 +605,14 @@ class BaseChart<T extends BaseConfig> {
         // dynamic props?
     }
     removeLayout?(): void;
+    
+    //@ts-expect-error - the decorator thinks it might not be setting an array value...
+    @loadColumnData
+    setParams(params: FieldSpecs) {
+        //! now the config will just have string[] - we want to allow things that can understand to have other objects
+        this.config.param = params;
+        this.drawChart();
+    }
     /**
      * Returns information about which controls to add to the settings dialog.
      * Subclasses should call this method and then add their own controls e.g.
@@ -642,6 +651,10 @@ class BaseChart<T extends BaseConfig> {
                 },
             },
         ];
+        const paramsSettings = getParamsGuiSpec(this);
+        if (paramsSettings) {
+            settings.push(paramsSettings);
+        }
         const colorOptions = this.getColorOptions();
 
         if (colorOptions.colorby) {

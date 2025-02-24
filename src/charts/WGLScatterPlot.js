@@ -315,6 +315,65 @@ class WGLScatterPlot extends WGLChart {
 
         this.onDataFiltered();
     }
+    
+    drawChart() {
+        const { config } = this;
+        const x_name = this.dataStore.getColumnName(config.param[0]);
+        const y_name = this.dataStore.getColumnName(config.param[1]);
+        config.axis.x.label = x_name;
+        config.axis.y.label = y_name;
+
+        this.x = this.config.param[0];
+        this.y = this.config.param[1];
+        this.dim = this.getDimension();
+        const bf = config.background_filter;
+        if (bf) {
+            this.dim.setBackgroundFilter(bf.column, bf.category);
+        }
+        this.minMaxX = this.dataStore.getMinMaxForColumn(this.x);
+        this.minMaxY = this.dataStore.getMinMaxForColumn(this.y);
+        const c = this.config;
+        const colorFunc = this.afterAppCreation();
+        this.app.setBackGroundColor(c.background_color);
+
+        this.app.addHandler("brush_stopped", (range, is_poly) => {
+            this.resetButton.style.display = "inline";
+            this.app.setFilter(true);
+            if (!is_poly) {
+                this._createFilter(range);
+            } else {
+                this._createPolyFilter(range);
+            }
+        });
+
+        if (c.background_image) {
+            c.image_opacity = c.image_opacity == null ? 1 : c.image_opacity;
+            this.addBackgroundImage(c.background_image);
+        }
+        const cx = this.dataStore.columnIndex[this.x];
+        const cy = this.dataStore.columnIndex[this.y];
+        //will get some loss of precision for int32 plus no updating on data changed
+        this.app.addCircles({
+            x: cx.datatype === "int32" ? new Float32Array(cx.data) : cx.data,
+            y: cy.datatype === "int32" ? new Float32Array(cy.data) : cy.data,
+            localFilter: this.dim.getLocalFilter(),
+            globalFilter: this.dataStore.getFilter(),
+            colorFunc: colorFunc,
+        });
+
+        this.defaultRadius = this._calculateRadius();
+
+        c.radius = c.radius || 2;
+
+        c.opacity = c.opacity == null ? 0.8 : c.opacity;
+
+        this.app.setPointRadius(this.config.radius);
+        this.app.setPointOpacity(this.config.opacity);
+
+        this.onDataFiltered();
+        
+        super.drawChart();
+    }
 
     /**
      * If called more than once, will result in more than one "RangeDimension" being created

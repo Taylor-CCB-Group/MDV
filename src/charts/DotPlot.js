@@ -54,6 +54,12 @@ class DotPlot extends SVGChart {
         this.x_scale.domain(yLabels);
         this.onDataFiltered();
     }
+    @loadColumnData
+    setParams(params) {
+        this.config.param = params;
+        this.setFields(params.slice(1));
+        this.onDataFiltered();
+    }
 
     remove(notify = true) {
         this.dim.destroy(notify);
