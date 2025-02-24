@@ -173,9 +173,20 @@ export function addChartLink(link: ChartLink, cm: ChartManager) {
 }
 
 interface IRowAsColumn {
+    /** Index of the row in the target data-store, from which other properties can be derived */
     index: number;
+    /** Human-readable form of column name */
     name: ColumnName;
+    /**
+     * Unique identifier for the column, in the form of `"subgroup|name (subgroup)|index"`,
+     * used internally for querying the associated column in the parent {@link DataStore}.
+     */
     fieldName: FieldName;
+    /**
+     * The actual {@link DataColumn} instance, which will be added to the parent {@link DataStore} when accessed.
+     * It should be possible for consumers to access this property directly in order to have an object that can be used
+     * for accessing the column (meta)data.
+     */
     column: DataColumn<DataType>;
 }
 
@@ -254,6 +265,9 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     get serialized() {
         return { linkedDsName: this.linkedDsName, maxItems: this.maxItems, type: "RowsAsColsQuery" };
     }
+    /**
+     * Returns a string that should have enough information to represent a JSON serialisation of the query.
+     */
     toString() {
         // will this be enough that JSON.stringify(config) will get the right thing without needing a custom replacer?
         // (or traversing the object to find the right thing)
@@ -371,7 +385,8 @@ export function getRowsAsColumnsLinks(dataStore: DataStore) {
                 // first pass... there can be only one or zero.
                 // how often will users actually want to link multiple dataSources in this way?
                 // perhaps not often - but let's handle it so we don't have to change it later or have bugs.
-                // UI should be simpler for the common case with a single linked dataSource.
+                // There are also multiple subgroups within a single linked dataSource - also important to support.
+                // UI should be simpler for the common case with a single linked dataSource/sg.
                 // Are there any crazy edge cases we should consider - like indirect links? links to self?
                 // !! this should be right now, but we should test with multiple links.
                 const linkedDs = dataSources.find(
