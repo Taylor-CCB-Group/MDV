@@ -207,7 +207,7 @@ else:
         # make sure the final code does not contain p.static
         final_code = final_code.replace("project.convert_to_static_page", "# project.convert_to_static_page")
         # all lines that include `data_frame` can be somewhat safely removed with the current template
-        final_code = re.sub(r".*data_frame.*", "", final_code)
+        #final_code = re.sub(r".*data_frame.*", "", final_code) # commenting this line, it is causing problems when a histogram is being generated.
         final_code = final_code.replace("delete_existing=True", "delete_existing=False")
         # final_code = final_code.replace("\"default\"", f"\"{view_name}\"") # "default" was also used e.g. for `brush = "default"`
         ## assumption of `view_name = "default"` being present in the code no longer holds - often it will include a nice view name

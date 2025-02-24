@@ -18,7 +18,7 @@ from the second DataFrame while selecting the remaining columns from the first D
     - Multiline chart: Requires one numerical column and one categorical column.  
     - Pie Chart: Requires one categorical column.  
     - Row Chart: Requires one categorical column.  
-    - Row summary box: Requires any column.  
+    - Row summary box: Requires any column(s).  
     - Sankey diagram: Requires two categorical columns.  
       - If only one categorical variable is available, return it twice.  
     - Scatter plot (2D): Requires two numerical columns.  
@@ -26,7 +26,7 @@ from the second DataFrame while selecting the remaining columns from the first D
     - Selection dialog plot: Requires any column.  
     - Stacked row chart: Requires two categorical columns.  
       - If only one categorical variable is available, return it twice.  
-    - Table: Requires any column.  
+    - Table: Requires any column(s).  
     - Text box: Requires no columns, just text.  
     - Violin plot: Requires one categorical column and one numerical column.  
     - Wordcloud: Requires one categorical column.  
