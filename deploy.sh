@@ -194,7 +194,7 @@ check_docker_daemon
 create_or_validate_env_file
 
 # URL of your production docker-compose file
-DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/dev/docker-secrets-local.yml"
+DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/auth_rbac/docker-secrets-local.yml"
 
 # Download and run docker-compose for production
 run_docker_compose $DOCKER_COMPOSE_URL
