@@ -2,7 +2,7 @@
 # warning - we had an obscure npm error with cross-env not found, and it seems like using an earlier nodejs version fixed it
 # for some reason node_modules/.bin wasn't populated after `RUN npm install` - but manually running it in the container worked
 # not sure if there's a way of pinning a more specific build of the base image. May want to see if we can reproduce this issue outside of docker.
-FROM nikolaik/python-nodejs:python3.12-nodejs20-slim AS frontend-builder
+FROM nikolaik/python-nodejs:python3.12-nodejs20-alpine AS frontend-builder
 
 # this layer will change less frequently than the others, so it's good to have it first
 # Install HDF5 library, for some reason poetry can't install it in this context as of now
