@@ -7,7 +7,7 @@ on:
     paths-ignore:
       - '**.github/workflows/**' # Ignore changes to workflow files
     if: "contains(github.event.head_commit.message, '[deploy]')"
-    
+
 jobs:
   build-and-push:
     if: "contains(github.event.head_commit.message, '[deploy]')"
@@ -40,12 +40,15 @@ jobs:
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo $NEW_VERSION > version.txt
 
-      - name: Build and push frontend image
+      - name: Build and push multi-architecture image
         run: |
-          docker build -t mdv-frontend:${{ env.NEW_VERSION }} -f Dockerfile .
-          docker tag mdv-frontend:${{ env.NEW_VERSION }} ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }}
-          docker tag mdv-frontend:${{ env.NEW_VERSION }} ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }}
+          echo "Building multi-architecture image for amd64, arm64, and windows/amd64..."
+          docker buildx build --platform linux/amd64,linux/arm64,windows/amd64 -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} --push .
+
+      - name: Tag and push latest version
+        run: |
+          echo "Tagging and pushing latest version..."
+          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest
 
       - name: Commit and push new version
