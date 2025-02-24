@@ -190,7 +190,7 @@ run_docker_compose() {
   fi
 
   echo "Running docker-compose with $compose_file..."
-  if ! docker-compose -f $compose_file up -d; then
+  if ! docker compose -f $compose_file up -d; then
     echo "Error: Failed to run docker-compose."
     exit 1
   fi
