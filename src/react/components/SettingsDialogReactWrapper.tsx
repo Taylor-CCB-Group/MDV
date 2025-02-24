@@ -24,11 +24,12 @@ class SettingsDialogReactWrapper<T extends BaseConfig> extends BaseDialog {
     constructor(chart: BaseChart<T>, position?: [number, number]) {
         // if this is intended to be a drop-in replacement for existing SettingsDialog,
         // it isn't only used by 'charts', but e.g. tracks.
-        const name =
-            chart.config.title || `${chart.config.type} ${chart.config.id}`;
+        const typeName = BaseChart.types[chart.config.type].name;
+        const name = `${chart.config.title} (${typeName})`;
+            //chart.config.title || `${chart.config.type} ${chart.config.id}`;
         const config = {
             width: 500,
-            title: `Settings (${name})`,
+            title: `Settings: ${name}`,
             doc: chart.__doc__ || document,
             position,
             onclose: () => {
