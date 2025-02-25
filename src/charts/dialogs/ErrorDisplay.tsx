@@ -8,7 +8,9 @@ import {
 import {
     Alert,
     AlertTitle,
+    Box,
     Button,
+    CircularProgress,
     Collapse,
     Container,
     Divider,
@@ -19,7 +21,8 @@ import {
     Tooltip,
     Typography,
 } from "@mui/material";
-import { useState } from "react";
+import axios from "axios";
+import { useEffect, useState } from "react";
 import JsonView from "react18-json-view";
 
 /** Any extra information we may want to use
@@ -42,26 +45,47 @@ const ErrorDisplay = ({
     title = "Error Occurred",
     extraMetadata,
 }: ErrorDisplayProps) => {
-    const [expanded, setExpanded] = useState(false);
+    const [expanded, setExpanded] = useState(true);
     const [copied, setCopied] = useState(false);
     const [userComments, setUserComments] = useState<string>();
+    const [isLoading, setIsLoading] = useState<boolean>();
+    const [emailSent, setEmailSent] = useState<boolean>();
+    const [emailNotSent, setEmailNotSent] = useState<boolean>();
+    const [metaData, setMetaData] = useState<any>();
+
+    useEffect(() => {
+        setMetaData({...extraMetadata, stackTrace: error?.traceback});
+    }, [extraMetadata, error]);
 
     // Send the error details and the user's comments (if any) to the support email address
-    const handleSend = () => {
+    const handleSend = async () => {
+        setIsLoading(true);
+        setEmailSent(false);
+        setEmailNotSent(false);
         const errorDetails = {
             message: error.message,
             traceback: error?.traceback,
             userComments: userComments ? userComments : null,
-            extraMetadata: extraMetadata ? extraMetadata : null
+            extraMetadata: metaData ? metaData : null,
         };
         //todo: Add the logic to send the error details to the email address and display the corresponding message to user
+        try {
+            const res = await axios.post("/send-error", JSON.stringify(errorDetails));
+            const data = res.data;
+            setEmailSent(true);
+        } catch (e) {
+            console.log("error", e);
+            setEmailNotSent(true);
+        } finally {
+            setIsLoading(false);
+        }
         console.log("Send", errorDetails);
     };
 
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(
-                `Error: ${error.message}\n\nTraceback:\n${error.traceback}${extraMetadata ? `\n\nMetaData:\n${JSON.stringify(extraMetadata, null, 2)}` : ""}`,
+                `Error: ${error.message}\n\nTraceback:\n${error.traceback}${metaData ? `\n\nMetaData:\n${JSON.stringify(metaData, null, 2)}` : ""}`,
             );
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
@@ -73,10 +97,15 @@ const ErrorDisplay = ({
     return (
         <div
             style={{
-                maxWidth: 800,
-                minWidth: 500,
+                // maxWidth: 800,
+                // minWidth: 500,
                 margin: "20px auto",
-                width: "90%",
+                // width: "90%",
+                width: "45vw",
+                minHeight: "45vh",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
             }}
         >
             <Paper
@@ -84,154 +113,221 @@ const ErrorDisplay = ({
                 sx={{
                     bgcolor: "var(--background_color_error)",
                     color: "var(--text_color)",
+                    height: "95%",
+                    width: "95%",
                 }}
             >
-                <Alert
-                    severity="error"
-                    icon={
-                        <ErrorIcon
-                            sx={{
-                                fontSize: 25,
-                                color: "red",
-                                marginTop: "1px",
-                            }}
-                        />
-                    }
-                    sx={{
-                        "& .MuiAlert-message": {
-                            width: "100%",
-                        },
-                        bgcolor: "transparent",
-                        color: "var(--text_color)",
-                        "& .MuiAlert-icon": {
-                            color: "var(--icon_color_error)",
-                        },
-                    }}
-                >
-                    <AlertTitle
+                {isLoading ? (
+                    // Display loading icon when button is clicked
+                    <Box
                         sx={{
-                            fontSize: "1.1rem",
-                            fontWeight: "bold",
+                            height: "40vh",
+                            width: "42vw",
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "space-between",
-                            color: "var(--text_color_error)",
+                            justifyContent: "center",
                         }}
                     >
-                        {title}
-                        {error.traceback && (
-                            <Tooltip title="Copy error details">
-                                <IconButton
-                                    size="small"
-                                    onClick={handleCopy}
+                        <CircularProgress color="inherit" />
+                    </Box>
+                ) : emailSent ? (
+                    // Display success message when email is sent
+                    <Box
+                        sx={{
+                            height: "40vh",
+                            width: "42vw",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <Typography>
+                            Thank you for your feedback, we will do our best to
+                            fix this issue as soon as possible.
+                        </Typography>
+                    </Box>
+                ) : (
+                    <>
+                        <Alert
+                            severity="error"
+                            icon={
+                                <ErrorIcon
                                     sx={{
-                                        ml: 1,
-                                        color: "var(--text_color_error)",
-                                        "&:hover": {
-                                            backgroundColor:
-                                                "var(--background_color)",
-                                        },
+                                        fontSize: 25,
+                                        color: "red",
+                                        marginTop: "1px",
                                     }}
-                                >
-                                    {copied ? <Check /> : <ContentCopy />}
-                                </IconButton>
-                            </Tooltip>
-                        )}
-                    </AlertTitle>
-
-                    <div style={{ marginTop: "12px" }}>
-                        <p
-                            style={{
-                                margin: "0 0 12px 0",
-                                lineHeight: "1.6",
-                                padding: "4px 8px",
-                                color: "var(--text_color_error)",
-                                whiteSpace: "pre-wrap",
-                                wordBreak: "break-word",
+                                />
+                            }
+                            sx={{
+                                "& .MuiAlert-message": {
+                                    width: "100%",
+                                },
+                                bgcolor: "transparent",
+                                color: "var(--text_color)",
+                                "& .MuiAlert-icon": {
+                                    color: "var(--icon_color_error)",
+                                },
                             }}
                         >
-                            {error.message}
-                        </p>
+                            <AlertTitle
+                                sx={{
+                                    fontSize: "1.1rem",
+                                    fontWeight: "bold",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    color: "var(--text_color_error)",
+                                }}
+                            >
+                                {title}
+                                {error.traceback && (
+                                    <Tooltip title="Copy error details">
+                                        <IconButton
+                                            size="small"
+                                            onClick={handleCopy}
+                                            sx={{
+                                                ml: 1,
+                                                color: "var(--text_color_error)",
+                                                "&:hover": {
+                                                    backgroundColor:
+                                                        "var(--background_color)",
+                                                },
+                                            }}
+                                        >
+                                            {copied ? (
+                                                <Check />
+                                            ) : (
+                                                <ContentCopy />
+                                            )}
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
+                            </AlertTitle>
 
-                        {error.traceback && (
-                            <div>
-                                <IconButton
-                                    size="medium"
-                                    onClick={() => setExpanded(!expanded)}
-                                    sx={{
-                                        mb: 1,
-                                        fontSize: "0.875rem",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        padding: "6px 12px",
-                                        borderRadius: "6px",
-                                        color: "var(--icon_color_error)",
-                                        "&:hover": {
-                                            backgroundColor:
-                                                "var(--background_color_hover)",
-                                        },
+                            <div style={{ marginTop: "12px" }}>
+                                <p
+                                    style={{
+                                        margin: "0 0 12px 0",
+                                        lineHeight: "1.6",
+                                        padding: "4px 8px",
+                                        color: "var(--text_color_error)",
+                                        whiteSpace: "pre-wrap",
+                                        wordBreak: "break-word",
                                     }}
                                 >
-                                    {expanded ? <ExpandLess /> : <ExpandMore />}
-                                    <span style={{ marginLeft: "6px" }}>
-                                        {expanded
-                                            ? "Hide Details"
-                                            : "Show Details"}
-                                    </span>
-                                </IconButton>
+                                    {error.message}
+                                </p>
 
-                                <Collapse in={expanded}>
-                                    {extraMetadata && (
-                                        <JsonView
-                                            src={{
-                                                ...extraMetadata,
-                                                stackTrace: error?.traceback,
+                                {error.traceback && (
+                                    <div>
+                                        <IconButton
+                                            size="medium"
+                                            onClick={() =>
+                                                setExpanded(!expanded)
+                                            }
+                                            sx={{
+                                                mb: 1,
+                                                fontSize: "0.875rem",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                padding: "6px 12px",
+                                                borderRadius: "6px",
+                                                color: "var(--icon_color_error)",
+                                                "&:hover": {
+                                                    backgroundColor:
+                                                        "var(--background_color_hover)",
+                                                },
                                             }}
-                                            collapsed={1}
-                                        />
-                                    )}
-                                </Collapse>
+                                        >
+                                            {expanded ? (
+                                                <ExpandLess />
+                                            ) : (
+                                                <ExpandMore />
+                                            )}
+                                            <span style={{ marginLeft: "6px" }}>
+                                                {expanded
+                                                    ? "Hide Details"
+                                                    : "Show Details"}
+                                            </span>
+                                        </IconButton>
+
+                                        <Collapse in={expanded}>
+                                            {metaData && (
+                                                <JsonView
+                                                    editable
+                                                    src={metaData}
+                                                    onAdd={(params) => setMetaData(params.src)}
+                                                    onDelete={(params) => setMetaData(params.src)}
+                                                    onEdit={(params) => setMetaData(params.src)}
+                                                    collapsed={1}
+                                                    customizeNode={(_params) => {
+                                                        return {add: false}
+                                                    }}
+                                                />
+                                            )}
+                                        </Collapse>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                </Alert>
-                <Divider />
-                <Container
-                    sx={{
-                        pt: 2,
-                    }}
-                >
-                    <Typography variant="h6" sx={{ mb: 2 }}>
-                        We are sorry for the inconvenience.
-                    </Typography>
-                    <Typography sx={{ mb: 2 }}>
-                        To help us diagnose and fix the problem, please click on
-                        the send button below to send error details.
-                    </Typography>
-                    <TextareaAutosize
-                        minRows={3}
-                        style={{
-                            width: "100%",
-                            padding: "10px 10px",
-                            marginTop: 2,
-                            backgroundColor: "var(--input_background_color)",
-                            borderWidth: 2,
-                            borderColor: "var(--input_border_color)",
-                        }}
-                        placeholder="Please provide any additional comments (optional)"
-                        value={userComments}
-                        onChange={(e) => setUserComments(e.target.value)}
-                    />
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        sx={{ mt: 2, mb: 3, justifySelf: "flex-start" }}
-                        onClick={handleSend}
-                    >
-                        Send
-                    </Button>
-                </Container>
+                        </Alert>
+                        <Divider />
+                        <Container
+                            sx={{
+                                pt: 2,
+                            }}
+                        >
+                            <Typography variant="h6" sx={{ mb: 2 }}>
+                                We are sorry for the inconvenience.
+                            </Typography>
+                            <Typography sx={{ mb: 2 }}>
+                                To help us diagnose and fix the problem, please
+                                click on the send button below to send error
+                                details.
+                            </Typography>
+                            <Typography sx={{ mb: 2 }}>
+                                Please remove any sensitive information from the error details above.
+                            </Typography>
+                            <TextareaAutosize
+                                minRows={3}
+                                style={{
+                                    width: "100%",
+                                    padding: "10px 10px",
+                                    marginTop: 2,
+                                    backgroundColor:
+                                        "var(--input_background_color)",
+                                    borderWidth: 2,
+                                    borderColor: "var(--input_border_color)",
+                                }}
+                                placeholder="Please provide any additional comments (optional)"
+                                value={userComments}
+                                onChange={(e) =>
+                                    setUserComments(e.target.value)
+                                }
+                            />
+                            {/* Error message when email is not sent */}
+                            {emailNotSent && (
+                                <Typography
+                                    sx={{
+                                        color: "var(--icon_color_error)",
+                                        mt: 1,
+                                    }}
+                                >
+                                    Something went wrong, please try again.
+                                </Typography>
+                            )}
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                sx={{ mt: 2, mb: 3, justifySelf: "flex-start" }}
+                                onClick={handleSend}
+                            >
+                                Send
+                            </Button>
+                        </Container>
+                    </>
+                )}
             </Paper>
 
             <Snackbar
