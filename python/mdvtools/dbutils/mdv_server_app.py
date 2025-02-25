@@ -32,7 +32,7 @@ if ENABLE_AUTH:
 
 
 def create_flask_app(config_name=None):
-    """ Create and configure the Flask app."""
+    """Create and configure the Flask app."""
     app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
     # this was causing a number of issues with various routes, changing this here seems to be the best way to fix it
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
@@ -44,10 +44,11 @@ def create_flask_app(config_name=None):
         SESSION_COOKIE_SECURE=True,     # Only send cookies over HTTPS
         SESSION_COOKIE_SAMESITE="Lax"   # Prevent cross-site cookie usage
     )
-    app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
+    if ENABLE_AUTH:
+        app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
 
-    if ENABLE_AUTH and not app.secret_key:
-        raise ValueError(" FLASK_SECRET_KEY environment variable is not set!")
+        if not app.secret_key:
+            raise ValueError(" FLASK_SECRET_KEY environment variable is not set!")
 
     
     try:
