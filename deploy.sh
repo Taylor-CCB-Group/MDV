@@ -43,7 +43,7 @@ jobs:
       - name: Build and push multi-architecture image
         run: |
           docker buildx build \
-            --platform linux/amd64,linux/arm64 \
+            --platform windows/amd64 \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest \
             --push .
