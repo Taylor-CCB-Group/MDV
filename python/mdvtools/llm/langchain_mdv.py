@@ -147,6 +147,13 @@ class ProjectChat:
             log("The project has more than one datasource, only the first one will be used")
             self.ds_name1 = project.datasources[1]['name']
             self.df1 = project.get_datasource_as_dataframe(self.ds_name1)
+
+        if len(project.datasources) >= 2:
+            df_list = [project.get_datasource_as_dataframe(ds['name']) for ds in project.datasources[:2]]
+        elif len(project.datasources) == 0:
+            raise ValueError("The project does not have any datasources")
+        else:
+            df_list = [project.get_datasource_as_dataframe(project.datasources[0]['name'])]
         self.ds_name = project.datasources[0]['name']
         try:
             self.df = project.get_datasource_as_dataframe(self.ds_name)
@@ -155,16 +162,11 @@ class ProjectChat:
             with time_block("b7: Initialising LLM for agent"):
                 self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
             with time_block("b8: Pandas agent creating"):
-                if len(project.datasources) == 1:
-                    self.agent = lp.create_pandas_dataframe_agent( # handle_parsing_errors no longer supported
-                        self.dataframe_llm, self.df, verbose=True, allow_dangerous_code=True,
-                        # handle_parsing_errors="Error in pandas agent"
-                    )
-                elif len(project.datasources) == 2:
-                    self.agent = lp.create_pandas_dataframe_agent(
-                        self.dataframe_llm, [self.df, self.df1], verbose=True, allow_dangerous_code=True,
-                        # handle_parsing_errors="Error in pandas agent"
-                    )
+                self.agent = lp.create_pandas_dataframe_agent( # handle_parsing_errors no longer supported
+                    self.dataframe_llm, df_list, verbose=True, allow_dangerous_code=True,
+                    handle_parsing_errors = True
+                    # handle_parsing_errors="Error in pandas agent" #self.df,
+                )
             self.ok = True
         except Exception as e:
             # raise ValueError(f"An error occurred while trying to create the agent: {e[:100]}")
@@ -240,13 +242,14 @@ class ProjectChat:
                 # path_to_data now contains the correct file path
                 #path_to_data = "data_cells.csv"
                 datasource_name = self.ds_name
+                datasource_names = [ds['name'] for ds in self.project.datasources[:2]]  # Get names of up to 2 datasources
 
                 #!!!!!! for now, assuming there will be an anndata.h5ad file in the project directory and will fail ungacefully if there isn't!!!!
                 # we pass a reference to the actual project object and let figuring out the path be an internal implementation detail...
                 # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
                 # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
                 # and the assert in the function is being triggered even though it should be fine
-                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_name, response['output']) #self.ds_name, response['output'])
+                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output']) #self.ds_name, response['output'])
                 prompt_RAG_template = PromptTemplate(
                     template=prompt_RAG,
                     input_variables=["context", "question"]
@@ -264,8 +267,8 @@ class ProjectChat:
                     return_source_documents=True,
                 )
                 context = retriever
-                output = qa_chain.invoke({"context": context, "query": question})
-                result = output["result"]
+                output_qa = qa_chain.invoke({"context": context, "query": question})
+                result = output_qa["result"]
                 print(result)
 
             with time_block("b12: Prepare code"):  # <0.1% of time
@@ -278,11 +281,11 @@ class ProjectChat:
                     view_name=question,
                 )
                 # view_name = parse_view_name(final_code)
-            # log_to_google_sheet(sheet, str(context_information_metadata_name), output['query'], prompt_RAG, code)
+            # log_to_google_sheet(sheet, str(context_information_metadata_name), output_qa['query'], prompt_RAG, code)
             # todo - save code at various stages of processing...
-            # log_chat(output, prompt_RAG, final_code)
+            # log_chat(output_qa, prompt_RAG, final_code)
             with time_block("b13: Chat logging by MDV"):  # <0.1% of time
-                self.project.log_chat_item(output, prompt_RAG, final_code)
+                self.project.log_chat_item(output_qa, prompt_RAG, final_code)
             with time_block("b14: Execute code"):  # ~9% of time
                 self.socket_api.update_chat_progress(
                     "Executing code...", id, progress, 9

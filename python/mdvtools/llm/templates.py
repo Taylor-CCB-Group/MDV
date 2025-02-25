@@ -111,7 +111,7 @@ Serving: Configure the project view, set it to editable, and serve the project u
 You are a top-class Python developer. Based on the question: {question}, decide which script from the context {context} is more relevant to the question: {question} and update the script to address the question.
 If no script is relevant, guided by the context generate a new script.
 
-This list """
+This string """
         + final_answer
         + """ specifies the names of the data fields that need to be plotted, for example in the params field. Get the structure of params definition from the context.
 DO NOT forget to use the f-string, or formatted string literal, python structure in the parameters, params or param.
