@@ -1904,9 +1904,10 @@ def add_column_to_group(
         quantiles = [0.001, 0.01, 0.05]
         col["quantiles"] = {}
         for q in quantiles:
+            #quantiles must be of type float else won't serialise to json
             col["quantiles"][str(q)] = [
-                numpy.percentile(na, 100 * q),
-                numpy.percentile(na, 100 * (1 - q)),
+                float(numpy.percentile(na, 100 * q)),
+                float(numpy.percentile(na, 100 * (1 - q))),
             ]
 
 def get_column_info(columns, dataframe, supplied_columns_only):
