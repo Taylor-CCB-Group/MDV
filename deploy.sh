@@ -175,6 +175,15 @@ zenity --info --title="MDV Deployment" --text="Welcome to the MDV application de
 check_zenity_installed
 check_docker_installed
 check_docker_daemon
+
+# Create app_logs directory if it doesn't exist
+if [ ! -d "app_logs" ]; then
+    mkdir app_logs
+    zenity --info --title="Directory Created" --text="The app_logs directory has been created."
+else
+    zenity --info --title="Directory Exists" --text="The app_logs directory already exists."
+fi
+
 create_or_validate_env_file
 
 DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/auth_rbac/docker-secrets-local.yml"
