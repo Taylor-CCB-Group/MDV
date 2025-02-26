@@ -35,6 +35,7 @@ export interface ErrorDisplayProps {
     error: {
         message: string;
         traceback?: string;
+        stack?: string;
     };
     title?: string;
     extraMetadata?: ErrorMetadata;
@@ -54,7 +55,15 @@ const ErrorDisplay = ({
     const [metaData, setMetaData] = useState<any>();
 
     useEffect(() => {
-        setMetaData({...extraMetadata, stackTrace: error?.traceback});
+        if (extraMetadata || error?.stack || error?.traceback)
+            setMetaData({
+                ...extraMetadata,
+                // Create the key traceback or stack only if the value exists
+                ...(error?.traceback != null && {
+                    traceback: error?.traceback,
+                }),
+                ...(error?.stack != null && { stack: error?.stack }),
+            });
     }, [extraMetadata, error]);
 
     // Send the error details and the user's comments (if any) to the support email address
@@ -64,13 +73,15 @@ const ErrorDisplay = ({
         setEmailNotSent(false);
         const errorDetails = {
             message: error.message,
-            traceback: error?.traceback,
             userComments: userComments ? userComments : null,
             extraMetadata: metaData ? metaData : null,
         };
         //todo: Add the logic to send the error details to the email address and display the corresponding message to user
         try {
-            const res = await axios.post("/send-error", JSON.stringify(errorDetails));
+            const res = await axios.post(
+                "/send-error",
+                JSON.stringify(errorDetails),
+            );
             const data = res.data;
             setEmailSent(true);
         } catch (e) {
@@ -85,7 +96,7 @@ const ErrorDisplay = ({
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(
-                `Error: ${error.message}\n\nTraceback:\n${error.traceback}${metaData ? `\n\nMetaData:\n${JSON.stringify(metaData, null, 2)}` : ""}`,
+                `Error: ${error.message}${metaData ? `\n\nMetaData:\n${JSON.stringify(metaData, null, 2)}` : ""}`,
             );
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
@@ -181,7 +192,7 @@ const ErrorDisplay = ({
                                 }}
                             >
                                 {title}
-                                {error.traceback && (
+                                {metaData && (
                                     <Tooltip title="Copy error details">
                                         <IconButton
                                             size="small"
@@ -219,7 +230,7 @@ const ErrorDisplay = ({
                                     {error.message}
                                 </p>
 
-                                {error.traceback && (
+                                {metaData && (
                                     <div>
                                         <IconButton
                                             size="medium"
@@ -254,19 +265,23 @@ const ErrorDisplay = ({
                                         </IconButton>
 
                                         <Collapse in={expanded}>
-                                            {metaData && (
-                                                <JsonView
-                                                    editable
-                                                    src={metaData}
-                                                    onAdd={(params) => setMetaData(params.src)}
-                                                    onDelete={(params) => setMetaData(params.src)}
-                                                    onEdit={(params) => setMetaData(params.src)}
-                                                    collapsed={1}
-                                                    customizeNode={(_params) => {
-                                                        return {add: false}
-                                                    }}
-                                                />
-                                            )}
+                                            <JsonView
+                                                editable
+                                                src={metaData}
+                                                onAdd={(params) =>
+                                                    setMetaData(params.src)
+                                                }
+                                                onDelete={(params) =>
+                                                    setMetaData(params.src)
+                                                }
+                                                onEdit={(params) =>
+                                                    setMetaData(params.src)
+                                                }
+                                                collapsed={1}
+                                                customizeNode={(_params) => {
+                                                    return { add: false };
+                                                }}
+                                            />
                                         </Collapse>
                                     </div>
                                 )}
@@ -286,9 +301,12 @@ const ErrorDisplay = ({
                                 click on the send button below to send error
                                 details.
                             </Typography>
-                            <Typography sx={{ mb: 2 }}>
-                                Please remove any sensitive information from the error details above.
-                            </Typography>
+                            {metaData && (
+                                <Typography sx={{ mb: 2 }}>
+                                    Please remove any sensitive information from
+                                    the error details above.
+                                </Typography>
+                            )}
                             <TextareaAutosize
                                 minRows={3}
                                 style={{

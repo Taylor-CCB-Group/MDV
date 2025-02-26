@@ -7,7 +7,8 @@ import { useState } from "react";
 export type ErrorComponentType = {
     error: {
         message: string,
-        stack?: string
+        stack?: string,
+        traceback?: string,
     },
     height?: number,
     width?: number,
@@ -70,10 +71,7 @@ const ErrorComponent = ({error, extraMetaData}: ErrorComponentType) => {
                     handleClose={handleClose}
                     component={
                         <ErrorDisplay
-                            error={{
-                                message: error.message,
-                                traceback: error.stack,
-                            }}
+                            error={error}
                             extraMetadata={extraMetaData}
                         />
                     }
