@@ -1,9 +1,17 @@
 #!/bin/bash
 
-# Function - Check if Docker is installed
+# Function to check if Zenity is installed
+check_zenity_installed() {
+  if ! command -v zenity &> /dev/null; then
+    echo "Error: Zenity is not installed. Please install it using your package manager."
+    exit 1
+  fi
+}
+
+# Function to check if Docker is installed
 check_docker_installed() {
   if ! command -v docker &> /dev/null; then
-    echo "Error: Docker is not installed. Please install Docker before running this script."
+    zenity --error --text="Error: Docker is not installed. Please install Docker before running this script."
     exit 1
   fi
 }
@@ -11,211 +19,164 @@ check_docker_installed() {
 # Function to check if Docker daemon is running
 check_docker_daemon() {
   if ! docker info &> /dev/null; then
-    echo "Error: Docker daemon is not running. Please start Docker before running this script."
+    zenity --error --text="Error: Docker daemon is not running. Please start Docker before running this script."
     exit 1
   fi
 }
 
-# Function to create or validate the .env file
+# Function to create or validate the .env file using Zenity
+#!/bin/bash
+
+# Function to check and update environment variables
 create_or_validate_env_file() {
   env_file=".env"
 
-  if [ -f "$env_file" ]; then
-      echo "$env_file already exists. Checking for required variables..."
-      source "$env_file"
-
-      # Check for database variables and prompt if missing
-      if [ -z "$DB_USER" ]; then
-          read -p "Please enter your database username: " DB_USER
-      fi
-      if [ -z "$DB_PASSWORD" ]; then
-          read -p "Please enter your database password: " DB_PASSWORD
-      fi
-      if [ -z "$DB_NAME" ]; then
-          read -p "Please enter your database name: " DB_NAME
-      fi
-      if [ -z "$DB_HOST" ]; then
-          DB_HOST="mdv_db"  # Default value
-      fi
-
-      # Check for PostgreSQL variables and prompt if missing
-      if [ -z "$POSTGRES_USER" ]; then
-          POSTGRES_USER="$DB_USER"  # Default to DB_USER
-      fi
-      if [ -z "$POSTGRES_PASSWORD" ]; then
-          POSTGRES_PASSWORD="$DB_PASSWORD"  # Default to DB_PASSWORD
-      fi
-      if [ -z "$POSTGRES_DB" ]; then
-          POSTGRES_DB="$DB_NAME"  # Default to DB_NAME
-      fi
-
-      # Check if ENABLE_AUTH is set
-      if [ -z "$ENABLE_AUTH" ]; then
-          read -p "Do you want to enable the authentication feature? (yes/no): " enable_auth
-          if [[ "$enable_auth" =~ ^[Yy] ]]; then
-              ENABLE_AUTH=1
-              # Prompt for FLASK_SECRET_KEY
-              read -p "Please enter your Flask secret key: " FLASK_SECRET_KEY
-              
-              # Prompt for Auth0 variables if they are not already set
-              if [ -z "$AUTH0_DOMAIN" ]; then
-                  read -p "Please enter your Auth0 domain: " AUTH0_DOMAIN
-              fi
-              if [ -z "$AUTH0_CLIENT_ID" ]; then
-                  read -p "Please enter your Auth0 client ID: " AUTH0_CLIENT_ID
-              fi
-              if [ -z "$AUTH0_CLIENT_SECRET" ]; then
-                  read -p "Please enter your Auth0 client secret: " AUTH0_CLIENT_SECRET
-              fi
-              if [ -z "$AUTH0_CALLBACK_URL" ]; then
-                  read -p "Please enter your Auth0 callback URL: " AUTH0_CALLBACK_URL
-              fi
-              if [ -z "$AUTH0_AUDIENCE" ]; then
-                  read -p "Please enter your Auth0 audience: " AUTH0_AUDIENCE
-              fi
-              if [ -z "$AUTH0_PUBLIC_KEY_URI" ]; then
-                  read -p "Please enter your Auth0 public key URI: " AUTH0_PUBLIC_KEY_URI
-              fi
-          else
-              ENABLE_AUTH=0
-              echo "Auth0 will not be enabled. Skipping Auth0 variable prompts."
-          fi
-      else
-          echo "Authentication feature already configured with ENABLE_AUTH=$ENABLE_AUTH."
-      fi
-
-      # Check for Shibboleth variables if authentication is enabled
-      if [ "$ENABLE_AUTH" -eq 1 ]; then
-          if [ -z "$SHIBBOLETH_LOGIN_URL" ]; then
-              read -p "Please enter your Shibboleth login URL: " SHIBBOLETH_LOGIN_URL
-          fi
-          if [ -z "$SHIBBOLETH_LOGOUT_URL" ]; then
-              read -p "Please enter your Shibboleth logout URL: " SHIBBOLETH_LOGOUT_URL
-          fi
-      fi
-
-  else
-      echo "$env_file does not exist. Creating it now..."
-      touch "$env_file"
-
-      # Prompt for database credentials
-      read -p "Please enter your database username: " DB_USER
-      read -p "Please enter your database password: " DB_PASSWORD
-      read -p "Please enter your database name: " DB_NAME
-      DB_HOST="mdv_db"  # Default value
-
-      # Prompt for PostgreSQL credentials
-      POSTGRES_USER="$DB_USER"  # Default to DB_USER
-      POSTGRES_PASSWORD="$DB_PASSWORD"  # Default to DB_PASSWORD
-      POSTGRES_DB="$DB_NAME"  # Default to DB_NAME
-
-      # Prompt for authentication feature
-      read -p "Do you want to enable the authentication feature? (yes/no): " enable_auth
-      if [[ "$enable_auth" =~ ^[Yy] ]]; then
-          ENABLE_AUTH=1
-          read -p "Please enter your Flask secret key: " FLASK_SECRET_KEY
-          read -p "Please enter your Auth0 domain: " AUTH0_DOMAIN
-          read -p "Please enter your Auth0 client ID: " AUTH0_CLIENT_ID
-          read -p "Please enter your Auth0 client secret: " AUTH0_CLIENT_SECRET
-          read -p "Please enter your Auth0 callback URL: " AUTH0_CALLBACK_URL
-          read -p "Please enter your Auth0 audience: " AUTH0_AUDIENCE
-          read -p "Please enter your Auth0 public key URI: " AUTH0_PUBLIC_KEY_URI
-      else
-          ENABLE_AUTH=0
-          echo "Auth0 will not be enabled. Skipping Auth0 variable prompts."
-      fi
-
-      # Prompt for Shibboleth variables if authentication is enabled
-      if [ "$ENABLE_AUTH" -eq 1 ]; then
-          read -p "Please enter your Shibboleth login URL: " SHIBBOLETH_LOGIN_URL
-          read -p "Please enter your Shibboleth logout URL: " SHIBBOLETH_LOGOUT_URL
-      fi
+  if [ ! -f "$env_file" ]; then
+    zenity --info --text="$env_file does not exist. Creating it now..."
+    touch "$env_file"
   fi
 
-  # Write the environment variables to the .env file
-  {
-      echo "# Flask Configuration"
-      echo "FLASK_ENV=production"
-      echo "PYTHONUNBUFFERED=1"
-      echo "FLASK_SECRET_KEY=$FLASK_SECRET_KEY"  # Include FLASK_SECRET_KEY only if provided
+  # Source the existing .env file to retain values
+  source "$env_file"
 
-      echo "# Database Configuration"
-      echo "DB_USER=$DB_USER"
-      echo "DB_PASSWORD=$DB_PASSWORD"
-      echo "DB_NAME=$DB_NAME"
-      echo "DB_HOST=$DB_HOST"  # Added host
+  # Function to ask the user if they want to overwrite an existing variable
+  prompt_variable() {
+    local var_name=$1
+    local hide_value=$2  # If "true", do not display the current value (for passwords, secrets)
+    local default_value=$3  # Default value if variable is empty
+    local current_value=${!var_name:-$default_value}  # Use existing value or default
 
-      echo "POSTGRES_USER=$POSTGRES_USER"
-      echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
-      echo "POSTGRES_DB=$POSTGRES_DB"
-
-      echo "# Authentication & Security"
-      echo "LOGIN_REDIRECT_URL=https://localhost:5055/login_dev"
-      echo "ENABLE_AUTH=$ENABLE_AUTH"
-      if [ "$ENABLE_AUTH" -eq 1 ]; then
-          echo "AUTH0_DOMAIN=$AUTH0_DOMAIN"
-          echo "AUTH0_CLIENT_ID=$AUTH0_CLIENT_ID"
-          echo "AUTH0_CLIENT_SECRET=$AUTH0_CLIENT_SECRET"
-          echo "AUTH0_CALLBACK_URL=$AUTH0_CALLBACK_URL"
-          echo "AUTH0_AUDIENCE=$AUTH0_AUDIENCE"
-          echo "AUTH0_PUBLIC_KEY_URI=$AUTH0_PUBLIC_KEY_URI"
+    if [ -n "${!var_name}" ]; then
+      if zenity --question --title="Overwrite $var_name?" --text="$var_name is already set.\nDo you want to overwrite it?"; then
+        if [ "$hide_value" == "true" ]; then
+          new_value=$(zenity --password --title="Enter new value for $var_name" --text="Enter a new value:")
+        else
+          new_value=$(zenity --entry --title="Enter new value for $var_name" --text="Current value: $current_value" --entry-text="$current_value")
+        fi
+        echo "$var_name=$new_value"
+      else
+        echo "$var_name=${!var_name}"
       fi
-
-      echo "# Shibboleth Configuration"
-      echo "SHIBBOLETH_LOGIN_URL=$SHIBBOLETH_LOGIN_URL"
-      echo "SHIBBOLETH_LOGOUT_URL=$SHIBBOLETH_LOGOUT_URL"
-  } > "$env_file" || {
-    echo "Error: Failed to create $env_file."
-    exit 1
+    else
+      if [ "$hide_value" == "true" ]; then
+        new_value=$(zenity --password --title="Enter value for $var_name" --text="No existing value found. Enter a new value:")
+      else
+        new_value=$(zenity --entry --title="Enter value for $var_name" --text="No existing value found. Enter a new value:" --entry-text="$default_value")
+      fi
+      echo "$var_name=$new_value"
+    fi
   }
 
-  echo "Environment variables saved to $env_file."
+  # Write the new .env file
+    {
+    echo "# Flask Configuration"
+    echo "FLASK_ENV=production"
+    echo "PYTHONUNBUFFERED=1"
 
+    echo "# Database Configuration"
+    DB_USER=$(prompt_variable "DB_USER" false)
+    DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true)
+    DB_NAME=$(prompt_variable "DB_NAME" false)
+    DB_HOST=$(prompt_variable "DB_HOST" false "mdv_db")  # Default value for DB_HOST
+
+    # Output Database Variables
+    echo "DB_USER=$DB_USER"
+    echo "DB_PASSWORD=$DB_PASSWORD"
+    echo "DB_NAME=$DB_NAME"
+    echo "DB_HOST=$DB_HOST"
+
+    # PostgreSQL should match DB values
+    echo "POSTGRES_USER=$DB_USER"
+    echo "POSTGRES_PASSWORD=$DB_PASSWORD"
+    echo "POSTGRES_DB=$DB_NAME"
+
+    # Authentication
+    if zenity --question --title="Enable Authentication?" --text="Enable authentication?"; then
+        echo "ENABLE_AUTH=1"
+        FLASK_SECRET_KEY=$(prompt_variable "FLASK_SECRET_KEY" true)
+        LOGIN_REDIRECT_URL=$(prompt_variable "LOGIN_REDIRECT_URL" false)
+        AUTH0_DOMAIN=$(prompt_variable "AUTH0_DOMAIN" false)
+        AUTH0_CLIENT_ID=$(prompt_variable "AUTH0_CLIENT_ID" false)
+        AUTH0_CLIENT_SECRET=$(prompt_variable "AUTH0_CLIENT_SECRET" true)
+        AUTH0_CALLBACK_URL=$(prompt_variable "AUTH0_CALLBACK_URL" false)
+        AUTH0_AUDIENCE=$(prompt_variable "AUTH0_AUDIENCE" false)
+        AUTH0_PUBLIC_KEY_URI=$(prompt_variable "AUTH0_PUBLIC_KEY_URI" false)
+
+        # Shibboleth (only if authentication is enabled)
+        SHIBBOLETH_LOGIN_URL=$(prompt_variable "SHIBBOLETH_LOGIN_URL" false)
+        SHIBBOLETH_LOGOUT_URL=$(prompt_variable "SHIBBOLETH_LOGOUT_URL" false)
+
+        # Output Authentication Variables
+        echo "FLASK_SECRET_KEY=$FLASK_SECRET_KEY"
+        echo "LOGIN_REDIRECT_URL=$LOGIN_REDIRECT_URL"
+        echo "AUTH0_DOMAIN=$AUTH0_DOMAIN"
+        echo "AUTH0_CLIENT_ID=$AUTH0_CLIENT_ID"
+        echo "AUTH0_CLIENT_SECRET=$AUTH0_CLIENT_SECRET"
+        echo "AUTH0_CALLBACK_URL=$AUTH0_CALLBACK_URL"
+        echo "AUTH0_AUDIENCE=$AUTH0_AUDIENCE"
+        echo "AUTH0_PUBLIC_KEY_URI=$AUTH0_PUBLIC_KEY_URI"
+        echo "SHIBBOLETH_LOGIN_URL=$SHIBBOLETH_LOGIN_URL"
+        echo "SHIBBOLETH_LOGOUT_URL=$SHIBBOLETH_LOGOUT_URL"
+    else
+        echo "ENABLE_AUTH=0"
+    fi
+    } > "$env_file"
+
+  zenity --info --text="Environment variables updated and saved to $env_file."
 }
+
+
 
 # Function to download and run docker-compose
 run_docker_compose() {
   local compose_url=$1
-  local compose_file=$(basename $compose_url)
+  local compose_file=$(basename "$compose_url")
 
-  # Check if the compose file already exists
-  if [ -f "$compose_file" ]; then
-    echo "$compose_file already exists. Skipping download."
-  else
-    echo "Downloading $compose_file from $compose_url..."
+  if [ ! -f "$compose_file" ]; then
+    zenity --info --text="Downloading $compose_file..."
     if ! curl -O "$compose_url"; then
-      echo "Error: Failed to download $compose_file from $compose_url."
+      zenity --error --text="Error: Failed to download $compose_file."
       exit 1
     fi
   fi
 
-  echo "Running docker-compose with $compose_file..."
-  if ! docker compose -f $compose_file up -d; then
-    echo "Error: Failed to run docker-compose."
+  zenity --info --text="Starting Docker Compose..."
+  if ! docker compose -f "$compose_file" up -d; then
+    zenity --error --text="Error: Failed to start Docker Compose."
     exit 1
+  fi
+
+  zenity --info --text="Docker Compose started successfully!"
+}
+
+# Function to open the browser
+open_browser() {
+  URL="https://localhost:5055"
+
+  zenity --question --title="Open Application" --text="Do you want to open MDV in your browser now?"
+  if [ $? -eq 0 ]; then
+    if command -v xdg-open &> /dev/null; then
+      xdg-open "$URL"  # Linux
+    elif command -v open &> /dev/null; then
+      open "$URL"  # macOS
+    else
+      zenity --error --text="Could not detect a way to open the browser. Please open it manually: $URL"
+    fi
   fi
 }
 
-# Main execution starts here
-echo "Welcome to the MDV application deployment script!"
+# Main Execution
+zenity --info --title="MDV Deployment" --text="Welcome to the MDV application deployment script!"
 
-# Check if Docker is installed
+check_zenity_installed
 check_docker_installed
-
-# Check if Docker daemon is running
 check_docker_daemon
-
-# Create or validate the .env file
 create_or_validate_env_file
 
-# URL of your production docker-compose file
 DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/auth_rbac/docker-secrets-local.yml"
+run_docker_compose "$DOCKER_COMPOSE_URL"
 
-# Download and run docker-compose for production
-run_docker_compose $DOCKER_COMPOSE_URL
+zenity --info --title="Deployment Complete" --text="MDV application deployed successfully!\nClick OK to proceed."
 
-echo "MDV application deployment completed successfully!"
+open_browser
 
-echo
-echo "******  Open your web browser and go to https://localhost:5055 to access the MDV application  ******"
-echo
