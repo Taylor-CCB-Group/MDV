@@ -279,6 +279,9 @@ def load_config(app, config_name=None, enable_auth=False):
             db_name = os.getenv('DB_NAME') or read_secret('db_name')
             db_host = os.getenv('DB_HOST') or app.config.get('db_host')
 
+            print("!@@@@@@@!!!!!@@@@@@@@£££££££££££££££££££")
+            print(db_user, db_password, db_name, db_host)
+
             if not all([db_user, db_password, db_name, db_host]):
                 raise ValueError("Error: One or more required secrets or configurations are missing.")
             

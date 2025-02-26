@@ -47,25 +47,29 @@ create_or_validate_env_file() {
     local current_value=${!var_name:-$default_value}  # Use existing value or default
 
     if [ -n "${!var_name}" ]; then
-      if zenity --question --title="Overwrite $var_name?" --text="$var_name is already set.\nDo you want to overwrite it?"; then
-        if [ "$hide_value" == "true" ]; then
-          new_value=$(zenity --password --title="Enter new value for $var_name" --text="Enter a new value:")
+        # If the variable is already set, ask if the user wants to overwrite it
+        if zenity --question --title="Overwrite $var_name?" --text="$var_name is already set.\nDo you want to overwrite it?"; then
+            if [ "$hide_value" == "true" ]; then
+                new_value=$(zenity --password --title="Enter new value for $var_name" --text="Enter a new value:")
+            else
+                new_value=$(zenity --entry --title="Enter new value for $var_name" --text="Current value: $current_value" --entry-text="$current_value")
+            fi
         else
-          new_value=$(zenity --entry --title="Enter new value for $var_name" --text="Current value: $current_value" --entry-text="$current_value")
+            new_value="${!var_name}"  # Keep the current value if not overwriting
         fi
-        echo "$var_name=$new_value"
-      else
-        echo "$var_name=${!var_name}"
-      fi
     else
-      if [ "$hide_value" == "true" ]; then
-        new_value=$(zenity --password --title="Enter value for $var_name" --text="No existing value found. Enter a new value:")
-      else
-        new_value=$(zenity --entry --title="Enter value for $var_name" --text="No existing value found. Enter a new value:" --entry-text="$default_value")
-      fi
-      echo "$var_name=$new_value"
+        # If there is no existing value, prompt for a new value
+        if [ "$hide_value" == "true" ]; then
+            new_value=$(zenity --password --title="Enter value for $var_name" --text="No existing value found. Enter a new value:")
+        else
+            new_value=$(zenity --entry --title="Enter value for $var_name" --text="No existing value found. Enter a new value:" --entry-text="$default_value")
+        fi
     fi
-  }
+
+    # Return only the new value
+    echo "$new_value"
+}
+
 
   # Write the new .env file
     {
