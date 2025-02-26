@@ -216,6 +216,20 @@ type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => void | Promise<void>;
 //         : never
 //     : never;
 
+/**
+ * This type describes an object that can be used to specify a GUI element in the settings dialog.
+ * The type parameter `T` is used to specify the type of the GUI element (such as `"slider"`, `"dropdown"` etc),
+ * from which we can infer `GV<T>` (`GuiValueType[T]`) used to specify the type of the `current_value` property of the object,
+ * as well as some other associated properties that might be expected.
+ * 
+ * For example, a `GuiSpec<"slider">` has `current_value: number`,
+ * in which case (because `GV<T> extends number`) we may also expect to have associated properties like `min` & `max`.
+ * The `GuiValueType["doubleslider"]` is `[number, number]`, which also means that there are `min` & `max` properties etc.
+ * For other types, `min` & `max` are not expected, so they are `never`.
+ * 
+ * There is a type-helper function `g({...})` that can be used when creating these objects, which can help with type inference,
+ * and allow for editor feedback to suggest properties etc.
+ */
 export type GuiSpec<T extends GuiSpecType> = {
     readonly type: T;
     label: string;
@@ -224,7 +238,11 @@ export type GuiSpec<T extends GuiSpecType> = {
     func?: GuiFunc<T>;
     //@ts-check !this is for review... it should *not* be optional, but if I make it non-optional then it demands values for 'never'...
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
-    // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
+    /**
+     * Used by `"radiobuttons"` to specify the choices available.
+     * This is a tuple of `[string, string][]` where the first element of each tuple is the label to display,
+     * and the second element is the value to be used when the radio button is selected.
+     */
     choices?: T extends "radiobuttons" ? [string, string][] : never;
     //thouht we could make these non-optional and only have it insist for number types, but that's not happening for some reason
     min?: GV<T> extends number
@@ -251,13 +269,32 @@ export type GuiSpec<T extends GuiSpecType> = {
     columnSelection?: T extends "column" ? ColumnSelectionParameters : never; //what about multicolumn?
 };
 // export type GuiSpecs = Array<GuiSpec<GuiSpecType>>;
-// This creates a union of `GuiSpec<"folder"> | GuiSpec<"slider"> | ...`
-// rather than `GuiSpec<"folder" | "slider" | ...>` which can cause co/contra-variance issues (or something like that...)
+/**
+ * This creates a discriminated union of `GuiSpec<"folder"> | GuiSpec<"slider"> | ...`, which can be preferable to the more
+ * obvious seeming `GuiSpec<GuiSpecType>`, which evaluates to `GuiSpec<"folder" | "slider" | ...>` - causing
+ * some obscure co/contra-variance issues, often resulting in irritating and incomprehensible error messages.
+ * 
+ * For example, in the Settings Dialog, we have an array of settings - which could be any kind of gui spec - and
+ * we want to iterate over them and pass them to `AbstractComponent` - which will then render the appropriate
+ * component for each setting, while also inferring that the types are correct.
+ * 
+ * If we have `GuiSpec<GuiSpecType>` then we can't pass that to `AbstractComponent` because it will complain,
+ * with a lengthy error message that includes something like
+ * ```
+ * Type 'AnyGuiSpec' is not assignable to type 'GuiSpec<keyof GuiValueTypes>'.
+ *  Type 'GuiSpec<"text">' is not assignable to type 'GuiSpec<keyof GuiValueTypes>'.
+ *      Types of property 'func' are incompatible.
+ *      Type 'GuiFunc<"text"> | undefined' is not assignable to type 'GuiFunc<keyof GuiValueTypes> | undefined'.
+ *          Type 'GuiFunc<"text">' is not assignable to type 'GuiFunc<keyof GuiValueTypes>'.
+ *          Type 'keyof GuiValueTypes' is not assignable to type '"text"'.
+ *              Type '"dropdown"' is not assignable to type '"text"'.ts(2322)```
+ * which is not very helpful.
+ */
 export type AnyGuiSpec = {
     [T in GuiSpecType]: GuiSpec<T>;
 }[GuiSpecType];
 
-type GuiSpecs = Array<AnyGuiSpec>;
+export type GuiSpecs = Array<AnyGuiSpec>;
 // type TestFunc<T extends GuiSpecType> = GuiSpec<T>['func'];
 // const f: TestFunc<'multidropdown'> = (v) => { };
 // todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types

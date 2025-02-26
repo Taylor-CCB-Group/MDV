@@ -116,7 +116,24 @@ const config: ConcreteDataColumnConfig<ScatterPlotConfig> = {
 
 Also - a config like this
 
-## Columns
+# Columns
 
 A fundamental aspect of the system is columnar data and how it is represented, with associated metadata.
 
+## Column Selection
+
+There are various places where the system can specify that columns should be selectable by the user - **somehow, the types involved in this have become perhaps the most confusing part of the whole project**
+### In "Add Chart Dialog" / `BaseChart.types`
+
+```
+params?: {
+  type: "text" | "number" | "multitext" | "text16" | "_multi_column:number" | "_multi_column:all",
+  name: string
+}
+```
+
+The relationship between these `type`s and those used by columns is somewhat obvious in a human sense, but requires somewhat bespoke logic to relate... and attempting to make TypeScript generics that express that is a bit messy.
+
+### In Settings Dialog
+
+My generic here has become obtuse - and the way that I martial these types confuses me.

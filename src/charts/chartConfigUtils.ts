@@ -234,6 +234,10 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             // so we no long makeAutoObservable(config) above, but this will apply it there
             config = v; // re-assigning config ref in this closure is not really relevant now;
             //we are using makeAutoObservable and not referring to config directly...
+            // - this should be a good place to call a method that will update the chart based on the new config
+            // current BaseChart.setParams() should probably be replaced.
+            //! - maybe better to have separate methods given that we start need logic like update legend based on color/params
+            // this should only happen with config objects that haven't been observed yet...
             makeAutoObservable(config);
         },
     });

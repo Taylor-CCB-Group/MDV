@@ -362,6 +362,7 @@ class DotPlot extends SVGChart {
                     this.drawChart();
                 },
             },
+            // this should be redundant now
             {
                 // perhaps the GuiType should be more aligned with params type - i.e. _multi_column:number
                 // * we should then be able to expose all params in the settings in a more consistent way *
@@ -373,6 +374,7 @@ class DotPlot extends SVGChart {
                 type: "multicolumn", //maybe this should be `"_multi_column:number"`
                 label: "Fields on x axis",
                 // this is more of a nuisance than type: "_multi_column:number"
+                // ^ need to figure out what we use is the generic adapter for this
                 columnSelection: {
                     filter: ["double", "integer", "int32"]
                 },

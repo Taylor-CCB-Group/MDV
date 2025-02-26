@@ -538,8 +538,11 @@ const ErrorComponent = observer(({ props, label }: { props: any, label: string }
 });
 
 // how close is this to something we could use from AddChartDialog?
+/**
+ * A component for rendering a GUI setting.
+ */
 export const AbstractComponent = observer(
-    ({ props }: { props: AnyGuiSpec | GuiSpec<GuiSpecType> }) => {
+    ({ props }: { props: AnyGuiSpec }) => {
         // would like to lose this `as` cast - maybe a newer/future typescript might manage it better?
         const Component = Components[props.type] as React.FC<{
             props: typeof props;
