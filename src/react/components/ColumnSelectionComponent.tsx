@@ -64,6 +64,7 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
     const columns: DataColumn<DataType>[] = useMemo(
         () => dataStore.columns
             .filter((c) => !props.exclude?.includes(c.name))
+            .filter((c) => !c.field.includes("|")) //exclude linked columns the hacky way for now
             //@ts- expect-error << looks like we don't need this any more.
             .filter((c) => columnMatchesType(c, type))
             ,
