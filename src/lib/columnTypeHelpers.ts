@@ -33,10 +33,10 @@ export type IsMultiParam<T extends CTypes> = T extends Param[] ? true
 : false;
 
 export type ColumnSelectionProps<T extends CTypes,
-    V = IsMultiParam<T> extends true ? FieldSpec : FieldName | MultiColumnQuery> = {
+    V = IsMultiParam<T> extends true ? FieldSpecs : FieldName | MultiColumnQuery> = { //should we have a SingleColumnQuery?
         type?: T; //wary of using 'type' as a name - not reserved, but could be confusing. also wary of optional type
         multiple?: boolean; //also interacts with type "_multi...", perhaps simpler to avoid having both
-        setSelectedColumn: (column: V) => void; //wip - type is right - implementation is not
+        setSelectedColumn: (column: V) => void;
         current_value?: V;
         placeholder?: string;
         exclude?: string[];

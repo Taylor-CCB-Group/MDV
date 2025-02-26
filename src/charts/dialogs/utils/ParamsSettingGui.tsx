@@ -117,7 +117,12 @@ export default function getParamsGuiSpec<T extends BaseConfig>(chart: BaseChart<
                 // - without column data loading
                 // - assuming that the chart will understand things in this format
                 if (isMultiType) {
-                    if (!isArray(v)) throw new Error("Expected array");
+                    // if (!isArray(v)) throw new Error("Expected array");
+                    //! when applying the link object value, it is not an array (although it evaluates to one)
+                    // it probably should be, and then we should indeed throw an error here
+                    // (there may well be a related @ts-expects-error
+                    //  - need to sort out `setSelectedColumn` and associated things to be less confusing).
+                    if (!isArray(v)) v = [v];
                     updateMultiParam(chart, i, v);
                 } else {
                     if (isArray(v)) throw new Error("Expected single value");
