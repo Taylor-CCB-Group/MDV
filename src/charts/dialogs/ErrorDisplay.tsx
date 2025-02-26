@@ -49,10 +49,10 @@ const ErrorDisplay = ({
     const [expanded, setExpanded] = useState(true);
     const [copied, setCopied] = useState(false);
     const [userComments, setUserComments] = useState<string>();
-    const [isLoading, setIsLoading] = useState<boolean>();
-    const [emailSent, setEmailSent] = useState<boolean>();
-    const [emailNotSent, setEmailNotSent] = useState<boolean>();
-    const [metaData, setMetaData] = useState<any>();
+    const [isLoading, setIsLoading] = useState(false);
+    const [emailSent, setEmailSent] = useState(false);
+    const [emailNotSent, setEmailNotSent] = useState(false);
+    const [metaData, setMetaData] = useState<Record<string, unknown> | null>(null);
 
     useEffect(() => {
         if (extraMetadata || error?.stack || error?.traceback)
