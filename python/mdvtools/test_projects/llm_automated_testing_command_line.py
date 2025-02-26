@@ -16,6 +16,12 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 
+# packages for custom langchain agent
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_experimental.tools.python.tool import PythonAstREPLTool
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_openai_functions_agent, AgentExecutor
+
 from mdvtools.llm.local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from mdvtools.llm.templates import get_createproject_prompt_RAG, prompt_data
 from mdvtools.llm.code_manipulation import prepare_code
@@ -89,7 +95,39 @@ def main(project_path, dataset_path, question_list_path, output_csv):
 
     datasource_names = [ds['name'] for ds in project.datasources[:2]]  # Get names of up to 2 datasources
 
-    agent = lp.create_pandas_dataframe_agent(dataframe_llm, df_list, verbose=True, allow_dangerous_code=True)
+
+    #CUSTOM AGENT:
+    def create_custom_pandas_agent(llm, dfs, prompt_data, verbose=False):
+        """
+        Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
+        
+        :param llm: The LLM to use (e.g., OpenAI GPT-4).
+        :param dfs: A dictionary of named Pandas DataFrames.
+        :param verbose: If True, prints debug information.
+        :return: An agent that can answer questions about the DataFrames.
+        """
+        
+        # Step 1: Create the Python REPL Tool (Dynamically Injecting DataFrames)
+        python_tool = PythonAstREPLTool()
+        
+        # Make DataFrames available inside the REPL tool
+        python_tool.globals.update(dfs)  
+
+        # Step 2: Define a Prompt Template
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", prompt_data),
+            ("human", "{input}"),
+            ("ai", "{agent_scratchpad}"),
+        ])
+
+        # Step 3: Create the Agent
+        agent = create_openai_functions_agent(llm, [python_tool], prompt)
+
+        # Step 4: Wrap in an Agent Executor (Finalized Agent)
+        return AgentExecutor(agent=agent, tools=[python_tool], verbose=verbose)
+
+    ## pandas agent code
+    #agent = lp.create_pandas_dataframe_agent(dataframe_llm, df_list, verbose=True, allow_dangerous_code=True)
 
     question_file = pd.read_csv(question_list_path, skipinitialspace=True, index_col=False)
     question_list = question_file['requests'].tolist()
@@ -97,7 +135,13 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     results = []
     for question in question_list:
         try:
-            response = agent.invoke(prompt_data + "\nQuestion: " + question)
+            ## pandas agent code
+            #response = agent.invoke(prompt_data + "\nQuestion: " + question)
+
+            ## custom agent code
+            agent_executor = create_custom_pandas_agent(dataframe_llm, {"df1": df_list[0], "df2": df_list[1]}, prompt_data, verbose=True)
+            response = agent_executor.invoke({"input": question})
+            
             prompt_RAG = get_createproject_prompt_RAG(project, dataset_path, datasource_names[0], response['output'])
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
             
