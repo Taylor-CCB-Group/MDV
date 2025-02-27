@@ -31,7 +31,7 @@ if ENABLE_AUTH:
 
 
 def create_flask_app(config_name=None):
-    """ Create and configure the Flask app."""
+    """Create and configure the Flask app."""
     app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
     # this was causing a number of issues with various routes, changing this here seems to be the best way to fix it
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
