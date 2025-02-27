@@ -41,6 +41,7 @@ data/
 xvenv/
 secrets/
 app_logs/
+docker-secrets-local.yml
 
 
 # as seen inside devcontainer

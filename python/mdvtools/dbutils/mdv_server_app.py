@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from flask import Flask, render_template, jsonify, request
 from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
 # from flask import Flask, render_template, jsonify, request
@@ -225,6 +226,7 @@ def wait_for_database():
             return
         except OperationalError as oe:
             print(f"OperationalError: {oe}. Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1} of {max_retries})")
+            print(f"OperationalError: {oe}. Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1} of {max_retries})")
             time.sleep(delay)
         except Exception as e:
             print(f"An unexpected error occurred while waiting for the database: {e}")
@@ -271,6 +273,7 @@ def load_config(app, config_name=None, enable_auth=False):
             app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
         else:
             app.config['PREFERRED_URL_SCHEME'] = 'https'
+            app.config['PREFERRED_URL_SCHEME'] = 'https'
             
             
 
@@ -286,6 +289,31 @@ def load_config(app, config_name=None, enable_auth=False):
                 raise ValueError("Error: One or more required secrets or configurations are missing.")
             
             app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+
+
+            # Only configure Auth0 if ENABLE_AUTH is True
+            if enable_auth:
+                auth0_domain = os.getenv('AUTH0_DOMAIN') or config.get('AUTH0_DOMAIN')
+                auth0_client_id = os.getenv('AUTH0_CLIENT_ID') or config.get('AUTH0_CLIENT_ID')
+                auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET') or read_secret("auth0_client_secret")
+
+                if not all([auth0_domain, auth0_client_id, auth0_client_secret]):
+                    raise ValueError("Error: Missing Auth0 configuration.")
+
+                app.config['AUTH0_DOMAIN'] = auth0_domain
+                app.config['AUTH0_CLIENT_ID'] = auth0_client_id
+                app.config['AUTH0_CLIENT_SECRET'] = auth0_client_secret
+                app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL') or config.get('AUTH0_CALLBACK_URL')
+                app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
+                app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
+
+                app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
+
+                app.config["SHIBBOLETH_LOGIN_URL"] = os.getenv('SHIBBOLETH_LOGIN_URL') or config.get('SHIBBOLETH_LOGIN_URL')
+                app.config["SHIBBOLETH_LOGOUT_URL"] = os.getenv('SHIBBOLETH_LOGOUT_URL') or config.get('SHIBBOLETH_LOGOUT_URL')
+
+                
+
 
 
             # Only configure Auth0 if ENABLE_AUTH is True
@@ -387,6 +415,7 @@ def serve_projects_from_db(app):
                 e = f"Error serving project #{project.id}: path '{project.path}' does not exist."
                 print(e)
                 failed_projects.append((project.id, e))
+               
                
     except Exception as e:
         print(f"Error serving projects from database: {e}")
@@ -614,6 +643,150 @@ def register_auth0_routes(app):
 
 
 
+# The function that registers the Auth0 routes
+def register_auth0_routes(app):
+    """
+    Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
+    with centralized and route-specific error handling.
+    """
+    print("Registering AUTH routes...")
+
+    try:
+        # Initialize the Auth0Provider
+        auth0_provider = Auth0Provider(
+            app,
+            oauth=oauth,
+            client_id=app.config['AUTH0_CLIENT_ID'],
+            client_secret=app.config['AUTH0_CLIENT_SECRET'],
+            domain=app.config['AUTH0_DOMAIN']
+        )
+
+        # Route for login (redirects to Auth0 for authentication)
+        @app.route('/login')
+        def login():
+            try:
+                print("$$$$$$$$$$$$$$$ app-login")
+                session.clear()  
+                return auth0_provider.login()
+            except Exception as e:
+                print(f"In register_auth0_routes : Error during login: {e}")
+                return jsonify({"error": "Failed to start login process."}), 500
+
+        # Route for the callback after login (handles the callback from Auth0)
+        @app.route('/callback')
+        def callback():
+            try:
+                print("$$$$$$$$$$$$$$$ app-callback")
+                code = request.args.get('code')  # Get the code from the callback URL
+                if not code:
+                    print("Missing 'code' parameter in the callback URL.")
+                    session.clear()  # Clear session if there's no code
+                    return jsonify({"error": "Authorization code not provided."}), 400
+                
+                print("$$$$$$$$$$$$$$$ app-callback  1")
+                access_token = auth0_provider.handle_callback()
+                if not access_token:  # If token retrieval fails, prevent redirecting
+                    print("Authentication failed: No valid token received.")
+                    session.clear()  # Clear session in case of failure
+                    return jsonify({"error": "Authentication failed."}), 401
+                
+                print(" $$$$$$$$$$$$$$$ app-callback 2")
+                return redirect(url_for('index'))  # Redirect to the home page or any protected page
+            except Exception as e:
+                print(f"In register_auth0_routes : Error during callback: {e}")
+                session.clear()  # Clear session on error
+                return jsonify({"error": "Failed to complete authentication process."}), 500
+
+        # Route for logout (clears the session and redirects to home)
+        @app.route('/logout')
+        def logout():
+            try:
+                # Check what authentication method was used (Auth0 or Shibboleth)
+                auth_method = session.get('auth_method', None)
+
+                if auth_method == 'auth0':
+                    # If the user logged in via Auth0, log them out from Auth0
+                    return auth0_provider.logout()
+                    
+
+                # If the user logged in via Shibboleth, redirect to Shibboleth IdP's logout URL
+                elif auth_method == 'shibboleth':
+                    # Shibboleth does not handle the session clearing, so we first clear the session
+                    session.clear()
+                    # Then, redirect to the Shibboleth IdP logout URL
+                    shibboleth_logout_url = app.config.get('SHIBBOLETH_LOGOUT_URL', None)
+
+                    if shibboleth_logout_url:
+                        # Redirect to the provided Shibboleth IdP logout URL
+                        return redirect(shibboleth_logout_url)
+                    else:
+                        # If no Shibboleth logout URL is configured, return an error
+                        return jsonify({"error": "Shibboleth logout URL not provided."}), 500
+
+                # Clear the session data after logging out from either Auth0 or Shibboleth
+                session.clear()
+
+                # No need to redirect here if auth0_provider.logout() already handles redirection
+                return jsonify({"message": "Logged out successfully"}), 200
+
+            except Exception as e:
+                print(f"In register_auth0_routes: Error during logout: {e}")
+                session.clear()
+                return jsonify({"error": "Failed to log out."}), 500
+
+
+        # You can also add a sample route to check the user's profile or token
+        @app.route('/profile')
+        def profile():
+            try:
+                token = session.get('token')
+                if token:
+                    user_info = auth0_provider.get_user(token)
+                    return jsonify(user_info)
+                else:
+                    print("Token not found in session.")
+                    return jsonify({"error": "Not authenticated."}), 401
+            except Exception as e:
+                print(f"In register_auth0_routes: Error during profile retrieval: {e}")
+                return jsonify({"error": "Failed to retrieve user profile."}), 500
+        
+
+        @app.route('/login_sso')
+        def login_sso():
+            """Redirect user to Shibboleth-protected login page on Apache."""
+            try:
+                # Clear any existing session data to ensure we start with a fresh session
+                session.clear()
+                
+                # Store the authentication method as Shibboleth
+                session["auth_method"] = "shibboleth"  # Indicate Shibboleth login
+
+                # Check if the Shibboleth login URL is provided in the environment
+                shibboleth_login_url = app.config.get('SHIBBOLETH_LOGIN_URL', None)
+
+                if shibboleth_login_url:
+                    # Redirect the user to Shibboleth login page if the URL is configured
+                    print("Redirecting to Shibboleth login page...")
+                    return redirect(shibboleth_login_url)
+                else:
+                    # If Shibboleth URL is not provided, inform the user
+                    print("Shibboleth login URL not provided.")
+                    return jsonify({"error": "Shibboleth login URL not provided."}), 500
+
+            except Exception as e:
+                # In case of error, clear the session and handle the error
+                session.clear()  # Ensure session is cleared in case of failure
+                print(f"In login_sso: Error during login: {e}")
+                return jsonify({"error": "Failed to start login process using SSO."}), 500
+
+        print("Auth0 routes registered successfully!")
+
+    except Exception as e:
+        print(f"Error registering AUTH routes: {e}")
+        raise
+
+
+
 def register_routes(app):
     """Register routes with the Flask app."""
     print("Registering routes...")
@@ -628,6 +801,11 @@ def register_routes(app):
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /")
+
+        @app.route('/login_dev')
+        def login_dev():
+            return render_template('login.html')
+        print("Route registered: /login_dev")
 
         @app.route('/login_dev')
         def login_dev():
@@ -693,6 +871,7 @@ def register_routes(app):
                     return jsonify({"id": new_project.id, "name": new_project.name, "status": "success"})
                 
                 
+                
 
             except Exception as e:
                 print(f"In register_routes - /create_project : Error creating project: {e}")
@@ -709,6 +888,7 @@ def register_routes(app):
                 if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(next_id)]
                     print("In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
+                    print("In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
                 
                 return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -716,6 +896,7 @@ def register_routes(app):
 
         @app.route("/delete_project/<project_id>", methods=["DELETE"])
         def delete_project(project_id: int):
+            #project_removed_from_blueprints = False
             #project_removed_from_blueprints = False
             try:
                 print(f"Deleting project '{project_id}'")
@@ -736,6 +917,7 @@ def register_routes(app):
                 # Remove the project from the ProjectBlueprint.blueprints dictionary
                 if str(project_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(project_id)]
+                    #project_removed_from_blueprints = True  # Mark as removed
                     #project_removed_from_blueprints = True  # Mark as removed
                     print(f"In register_routes - /delete_project : Removed project '{project_id}' from ProjectBlueprint.blueprints")
                 
