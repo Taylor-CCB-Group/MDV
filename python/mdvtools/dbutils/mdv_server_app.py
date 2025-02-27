@@ -28,7 +28,7 @@ if ENABLE_AUTH:
     oauth = OAuth()  # Initialize OAuth only if auth is enabled
     #except ImportError:
     #    print("Auth library not found. Ensure poetry installs `auth` dependencies when ENABLE_AUTH=1.")
-    #    exit(1)  # Fail early if auth is enabled but libraries are missing
+    #    raise e  # Fail early if auth is enabled but libraries are missing
 
 
 def create_flask_app(config_name=None):
@@ -56,21 +56,21 @@ def create_flask_app(config_name=None):
         load_config(app, config_name, ENABLE_AUTH)
     except Exception as e:
         print(f"Error loading configuration: {e}")
-        exit(1)
+        raise e
     
     try:
         print("Creating base directory")
         create_base_directory(app)
     except Exception as e:
         print(f"Error creating base directory: {e}")
-        exit(1)
+        raise e
 
     try:
         print("Initializing app with db")
         db.init_app(app)
     except Exception as e:
         print(f"Error initializing database: {e}")
-        exit(1)
+        raise e
 
     try:
         print("Creating tables")
@@ -89,10 +89,10 @@ def create_flask_app(config_name=None):
             ProjectBlueprint.register_app(app)
     except OperationalError as oe:
         print(f"OperationalError: {oe}")
-        exit(1)
+        raise oe
     except Exception as e:
         print(f"Error during app setup: {e}")
-        exit(1)
+        raise e
 
     # Register OAuth with the app
     if ENABLE_AUTH:
@@ -101,7 +101,7 @@ def create_flask_app(config_name=None):
             oauth.init_app(app)
         except Exception as e:
             print(f"Error initializing OAuth: {e}")
-            exit(1)
+            raise e
 
     # Global variable for Auth0 provider
     auth0_provider = None  # This should be set when Auth0 routes are registered
@@ -196,7 +196,7 @@ def create_flask_app(config_name=None):
             register_auth0_routes(app)  # Register Auth0-related routes like /login and /callback
         except Exception as e:
             print(f"Error registering authentication routes: {e}")
-            exit(1)
+            raise e
 
     # Register other routes (base routes like /, /projects, etc.)
     try:
@@ -205,7 +205,7 @@ def create_flask_app(config_name=None):
         register_routes(app)
     except Exception as e:
         print(f"Error registering routes: {e}")
-        exit(1)
+        raise e
 
     return app
 
