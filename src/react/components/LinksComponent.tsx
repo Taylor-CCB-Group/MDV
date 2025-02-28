@@ -3,7 +3,7 @@ import { useDataStore } from "../context";
 import { action, makeAutoObservable, runInAction } from "mobx";
 import { useHighlightedForeignRows, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import type { DataColumn, DataType, GuiSpec } from "@/charts/charts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import LinkIcon from '@mui/icons-material/Link';
 import { Button, Paper } from "@mui/material";
@@ -11,7 +11,7 @@ import { isMultiColumn, type CTypes, type ColumnSelectionProps } from "@/lib/col
 import { RowsAsColsQuery } from "@/links/link_utils";
 import { g } from "@/lib/utils";
 
-type RowsAsColsProps<T extends CTypes> = ReturnType<typeof useRowsAsColumnsLinks>[0] & ColumnSelectionProps<T>;
+export type RowsAsColsProps<T extends CTypes> = ReturnType<typeof useRowsAsColumnsLinks>[0] & ColumnSelectionProps<T>;
 
 const RowsAsCols = observer(<T extends CTypes,>(props : RowsAsColsProps<T>) => {
     const { linkedDs, link } = props;
@@ -79,6 +79,51 @@ export const RAComponent = observer(<T extends CTypes,>(props: ColumnSelectionPr
     }}
     >⦿⌁{maxItems} '{link.name}'</Paper>;
 })
+
+// export const LinkTo = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
+//     const { linkedDs, link } = props;
+//     const { name_column, name, subgroups } = link;
+//     // const dataSources = useDataSources();
+//     const cm = window.mdv.chartManager;
+//     const targetColumn = cm.getDataSource(linkedDs.name).columnIndex[name_column] as DataColumn<DataType>;
+//     //@ts-expect-error need to review isMultiType logic
+//     const isMultiType = isMultiColumn(props.type);
+//     // potential symbols for live link ➤ ⌁ ⇢ ⍆ ⚡︎ ► ◎ ▷ ☑︎ ⦿
+//     const liveSelectionName = `⦿⌁ active '${name}' selection`;
+//     const spec = useMemo(() => makeAutoObservable(g<"multidropdown">({
+//         type: 'multidropdown',
+//         // name: name_column,
+//         label: `specific '${name}' column`, //todo different label for multiple
+//         // I don't think we want to prepend option to dropdown - we should have a different way of showing this
+//         values: [targetColumn.values],
+//         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
+//         current_value: [`${props.current_value}`],
+//         func: action((v) => {
+//             props.current_value = v[0];
+//         })
+//     })), [targetColumn, name_column, name]);
+//     const { current_value } = spec;
+//     return (
+//         <DropdownAutocompleteComponent props={spec} />
+//     )
+// })
+
+// export const ActiveLink = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
+//     const { linkedDs, link } = props;
+//     const { setSelectedColumn } = props;
+//     const rowNames = useHighlightedForeignRows().map(r => r.fieldName);
+//     const maxItems = props.multiple ? 10 : 1;
+
+//     useEffect(() => {
+//         setSelectedColumn(new RowsAsColsQuery(link, linkedDs.name, maxItems))
+//     }, [link, linkedDs, maxItems, setSelectedColumn]);
+
+//     return (
+//         <div>
+//             Selected Active Link
+//         </div>
+//     );
+// })
 
 export default observer(function LinksComponent<T extends CTypes,>(props: ColumnSelectionProps<T>) {
     const linkProps = useRowsAsColumnsLinks()[0]; //todo: arbitrary number of links

@@ -25,7 +25,7 @@ import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
-    <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>
+    <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
         {props.label} 
         {/* <em className="opacity-30"> ({props.type})</em> */}
     </Typography>
@@ -554,7 +554,7 @@ export const AbstractComponent = observer(
             return <ErrorComponent props={errorObj} label={props.label} />;
         }
         return (
-            <div className="grid grid-cols-2 p-1 justify-items-start">
+            <div className="grid p-2 pr-4 justify-items-start" style={{ gridTemplateColumns: "1fr 2fr" }}>
                 <ErrorBoundary fallback={<ErrorComponent props={props} label={props.label} />}>
                     <Component props={props} />
                 </ErrorBoundary>
