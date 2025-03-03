@@ -1,7 +1,7 @@
 import BaseChart from "@/charts/BaseChart";
 import type { FieldName } from "@/charts/charts";
 import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
-import type { IReactionDisposer } from "mobx";
+import { action, type IReactionDisposer } from "mobx";
 
 /**
  * Apply the {@link loadColumnData} decorator to a method on a chart class manually at runtime, rather than using the `@loadColumnData` syntax
@@ -101,9 +101,9 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
                 const a = multiCol ? cols : cols[0];
                 // const newArgs = [a, ...args.slice(1)];
                 const cm = window.mdv.chartManager;
-                cm._getColumnsThen(dataSource, cols, () => {
+                cm._getColumnsThen(dataSource, cols, action(() => {
                     target.call(this, a, ...args);
-                });
+                }));
             });
         }
     }
