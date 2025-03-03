@@ -100,10 +100,12 @@ const DefaultMessage: ChatMessage = {
 }
 
 const useChat = () => {
-    const { root } = useProject(); //todo add viewName to ProjectProvider
-    const route = `${root}/chat`;
-    const progressRoute = `${root}/chat_progress`;
-    const routeInit = `${root}/chat_init`;
+    // { root } is problematic here, need to revise so that we have something sensible
+    // -- also test with the app not being at the root of the server
+    const { projectName } = useProject(); //todo add viewName to ProjectProvider
+    const route = `/project/${projectName}/chat`;
+    const progressRoute = `/project/${projectName}/chat_progress`;
+    const routeInit = `/project/${projectName}/chat_init`;
     // use sessionStorage to remember things like whether the chat is open or closed... localStorage for preferences like theme,
     //! but this might not be such a good idea for things like chat logs with sensitive information
     const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
@@ -138,6 +140,7 @@ const useChat = () => {
         socket?.on(progressRoute, progressListener);
         const verboseProgress = (msg: string) => setVerboseProgress(v => [...v, msg].slice(-5));
         socket?.on(route, verboseProgress);
+        console.log(`addded listeners for '${progressRoute}' and '${route}'`);
         const chatInit = async () => {
             setIsSending(true);
             try {
