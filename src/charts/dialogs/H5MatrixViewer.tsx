@@ -168,6 +168,9 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
             const { rows, hasMoreRows, hasMoreCols, colIndices, rowIndices } =
                 visibleMatrixData;
 
+            const formatNumber = (value: number) =>
+                Number.isNaN(value) ? " - " : value.toFixed(4);
+
             return (
                 <Box sx={{ width: "100%" }}>
                     <Stack
@@ -182,7 +185,9 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 Dimensions: {stats.dimensions} | Range: [
-                                {stats.min}, {stats.max}] | Mean: {stats.mean}
+                                {formatNumber(stats.min)},{" "}
+                                {formatNumber(stats.max)}] | Mean:{" "}
+                                {formatNumber(stats.mean)}
                             </Typography>
                         </Stack>
                     </Stack>
