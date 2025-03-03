@@ -78,23 +78,51 @@ def convert_scanpy_to_mdv(
     cell_table = scanpy_object.obs
     cell_table["cell_id"] = cell_table.index
 
-    # add any dimension reduction
-    _add_dims(cell_table, scanpy_object.obsm, max_dims)
-    mdv.add_datasource(f"{label}cells", cell_table)
+    # add any dimension reduction to the dataframe
+    cell_table = _add_dims(cell_table, scanpy_object.obsm, max_dims)
+
+    # cell_is is the unique barcode and should of type unique
+    # (will be text16 by default if number of values are below 65536)
+    # hopefully other columns will be of the correct format
+    columns=[{
+        "name":"cell_id",
+        "datatype":"unique"
+    }]
+    mdv.add_datasource(f"{label}cells", cell_table,columns)
 
     # create datasource 'genes'
     gene_table = scanpy_object.var
+    #need a way of detecting which column is the common gene name
+    #most times it is the index but sometimes this is just the gene code or an
+    #incremental number. 
     gene_table[f"{label}name"] = gene_table.index
-    _add_dims(gene_table, scanpy_object.varm, max_dims)
-    mdv.add_datasource(f"{label}genes", gene_table)
+    gene_table = _add_dims(gene_table, scanpy_object.varm, max_dims)
+
+    #me column should be of type unique
+    columns=[{
+        "name":"name",
+        "datatype":"unique"
+    }]
+    mdv.add_datasource(f"{label}genes", gene_table,columns)
 
     # link the two datasets
     mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", f"{label}name", "Gene Expr")
 
-    # add the gene expression
-    mdv.add_rows_as_columns_subgroup(
-        f"{label}cells", f"{label}genes", "gs", scanpy_object.X, name="gene_scores", label="Gene Scores"
-    )
+    #get the matrix in the correct format
+    matrix,sparse= get_matrix(scanpy_object.X)
+    #sometimes X is empty - all the data is in the layers
+    if matrix.shape[1] !=0:
+        # add the gene expression
+        mdv.add_rows_as_columns_subgroup(
+            f"{label}cells", f"{label}genes", "gs", scanpy_object.X, name="gene_scores", label="Gene Scores",sparse=sparse
+        )
+
+    #now add layers
+    for layer,matrix in scanpy_object.layers.items():
+        matrix,sparse = get_matrix(matrix)
+        mdv.add_rows_as_columns_subgroup(
+            f"{label}cells",f"{label}genes",layer,sparse=sparse
+        )     
 
     if delete_existing:
         # If we're deleting existing, create new default view
@@ -126,27 +154,74 @@ def convert_scanpy_to_mdv(
         
     return mdv
 
-
-def convert_mudata_to_mdv(folder: str, mudata_object: MuData, max_dims=3) -> MDVProject:
-    md = mudata_object
-    p = MDVProject(folder)
-    # add the cells
-    _add_dims(md.obs, md.obsm, max_dims)
-    p.add_datasource("cells", md.obs)
+def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,add_dims_via_modlaities=True):
+    md=mudata_object
+    p= MDVProject(folder)
+    #add the cells
+    if not add_dims_via_modlaities:
+        _add_dims(md.obs,md.obsm,max_dims)
+    else:
+        md.obs = _add_dims_via_mods(md.obs,md.mod,max_dims)
+    md.obs["cell_id"] = md.obs.index
+    p.add_datasource("cells",md.obs)
 
     for mod in md.mod.keys():
         mdata = md.mod[mod]
-        matrix = mdata.X.value if hasattr(mdata.X, "value") else mdata.X
-        if matrix.shape[1] != 0:
-            p.add_datasource(mod, mdata.var)
-            p.set_column(mod, {"name": "name", "datatype": "unique"}, mdata.var.index)
-            p.add_rows_as_columns_link("cells", mod, "name", mod)
-            matrix = scipy.sparse.csr_matrix(matrix).transpose().tocsr()
-            p.add_rows_as_columns_subgroup(
-                "cells", mod, mod + "_expr", matrix, sparse=True
-            )
-
+        #add the modality to project
+        p.add_datasource(mod,mdata.var)
+        #adds the index to the data as a name column
+        #This is usually the unique gene name - but not always
+        p.set_column(mod,{"name":"name","datatype":"unique"},mdata.var.index)
+        #mod is used a both the tag and the label
+        #the name column is specified as the identifier that the user will use
+        #it is derived from the index and is usually the gene 'name'
+        #However it may mot be appropriate can be changed later on 
+        p.add_rows_as_columns_link("cells",mod,"name",mod)
+        matrix,sparse= get_matrix(mdata.X)
+        #sometimes X is empty - all the data is in the layers
+        if matrix.shape[1] !=0:
+            p.add_rows_as_columns_subgroup("cells",mod,mod+"_expr",matrix,sparse=sparse)
+        #now add the layers (if there are any)
+        layers = mdata.layers.keys()
+        for layer in layers:
+            matrix  = mdata.layers[layer]
+            matrix,sparse = get_matrix(matrix,mdata.obs_names,md.obs_names)
+            p.add_rows_as_columns_subgroup("cells",mod,f"{mod}_{layer}",matrix,sparse=sparse)     
     return p
+
+
+# The main_names correspond to obs_names in the main mudata object
+# and the mod names those in the modality
+# Only required if data is being added from a modality)as sometimes
+# the modality's obs_names will be in a different order and/or a subset of the main names
+# Hence a sparse matrix corresponding to the main indices needs to be created
+def get_matrix(matrix,main_names=None,mod_names=None):
+    #check where the matrix data actually is
+    matrix = matrix.value if hasattr(matrix,"value") else matrix
+    #not a sparse matrix - nothing else to do
+    if not scipy.sparse.issparse(matrix):
+        return matrix,False
+    #will convert sparse and dense matrixes to the csc
+    #format required by MDV
+    if not isinstance(matrix, scipy.sparse.csc_matrix):
+        matrix = scipy.sparse.csc_matrix(matrix)
+   
+    #check indexes are in sync and if so just return the csc matrix
+    if not main_names or not mod_names:
+        return matrix,True
+    if list(main_names) == list(mod_names):
+        return matrix,True
+    #create lookup of mod indices to main indices
+    main_map  =  {name: i for i, name in enumerate(main_names)}
+    lookup = np.array([main_map[name] for name in mod_names])
+    # Apply the lookup to the entire mod indices array using vectorized approach
+    indices  = lookup[matrix.indices]
+    # create a new sparse matrix 
+    matrix = scipy.sparse.csc_matrix((matrix.data, indices, matrix.indptr), 
+                                          shape=(len(main_names), matrix.shape[1]),
+                                          dtype=matrix.dtype)
+    return matrix,True
+
 
 
 def convert_vcf_to_df(vcf_filename: str) -> pd.DataFrame:
@@ -397,13 +472,34 @@ def _create_dt_heatmap(folder, project, mdv, marks):
     project.set_datasource_metadata(md)
 
 
-def _add_dims(table, dims, max_dims):
+def _add_dims(table, dims, max_dims,stub=""):
     if len(dims.keys()) == 0:
-        return
-    for dname in dims:
-        if len(dims[dname].shape) == 1:
+        return table
+    #stub is if there is  more than one modality e.g.
+    #RNA UMAP, ATAC UMAP
+    if stub:
+        stub=stub+":"
+    for dname,data in dims.items():
+        #not sure whats going on here but cannot extract dims
+        if len(data.shape) == 1:
             continue
-        dm = dims[dname].transpose()
-        md = min(max_dims, dm.shape[0])
-        for n in range(md):
-            table[f"{dname}_{n+1}"] = dm[n]
+        num_dims= min(max_dims,data.shape[1])
+        #name the columns
+        cols  = [f"{stub}{dname}_{i+1}" for i in range(num_dims)]
+        dim_table= pd.DataFrame()
+        #can either be an ndarraty or a dataframe
+        if type(data)== np.ndarray:
+            data = data[:,0:num_dims]
+            dim_table =pd.DataFrame(data[:,0:num_dims])
+            dim_table.index = dims.dim_names
+        elif type(data)==pd.DataFrame:
+            ##should already have correct index
+            dim_table= data.iloc[:,0:num_dims]
+        else:
+            print (f"unrecognized dimension reduction format - {type(data)} for dim reduction {dname} ")
+            continue
+        dim_table.columns=cols
+        #merge the tables to ensure the dims ar in sync with the main table
+        #perhaps only necessary with mudata objects but will do no harm
+        table = table.merge(dim_table, left_index=True, right_index=True, how= "left")
+    return table
