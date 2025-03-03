@@ -8,7 +8,7 @@ import type { DataType, ExtraControl, GuiSpecType } from "./charts";
  * 
  * Note that these are not the same as the `DataType` values used in `DataSource`. As well as allowing
  * for `"_multi_column:number"` and `"_multi_column:all"` types, we also have `"number"` - loosely
- * equivalent to `export type NumberDataType = "integer" | "double" | "int32";` in `DataSource.ts`.
+ * equivalent to `export type NumberDataType = "integer" | "double" | "int32";` in `charts.d.ts`.
  * 
  * The list of legal values is deemed exhaustive based on the evaluation of
  * ```ts
