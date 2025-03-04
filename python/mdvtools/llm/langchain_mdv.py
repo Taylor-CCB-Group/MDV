@@ -26,6 +26,11 @@ import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 from dotenv import load_dotenv
 from mdvtools.websocket import ChatSocketAPI
 
+# packages for custom langchain agent
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_experimental.tools.python.tool import PythonAstREPLTool
+from langchain.agents import create_openai_functions_agent, AgentExecutor
+
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data, get_updateproject_prompt_RAG
 from .code_manipulation import parse_view_name, prepare_code
@@ -142,11 +147,11 @@ class ProjectChat:
         log = self.log = logger.info
         if len(project.datasources) == 0:
             raise ValueError("The project does not have any datasources")
-        elif len(project.datasources) > 1:
+        elif len(project.datasources) > 1: # remove? or make it == 1 ?
             # tempting to think we should just give the agent all of the datasources here
             log("The project has more than one datasource, only the first one will be used")
-            self.ds_name1 = project.datasources[1]['name']
-            self.df1 = project.get_datasource_as_dataframe(self.ds_name1)
+            self.ds_name1 = project.datasources[1]['name'] # maybe comment this out?
+            self.df1 = project.get_datasource_as_dataframe(self.ds_name1) # and maybe comment this out?
 
         if len(project.datasources) >= 2:
             df_list = [project.get_datasource_as_dataframe(ds['name']) for ds in project.datasources[:2]]
@@ -162,14 +167,58 @@ class ProjectChat:
             with time_block("b7: Initialising LLM for agent"):
                 self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
             with time_block("b8: Pandas agent creating"):
-                self.agent = lp.create_pandas_dataframe_agent( # handle_parsing_errors no longer supported
-                    self.dataframe_llm, df_list, verbose=True, allow_dangerous_code=True,
-                    handle_parsing_errors = True
-                    # handle_parsing_errors="Error in pandas agent" #self.df,
-                )
+                #CUSTOM AGENT:
+                def create_custom_pandas_agent(llm, dfs, prompt_data, verbose=False):
+                    """
+                    Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
+                    
+                    :param llm: The LLM to use (e.g., OpenAI GPT-4).
+                    :param dfs: A dictionary of named Pandas DataFrames.
+                    :param verbose: If True, prints debug information.
+                    :return: An agent that can answer questions about the DataFrames.
+                    """
+                    
+                    # Step 1: Create the Python REPL Tool (Dynamically Injecting DataFrames)
+                    python_tool = PythonAstREPLTool()
+                    
+                    if python_tool.globals is None:
+                        python_tool.globals = {}  # Ensure it's a dictionary
+                    
+                    # Make DataFrames available inside the REPL tool
+                    python_tool.globals.update(dfs) 
+
+                    ## New fixes:
+                    python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())]
+
+                    python_tool.globals.update(dfs, list_globals=lambda: list(python_tool.globals.keys()))
+
+
+                    prompt_data = f"""You have access to the following Pandas DataFrames: 
+                    {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
+                    If you need to check their structure, use `df.info()` or `df.head()`.
+                    Before running any code, check available variables using `list_globals()`.""" + prompt_data
+
+                    # Step 2: Define a Prompt Template
+                    prompt = ChatPromptTemplate.from_messages([
+                        ("system", prompt_data),
+                        ("human", "{input}"),
+                        ("ai", "{agent_scratchpad}"),
+                    ])
+
+                    # Step 3: Create the Agent
+                    agent = create_openai_functions_agent(llm, [python_tool], prompt)
+
+                    # Step 4: Wrap in an Agent Executor (Finalized Agent)
+                    return AgentExecutor(agent=agent, tools=[python_tool], verbose=verbose)
+
+                self.agent = create_custom_pandas_agent(self.dataframe_llm, {"df1": df_list[0], "df2": df_list[1]}, prompt_data, verbose=True)
+                #self.agent = lp.create_pandas_dataframe_agent(
+                #    self.dataframe_llm, df_list, verbose=True, allow_dangerous_code=True,
+                #    handle_parsing_errors = True)
+    
             self.ok = True
         except Exception as e:
-            # raise ValueError(f"An error occurred while trying to create the agent: {e[:100]}")
+            # raise ValueError(f"An error occurred while trying to create the agent: {e[:500]}")
             log(f"An error occurred while trying to create the agent: {str(e)[:500]}")
             # todo keep better track of the state of the agent, what went wrong etc
             self.ok = False
@@ -210,7 +259,8 @@ class ProjectChat:
                 )
                 progress += 31
                 # Argument of type "str" cannot be assigned to parameter "input" of type "Dict[str, Any]"
-                response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]})  # type: ignore for now
+                # response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]})  # type: ignore for now
+                response = self.agent.invoke({"input": question})
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b10: RAG prompt preparation"):  # ~0.003% of time
                 self.socket_api.update_chat_progress(
