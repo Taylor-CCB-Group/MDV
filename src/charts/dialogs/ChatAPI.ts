@@ -103,12 +103,15 @@ const useChat = () => {
     // { root } is problematic here, need to revise so that we have something sensible
     // -- also test with the app not being at the root of the server
     const { projectName } = useProject(); //todo add viewName to ProjectProvider
+    //! still need to consider that some things really are routes while others are just names
+    // and routes will need to be careful if e.g. the app is not at the root of the server
     const route = `/project/${projectName}/chat`;
     const progressRoute = `/project/${projectName}/chat_progress`;
     const routeInit = `/project/${projectName}/chat_init`;
     // use sessionStorage to remember things like whether the chat is open or closed... localStorage for preferences like theme,
     //! but this might not be such a good idea for things like chat logs with sensitive information
-    const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
+    // const [messages, setMessages] = useState<ChatMessage[]>(JSON.parse(sessionStorage.getItem('chatMessages') as any) || []);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isSending, setIsSending] = useState<boolean>(false);
     const [currentRequestId, setCurrentRequestId] = useState<string>("");
     const [isInit, setIsInit] = useState<boolean>(false);
@@ -202,20 +205,26 @@ const useChat = () => {
 /**
  * This function is used to navigate to a different view.
  * 
+ * @param view - The name of the view to navigate to.
+ * @param needsRefresh - Whether the page will need to be refreshed after navigating - for example,
+ * if datasources have changed. We should be able to determine this automatically in the future
+ * (and ideally not need to refresh the page).
+ * 
  * ! doesn't belong in this file, I intend to refactor soon, but for quick prototyping it's here
  */
-export async function navigateToView(view: string) {
-    //todo - use this, but make sure it works with updated datasources etc...
-    //window.mdv.chartManager.changeView(view);
-
-    const params = new URLSearchParams(window.location.search);
-    params.set("view", view);
-    window.history.replaceState(
-        {},
-        "",
-        `${window.location.pathname}?${params}`,
-    );
-    window.location.reload();
+export async function navigateToView(view: string, needsRefresh = false) {
+    if (!needsRefresh) {
+        window.mdv.chartManager.changeView(view);
+    } else {
+        const params = new URLSearchParams(window.location.search);
+        params.set("view", view);
+        window.history.replaceState(
+            {},
+            "",
+            `${window.location.pathname}?${params}`,
+        );
+        window.location.reload();
+    }
 }
 
 export default useChat;

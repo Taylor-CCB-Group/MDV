@@ -380,15 +380,17 @@ export class ChartManager {
                             this.chatDialog.close();                            
                         } else {
                             this.chatDialog = new ChatDialog();
-                            sessionStorage.setItem('chatMDV', true);
+                            // session storage needs more thought, for now we
+                            // sessionStorage.setItem('chatMDV', true);
                             this.chatDialog.config.onclose = () => {
                                 this.chatDialog = null;
-                                sessionStorage.removeItem('chatMDV');
+                                // sessionStorage.removeItem('chatMDV');
                             }
                         }
                     }
                 }, this.rightMenuBar);
-                if (sessionStorage.getItem('chatMDV')) {
+                // biome-ignore lint/correctness/noConstantCondition: disabling sessionStorage with constant condition for now
+                if (sessionStorage.getItem('chatMDV') && false) {
                     this.chatDialog = new ChatDialog();
                     this.chatDialog.config.onclose = () => {
                         this.chatDialog = null;
