@@ -186,9 +186,18 @@ class ProjectChat:
                     
                     # Make DataFrames available inside the REPL tool
                     python_tool.globals.update(dfs) 
+                    
+                    # If we keep a reference to the globals dictionary so when we access it in a lambda, we know it's not None now.
+                    # This assumes that any changes to globals will be changes to the same dictionary... probably a safe assumption,
+                    #! but, if it is possible for something else to assign a new dictionary to python_tool.globals
+                    #! then this will break... so maybe this is actually technically less safe... better safe than sorry.
+                    # this would lead to much worse bugs than just a NoneType error
+                    # we should still handle None in the lambdas, though.
+                    # globals = python_tool.globals
+                    # python_tool.globals["list_globals"] = lambda: list(globals.keys()) # concise but less safe rather than more
 
                     ## New fixes:
-                    python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())]
+                    python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
 
                     python_tool.globals.update(dfs, list_globals=lambda: list(python_tool.globals.keys()))
 
