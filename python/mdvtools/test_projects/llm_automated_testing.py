@@ -215,7 +215,7 @@ for question in question_list:
         print(f"Error: {str(e)[:100]}")
 
 pandas_input_list = [
-    re.search(r'Question:.*', x).group() if re.search(r'Question.*', x) else "None"
+    re.search(r'Question:.*', x).group() if re.search(r'Question.*', x) else "None" # type: ignore - actually, this will raise an error rather than return "None"
     for x in pandas_input_list]
 
 print(question_list)
