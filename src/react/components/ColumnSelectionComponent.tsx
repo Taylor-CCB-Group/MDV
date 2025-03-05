@@ -28,7 +28,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
     const rowLinkProps = useRowsAsColumnsLinks()[0]; //todo: arbitrary number of links
     //@ts-ignore nonsense about setBoolean type
-    if (!linkProps) return <ColumnDropdown {...props} {...guiProps} />;
+    if (!linkProps) return <ColumnDropdownComponent {...props} {...guiProps} />;
     // In general, this should (probably) be using our "(multi)dropdown" component
     // and the <LinksComponent /> can select which column options to show.
 
