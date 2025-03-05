@@ -93,34 +93,8 @@ const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<
  * this would be ambiguous).
  */
 const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T> & GuiStateProps) => {
-    // const props = inferGenericColumnGuiProps(gProps);
-    // const { setSelectedColumn, placeholder, type } = props;
-    // const { setIsAutocompleteFocused, setIsExpanded } = props;
-    
-    // // - this is starting to do the right thing, still massively confusing
-    // const isMultiType = isMultiColProp(props);
-    // const dataStore = useDataStore(props.dataStore);
-    // // todo column groups
-    // const columns: DataColumn<DataType>[] = useMemo(
-    //     () => dataStore.columns
-    //         .filter((c) => !props.exclude?.includes(c.name))
-    //         .filter((c) => !c.field.includes("|")) //exclude linked columns the hacky way for now
-    //         //@ts- expect-error << looks like we don't need this any more.
-    //         .filter((c) => columnMatchesType(c, type))
-    //         ,
-    //     [dataStore, props.exclude, type],
-    // );
-    
-    // useEffect(() => {
-    //     console.log("useEffect all");
-    // });
-
     const { setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded,isMultiType, columns, current_value } = useColumnDropdownValue(gProps);
     
-    // const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links, and subgroups within links
-    // if (current_value && typeof current_value !== "string" && !Array.isArray(current_value)) {
-    //     return <RAComponent {...props} />;
-    // };
     return (
         <Grid className="w-full items-center" container>
             <Grid size={"grow"}>
@@ -187,6 +161,13 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
     );
 });
 
+/**
+ * A hook for managing the state of manually chosen columns from a rows-as-columns link.
+ * 
+ * Should encapsulate
+ * - making sure that an appropriate type of value is selected
+ * - providing a way to select the value that has a simple interface, managing the complexity of incoming generic types
+ */
 function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
     const { linkedDs, link } = props;
     const { name_column, name, subgroups } = link;
@@ -221,7 +202,8 @@ const LinkTo = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
     // - would be nice to be able to avoid that, this is really difficult to understand and work with.
     // maybe we should have a branch that returns a totally different g() for multidropdown, for example.
     const spec = useMemo(() => makeAutoObservable(g<"multidropdown" | "dropdown">({
-        type: isMultiType ? 'multidropdown' : 'dropdown',
+        // type: isMultiType ? 'multidropdown' : 'dropdown',
+        type: 'multidropdown',
         // name: name_column,
         label: `specific '${name}' column`, //todo different label for multiple
         values: [values],
@@ -234,7 +216,7 @@ const LinkTo = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
             //@ts-expect-error maybe we'll make it so that we have a hook returning a setSelectedLinkedColumn function of narrower type
             setSelectedColumn(v[0])
         })
-    })), [values, name, isMultiType, setSelectedColumn, props.current_value]);
+    })), [values, name, isMultiType, setSelectedColumn]);
     // const { current_value } = spec;
     return (
         <div className="flex flex-col" style={{ textAlign: 'left' }}>
@@ -250,10 +232,11 @@ const ActiveLink = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
     const rowNames = useHighlightedForeignRows().map(r => r.fieldName);
     const maxItems = props.multiple ? 10 : 1;
 
-    useEffect(() => {
-        //@ts-expect-error probably need isMulti logic here - may be able to refactor that into a hook
-        setSelectedColumn(new RowsAsColsQuery(link, linkedDs.name, maxItems))
-    }, [link, linkedDs, maxItems, setSelectedColumn]);
+    //! this was causing an infinite loop, need to fix that!!!
+    // useEffect(() => {
+    //     //@ts-expect-error probably need isMulti logic here - may be able to refactor that into a hook
+    //     setSelectedColumn(new RowsAsColsQuery(link, linkedDs.name, maxItems))
+    // }, [link, linkedDs, maxItems, setSelectedColumn]);
 
     return (
         <div>
