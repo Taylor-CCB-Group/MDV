@@ -174,6 +174,9 @@ export type DualContourLegacyConfig = {
  */
 export function useLegacyDualContour() {
     const config = useConfig<DualContourLegacyConfig>();
+    // todo: this is currently short-circuiting for non-viv deck scatter...
+    // breaking rule of hooks etc, should be fixed
+    if (!config.contourParameter) return [];
     const commonProps = {
         parameter: config.contourParameter,
         fill: config.contour_fill,
