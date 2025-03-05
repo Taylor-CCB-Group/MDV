@@ -11,7 +11,9 @@ import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import ActiveLinkComponent from "./ActiveLinkComponent.js";
 
 /**
- * A component for selecting a column from the data store.
+ * A component for selecting a column from the data store - which can entail quite complex UI
+ * and state for things like synthesising columns from linked data etc.
+ * 
  * Must be in a context where `useDataStore` is available
  * (e.g. if we're in a more global dialog etc rather than a chart context,
  * this would be ambiguous).
@@ -32,7 +34,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
 
     return (
         <>
-            <Paper className="mx-auto mt-8 px-4 py-2 w-full" variant="outlined">
+            <Paper className="mx-auto px-4 py-2 w-full" variant="outlined">
                 <div className="w-full flex justify-around text-xs font-medium">
                     <button
                         onClick={() => setActiveTab(0)}
@@ -46,7 +48,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                                 : theme.palette.text.primary,
                         }}
                     >
-                    Value
+                    Column
                     </button>
                     {rowLinkProps && (<button
                         onClick={() => setActiveTab(1)}
@@ -98,27 +100,5 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
             </Paper>
         </>
     );
-    // return (
-    //     <>
-    //     <Accordion expanded={isExpanded} onChange={e => {
-    //         if (!isAutocompleteFocused) {
-    //             setIsExpanded(prev => !prev);
-    //         }
-    //     }}>
-    //         <AccordionSummary expandIcon={<LinkIcon sx={{marginLeft: '0.2em'}} />} sx={{padding: '0 0.5em'}}>
-    //             <Grid className="w-full items-center" container>
-    //                 <Grid size={"grow"}>
-    //                     {/* we may want to show something different, especially if special value is selected... */}                        
-    //                     {/* @ts-ignore setExpanded type */}
-    //                     <ColumnDropdown {...props} {...guiProps} />
-    //                 </Grid>
-    //             </Grid>
-    //         </AccordionSummary>
-    //         <AccordionDetails>
-    //             <LinksComponent {...props} />
-    //         </AccordionDetails>
-    //     </Accordion>
-    //     </>
-    // );
 });
 export default ColumnSelectionComponent;
