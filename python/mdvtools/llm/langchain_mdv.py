@@ -199,9 +199,6 @@ class ProjectChat:
                     ## New fixes:
                     python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
 
-                    python_tool.globals.update(dfs, list_globals=lambda: list(python_tool.globals.keys()))
-
-
                     prompt_data = f"""You have access to the following Pandas DataFrames: 
                     {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
                     If you need to check their structure, use `df.info()` or `df.head()`.
