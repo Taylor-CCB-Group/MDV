@@ -41,6 +41,7 @@ const RowsAsCols = observer(<T extends CTypes,>(props : RowsAsColsProps<T>) => {
         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
         current_value: [`${props.current_value}`],
         func: action((v) => {
+            //@ts-expect-error need to handle multiple
             props.current_value = v[0];
         })
     })), [targetColumn, name_column, name]);
@@ -49,7 +50,10 @@ const RowsAsCols = observer(<T extends CTypes,>(props : RowsAsColsProps<T>) => {
     return (
         <>
         {/* set the value... to something special... not just a specially formatted string */}
-        <Button onClick={() => {setSelectedColumn(new RowsAsColsQuery(link, linkedDs.name, maxItems))}}>{liveSelectionName}</Button>
+        <Button onClick={() => {setSelectedColumn(
+            //@ts-expect-error need to handle multiple
+            new RowsAsColsQuery(link, linkedDs.name, maxItems))
+            }}>{liveSelectionName}</Button>
         <DropdownAutocompleteComponent props={spec} />
         {/* <FormControl>
             <RadioGroup>

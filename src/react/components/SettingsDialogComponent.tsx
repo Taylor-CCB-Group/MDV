@@ -542,7 +542,7 @@ const ErrorComponent = observer(({ props, label }: { props: any, label: string }
  * A component for rendering a GUI setting.
  */
 export const AbstractComponent = observer(
-    ({ props }: { props: AnyGuiSpec }) => {
+    ({ props }: { props: AnyGuiSpec | GuiSpec<GuiSpecType> }) => {
         // would like to lose this `as` cast - maybe a newer/future typescript might manage it better?
         const Component = Components[props.type] as React.FC<{
             props: typeof props;

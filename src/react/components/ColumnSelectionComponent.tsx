@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
 import Autocomplete from "@mui/material/Autocomplete";
 import { useDataStore } from "../context.js";
-import type { DataColumn, DataType, FieldName } from "@/charts/charts.js";
+import type { DataColumn, DataType, FieldName, GuiSpec } from "@/charts/charts.js";
 import type { Param } from "@/charts/ChartTypes.js";
 import type DataStore from "@/datastore/DataStore.js";
 import { g, isArray } from "@/lib/utils.js";
@@ -53,6 +53,7 @@ const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<
     const { setIsAutocompleteFocused, setIsExpanded } = props;
     
     // - this is starting to do the right thing, still massively confusing
+    //@ts-expect-error type of setSelectedColumn is wrong here
     const isMultiType = isMultiColProp(props);
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
@@ -136,10 +137,11 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
                         if (isMultiType) {
                             // todo - need to make controlled anyway for multiple...
                             if (!isArray(value)) throw "Expected array - and really didn't expect to get here";
-                            // haven't quite managed to infer the setSelectedColumn type here...
-                            setSelectedColumn(value.map(v => v.field) as any);
+                            //@ts-expect-error haven't quite managed to infer the setSelectedColumn type here...
+                            setSelectedColumn(value.map(v => v.field));
                         } else {
                             if (isArray(value)) throw "Expected single value - and really didn't expect to get here";
+                            //@ts-expect-error haven't quite managed to infer the setSelectedColumn type here...
                             setSelectedColumn(value.field);
                         }
                     }}
@@ -214,51 +216,31 @@ const LinkTo = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
     const { setSelectedColumn, current_value } = props;
     //@ts-expect-error need to review isMultiType logic
     const isMultiType = isMultiColumn(props.type);
-    
-    // formattedValues.forEach((v) => {
-    //     console.log("formatted", v.split("|"));
-    // })
 
-    
-
-    // useEffect(() => {
-    //     // is the current_value something that would be a legal state for this component?
-    //     // -- remember that actually we need a "FieldName" like `${sg}|${value} (${sg})|index`...
-    //     // If it's an active link, or values that aren't in `values`, then we need to set the state to some default
-    //     // (we set the state by mutating props.current_value in `runInAction()`)
-    //     // runInAction(() => {
-    //     //     //@ts-expect-error we need to find a neater solution for column props.current_value type
-    //     //     props.current_value = isMultiType ? [] : values[0];
-    //     // });
-    //     autorun(() => {
-    //     const value = formattedValues[0];
-    //         //@ts-expect-error we need to find a neater solution for column props.current_value type
-    //         //todo - need to handle multi type correctly
-    //         setSelectedColumn(isMultiType ? [value] : value)
-    //     });
-    //     // console.log("useEffect", subgroups, subgroups[Object.keys(subgroups)[0]])
-    // }, [formattedValues, setSelectedColumn, isMultiType])
-
-    const spec = useMemo(() => makeAutoObservable(g<"multidropdown">({
-        type: 'multidropdown',
+    // nb, the <"multidropdown" | "dropdown"> type parameter ends up causing problem vs <"multidropdown"> | <"dropdown">
+    // - would be nice to be able to avoid that, this is really difficult to understand and work with.
+    // maybe we should have a branch that returns a totally different g() for multidropdown, for example.
+    const spec = useMemo(() => makeAutoObservable(g<"multidropdown" | "dropdown">({
+        type: isMultiType ? 'multidropdown' : 'dropdown',
         // name: name_column,
         label: `specific '${name}' column`, //todo different label for multiple
-        // I don't think we want to prepend option to dropdown - we should have a different way of showing this
         values: [values],
         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
         current_value: [`${props.current_value}`],
         func: action((v) => {
             console.log("v", v);
-            props.current_value = v[0];
+            // we don't set current_value here, we use the setSelectedColumn function
+            // props.current_value = isMultiType ? v : v[0];
             // const value = `${Object.keys(subgroups)[0]}|${v[0]} (${Object.keys(subgroups)[0]})|${0}`;
-            //@ts-expect-error we need to find a neater solution for column props.current_value types
-            setSelectedColumn(v[0])
+            //@ts-expect-error maybe we'll make it so that we have a hook returning a setSelectedLinkedColumn function of narrower type
+            setSelectedColumn(isMultiType ? v : v[0])
         })
-    })), [values, name, props.current_value, isMultiType, setSelectedColumn]);
+    })), [values, name, props, isMultiType, setSelectedColumn]);
     // const { current_value } = spec;
     return (
         <div className="flex flex-col" style={{ textAlign: 'left' }}>
-            <DropdownAutocompleteComponent props={spec} />
+            {/* really don't want to have this typecast here, what a nuisance! (also not really correct) */}
+            <DropdownAutocompleteComponent props={spec as GuiSpec<"dropdown"> | GuiSpec<"multidropdown">} />
         </div>
     )
 })
@@ -270,8 +252,9 @@ const ActiveLink = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
     const maxItems = props.multiple ? 10 : 1;
 
     useEffect(() => {
+        //@ts-expect-error probably need isMulti logic here - may be able to refactor that into a hook
         setSelectedColumn(new RowsAsColsQuery(link, linkedDs.name, maxItems))
-    }, [link, linkedDs, maxItems]);
+    }, [link, linkedDs, maxItems, setSelectedColumn]);
 
     return (
         <div>

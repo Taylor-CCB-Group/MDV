@@ -12,7 +12,19 @@ We aim to trap errors at the earliest possible time, so that if - for instance -
 
 Of course, TypeScript itself can only decorate the code with assertions that we make as programmers - but it should be able to give us the facility to express what we deem to be knowable about the state of the system at some time: perhaps we are sure that the "add chart" dialog will never produce a configuration that would lead to an error such as that described above, but if we are loading view data from a server, we would like to reason about the fact that we cannot be certain of it's correctness until some form of validation occurs - and this reasoning can be expressed by passing some value of a type which has known and verified characteristics. In this way, as the assertions encoded in these characteristics change through the introduction of new features or refactoring, we can track which parts of the code will be impacted - to the extent that our use of types is correct.
 
-This can avoid the author of a chart being encumbered with checking - for instance - whether a value representing "a column I need to render" is an array, or a FieldName (string) which can be used via reference a DataStore, whether the data needs to be fetched from the server, has a compatible data type - or with more recent additions, how to know when the chosen option has changed, etc.
+This can avoid the author of a chart being encumbered with checking - for instance - whether a value representing "a column I need to render" is an array, or a FieldName (string) which can be used via reference a DataStore, whether the data needs to be fetched from the server, has a compatible data type - or with more recent additions, how to know when the chosen option has changed, etc
+
+## Coding guidelines
+
+### `//@ts-expect-error` for work-in-progress
+
+We use this flag - along with a brief comment that should be comprehensible when glancing over a search for that string in the code - in situations where we know that the underlying logic of the model and its types have not yet been fully understood or resolved.
+
+This is ok at intermediate stages of working on a PR - particularly in cases involving complex types, but they should all be removed in order for the it to be considered ready to merge. It should be treated as a code-smell, analogous to the smell of gas that is deliberately added so that leaks will be noticed.
+
+We should avoid knowingly committing changes which produce errors when running `tsc` or `biome` - in particular, any TypeScript error should be flagged in this way.
+
+`biome-ignore` comments can also be used in a similar-ish way - although we may be at greater risk of losing track of them!
 
 ## Config
 
