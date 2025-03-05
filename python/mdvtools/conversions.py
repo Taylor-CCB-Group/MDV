@@ -15,7 +15,8 @@ def convert_scanpy_to_mdv(
     scanpy_object: AnnData, 
     max_dims: int = 3, 
     delete_existing: bool = False, 
-    label: str = ""
+    label: str = "",
+    chunk_data: bool = False
 ) -> MDVProject:
     """
     Convert a Scanpy AnnData object to MDV (Multi-Dimensional Viewer) format.
@@ -114,14 +115,14 @@ def convert_scanpy_to_mdv(
     if matrix.shape[1] !=0:
         # add the gene expression
         mdv.add_rows_as_columns_subgroup(
-            f"{label}cells", f"{label}genes", "gs", matrix, name="gene_scores", label="Gene Scores",sparse=sparse
+            f"{label}cells", f"{label}genes", "gs", matrix, name="gene_scores", label="Gene Scores",sparse=sparse,chunk_data=chunk_data
         )
 
     #now add layers
     for layer,matrix in scanpy_object.layers.items():
         matrix,sparse = get_matrix(matrix)
         mdv.add_rows_as_columns_subgroup(
-            f"{label}cells",f"{label}genes",layer,sparse=sparse
+            f"{label}cells",f"{label}genes",layer,sparse=sparse, chunk_data=chunk_data
         )     
 
     if delete_existing:
@@ -154,7 +155,7 @@ def convert_scanpy_to_mdv(
         
     return mdv
 
-def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False):
+def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False, chunk_data=False):
     md=mudata_object
     p= MDVProject(folder,delete_existing=delete_existing)
     #are there any general drs
@@ -181,13 +182,13 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False)
         matrix,sparse= get_matrix(mdata.X)
         #sometimes X is empty - all the data is in the layers
         if matrix.shape[1] !=0:
-            p.add_rows_as_columns_subgroup("cells",mod,mod+"_expr",matrix,sparse=sparse)
+            p.add_rows_as_columns_subgroup("cells",mod,mod+"_expr",matrix,sparse=sparse, chunk_data=chunk_data)
         #now add the layers (if there are any)
         layers = mdata.layers.keys()
         for layer in layers:
             matrix  = mdata.layers[layer]
             matrix,sparse = get_matrix(matrix,mdata.obs_names,md.obs_names)
-            p.add_rows_as_columns_subgroup("cells",mod,f"{mod}_{layer}",matrix,sparse=sparse)
+            p.add_rows_as_columns_subgroup("cells",mod,f"{mod}_{layer}",matrix,sparse=sparse, chunk_data=chunk_data)
     return p
 
 
@@ -457,7 +458,7 @@ def _create_dt_heatmap(folder, project, mdv, marks):
     arr = arr.astype(np.uint8)
     hm.write(arr.tobytes())
     hm.close()
-    # add the metdata
+    # add the metadata
     md = project.get_datasource_metadata("elements")
     md["deeptools"] = {
         "maps": {
@@ -500,7 +501,7 @@ def _add_dims(table, dims, max_dims,stub=""):
             print (f"unrecognized dimension reduction format - {type(data)} for dim reduction {dname} ")
             continue
         dim_table.columns=cols
-        #merge the tables to ensure the dims are in sync with the main table
+        #merge the tables to ensure the dims ar in sync with the main table
         #perhaps only necessary with mudata objects but will do no harm
         table = table.merge(dim_table, left_index=True, right_index=True, how= "left")
     return table
