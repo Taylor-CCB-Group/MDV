@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import type React from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
 import Autocomplete from "@mui/material/Autocomplete";
 import { useDataStore } from "../context.js";
@@ -10,17 +11,17 @@ import { columnMatchesType } from "@/lib/columnTypeHelpers.js";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
 // todo - subgroups
-import LinksComponent, { RAComponent, RowsAsColsProps } from "./LinksComponent.js";
+import LinksComponent, { RAComponent, type RowsAsColsProps } from "./LinksComponent.js";
 import { TextFieldExtended } from "./TextFieldExtended.js";
 import Grid from '@mui/material/Grid2';
 import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Paper, Tab, Tabs, Typography, useTheme } from "@mui/material";
 import LinkIcon from '@mui/icons-material/Link';
 import { useHighlightedForeignRows, useRowsAsColumnsLinks } from "../chartLinkHooks.js";
-import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers.js";
+import type { CTypes, ColumnSelectionProps, FieldSpecs, IsMultiParam } from "@/lib/columnTypeHelpers.js";
 import { inferGenericColumnGuiProps, isMultiColumn } from "@/lib/columnTypeHelpers.js";
-import { action, makeAutoObservable } from "mobx";
+import { action, autorun, makeAutoObservable, runInAction } from "mobx";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent.js";
-import { RowsAsColsQuery } from "@/links/link_utils.js";
+import { MultiColumnQuery, RowsAsColslink, RowsAsColsQuery } from "@/links/link_utils.js";
 
 type setBoolean = ReturnType<typeof useState<boolean>>[1];
 type GuiStateProps = {
@@ -45,23 +46,14 @@ function isMultiColProp(p: ColumnSelectionProps<any>): boolean {
     return p.multiple || p.type && isMultiColumn(p.type);
 }
 
-/**
- * A component for selecting columns from the data store.
- * Depending on the type, this may be a single column or multiple columns.
- * As well as concrete columns, these columns may be 'virtual' columns representing properties that may
- * change dynamically (e.g. based on selection in a linked data source).
- * Must be in a context where `useDataStore` is available
- * (e.g. if we're in a more global dialog etc rather than a chart context,
- * this would be ambiguous).
- */
-const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T> & GuiStateProps) => {
+const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<T> & GuiStateProps) => {
+
     const props = inferGenericColumnGuiProps(gProps);
-    const { setSelectedColumn, placeholder, type } = props;
-    const { setIsAutocompleteFocused, setIsExpanded, current_value } = props;
+    const { setSelectedColumn, placeholder, type, current_value } = props;
+    const { setIsAutocompleteFocused, setIsExpanded } = props;
     
     // - this is starting to do the right thing, still massively confusing
     const isMultiType = isMultiColProp(props);
-
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
     const columns: DataColumn<DataType>[] = useMemo(
@@ -73,6 +65,57 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
             ,
         [dataStore, props.exclude, type],
     );
+
+    useEffect(() => {
+        autorun(() => {
+            if (isMultiType) {
+                // todo - need to put a valid check for current value and set it accordingly
+                setSelectedColumn([columns[0].field] as any);
+            } else {
+                if (!columns.find(c => c.field === current_value))
+                    setSelectedColumn(columns[0].field as any);
+            }
+        });
+    }, [isMultiType, columns, current_value, setSelectedColumn]);
+
+    return {setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded,isMultiType, columns, current_value};
+
+};
+
+/**
+ * A component for selecting columns from the data store.
+ * Depending on the type, this may be a single column or multiple columns.
+ * As well as concrete columns, these columns may be 'virtual' columns representing properties that may
+ * change dynamically (e.g. based on selection in a linked data source).
+ * Must be in a context where `useDataStore` is available
+ * (e.g. if we're in a more global dialog etc rather than a chart context,
+ * this would be ambiguous).
+ */
+const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T> & GuiStateProps) => {
+    // const props = inferGenericColumnGuiProps(gProps);
+    // const { setSelectedColumn, placeholder, type } = props;
+    // const { setIsAutocompleteFocused, setIsExpanded } = props;
+    
+    // // - this is starting to do the right thing, still massively confusing
+    // const isMultiType = isMultiColProp(props);
+    // const dataStore = useDataStore(props.dataStore);
+    // // todo column groups
+    // const columns: DataColumn<DataType>[] = useMemo(
+    //     () => dataStore.columns
+    //         .filter((c) => !props.exclude?.includes(c.name))
+    //         .filter((c) => !c.field.includes("|")) //exclude linked columns the hacky way for now
+    //         //@ts- expect-error << looks like we don't need this any more.
+    //         .filter((c) => columnMatchesType(c, type))
+    //         ,
+    //     [dataStore, props.exclude, type],
+    // );
+    
+    // useEffect(() => {
+    //     console.log("useEffect all");
+    // });
+
+    const { setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded,isMultiType, columns, current_value } = useColumnDropdownValue(gProps);
+    
     // const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links, and subgroups within links
     // if (current_value && typeof current_value !== "string" && !Array.isArray(current_value)) {
     //     return <RAComponent {...props} />;
@@ -80,11 +123,12 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
     return (
         <Grid className="w-full items-center" container>
             <Grid size={"grow"}>
+                {current_value &&
                 <Autocomplete
                     className="w-full"
                     options={columns}
                     multiple={isMultiType}
-                    value={current_value ? columns.find(c => c.name === current_value) : null}
+                    value={columns.find(c => c.field === current_value) || null}
                     onChange={(_, value) => {
                         //! fixme
                         if (!value) return; //! check if this is correct
@@ -135,58 +179,87 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
                         );
                     }}
                 />
+}
             </Grid>
         </Grid>
     );
 });
 
-type CustomTabPanelProps = {
-    children?: React.ReactNode,
-    index: number,
-    value: number,
-}
+function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
+    const { linkedDs, link } = props;
+    const { name_column, name, subgroups } = link;
+    const cm = window.mdv.chartManager;
+    const targetColumn = cm.getDataSource(linkedDs.name).columnIndex[name_column] as DataColumn<DataType>;
+    // we need to associate each value with the row index that references it...
+    // as far as the code is concerned, this isn't necessarily a 1:1 mapping - but as my understanding of the logic
+    // it should be...
+    // We may have
+    // - more than one row with the same "gene_id"; I think this leads to undefined behaviour, we should give a warning
+    // - "gene_id" that doesn't have any corresponding row... maybe this doesn't matter, but we should filter those values out???
+    //   (and probably also log a warning)
+    // - If we have more than 2^16 rows, I think that means there must be some duplicates...
 
-const CustomTabPanel = (props: CustomTabPanelProps) => {
-    const {children, index, value, ...other} = props;
-    return (
-        <div
-            role="tabpanel"
-            hidden={value !== index}
-            id={`tab-${index}`}
-            aria-labelledby={`tab-${index}`}
-            style={{padding: '1em 0.5em', width: "100%"}}
-            {...other}
-            >
-            {value === index && children}
-        </div>
-    )
-};
+    // Loop through the values and create the format in pipes '|', by making use of the index.
+    //todo - what if we have multiple subgroups, need to take care of that the target column is not returning subgroups
+    console.log(targetColumn);
+    const formattedValues = targetColumn.values.map((value, index) => (`${Object.keys(subgroups)[0]}|${value} (${Object.keys(subgroups)[0]})|${index}`))
+    
+    return {values: targetColumn.values, formattedValues}; //this output should be in the 'FieldName' form with pipes
+}
 
 const LinkTo = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
     const { linkedDs, link } = props;
     const { name_column, name, subgroups } = link;
-    // const dataSources = useDataSources();
-    const cm = window.mdv.chartManager;
-    const targetColumn = cm.getDataSource(linkedDs.name).columnIndex[name_column] as DataColumn<DataType>;
+    const {values, formattedValues} = useLinkTargetValues(props);
+    const { setSelectedColumn, current_value } = props;
     //@ts-expect-error need to review isMultiType logic
     const isMultiType = isMultiColumn(props.type);
-    // potential symbols for live link ➤ ⌁ ⇢ ⍆ ⚡︎ ► ◎ ▷ ☑︎ ⦿
-    const liveSelectionName = `⦿⌁ active '${name}' selection`;
+    
+    // formattedValues.forEach((v) => {
+    //     console.log("formatted", v.split("|"));
+    // })
+
+    
+
+    // useEffect(() => {
+    //     // is the current_value something that would be a legal state for this component?
+    //     // -- remember that actually we need a "FieldName" like `${sg}|${value} (${sg})|index`...
+    //     // If it's an active link, or values that aren't in `values`, then we need to set the state to some default
+    //     // (we set the state by mutating props.current_value in `runInAction()`)
+    //     // runInAction(() => {
+    //     //     //@ts-expect-error we need to find a neater solution for column props.current_value type
+    //     //     props.current_value = isMultiType ? [] : values[0];
+    //     // });
+    //     autorun(() => {
+    //     const value = formattedValues[0];
+    //         //@ts-expect-error we need to find a neater solution for column props.current_value type
+    //         //todo - need to handle multi type correctly
+    //         setSelectedColumn(isMultiType ? [value] : value)
+    //     });
+    //     // console.log("useEffect", subgroups, subgroups[Object.keys(subgroups)[0]])
+    // }, [formattedValues, setSelectedColumn, isMultiType])
+
     const spec = useMemo(() => makeAutoObservable(g<"multidropdown">({
         type: 'multidropdown',
         // name: name_column,
         label: `specific '${name}' column`, //todo different label for multiple
         // I don't think we want to prepend option to dropdown - we should have a different way of showing this
-        values: [targetColumn.values],
+        values: [values],
         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
         current_value: [`${props.current_value}`],
         func: action((v) => {
+            console.log("v", v);
             props.current_value = v[0];
+            // const value = `${Object.keys(subgroups)[0]}|${v[0]} (${Object.keys(subgroups)[0]})|${0}`;
+            //@ts-expect-error we need to find a neater solution for column props.current_value types
+            setSelectedColumn(v[0])
         })
-    })), [targetColumn, name_column, name]);
-    const { current_value } = spec;
+    })), [values, name, props.current_value, isMultiType, setSelectedColumn]);
+    // const { current_value } = spec;
     return (
-        <DropdownAutocompleteComponent props={spec} />
+        <div className="flex flex-col" style={{ textAlign: 'left' }}>
+            <DropdownAutocompleteComponent props={spec} />
+        </div>
     )
 })
 
@@ -203,7 +276,7 @@ const ActiveLink = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
     return (
         <div>
             <RAComponent {...props} />
-            Selected Active Link
+            {link.observableFields[0].fieldName}
         </div>
     );
 })
@@ -218,14 +291,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     const [isExpanded, setIsExpanded] = useState(false);
     const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
     const [activeTab, setActiveTab] = useState(0);
-    console.log("props", props);
     const theme = useTheme();
-    function a11yProps(index: number) {
-        return {
-          id: `tab-${index}`,
-          'aria-controls': `tab-${index}`,
-        };
-      }
 
     const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
@@ -238,12 +304,13 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     return (
         <>
             <Paper className="mx-auto mt-8 px-4 py-2 w-full" variant="outlined">
-                <div className="border-b border-gray-200 w-full flex justify-around">
+                <div className="w-full flex justify-around text-xs font-medium">
                     <button
                         onClick={() => setActiveTab(0)}
+                        type="button"
                         className="p-2 text-center border-b-2 transition-colors w-full"
                         style={{
-                            borderColor: activeTab === 0 ? theme.palette.primary.main : "transparent",
+                            borderColor: activeTab === 0 ? theme.palette.primary.main : theme.palette.divider,
                             color:
                             activeTab === 0
                                 ? theme.palette.primary.main
@@ -252,32 +319,37 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                     >
                     Value
                     </button>
-                    <button
+                    {rowLinkProps && (<button
                         onClick={() => setActiveTab(1)}
+                        type="button"
                         className="p-2 text-center border-b-2 transition-colors w-full"
                         style={{
-                        borderColor: activeTab === 1 ? theme.palette.primary.main : "transparent",
+                        borderColor: activeTab === 1 ? theme.palette.primary.main : theme.palette.divider,
                         color:
                             activeTab === 1
                             ? theme.palette.primary.main
                             : theme.palette.text.primary,
                         }}
                     >
-                    Link to
+                    Link
                     </button>
-                    <button
+                    )}
+
+                    {rowLinkProps && (<button
                         onClick={() => setActiveTab(2)}
+                        type="button"
                         className="p-2 text-center border-b-2 transition-colors w-full"
                         style={{
-                        borderColor: activeTab === 2 ? theme.palette.primary.main : "transparent",
+                        borderColor: activeTab === 2 ? theme.palette.primary.main : theme.palette.divider,
                         color:
                             activeTab === 2
                             ? theme.palette.primary.main
                             : theme.palette.text.primary,
                         }}
                     >
-                    Active Link to
+                    Active Link
                     </button>
+                    )}
                 </div>
 
                 <div className="py-4">
@@ -286,43 +358,16 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                     /* @ts-ignore setExpanded type */
                     <ColumnDropdown {...props} {...guiProps} />
                     )}
-                    {activeTab === 1 && (
-                    rowLinkProps && (
+                    {activeTab === 1 && rowLinkProps && (
                             <div><LinkTo {...rowLinkProps} {...props} /></div>
-                        )
+                        
                     )}
-                    {activeTab === 2 && (
-                    rowLinkProps && (
+                    {activeTab === 2 && rowLinkProps && (
                             <div><ActiveLink {...rowLinkProps} {...props} /></div>
-                        )
                     )}
                 </div>
             </Paper>
         </>
-        // <>
-        // <Paper sx={{width: "100%"}}>
-        //     <Tabs value={tabValue} onChange={(_e, value) => setTabValue(value)} variant="scrollable">
-        //         <Tab value={0} label="Value" {...a11yProps} />
-        //         <Tab value={1} label="Link to" {...a11yProps} />
-        //         <Tab value={2} label="Active Link to" {...a11yProps} />
-        //     </Tabs>
-        //     <CustomTabPanel index={0} value={tabValue}>
-        //         {/* we may want to show something different, especially if special value is selected... */}                        
-        //         {/* @ts-ignore setExpanded type */}
-        //         <ColumnDropdown {...props} {...guiProps} />
-        //     </CustomTabPanel>
-        //     {rowLinkProps && (
-        //         <CustomTabPanel index={1} value={tabValue}>
-        //             <div><LinkTo {...rowLinkProps} {...props} /></div>
-        //         </CustomTabPanel>
-        //     )}
-        //     {rowLinkProps && (
-        //         <CustomTabPanel index={2} value={tabValue}>
-        //             <div><ActiveLink {...rowLinkProps} {...props} /></div>
-        //         </CustomTabPanel>
-        //     )}
-        // </Paper>
-        // </>
     );
     // return (
     //     <>

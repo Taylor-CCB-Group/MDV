@@ -70,14 +70,14 @@ export const RAComponent = observer(<T extends CTypes,>(props: ColumnSelectionPr
     const { link, linkedDsName, maxItems } = current_value;
     //@ts-expect-error need to review isMultiType logic
     const multiple = isMultiColumn(props.type);
-    return <Paper 
+    return <div 
     onClick={(e) => {
         runInAction(() => {
             current_value.maxItems = 100;
             e.stopPropagation();
         });
     }}
-    >⦿⌁{maxItems} '{link.name}'</Paper>;
+    >⦿⌁{maxItems} '{link.name}'</div>;
 })
 
 // export const LinkTo = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
