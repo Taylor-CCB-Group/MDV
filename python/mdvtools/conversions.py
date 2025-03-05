@@ -114,7 +114,7 @@ def convert_scanpy_to_mdv(
     if matrix.shape[1] !=0:
         # add the gene expression
         mdv.add_rows_as_columns_subgroup(
-            f"{label}cells", f"{label}genes", "gs", scanpy_object.X, name="gene_scores", label="Gene Scores",sparse=sparse
+            f"{label}cells", f"{label}genes", "gs", matrix, name="gene_scores", label="Gene Scores",sparse=sparse
         )
 
     #now add layers
@@ -154,16 +154,17 @@ def convert_scanpy_to_mdv(
         
     return mdv
 
-def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,add_dims_via_modlaities=True):
+def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False):
     md=mudata_object
-    p= MDVProject(folder)
-    #add the cells
-    if not add_dims_via_modlaities:
-        _add_dims(md.obs,md.obsm,max_dims)
-    else:
-        md.obs = _add_dims_via_mods(md.obs,md.mod,max_dims)
+    p= MDVProject(folder,delete_existing=delete_existing)
+    #are there any general drs
+    table = _add_dims(md.obs,md.obsm,max_dims)
+    #add drs derived from modalities
+    for name,mod in md.mod.items():
+        table = _add_dims(table,mod.obsm,max_dims,name)
     md.obs["cell_id"] = md.obs.index
-    p.add_datasource("cells",md.obs)
+    columns= [{"name":"cell_id","datatype":"unique"}]
+    p.add_datasource("cells",table,columns)
 
     for mod in md.mod.keys():
         mdata = md.mod[mod]
@@ -172,10 +173,10 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,add_dims_via_modlaitie
         #adds the index to the data as a name column
         #This is usually the unique gene name - but not always
         p.set_column(mod,{"name":"name","datatype":"unique"},mdata.var.index)
-        #mod is used a both the tag and the label
+        #mod is used as both the tag and the label
         #the name column is specified as the identifier that the user will use
         #it is derived from the index and is usually the gene 'name'
-        #However it may mot be appropriate can be changed later on 
+        #However it may not be appropriate can be changed later on 
         p.add_rows_as_columns_link("cells",mod,"name",mod)
         matrix,sparse= get_matrix(mdata.X)
         #sometimes X is empty - all the data is in the layers
@@ -186,29 +187,30 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,add_dims_via_modlaitie
         for layer in layers:
             matrix  = mdata.layers[layer]
             matrix,sparse = get_matrix(matrix,mdata.obs_names,md.obs_names)
-            p.add_rows_as_columns_subgroup("cells",mod,f"{mod}_{layer}",matrix,sparse=sparse)     
+            p.add_rows_as_columns_subgroup("cells",mod,f"{mod}_{layer}",matrix,sparse=sparse)
     return p
 
 
-# The main_names correspond to obs_names in the main mudata object
-# and the mod names those in the modality
-# Only required if data is being added from a modality)as sometimes
+# The main_names correspond to obs_names in the main anndata object
+# and the mod_names those in the modality.
+# Only required if data is being added from a modality,as sometimes
 # the modality's obs_names will be in a different order and/or a subset of the main names
 # Hence a sparse matrix corresponding to the main indices needs to be created
-def get_matrix(matrix,main_names=None,mod_names=None):
+def get_matrix(matrix,main_names=[],mod_names=[]):
     #check where the matrix data actually is
     matrix = matrix.value if hasattr(matrix,"value") else matrix
+    #is the matrix backed sparse matrix -convert to non backed else cannot convert
+    if hasattr(matrix,"backend"):
+        matrix=matrix._to_backed()
     #not a sparse matrix - nothing else to do
     if not scipy.sparse.issparse(matrix):
         return matrix,False
-    #will convert sparse and dense matrixes to the csc
+    #will convert sparse (and dense matrixes) to the csc
     #format required by MDV
     if not isinstance(matrix, scipy.sparse.csc_matrix):
         matrix = scipy.sparse.csc_matrix(matrix)
    
     #check indexes are in sync and if so just return the csc matrix
-    if not main_names or not mod_names:
-        return matrix,True
     if list(main_names) == list(mod_names):
         return matrix,True
     #create lookup of mod indices to main indices
@@ -487,9 +489,8 @@ def _add_dims(table, dims, max_dims,stub=""):
         #name the columns
         cols  = [f"{stub}{dname}_{i+1}" for i in range(num_dims)]
         dim_table= pd.DataFrame()
-        #can either be an ndarraty or a dataframe
+        #can either be an ndarray or a dataframe
         if type(data)== np.ndarray:
-            data = data[:,0:num_dims]
             dim_table =pd.DataFrame(data[:,0:num_dims])
             dim_table.index = dims.dim_names
         elif type(data)==pd.DataFrame:
@@ -499,7 +500,7 @@ def _add_dims(table, dims, max_dims,stub=""):
             print (f"unrecognized dimension reduction format - {type(data)} for dim reduction {dname} ")
             continue
         dim_table.columns=cols
-        #merge the tables to ensure the dims ar in sync with the main table
+        #merge the tables to ensure the dims are in sync with the main table
         #perhaps only necessary with mudata objects but will do no harm
         table = table.merge(dim_table, left_index=True, right_index=True, how= "left")
     return table
