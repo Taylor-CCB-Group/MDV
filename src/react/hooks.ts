@@ -286,6 +286,17 @@ export function useFilteredIndices() {
     return filteredIndices;
 }
 
+/** this should really understand things like background_filter */
+export function useFilteredOutIndices() {
+    const filteredIndices = useFilteredIndices();
+    const filteredOutIndices = useMemo(() => {
+        const allIndices = new Set(filteredIndices);
+        return Array.from({ length: filteredIndices.length }, (_, i) => i).filter(
+            (i) => !allIndices.has(i),
+        );
+    }, [filteredIndices]);
+}
+
 export function useCategoryFilterIndices(
     contourParameter?: DataColumn<CategoricalDataType>,
     category?: string | string[] | null,
