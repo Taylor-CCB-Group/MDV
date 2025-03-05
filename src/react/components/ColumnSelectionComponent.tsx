@@ -133,14 +133,14 @@ const ColumnDropdown = observer(<T extends CTypes,>(gProps: ColumnSelectionProps
                     onChange={(_, value) => {
                         //! fixme
                         if (!value) return; //! check if this is correct
-                        if (!(isMultiType === isArray(value))) throw "type mismatch";
+                        if (!(isMultiType === isArray(value))) throw new Error("type mismatch");
                         if (isMultiType) {
                             // todo - need to make controlled anyway for multiple...
-                            if (!isArray(value)) throw "Expected array - and really didn't expect to get here";
+                            if (!isArray(value)) throw new Error("Expected array - and really didn't expect to get here");
                             //@ts-expect-error haven't quite managed to infer the setSelectedColumn type here...
                             setSelectedColumn(value.map(v => v.field));
                         } else {
-                            if (isArray(value)) throw "Expected single value - and really didn't expect to get here";
+                            if (isArray(value)) throw new Error("Expected single value - and really didn't expect to get here");
                             //@ts-expect-error haven't quite managed to infer the setSelectedColumn type here...
                             setSelectedColumn(value.field);
                         }
@@ -226,16 +226,15 @@ const LinkTo = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
         label: `specific '${name}' column`, //todo different label for multiple
         values: [values],
         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
-        current_value: [`${props.current_value}`],
+        current_value: [values[0]],
         func: action((v) => {
-            console.log("v", v);
             // we don't set current_value here, we use the setSelectedColumn function
             // props.current_value = isMultiType ? v : v[0];
             // const value = `${Object.keys(subgroups)[0]}|${v[0]} (${Object.keys(subgroups)[0]})|${0}`;
             //@ts-expect-error maybe we'll make it so that we have a hook returning a setSelectedLinkedColumn function of narrower type
-            setSelectedColumn(isMultiType ? v : v[0])
+            setSelectedColumn(v[0])
         })
-    })), [values, name, props, isMultiType, setSelectedColumn]);
+    })), [values, name, isMultiType, setSelectedColumn, props.current_value]);
     // const { current_value } = spec;
     return (
         <div className="flex flex-col" style={{ textAlign: 'left' }}>

@@ -478,7 +478,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
         e.stopPropagation();
         runInAction(() => {
             delete filters[column.field];
-            if (!isArray(config.param)) throw "expected param array";
+            if (!isArray(config.param)) throw new Error("expected param array");
             config.param = config.param.filter((p) => p !== column.field);
         });
         console.log('Delete item');
@@ -532,7 +532,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
 const AddRowComponent = observer(() => {
     const config = useConfig<SelectionDialogConfig>();
     const { filters, param } = useConfig<SelectionDialogConfig>();
-    if (!isArray(param)) throw "expected param array";
+    if (!isArray(param)) throw new Error("expected param array");
     const setSelectedColumn = useCallback((column: string) => {
         if (!column) return;
         if (param.includes(column)) return;

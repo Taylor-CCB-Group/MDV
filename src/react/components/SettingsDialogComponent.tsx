@@ -23,6 +23,8 @@ import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
 import { g, isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
+import ReusableDialog from "@/charts/dialogs/ReusableDialog";
+import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -78,7 +80,7 @@ const SliderComponent = ({ props }: { props: GuiSpec<"slider"> }) => (
             onChange={action((_, value) => {
                 // const value = Number.parseFloat(e.target.value);
                 if (Array.isArray(value))
-                    throw "slider callback should have multiple values";
+                    throw new Error("slider callback should have multiple values");
                 props.current_value = value;
                 if (props.func) props.func(value);
             })}
@@ -173,12 +175,12 @@ export type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
 function getOptionAsObjectHelper(values: DropDownValues) {
     const useObjectKeys = values.length === 3;
     const [_valueObjectArray, labelKey, valueKey] = useObjectKeys ? values : ["X", "X", "X"];
-    if (!labelKey || !valueKey) throw "DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys";
+    if (!labelKey || !valueKey) throw new Error("DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys");
     type Option = { label: string, value: string, original: any };
     // might put some more elaborate types here on original at some point
     return (original: string | any): Option => {
         const isString = typeof original === "string";
-        if (isString === useObjectKeys) throw "DropdownAutocompleteComponent requires values to be either all strings or all objects";
+        if (isString === useObjectKeys) throw new Error("DropdownAutocompleteComponent requires values to be either all strings or all objects");
         if (isString) {
             return { label: original, value: original, original };
         }
@@ -189,7 +191,7 @@ function getOptionAsObjectHelper(values: DropDownValues) {
 }
 function useDropdownOptions(props: DropdownSpec) {
     // this check should be redundant with current types, but leaving it in for now
-    if (!props.values) throw "DropdownAutocompleteComponent requires props.values - probable logic error in type definitions";
+    if (!props.values) throw new Error("DropdownAutocompleteComponent requires props.values - probable logic error in type definitions");
     const toOption = useCallback(getOptionAsObjectHelper(props.values), []);
     type OptionType = ReturnType<typeof toOption>;
     const NO_OPTIONS = [{ label: "No options (error - sorry...)", value: "", original: "" }];
@@ -255,7 +257,7 @@ function useDropdownOptions(props: DropdownSpec) {
 }
 function isMultidropdown(props: DropdownSpec): props is GuiSpec<"multidropdown"> {
     const multi = props.type === "multidropdown";
-    if (multi !== isArray(props.current_value)) throw "current_value should be an array if (and only if) type is multidropdown";
+    if (multi !== isArray(props.current_value)) throw new Error("current_value should be an array if (and only if) type is multidropdown");
     return multi;
 }
 function inferDropdownType<T extends "dropdown" | "multidropdown">(props: GuiSpec<T>): GuiSpec<T> {
@@ -265,7 +267,7 @@ function getCurrentValue(props: DropdownSpec) {
     const multi = isMultidropdown(props);
     if (multi) return props.current_value; //ts correctly infers this is an array
     // return props.current_value; //.. fails to infer this is a string
-    if (isArray(props.current_value)) throw "current_value should be an array if and only if type is multidropdown";
+    if (isArray(props.current_value)) throw new Error("current_value should be an array if and only if type is multidropdown");
     return props.current_value;
 }
 export const DropdownAutocompleteComponent = observer(({
@@ -276,7 +278,7 @@ export const DropdownAutocompleteComponent = observer(({
     // const props = inferDropdownType(propsAmbiguous);
     const multiple = isMultidropdown(props);
     // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
-    if (!props.values) throw "DropdownAutocompleteComponent requires props.values";
+    if (!props.values) throw new Error("DropdownAutocompleteComponent requires props.values");
     //todo handle multitext / tags properly.
 
     const {options, single, label, val, okOption} = useDropdownOptions(props);
@@ -300,13 +302,13 @@ export const DropdownAutocompleteComponent = observer(({
                     //added type annotation above because mobx seems to fluff the inference to `never`
                     if (value === null) return;
                     if (isArray(value)) {
-                        if (!multiple) throw "shouldn't get an array here";
+                        if (!multiple) throw new Error("shouldn't get an array here");
                         const vals = value.map(val);
                         props.current_value = vals;
                         props.func?.(vals);
                         return;
                     }
-                    if (multiple) throw "shouldn't get a single value here";
+                    if (multiple) throw new Error("shouldn't get a single value here");
                     const v = val(value);
                     props.current_value = v;
                     if (props.func) props.func(v);
@@ -518,11 +520,11 @@ const Components: {
     multicolumn: ColumnSelectionSettingGui,
 } as const;
 
-const ErrorComponent = observer(({ props, label }: { props: any, label: string }) => {
+const ErrorComponent = observer(({ error, label }: { error: any, label: string }) => {
     const [expanded, setExpanded] = useState(true);
     return (
         <>
-        <Dialog open={expanded}
+        {/* <Dialog open={expanded}
             className="border-red-500 border-2 border-solid"
             >
             <h2>Settings Dialog Error...</h2>
@@ -530,7 +532,14 @@ const ErrorComponent = observer(({ props, label }: { props: any, label: string }
             <Button
                 onClick={() => setExpanded(!expanded)}
                 >ok</Button>
-        </Dialog>
+        </Dialog> */}
+        <ReusableDialog
+            open={expanded}
+            handleClose={() => setExpanded(false)}
+            component={
+                <ErrorDisplay error={{message: error?.message, traceback: error?.stack}} title={label} />
+            }
+        />
         <label className="text-red-500">Error in component:</label>
         <label className="text-red-500">{label}</label>
         </>
@@ -551,11 +560,11 @@ export const AbstractComponent = observer(
             //todo use zod to validate the props object
             console.error(`Unknown component type: '${props.type}'`);
             const errorObj = { props, error: `Unknown component type: ${props.type}` };
-            return <ErrorComponent props={errorObj} label={props.label} />;
+            return <ErrorComponent error={errorObj} label={props.label} />;
         }
         return (
             <div className="grid p-2 pr-4 justify-items-start" style={{ gridTemplateColumns: "1fr 2fr" }}>
-                <ErrorBoundary fallback={<ErrorComponent props={props} label={props.label} />}>
+                <ErrorBoundary fallbackRender={({error}) => <ErrorComponent error={error} label={props.label} />}>
                     <Component props={props} />
                 </ErrorBoundary>
             </div>
