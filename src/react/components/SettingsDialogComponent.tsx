@@ -10,7 +10,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { v4 as uuid } from "uuid";
-import { Button, Chip, Dialog, FormControl, FormControlLabel, MenuItem, Radio, RadioGroup, Select, Slider, Typography } from "@mui/material";
+import { Button, Chip, FormControl, FormControlLabel, MenuItem, Radio, RadioGroup, Select, Slider, Typography } from "@mui/material";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -25,6 +25,7 @@ import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -520,32 +521,6 @@ const Components: {
     multicolumn: ColumnSelectionSettingGui,
 } as const;
 
-const ErrorComponent = observer(({ error, label }: { error: any, label: string }) => {
-    const [expanded, setExpanded] = useState(true);
-    return (
-        <>
-        {/* <Dialog open={expanded}
-            className="border-red-500 border-2 border-solid"
-            >
-            <h2>Settings Dialog Error...</h2>
-            <JsonView src={props} collapsed={1} />
-            <Button
-                onClick={() => setExpanded(!expanded)}
-                >ok</Button>
-        </Dialog> */}
-        <ReusableDialog
-            open={expanded}
-            handleClose={() => setExpanded(false)}
-            component={
-                <ErrorDisplay error={{message: error?.message, traceback: error?.stack}} title={label} />
-            }
-        />
-        <label className="text-red-500">Error in component:</label>
-        <label className="text-red-500">{label}</label>
-        </>
-    );
-});
-
 // how close is this to something we could use from AddChartDialog?
 /**
  * A component for rendering a GUI setting.
@@ -560,11 +535,27 @@ export const AbstractComponent = observer(
             //todo use zod to validate the props object
             console.error(`Unknown component type: '${props.type}'`);
             const errorObj = { props, error: `Unknown component type: ${props.type}` };
-            return <ErrorComponent error={errorObj} label={props.label} />;
+            return (
+                <div className="col-span-3 w-full"> 
+                    <ErrorComponentReactWrapper title={errorObj.error} error={{message: errorObj.error}} extraMetaData={errorObj.props} />
+                </div>
+            );
         }
         return (
             <div className="grid p-2 pr-4 justify-items-start" style={{ gridTemplateColumns: "1fr 2fr" }}>
-                <ErrorBoundary fallbackRender={({error}) => <ErrorComponent error={error} label={props.label} />}>
+                <ErrorBoundary
+                    FallbackComponent={({error}) =>
+                        (
+                        <div className="col-span-3 w-full"> 
+                            <ErrorComponentReactWrapper 
+                                error={{message: error.message, stack: error.stack}} 
+                                extraMetaData={props} 
+                                title={`Error displaying '${props.label}'. Click to view details`}
+                            />
+                        </div>
+                        )
+                    }
+                >
                     <Component props={props} />
                 </ErrorBoundary>
             </div>

@@ -24,6 +24,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 import { TextFieldExtended } from "./TextFieldExtended";
 import { isArray } from "@/lib/utils";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -610,12 +611,32 @@ const SelectionDialogComponent = () => {
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
             <ErrorBoundary FallbackComponent={
-                ({ error }) => <ErrorDisplay error={{message: error.message, traceback: error.stack}} extraMetadata={{stack: error.stack.toString()}} title="Error displaying 'AddRowComponent'." />
+                ({ error }) => 
+                    (
+                        <div className="col-span-3 w-full"> 
+                            <ErrorComponentReactWrapper 
+                                error={{message: error.message, stack: error.stack}} 
+                                //todo assign proper meta data
+                                // extraMetaData={} 
+                                title={`Error displaying 'AddRowComponent'. Click to view details`}
+                            />
+                        </div>
+                        )
             }>
                 <AddRowComponent />
             </ErrorBoundary>
             <ErrorBoundary FallbackComponent={
-                ({ error }) => <ErrorDisplay error={error} title="Error displaying linked rows." />
+                ({ error }) => 
+                    (
+                        <div className="col-span-3 w-full"> 
+                            <ErrorComponentReactWrapper 
+                                error={{message: error.message, stack: error.stack}} 
+                                //todo assign proper meta data
+                                // extraMetaData={} 
+                                title={`Error displaying linked rows. Click to view details`}
+                            />
+                        </div>
+                    )
             }>
                 <ForeignRows />
             </ErrorBoundary>
