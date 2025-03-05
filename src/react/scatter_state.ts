@@ -1,6 +1,5 @@
 import type { Matrix4 } from "@math.gl/core";
 import type { PickingInfo } from "@deck.gl/core";
-import type { ScatterPlotConfig } from "./components/VivMDVReact";
 import { useChart } from "./context";
 import {
     useChartID,
@@ -19,7 +18,61 @@ import {
     ScatterDensityExension,
 } from "../webgl/ScatterDeckExtension";
 import { useHighlightedIndex } from "./selectionHooks";
-import { useLegacyDualContour } from "./contour_state";
+import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
+import type { ColumnName } from "@/charts/charts";
+
+export type TooltipConfig = {
+    tooltip: {
+        show: boolean;
+        column?: ColumnName;
+    };
+};
+export type CategoryFilter = {
+    column: ColumnName;
+    category: string | string[];
+    // consider properties like 'invert' or 'exclude', or 'color'...
+};
+//viewState should be persisted... maybe a way of saving different snapshots?
+//now using MobX for this, in a way that's common to viv & non-viv charts
+export type ScatterPlotConfig = {
+    course_radius: number;
+    radius: number;
+    opacity: number;
+    // color_by: ColumnName;
+    // color_legend: {
+    //     display: boolean;
+    //     // todo: add more options here...
+    // };
+    category_filters: Array<CategoryFilter>;
+    on_filter: "hide" | "grey", //todo...
+    zoom_on_filter: boolean;
+    point_shape: "circle" | "square" | "gaussian";
+    dimension: "2d" | "3d";
+} & TooltipConfig &
+    DualContourLegacyConfig;
+export const scatterDefaults: ScatterPlotConfig = {
+    course_radius: 1,
+    radius: 10,
+    opacity: 1,
+    // color_by: null,
+    // color_legend: {
+    //     display: false,
+    // },
+    tooltip: {
+        show: false,
+    },
+    category_filters: [],
+    zoom_on_filter: false,
+    point_shape: "circle",
+    contour_fill: false,
+    contour_bandwidth: 0.1,
+    contour_intensity: 1,
+    contour_opacity: 0.5,
+    dimension: "2d",
+    on_filter: "grey",
+};
+
+
 
 export function useRegionScale() {
     const metadata = useMetadata();
