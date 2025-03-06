@@ -1,11 +1,12 @@
 import { CTypes, isMultiColumn } from "@/lib/columnTypeHelpers";
 import { observer } from "mobx-react-lite";
 import { RowsAsColsProps } from "./LinksComponent";
-import { DataColumn, DataType, GuiSpec } from "@/charts/charts";
+import { DropdownMappedValues, GuiSpec } from "@/charts/charts";
 import { useMemo } from "react";
 import { action, makeAutoObservable } from "mobx";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import { g } from "@/lib/utils";
+import { getFieldName } from "@/links/link_utils";
 /**
  * A hook for managing the state of manually chosen columns from a rows-as-columns link.
  * 
@@ -16,8 +17,15 @@ import { g } from "@/lib/utils";
 function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
     const { linkedDs, link } = props;
     const { name_column, name, subgroups } = link;
-    const cm = window.mdv.chartManager;
-    const targetColumn = cm.getDataSource(linkedDs.name).columnIndex[name_column] as DataColumn<DataType>;
+    const targetColumn = linkedDs.dataStore.columnIndex[name_column];
+    if (!targetColumn) {
+        throw new Error(`Could not find name_column '${name_column}' in linked dataset`);
+    }
+    if (linkedDs.size > 2**16) {
+        // If we have more than 2^16 rows, I think that means there must be some duplicates...
+        // so this is potentially somewhat undefined behaviour.
+        console.warn(`Linked dataset has more than 2^16 rows, this may lead to unexpected behaviour`);
+    }
     // we need to associate each value with the row index that references it...
     // as far as the code is concerned, this isn't necessarily a 1:1 mapping - but as my understanding of the logic
     // it should be...
@@ -25,31 +33,57 @@ function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
     // - more than one row with the same "gene_id"; I think this leads to undefined behaviour, we should give a warning
     // - "gene_id" that doesn't have any corresponding row... maybe this doesn't matter, but we should filter those values out???
     //   (and probably also log a warning)
-    // - If we have more than 2^16 rows, I think that means there must be some duplicates...
 
     // Loop through the values and create the format in pipes '|', by making use of the index.
-    //todo - what if we have multiple subgroups, need to take care of that the target column is not returning subgroups
-    const formattedValues = targetColumn.values.map((value, index) => (`${Object.keys(subgroups)[0]}|${value} (${Object.keys(subgroups)[0]})|${index}`))
+    //todo - we need to let the user select subgroup...
+    //^^ do we allow a mix-match of links/subgroups? We could... but that doesn't mean we should.
+    //(we should only do so if we have a clean way of presenting it to the user)
+    const sg = Object.keys(subgroups)[0];
     
-    return {values: targetColumn.values, formattedValues}; //this output should be in the 'FieldName' form with pipes
+    // return values in a format that can be used by the dropdown component
+    const values = useMemo(() => {
+        const labelValueObjects = link.valueToRowIndex.entries().map(([value, rowIndex]) => ({
+            label: value,
+            fieldName: getFieldName(sg, value, rowIndex)
+        }));
+        // tricky type here... but 'satisfies' gives us a bit of confidence that we're getting something that will work
+        // ! better than `as` typecasting when possible.
+        return [[...labelValueObjects], "label", "fieldName"] as const satisfies DropdownMappedValues<"label", "fieldName">;
+    }, [targetColumn.values, sg]);
+    
+    return { values };
 }
 
+/**
+ * This presents the user with a method for selecting column(s) corresponding to a linked dataset.
+ * 
+ * There should be a re-usable component for selecting values from a category column, and this should be used here,
+ * referring to the `link.name_column` column of the linked dataset.
+ * 
+ * Values that this component operates on - at the time of writing - will be in a `FieldName` (`string`) format, with pipes separating
+ * `subgroup|value (subgroup)|index`, where `subgroup` is the name of the user-selected subgroup, `value (subgroup)` is a human-readable
+ * representation of the value, and `index` is the index of the value in the column.
+ */
 const LinkToColumnComponent = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
     const { linkedDs, link } = props;
     const { name_column, name, subgroups } = link;
-    const {values, formattedValues} = useLinkTargetValues(props);
+    const { values } = useLinkTargetValues(props);
     const { setSelectedColumn, current_value } = props;
     //@ts-expect-error need to review isMultiType logic
     const isMultiType = isMultiColumn(props.type);
     // nb, the <"multidropdown" | "dropdown"> type parameter ends up causing problem vs <"multidropdown"> | <"dropdown">
     // - would be nice to be able to avoid that, this is really difficult to understand and work with.
     // maybe we should have a branch that returns a totally different g() for multidropdown, for example.
+    // todo - consider a g<"category"> | g<"multicategory"> for cases such as this where we're chosing row values
+    // - this is also used for other things (e.g. density)
+    //   (where we don't necessarily need all the faff with associated row indices)
+    // - also as well as multi/single chosen options, there is 'multitext' which is a different thing, with a different interface...
     const spec = useMemo(() => makeAutoObservable(g<"multidropdown" | "dropdown">({
+        type: 'multidropdown', //!wrong - need to adapt this along with current_value
         // type: isMultiType ? 'multidropdown' : 'dropdown',
-        type: 'multidropdown',
-        // name: name_column,
         label: `specific '${name}' column`, //todo different label for multiple
-        values: [values],
+        // no ts error! praise be!
+        values,
         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
         current_value: current_value ? [`${current_value}`] : [],
         func: action((v) => {

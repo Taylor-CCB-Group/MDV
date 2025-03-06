@@ -157,7 +157,7 @@ type DropdownMappedValue<T extends string, V extends string> = {
     [P in T]: string;
 } & { [P in V]: string };
 /** tuple of `[{textKey: string, valueKey: string}[], textKey, valueKey]` where `textKey` and `valueKey` are string properties of the object. */
-type DropdownMappedValues<TextKey extends string, ValueKey extends string> = [
+export type DropdownMappedValues<TextKey extends string, ValueKey extends string> = [
     Array<DropdownMappedValue<TextKey, ValueKey>>,
     TextKey,
     ValueKey,
