@@ -10,6 +10,9 @@ import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
 import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import ActiveLinkComponent from "./ActiveLinkComponent.js";
 
+
+type ColumnMode = "column" | "link" | "activeLink";
+
 /**
  * A component for selecting a column from the data store - which can entail quite complex UI
  * and state for things like synthesising columns from linked data etc.
@@ -18,14 +21,12 @@ import ActiveLinkComponent from "./ActiveLinkComponent.js";
  * (e.g. if we're in a more global dialog etc rather than a chart context,
  * this would be ambiguous).
  */
-const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => { //GuiSpec<"column">) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
-    const [activeTab, setActiveTab] = useState(0);
+const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => {
+    const [activeTab, setActiveTab] = useState<ColumnMode>("link");
     const theme = useTheme();
-    const { current_value } = props;
-
-    //todo find a way to check for the type of current value and set active tab
+    
+    //todo check for the type of current value and set active tab
+    // const { current_value } = props;
     // useEffect(() => {
     //     // Setting the active tab based on the type of current value
     //     if (current_value) {
@@ -38,83 +39,76 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     //     }
     // }, [current_value, setActiveTab]);
 
-    const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
     const rowLinkProps = useRowsAsColumnsLinks()[0]; //todo: arbitrary number of links
-    //@ts-ignore nonsense about setBoolean type
-    if (!linkProps) return <ColumnDropdownComponent {...props} {...guiProps} />;
-    // In general, this should (probably) be using our "(multi)dropdown" component
-    // and the <LinksComponent /> can select which column options to show.
+    if (!linkProps) return <ColumnDropdownComponent {...props} />;
 
     return (
         <>
         {rowLinkProps ? (
-            <Paper className="mx-auto px-4 py-2 w-full" variant="outlined" sx={{backgroundColor: "transparent"}}>
-                        <div className="w-full flex justify-around text-xs font-medium">
+            <Paper className="mx-auto w-full" variant="outlined" sx={{backgroundColor: "transparent"}}>
+                        <div className="w-full flex justify-around text-xs font-light">
                         <button
-                            onClick={() => setActiveTab(0)}
+                            onClick={() => setActiveTab("column")}
                             type="button"
                             className="p-2 text-center border-b-2 transition-colors w-full"
                             style={{
-                                borderColor: activeTab === 0 ? theme.palette.primary.main : theme.palette.divider,
+                                borderColor: activeTab === "column" ? theme.palette.primary.main : theme.palette.divider,
                                 color:
-                                activeTab === 0
-                                    ? theme.palette.primary.main
-                                    : theme.palette.text.primary,
+                                    activeTab === "column"
+                                        ? theme.palette.primary.main
+                                        : theme.palette.text.primary,
                             }}
                         >
-                        Column
+                            Column
                         </button>
                         <button
-                            onClick={() => setActiveTab(1)}
+                            onClick={() => setActiveTab("link")}
                             type="button"
                             className="p-2 text-center border-b-2 transition-colors w-full"
                             style={{
-                            borderColor: activeTab === 1 ? theme.palette.primary.main : theme.palette.divider,
-                            color:
-                                activeTab === 1
-                                ? theme.palette.primary.main
-                                : theme.palette.text.primary,
+                                borderColor: activeTab === "link" ? theme.palette.primary.main : theme.palette.divider,
+                                color:
+                                    activeTab === "link"
+                                        ? theme.palette.primary.main
+                                        : theme.palette.text.primary,
                             }}
                         >
-                        Link
+                            Link
                         </button>
 
                         <button
-                            onClick={() => setActiveTab(2)}
+                            onClick={() => setActiveTab("activeLink")}
                             type="button"
                             className="p-2 text-center border-b-2 transition-colors w-full"
                             style={{
-                            borderColor: activeTab === 2 ? theme.palette.primary.main : theme.palette.divider,
-                            color:
-                                activeTab === 2
-                                ? theme.palette.primary.main
-                                : theme.palette.text.primary,
+                                borderColor: activeTab === "activeLink" ? theme.palette.primary.main : theme.palette.divider,
+                                color:
+                                    activeTab === "activeLink"
+                                        ? theme.palette.primary.main
+                                        : theme.palette.text.primary,
                             }}
                         >
-                        Active Link
+                            Active Link
                         </button>
                     </div>
 
-                    <div className="py-4">
-                        {activeTab === 0 && (
-                        /* we may want to show something different, especially if special value is selected... */                       
-                        /* @ts-ignore setExpanded type */
-                        <ColumnDropdownComponent {...props} {...guiProps} />
+                    <div className="p-4">
+                        {activeTab === "column" && (
+                            <ColumnDropdownComponent {...props} />
                         )}
-                        {activeTab === 1 && (
-                                <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
-                            
+                        {activeTab === "link" && (
+                            <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
+
                         )}
-                        {activeTab === 2 && (
-                                <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
+                        {activeTab === "activeLink" && (
+                            <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
                         )}
                     </div>
-            </Paper>
-        ) : (
-                /* @ts-ignore setExpanded type */
-                <ColumnDropdownComponent {...props} {...guiProps} />
-        )}
+                </Paper>
+            ) : (
+                <ColumnDropdownComponent {...props} />
+            )}
         </>
     );
 });

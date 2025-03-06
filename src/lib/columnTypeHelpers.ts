@@ -70,16 +70,9 @@ export function isMultiColumn(type: CTypes): type is MultiColumnPrefix | Param[]
     return typeof type === "string" && type.startsWith("_multi_column:");
 }
 export function inferGenericColumnGuiProps<T extends CTypes>(
-    props: ColumnSelectionProps<T> & GuiStateProps
-): ColumnSelectionProps<T> & GuiStateProps {
+    props: ColumnSelectionProps<T>
+): ColumnSelectionProps<T> {
     return props;
-}
-type setBoolean = ReturnType<typeof useState<boolean>>[1];
-type GuiStateProps = {
-    isExpanded: boolean;
-    setIsExpanded: setBoolean;
-    isAutocompleteFocused: boolean;
-    setIsAutocompleteFocused: setBoolean;
 }
 /**
  * This is for filtering columns based on some relatively complex type specification potentially including things like `"_multi_column:number"`...
