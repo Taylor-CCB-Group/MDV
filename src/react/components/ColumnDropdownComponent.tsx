@@ -53,18 +53,6 @@ const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<
         [dataStore, props.exclude, type],
     );
 
-    useEffect(() => {
-        autorun(() => {
-            if (isMultiType) {
-                // todo - need to put a valid check for current value and set it accordingly
-                setSelectedColumn([columns[0].field] as any);
-            } else {
-                if (!columns.find(c => c.field === current_value))
-                    setSelectedColumn(columns[0].field as any);
-            }
-        });
-    }, [isMultiType, columns, current_value, setSelectedColumn]);
-
     return {setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded,isMultiType, columns, current_value};
 
 };
@@ -84,7 +72,6 @@ const ColumnDropdownComponent = observer(<T extends CTypes,>(gProps: ColumnSelec
     return (
         <Grid className="w-full items-center" container>
             <Grid size={"grow"}>
-                {current_value &&
                 <Autocomplete
                     className="w-full"
                     options={columns}
@@ -141,7 +128,6 @@ const ColumnDropdownComponent = observer(<T extends CTypes,>(gProps: ColumnSelec
                         );
                     }}
                 />
-}
             </Grid>
         </Grid>
     );

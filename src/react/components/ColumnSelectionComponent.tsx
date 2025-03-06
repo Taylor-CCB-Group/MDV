@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { observer } from "mobx-react-lite";
 // todo - get the gui looking respectable with LinksComponent, and get it to work.
 // todo - get multiple working properly.
@@ -23,6 +23,20 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
     const [activeTab, setActiveTab] = useState(0);
     const theme = useTheme();
+    const { current_value } = props;
+
+    //todo find a way to check for the type of current value and set active tab
+    // useEffect(() => {
+    //     // Setting the active tab based on the type of current value
+    //     if (current_value) {
+    //         if (typeof current_value === 'string') {
+    //             if (current_value.includes("|")) setActiveTab(1);
+    //             else setActiveTab(0);
+    //         } else {
+    //             setActiveTab(2);
+    //         }
+    //     }
+    // }, [current_value, setActiveTab]);
 
     const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
@@ -34,70 +48,73 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
 
     return (
         <>
+        {rowLinkProps ? (
             <Paper className="mx-auto px-4 py-2 w-full" variant="outlined">
-                <div className="w-full flex justify-around text-xs font-medium">
-                    <button
-                        onClick={() => setActiveTab(0)}
-                        type="button"
-                        className="p-2 text-center border-b-2 transition-colors w-full"
-                        style={{
-                            borderColor: activeTab === 0 ? theme.palette.primary.main : theme.palette.divider,
+                        <div className="w-full flex justify-around text-xs font-medium">
+                        <button
+                            onClick={() => setActiveTab(0)}
+                            type="button"
+                            className="p-2 text-center border-b-2 transition-colors w-full"
+                            style={{
+                                borderColor: activeTab === 0 ? theme.palette.primary.main : theme.palette.divider,
+                                color:
+                                activeTab === 0
+                                    ? theme.palette.primary.main
+                                    : theme.palette.text.primary,
+                            }}
+                        >
+                        Column
+                        </button>
+                        <button
+                            onClick={() => setActiveTab(1)}
+                            type="button"
+                            className="p-2 text-center border-b-2 transition-colors w-full"
+                            style={{
+                            borderColor: activeTab === 1 ? theme.palette.primary.main : theme.palette.divider,
                             color:
-                            activeTab === 0
+                                activeTab === 1
                                 ? theme.palette.primary.main
                                 : theme.palette.text.primary,
-                        }}
-                    >
-                    Column
-                    </button>
-                    {rowLinkProps && (<button
-                        onClick={() => setActiveTab(1)}
-                        type="button"
-                        className="p-2 text-center border-b-2 transition-colors w-full"
-                        style={{
-                        borderColor: activeTab === 1 ? theme.palette.primary.main : theme.palette.divider,
-                        color:
-                            activeTab === 1
-                            ? theme.palette.primary.main
-                            : theme.palette.text.primary,
-                        }}
-                    >
-                    Link
-                    </button>
-                    )}
+                            }}
+                        >
+                        Link
+                        </button>
 
-                    {rowLinkProps && (<button
-                        onClick={() => setActiveTab(2)}
-                        type="button"
-                        className="p-2 text-center border-b-2 transition-colors w-full"
-                        style={{
-                        borderColor: activeTab === 2 ? theme.palette.primary.main : theme.palette.divider,
-                        color:
-                            activeTab === 2
-                            ? theme.palette.primary.main
-                            : theme.palette.text.primary,
-                        }}
-                    >
-                    Active Link
-                    </button>
-                    )}
-                </div>
+                        <button
+                            onClick={() => setActiveTab(2)}
+                            type="button"
+                            className="p-2 text-center border-b-2 transition-colors w-full"
+                            style={{
+                            borderColor: activeTab === 2 ? theme.palette.primary.main : theme.palette.divider,
+                            color:
+                                activeTab === 2
+                                ? theme.palette.primary.main
+                                : theme.palette.text.primary,
+                            }}
+                        >
+                        Active Link
+                        </button>
+                    </div>
 
-                <div className="py-4">
-                    {activeTab === 0 && (
-                    /* we may want to show something different, especially if special value is selected... */                       
-                    /* @ts-ignore setExpanded type */
-                    <ColumnDropdownComponent {...props} {...guiProps} />
-                    )}
-                    {activeTab === 1 && rowLinkProps && (
-                            <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
-                        
-                    )}
-                    {activeTab === 2 && rowLinkProps && (
-                            <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
-                    )}
-                </div>
+                    <div className="py-4">
+                        {activeTab === 0 && (
+                        /* we may want to show something different, especially if special value is selected... */                       
+                        /* @ts-ignore setExpanded type */
+                        <ColumnDropdownComponent {...props} {...guiProps} />
+                        )}
+                        {activeTab === 1 && (
+                                <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
+                            
+                        )}
+                        {activeTab === 2 && (
+                                <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
+                        )}
+                    </div>
             </Paper>
+        ) : (
+                /* @ts-ignore setExpanded type */
+                <ColumnDropdownComponent {...props} {...guiProps} />
+        )}
         </>
     );
 });

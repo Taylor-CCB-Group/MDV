@@ -41,7 +41,6 @@ const LinkToColumnComponent = observer(<T extends CTypes,>(props: RowsAsColsProp
     const { setSelectedColumn, current_value } = props;
     //@ts-expect-error need to review isMultiType logic
     const isMultiType = isMultiColumn(props.type);
-
     // nb, the <"multidropdown" | "dropdown"> type parameter ends up causing problem vs <"multidropdown"> | <"dropdown">
     // - would be nice to be able to avoid that, this is really difficult to understand and work with.
     // maybe we should have a branch that returns a totally different g() for multidropdown, for example.
@@ -52,7 +51,7 @@ const LinkToColumnComponent = observer(<T extends CTypes,>(props: RowsAsColsProp
         label: `specific '${name}' column`, //todo different label for multiple
         values: [values],
         //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
-        current_value: [values[0]],
+        current_value: current_value ? [`${current_value}`] : [],
         func: action((v) => {
             // we don't set current_value here, we use the setSelectedColumn function
             // props.current_value = isMultiType ? v : v[0];
@@ -60,7 +59,7 @@ const LinkToColumnComponent = observer(<T extends CTypes,>(props: RowsAsColsProp
             // @ts-expect-error maybe we'll make it so that we have a hook returning a setSelectedLinkedColumn function of narrower type
             setSelectedColumn(isMultiType ? v : v[0])
         })
-    })), [values, name, isMultiType, setSelectedColumn]);
+    })), [values, name, isMultiType, setSelectedColumn, current_value]);
     // const { current_value } = spec;
     return (
         <div className="flex flex-col" style={{ textAlign: 'left' }}>
