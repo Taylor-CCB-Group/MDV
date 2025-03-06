@@ -9,9 +9,10 @@ import Autocomplete from "@mui/material/Autocomplete";
 import BaseChart from "../BaseChart";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
-import { AppBar, Box, Button, Dialog, Grid, Paper, Typography } from "@mui/material";
+import { Button, Dialog, Divider, IconButton, Paper } from "@mui/material";
+import Grid from "@mui/material/Grid2";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
-import { action, observable, reaction, runInAction, toJS } from "mobx";
+import { action, observable, reaction, toJS } from "mobx";
 import z from "zod";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
@@ -19,6 +20,13 @@ import { columnMatchesType } from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
 import { isArray } from "@/lib/utils.js";
 import { serialiseConfig } from "../chartConfigUtils.js";
+import "react18-json-view/src/style.css";
+// If dark mode is needed, import `dark.css`.
+import "react18-json-view/src/dark.css";
+import "../../utilities/css/JsonDialogStyles.css";
+import { Close as CloseIcon } from "@mui/icons-material";
+import { ErrorBoundary } from "react-error-boundary";
+import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper.js";
 
 // how do I match this with the type in link_utils?
 //! using zod here is an extra layer of complexity and it's not at all clear that this is the place for it
@@ -106,10 +114,18 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
     }, [config, dataStore, chartType]);
     const { _updated, ...configWithoutUpdated } = toJS(config);
     return (
-        <div className="grid grid-cols-2">
+        <div className="grid grid-cols-2 px-3 py-5">
             {/* <h2>Chart Preview</h2> */}
-            <JsonView src={configWithoutUpdated} collapsed collapseStringsAfterLength={10} />
-            <JsonView src={scratchProps} collapsed />
+            <JsonView style={{
+                    backgroundColor: 'transparent',
+                    fontSize: '0.875rem',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                }} src={configWithoutUpdated} collapseStringsAfterLength={10} collapsed={1} />
+            <JsonView style={{
+                    backgroundColor: 'transparent',
+                    fontSize: '0.875rem',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                }} src={scratchProps} collapsed={1} />
         </div>
     );
 });
@@ -274,9 +290,21 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
         onDone();
     }, [config, dataStore, onDone, chartType]);
     return (
-        <>
-            <Grid container spacing={2} sx={{margin: 1, width: '50em'}}>
-                <Grid item xs={6}>
+        <ErrorBoundary FallbackComponent={({error}) =>
+            (
+            <div className="flex items-center" style={{width: 600, height: 420}}> 
+                <ErrorComponentReactWrapper 
+                    error={{message: error.message, stack: error.stack}} 
+                    extraMetaData={config} 
+                    title={chartType?.name 
+                        ? `Error creating '${chartType?.name}'. Click to view details`
+                        : 'Something went wrong. Click to view details'}
+                />
+            </div>
+            )
+        }>
+            <Grid container spacing={2} sx={{margin: 1, padding: 2, width: '50em'}}>
+                <Grid size={6}>
                     <Grid container direction={"column"} spacing={1}
                     sx={{gap: 1}}
                     >
@@ -297,7 +325,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                         />
                     </Grid>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={6}>
                     <Grid container direction={"column"} spacing={1}
                     sx={{gap: 1}}
                     >
@@ -324,6 +352,8 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                                 config._updated = new Date();
                             })}
                             type={p.type}
+                            //@ts-expect-error - fix incompatible type for config param
+                            current_value={config.param?.[i]}
                             />
                         ))}
                         {extraControls && <h2>Extra Controls</h2>}
@@ -334,10 +364,27 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     </Grid>
                 </Grid>
             </Grid>
-            <AppBar position="absolute" sx={{ top: 'auto', bottom: 0 }}>
-                <Button variant="contained" color="primary" onClick={addChart}>Add Chart</Button>
-            </AppBar>
-        </>
+            <Divider />
+            <div>
+                {/* NOTE - before config._updated was added, this causes update when config.legend chages,
+                    otherwise not unless we spread config... and then nested `config.params[i] = c` updates didn't work */}
+                <ChartPreview config={{...config}} />
+            </div>
+            <div>
+                <Button 
+                    sx={{
+                        width: "100%", 
+                        paddingY: 1, 
+                        borderTopLeftRadius: 0, 
+                        borderTopRightRadius: 0
+                    }} 
+                    variant="contained"
+                    onClick={addChart}
+                >
+                        Add Chart
+                </Button>
+            </div>
+        </ErrorBoundary>
     );
 });
 
@@ -347,16 +394,16 @@ const AddChartDialogComponent = observer(
         return (
             <>
                 <DataStoreContext.Provider value={dataStore}>
-                    <div className="align-top">
+                    {/* <div className="align-top"> */}
                     <ConfigureChart config={config} onDone={onDone} />
-                    </div>
+                    {/* </div> */}
                     {/* NOTE - before config._updated was added, this causes update when config.legend chages,
                     otherwise not unless we spread config... and then nested `config.params[i] = c` updates didn't work */}
                     {/* <div>
                         <p>Chart Preview: "{config.legend}"</p>
                         <JsonView src={{...config}} />
                     </div> */}
-                    <ChartPreview config={{...config}} />
+                    {/* <ChartPreview config={{...config}} /> */}
                 </DataStoreContext.Provider>
             </>
         )
@@ -407,9 +454,23 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
             }}
         >
             <div className="h-screen flex items-center justify-center">
-                <Paper elevation={2} sx={{ p: 2 }}>
-                    <h1>Add Chart in "{props.dataStore.name}"...</h1>
-                    <AddChartDialogComponent {...props} config={config} />
+                <Paper 
+                    elevation={24} 
+                    style={{backgroundColor: "var(--dlg_background_color)", backgroundImage: 'none'}}
+                >
+                    <div 
+                        className="p-3 rounded-t-sm flex justify-between items-center" 
+                        style={{ backgroundColor: "var(--menu_bar_color)" }}
+                    >
+                        <h2>Add Chart in "{props.dataStore.name}"</h2>
+                        <IconButton onClick={() => {
+                            setOpen(false);
+                            props.onDone();
+                        }}>
+                            <CloseIcon sx={{ fontSize: "1.5rem" }} />
+                        </IconButton>
+                    </div>
+                        <AddChartDialogComponent {...props} config={config} />
                 </Paper>
             </div>
         </Dialog>

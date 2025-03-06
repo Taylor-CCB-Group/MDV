@@ -49,7 +49,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     return (
         <>
         {rowLinkProps ? (
-            <Paper className="mx-auto px-4 py-2 w-full" variant="outlined">
+            <Paper className="mx-auto px-4 py-2 w-full" variant="outlined" sx={{backgroundColor: "transparent"}}>
                         <div className="w-full flex justify-around text-xs font-medium">
                         <button
                             onClick={() => setActiveTab(0)}
