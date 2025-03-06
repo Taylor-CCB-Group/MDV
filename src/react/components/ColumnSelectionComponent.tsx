@@ -10,6 +10,9 @@ import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
 import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import ActiveLinkComponent from "./ActiveLinkComponent.js";
 
+
+type ColumnMode = "column" | "link" | "activeLink";
+
 /**
  * A component for selecting a column from the data store - which can entail quite complex UI
  * and state for things like synthesising columns from linked data etc.
@@ -19,7 +22,7 @@ import ActiveLinkComponent from "./ActiveLinkComponent.js";
  * this would be ambiguous).
  */
 const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => {
-    const [activeTab, setActiveTab] = useState(0);
+    const [activeTab, setActiveTab] = useState<ColumnMode>("link");
     const theme = useTheme();
     
     //todo check for the type of current value and set active tab
@@ -43,16 +46,16 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     return (
         <>
             {rowLinkProps ? (
-                <Paper className="mx-auto px-4 py-2 w-full" variant="outlined">
+                <Paper className="mx-auto w-full" variant="outlined">
                     <div className="w-full flex justify-around text-xs font-light">
                         <button
-                            onClick={() => setActiveTab(0)}
+                            onClick={() => setActiveTab("column")}
                             type="button"
                             className="p-2 text-center border-b-2 transition-colors w-full"
                             style={{
-                                borderColor: activeTab === 0 ? theme.palette.primary.main : theme.palette.divider,
+                                borderColor: activeTab === "column" ? theme.palette.primary.main : theme.palette.divider,
                                 color:
-                                    activeTab === 0
+                                    activeTab === "column"
                                         ? theme.palette.primary.main
                                         : theme.palette.text.primary,
                             }}
@@ -60,13 +63,13 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                             Column
                         </button>
                         <button
-                            onClick={() => setActiveTab(1)}
+                            onClick={() => setActiveTab("link")}
                             type="button"
                             className="p-2 text-center border-b-2 transition-colors w-full"
                             style={{
-                                borderColor: activeTab === 1 ? theme.palette.primary.main : theme.palette.divider,
+                                borderColor: activeTab === "link" ? theme.palette.primary.main : theme.palette.divider,
                                 color:
-                                    activeTab === 1
+                                    activeTab === "link"
                                         ? theme.palette.primary.main
                                         : theme.palette.text.primary,
                             }}
@@ -75,13 +78,13 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                         </button>
 
                         <button
-                            onClick={() => setActiveTab(2)}
+                            onClick={() => setActiveTab("activeLink")}
                             type="button"
                             className="p-2 text-center border-b-2 transition-colors w-full"
                             style={{
-                                borderColor: activeTab === 2 ? theme.palette.primary.main : theme.palette.divider,
+                                borderColor: activeTab === "activeLink" ? theme.palette.primary.main : theme.palette.divider,
                                 color:
-                                    activeTab === 2
+                                    activeTab === "activeLink"
                                         ? theme.palette.primary.main
                                         : theme.palette.text.primary,
                             }}
@@ -90,16 +93,15 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                         </button>
                     </div>
 
-                    <div className="py-4">
-                        {activeTab === 0 && (
-                            /* we may want to show something different, especially if special value is selected... */
+                    <div className="p-4">
+                        {activeTab === "column" && (
                             <ColumnDropdownComponent {...props} />
                         )}
-                        {activeTab === 1 && (
+                        {activeTab === "link" && (
                             <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
 
                         )}
-                        {activeTab === 2 && (
+                        {activeTab === "activeLink" && (
                             <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
                         )}
                     </div>
