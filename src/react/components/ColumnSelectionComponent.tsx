@@ -22,7 +22,7 @@ type ColumnMode = "column" | "link" | "activeLink";
  * this would be ambiguous).
  */
 const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => {
-    const [activeTab, setActiveTab] = useState<ColumnMode>("link");
+    const [activeTab, setActiveTab] = useState<ColumnMode>("column");
     const theme = useTheme();
     
     //todo check for the type of current value and set active tab
