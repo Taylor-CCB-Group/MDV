@@ -48,9 +48,9 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
 
     return (
         <>
-        {rowLinkProps ? (
-            <Paper className="mx-auto px-4 py-2 w-full" variant="outlined">
-                        <div className="w-full flex justify-around text-xs font-medium">
+            {rowLinkProps ? (
+                <Paper className="mx-auto px-4 py-2 w-full" variant="outlined">
+                    <div className="w-full flex justify-around text-xs font-medium">
                         <button
                             onClick={() => setActiveTab(0)}
                             type="button"
@@ -58,26 +58,26 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                             style={{
                                 borderColor: activeTab === 0 ? theme.palette.primary.main : theme.palette.divider,
                                 color:
-                                activeTab === 0
-                                    ? theme.palette.primary.main
-                                    : theme.palette.text.primary,
+                                    activeTab === 0
+                                        ? theme.palette.primary.main
+                                        : theme.palette.text.primary,
                             }}
                         >
-                        Column
+                            Column
                         </button>
                         <button
                             onClick={() => setActiveTab(1)}
                             type="button"
                             className="p-2 text-center border-b-2 transition-colors w-full"
                             style={{
-                            borderColor: activeTab === 1 ? theme.palette.primary.main : theme.palette.divider,
-                            color:
-                                activeTab === 1
-                                ? theme.palette.primary.main
-                                : theme.palette.text.primary,
+                                borderColor: activeTab === 1 ? theme.palette.primary.main : theme.palette.divider,
+                                color:
+                                    activeTab === 1
+                                        ? theme.palette.primary.main
+                                        : theme.palette.text.primary,
                             }}
                         >
-                        Link
+                            Link
                         </button>
 
                         <button
@@ -85,36 +85,36 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                             type="button"
                             className="p-2 text-center border-b-2 transition-colors w-full"
                             style={{
-                            borderColor: activeTab === 2 ? theme.palette.primary.main : theme.palette.divider,
-                            color:
-                                activeTab === 2
-                                ? theme.palette.primary.main
-                                : theme.palette.text.primary,
+                                borderColor: activeTab === 2 ? theme.palette.primary.main : theme.palette.divider,
+                                color:
+                                    activeTab === 2
+                                        ? theme.palette.primary.main
+                                        : theme.palette.text.primary,
                             }}
                         >
-                        Active Link
+                            Active Link
                         </button>
                     </div>
 
                     <div className="py-4">
                         {activeTab === 0 && (
-                        /* we may want to show something different, especially if special value is selected... */                       
-                        /* @ts-ignore setExpanded type */
-                        <ColumnDropdownComponent {...props} {...guiProps} />
+                            /* we may want to show something different, especially if special value is selected... */
+                            /* @ts-ignore setExpanded type */
+                            <ColumnDropdownComponent {...props} {...guiProps} />
                         )}
                         {activeTab === 1 && (
-                                <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
-                            
+                            <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
+
                         )}
                         {activeTab === 2 && (
-                                <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
+                            <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
                         )}
                     </div>
-            </Paper>
-        ) : (
+                </Paper>
+            ) : (
                 /* @ts-ignore setExpanded type */
                 <ColumnDropdownComponent {...props} {...guiProps} />
-        )}
+            )}
         </>
     );
 });
