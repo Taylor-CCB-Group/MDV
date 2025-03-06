@@ -119,7 +119,7 @@ function listenPreferredColorScheme(callback) {
 * The object to manage charts [Chart Manager](../../docs/extradocs/chartmanager.md)
 * 
 * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
-* @param {object[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
+* @param {import("@/charts/charts").DataSource[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
 * Each config must contain the size parameter, giving the number of rows in the DataStore.
 * @param {object} dataloader - An object containing the following
 *   - function - The [function](../../docs/extradocs/dataloader.md) to load the data
@@ -176,7 +176,7 @@ export class ChartManager {
          *  name - the name given to this data source
          *  menuBar the dom menu associated with this element
          *  contentDiv the div that the charts associated with the datastore will be added
-         * @typedef {import("@/charts/charts/DataSource")} DataSource
+         * @typedef {import("@/charts/charts").DataSource} DataSource
          * @type {DataSource[]}
          */
         this.dataSources = []; //why is this inferred as `any[]`?
