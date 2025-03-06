@@ -204,6 +204,11 @@ export type RowsAsColslink = {
     observableFields: IRowAsColumn[];
     //^^ what if it was iterator instead of Array? and/or `column` can be a computed value?
     // observableColumns: DataColumn<DataType>[]; //computed?
+    /** 
+     * Added at runtime, given a value appearing in `name_column`, the index of a row corresponding to that value.
+     * This can be used in the formation of a {@link FieldName}
+     */
+    valueToRowIndex: Map<string, number>;
 }
 /**
  * Represents an active query for a set of columns based on the currently highlighted or filtered rows.
@@ -283,7 +288,9 @@ export class RowsAsColsQuery implements MultiColumnQuery {
         return new RowsAsColsQuery(link, serialized.linkedDsName, serialized.maxItems);
     }
 }
-
+export function getFieldName(sg: string, value: string, index: number) {
+    return `${sg}|${value} (${sg})|${index}`;
+}
 /** 
  * a given {@param link} will currently have a single listener associated with it,
  * instantiated by this function.
@@ -297,10 +304,30 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
         console.error(`Column ${link.name_column} not found in DataStore ${ds.name}`);
         return;
     }
+    await cm.loadColumnSetAsync([link.name_column], tds.name);
+    if (!isColumnLoaded(nameCol)) {
+        throw new Error(`Column ${link.name_column} not loaded`);
+    }
+
     link.observableFields = []; //this will be populated by setFieldsFromFilter below
+    // we should also add a data structure mapping each name_column value (string) to the index of the corresponding row
+    // which seems to assume a 1:1 mapping between name_column values and rows? Or not? 
+    // While we're here, check for anything that may be inconsistent with our assumptions.
+    // Maybe we can have a lot of rows with the same name_column value, returning equivalent rows_as_columns data?
+    const valueToRowIndex = new Map<string, number>();
+    //! this is O(n) when we shouldn't need it...
+    nameCol.data.forEach((valueIndex, rowIndex) => {
+        const value = nameCol.values[valueIndex];
+        if (valueToRowIndex.has(value)) {
+            console.warn(`Multiple rows with the same value '${value}' in column '${link.name_column}'`);
+        }
+        valueToRowIndex.set(value, rowIndex);
+    });
+    link.valueToRowIndex = valueToRowIndex;
+    
+    
     makeObservable(link, { observableFields: true });
     
-    await cm.loadColumnSetAsync([link.name_column], tds.name);
     //! we have an assumption here that there is only one subgroup
     //(nb, I think this is the thing that there'd be a radio-button for in the UI)
     //(whereas if there were multiple linked dataSources, they'd appear as different buttons for opening the dialog)
@@ -328,7 +355,7 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
         }
         @computed
         get fieldName(): FieldName {
-            return `${sg}|${this.name} (${sg})|${this.index}`;
+            return getFieldName(sg, this.name, this.index);
         }
         @computed
         get column(): DataColumn<DataType> {
