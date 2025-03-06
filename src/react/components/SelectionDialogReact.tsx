@@ -45,19 +45,6 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
             }
         })();
     }
-    getSettings() {
-        const settings = super.getSettings();
-        settings.push(g({
-            type: "multicolumn", //this `type` wasn't make it through to `ColumnDropdown` earlier, but ok now.
-            label: "Columns To filter",
-            current_value: this.config.param,//! this doesn't seem to appear sensibly in the UI atm.
-            func: (v) => {
-                this.config.param = v;
-                // this.removeFilter();
-            }
-        }));
-        return settings;
-    }
 }
 
 BaseChart.types["selection_dialog"] = {
