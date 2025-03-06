@@ -403,7 +403,7 @@ class BaseChart<T extends BaseConfig> {
         //update any charts which use data from the columns
         //(if they haven't already been updated by the filter changing)
         if (!data.hasFiltered) {
-            //@ts-expect-error param type
+            //@ts-expect-error param type - want a version of config with concrete column names as strings
             let cols: string | string[] = this.config.param;
             let isDirty = false;
             if (typeof this.config.param === "string") {
@@ -532,7 +532,6 @@ class BaseChart<T extends BaseConfig> {
         if (typeof this.config.param === "string") {
             cols = [this.config.param];
         }
-        //@ts-ignore ! @ts-expect-error is inconsistent between editor & cli???
         for (const p of cols) {
             if (column === p) {
                 isDirty = true;
