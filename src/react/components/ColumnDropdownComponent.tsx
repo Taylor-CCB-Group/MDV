@@ -40,6 +40,8 @@ const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<
     // - this is starting to do the right thing, still massively confusing
     //@ts-expect-error type of setSelectedColumn is wrong here
     const isMultiType = isMultiColProp(props);
+    // are we sure that props.dataStore will be right 
+    // - are there any inconsistencies between this and the current DataStoreContext?
     const dataStore = useDataStore(props.dataStore);
     // todo column groups
     const columns: DataColumn<DataType>[] = useMemo(
@@ -52,18 +54,18 @@ const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<
         [dataStore, props.exclude, type],
     );
 
+    // todo make a setLocalColumn function, with single / multi type, but only taking strings
+    // also allow "None" if optional
+    // check why SelectionDialog is not working (multi-column)
+
     return {setSelectedColumn, placeholder, type, isMultiType, columns, current_value};
 
 };
 
 /**
  * A component for selecting columns from the data store.
- * Depending on the type, this may be a single column or multiple columns.
- * As well as concrete columns, these columns may be 'virtual' columns representing properties that may
- * change dynamically (e.g. based on selection in a linked data source).
- * Must be in a context where `useDataStore` is available
- * (e.g. if we're in a more global dialog etc rather than a chart context,
- * this would be ambiguous).
+ * Depending on the type, this may be a single column or multiple columns, but for the purposes of this component,
+ * it will only need to understand columns originating from 
  */
 const ColumnDropdownComponent = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T>) => {
     const { setSelectedColumn, placeholder, type, isMultiType, columns, current_value } = useColumnDropdownValue(gProps);

@@ -17,9 +17,14 @@ type ColumnMode = "column" | "link" | "activeLink";
  * A component for selecting a column from the data store - which can entail quite complex UI
  * and state for things like synthesising columns from linked data etc.
  * 
- * Must be in a context where `useDataStore` is available
- * (e.g. if we're in a more global dialog etc rather than a chart context,
- * this would be ambiguous).
+ * When 'linked' data is available, an interface is shown allowing for switching between different 
+ * modes of column selection, each of which has it's own UI as well as hooks for adapting the complex generic
+ * props and narrowing them to simpler types related specifically to the corresponding mode.
+ * 
+ * As of this writing, this more complex functionality is specifically related to `RowsAsCols` links.
+ * 
+ * Must either be used in a context where a `DataStoreContext` is available, or provided with a `dataStore` prop.
+ * (e.g. if we're in a more global dialog etc rather than a chart context, this would be ambiguous).
  */
 const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => {
     const [activeTab, setActiveTab] = useState<ColumnMode>("column");
@@ -31,10 +36,10 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     //     // Setting the active tab based on the type of current value
     //     if (current_value) {
     //         if (typeof current_value === 'string') {
-    //             if (current_value.includes("|")) setActiveTab(1);
-    //             else setActiveTab(0);
+    //             if (current_value.includes("|")) setActiveTab("link");
+    //             else setActiveTab("column");
     //         } else {
-    //             setActiveTab(2);
+    //             setActiveTab("activeLink");
     //         }
     //     }
     // }, [current_value, setActiveTab]);
