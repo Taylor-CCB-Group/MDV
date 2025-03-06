@@ -179,7 +179,7 @@ export class ChartManager {
          * @typedef {import("@/charts/charts").DataSource} DataSource
          * @type {DataSource[]}
          */
-        this.dataSources = []; //why is this inferred as `any[]`?
+        this.dataSources = [];
         /** @type {{[k: string]: DataSource | undefined}} */
         this.dsIndex = {};
         this.columnsLoading = {};
