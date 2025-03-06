@@ -10,6 +10,7 @@ import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
 import type { OrbitViewState } from "@deck.gl/core";
 import type { LoadedDataColumn } from "@/charts/charts";
+import { Axis, Scale } from "@visx/visx";
 
 
 /** todo this should be common for viv / scatter_state, pending refactor
@@ -108,10 +109,14 @@ export default observer(function DeckScatterComponent() {
             if (cz) target[2] = cz.data[index];
             return target as [number, number];
         },
+        // maybe we want a kind of concrete config synthesis that means we have colorBy as a function...
+        // also maybe getPosition...
+        // to what extent is that stuff we want to generalise?
         getFillColor: colorBy ?? [61, 126, 180],
         getLineColor: [0, 0, 0],
         updateTriggers: {
             //! is this triggering? why don't I see the color change?
+            //(only seeing the gray layer - probably missing other relevant changes to scatter_state)
             getFillColor: colorBy,
         },
         billboard: true,
@@ -174,6 +179,11 @@ export default observer(function DeckScatterComponent() {
         });
     }, [width, height, config.dimension, id]);
     const layers = greyOnFilter ? [scatterplotLayer, greyScatterplotLayer] : [scatterplotLayer];
+    // todo - these need to be encapsulated better, the DeckGL component should be in a smaller
+    // area with the axes outside of it.
+    // axes need to respond to the viewState... which'll take a bit of head-scratching. have fun!
+    const scaleX = Scale.scaleLinear({ range: [0, width], domain: cx.minMax });
+    const scaleY = Scale.scaleLinear({ range: [height, 0], domain: cy.minMax });
     return (
         <>
             <DeckGL
@@ -185,6 +195,9 @@ export default observer(function DeckScatterComponent() {
                 views={view}
                 onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
             />
+            <svg width={width} height={height}>
+                <Axis.AxisBottom scale={scaleX} label={cx.name} top={height-50}  />
+            </svg>
         </>
     );
 });
