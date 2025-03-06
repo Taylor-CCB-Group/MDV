@@ -18,14 +18,12 @@ import ActiveLinkComponent from "./ActiveLinkComponent.js";
  * (e.g. if we're in a more global dialog etc rather than a chart context,
  * this would be ambiguous).
  */
-const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => { //GuiSpec<"column">) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [isAutocompleteFocused, setIsAutocompleteFocused] = useState(false);
+const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => {
     const [activeTab, setActiveTab] = useState(0);
     const theme = useTheme();
-    const { current_value } = props;
-
-    //todo find a way to check for the type of current value and set active tab
+    
+    //todo check for the type of current value and set active tab
+    // const { current_value } = props;
     // useEffect(() => {
     //     // Setting the active tab based on the type of current value
     //     if (current_value) {
@@ -38,19 +36,15 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     //     }
     // }, [current_value, setActiveTab]);
 
-    const guiProps = { isExpanded, setIsExpanded, isAutocompleteFocused, setIsAutocompleteFocused };
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
     const rowLinkProps = useRowsAsColumnsLinks()[0]; //todo: arbitrary number of links
-    //@ts-ignore nonsense about setBoolean type
-    if (!linkProps) return <ColumnDropdownComponent {...props} {...guiProps} />;
-    // In general, this should (probably) be using our "(multi)dropdown" component
-    // and the <LinksComponent /> can select which column options to show.
+    if (!linkProps) return <ColumnDropdownComponent {...props} />;
 
     return (
         <>
             {rowLinkProps ? (
                 <Paper className="mx-auto px-4 py-2 w-full" variant="outlined">
-                    <div className="w-full flex justify-around text-xs font-medium">
+                    <div className="w-full flex justify-around text-xs font-light">
                         <button
                             onClick={() => setActiveTab(0)}
                             type="button"
@@ -99,8 +93,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                     <div className="py-4">
                         {activeTab === 0 && (
                             /* we may want to show something different, especially if special value is selected... */
-                            /* @ts-ignore setExpanded type */
-                            <ColumnDropdownComponent {...props} {...guiProps} />
+                            <ColumnDropdownComponent {...props} />
                         )}
                         {activeTab === 1 && (
                             <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
@@ -112,8 +105,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                     </div>
                 </Paper>
             ) : (
-                /* @ts-ignore setExpanded type */
-                <ColumnDropdownComponent {...props} {...guiProps} />
+                <ColumnDropdownComponent {...props} />
             )}
         </>
     );

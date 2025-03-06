@@ -9,18 +9,18 @@ import { isArray } from "@/lib/utils";
 import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';
 
-type setBoolean = ReturnType<typeof useState<boolean>>[1];
-type GuiStateProps = {
-    isExpanded: boolean;
-    setIsExpanded: setBoolean;
-    isAutocompleteFocused: boolean;
-    setIsAutocompleteFocused: setBoolean;
-}
+// type setBoolean = ReturnType<typeof useState<boolean>>[1];
+// type GuiStateProps = {
+//     isExpanded: boolean;
+//     setIsExpanded: setBoolean;
+//     isAutocompleteFocused: boolean;
+//     setIsAutocompleteFocused: setBoolean;
+// }
+
 // todo - all kinds of things to do here...
+// - make sure only compatible columns are shown
 // - fix multi columns
 // - column groups
-// - think about how to present the links, including selecting subgroups etc.
-// - maybe when more complex UI is involved, this should be displayed in a dialog.
 
 /**
  * Check if a column selection prop is for multiple columns...
@@ -32,11 +32,10 @@ function isMultiColProp(p: ColumnSelectionProps<any>): boolean {
     return p.multiple || p.type && isMultiColumn(p.type);
 }
 
-const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<T> & GuiStateProps) => {
+const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<T>) => {
 
     const props = inferGenericColumnGuiProps(gProps);
     const { setSelectedColumn, placeholder, type, current_value } = props;
-    const { setIsAutocompleteFocused, setIsExpanded } = props;
     
     // - this is starting to do the right thing, still massively confusing
     //@ts-expect-error type of setSelectedColumn is wrong here
@@ -53,7 +52,7 @@ const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<
         [dataStore, props.exclude, type],
     );
 
-    return {setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded,isMultiType, columns, current_value};
+    return {setSelectedColumn, placeholder, type, isMultiType, columns, current_value};
 
 };
 
@@ -66,8 +65,8 @@ const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<
  * (e.g. if we're in a more global dialog etc rather than a chart context,
  * this would be ambiguous).
  */
-const ColumnDropdownComponent = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T> & GuiStateProps) => {
-    const { setSelectedColumn, placeholder, type, setIsAutocompleteFocused, setIsExpanded,isMultiType, columns, current_value } = useColumnDropdownValue(gProps);
+const ColumnDropdownComponent = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T>) => {
+    const { setSelectedColumn, placeholder, type, isMultiType, columns, current_value } = useColumnDropdownValue(gProps);
     
     return (
         <Grid className="w-full items-center" container>
@@ -99,9 +98,6 @@ const ColumnDropdownComponent = observer(<T extends CTypes,>(gProps: ColumnSelec
                         };
                         return (
                             <TextFieldExtended
-                                // onClick={(e) => e.stopPropagation()}
-                                onFocus={() => setIsAutocompleteFocused(true)}
-                                onBlur={() => setIsAutocompleteFocused(false)}
                                 key={key}
                                 {...p}
                                 placeholder={placeholder}
@@ -118,7 +114,6 @@ const ColumnDropdownComponent = observer(<T extends CTypes,>(gProps: ColumnSelec
                         return (
                             <li key={key} {...p}
                             onClick={(e) => {
-                                setIsExpanded(prev => prev);
                                 p.onClick?.(e);
                             }}
                             >
