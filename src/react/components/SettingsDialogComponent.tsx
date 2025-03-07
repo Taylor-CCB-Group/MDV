@@ -128,21 +128,9 @@ function isMultiSpec(props: ColumnSelectionSpec): props is GuiSpec<"multicolumn"
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSelectionSpec }) => {
-    // multiple...
-    // proably want to change the type of ColumnSelectionProps anyway...
-    // perhaps we should be looking at other places where it's used & make them use this,
-    // with a different evolution of the API.
-    // currently this is not showing the current_value, among other missing features...
-    /** this needs fixing... and we should be able to observe mobx state for column queries 
-     * which should persist when the dialog (entire react root) is closed.
-    */
+    // multiple etc... this is the level above ColumnSelectionComponent I need to be focusing on.
    const multiple = isMultiSpec(props);
 
-    // const setSelectedColumn = useCallback(action((v: FieldSpec | FieldSpecs) => {
-    //     props.current_value = v;
-    //     //@ts -expect-error string is not assignable to FieldSpecs, type of v is wrong here
-    //     props.func?.(v);
-    // }), [multiple]); //as of this writing, biome is right that props is not a dependency
     const filter = props.columnSelection?.filter;
     // not only is the filter not working, but we need to decide how to express "multiple"
     const props2 = useMemo(() => inferGenericColumnSelectionProps({

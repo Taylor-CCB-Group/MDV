@@ -6,6 +6,7 @@ import { observer } from "mobx-react-lite";
 import { Paper, useTheme } from "@mui/material";
 import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
 import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers.js";
+import { isMultiColumn } from "@/lib/columnTypeHelpers";
 import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
 import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import ActiveLinkComponent from "./ActiveLinkComponent.js";
@@ -60,17 +61,23 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
 
     //todo check for the type of current value and set active tab
     const { current_value } = props;
+    
+    //@ts-expect-error need to review isMultiType logic
+    const isMultiType = isMultiColumn(props.type);
+
     const activeMode = useMemo(() => {
         if (current_value) {
-            if (typeof current_value === 'string') {
-                if (current_value.includes("|")) return "link";
+            //@ts-expect-error need to review isMultiType logic
+            const v = isMultiType ? current_value : current_value[0];
+            if (typeof v === 'string') {
+                if (v.includes("|")) return "link";
                 else return "column";
             } else {
                 return "active link";
             }
         }
         return "column";
-    }, [current_value]);
+    }, [current_value, isMultiType]);
     const [initialActiveTab] = useState<ColumnMode>(activeMode);
     useEffect(() => {
         //slight annoying glitch when first mounted - useLayoutEffect didn't help.

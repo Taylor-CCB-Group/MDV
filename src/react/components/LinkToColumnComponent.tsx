@@ -35,7 +35,7 @@ function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
     //   (and probably also log a warning)
 
     // Loop through the values and create the format in pipes '|', by making use of the index.
-    //todo - we need to let the user select subgroup...
+    //todo - we need to let the user select link/subgroup...
     //^^ do we allow a mix-match of links/subgroups? We could... but that doesn't mean we should.
     //(we should only do so if we have a clean way of presenting it to the user)
     const sg = Object.keys(subgroups)[0];
@@ -48,10 +48,22 @@ function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
         }));
         // tricky type here... but 'satisfies' gives us a bit of confidence that we're getting something that will work
         // ! better than `as` typecasting when possible.
-        return [[...labelValueObjects], "label", "fieldName"] as const satisfies DropdownMappedValues<"label", "fieldName">;
+        return [[...labelValueObjects], "label", "fieldName"] satisfies DropdownMappedValues<"label", "fieldName">;
     }, [targetColumn.values, sg]);
+
+    //@ts-expect-error need to review isMultiType logic
+    const isMultiType = isMultiColumn(props.type);
+
+    const current_value = useMemo(() => {
+        if (props.current_value) {
+            //: current_value ? [`${current_value}`] : []
+            return [`${props.current_value}`];
+        }
+        return [];
+    }, [props.current_value, isMultiType]);
     
-    return { values };
+    
+    return { values, current_value };
 }
 
 /**
@@ -67,8 +79,8 @@ function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
 const LinkToColumnComponent = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
     const { linkedDs, link } = props;
     const { name_column, name, subgroups } = link;
-    const { values } = useLinkTargetValues(props);
-    const { setSelectedColumn, current_value } = props;
+    const { values, current_value } = useLinkTargetValues(props);
+    const { setSelectedColumn } = props;
     //@ts-expect-error need to review isMultiType logic
     const isMultiType = isMultiColumn(props.type);
     // nb, the <"multidropdown" | "dropdown"> type parameter ends up causing problem vs <"multidropdown"> | <"dropdown">
