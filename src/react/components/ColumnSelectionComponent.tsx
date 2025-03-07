@@ -62,7 +62,7 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
     //todo check for the type of current value and set active tab
     const { current_value } = props;
     
-    //@ts-expect-error need to review isMultiType logic
+    //@ts-expect-error this ends up with e.g. GuiSpec<"multicolumn"> ending up false... we're ignoring `multiple` prop!
     const isMultiType = isMultiColumn(props.type);
 
     const activeMode = useMemo(() => {
