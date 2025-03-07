@@ -188,7 +188,7 @@ const Chatbot = () => {
     // biome-ignore lint/correctness/useExhaustiveDependencies: messages is needed for the effect to run
     useEffect(() => {
         scrollToBottom();
-    }, [messages, scrollToBottom]);
+    }, [messages, requestProgress, scrollToBottom]);
     
     return (
         <div className="flex flex-col h-full mx-auto overflow-hidden">
