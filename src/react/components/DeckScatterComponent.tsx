@@ -11,8 +11,9 @@ import { action } from "mobx";
 import type { OrbitViewState } from "@deck.gl/core";
 import type { LoadedDataColumn } from "@/charts/charts";
 import { Axis, Scale } from "@visx/visx";
+import "../../charts/css/charts.css";
 
-
+const margin = { top: 10, right: 10, bottom: 40, left: 60 };
 /** todo this should be common for viv / scatter_state, pending refactor
  * there should be hooks getting the range of a filtered column 
  * so that multiple charts can re-use the computation (but if not used, it's not computed)
@@ -90,7 +91,8 @@ export default observer(function DeckScatterComponent() {
     //todo colorBy should be done differently (also bearing in mind multiple layers)
     const colorBy = (chart as any).colorBy;
     // const colorBy = color_by;
-
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
     useZoomOnFilter(data);
 
     const greyOnFilter = on_filter === "grey";
@@ -165,39 +167,107 @@ export default observer(function DeckScatterComponent() {
         return config.dimension === "2d" ? new OrthographicView({
             id: `scatterplot-view-${id}`,
             controller: true,
-            width,
-            height,
-            x: 0,
-            y: 0,
+            width: chartWidth,
+            height: chartHeight,
+            x: margin.left,
+            y: margin.top,
+            // width,
+            // height,
+            // x: 0,
+            // y: 0,
         }) : new OrbitView({
             id: `scatterplot-view-${id}`,
             controller: true,
-            width,
-            height,
-            x: 0,
-            y: 0,
+            width: chartWidth,
+            height: chartHeight,
+            x: margin.left,
+            y: margin.top,
+            // width,
+            // height,
+            // x: 0,
+            // y: 0,
         });
-    }, [width, height, config.dimension, id]);
+    }, [chartWidth, chartHeight, config.dimension, id]);
     const layers = greyOnFilter ? [scatterplotLayer, greyScatterplotLayer] : [scatterplotLayer];
     // todo - these need to be encapsulated better, the DeckGL component should be in a smaller
     // area with the axes outside of it.
     // axes need to respond to the viewState... which'll take a bit of head-scratching. have fun!
-    const scaleX = Scale.scaleLinear({ range: [0, width], domain: cx.minMax });
-    const scaleY = Scale.scaleLinear({ range: [height, 0], domain: cy.minMax });
+    // const scaleX = Scale.scaleLinear({ range: [0, width], domain: cx.minMax });
+    // const scaleY = Scale.scaleLinear({ range: [height, 0], domain: cy.minMax });
+    const scaleX = useMemo(() => Scale.scaleLinear({
+        domain: cx.minMax, // e.g. [min, max]
+        range: [margin.left, chartWidth + margin.left],
+      }), [cx.minMax, chartWidth]);    
+    const scaleY = useMemo(() => Scale.scaleLinear({
+        domain: cy.minMax, // e.g. [min, max]
+        range: [chartHeight+margin.top, margin.top],
+      }), [cy.minMax, chartHeight]);    
+      
     return (
         <>
-            <DeckGL
+            {/* <DeckGL
                 layers={layers}
                 useDevicePixels={true}
-                // controller={true}
+                controller={true}
                 viewState={viewState}
                 // initialViewState={viewState} //consider not using react state for this
                 views={view}
                 onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
             />
-            <svg width={width} height={height}>
-                <Axis.AxisBottom scale={scaleX} label={cx.name} top={height-50}  />
-            </svg>
+            <svg width={width} height={height} 
+            // stroke="var(--text_color)" style={{ fontWeight: "normal" }}
+            >
+                <Axis.AxisBottom scale={scaleX} label={cx.name} top={height-50}
+                //  stroke="var(--text_color)"
+                 />
+                <Axis.AxisLeft scale={scaleY} label={cy.name} left={60}
+                //  stroke="var(--text_color)" 
+                  />
+            </svg> */}
+    <DeckGL
+        layers={layers}                
+        useDevicePixels={true}        
+        controller={true}        
+        viewState={viewState}        
+        // initialViewState={viewState} //consider not using react state for this        
+        views={view}        
+        onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
+    />
+      <svg width={width} height={height}>
+        <Axis.AxisBottom
+          top={chartHeight + margin.top}
+          scale={scaleX}
+          stroke={"var(--text_color)"}
+          tickStroke={"var(--text_color)"}
+          tickLabelProps={() => ({
+            fill: "var(--text_color)",
+            fontSize: 9.5,
+            textAnchor: "middle",
+          })}
+          labelProps={{
+            fill: "var(--text_color)",
+            fontSize: 10,
+            textAnchor: "middle",
+          }}
+          label={cx.name}
+        />
+        <Axis.AxisLeft
+          left={margin.left}
+          scale={scaleY}
+          stroke={"var(--text_color)"}
+          tickStroke={"var(--text_color)"}
+          tickLabelProps={() => ({
+            fill: "var(--text_color)",
+            fontSize: 9.5,
+            textAnchor: "end",
+          })}
+          labelProps={{
+            fill: "var(--text_color)",
+            fontSize: 10,
+          }}
+          label={cy.name}
+        />
+      </svg>
         </>
     );
 });
