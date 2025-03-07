@@ -191,83 +191,77 @@ export default observer(function DeckScatterComponent() {
     const layers = greyOnFilter ? [scatterplotLayer, greyScatterplotLayer] : [scatterplotLayer];
     // todo - these need to be encapsulated better, the DeckGL component should be in a smaller
     // area with the axes outside of it.
-    // axes need to respond to the viewState... which'll take a bit of head-scratching. have fun!
-    // const scaleX = Scale.scaleLinear({ range: [0, width], domain: cx.minMax });
-    // const scaleY = Scale.scaleLinear({ range: [height, 0], domain: cy.minMax });
+    // axes need to respond to the viewState...
+    // This implementation will mean that the whole react component will re-render when the viewState changes.
+    // This is not very good for performance - we may consider using refs or something to avoid this, 
+    // and/or debouncing the viewState changes.
+    const ranges = useMemo(() => {
+        // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
+        try {
+            const p = scatterplotLayer.unproject([0, 0]);
+            const p2 = scatterplotLayer.unproject([width, height]);
+            const domainX = [p[0], p2[0]];
+            const domainY = [p[1], p2[1]];
+            return { domainX, domainY };
+        } catch (e) {
+            return { domainX: cx.minMax, domainY: cx.minMax };
+        }
+    }, [cx.minMax, cy.minMax, viewState, view, scatterplotLayer]);
     const scaleX = useMemo(() => Scale.scaleLinear({
-        domain: cx.minMax, // e.g. [min, max]
+        domain: ranges.domainX, // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
-      }), [cx.minMax, chartWidth]);    
+    }), [cx.minMax, chartWidth, ranges]);
     const scaleY = useMemo(() => Scale.scaleLinear({
-        domain: cy.minMax, // e.g. [min, max]
-        range: [chartHeight+margin.top, margin.top],
-      }), [cy.minMax, chartHeight]);    
-      
+        domain: ranges.domainY, // e.g. [min, max]
+        range: [chartHeight + margin.top, margin.top],
+    }), [cy.minMax, chartHeight, ranges]);
+
     return (
         <>
-            {/* <DeckGL
+            <DeckGL
                 layers={layers}
                 useDevicePixels={true}
                 controller={true}
                 viewState={viewState}
-                // initialViewState={viewState} //consider not using react state for this
+                // initialViewState={viewState} //consider not using react state for this        
                 views={view}
                 onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
             />
-            <svg width={width} height={height} 
-            // stroke="var(--text_color)" style={{ fontWeight: "normal" }}
-            >
-                <Axis.AxisBottom scale={scaleX} label={cx.name} top={height-50}
-                //  stroke="var(--text_color)"
-                 />
-                <Axis.AxisLeft scale={scaleY} label={cy.name} left={60}
-                //  stroke="var(--text_color)" 
-                  />
-            </svg> */}
-    <DeckGL
-        layers={layers}                
-        useDevicePixels={true}        
-        controller={true}        
-        viewState={viewState}        
-        // initialViewState={viewState} //consider not using react state for this        
-        views={view}        
-        onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
-    />
-      <svg width={width} height={height}>
-        <Axis.AxisBottom
-          top={chartHeight + margin.top}
-          scale={scaleX}
-          stroke={"var(--text_color)"}
-          tickStroke={"var(--text_color)"}
-          tickLabelProps={() => ({
-            fill: "var(--text_color)",
-            fontSize: 9.5,
-            textAnchor: "middle",
-          })}
-          labelProps={{
-            fill: "var(--text_color)",
-            fontSize: 10,
-            textAnchor: "middle",
-          }}
-          label={cx.name}
-        />
-        <Axis.AxisLeft
-          left={margin.left}
-          scale={scaleY}
-          stroke={"var(--text_color)"}
-          tickStroke={"var(--text_color)"}
-          tickLabelProps={() => ({
-            fill: "var(--text_color)",
-            fontSize: 9.5,
-            textAnchor: "end",
-          })}
-          labelProps={{
-            fill: "var(--text_color)",
-            fontSize: 10,
-          }}
-          label={cy.name}
-        />
-      </svg>
+            <svg width={width} height={height}>
+                <Axis.AxisBottom
+                    top={chartHeight + margin.top}
+                    scale={scaleX}
+                    stroke={"var(--text_color)"}
+                    tickStroke={"var(--text_color)"}
+                    tickLabelProps={() => ({
+                        fill: "var(--text_color)",
+                        fontSize: 9.5,
+                        textAnchor: "middle",
+                    })}
+                    labelProps={{
+                        fill: "var(--text_color)",
+                        fontSize: 10,
+                        textAnchor: "middle",
+                    }}
+                    label={cx.name}
+                />
+                <Axis.AxisLeft
+                    left={margin.left}
+                    scale={scaleY}
+                    stroke={"var(--text_color)"}
+                    tickStroke={"var(--text_color)"}
+                    tickLabelProps={() => ({
+                        fill: "var(--text_color)",
+                        fontSize: 9.5,
+                        textAnchor: "end",
+                    })}
+                    labelProps={{
+                        fill: "var(--text_color)",
+                        fontSize: 10,
+                    }}
+                    label={cy.name}
+                />
+            </svg>
         </>
     );
 });
