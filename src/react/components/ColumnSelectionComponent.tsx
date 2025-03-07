@@ -9,6 +9,7 @@ import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers.js";
 import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
 import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import ActiveLinkComponent from "./ActiveLinkComponent.js";
+import clsx from "clsx";
 
 
 type ColumnMode = "column" | "link" | "active link";
@@ -22,11 +23,12 @@ type TabHeaderProps = {
 
 const TabHeader = ({ activeTab, setActiveTab, tabName, activeMode }: TabHeaderProps) => {
     const theme = useTheme();
+    const isActiveMode = activeMode === tabName;
     return (
         <button
             onClick={() => setActiveTab(tabName)}
             type="button"
-            className="p-2 text-center border-b-2 transition-colors w-full"
+            className={clsx("p-2 text-center border-b-2 transition-colors w-full", isActiveMode ? "font-bold" : "font-light")}
             style={{
                 borderColor: activeTab === tabName ? theme.palette.primary.main : theme.palette.divider,
                 color:
