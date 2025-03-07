@@ -199,14 +199,14 @@ export default observer(function DeckScatterComponent() {
         // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
         try {
             const p = scatterplotLayer.unproject([0, 0]);
-            const p2 = scatterplotLayer.unproject([width, height]);
+            const p2 = scatterplotLayer.unproject([chartWidth, chartHeight]);
             const domainX = [p[0], p2[0]];
-            const domainY = [p[1], p2[1]];
+            const domainY = [p2[1], p[1]];
             return { domainX, domainY };
         } catch (e) {
             return { domainX: cx.minMax, domainY: cx.minMax };
         }
-    }, [cx.minMax, cy.minMax, viewState, view, scatterplotLayer]);
+    }, [cx.minMax, cy.minMax, viewState, chartWidth, chartHeight, scatterplotLayer]);
     const scaleX = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainX, // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
