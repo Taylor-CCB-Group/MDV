@@ -57,7 +57,6 @@ const TabHeader = ({ activeTab, setActiveTab, tabName, activeMode }: TabHeaderPr
  */
 const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => {
     const [activeTab, setActiveTab] = useState<ColumnMode>("column");
-    const theme = useTheme();
 
     //todo check for the type of current value and set active tab
     const { current_value } = props;
@@ -70,19 +69,14 @@ const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelec
                 return "active link";
             }
         }
+        return "column";
     }, [current_value]);
+    const [initialActiveTab] = useState<ColumnMode>(activeMode);
+    useEffect(() => {
+        //slight annoying glitch when first mounted - useLayoutEffect didn't help.
+        setActiveTab(initialActiveTab);
+    }, [initialActiveTab]);
 
-    // useEffect(() => {
-    //     // Setting the active tab based on the type of current value
-    //     if (current_value) {
-    //         if (typeof current_value === 'string') {
-    //             if (current_value.includes("|")) setActiveTab("link");
-    //             else setActiveTab("column");
-    //         } else {
-    //             setActiveTab("active link");
-    //         }
-    //     }
-    // }, [current_value, setActiveTab]);
 
     const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
     const rowLinkProps = useRowsAsColumnsLinks()[0]; //todo: arbitrary number of links
