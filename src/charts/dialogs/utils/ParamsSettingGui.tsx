@@ -107,6 +107,11 @@ export default function getParamsGuiSpec<T extends BaseConfig>(chart: BaseChart<
         //even if !isMultiType, we still need to think about whether another param is multi...
         // const current_value = isMultiType ? config.param[i] : [config.param[i]];
         const current_value = getCurrentParam(chart, i);
+        // we aren't passing information about which datatypes are allowed for the parameter...
+        // e.g. param.type === "text" should only allow category columns
+        // in AddChartDialogReact, we pass p.type to ColumnSelectionComponent
+        // but here we are making a GUI spec, which has an entirely different meaning for "type"
+        // and needs to be handled differently.
         return g({
             type: isMultiType ? "multicolumn" : "column",
             label: param.name,

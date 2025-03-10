@@ -46,7 +46,6 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
         () => dataStore.columns
             .filter((c) => !props.exclude?.includes(c.name))
             .filter((c) => !c.field.includes("|")) //exclude linked columns the hacky way for now
-            //@ts- expect-error << looks like we don't need this any more.
             .filter((c) => columnMatchesType(c, type))
             ,
         [dataStore, props.exclude, type],

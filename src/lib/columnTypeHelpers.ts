@@ -1,11 +1,8 @@
 import type { DataColumn, FieldName, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import type { MultiColumnQuery } from "@/links/link_utils.js";
-import type { useState } from "react";
 import type { DataType } from "../charts/charts";
 import { isArray } from "./utils";
-
-// this is more to do with column queries than columns themselves
 
 //new Set(Object.values(BaseChart.types).flatMap(t => t.params).filter(Boolean).flatMap(p => p.type))
 // export type Param = "text" | "number" | "multitext" | "text16" | "_multi_column:number" | "_multi_column:all";
@@ -59,6 +56,9 @@ export function inferGenericColumnGuiProps<T extends CTypes, M extends boolean>(
     props: ColumnSelectionProps<T, M>
 ): ColumnSelectionProps<T, M> {
     return props;
+}
+export function paramAcceptsNumeric<T extends CTypes>(param: T): boolean {
+    return param === "number" || (Array.isArray(param) && param.includes("number"));
 }
 /**
  * This is for filtering columns based on some relatively complex type specification potentially including things like `"_multi_column:number"`...

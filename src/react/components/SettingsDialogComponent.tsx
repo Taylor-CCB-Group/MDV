@@ -217,20 +217,6 @@ function useDropdownOptions(props: DropdownSpec) {
         (v: string) => options.some((item) => item.value === v),
         [options],
     );
-    // some type checking / evaluation
-    // if (props.type === "multidropdown") {
-    //     const t: "multidropdown" = props.type;
-    //     const arr: string[] = props.current_value;
-    //     const func: GuiSpec<"multidropdown">['func'] = props.func;
-    // } else {
-    //     const t: "dropdown" = props.type;
-    //     //@ts-expect-error
-    //     const arr: string = v;
-    //     const arr2: string = props.current_value;
-    //     if (props.func) {
-    //         const func: (v: string) => void = props.func;
-    //     }
-    // }
     const isVArray = isArray(v);
     const allValid = isVArray ? v.every(validVal) : validVal(v);
     const okValue = allValid ? v : isVArray ? v.filter(validVal) : null;

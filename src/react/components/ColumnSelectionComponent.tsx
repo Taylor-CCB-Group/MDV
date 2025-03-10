@@ -84,8 +84,11 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
     }, [initialActiveTab]);
 
 
-    const linkProps = useRowsAsColumnsLinks(); //todo: arbitrary number of links
-    const rowLinkProps = useRowsAsColumnsLinks()[0]; //todo: arbitrary number of links
+    const linkProps = useRowsAsColumnsLinks();
+    const rowLinkProps = linkProps[0]; //todo: not our responsibility to select the link here, children should do that.
+    // only show extra UI if there is a link and the thing we are setting is compatible with number values...
+    // also, active links don't make much sense if the corresponding datasource isn't visible in the view 
+    // - but we might change how views work so we don't have the separate panes...
     if (!linkProps) return <ColumnDropdownComponent {...props} />;
 
     return (
