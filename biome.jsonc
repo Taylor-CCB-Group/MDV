@@ -7,7 +7,6 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
-			// we will make things stricter in the future
 			"complexity": {
 				"useLiteralKeys": "off",
 				"noForEach": "off",
@@ -28,7 +27,7 @@
 				"noParameterAssign": "off",
 				"useTemplate": "info",
 				"useSingleVarDeclarator": "info",
-				"noUselessElse": "info",
+				"noUselessElse": "off",
 				"noArguments": "off"
 			},
 			"a11y": {
