@@ -1,9 +1,9 @@
-import { CTypes } from "@/lib/columnTypeHelpers";
+import type { CTypes } from "@/lib/columnTypeHelpers";
 import { observer } from "mobx-react-lite";
-import { RAComponent, RowsAsColsProps } from "./LinksComponent";
+import { RAComponent, type RowsAsColsProps } from "./LinksComponent";
 import { useHighlightedForeignRows } from "../chartLinkHooks";
 
-const ActiveLinkComponent = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
+const ActiveLinkComponent = observer(<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) => {
     const { linkedDs, link } = props;
     const { setSelectedColumn } = props;
     const rowNames = useHighlightedForeignRows().map(r => r.fieldName);

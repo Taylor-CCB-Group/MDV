@@ -1,6 +1,7 @@
-import { columnMatchesType, ColumnSelectionProps, CTypes, inferGenericColumnGuiProps, isMultiColumn } from "@/lib/columnTypeHelpers";
+import { columnMatchesType, inferGenericColumnGuiProps } from "@/lib/columnTypeHelpers";
+import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { useDataStore } from "../context";
-import { DataColumn, DataType } from "@/charts/charts";
+import type { DataColumn, DataType } from "@/charts/charts";
 import { useEffect, useMemo, useState } from "react";
 import { autorun } from "mobx";
 import { observer } from "mobx-react-lite";
@@ -24,15 +25,12 @@ import Grid from '@mui/material/Grid2';
 
 /**
  * Check if a column selection prop is for multiple columns...
- * I do wish that there weren't so many layers of indirection etc here.
- * !Probably one of the most confusing parts of the codebase at the moment.
  */
-function isMultiColProp(p: ColumnSelectionProps<any>): boolean {
-    if (p.multiple === false) return false;
-    return p.multiple || p.type && isMultiColumn(p.type);
+function isMultiColProp(p: ColumnSelectionProps<any, boolean>): boolean {
+    return p.multiple;    
 }
 
-const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<T>) => {
+const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
 
     const props = inferGenericColumnGuiProps(gProps);
     const { setSelectedColumn, placeholder, type, current_value } = props;
@@ -67,7 +65,7 @@ const useColumnDropdownValue = <T extends CTypes,>(gProps: ColumnSelectionProps<
  * Depending on the type, this may be a single column or multiple columns, but for the purposes of this component,
  * it will only need to understand columns originating from 
  */
-const ColumnDropdownComponent = observer(<T extends CTypes,>(gProps: ColumnSelectionProps<T>) => {
+const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
     const { setSelectedColumn, placeholder, type, isMultiType, columns, current_value } = useColumnDropdownValue(gProps);
     
     return (

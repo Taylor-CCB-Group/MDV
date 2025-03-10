@@ -56,19 +56,18 @@ const TabHeader = ({ activeTab, setActiveTab, tabName, activeMode }: TabHeaderPr
  * Must either be used in a context where a `DataStoreContext` is available, or provided with a `dataStore` prop.
  * (e.g. if we're in a more global dialog etc rather than a chart context, this would be ambiguous).
  */
-const ColumnSelectionComponent = observer(<T extends CTypes,>(props: ColumnSelectionProps<T>) => {
+const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
     const [activeTab, setActiveTab] = useState<ColumnMode>("column");
 
     //todo check for the type of current value and set active tab
     const { current_value } = props;
     
-    //@ts-expect-error this ends up with e.g. GuiSpec<"multicolumn"> ending up false... we're ignoring `multiple` prop!
-    const isMultiType = isMultiColumn(props.type);
+    const isMultiType = props.multiple;
 
     const activeMode = useMemo(() => {
         if (current_value) {
-            //@ts-expect-error need to review isMultiType logic
-            const v = isMultiType ? current_value : current_value[0];
+            //@ts-expect-error type-guard should be possible here
+            const v = isMultiType ? current_value[0] : current_value;
             if (typeof v === 'string') {
                 if (v.includes("|")) return "link";
                 else return "column";

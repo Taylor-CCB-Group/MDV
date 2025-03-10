@@ -331,10 +331,11 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     >
                         {chartType?.params && <h2>Columns</h2>}
                         {chartType?.params?.map((p, i) => (
-                            <ColumnSelectionComponent key={p.name} placeholder={p.name} //multiple={false}
+                            <ColumnSelectionComponent key={p.name} placeholder={p.name}
+                            // multiple={} //<- which helper do we use to determine this?
                             // this may be changing - perhaps we always pass mobx object to ColumnSelectionComponent
                             // but we definitely need to know whether it's a multi-column or not & be able to set the value accordingly
-                            //@ts-expect-error setSelectedColumn type needs to be fixed
+                            //@ts-expect-error setSelectedColumn(c: never)???
                             setSelectedColumn={action((column) => {
                                 // !! in the original AddChartDialog, we use a "ChooseColumnDialog" for multi-column
                                 // that sets `this.multiColumns` which in `submit` is concatenated to `config.param`
@@ -346,13 +347,11 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                                 //... could we set up a reaction to update the config when the column changes?
 
                                 // if (typeof column !== "string") throw new Error("Expected string column name");
-                                //@ts-expect-error - we should be handling array ok now, but MultiColumnQuery is tbd
                                 config.param[i] = column; //issue now is that because ref is stable, we don't re-flatten the param
                                 // grumble grumble
                                 config._updated = new Date();
                             })}
                             type={p.type}
-                            //@ts-expect-error - fix incompatible type for config param
                             current_value={config.param?.[i]}
                             />
                         ))}

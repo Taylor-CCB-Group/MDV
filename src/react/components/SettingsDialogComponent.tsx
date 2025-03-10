@@ -135,15 +135,13 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
     // not only is the filter not working, but we need to decide how to express "multiple"
     const props2 = useMemo(() => inferGenericColumnSelectionProps({
         // fixing this stuff is high priority
-        //@ts -expect-error ColumnSelection setSelectedColumn type
+        //@ts-expect-error ColumnSelection setSelectedColumn(never)???
         setSelectedColumn: action((v) => {
             props.current_value = v;
-            //@ts-expect-error setSelectedColumn type
             props.func?.(v);
         }),
         type: filter, //is it ok for this to be optional?
         multiple,
-        //@ts-expect-error ColumnSelection current_value type
         current_value: props.current_value //! ideally this would also react to changes in the mobx store, why doesn't it?
         // current_value: props.current_value... maybe want to be more mobx-y about this
     }), [filter, props, props.current_value, multiple]);

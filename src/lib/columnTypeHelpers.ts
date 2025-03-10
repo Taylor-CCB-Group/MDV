@@ -32,10 +32,10 @@ export type IsMultiParam<T extends CTypes> = T extends Param[] ? true
 : T extends MultiColumnPrefix ? true 
 : false;
 
-export type ColumnSelectionProps<T extends CTypes,
-    V = IsMultiParam<T> extends true ? FieldSpecs : FieldName | MultiColumnQuery> = { //should we have a SingleColumnQuery?
+export type ColumnSelectionProps<T extends CTypes, M extends boolean,
+    V = M extends true ? FieldSpecs : FieldName | MultiColumnQuery> = { //should we have a SingleColumnQuery?
         type?: T; //wary of using 'type' as a name - not reserved, but could be confusing. also wary of optional type
-        multiple?: boolean; //also interacts with type "_multi...", perhaps simpler to avoid having both
+        multiple: M; //also interacts with type "_multi..."; in future, prefer separate props for multiple selection and type
         setSelectedColumn: (column: V) => void;
         current_value?: V;
         placeholder?: string;
@@ -46,32 +46,18 @@ export type ColumnSelectionProps<T extends CTypes,
 /** 
  * Given a `ColumnSelectionProps` object, this function should return the same object with the correct type annotations.
  */
-export function inferGenericColumnSelectionProps<T extends CTypes>(
-    props: ColumnSelectionProps<T>
-): ColumnSelectionProps<T> {
+export function inferGenericColumnSelectionProps<T extends CTypes, M extends boolean>(
+    props: ColumnSelectionProps<T, M>
+): ColumnSelectionProps<T, M> {
     return props;
 }
-
-/// these result in the setSelectedColumn function being typed correctly
-// const testMulti = createGenericColumnSelectionProps({
-//     type: "_multi_column:number",
-//     setSelectedColumn: (multiColumns) => { },
-// });
-// const testSingle = createGenericColumnSelectionProps({
-//     type: "number",
-//     setSelectedColumn: (column) => { },
-// });
-// const testArray = createGenericColumnSelectionProps({
-//     type: ["number", "text"],
-//     setSelectedColumn: (multiColumns) => { },
-// });
 
 export function isMultiColumn(type: CTypes): type is MultiColumnPrefix | Param[] {
     return typeof type === "string" && type.startsWith("_multi_column:");
 }
-export function inferGenericColumnGuiProps<T extends CTypes>(
-    props: ColumnSelectionProps<T>
-): ColumnSelectionProps<T> {
+export function inferGenericColumnGuiProps<T extends CTypes, M extends boolean>(
+    props: ColumnSelectionProps<T, M>
+): ColumnSelectionProps<T, M> {
     return props;
 }
 /**

@@ -1,7 +1,7 @@
-import { CTypes, isMultiColumn } from "@/lib/columnTypeHelpers";
+import { type CTypes, isMultiColumn } from "@/lib/columnTypeHelpers";
 import { observer } from "mobx-react-lite";
-import { RowsAsColsProps } from "./LinksComponent";
-import { DropdownMappedValues, GuiSpec } from "@/charts/charts";
+import type { RowsAsColsProps } from "./LinksComponent";
+import type { DropdownMappedValues, GuiSpec } from "@/charts/charts";
 import { useMemo } from "react";
 import { action, makeAutoObservable } from "mobx";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
@@ -14,7 +14,7 @@ import { getFieldName } from "@/links/link_utils";
  * - making sure that an appropriate type of value is selected
  * - providing a way to select the value that has a simple interface, managing the complexity of incoming generic types
  */
-function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
+function useLinkTargetValues<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) {
     const { linkedDs, link } = props;
     const { name_column, name, subgroups } = link;
     const targetColumn = linkedDs.dataStore.columnIndex[name_column];
@@ -24,7 +24,7 @@ function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
     if (linkedDs.size > 2**16) {
         // If we have more than 2^16 rows, I think that means there must be some duplicates...
         // so this is potentially somewhat undefined behaviour.
-        console.warn(`Linked dataset has more than 2^16 rows, this may lead to unexpected behaviour`);
+        console.warn("Linked dataset has more than 2^16 rows, this may lead to unexpected behaviour");
     }
     // we need to associate each value with the row index that references it...
     // as far as the code is concerned, this isn't necessarily a 1:1 mapping - but as my understanding of the logic
@@ -49,10 +49,7 @@ function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
         // tricky type here... but 'satisfies' gives us a bit of confidence that we're getting something that will work
         // ! better than `as` typecasting when possible.
         return [[...labelValueObjects], "label", "fieldName"] satisfies DropdownMappedValues<"label", "fieldName">;
-    }, [targetColumn.values, sg]);
-
-    //@ts-expect-error need to review isMultiType logic
-    const isMultiType = isMultiColumn(props.type);
+    }, [sg, link.valueToRowIndex]);
 
     const current_value = useMemo(() => {
         if (props.current_value) {
@@ -60,7 +57,7 @@ function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
             return [`${props.current_value}`];
         }
         return [];
-    }, [props.current_value, isMultiType]);
+    }, [props.current_value]);
     
     
     return { values, current_value };
@@ -76,13 +73,12 @@ function useLinkTargetValues<T extends CTypes,>(props: RowsAsColsProps<T>) {
  * `subgroup|value (subgroup)|index`, where `subgroup` is the name of the user-selected subgroup, `value (subgroup)` is a human-readable
  * representation of the value, and `index` is the index of the value in the column.
  */
-const LinkToColumnComponent = observer(<T extends CTypes,>(props: RowsAsColsProps<T>) => {
+const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) => {
     const { linkedDs, link } = props;
     const { name_column, name, subgroups } = link;
     const { values, current_value } = useLinkTargetValues(props);
     const { setSelectedColumn } = props;
-    //@ts-expect-error need to review isMultiType logic
-    const isMultiType = isMultiColumn(props.type);
+    const isMultiType = props.multiple;
     // nb, the <"multidropdown" | "dropdown"> type parameter ends up causing problem vs <"multidropdown"> | <"dropdown">
     // - would be nice to be able to avoid that, this is really difficult to understand and work with.
     // maybe we should have a branch that returns a totally different g() for multidropdown, for example.
