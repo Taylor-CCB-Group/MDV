@@ -23,6 +23,7 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 
 # packages for history
 from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationalRetrievalChain
 from langchain.agents import initialize_agent
 
 from mdvtools.llm.local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
@@ -109,6 +110,9 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         :param verbose: If True, prints debug information.
         :return: An agent that can answer questions about the DataFrames.
         """
+
+        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
         
         # Step 1: Create the Python REPL Tool (Dynamically Injecting DataFrames)
         python_tool = PythonAstREPLTool()
@@ -140,7 +144,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         agent = create_openai_functions_agent(llm, [python_tool], prompt)
 
         # Step 4: Wrap in an Agent Executor (Finalized Agent)
-        return AgentExecutor(agent=agent, tools=[python_tool], verbose=verbose)
+        return AgentExecutor(agent=agent, tools=[python_tool], memory=memory, verbose=verbose)
 
     ## pandas agent code
     #agent = lp.create_pandas_dataframe_agent(dataframe_llm, df_list, verbose=True, allow_dangerous_code=True)
@@ -162,7 +166,10 @@ def main(project_path, dataset_path, question_list_path, output_csv):
             prompt_RAG = get_createproject_prompt_RAG(project, dataset_path, datasource_names[0], response['output'])
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
             
-            qa_chain = RetrievalQA.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, return_source_documents=True)
+            rag_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+
+            qa_chain = ConversationalRetrievalChain.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, memory=rag_memory, return_source_documents=True)
             output = qa_chain.invoke({"context": retriever, "query": question})
             result_code = prepare_code(output["result"], df_list[0], project, logger.info, modify_existing_project=True, view_name=question)
 
