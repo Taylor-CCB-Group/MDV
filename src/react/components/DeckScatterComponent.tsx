@@ -155,6 +155,14 @@ export default observer(function DeckScatterComponent() {
         parameters: {
             depthTest: false,
         },
+        transitions: {
+            getPosition: {
+                duration: 100,
+                //https://easings.net/#easeInOutCubic
+                easing: (x: number) => x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2,
+                // type: "spring",
+            },
+        },
         // this will be slow, !!!intention is to change this design!!!
         //@ts-expect-error - we could probably have a generic on the layer
         getFilterValue: (_, { index }: { index: number }) => indexSet.has(index) ? 0 : 1,
@@ -197,17 +205,17 @@ export default observer(function DeckScatterComponent() {
             const domainY = [p2[1], p[1]];
             return { domainX, domainY };
         } catch (e) {
-            return { domainX: cx.minMax, domainY: cx.minMax };
+            return { domainX: cx.minMax, domainY: cy.minMax };
         }
-    }, [cx.minMax, cy.minMax, viewState, chartWidth, chartHeight, scatterplotLayer]);
+    }, [cx.minMax, cy.minMax, chartWidth, chartHeight, scatterplotLayer]);
     const scaleX = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainX, // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
-    }), [cx.minMax, chartWidth, ranges]);
+    }), [chartWidth, ranges]);
     const scaleY = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainY, // e.g. [min, max]
         range: [chartHeight + margin.top, margin.top],
-    }), [cy.minMax, chartHeight, ranges]);
+    }), [chartHeight, ranges]);
 
     return (
         <>
