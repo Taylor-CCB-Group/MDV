@@ -131,7 +131,7 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
     // multiple etc... this is the level above ColumnSelectionComponent I need to be focusing on.
    const multiple = isMultiSpec(props);
 
-    const filter = props.columnSelection?.filter;
+   const filter = props.columnType;
     // not only is the filter not working, but we need to decide how to express "multiple"
     const props2 = useMemo(() => inferGenericColumnSelectionProps({
         // fixing this stuff is high priority

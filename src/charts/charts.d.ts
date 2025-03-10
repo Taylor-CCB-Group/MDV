@@ -4,7 +4,7 @@
 //   partly just using them as a form of documentation / notes-to-self.
 
 // todo rearrange - maybe have a datastore.d.ts etc
-import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
 /**
@@ -196,13 +196,6 @@ export type GuiValueTypes = {
     multicolumn: FieldSpecs; //easier to have distinct 'multicolumn' type than overly generic 'column'?
 };
 export type GuiSpecType = keyof GuiValueTypes;
-export type ColumnSelectionParameters = {
-    filter?: DataType[];
-    multiple?: boolean;
-    exclude?: string[];
-};
-// type GuiFunc<T extends GuiSpecType, V = GuiValueTypes<T>, F = (v: V) => void> = F;//T extends "folder" ? never : (v: V) => void;
-// export type GuiSpec<T extends GuiSpecType, V = GuiValueTypes<T>, F = GuiFunc<T>> = {
 type GV<T extends GuiSpecType> = GuiValueTypes[T];
 type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => void | Promise<void>;
 // type GuiSpecExperiment<T extends keyof GuiSpecType> = T extends infer K
@@ -266,7 +259,12 @@ export type GuiSpec<T extends GuiSpecType> = {
           ? boolean
           : never;
     defaultVal?: GV<T>;
-    columnSelection?: T extends "column" ? ColumnSelectionParameters : never; //what about multicolumn?
+    /**
+     * Expresses the type of column that can be selected in a column selection dialog.
+     * Can be in the form of {@link DataType} as in {@link DataColumn#datatype}, 
+     * or other form like `"_multi_column:number" | "number"`.
+     */
+    columnType?: T extends ("column" | "multicolumn") ? CTypes : never;
 };
 // export type GuiSpecs = Array<GuiSpec<GuiSpecType>>;
 /**
