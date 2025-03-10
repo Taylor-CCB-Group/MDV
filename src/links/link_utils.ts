@@ -304,12 +304,13 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
         console.error(`Column ${link.name_column} not found in DataStore ${ds.name}`);
         return;
     }
+    // make sure this happens before any async stuff so the check above is valid and subsequent calls return early.
+    link.observableFields = []; //this will be populated by setFieldsFromFilter below
     await cm.loadColumnSetAsync([link.name_column], tds.name);
     if (!isColumnLoaded(nameCol)) {
         throw new Error(`Column ${link.name_column} not loaded`);
     }
 
-    link.observableFields = []; //this will be populated by setFieldsFromFilter below
     // we should also add a data structure mapping each name_column value (string) to the index of the corresponding row
     // which seems to assume a 1:1 mapping between name_column values and rows? Or not? 
     // While we're here, check for anything that may be inconsistent with our assumptions.
