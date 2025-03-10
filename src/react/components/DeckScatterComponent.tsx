@@ -196,6 +196,7 @@ export default observer(function DeckScatterComponent() {
     // This implementation will mean that the whole react component will re-render when the viewState changes.
     // This is not very good for performance - we may consider using refs or something to avoid this, 
     // and/or debouncing the viewState changes.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: we need to recompute these when the viewState changes
     const ranges = useMemo(() => {
         // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
         try {
@@ -207,7 +208,7 @@ export default observer(function DeckScatterComponent() {
         } catch (e) {
             return { domainX: cx.minMax, domainY: cy.minMax };
         }
-    }, [cx.minMax, cy.minMax, chartWidth, chartHeight, scatterplotLayer]);
+    }, [cx.minMax, cy.minMax, chartWidth, chartHeight, scatterplotLayer, viewState]);
     const scaleX = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainX, // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
