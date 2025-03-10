@@ -11,6 +11,8 @@ import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
 import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import ActiveLinkComponent from "./ActiveLinkComponent.js";
 import clsx from "clsx";
+import { ErrorBoundary } from "react-error-boundary";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper.js";
 
 
 type ColumnMode = "column" | "link" | "active link";
@@ -100,19 +102,20 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
                         <TabHeader activeMode={activeMode} activeTab={activeTab} setActiveTab={setActiveTab} tabName="link" />
                         <TabHeader activeMode={activeMode} activeTab={activeTab} setActiveTab={setActiveTab} tabName="active link" />
                     </div>
+                    <ErrorBoundary FallbackComponent={({error}) => <ErrorComponentReactWrapper error={error} title={error.toString()} />}>
+                        <div className="p-4">
+                            {activeTab === "column" && (
+                                <ColumnDropdownComponent {...props} />
+                            )}
+                            {activeTab === "link" && (
+                                <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
 
-                    <div className="p-4">
-                        {activeTab === "column" && (
-                            <ColumnDropdownComponent {...props} />
-                        )}
-                        {activeTab === "link" && (
-                            <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
-
-                        )}
-                        {activeTab === "active link" && (
-                            <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
-                        )}
-                    </div>
+                            )}
+                            {activeTab === "active link" && (
+                                <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
+                            )}
+                        </div>
+                    </ErrorBoundary>
                 </Paper>
             ) : (
                 <ColumnDropdownComponent {...props} />
