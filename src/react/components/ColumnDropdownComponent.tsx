@@ -48,14 +48,35 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
 
     const value = useMemo(() => {
         if (isMultiType) {
-            if (!isArray(current_value)) throw new Error("Expected array - this should be unreachable");
+            if (!isArray(current_value)) {
+                // throw new Error("Expected array - this should be unreachable");
+                console.error("Expected array - this should be unreachable (minor)");
+                return [];
+            }
             return columns.filter(c => current_value.includes(c.field));
         } else {
             return columns.find(c => c.field === current_value);
         }
     }, [current_value, columns, isMultiType]);
+    console.log("value", value);
 
-    return {setSelectedColumn, placeholder, type, isMultiType, columns, current_value, value};
+    const setValue = useMemo(() => {
+        if (isMultiType) {
+            return (v: DataColumn<DataType>[]) => {
+                if (!isArray(v)) throw new Error("Expected array - this should be unreachable");
+                //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
+                setSelectedColumn(v.map(c => c.field));
+            }
+        } else {
+            return (v: DataColumn<DataType>) => {
+                if (isMultiType) throw new Error("Unexpected single column value for multi column dropdown");
+                //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
+                setSelectedColumn(v.field);
+            }
+        }
+    }, [setSelectedColumn, isMultiType]);
+
+    return {placeholder, type, isMultiType, columns, value, setValue};
 
 };
 
@@ -65,12 +86,13 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
  * it will only need to understand columns originating from 
  */
 const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
-    const { setSelectedColumn, placeholder, isMultiType, columns, current_value, value } = useColumnDropdownValue(gProps);
+    const { placeholder, isMultiType, columns, value, setValue } = useColumnDropdownValue(gProps);
     
     // should we be using a `GuiSpec<"dropdown"> | GuiSpec<"multidropdown">` here?
     // we decided against - we have some extra adornments we add and we don't want to have to deal with that in GuiSpec
     // (at least, not yet - might be tempted but there's a serious risk of types getting further out of hand)
-
+    type ColumnOption = DataColumn<DataType>;
+    type ColumnValue = M extends true ? ColumnOption[] : ColumnOption | null;
     
     return (
         <Grid className="w-full items-center" container>
@@ -79,24 +101,15 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                     className="w-full"
                     options={columns}
                     multiple={isMultiType}
-                    //@ts-expect-error autocomplete value type seems sane - but we have an error...
-                    value={value}
+                    value={value as ColumnValue}
                     onChange={(_, value) => {
-                        //! fixme <<<
+                        //! now that we say `value as ColumnValue`, MUI thinks the value for onChange is not an array - which it could be.
+                        // *sigh*. time to move on.
                         if (!value) return; //! check if this is correct
                         if (!(isMultiType === isArray(value))) throw new Error("type mismatch");
-                        if (isMultiType) {
-                            // todo - need to make controlled anyway for multiple...
-                            if (!isArray(value)) throw new Error("Expected array - this should be unreachable");
-                            //@ts-expect-error we could use a narrower type for the setter we use here
-                            setSelectedColumn(value.map(v => v.field));
-                        } else {
-                            if (isArray(value)) throw new Error("Unexpected array - this should be unreachable");
-                            //@ts-expect-error we could use a narrower type for the setter we use here
-                            setSelectedColumn(value.field);
-                        }
+                        //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
+                        setValue(value);
                     }}
-                    //@ts-expect-error wtf is going on, why would an individual option be an array?
                     getOptionLabel={(column) => column.name}
                     renderInput={(params) => {
                         const { key, ...p } = params as typeof params & {
@@ -107,11 +120,9 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                                 key={key}
                                 {...p}
                                 placeholder={placeholder}
-                            // customStartAdornment={<LinksComponent />}
                             />
                         );
                     }}
-                    //@ts-expect-error wtf is going on, why would an individual option be an array? (go back to inferred type when fixed)
                     renderOption={(props, column: DataColumn<DataType>) => {
                         const { key, ...p } = props as typeof props & {
                             key: string;
@@ -119,11 +130,9 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                         const { datatype } = column;
                         // todo: consider an optional description prop, which we could show in a tooltip?
                         if (isMultiType) {
-                            // we do hit this error... but it kinda sorta works - need to fix.
-                            if (!isArray(current_value)) console.error(`Expected array - this should be unreachable (${current_value})`);
-                            if (current_value === undefined) throw new Error("Expected current_value to be defined");
-                            //@ts-expect-error if it was behaving, type would be narrow after throw above - not throwing because it's not behaving
-                            const selected = current_value?.includes(column.field);
+                            if (!isArray(value)) throw new Error("Expected array - this should be unreachable");
+                            if (value === undefined) throw new Error("Expected value to be defined");
+                            const selected = value?.includes(column);
                             return (
                                 <li key={key} {...p}>
                                     <Checkbox
