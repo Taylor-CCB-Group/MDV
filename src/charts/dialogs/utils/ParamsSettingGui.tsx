@@ -31,11 +31,12 @@ function getCurrentParam<T extends BaseConfig>(chart: BaseChart<T>, i: number) {
     }
     if (hasMulti) {
         // there is a multi-column parameter, and this is not it.
-        // we need to figure out where it is in the array
-        const multiIndex = params.findIndex(p => isMultiColumn(p.type));
-        const nBefore = multiIndex < i ? multiIndex : multiIndex - 1;
-        const nAfter = n - nBefore - 1;
-        return currentParams.slice(nBefore, n - nAfter);
+        // we already handled the case where we are the multi-column parameter
+        // that means we should be either first or last in the array.
+        if (i === 0) {
+            return currentParams[0];
+        }
+        return currentParams[n - 1];
     }
     // there is no multi-column parameter; happy days
     return currentParams[i];
