@@ -16,7 +16,7 @@ import { action, observable, reaction, toJS } from "mobx";
 import z from "zod";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
-import { columnMatchesType } from "@/lib/columnTypeHelpers";
+import { columnMatchesType, isMultiColumn } from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
 import { isArray } from "@/lib/utils.js";
 import { serialiseConfig } from "../chartConfigUtils.js";
@@ -336,7 +336,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                                     {p.name}:
                                 </Typography>
                                 <ColumnSelectionComponent key={p.name} placeholder={p.name}
-                                // multiple={} //<- which helper do we use to determine this?
+                                multiple={isMultiColumn(p.type)}
                                 // this may be changing - perhaps we always pass mobx object to ColumnSelectionComponent
                                 // but we definitely need to know whether it's a multi-column or not & be able to set the value accordingly
                                 //@ts-expect-error setSelectedColumn(c: never)???

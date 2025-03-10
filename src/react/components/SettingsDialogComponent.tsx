@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useState, useMemo, useId, useCallback, useEffect } from "react";
+import { useMemo, useId, useCallback } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -10,21 +10,18 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { v4 as uuid } from "uuid";
-import { Button, Chip, FormControl, FormControlLabel, MenuItem, Radio, RadioGroup, Select, Slider, Typography } from "@mui/material";
+import { Button, Chip, FormControl, FormControlLabel, Radio, RadioGroup, Slider, Typography } from "@mui/material";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import JsonView from "react18-json-view";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { g, isArray, notEmpty } from "@/lib/utils";
+import { isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
-import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
