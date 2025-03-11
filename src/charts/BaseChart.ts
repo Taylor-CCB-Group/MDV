@@ -10,7 +10,7 @@ import type { BaseDialog } from "@/utilities/Dialog";
 import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
-import { serialiseChart, initialiseChartConfig } from "./chartConfigUtils";
+import { serialiseChart, initialiseChartConfig, ColumnQueryMapper } from "./chartConfigUtils";
 import type { MultiColumnQuery } from "@/links/link_utils";
 import { decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -69,10 +69,8 @@ class BaseChart<T extends BaseConfig> {
     width = 0;
     height = 0;
     legend: any;
-    // activeQueries: Record<string, FieldSpec> = {};
-    // thinking of making this a class with a bit more logic, for now, this is a record of queries...
-    activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
-    // _hasDecorated: Set<string> = new Set();
+    // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
+    activeQueries: ColumnQueryMapper<T>;
     /**
      * The base constructor
      * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
@@ -103,6 +101,7 @@ class BaseChart<T extends BaseConfig> {
         //... so perhaps the idea of keeping that property to react charts is a good one?
         this.config = initialiseChartConfig(config, this);
         //this needs to be called after we initialise the config
+        this.activeQueries = new ColumnQueryMapper(this);
         decorateChartColumnMethods(this);
 
         //required in case added to separate browser window
