@@ -65,6 +65,7 @@ import FilterComponentReactWrapper from "@/react/components/FilterComponentReact
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
+import ToggleThemeWrapper from "./dialogs/ToggleTheme";
 
 
 //order of column data in an array buffer
@@ -324,20 +325,35 @@ export class ChartManager {
             );
         }
 
-        const themeButton = createMenuIcon(
-            "fas fa-adjust",
+        // const themeButton = createMenuIcon(
+        //     "fas fa-adjust",
+        //     {
+        //         tooltip: {
+        //             text: "Change Theme",
+        //             position: "bottom-left",
+        //         },
+        //         func: (e) => {
+        //             this.themeMenu.show(e);
+        //         },
+        //     },
+        //     this.rightMenuBar,
+        // );
+
+        this.rightMenuBar.style.display = "flex";
+        this.rightMenuBar.style.alignItems = "center";
+
+        const themeNode = createEl(
+            "span",
             {
-                tooltip: {
-                    text: "Change Theme",
-                    position: "bottom-left",
-                },
-                func: (e) => {
-                    this.themeMenu.show(e);
+                style: {
+                    marginRight: "4px",
                 },
             },
             this.rightMenuBar,
         );
-        themeButton.style.margin = "3px";
+
+        createMdvPortal(ToggleThemeWrapper(), themeNode)
+        // themeButton.style.margin = "3px";
         if (config.permission === "edit") {
             const uploadButton = createMenuIcon(
                 "fas fa-upload",
