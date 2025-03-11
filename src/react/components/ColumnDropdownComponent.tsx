@@ -4,7 +4,7 @@ import { useDataStore } from "../context";
 import type { DataColumn, DataType } from "@/charts/charts";
 import { useMemo } from "react";
 import { observer } from "mobx-react-lite";
-import { Autocomplete, Checkbox } from "@mui/material";
+import { Autocomplete, Box, Checkbox, Chip } from "@mui/material";
 import { isArray } from "@/lib/utils";
 import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';
@@ -96,12 +96,13 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
     
     return (
         <Grid className="w-full items-center" container>
-            <Grid size={"grow"}>
+            <Grid className={"grow"}>
                 <Autocomplete
                     className="w-full"
                     options={columns}
                     multiple={isMultiType}
                     value={value as ColumnValue}
+                    disableCloseOnSelect
                     onChange={(_, value) => {
                         //! now that we say `value as ColumnValue`, MUI thinks the value for onChange is not an array - which it could be.
                         // *sigh*. time to move on.
@@ -123,6 +124,22 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                             />
                         );
                     }}
+                    renderTags={(value, getTagProps) => (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            width: "100%",
+                          }}
+                        >
+                          {value.map((option, index) => (
+                            <Chip
+                              label={option.name}
+                              {...getTagProps({ index })}
+                            />
+                          ))}
+                        </Box>
+                    )}
                     renderOption={(props, column: DataColumn<DataType>) => {
                         const { key, ...p } = props as typeof props & {
                             key: string;
