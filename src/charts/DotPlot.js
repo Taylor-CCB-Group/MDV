@@ -43,7 +43,6 @@ class DotPlot extends SVGChart {
     //but when we clone a chart like that, at the moment the old chart stops responding to changes
     @loadColumnData 
     setFields(fieldNames) {
-        const cm = window.mdv.chartManager;
         //! we don't want to mutate the config object... 
         // we want to have a special value which signifies that it should use this behaviour.
         // then when we save state, it will have the appropriate value.
@@ -55,9 +54,14 @@ class DotPlot extends SVGChart {
         this.onDataFiltered();
     }
     @loadColumnData
-    setParams(params) {
+    setParams(params, liveParams) {
         this.config.param = params;
-        this.setFields(params.slice(1));
+        //ooops... we get in to here with a string array (concrete version of something active), 
+        // and then setFields with that
+        // which overrides `this.activeQueries['setFields']` with a string array
+        // - what if pass another argument with some extra information?
+        //   it should pass through decorateColumnMethod without any issues...
+        this.setFields(liveParams.slice(1));
         this.onDataFiltered();
     }
 

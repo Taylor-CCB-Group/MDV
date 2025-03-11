@@ -605,11 +605,21 @@ class BaseChart<T extends BaseConfig> {
     }
     removeLayout?(): void;
     
+    /**
+     * Sets the params array in the config and redraws the chart.
+     * 
+     * Note that if an active query is set, the first argument will have the concrete column names as strings,
+     * as processed by `@loadColumnData`,
+     * while the second argument will have the FieldSpecs objects, unprocessed by the decorator.
+     */
     //@ts-expect-error - the decorator thinks it might not be setting an array value...
     @loadColumnData
-    setParams(params: FieldSpecs) {
+    setParams(params: FieldSpecs, liveParams: FieldSpecs) {
         //! now the config will just have string[] - we want to allow things that can understand to have other objects
         this.config.param = params;
+        // if we keep liveParams around it could be useful when serialising the chart
+        // although how can we be sure that the liveParams are up to date?
+        // maybe as a rule, this method is the only way to set the params...
         this.drawChart();
     }
     /**
