@@ -260,6 +260,7 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     }
     @computed
     get columns() {
+        //how would we pause this?
         return this.link.observableFields.slice(0, this.maxItems).map(f => f.column);
     }
     @computed
@@ -300,6 +301,7 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
     }
     // make sure this happens before any async stuff so the check above is valid and subsequent calls return early.
     link.observableFields = []; //this will be populated by setFieldsFromFilter below
+    makeObservable(link, { observableFields: true });
     await cm.loadColumnSetAsync([link.name_column], tds.name);
     if (!isColumnLoaded(nameCol)) {
         throw new Error(`Column ${link.name_column} not loaded`);
@@ -321,7 +323,6 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
     link.valueToRowIndex = valueToRowIndex;
     
     
-    makeObservable(link, { observableFields: true });
     
     //! we have an assumption here that there is only one subgroup
     //(nb, I think this is the thing that there'd be a radio-button for in the UI)
