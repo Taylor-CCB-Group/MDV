@@ -64,6 +64,7 @@ import { createMdvPortal } from "@/react/react_utils";
 import FilterComponentReactWrapper from "@/react/components/FilterComponentReactWrapper";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
+import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 
 
 //order of column data in an array buffer
@@ -1012,132 +1013,136 @@ export class ChartManager {
     }
 
     showAddViewDialog() {
-        const controls = [
-            {
-                type: "checkbox",
-                id: "clone-view",
-                label: "Clone current view",
-            },
-            {
-                type: "text",
-                id: "name",
-                label: "name",
-                // todo have some better reusability for this kind of validation
-                // (also probably refactor this dialog into react)
-                // considered returning a string to set a tooltip or something, parked that idea for now pending more thought/refactoring
-                // validate: (v) => this.viewManager.all_views.some(view => view.value === v) ? "Name already exists" : null,
-                validate: (v) => !this.viewManager.all_views.some(view => view === v),
-            },
-        ];
-        if (this.dataSources.length > 1) {
-            for (const ds of this.dataSources) {
-                controls.push({
-                    type: "checkbox",
-                    id: ds.name,
-                    label: `Include ${ds.name}`,
-                });
-            }
-        }
-        new CustomDialog({
-            title: "Add New View",
-            controls: controls,
-            buttons: [
-                {
-                    text: "Create New View",
-                    method: (vals) => {
-                        //create new view option
-                        this.viewManager.setAllViews([
-                            ...this.viewManager.all_views,
-                            vals["name"]
-                        ]);
+        
+        // const controls = [
+        //     {
+        //         type: "checkbox",
+        //         id: "clone-view",
+        //         label: "Clone current view",
+        //     },
+        //     {
+        //         type: "text",
+        //         id: "name",
+        //         label: "name",
+        //         // todo have some better reusability for this kind of validation
+        //         // (also probably refactor this dialog into react)
+        //         // considered returning a string to set a tooltip or something, parked that idea for now pending more thought/refactoring
+        //         // validate: (v) => this.viewManager.all_views.some(view => view.value === v) ? "Name already exists" : null,
+        //         validate: (v) => !this.viewManager.all_views.some(view => view === v),
+        //     },
+        // ];
+        // if (this.dataSources.length > 1) {
+        //     for (const ds of this.dataSources) {
+        //         controls.push({
+        //             type: "checkbox",
+        //             id: ds.name,
+        //             label: `Include ${ds.name}`,
+        //         });
+        //     }
+        // }
+        new ViewDialogWrapper("create");
+        // new CustomDialog({
+        //     title: "Add New View",
+        //     controls: controls,
+        //     buttons: [
+        //         {
+        //             text: "Create New View",
+        //             method: (vals) => {
+        //                 //create new view option
+        //                 this.viewManager.setAllViews([
+        //                     ...this.viewManager.all_views,
+        //                     vals["name"]
+        //                 ]);
 
-                        // Optionally make it the current view
-                        this.viewManager.setView(vals["name"]);
-                        if (!vals["clone-view"]) {
-                            //remove all charts and links
-                            for (const ds in this.viewData.dataSources) {
-                                if (
-                                    this.viewData.dataSources[ds].layout ===
-                                    "gridstack"
-                                ) {
-                                    this.gridStack.destroy(this.dsIndex[ds]);
-                                }
-                            }
-                            this.removeAllCharts();
-                            this.viewData.links = [];
-                            const state = this.getState();
-                            state.view.initialCharts = {};
-                            state.view.dataSources = {};
-                            //only one datasource
-                            if (this.dataSources.length === 1) {
-                                state.view.initialCharts[
-                                    this.dataSources[0].name
-                                ] = [];
-                                state.view.dataSources[
-                                    this.dataSources[0].name
-                                ] = {};
-                            } else {
-                                for (const ds in this.dsIndex) {
-                                    if (vals[ds]) {
-                                        state.view.initialCharts[ds] = [];
-                                        state.view.dataSources[ds] = {};
-                                    }
-                                }
-                            }
-                            this._callListeners("state_saved", state);
-                            this.contentDiv.innerHTML = "";
-                            this._init(state.view);
-                        } else {
-                            const state = this.getState();
-                            console.log("state add new: ", state);
-                            this._callListeners("state_saved", state);
-                        }
-                    },
-                },
-            ],
-        });
+        //                 // Optionally make it the current view
+        //                 this.viewManager.setView(vals["name"]);
+        //                 if (!vals["clone-view"]) {
+        //                     //remove all charts and links
+        //                     for (const ds in this.viewData.dataSources) {
+        //                         if (
+        //                             this.viewData.dataSources[ds].layout ===
+        //                             "gridstack"
+        //                         ) {
+        //                             this.gridStack.destroy(this.dsIndex[ds]);
+        //                         }
+        //                     }
+        //                     this.removeAllCharts();
+        //                     this.viewData.links = [];
+        //                     const state = this.getState();
+        //                     state.view.initialCharts = {};
+        //                     state.view.dataSources = {};
+        //                     //only one datasource
+        //                     if (this.dataSources.length === 1) {
+        //                         state.view.initialCharts[
+        //                             this.dataSources[0].name
+        //                         ] = [];
+        //                         state.view.dataSources[
+        //                             this.dataSources[0].name
+        //                         ] = {};
+        //                     } else {
+        //                         for (const ds in this.dsIndex) {
+        //                             if (vals[ds]) {
+        //                                 state.view.initialCharts[ds] = [];
+        //                                 state.view.dataSources[ds] = {};
+        //                             }
+        //                         }
+        //                     }
+        //                     this._callListeners("state_saved", state);
+        //                     this.contentDiv.innerHTML = "";
+        //                     this._init(state.view);
+        //                 } else {
+        //                     const state = this.getState();
+        //                     console.log("state add new: ", state);
+        //                     this._callListeners("state_saved", state);
+        //                 }
+        //             },
+        //         },
+        //     ],
+        // });
     }
 
     showSaveViewDialog(action) {
-        new CustomDialog({
-            title: "Save View",
-            text: "Do you want to save the current view",
-            buttons: [
-                {
-                    text: "YES",
-                    method: () => {
-                        const state = this.getState();
-                        this._callListeners("state_saved", state);
-                        action();
-                    },
-                },
-                {
-                    text: "NO",
-                    method: () => {
-                        action();
-                    },
-                },
-            ],
-        });
+        new ViewDialogWrapper("save", action);
+        // new CustomDialog({
+        //     title: "Save View",
+        //     text: "Do you want to save the current view",
+        //     buttons: [
+        //         {
+        //             text: "YES",
+        //             method: () => {
+        //                 const state = this.getState();
+        //                 this._callListeners("state_saved", state);
+        //                 action();
+        //             },
+        //         },
+        //         {
+        //             text: "NO",
+        //             method: () => {
+        //                 action();
+        //             },
+        //         },
+        //     ],
+        // });
     }
 
     showDeleteViewDialog() {
-        new CustomDialog({
-            title: "Delete View",
-            text: "Do you want to delete the current view?",
-            buttons: [
-                {
-                    text: "YES",
-                    method: () => {
-                        this.deleteCurrentView();
-                    },
-                },
-                {
-                    text: "NO",
-                    method: () => { },
-                },
-            ],
-        });
+        new ViewDialogWrapper("delete");
+        // new CustomDialog({
+        //     title: "Delete View",
+        //     text: "Do you want to delete the current view?",
+        //     buttons: [
+        //         {
+        //             text: "YES",
+        //             method: () => {
+        //                 this.deleteCurrentView();
+        //             },
+        //         },
+        //         {
+        //             text: "NO",
+        //             method: () => { },
+        //         },
+        //     ],
+        // });
     }
 
     changeView(view) {
