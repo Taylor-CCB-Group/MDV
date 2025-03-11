@@ -1,20 +1,76 @@
-import type { CTypes } from "@/lib/columnTypeHelpers";
+import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { observer } from "mobx-react-lite";
-import { RAComponent, type RowsAsColsProps } from "./LinksComponent";
-import { useHighlightedForeignRows } from "../chartLinkHooks";
+import { useHighlightedForeignRows, useRowsAsColumnsLinks } from "../chartLinkHooks";
+import { useCallback, useMemo, useState } from "react";
+import { isArray } from "@/lib/utils";
+import { RowsAsColsQuery } from "@/links/link_utils";
+import { Button, TextField } from "@mui/material";
 
-const ActiveLinkComponent = observer(<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) => {
-    const { linkedDs, link } = props;
-    const { setSelectedColumn } = props;
-    const rowNames = useHighlightedForeignRows().map(r => r.fieldName);
-    const maxItems = props.multiple ? 10 : 1;
+function useActiveLink<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) {
+    const { link, linkedDs } = useRowsAsColumnsLinks()[0]; //pending multiple link support
+    const sg = Object.values(link.subgroups)[0]; //pending subgroup support
+    const highlightedForeignRows = useHighlightedForeignRows();
+    const isActive = useMemo(() => {
+        const ov = props.current_value;
+        const v = isArray(ov) ? ov[0] : ov;
+        // for now, if it's not a string, there's only one option - it's an active link...
+        //! but this is not the long-term intention.
+        return typeof v !== "string";
+    }, [props.current_value]);
+    const [maxItems, setMaxItems] = useState(props.multiple ? 10 : 1);
+    const activateLink = useCallback(() => {
+        const multiple = props.multiple;
+        const q = new RowsAsColsQuery(link, linkedDs.name, maxItems);
+        //@ts-expect-error it knows `multiple` is `M`, but we haven't passed `V` - can we combine these into a single type to reduce noise?
+        props.setSelectedColumn(multiple ? [q] : q);
+    }, [props, link, linkedDs.name, maxItems]);
+
+    // todo
+    // const freezeLink = useCallback(() => {
+    // })
+
+    return {
+        isActive,
+        activateLink,
+        maxItems,
+        setMaxItems,
+        link,
+        sg,
+        highlightedForeignRows,
+    };
+}
+
+const ActiveLinkComponent = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
+    const {
+        isActive,
+        activateLink,
+        maxItems,
+        setMaxItems,
+        sg,
+        // highlightedForeignRows,
+    } = useActiveLink(props);
+    // maybe something like rowsText can be shown in a little scrollable box...
+    // const rowsText = highlightedForeignRows.slice(0, maxItems).map((r) => r.name).join(", ");
 
     return (
-        <div>
-            <RAComponent {...props} />
-            {link.observableFields[0]?.fieldName}
+        <div className="w-full flex justify-around text-xs font-light">
+            <Button onClick={activateLink}>
+                {isActive ? "Using" : "Activate"} '{sg.label}' Link
+            </Button>
+            {props.multiple && (
+                <TextField
+                    size="small"
+                    className="max-w-20 float-right"
+                    type="number"
+                    label="Max"
+                    variant="standard"
+                    value={maxItems}
+                    onChange={(e) => setMaxItems(Number(e.target.value))}
+                />
+            )}
+            {/* {isActive && rowsText} */}
         </div>
     );
-})
+});
 
 export default ActiveLinkComponent;
