@@ -618,7 +618,7 @@ const SelectionDialogComponent = () => {
                                 error={{message: error.message, stack: error.stack}} 
                                 //todo assign proper meta data
                                 // extraMetaData={} 
-                                title={`Error displaying 'AddRowComponent'. Click to view details`}
+                                title="Error displaying 'AddRowComponent'. Click to view details"
                             />
                         </div>
                         )
@@ -633,7 +633,7 @@ const SelectionDialogComponent = () => {
                                 error={{message: error.message, stack: error.stack}} 
                                 //todo assign proper meta data
                                 // extraMetaData={} 
-                                title={`Error displaying linked rows. Click to view details`}
+                                title="Error displaying linked rows. Click to view details"
                             />
                         </div>
                     )
