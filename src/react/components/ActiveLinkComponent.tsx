@@ -17,7 +17,15 @@ function useActiveLink<T extends CTypes, M extends boolean>(props: ColumnSelecti
         //! but this is not the long-term intention.
         return typeof v !== "string";
     }, [props.current_value]);
-    const [maxItems, setMaxItems] = useState(props.multiple ? 10 : 1);
+    const [maxItems, setMaxItemsState] = useState(props.multiple ? 10 : 1);
+    const setMaxItems = useCallback((v: number) => {
+        setMaxItemsState(v);
+        //todo don't repeat this code
+        const multiple = props.multiple;
+        const q = new RowsAsColsQuery(link, linkedDs.name, v);
+        //@ts-expect-error it knows `multiple` is `M`, but we haven't passed `V` - can we combine these into a single type to reduce noise?
+        props.setSelectedColumn(multiple ? [q] : q);
+    }, [props, link, linkedDs.name]);
     const activateLink = useCallback(() => {
         const multiple = props.multiple;
         const q = new RowsAsColsQuery(link, linkedDs.name, maxItems);
