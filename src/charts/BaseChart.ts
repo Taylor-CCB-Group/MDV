@@ -914,6 +914,7 @@ class BaseChart<T extends BaseConfig> {
     }
     
     /**
+     * Note: prefer `toJSON()` for serializing the chart config.
      * Returns a string representation of the chart's config, such that a simple call
      * a simple call to `JSON.stringify(chart)` will return the config.
      * 
@@ -922,6 +923,9 @@ class BaseChart<T extends BaseConfig> {
      */
     toString(): SerialString<T> {
         return JSON.stringify(this.getConfig());
+    }
+    toJSON() {
+        return this.getConfig().toJSON();
     }
 
     getColorOptions(): ColorOptions {

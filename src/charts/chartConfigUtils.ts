@@ -81,7 +81,7 @@ export function serialiseQueries(chart: BaseChart<any>) {
     for (const k in activeQueries) {
         serialized[k] = activeQueries[k].map(q => {
             if (q instanceof RowsAsColsQuery) {
-                return q.serialized;
+                return q.toJSON();
             }
             return q;
         });
@@ -94,6 +94,8 @@ export function serialiseConfig(config: any) {
     //the idea is that anywhere we previously had a column name, we can have a query object
     // Is this enough?
     // (as long as we don't have some vanilla chart with column query nonsense in it...)
+    // n.b. now using `toJSON()` in favour of `toString()` where possible - but there isn't a default `toJSON()` 
+    // for arbitrary objects, so still using stringification here.
     const serialized = JSON.parse(JSON.stringify(config));
     
     //! pending more generic approach to serialising queries...

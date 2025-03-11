@@ -123,7 +123,7 @@ In order to specify that a given property should respond in an active way to oth
 
 So, wherever a chart `config` has a property representing a column, it should be a `FieldSpec`, which may be a `string` or a `ColumnQuery` object. This is a somewhat subtle change, but it is intended to make the system more robust and flexible.
 
-These `ColumnQuery`s must be implemented in a way such that their representation throughout the lifecycle of charts and `config` objects is consistent: there needs to be some way to serialise them (this should be via a `toString()` implementation, such that `JSON.stringify(config)` is sufficient in many cases), and to deserialise them.
+These `ColumnQuery`s must be implemented in a way such that their representation throughout the lifecycle of charts and `config` objects is consistent: there needs to be some way to serialise them (this should be via a `toJSON()` implementation, such that `config.toJSON()` is sufficient in many cases), and to deserialise them.
 
 So, the serialised form may look something like this:
 

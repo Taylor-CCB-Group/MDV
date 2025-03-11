@@ -266,18 +266,12 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     get fields() {
         return this.columns.map(c => c.field);
     }
-    @computed
-    get serialized() {
-        return { linkedDsName: this.linkedDsName, maxItems: this.maxItems, type: "RowsAsColsQuery" };
-    }
     /**
-     * Returns a string that should have enough information to represent a JSON serialisation of the query.
+     * JSON serialisation that can be used to recreate the query object.
      */
-    toString() {
-        // will this be enough that JSON.stringify(config) will get the right thing without needing a custom replacer?
-        // (or traversing the object to find the right thing)
-        // probably ok for things that are able to take the config object without things like decorator for turning into a string...
-        return JSON.stringify(this.serialized);
+    toJSON() {
+        // I was previously naively using toString() for serialization - now I know better.
+        return { linkedDsName: this.linkedDsName, maxItems: this.maxItems, type: "RowsAsColsQuery" };
     }
     static fromSerialized(ds: DataStore, serialized: RowsAsColsQuerySerialized) {
         const link = getRowsAsColumnsLinks(ds).find(l => l?.linkedDs.name === serialized.linkedDsName)?.link;
