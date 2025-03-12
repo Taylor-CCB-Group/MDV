@@ -49,11 +49,13 @@ export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
     return result;
 }
 
-export function getConcreteFieldName(fieldSpec: FieldSpec) {
+export function getConcreteFieldNames(fieldSpec: FieldSpec) {
     if (isArray(fieldSpec)) {
         throw new Error("Not implemented");
     }
-    return typeof fieldSpec === "string" ? fieldSpec : fieldSpec.fields[0];
+    //! nb, previously unused, now changing the signature to return string array
+    //(I've had it with checking for array or string)
+    return typeof fieldSpec === "string" ? [fieldSpec] : fieldSpec.fields;
 }
 
 /**
