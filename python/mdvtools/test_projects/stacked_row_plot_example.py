@@ -52,12 +52,12 @@ def main():
     size = [792, 472]
     position = [10, 10]
 
-    bandwith = 0.1
-    intervals = 40
-    scale = "0.001"
+    #bandwith = 0.1
+    #intervals = 40
+    #scale = "0.001"
 
     legend_display = True
-    legend_position = [375,1]
+    #legend_position = [375,1]
               
     
     xaxis_properties = {"label": "n_genes_by_counts", 

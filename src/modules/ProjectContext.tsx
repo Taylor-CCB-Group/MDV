@@ -13,9 +13,12 @@ export type ProjectInfo = {
     projectName: string;
 };
 
-const ProjectContext = createContext<ProjectInfo>(null as any);
-
-export const ProjectProvider = ({ children }: PropsWithChildren) => {
+/** 
+ * Get project information from the URL and URL parameters.
+ * 
+ * This can be used to derive the initial state of the project, or called by non-React code to get similar information.
+ */
+export function getProjectInfo(): ProjectInfo {
     // Derive initial state from window.location and URL parameters
     const { origin, pathname } = window.location;
     const flaskURL = origin + pathname;
@@ -28,20 +31,23 @@ export const ProjectProvider = ({ children }: PropsWithChildren) => {
     const root = getRoot(dir);
     // todo - get these from e.g. state.json instead?
     const staticFolder = urlParams.get("static") !== null;
+    // this is really projectID in the current implementation - would be good to have name as well (and be able to change it)
     const projectName = dir.split("/").pop() || ""; //todo - check logic for default project name
     const { chartManager } = window.mdv;
-
-    const [projectConfig, setProjectConfig] = useState<ProjectInfo>({
-        // not used? - test / check <<<---
-        // I think we determined that `root` was the useful thing to expose
-        // in a way that hides most of the sketchiness of the current setup.
-        // flaskURL,
-        // dir,
+    return {
         root,
         staticFolder,
         projectName,
         chartManager,
-    });
+    };   
+}
+
+const ProjectContext = createContext<ProjectInfo>(null as any);
+
+export const ProjectProvider = ({ children }: PropsWithChildren) => {
+    // we might get away with just a hook for `useProject = () => useMemo(getProjectInfo, [])`... 
+    // but maybe in future we'll make this more complex
+    const [projectConfig, setProjectConfig] = useState<ProjectInfo>(getProjectInfo());
 
     return (
         <ProjectContext.Provider value={{ ...projectConfig }}>
