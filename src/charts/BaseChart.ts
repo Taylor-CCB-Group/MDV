@@ -658,6 +658,15 @@ class BaseChart<T extends BaseConfig> {
                     this.setTitle(v);
                 },
             },
+            {
+                type: "text",
+                label: "Chart Legend",
+                current_value: c.legend,
+                func: (v) => {
+                    c.legend = v;
+                    this.legendIcon.setAttribute("aria-label", v);
+                }
+            }
         ];
         const paramsSettings = getParamsGuiSpec(this);
         if (paramsSettings) {
