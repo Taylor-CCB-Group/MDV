@@ -613,7 +613,7 @@ class BaseChart<T extends BaseConfig> {
      */
     //@ts-expect-error - the decorator thinks it might not be setting an array value...
     @loadColumnData
-    setParams(params: FieldSpecs, liveParams: FieldSpecs) {
+    setParams(params: FieldSpecs) {
         //! now the config will just have string[] - we want to allow things that can understand to have other objects
         this.config.param = params;
         // if we keep liveParams around it could be useful when serialising the chart
@@ -658,6 +658,15 @@ class BaseChart<T extends BaseConfig> {
                     this.setTitle(v);
                 },
             },
+            {
+                type: "text",
+                label: "Chart Legend",
+                current_value: c.legend,
+                func: (v) => {
+                    c.legend = v;
+                    this.legendIcon.setAttribute("aria-label", v);
+                }
+            }
         ];
         const paramsSettings = getParamsGuiSpec(this);
         if (paramsSettings) {

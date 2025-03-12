@@ -49,11 +49,13 @@ export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
     return result;
 }
 
-export function getConcreteFieldName(fieldSpec: FieldSpec) {
+export function getConcreteFieldNames(fieldSpec: FieldSpec) {
     if (isArray(fieldSpec)) {
         throw new Error("Not implemented");
     }
-    return typeof fieldSpec === "string" ? fieldSpec : fieldSpec.fields[0];
+    //! nb, previously unused, now changing the signature to return string array
+    //(I've had it with checking for array or string)
+    return typeof fieldSpec === "string" ? [fieldSpec] : fieldSpec.fields;
 }
 
 /**
@@ -190,17 +192,9 @@ export function serialiseChart<T extends BaseChart<any>>(chart: T) {
     
     // we should find any mapped column queries and replace relevant values with a representation of that
     //the idea is that anywhere we previously had a column name, we can have a query object
-    for (const k in chart.activeQueries) {
-        // this is a different approach where we have a 'queries' property which has a method name as a key
-        // so the contents of `param` are less relevant...
-        // indeed, we could call this something like `columns` and use it in place of `param`...
-        // would mostly apply to non-react charts though, or I'd be more keen on this approach...
-        // serialized.queries = serialiseQueries(chart);
-    }
-    const serialisedQueries = serialiseQueries(chart);
-    const colorByColumn = serialisedQueries['colorByColumn'];
+    const { colorByColumn, ...serialisedQueries } = serialiseQueries(chart);
+    serialized.queries = serialisedQueries;
     if (colorByColumn) {
-        // serialized.colorByColumn = getConcreteFieldName(chart.activeQueries['colorByColumn'][0]);
         serialized.color_by = colorByColumn[0];
     }
     console.log('processed config:', serialized);
@@ -259,6 +253,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
         const c = config as any;
         const queries = c.queries;
         for (const method in queries) {
+            // if we want to handle multiple arguments that had been provided to some function, this would be the place
             const q = queries[method].map((v: any) => deserialiseParam(chart.dataStore, v));
             (chart as any)[method](q);
         }

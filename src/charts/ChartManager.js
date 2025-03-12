@@ -64,6 +64,7 @@ import { createMdvPortal } from "@/react/react_utils";
 import FilterComponentReactWrapper from "@/react/components/FilterComponentReactWrapper";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
+import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 
 
 //order of column data in an array buffer
@@ -2184,23 +2185,22 @@ export class ChartManager {
         div.style.alignItems = "";
         div.style.justifyContent = "";
         const chartType = BaseChart.types[config.type];
-        // if (!chartType.allowDynamicColumns) {
-            // turn the config into a static one...
-            // the above property name is not the way I'm currently thinking of approaching this...
-        // }
-        const newParams = chartType.params?.map((param, i) => {
-            if (!param.reactive) {
-                // try to find the corresponding entry in `config.param`...
-                // issue with that being that multicolumn params will be arbitrarily long, 
-                // so we can't really 'know' that we are doing the right thing here...
-                // most charts with _multi params, it's at index 0. 
-                // 15 (heat_map) & 24 (dot_plot) are exceptions (both have two params, with 'something else' first).
-                // Anyway - importantly, there are no charts with more than one _multi param.
-                
-                // param.type.startsWith('_multi')
-            }
-        });
+        // sometimes the constructor doesn't understand active link, but chart.setParams() does...
+        // it somewhat appears to work if we first manifest concrete field names, 
+        // then set the real params in a setTimeout()...
+        // but we're resorting to setTimeout for a few things and it's going to be hard to manage...
+        // are we sure that this timeout will happen after the one that instruments decorators etc?
+        // seems dodgy to rely on setTimeout order.
+        // Also setParams() itself is not always going to work - depends on the chart.
+        const originalParam = config.param.map(p => deserialiseParam(ds, p));
+        config.param = originalParam.flatMap(getConcreteFieldNames);
         const chart = new chartType.class(ds.dataStore, div, config);
+        if (originalParam.some(p => typeof p !== 'string')) {
+            console.log('setting param with active queries in timeout');
+            setTimeout(() => {
+                chart.setParams(originalParam);
+            });
+        }
         this.charts[chart.config.id] = {
             chart: chart,
             dataSource: ds,
