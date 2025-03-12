@@ -102,7 +102,7 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                     options={columns}
                     multiple={isMultiType}
                     value={value as ColumnValue}
-                    disableCloseOnSelect
+                    disableCloseOnSelect={isMultiType}
                     onChange={(_, value) => {
                         //! now that we say `value as ColumnValue`, MUI thinks the value for onChange is not an array - which it could be.
                         // *sigh*. time to move on.
@@ -132,12 +132,15 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                             width: "100%",
                           }}
                         >
-                          {value.map((option, index) => (
+                          {value.map((option, index) => {
+                            const { key, ...tagProps } = getTagProps({ index });
+                            return (
                             <Chip
+                              key={key}
                               label={option.name}
-                              {...getTagProps({ index })}
+                              {...tagProps}
                             />
-                          ))}
+                          )})}
                         </Box>
                     )}
                     renderOption={(props, column: DataColumn<DataType>) => {

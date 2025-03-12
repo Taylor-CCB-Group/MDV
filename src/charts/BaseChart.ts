@@ -10,7 +10,7 @@ import type { BaseDialog } from "@/utilities/Dialog";
 import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
-import { serialiseChart, initialiseChartConfig } from "./chartConfigUtils";
+import { serialiseChart, initialiseChartConfig, ColumnQueryMapper } from "./chartConfigUtils";
 import type { MultiColumnQuery } from "@/links/link_utils";
 import { decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
@@ -69,10 +69,8 @@ class BaseChart<T extends BaseConfig> {
     width = 0;
     height = 0;
     legend: any;
-    // activeQueries: Record<string, FieldSpec> = {};
-    // thinking of making this a class with a bit more logic, for now, this is a record of queries...
-    activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
-    // _hasDecorated: Set<string> = new Set();
+    // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
+    activeQueries: ColumnQueryMapper<T>;
     /**
      * The base constructor
      * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
@@ -103,6 +101,7 @@ class BaseChart<T extends BaseConfig> {
         //... so perhaps the idea of keeping that property to react charts is a good one?
         this.config = initialiseChartConfig(config, this);
         //this needs to be called after we initialise the config
+        this.activeQueries = new ColumnQueryMapper(this);
         decorateChartColumnMethods(this);
 
         //required in case added to separate browser window
@@ -605,11 +604,21 @@ class BaseChart<T extends BaseConfig> {
     }
     removeLayout?(): void;
     
+    /**
+     * Sets the params array in the config and redraws the chart.
+     * 
+     * Note that if an active query is set, the first argument will have the concrete column names as strings,
+     * as processed by `@loadColumnData`,
+     * while the second argument will have the FieldSpecs objects, unprocessed by the decorator.
+     */
     //@ts-expect-error - the decorator thinks it might not be setting an array value...
     @loadColumnData
-    setParams(params: FieldSpecs) {
+    setParams(params: FieldSpecs, liveParams: FieldSpecs) {
         //! now the config will just have string[] - we want to allow things that can understand to have other objects
         this.config.param = params;
+        // if we keep liveParams around it could be useful when serialising the chart
+        // although how can we be sure that the liveParams are up to date?
+        // maybe as a rule, this method is the only way to set the params...
         this.drawChart();
     }
     /**

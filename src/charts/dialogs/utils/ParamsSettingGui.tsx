@@ -59,12 +59,12 @@ function updateMultiParam<T extends BaseConfig>(chart: BaseChart<T>, i: number, 
     if (i === 0) {
         const newParams = value.concat(currentParams.slice(-nOthers));
         // chart.config.param = newParams;
-        chart.setParams(newParams);
+        chart.setParams(newParams, newParams);
         return;
     }
     const newParams = currentParams.slice(0, nOthers).concat(value);
     // chart.config.param = newParams;
-    chart.setParams(newParams);
+    chart.setParams(newParams, newParams);
 }
 function updateSingleParam<T extends BaseConfig>(chart: BaseChart<T>, i: number, value: FieldSpec) {
     const chartType = BaseChart.types[chart.config.type];
@@ -78,11 +78,11 @@ function updateSingleParam<T extends BaseConfig>(chart: BaseChart<T>, i: number,
         const nBefore = multiIndex < i ? multiIndex : multiIndex - 1;
         const nAfter = n - nBefore - 1;
         const newParams = currentParams.slice(0, nBefore).concat(value).concat(currentParams.slice(n - nAfter));
-        chart.setParams(newParams);
+        chart.setParams(newParams, newParams);
         // chart.config.param = newParams;
     } else {
         chart.config.param[i] = value;
-        chart.setParams(chart.config.param);
+        chart.setParams(chart.config.param, chart.config.param);
     }
 }
 

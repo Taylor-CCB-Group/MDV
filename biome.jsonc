@@ -42,7 +42,8 @@
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "space",
-		"indentWidth": 4 // considering changing to 2, but most of the codebase uses 4
+		"indentWidth": 4, // considering changing to 2, but most of the codebase uses 4
+		"lineWidth": 120
 	},
 	"files": {
 		// todo - fix other code and remove these ignores (notwithstanding legacy)

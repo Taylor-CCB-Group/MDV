@@ -9,7 +9,7 @@ import Autocomplete from "@mui/material/Autocomplete";
 import BaseChart from "../BaseChart";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
-import { Button, Dialog, Divider, IconButton, Paper, Typography } from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Paper, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
 import { action, observable, reaction, toJS } from "mobx";
@@ -303,12 +303,12 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
             </div>
             )
         }>
-            <Grid container spacing={2} sx={{margin: 1, padding: 2, width: '50em'}}>
+            <DialogContent dividers>
+            <Grid container spacing={2} sx={{paddingBottom: 2, width: "100%"}}>
                 <Grid size={6}>
                     <Grid container direction={"column"} spacing={1}
-                    sx={{gap: 1}}
                     >
-                        <h2>Chart Type</h2>
+                        <Typography variant="h6">Chart Type</Typography>
                         <Autocomplete
                             options={chartNames}
                             value={config.type}
@@ -316,6 +316,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                             renderInput={(params) => (
                                 <TextField {...params} label="Chart Type" />
                             )}
+                            sx={{pt: 1}}
                         />
                         <TextField label="Title" size="small" onChange={action((e) => config.title = e.target.value)} />
                         <TextField label="Description" size="small"
@@ -329,7 +330,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     <Grid container direction={"column"} spacing={1}
                     sx={{gap: 1}}
                     >
-                        {chartType?.params && <h2>Columns</h2>}
+                        {chartType?.params && <Typography variant="h6">Columns</Typography>}
                         {chartType?.params?.map((p, i) => (
                             <>
                                 <Typography key={`label_${p.name}`} fontSize="small">
@@ -374,20 +375,16 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     otherwise not unless we spread config... and then nested `config.params[i] = c` updates didn't work */}
                 <ChartPreview config={{...config}} />
             </div>
-            <div>
-                <Button 
-                    sx={{
-                        width: "100%", 
-                        paddingY: 1, 
-                        borderTopLeftRadius: 0, 
-                        borderTopRightRadius: 0
-                    }} 
+            </DialogContent>
+            <DialogActions sx={{justifyContent: "center"}}>
+                <Button
                     variant="contained"
                     onClick={addChart}
+                    disabled={!chartType}
                 >
-                        Add Chart
+                    Add Chart
                 </Button>
-            </div>
+            </DialogActions>
         </ErrorBoundary>
     );
 });
@@ -449,34 +446,38 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
         return <AddChartDialogComponent {...props} config={config} />;
     }
     return (
-        <Dialog open={open} fullScreen disableEscapeKeyDown={true}
+        <Dialog open={open} disableEscapeKeyDown={true}
             PaperProps={{
                 style: { //copied from FileUploadDialog, should maybe be part of theme.
-                    backgroundColor: "var(--fade_background_color)",
-                    backdropFilter: "blur(1px)",
+                //     backgroundColor: "var(--fade_background_color)",
+                //     backdropFilter: "blur(1px)",
+                border: "1px solid var(--border_menu_bar_color)"
                 },
             }}
+            fullWidth
+            onClose={() => {
+                setOpen(false);
+                props.onDone();
+            }} 
         >
-            <div className="h-screen flex items-center justify-center">
-                <Paper 
-                    elevation={24} 
-                    style={{backgroundColor: "var(--dlg_background_color)", backgroundImage: 'none'}}
-                >
-                    <div 
-                        className="p-3 rounded-t-sm flex justify-between items-center" 
-                        style={{ backgroundColor: "var(--menu_bar_color)" }}
-                    >
-                        <h2>Add Chart in "{props.dataStore.name}"</h2>
-                        <IconButton onClick={() => {
-                            setOpen(false);
-                            props.onDone();
-                        }}>
-                            <CloseIcon sx={{ fontSize: "1.5rem" }} />
+            <DialogTitle>
+                Add Chart in "{props.dataStore.name}"
+                        <IconButton
+                            aria-label="close"
+                                            onClick={() => {
+                                                setOpen(false);
+                                                props.onDone();
+                                            }}
+                                            sx={{
+                                                position: "absolute",
+                                                right: 8,
+                                                top: 8,
+                                            }}
+                            >
+                            <CloseIcon />
                         </IconButton>
-                    </div>
-                        <AddChartDialogComponent {...props} config={config} />
-                </Paper>
-            </div>
+                    </DialogTitle>
+                    <AddChartDialogComponent {...props} config={config} />
         </Dialog>
     );
 }

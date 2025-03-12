@@ -66,7 +66,6 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
     target: (this: This, inputCol: FieldName | FieldName[], ...args: Args) => void, // we could probably type this to have first argument specified...
     // context: ClassMethodDecoratorContext<This, (this: This, inputCol: FieldSpec, ...args: Args) => void> | { target: This },
 ) {
-    let disposer: IReactionDisposer | null = null;
     function replacementMethod(this: This, inputCol: FieldSpec, ...args: Args) {
         // when I deserialise a chart, it should have working reactions for any live columns...
         console.log("decorated loadColumnData method called", this.config.type, inputCol, args);
@@ -75,7 +74,10 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
         // we want to make sure that
         // - the result of the live column change will be applied ✅
         // - the value stored in the config will be the special value, rather than the result of the live column change
-        // - reaction disposes when the live column is no longer needed ✅ (to be tested)
+        // - old reaction disposes when user changes the value ✅
+        // - multiple instances of the same class don't interfere with each other ✅
+        //   (no longer keeping a reference to disposer in the outer scope)
+        
         // there could be anything happening inside the method... but perhaps if we know that the config is always a
         // proxied mobx object, we can somehow generically detect changes and re-patch???
         // perhaps safer to have a copy of the config that will be used in chart.getConfig(), which has the 'special value',
@@ -83,23 +85,19 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
         // this is really a 'config vs state' thing.
         if (inputCol == null) {
             // columns not needed
+            // should still dispose any reaction that was set up
+            // ? (when) is this called? consider this untested
+            this.activeQueries.setActiveQuery(target.name, [null, ...args], () => {});
             target.call(this, inputCol, ...args);
         } else {
             // this should only happen if there are any live columns...
-            // and we should dispose if replacementMethod is called again
-            if (disposer) {
-                disposer();
-                this.reactionDisposers = this.reactionDisposers.filter(v => v !== disposer);
-            }
             const multiCol = Array.isArray(inputCol);
             const colsOriginalArr = multiCol ? inputCol : [inputCol];
-            // args[0] = colsOriginal;
-            // how do we specify which params this will operate on?
-            this.activeQueries[target.name] = [...colsOriginalArr, ...args];
-            disposer = this.mobxAutorun(() => {
+            // changing this mechanism to use ColumnQueryMapper rather than managing disposer here
+            const userValue = [...colsOriginalArr, ...args];
+            this.activeQueries.setActiveQuery(target.name, userValue, () => {
                 const cols = flattenFields(colsOriginalArr);
                 const a = multiCol ? cols : cols[0];
-                // const newArgs = [a, ...args.slice(1)];
                 const cm = window.mdv.chartManager;
                 cm._getColumnsThen(dataSource, cols, action(() => {
                     target.call(this, a, ...args);
