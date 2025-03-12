@@ -54,13 +54,16 @@ class DotPlot extends SVGChart {
         this.onDataFiltered();
     }
     @loadColumnData
-    setParams(params, liveParams) {
+    setParams(params) {
         this.config.param = params;
         //ooops... we get in to here with a string array (concrete version of something active), 
         // and then setFields with that
         // which overrides `this.activeQueries['setFields']` with a string array
         // - what if pass another argument with some extra information?
         //   it should pass through decorateColumnMethod without any issues...
+        // - or maybe not, but do some otehr hacky stuff to get it to work
+        //? I think this is working with this workaround - not a pattern I want to repeat
+        const liveParams = this.activeQueries.userValues['setParams'];
         this.setFields(liveParams.slice(1));
         this.onDataFiltered();
     }
@@ -364,28 +367,6 @@ class DotPlot extends SVGChart {
                     c.color_scale.log = v;
                     this.setColorFunction();
                     this.drawChart();
-                },
-            },
-            // this should be redundant now
-            {
-                // perhaps the GuiType should be more aligned with params type - i.e. _multi_column:number
-                // * we should then be able to expose all params in the settings in a more consistent way *
-                // then we wouldn't want current_value to be this.fieldNames, but the entries in config.param
-                // corresponding to fields... as defined in BaseChart.types["dot_plot"].params
-                // - param is a flat array - so we'd need to mimic the behaviour of spreading values from here
-                // there's a more general question of whether settings operates on the mobx mutable config object
-                // ... in many cases we could avoid having a `func`...
-                type: "multicolumn", //maybe this should be `"_multi_column:number"`
-                label: "Fields on x axis",
-                // this is more of a nuisance than type: "_multi_column:number"
-                // ^ need to figure out what we use is the generic adapter for this
-                columnSelection: {
-                    filter: ["double", "integer", "int32"]
-                },
-                current_value: this.fieldNames,
-                func: (v) => {
-                    // given that this is "multicolumn", we should be able to assume that v is an array
-                    this.setFields(Array.isArray(v) ? v : [v]);
                 },
             },
         ]);
