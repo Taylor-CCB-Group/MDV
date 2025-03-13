@@ -10,7 +10,7 @@ class ViolinPlot extends WGLChart {
     useDefaultTitle = false;
     constructor(dataStore, div, config) {
         const x_name = dataStore.getColumnName(config.param[0]);
-        const y_name = dataStore.getColumnName(config.param[1]); //! no.
+        const y_name = dataStore.getColumnName(config.param[1]);
         if (!config.axis) {
             config.axis = {
                 x: { size: 30, label: x_name, textsize: 13 },
@@ -32,6 +32,7 @@ class ViolinPlot extends WGLChart {
         const appConf = { brush: c.brush };
 
         this.app = new WGL2DI(this.graphDiv, appConf);
+        //this appears problematic with active color column selection
         const colorFunc = this.afterAppCreation();
         this.colorFunc = colorFunc;
         const len = this.dataStore.size;
@@ -64,6 +65,29 @@ class ViolinPlot extends WGLChart {
         this.app.setPointOpacity(this.config.opacity);
         this.data = [];
         this.setValueField(c.param[1]);
+    }
+    @loadColumnData
+    colorByColumn(column) {
+        super.colorByColumn(column);
+        // trying to extract relavant code from WGLChart.afterAppCreation
+        const c = this.config;
+        const conf = {
+            asArray: true,
+            overideValues: {
+                colorLogScale: this.config.log_color_scale,
+            },
+        };
+        this._addTrimmedColor(column, conf);
+        const colorFunc = this.dataStore.getColorFunction(column, conf);
+        if (!c.color_legend) {
+            c.color_legend = {
+                display: true,
+            };
+        }
+
+        this.setColorLegend();
+        this.colorFunc = colorFunc;
+        this.drawChart();
     }
     // @computed get bandwidth() {
     //     const mm = this.dataStore.getMinMaxForColumn(this.valueFieldName);
