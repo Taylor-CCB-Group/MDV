@@ -15,7 +15,9 @@ function getCurrentParam<T extends BaseConfig>(chart: BaseChart<T>, i: number) {
     // we only call this in the context of a chart type that has params
     if (!params) throw new Error("No params for chart type");
     const isMultiType = isMultiColumn(params[i].type);
-    const currentParams = config.param;
+    
+    // const currentParams = config.param;
+    const currentParams = chart.activeQueries.userValues['setParams'] || config.param;
     const n = currentParams.length;
     const hasMulti = params.some(p => isMultiColumn(p.type));
     if (isMultiType) {
