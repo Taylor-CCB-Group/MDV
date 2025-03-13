@@ -5,6 +5,7 @@ import SVGChart from "./SVGChart.js";
 import { scaleLinear } from "d3-scale";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
 import { axisLeft } from "d3";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class HeatMap extends SVGChart {
     constructor(dataStore, div, config) {
@@ -16,7 +17,10 @@ class HeatMap extends SVGChart {
         });
 
         const p = this.config.param;
-        //! we use this.fieldNames instead of `param[1, ...]` to avoid mutating config - which is observable - in setFields - which may be in an action
+        //! we used this.fieldNames instead of `param[1, ...]` 
+        // to avoid mutating config - which is observable - in setFields - which may be in an action
+        // also note that a lot of this was actually because of the way active links worked during development
+        // this is less needed now (although we still have the reaction -> mutation issue)
         this.fieldNames = p.slice(1);
         const vals = this.dataStore.getColumnValues(p[0]);
         this.x_scale.domain(vals.slice(0));
@@ -38,7 +42,16 @@ class HeatMap extends SVGChart {
         this.addToolTip();
         this.setFields(p.slice(1));
     }
-    
+    @loadColumnData
+    setParams(params) {
+        this.config.param = params;
+        this.setFields(params.slice(1));
+        this.config.title = this.dataStore.getColumnName(params[0]);
+        this.x_scale.domain(this.dataStore.getColumnValues(params[0]));
+        this.setColorFunction();
+        this.onDataFiltered();
+    }
+    // @loadColumnData
     setFields(p) {
         this.fieldNames = p;
         const yLabels = this.fieldNames.map(f => this.dataStore.getColumnName(f));
@@ -420,19 +433,6 @@ class HeatMap extends SVGChart {
                     this.drawChart();
                 },
             },
-            {
-                type: "multicolumn",
-                label: "Fields on y axis",
-                // this is more of a nuisance than type: "_multi_column:number"
-                columnSelection: {
-                    filter: ["double", "integer", "int32"]
-                },
-                current_value: this.config.param.slice(1),
-                func: (v) => {
-                    // given that this is "multicolumn", we should be able to assume that v is an array
-                    this.setFields(Array.isArray(v) ? v : [v]);
-                },
-            }
         ]);
     }
 }
@@ -440,7 +440,7 @@ class HeatMap extends SVGChart {
 BaseChart.types["heat_map"] = {
     name: "Heat Map",
     class: HeatMap,
-    methodsUsingColumns: ["setFields"],
+    // methodsUsingColumns: ["setFields"],
     params: [
         {
             type: "text",
