@@ -100,7 +100,11 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
                 const a = multiCol ? cols : cols[0];
                 const cm = window.mdv.chartManager;
                 cm._getColumnsThen(dataSource, cols, action(() => {
-                    target.call(this, a, ...args);
+                    try {
+                        target.call(this, a, ...args);
+                    } catch (e) {
+                        console.error("Error in loadColumnData method", e);
+                    }
                 }));
             });
         }
