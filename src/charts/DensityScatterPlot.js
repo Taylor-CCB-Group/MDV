@@ -188,7 +188,7 @@ class DensityScatterPlot extends WGLScatterPlot {
 
         cats.push({ t: "None" });
 
-        s.push(
+        const contourSettings = [
             {
                 type: "dropdown",
                 label: "Contour Parameter",
@@ -303,7 +303,12 @@ class DensityScatterPlot extends WGLScatterPlot {
                     this.drawChart();
                 },
             },
-        );
+        ];
+        s.push({
+            type: "folder",
+            label: "Contour Settings",
+            current_value: contourSettings
+        });
         return s;
     }
 }
