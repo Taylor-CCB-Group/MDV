@@ -1,4 +1,4 @@
-import BaseChart from "@/charts/BaseChart";
+import BaseChart, { type BaseConfig } from "@/charts/BaseChart";
 import type { FieldName } from "@/charts/charts";
 import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
 import { action, type IReactionDisposer } from "mobx";
@@ -111,4 +111,46 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
     }
 
     return replacementMethod;
+}
+
+type DecoratedMethodName = string;
+type UserArgs = any[] | null;
+/**
+ * This class is used to map column queries to `@loadColumnData` methods on a chart object.
+ * 
+ * It will manage the reactions that will update the chart when the column query changes,
+ * ensuring that they are disposed of appropriately, as well as tracking the active state
+ * for serialisation.
+ * 
+ * As such, charts internally using `string` column names continue to internally use this format,
+ * with values representing the concrete manifestation of any live queries at a given moment.
+ * This `ColumnQueryMapper` will keep track of how these values relate to whatever configuration
+ * a user may have set.
+ */
+export class ColumnQueryMapper<T extends BaseConfig> {
+    reactionDisposers: Map<DecoratedMethodName, IReactionDisposer> = new Map();
+    // using a `Record` so it's similar to previous `activeQueries` property
+    userValues: Record<DecoratedMethodName, UserArgs> = {};
+    chart: BaseChart<T>;
+    constructor(chart: BaseChart<T>) {
+        this.chart = chart;
+    }
+    /**
+     * Called from the implementation of `@loadColumnData` decorator to ensure proper housekeeping of reactions
+     * and keeping track of object form of queries for serialisation.
+     * @param methodName the name of the method being called
+     * @param userValue the value passed to the method before any transformation
+     */
+    setActiveQuery(methodName: DecoratedMethodName, userValue: UserArgs, callback: () => void) {
+        if (this.reactionDisposers.has(methodName)) {
+            const disposer = this.reactionDisposers.get(methodName);
+            disposer?.();
+            this.reactionDisposers.delete(methodName);
+            this.chart.reactionDisposers = this.chart.reactionDisposers.filter(v => v !== disposer);
+        }
+        this.userValues[methodName] = userValue;
+        //using chart.mobxAutorun() to ensure that the reaction is disposed when the chart is disposed
+        const disposer = this.chart.mobxAutorun(callback);
+        this.reactionDisposers.set(methodName, disposer);
+    }
 }
