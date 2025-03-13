@@ -5,7 +5,6 @@ import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
-import { serialiseQueries } from "./chartConfigUtils";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class DotPlot extends SVGChart {
@@ -37,11 +36,11 @@ class DotPlot extends SVGChart {
         //this.fractionScale = scaleSqrt().domain([0, 100]);
     }
     
-    // todo figure out why annotation version isn't fully working - need methodsUsingColumns as well???
-    //if called with objects representing queries, this will cause the method to be called with column names
-    //and again whenever the column data changes
-    //but when we clone a chart like that, at the moment the old chart stops responding to changes
-    @loadColumnData 
+    // removing this decorator as it muddies the waters with setParams.
+    // - both methods having the annotation didn't particularly cause an issue..
+    //   as long as we had the workaround in `setParams()` to manually look for activeQuery
+    //   but that was itself a hack.
+    // @loadColumnData
     setFields(fieldNames) {
         //! we don't want to mutate the config object... 
         // we want to have a special value which signifies that it should use this behaviour.
@@ -56,16 +55,7 @@ class DotPlot extends SVGChart {
     @loadColumnData
     setParams(params) {
         this.config.param = params;
-        //ooops... we get in to here with a string array (concrete version of something active), 
-        // and then setFields with that
-        // which overrides `this.activeQueries['setFields']` with a string array
-        // - what if pass another argument with some extra information?
-        //   it should pass through decorateColumnMethod without any issues...
-        // - or maybe not, but do some otehr hacky stuff to get it to work
-        //? I think this is working with this workaround - not a pattern I want to repeat
-        const liveParams = this.activeQueries.userValues['setParams'];
-        this.setFields(liveParams.slice(1));
-        this.onDataFiltered();
+        this.setFields(params.slice(1));
     }
 
     remove(notify = true) {
@@ -136,17 +126,6 @@ class DotPlot extends SVGChart {
         const l = this.linkThicknessLegend;
         if (l) {
             config.fraction_legend.position = [l.offsetLeft, l.offsetTop];
-        }
-        // it looks as though individual charts may be on the hook to serialise their queries
-        // because only they really know how they relate to order of params in the config
-        // in the case of react charts, they should hypothetically respond to changes in the config already
-        // - we just need to make that aware of queries in appropriate hooks?
-        // as for non-react... I suppose if they all have a contract whereby setConfig method will set appropriate state
-        const fieldQuery = serialiseQueries(this)['setFields'];
-        // if we have a way of interpreting this we'd be good to go
-        if (fieldQuery) {
-            console.log('DotPlot fieldQuery', fieldQuery);
-            config.param = [config.param[0], ...fieldQuery];
         }
         return config;
     }

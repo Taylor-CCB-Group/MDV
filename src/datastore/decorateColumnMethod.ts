@@ -1,6 +1,7 @@
 import BaseChart, { type BaseConfig } from "@/charts/BaseChart";
-import type { FieldName } from "@/charts/charts";
 import { flattenFields, type FieldSpec } from "@/lib/columnTypeHelpers";
+import { isArray } from "@/lib/utils";
+import { RowsAsColsQuery } from "@/links/link_utils";
 import { action, type IReactionDisposer } from "mobx";
 
 /**
@@ -51,19 +52,24 @@ export function decorateChartColumnMethods<T extends BaseChart<any>>(chart: T) {
 // also consider configEntriesUsingColumns...
 // perhaps we can have computed getters and custom setters for the columns in the config
 
+type DecoratorTarget<This extends BaseChart<any>, Args extends any[], Return> = (this: This, inputCol: FieldSpec, ...args: Args) => Return;
+
 /**
  * Decorator for a method that requires column data to be loaded.
  * 
  * Methods decorated with this will use the first argument as a column id or array of column ids.
  * 
+ * 
  * Anything specified as a virtual column that may change at runtime should cause the original method to be called again
  * as a `reaction`.
  * 
- * Considering the possibility that this might also take arguments about how this will map to the config object / params....
- * Maybe it's enough in the short term to remember which method will be called with associated column specifications.
+ * Considering the possibility that this might also take arguments about how this will map to the config object / params...
+ * We keep track of active queries with a `ColumnQueryMapper` object. An optional argument to this decorator
+ * seems neater than having to set `activeQueries.methodToConfigMap` from elsewhere, but
+ * not worth the change required here as of now.
  */
 export function loadColumnData<This extends BaseChart<any>, Args extends any[], Return>(
-    target: (this: This, inputCol: FieldName | FieldName[], ...args: Args) => void, // we could probably type this to have first argument specified...
+    target: DecoratorTarget<This, Args, Return>, // we could probably type this to have first argument specified...
     // context: ClassMethodDecoratorContext<This, (this: This, inputCol: FieldSpec, ...args: Args) => void> | { target: This },
 ) {
     function replacementMethod(this: This, inputCol: FieldSpec, ...args: Args) {
@@ -74,6 +80,7 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
         // we want to make sure that
         // - the result of the live column change will be applied ✅
         // - the value stored in the config will be the special value, rather than the result of the live column change
+        //   it'll be mapped back during serialisation as long as there's some `methodToConfigMap` appropriately configured ✅
         // - old reaction disposes when user changes the value ✅
         // - multiple instances of the same class don't interfere with each other ✅
         //   (no longer keeping a reference to disposer in the outer scope)
@@ -91,7 +98,7 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
             target.call(this, inputCol, ...args);
         } else {
             // this should only happen if there are any live columns...
-            const multiCol = Array.isArray(inputCol);
+            const multiCol = isArray(inputCol);
             const colsOriginalArr = multiCol ? inputCol : [inputCol];
             // changing this mechanism to use ColumnQueryMapper rather than managing disposer here
             const userValue = [...colsOriginalArr, ...args];
@@ -101,6 +108,7 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
                 const cm = window.mdv.chartManager;
                 cm._getColumnsThen(dataSource, cols, action(() => {
                     try {
+                        //@ts-ignore array vs single column
                         target.call(this, a, ...args);
                     } catch (e) {
                         console.error("Error in loadColumnData method", e);
@@ -131,8 +139,18 @@ export class ColumnQueryMapper<T extends BaseConfig> {
     reactionDisposers: Map<DecoratedMethodName, IReactionDisposer> = new Map();
     // using a `Record` so it's similar to previous `activeQueries` property
     userValues: Record<DecoratedMethodName, UserArgs> = {};
+    /**
+     * A map from method names to the path in the chart config object where the column query should be stored.
+     * Note - a single element array is used to indicate that the value should be stored as an array.
+     * It does not relate to the depth of the object in the config.
+     * 
+     * So `'tooltip.column'` means `config.tooltip.column` taking a non-array value,
+     * while `['param']` means `config.param` taking an array value.
+     */
+    methodToConfigMap: Record<DecoratedMethodName, string | [string]>;
     chart: BaseChart<T>;
-    constructor(chart: BaseChart<T>) {
+    constructor(chart: BaseChart<T>, methodToConfigMap: Record<DecoratedMethodName, string | [string]>) {
+        this.methodToConfigMap = methodToConfigMap;
         this.chart = chart;
     }
     /**
@@ -152,5 +170,55 @@ export class ColumnQueryMapper<T extends BaseConfig> {
         //using chart.mobxAutorun() to ensure that the reaction is disposed when the chart is disposed
         const disposer = this.chart.mobxAutorun(callback);
         this.reactionDisposers.set(methodName, disposer);
+    }
+    /**
+     * This method is called at the start of the chart serialisation process to ensure that the chart configuration
+     * has the correct values for any live queries, 
+     * prior to possible further processing by overrides of `BaseChart.getConfig()`.
+     * 
+     * Returns something like a `SerialisedConfig<T>`, except that we don't really have a type for that yet.
+     */
+    serialiseChartConfig() {
+        const serialized = JSON.parse(JSON.stringify(this.chart.config));
+        const activeQueries = this.userValues;
+        // serialized.queries = {};
+
+        for (const k in activeQueries) {
+            const methodName = k;
+            const configKeyA = this.methodToConfigMap[methodName];
+            // if we have something like `['param']`, we know that the value should be stored as an array
+            const serializedValueA = activeQueries[k]?.map(q => {
+                if (q instanceof RowsAsColsQuery) {
+                    return q.toJSON();
+                }
+                return q;
+            });
+            if (!serializedValueA) continue;
+            const array = isArray(configKeyA);
+            const serializedValue = array ? serializedValueA : serializedValueA[0];
+            const configKey = array ? configKeyA[0] : configKeyA;
+            if (!configKey) {
+                if (!serialized.queries) serialized.queries = {};
+                serialized.queries[methodName] = serializedValue;
+                continue;
+            }
+            const configPath = configKey.split(".");
+            const configObj = serialized;
+            // recursively search for the property in the config object and set the value
+            function setConfigValue(obj: any, path: string[], value: any) {
+                if (path.length === 1) {
+                    obj[path[0]] = value;
+                    return;
+                }
+                const nextObj = obj[path[0]];
+                if (nextObj == null) {
+                    obj[path[0]] = {};
+                }
+                setConfigValue(obj[path[0]], path.slice(1), value);
+            }
+            setConfigValue(configObj, configPath, serializedValue);
+        }
+
+        return serialized;
     }
 }

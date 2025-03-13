@@ -58,34 +58,10 @@ export function getConcreteFieldNames(fieldSpec: FieldSpec) {
     return typeof fieldSpec === "string" ? [fieldSpec] : fieldSpec.fields;
 }
 
+
 /**
- * For charts that aren't able to accept observable props for columns,
- * this function will replace any query objects with the corresponding field name(s).
- * 
- * It takes as input a config object that may contain serialised queries, and returns a new object
- * with the queries replaced by the field names as of the moment at which the method is run.
- * 
- * @param config object in serialised form
+ * We use this only as an intermediate step in AddChartDialogReact, as of this writing.
  */
-// export function getConcreteConfig(config: any) {
-//     // return concrete;
-// }
-
-
-export function serialiseQueries(chart: BaseChart<any>) {
-    const activeQueries = chart.activeQueries.userValues;
-    const serialized: Record<string, any> = {};
-    for (const k in activeQueries) {
-        serialized[k] = activeQueries[k]?.map(q => {
-            if (q instanceof RowsAsColsQuery) {
-                return q.toJSON();
-            }
-            return q;
-        });
-    }
-    return serialized;
-}
-
 export function serialiseConfig(config: any) {
     // we should find any mapped column queries and replace relevant values with a representation of that
     //the idea is that anywhere we previously had a column name, we can have a query object
@@ -133,32 +109,6 @@ export function deserialiseConfig(ds: DataStore, serialConfig: any) {
     return exceptions.length ? { config, exceptions } : config;
 }
 
-export function serialiseChart<T extends BaseChart<any>>(chart: T) {
-    const { config } = chart;
-    // thinking about config vs state, in the context of dynamic virtual columns...
-    // if we just have a record of paramSpecs, then we can use those in this representation
-    // while the config object itself will have the actual evaluated runtime state of the values
-    // then if we also keep a record of other `configEntriesUsingColumns`, that should, hypothetically,
-    // be enough information?
-    // - wouldn't like to count on that.
-    // If we make sure that any special config values are of some type other than string, 
-    // then we should be easily able to traverse the config object for them... however, it works the other way around:
-    // the config object is liable to have computed strings & we want to get the 'special value' from that.
-
-    // get the BaseChart.types entry for this chart, 
-    // use it to determine any `configEntriesUsingColumns`...
-    const serialized = JSON.parse(JSON.stringify(config));
-    
-    // we should find any mapped column queries and replace relevant values with a representation of that
-    //the idea is that anywhere we previously had a column name, we can have a query object
-    const { colorByColumn, ...serialisedQueries } = serialiseQueries(chart);
-    serialized.queries = serialisedQueries;
-    if (colorByColumn) {
-        serialized.color_by = colorByColumn[0];
-    }
-    console.log('processed config:', serialized);
-    return serialized;
-}
 
 /**
  * This will be called by the chart constructor to set up the config object, as well as properties on the chart object

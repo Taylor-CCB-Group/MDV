@@ -4,8 +4,7 @@ import { curveBasis, line } from "d3-shape";
 import { easeLinear } from "d3-ease";
 import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
-import { g } from "@/lib/utils";
-import { serialiseQueries } from "./chartConfigUtils";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class ViolinPlot extends WGLChart {
     useDefaultTitle = false;
@@ -39,25 +38,12 @@ class ViolinPlot extends WGLChart {
         this.xPosBuff = new SharedArrayBuffer(len * 4);
         this.xPos = new Float32Array(this.xPosBuff);
 
-        //-- notes around column queries / TAURUS
-        //we want to have dynamic 'values' - but these are not the values we're looking for
-        //it's the contents of param[1] we care about at this time
         this.values = this.dataStore.getColumnValues(c.param[0]);
         const cats = this.dataStore.getRawColumn(c.param[0]);
         //jitter x position
         for (let i = 0; i < len; i++) {
             this.xPos[i] = cats[i] * 50 + 4 + Math.random() * 42;
         }
-
-        //set default band width
-        //this is where it's going wrong - when should we be using `getConfig()`?
-        //when this is called before initial fields for the link have been set, it fails
-        // const p1 = getConcreteFieldName(this.config.param[1]);
-        //if we do all this in setValueField, it'll be violating mobx rules?
-        // const mm = this.dataStore.getMinMaxForColumn(p1);
-        // this.defaultBandWidth = (mm[1] - mm[0]) / 100;
-        // c.band_width = c.band_width || this.defaultBandWidth;
-        // c.intervals = c.intervals || 20;
 
         this.dim = this.dataStore.getDimension("catrange_dimension");
         this.x_scale.domain(this.values);
@@ -78,8 +64,6 @@ class ViolinPlot extends WGLChart {
         this.app.setPointOpacity(this.config.opacity);
         this.data = [];
         this.setValueField(c.param[1]);
-        // this.centerGraph();
-        // this.onDataFiltered();
     }
     // @computed get bandwidth() {
     //     const mm = this.dataStore.getMinMaxForColumn(this.valueFieldName);
@@ -87,7 +71,7 @@ class ViolinPlot extends WGLChart {
 
     // @loadColumnData
     setValueField(field) {        
-        //this.config.param[1] = field; //NO
+        //this.config.param[1] = field; //NO - don't call us, we'll call you
         if (!field) {
             console.warn("No field provided for setValueField");
             return;
@@ -117,6 +101,11 @@ class ViolinPlot extends WGLChart {
     // @computed get valueFieldName() {
     //      return getConcreteFieldName(this.config.param[1]);
     // }
+    @loadColumnData
+    setParams(params) {
+        this.config.param = params;
+        this.setValueField(params[1]);
+    }
 
     _createFilter(range) {
         this.range = range;
@@ -335,41 +324,20 @@ class ViolinPlot extends WGLChart {
         //this.x_scale.domain([range.x_range[0],range.x_range[1]]);
         this.y_scale.domain([-range.y_range[0], -range.y_range[1]]);
     }
-    getConfig() {
-        const c = super.getConfig();
-        //! serialisation vs getting of config
-        const valueQuery = serialiseQueries(this)['setValueField'];
-        if (valueQuery) {
-            c.param = [c.param[0], valueQuery[0]];
-        }
-        console.log(c);
-        return c;
-    }
 
     getSettings() {
         const s = super.getSettings();
         const c = this.config;
-        // no - we should be using config value, but when serialising in getConfig() we need to patch
+        // note that we previously relied on this.valueField as distinct from c.param[1]
+        // but we could now just use c.param[1] directly
         const p1 = this.valueField;
         const mm = this.dataStore.getMinMaxForColumn(p1);
 
         s.splice(
+            //not sure what this splice is for, now we have generic Parameters
+            //in an unusual place...
             1,
             0,
-            g({
-                type: "column",
-                label: "Value (Y axis)",
-                columnSelection: {
-                    filter: ["double", "integer", "int32"]
-                },
-                current_value: p1,
-                func: (x) => {
-                    //! what if we decorated the func with query response?
-                    this.setValueField(x);
-                    // c.param[1] = x;
-                    // this.onDataFiltered();
-                },
-            }),
             {
                 type: "slider",
                 max: mm[1] / 10,
@@ -419,7 +387,6 @@ class ViolinPlot extends WGLChart {
 BaseChart.types["violin_plot"] = {
     class: ViolinPlot,
     name: "Violin Plot",
-    methodsUsingColumns: ["setValueField"],
     params: [
         {
             type: "text",

@@ -10,8 +10,7 @@ import type { BaseDialog } from "@/utilities/Dialog";
 import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
-import { serialiseChart, initialiseChartConfig } from "./chartConfigUtils";
-import type { MultiColumnQuery } from "@/links/link_utils";
+import { initialiseChartConfig } from "./chartConfigUtils";
 import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
@@ -100,8 +99,14 @@ class BaseChart<T extends BaseConfig> {
         //   but there are issues with mobx actions that result in mutations to the config
         //... so perhaps the idea of keeping that property to react charts is a good one?
         this.config = initialiseChartConfig(config, this);
+        //thinking about having arguments like `@loadColumnData(['param'])`, but requires a bit of work
+        //and would break compatibility with `"methodsUsingColumns"` forcing us to update all charts using that.
+        this.activeQueries = new ColumnQueryMapper(this, {
+            setParams: ["param"],
+            setToolTipColumn: "tooltip.column",
+            colorByColumn: "color_by",
+        });
         //this needs to be called after we initialise the config
-        this.activeQueries = new ColumnQueryMapper(this);
         decorateChartColumnMethods(this);
 
         //required in case added to separate browser window
@@ -928,7 +933,8 @@ class BaseChart<T extends BaseConfig> {
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
             };
         }
-        return serialiseChart(this);
+        // return serialiseChart(this);
+        return this.activeQueries.serialiseChartConfig();
     }
     
     /**
