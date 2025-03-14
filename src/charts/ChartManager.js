@@ -1698,6 +1698,9 @@ export class ChartManager {
         );
     }
 
+    /**
+     * @param {{dataStore: DataStore}} ds
+     */
     _setUpMenu(ds) {
         const dataStore = ds.dataStore;
         createMenuIcon(

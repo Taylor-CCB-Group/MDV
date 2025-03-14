@@ -158,6 +158,18 @@ export class ColumnQueryMapper<T extends BaseConfig> {
         this.methodToConfigMap = methodToConfigMap;
         this.chart = chart;
     }
+    /** 
+     * prevent nested methods from adding more `userValues` & confusing things? 
+     * e.g. if `setParams([someQuery])` calls `setFields(params.slice(1))` internally,
+     * which one should be the active query?
+     * We don't want to use the inner one, which will've been called with string column names.
+     * The answer seems to be that the outermost method should always be the active query...
+     * and if inner previously set a query, it should be cleared.
+     * but perhaps a better answer is to avoid this kind of nesting... which is what we're also doing anyway.
+     *! So this is probably not needed - and not properly tested.
+     * added because of `methodName: 'replacementMethod'` issue, now resolved differently.
+     */
+    inSetQuery = false;
     /**
      * Called from the implementation of `@loadColumnData` decorator to ensure proper housekeeping of reactions
      * and keeping track of object form of queries for serialisation.
@@ -165,16 +177,20 @@ export class ColumnQueryMapper<T extends BaseConfig> {
      * @param userValue the value passed to the method before any transformation
      */
     setActiveQuery(methodName: DecoratedMethodName, userValue: UserArgs, callback: () => void) {
+        const alreadyInSetQuery = this.inSetQuery;        
+        this.inSetQuery = true;
         if (this.reactionDisposers.has(methodName)) {
             const disposer = this.reactionDisposers.get(methodName);
             disposer?.();
             this.reactionDisposers.delete(methodName);
             this.chart.reactionDisposers = this.chart.reactionDisposers.filter(v => v !== disposer);
         }
-        this.userValues[methodName] = userValue;
+        if (!alreadyInSetQuery) this.userValues[methodName] = userValue;
+        else this.userValues[methodName] = null;
         //using chart.mobxAutorun() to ensure that the reaction is disposed when the chart is disposed
         const disposer = this.chart.mobxAutorun(callback);
         this.reactionDisposers.set(methodName, disposer);
+        if (!alreadyInSetQuery) this.inSetQuery = false;
     }
     /**
      * This method is called at the start of the chart serialisation process to ensure that the chart configuration

@@ -174,8 +174,20 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
         const queries = c.queries;
         for (const method in queries) {
             // if we want to handle multiple arguments that had been provided to some function, this would be the place
-            const q = queries[method].map((v: any) => deserialiseParam(chart.dataStore, v));
-            (chart as any)[method](q);
+            // this should be more robust than earlier versions of this code...
+            // but most things are avoiding it now, so it's not really tested...        
+            const sq = queries[method];
+            if (!sq) {
+                continue;
+            }
+            const multi = isArray(sq); //! hang on... first argument is the thing we should be processing...
+            const qa = multi ? sq : [sq];
+            const q = qa.map((v: any) => deserialiseParam(chart.dataStore, v));
+            try {
+                (chart as any)[method](multi ? q : q[0]);
+            } catch (e) {
+                console.error('failed to run query', method, config.type, q, e);
+            }
         }
     }));
 

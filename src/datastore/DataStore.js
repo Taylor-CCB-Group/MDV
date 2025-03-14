@@ -235,8 +235,8 @@ class DataStore {
 
     /**
      * Removes all filters from the datastore,
-     * More efficient than removing each filter individuallu
-     * Filters oo dimnensions with a noclear property will not
+     * More efficient than removing each filter individually
+     * Filters on dimnensions with a noclear property will not
      * be removed
      */
     removeAllFilters() {

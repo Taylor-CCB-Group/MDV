@@ -29,6 +29,15 @@ export type IsMultiParam<T extends CTypes> = T extends Param[] ? true
 : T extends MultiColumnPrefix ? true 
 : false;
 
+/**
+ * The properties that are used for the actual `ColumnSelectionComponent` - possibly as a result of some kind of transformation
+ * from `GuiSpec<"column"> | GuiSpec<"multicolumn>"` or an entry in a `ChartType` object.
+ * It can also be used where the component is being used more directly (e.g. `AddRowComponent` in Selection Dialog).
+ * 
+ * Generic arguments `T` and `M` are used to specify compatible column datatypes and whether multiple columns are being selected.
+ * `V` is the type of value, which is inferred from the `multiple` property (most importantly, whether it is an array).
+ * We may wish to group these generic arguments into a single entry if that can help to simplify the annotations needed when using this type.
+ */
 export type ColumnSelectionProps<T extends CTypes, M extends boolean,
     V = M extends true ? FieldSpecs : FieldName | MultiColumnQuery> = { //should we have a SingleColumnQuery?
         type?: T; //wary of using 'type' as a name - not reserved, but could be confusing. also wary of optional type
@@ -57,6 +66,7 @@ export function inferGenericColumnGuiProps<T extends CTypes, M extends boolean>(
 ): ColumnSelectionProps<T, M> {
     return props;
 }
+// need a version of this that understand DataType as well as Param
 export function paramAcceptsNumeric<T extends CTypes>(param: T): boolean {
     return param === "number" || (Array.isArray(param) && param.includes("number"));
 }
