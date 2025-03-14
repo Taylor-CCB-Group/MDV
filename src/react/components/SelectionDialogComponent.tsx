@@ -2,7 +2,7 @@ import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../h
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
 import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
@@ -14,7 +14,7 @@ import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
 import { action, runInAction } from "mobx";
-import { useChart } from "../context";
+import { useChart, useDataStore } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
@@ -597,6 +597,22 @@ function useResetButton() {
         console.log("hasFilter changed (in hook): ", hasFilter);
         chart.resetButton.style.display = hasFilter ? "inline" : "none";
     }, [hasFilter, chart.resetButton]);
+    // we also need to respond to the 'reset all' button
+    const ds = useDataStore();
+    const id = useId();
+    useEffect(() => {
+        const k = `SelectionDialog-${id}`;
+        const resetAll = (type: string, data: string) => {
+            if (type !== "filtered" || data !== "all_removed") return;
+            runInAction(() => {
+                for (const key in filters) {
+                    delete filters[key];
+                }
+            });
+        };
+        ds.addListener(k, resetAll);
+        return () => ds.removeListener(k);
+    }, [ds, id, filters]);
 }
 
 const SelectionDialogComponent = () => {
