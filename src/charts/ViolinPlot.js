@@ -18,6 +18,7 @@ class ViolinPlot extends WGLChart {
             };
         }
         super(dataStore, div, config, { x: { type: "band" }, y: {} });
+        //disable scroll zoom / pan
         this.config.type = "violin_plot"; //<<< I don't like the look of this
         if (!config.title) {
             // --- causes some nasty exception... let's not do that for now
@@ -29,7 +30,7 @@ class ViolinPlot extends WGLChart {
         const c = this.config;
         c.brush = c.brush || "poly";
 
-        const appConf = { brush: c.brush };
+        const appConf = { brush: c.brush, noCameraControl: true };
 
         this.app = new WGL2DI(this.graphDiv, appConf);
         //this appears problematic with active color column selection
