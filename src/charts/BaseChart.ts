@@ -103,6 +103,7 @@ class BaseChart<T extends BaseConfig> {
         //and would break compatibility with `"methodsUsingColumns"` forcing us to update all charts using that.
         this.activeQueries = new ColumnQueryMapper(this, {
             setParams: ["param"],
+            //! warning - we do still need some manual intervention in deserialisation
             setToolTipColumn: "tooltip.column",
             colorByColumn: "color_by",
         });
@@ -390,7 +391,7 @@ class BaseChart<T extends BaseConfig> {
      */
     onDataFiltered(dim?: Dimension) {}
 
-    setToolTipColumn?(column: FieldName): void;
+    setToolTipColumn?(column: FieldSpec): void;
     setBackgroundFilter?(column: FieldName): void;
     changeContourParameter?(column: FieldName): void;
     colorByColumn?(c: FieldName): void;

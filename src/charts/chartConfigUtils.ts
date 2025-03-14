@@ -136,12 +136,14 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     //or rather than relying on that property we can traverse the config object for any special values
     //for now, only operating on the param property of the config object
     //also we move around where actual loading of column data currently done by ChartManager happens
-    //todo process entire config object, not just param
+    //todo process entire config object, not just param<<<
     //@ts-expect-error todo distinguish type of serialised vs runtime config
     const param: SerialisedParams = config.param;
     const processed = param.map(p => deserialiseParam(chart.dataStore, p));
     config.param = processed;
-    //pending more generic approach to serialising queries...
+    //pending more generic approach to deserialising queries...
+    //we should be doing something like a reverse lookup of the methodToConfigMap
+    //we don't have that yet... although... by the time we setTimeout, we will...
     if (originalConfig.color_by) {
         //@ts-expect-error color_by
         const colorBy = isArray(originalConfig.color_by) ? deserialiseParam(chart.dataStore, originalConfig.color_by[0]) : config.color_by = deserialiseParam(chart.dataStore, originalConfig.color_by);
@@ -155,8 +157,17 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             chart.colorByColumn?.(colorBy);
         })
     }
+    if ((originalConfig as any).tooltip?.column) {
+        const tooltipColumn = deserialiseParam(chart.dataStore, (originalConfig as any).tooltip.column);
+        (config as any).tooltip.column = getConcreteFieldNames(tooltipColumn)[0];
+        setTimeout(() => {
+            if (chart.setToolTipColumn) chart.setToolTipColumn(tooltipColumn);
+        })
+    }
     console.log(config.type, 'processed config:', config);
     //temporary way of prototyping query
+    //any methodsUsingColumns that don't have an associated ColumnQueryMapper methodToConfigMap will
+    //will be handled here
     //may return to something like this for non-react charts as it requires less boilerplate & chart specific code
     setTimeout(action(() => {
         const c = config as any;
