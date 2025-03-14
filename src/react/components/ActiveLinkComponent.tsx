@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { isArray } from "@/lib/utils";
 import { RowsAsColsQuery } from "@/links/link_utils";
 import { Button, TextField } from "@mui/material";
+import { action } from "mobx";
 
 function useActiveLink<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) {
     const { link, linkedDs } = useRowsAsColumnsLinks()[0]; //pending multiple link support
@@ -17,30 +18,33 @@ function useActiveLink<T extends CTypes, M extends boolean>(props: ColumnSelecti
         //! but this is not the long-term intention.
         return typeof v !== "string";
     }, [props.current_value]);
-    const [maxItems, setMaxItemsState] = useState(props.multiple ? 10 : 1);
-    const setMaxItems = useCallback((v: number) => {
-        setMaxItemsState(v);
-        //todo don't repeat this code
-        const multiple = props.multiple;
-        const q = new RowsAsColsQuery(link, linkedDs.name, v);
-        //@ts-expect-error it knows `multiple` is `M`, but we haven't passed `V` - can we combine these into a single type to reduce noise?
-        props.setSelectedColumn(multiple ? [q] : q);
-    }, [props, link, linkedDs.name]);
+    // if we already have a link, we should initialize the maxItems to its current value
+    const defaultMaxItems = props.multiple ? 10 : 1;
+    // will change when we can actually select different link/sg... but we could just keep one of these around
+    // apply it to the app state / mutate whenever... this is very un-functional/react... which is a shame (really).
+    const [queryObj] = useState(() => {
+        if (props.current_value) {
+            //@ts-expect-error grrr
+            const v = props.multiple ? props.current_value[0] : props.current_value;
+            if (v instanceof RowsAsColsQuery) return v;
+        }
+        return new RowsAsColsQuery(link, linkedDs.name, defaultMaxItems);
+    });
+    const setMaxItems = useCallback(action((v: number) => {
+        queryObj.maxItems = v;
+    }), []);
     const activateLink = useCallback(() => {
-        const multiple = props.multiple;
-        const q = new RowsAsColsQuery(link, linkedDs.name, maxItems);
-        //@ts-expect-error it knows `multiple` is `M`, but we haven't passed `V` - can we combine these into a single type to reduce noise?
-        props.setSelectedColumn(multiple ? [q] : q);
-    }, [props, link, linkedDs.name, maxItems]);
+        //@ts-expect-error grrr
+        props.setSelectedColumn(props.multiple ? [queryObj] : queryObj);
+    }, [props, queryObj]);
 
     // todo
     // const freezeLink = useCallback(() => {
     // })
-
     return {
         isActive,
         activateLink,
-        maxItems,
+        maxItems: queryObj.maxItems,
         setMaxItems,
         link,
         sg,
