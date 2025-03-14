@@ -15,16 +15,17 @@ class ViolinPlot extends WGLChart {
                 y: { size: 45, label: y_name, textsize: 13 },
             };
         }
+        super(dataStore, div, config, { x: { type: "band" }, y: {} });
+        this.config.type = "violin_plot"; //<<< I don't like the look of this
         if (!config.title) {
             config.title = `${x_name} x ${y_name}`;
         }
-        super(dataStore, div, config, { x: { type: "band" }, y: {} });
-        this.config.type = "violin_plot";
-
+        
         const c = this.config;
         c.brush = c.brush || "poly";
-
-        const appConf = { brush: c.brush };
+        
+        //disable scroll zoom / pan
+        const appConf = { brush: c.brush, noCameraControl: true };
 
         this.app = new WGL2DI(this.graphDiv, appConf);
         const colorFunc = this.afterAppCreation();
