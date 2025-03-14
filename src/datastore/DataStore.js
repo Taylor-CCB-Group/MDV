@@ -1753,8 +1753,16 @@ class DataStore {
         return c.minMax[1] - c.minMax[0];
     }
 
+    /**
+     * @param {string} column if this is in the form of a link `FieldName` it will first attempt to
+     * `addColumnFromField()`...
+     */
     getColumnInfo(column) {
+        if (column.includes("|")) {
+            this.addColumnFromField(column);
+        }
         const c = this.columnIndex[column];
+        if (!c) throw `no metadata for column '${column}' in ds '${this.name}'`;
         return {
             name: c.name,
             field: c.field,
