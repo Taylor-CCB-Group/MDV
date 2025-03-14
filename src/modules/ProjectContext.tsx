@@ -50,11 +50,16 @@ export function getProjectInfo(): ProjectInfo {
 }
 
 export async function getProjectName(projectId: number) {
-    const res = await axios.get("/projects");
-    const projectData: Project[] = res.data;
-
-    const projectName = projectData?.find((project) => project.id === projectId)?.name || "unnamed_project";
-    return projectName;
+    try {
+        const res = await axios.get("/projects");
+        const projectData: Project[] = res.data;
+    
+        const projectName = projectData?.find((project) => project.id === projectId)?.name || "unnamed_project";
+        return projectName;
+    } catch (error) {
+        console.error("Failed to fetch project name:", error);
+        return "unnamed_project";
+    }
 }
 
 const ProjectContext = createContext<ProjectInfo>(null as any);
