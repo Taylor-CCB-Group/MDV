@@ -1,9 +1,9 @@
-import { type CTypes, isMultiColumn } from "@/lib/columnTypeHelpers";
+import type { CTypes } from "@/lib/columnTypeHelpers";
 import { observer } from "mobx-react-lite";
 import type { RowsAsColsProps } from "./LinksComponent";
 import type { DropdownMappedValues, GuiSpec } from "@/charts/charts";
-import { useMemo } from "react";
-import { action, makeAutoObservable } from "mobx";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { action, makeAutoObservable, observe, runInAction } from "mobx";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import { g, isArray } from "@/lib/utils";
 import { getFieldName } from "@/links/link_utils";
@@ -13,8 +13,10 @@ import { getFieldName } from "@/links/link_utils";
  * Should encapsulate
  * - making sure that an appropriate type of value is selected
  * - providing a way to select the value that has a simple interface, managing the complexity of incoming generic types
+ * 
+ * In the end... just bundling everything about state management for this component into a hook, returning a spec.
  */
-function useLinkTargetValues<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) {
+function useLinkSpec<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) {
     const { linkedDs, link } = props;
     const { name_column, name, subgroups } = link;
     const targetColumn = linkedDs.dataStore.columnIndex[name_column];
@@ -51,19 +53,30 @@ function useLinkTargetValues<T extends CTypes, M extends boolean>(props: RowsAsC
         return [[...labelValueObjects], "label", "fieldName"] satisfies DropdownMappedValues<"label", "fieldName">;
     }, [sg, link.valueToRowIndex]);
 
-    const value = useMemo(() => {
+
+    const { setSelectedColumn } = props;
+    const isMultiType = props.multiple;
+
+    // setting internal state will be in the dropdown component...
+    // this will be a side-effect to set the state used by the wider application
+    const setValue = useCallback((v: string | string[]) => {
+        //@ts-ignore could check to the nth degree with props.multiple
+        setSelectedColumn(v);
+    }, [setSelectedColumn]);
+    
+    const getSafeInternalValue = useCallback((v: typeof props.current_value) => {
         const defaultVal = props.multiple ? [] : values[0][0].fieldName;
-        if (!props.current_value) return defaultVal;
+        if (!v) return defaultVal;
         if (props.multiple) {
             // does the current value look like ours? we're not assuming it should:
             // we might not be the active mode...
-            if (!isArray(props.current_value)) {
+            if (!isArray(v)) {
                 return defaultVal;
             }
-            if (props.current_value.length === 0) {
+            if (v.length === 0) {
                 return defaultVal;
             }
-            const [firstValue] = props.current_value;
+            const [firstValue] = v;
             if (typeof firstValue !== 'string') {
                 return defaultVal;
             }
@@ -71,29 +84,53 @@ function useLinkTargetValues<T extends CTypes, M extends boolean>(props: RowsAsC
             if (!firstValue.includes("|") || !link.valueToRowIndex.has(firstValue)) {
                 return defaultVal;
             }
-            return props.current_value;
+            return v;
         } else {
             // if it's an array, we're not the active mode
-            if (isArray(props.current_value)) {
+            if (isArray(v)) {
                 return defaultVal;
             }
-            if (typeof props.current_value !== 'string') {
+            if (typeof v !== 'string') {
                 return defaultVal;
             }
             // check that the current value is in the list of possible values
-            if (!props.current_value.includes("|") || !link.valueToRowIndex.has(props.current_value)) {
+            if (!v.includes("|") || !link.valueToRowIndex.has(v)) {
                 return defaultVal;
             }
-            return props.current_value;
+            return v;
         }
-    }, [props.current_value, link.valueToRowIndex, props.multiple, values[0]]);
+    }, [values, link.valueToRowIndex, props.multiple]);
+    const [initialValue] = useState(() => getSafeInternalValue(props.current_value));
 
-    const { setSelectedColumn } = props;
-    const isMultiType = props.multiple;
+    /// we don't want a new spec every time the value changes... we want to give it an observable value
+    // (I think)- definition of this spec may want to be in the hook, with an observable value that isn't
+    // the real props.current_value???
+    const [spec] = useState(() => makeAutoObservable(g<"multidropdown" | "dropdown">({
+        type: isMultiType ? 'multidropdown' : 'dropdown',
+        label: `specific '${name}'`,
+        // no ts error! praise be!
+        values,
+        current_value: initialValue,
+        func: action((v) => {
+            // something about having setValue as a dependency makes it end up re-running this...
+            // & we really want the spec to be stable.
+            //! for some reason if we call this in here we get glitchy behaviour, not really sure
+            // setValue(v);
+        })
+    // })), [values, name, isMultiType, initialValue]);
+    })));
+
+    useEffect(() => {
+        // do you swim with the mobx stream? or against it?
+        // took me a while to realise that this is the direction we should be going in...
+        return observe(spec, "current_value", (change) => {
+            if (change.type === 'update') {
+                setValue(change.newValue);
+            }
+        });
+    }, [spec, setValue]);
     
-    
-    
-    return { values, value };
+    return spec;
 }
 
 /**
@@ -107,38 +144,12 @@ function useLinkTargetValues<T extends CTypes, M extends boolean>(props: RowsAsC
  * representation of the value, and `index` is the index of the value in the column.
  */
 const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) => {
-    const { linkedDs, link } = props;
-    const { name_column, name, subgroups } = link;
-    const { values, value } = useLinkTargetValues(props);
-    const { setSelectedColumn } = props;
-    const isMultiType = props.multiple;
-    
-    // nb, the <"multidropdown" | "dropdown"> type parameter ends up causing problem vs <"multidropdown"> | <"dropdown">
-    // - would be nice to be able to avoid that, this is really difficult to understand and work with.
-    // maybe we should have a branch that returns a totally different g() for multidropdown, for example.
-    // todo - consider a g<"category"> | g<"multicategory"> for cases such as this where we're chosing row values
-    // - this is also used for other things (e.g. density)
-    //   (where we don't necessarily need all the faff with associated row indices)
-    // - also as well as multi/single chosen options, there is 'multitext' which is a different thing, with a different interface...
-    
-    /// we don't want a new spec every time the value changes... we want to give it an observable value
-    // (I think)- definition of this spec may want to be in the hook, with an observable value that isn't
-    // the real props.current_value???
-    const spec = useMemo(() => makeAutoObservable(g<"multidropdown" | "dropdown">({
-        type: isMultiType ? 'multidropdown' : 'dropdown',
-        label: `specific '${name}' column`, //todo different label for multiple
-        // no ts error! praise be!
-        values,
-        current_value: value,
-        func: action((v) => {
-            // @ts-expect-error maybe we'll make it so that we have a hook returning a setSelectedLinkedColumn function of narrower type
-            setSelectedColumn(v);
-        })
-    })), [values, name, isMultiType, setSelectedColumn, value]);
-    // const { current_value } = spec;
+    // is all of the complexity being in the hook really making this component simpler?
+    // at least it feels simple if you ignore everything in the hook...
+    const spec = useLinkSpec(props);
     return (
         <div className="flex flex-col" style={{ textAlign: 'left' }}>
-            {/* really don't want to have this typecast here, what a nuisance! (also not really correct) */}
+            {/* don't want to have this typecast here, slight nuisance. */}
             <DropdownAutocompleteComponent props={spec as GuiSpec<"dropdown"> | GuiSpec<"multidropdown">} />
         </div>
     )
