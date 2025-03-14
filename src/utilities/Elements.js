@@ -371,6 +371,12 @@ function makeDraggable(el, config = {}) {
     function dragMouseDown(e) {
         e = e || window.event;
         e.preventDefault();
+
+        //! current fix for the dropdown issue while dragging, check for any side effects
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+
         // get the mouse cursor position at startup:
         pos3 = e.clientX;
         pos4 = e.clientY;
