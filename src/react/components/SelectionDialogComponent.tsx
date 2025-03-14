@@ -531,6 +531,8 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
 });
 
 const AddRowComponent = observer(() => {
+    //! warning, as well as being disabled for now, this was not working properly
+    //(something about setSelectedColumn was going wrong with other recent changes)
     const config = useConfig<SelectionDialogConfig>();
     const { filters, param } = useConfig<SelectionDialogConfig>();
     if (!isArray(param)) throw new Error("expected param array");
@@ -623,10 +625,11 @@ const SelectionDialogComponent = () => {
     //we could consider returning some kind of `Result` object from this hook...
     const cols = useParamColumnsExperimental();
     useResetButton();
+    const showAddRow = false;
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
-            <ErrorBoundary FallbackComponent={
+            {showAddRow && <ErrorBoundary FallbackComponent={
                 ({ error }) => 
                     (
                         <div className="col-span-3 w-full"> 
@@ -640,22 +643,7 @@ const SelectionDialogComponent = () => {
                         )
             }>
                 <AddRowComponent />
-            </ErrorBoundary>
-            <ErrorBoundary FallbackComponent={
-                ({ error }) => 
-                    (
-                        <div className="col-span-3 w-full"> 
-                            <ErrorComponentReactWrapper 
-                                error={{message: error.message, stack: error.stack}} 
-                                //todo assign proper meta data
-                                // extraMetaData={} 
-                                title="Error displaying linked rows. Click to view details"
-                            />
-                        </div>
-                    )
-            }>
-                <ForeignRows />
-            </ErrorBoundary>
+            </ErrorBoundary>}
         </div>
     );
 };
