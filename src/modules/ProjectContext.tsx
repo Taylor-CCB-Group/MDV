@@ -1,5 +1,6 @@
 import type ChartManager from "@/charts/ChartManager";
-import React, {
+import axios from "axios";
+import {
     type PropsWithChildren,
     createContext,
     useContext,
@@ -11,6 +12,12 @@ export type ProjectInfo = {
     staticFolder: boolean;
     chartManager: ChartManager;
     projectName: string;
+};
+
+export type Project = {
+    id: number;
+    lastModified: string;
+    name: string;
 };
 
 /** 
@@ -40,6 +47,14 @@ export function getProjectInfo(): ProjectInfo {
         projectName,
         chartManager,
     };   
+}
+
+export async function getProjectName(projectId: number) {
+    const res = await axios.get("/projects");
+    const projectData: Project[] = res.data;
+
+    const projectName = projectData?.find((project) => project.id === projectId)?.name || "unnamed_project";
+    return projectName;
 }
 
 const ProjectContext = createContext<ProjectInfo>(null as any);
