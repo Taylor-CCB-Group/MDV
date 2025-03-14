@@ -1974,6 +1974,7 @@ export class ChartManager {
             // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
             // when it goes wrong, it can cause problems outside the creation of this chart
             // - other charts wanting to use similar neededCols end up not having data?
+            // links should be initialised here as well...
             await this._getColumnsAsync(dataSource, neededCols);
             this._addChart(dataSource, config, div, notify);
         } catch (error) {
@@ -2062,9 +2063,19 @@ export class ChartManager {
     }
 
     async _getColumnsAsync(dataSource, columns) {
+        // there could be links as well as column `fields` in columns.
+        // let's make a mechanism for awaiting the link - and initial linked cols.
+        const ds = this.dsIndex[dataSource].dataStore;
+        const links = columns.map((c) => deserialiseParam(ds, c)).filter(c => typeof c !== 'string');
+        const linkPromises = links.map(link => link.initialize());
+        await Promise.all(linkPromises);
+        const linkedFields = links.flatMap(link => link.fields);
+        const allColumns = columns.concat(linkedFields);
+        
+
         // let's add some error handling here...
         const result = await new Promise((resolve) => {
-            this._getColumnsThen(dataSource, columns, resolve);
+            this._getColumnsThen(dataSource, allColumns, resolve);
         });
         return result;
     }

@@ -209,6 +209,7 @@ export type RowsAsColslink = {
      * This can be used in the formation of a {@link FieldName}
      */
     valueToRowIndex: Map<string, number>;
+    initPromise: Promise<void>;
 }
 /**
  * Represents an active query for a set of columns based on the currently highlighted or filtered rows.
@@ -219,11 +220,24 @@ export type RowsAsColslink = {
 export interface MultiColumnQuery {
     columns: DataColumn<DataType>[]; //could have a generic type for this?
     fields: FieldName[];
+    /**
+     * When the query is first created, it may need to perform some async initialization:
+     * in the case of a `RowsAsColsQuery`, it needs to know the values of the `name_column` 
+     * in the linked dataSource.
+     * 
+     * Implementation note: as far as this interface is concerned, maybe this
+     * could be optional - we could have a conformant `MultiColumnQuery`
+     * that doesn't need any async initialization. For example, if it was for
+     * generating mock data.
+     */
+    initialize(): Promise<void>;
 }
-export interface ColumnQuery {
-    column: DataColumn<DataType>;
-    field: FieldName;
-}
+
+// unused
+// export interface ColumnQuery {
+//     column: DataColumn<DataType>;
+//     field: FieldName;
+// }
 
 type RowsAsColsPrefs = {
     //todo: properties for setting the link to pause / choose between highlighted or filtered data.
@@ -247,7 +261,7 @@ export type RowsAsColsQuerySerialized = {
  * @param link - the link configuration object, with observable properties
  * @param maxItems - the maximum number of columns to return
  * 
- * 
+ * ! we should really have sg as well as linkedDsName
  */
 export class RowsAsColsQuery implements MultiColumnQuery {
     // it may be logical to make this class be the thing that encapsulates a listener,
@@ -266,6 +280,9 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     @computed
     get fields() {
         return this.columns.map(c => c.field);
+    }
+    async initialize() {
+        return this.link.initPromise;
     }
     /**
      * JSON serialisation that can be used to recreate the query object.
@@ -292,7 +309,15 @@ export function getFieldName(sg: string, value: string, index: number) {
  * ! design needs review to account for multiple subgroups
  */
 async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
-    if (link.observableFields !== undefined) return;
+    if (link.initPromise !== undefined) return link.initPromise;
+    link.initPromise = new Promise<void>((resolve, reject) => {
+        initRacListenerImpl(link, ds, tds).then(resolve, reject);
+    });
+    return link.initPromise;
+}
+async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
+    // didn't want to re-indent this block, so it's only valid to call once as in the above function.
+    if (link.initPromise !== undefined) throw new Error("initPromise already set");
     const cm = window.mdv.chartManager;
     const nameCol = tds.columnIndex[link.name_column];
     if (!nameCol) {
@@ -411,7 +436,7 @@ export function getRowsAsColumnsLinks(dataStore: DataStore) {
                 // There are also multiple subgroups within a single linked dataSource - also important to support.
                 // UI should be simpler for the common case with a single linked dataSource/sg.
                 // Are there any crazy edge cases we should consider - like indirect links? links to self?
-                // !! this should be right now, but we should test with multiple links.
+                // !! this should be ok now, but we should test with multiple links.
                 const linkedDs = dataSources.find(
                     (ds) => ds.name === linkedDsName,
                 );
