@@ -217,19 +217,17 @@ function makeSortable(list, config = {}) {
 }
 
 function makeResizable(el, config = {}) {
-    //already resizable
-    if (el.__resizeinfo__) {
-        return;
-    }
+    if (el.__resizeinfo__) return;
+  
+    const doc = config.doc || document;
+    el.__doc__ = doc;
+
     const ri = {
-        resize: el.style.resize,
-        overflow: el.style.overflow,
+      resize: el.style.resize,
+      overflow: el.style.overflow,
     };
-    //document can change if in another window
-    el.__doc__ = config.doc || document;
-    // el.style.resize="both"; //standard resizer is sometimes visible when it shouldn't be.
     el.style.overflow = "hidden";
-    //el.style.zIndex="0";
+  
     if (config.onresizeend) {
         ri.onresize = addResizeListener(
             el,
@@ -239,49 +237,154 @@ function makeResizable(el, config = {}) {
             config.onResizeStart,
         );
     }
-    //workaround for Safari bug #50
-    //https://codepen.io/jkasun/pen/QrLjXP
-    //(actually, mostly copilot filling in very similar code...)
-    const bottomRight = createEl(
-        "div",
-        {
-            classes: ["resizer-both"],
-        },
-        el,
-    );
-    bottomRight.addEventListener("mousedown", initDrag, false);
-    function initDrag(e) {
-        ri.startX = e.clientX;
-        ri.startY = e.clientY;
-        ri.startWidth = Number.parseInt(
-            document.defaultView.getComputedStyle(el).width,
-            10,
-        );
-        ri.startHeight = Number.parseInt(
-            document.defaultView.getComputedStyle(el).height,
-            10,
-        );
+
+    const directions = [
+        { dir: "n", className: "resizer-n" },
+        { dir: "s", className: "resizer-s" },
+        { dir: "e", className: "resizer-e" },
+        { dir: "w", className: "resizer-w" },
+        { dir: "ne", className: "resizer-ne" },
+        { dir: "nw", className: "resizer-nw" },
+        { dir: "se", className: "resizer-se" },
+        { dir: "sw", className: "resizer-sw" }
+      ];
+    
+      directions.forEach(({ className }) => {
+        const resizeEl = createEl(
+                    "div",
+                    {
+                        classes: [className],
+                    },
+                    el,
+                );
+        resizeEl.addEventListener("mousedown", initDrag, false);
+      });
+    
+      function initDrag(e) {
+        e.preventDefault();
+        if (config.onResizeStart) config.onResizeStart();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startWidth = el.offsetWidth;
+        const startHeight = el.offsetHeight;
+        const startLeft = el.offsetLeft;
+        const startTop = el.offsetTop;
+    
+        // Determine the direction from the target's class list.
+        const target = e.target;
+        const directionObj = directions.find(({ className }) => target.classList.contains(className));
+        const dir = directionObj ? directionObj.dir : "";
+    
+        function doDrag(e) {
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          let newWidth = startWidth;
+          let newHeight = startHeight;
+          let newLeft = startLeft;
+          let newTop = startTop;
+    
+          if (dir.includes("e")) {
+            newWidth = startWidth + dx;
+          }
+          if (dir.includes("w")) {
+            newWidth = startWidth - dx;
+            newLeft = startLeft + dx;
+          }
+          if (dir.includes("s")) {
+            newHeight = startHeight + dy;
+          }
+          if (dir.includes("n")) {
+            newHeight = startHeight - dy;
+            newTop = startTop + dy;
+          }
+          el.style.width = `${newWidth}px`;
+          el.style.height = `${newHeight}px`;
+          el.style.left = `${newLeft}px`;
+          el.style.top = `${newTop}px`;
+        }
+    
+        function stopDrag() {
+          el.__doc__.documentElement.removeEventListener("mousemove", doDrag, false);
+          el.__doc__.documentElement.removeEventListener("mouseup", stopDrag, false);
+          if (config.onresizeend) {
+            config.onresizeend(el.offsetWidth, el.offsetHeight, el.offsetLeft, el.offsetTop);
+          }
+        }
+    
         el.__doc__.documentElement.addEventListener("mousemove", doDrag, false);
         el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
-    }
-    function doDrag(e) {
-        el.style.width = `${ri.startWidth + e.clientX - ri.startX}px`;
-        el.style.height = `${ri.startHeight + e.clientY - ri.startY}px`;
-    }
-    function stopDrag(e) {
-        el.__doc__.documentElement.removeEventListener(
-            "mousemove",
-            doDrag,
-            false,
-        );
-        el.__doc__.documentElement.removeEventListener(
-            "mouseup",
-            stopDrag,
-            false,
-        );
-    }
-    el.__resizeinfo__ = ri;
-}
+      }
+    
+      el.__resizeinfo__ = ri;
+  }
+
+// function makeResizable(el, config = {}) {
+//     //already resizable
+//     if (el.__resizeinfo__) {
+//         return;
+//     }
+//     const ri = {
+//         resize: el.style.resize,
+//         overflow: el.style.overflow,
+//     };
+//     //document can change if in another window
+//     el.__doc__ = config.doc || document;
+//     // el.style.resize="both"; //standard resizer is sometimes visible when it shouldn't be.
+//     el.style.overflow = "hidden";
+//     //el.style.zIndex="0";
+//     if (config.onresizeend) {
+//         ri.onresize = addResizeListener(
+//             el,
+//             (x, y) => {
+//                 config.onresizeend(x, y);
+//             },
+//             config.onResizeStart,
+//         );
+//     }
+//     //workaround for Safari bug #50
+//     //https://codepen.io/jkasun/pen/QrLjXP
+//     //(actually, mostly copilot filling in very similar code...)
+//     const bottomRight = createEl(
+//         "div",
+//         {
+//             classes: ["resizer-both"],
+//         },
+//         el,
+//     );
+//     bottomRight.addEventListener("mousedown", initDrag, false);
+//     function initDrag(e) {
+//         ri.startX = e.clientX;
+//         ri.startY = e.clientY;
+//         ri.startWidth = Number.parseInt(
+//             document.defaultView.getComputedStyle(el).width,
+//             10,
+//         );
+//         ri.startHeight = Number.parseInt(
+//             document.defaultView.getComputedStyle(el).height,
+//             10,
+//         );
+//         el.__doc__.documentElement.addEventListener("mousemove", doDrag, false);
+//         el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
+//     }
+//     function doDrag(e) {
+//         el.style.width = `${ri.startWidth + e.clientX - ri.startX}px`;
+//         el.style.height = `${ri.startHeight + e.clientY - ri.startY}px`;
+//     }
+//     function stopDrag(e) {
+//         el.__doc__.documentElement.removeEventListener(
+//             "mousemove",
+//             doDrag,
+//             false,
+//         );
+//         el.__doc__.documentElement.removeEventListener(
+//             "mouseup",
+//             stopDrag,
+//             false,
+//         );
+//     }
+//     el.__resizeinfo__ = ri;
+// }
+  
 
 function removeResizable(el) {
     if (!el.__resizeinfo__) {
