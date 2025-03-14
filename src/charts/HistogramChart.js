@@ -3,6 +3,7 @@ import { easeLinear } from "d3-ease";
 import SVGChart from "./SVGChart.js";
 import BaseChart from "./BaseChart";
 import { brushX } from "d3-brush";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class HistogramChart extends SVGChart {
     constructor(dataStore, div, config) {
@@ -47,6 +48,18 @@ class HistogramChart extends SVGChart {
         this.filter = null;
         this.binFiltered = new Array(this.config.bin_number).fill(false);
         this.onDataFiltered(null, true);
+    }
+    @loadColumnData
+    setParams(params) {
+        const param = params[0];
+        const pname = this.dataStore.getColumnName(param);
+        const oldTitle = this.config.title;
+        const oldPName = this.dataStore.getColumnName(this.config.param[0]);
+        this.config.title = oldTitle === oldPName ? pname : oldTitle;
+        this.config.axis.x.label = pname;
+        
+        this.config.param = params;        
+        this.onDataFiltered(); //the arguments! they do nothing!
     }
 
     _setBrushExtent() {
