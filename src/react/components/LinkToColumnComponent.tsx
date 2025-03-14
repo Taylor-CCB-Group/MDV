@@ -5,7 +5,7 @@ import type { DropdownMappedValues, GuiSpec } from "@/charts/charts";
 import { useMemo } from "react";
 import { action, makeAutoObservable } from "mobx";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
-import { g } from "@/lib/utils";
+import { g, isArray } from "@/lib/utils";
 import { getFieldName } from "@/links/link_utils";
 /**
  * A hook for managing the state of manually chosen columns from a rows-as-columns link.
@@ -51,23 +51,56 @@ function useLinkTargetValues<T extends CTypes, M extends boolean>(props: RowsAsC
         return [[...labelValueObjects], "label", "fieldName"] satisfies DropdownMappedValues<"label", "fieldName">;
     }, [sg, link.valueToRowIndex]);
 
-    const current_value = useMemo(() => {
-        if (props.current_value) {
-            //: current_value ? [`${current_value}`] : []
-            return [`${props.current_value}`];
+    const value = useMemo(() => {
+        const defaultVal = props.multiple ? [] : values[0][0].fieldName;
+        if (!props.current_value) return defaultVal;
+        if (props.multiple) {
+            // does the current value look like ours? we're not assuming it should:
+            // we might not be the active mode...
+            if (!isArray(props.current_value)) {
+                return defaultVal;
+            }
+            if (props.current_value.length === 0) {
+                return defaultVal;
+            }
+            const [firstValue] = props.current_value;
+            if (typeof firstValue !== 'string') {
+                return defaultVal;
+            }
+            // check that the current value is in the list of possible values
+            if (!firstValue.includes("|") || !link.valueToRowIndex.has(firstValue)) {
+                return defaultVal;
+            }
+            return props.current_value;
+        } else {
+            // if it's an array, we're not the active mode
+            if (isArray(props.current_value)) {
+                return defaultVal;
+            }
+            if (typeof props.current_value !== 'string') {
+                return defaultVal;
+            }
+            // check that the current value is in the list of possible values
+            if (!props.current_value.includes("|") || !link.valueToRowIndex.has(props.current_value)) {
+                return defaultVal;
+            }
+            return props.current_value;
         }
-        return [];
-    }, [props.current_value]);
+    }, [props.current_value, link.valueToRowIndex, props.multiple, values[0]]);
+
+    const { setSelectedColumn } = props;
+    const isMultiType = props.multiple;
     
     
-    return { values, current_value };
+    
+    return { values, value };
 }
 
 /**
  * This presents the user with a method for selecting column(s) corresponding to a linked dataset.
  * 
  * There should be a re-usable component for selecting values from a category column, and this should be used here,
- * referring to the `link.name_column` column of the linked dataset.
+ * referring to the `link.name_column` column of the linked dataset... at the moment, we deal with this in a more ad-hoc way.
  * 
  * Values that this component operates on - at the time of writing - will be in a `FieldName` (`string`) format, with pipes separating
  * `subgroup|value (subgroup)|index`, where `subgroup` is the name of the user-selected subgroup, `value (subgroup)` is a human-readable
@@ -76,9 +109,10 @@ function useLinkTargetValues<T extends CTypes, M extends boolean>(props: RowsAsC
 const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) => {
     const { linkedDs, link } = props;
     const { name_column, name, subgroups } = link;
-    const { values, current_value } = useLinkTargetValues(props);
+    const { values, value } = useLinkTargetValues(props);
     const { setSelectedColumn } = props;
     const isMultiType = props.multiple;
+    
     // nb, the <"multidropdown" | "dropdown"> type parameter ends up causing problem vs <"multidropdown"> | <"dropdown">
     // - would be nice to be able to avoid that, this is really difficult to understand and work with.
     // maybe we should have a branch that returns a totally different g() for multidropdown, for example.
@@ -86,22 +120,21 @@ const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(pro
     // - this is also used for other things (e.g. density)
     //   (where we don't necessarily need all the faff with associated row indices)
     // - also as well as multi/single chosen options, there is 'multitext' which is a different thing, with a different interface...
+    
+    /// we don't want a new spec every time the value changes... we want to give it an observable value
+    // (I think)- definition of this spec may want to be in the hook, with an observable value that isn't
+    // the real props.current_value???
     const spec = useMemo(() => makeAutoObservable(g<"multidropdown" | "dropdown">({
-        type: 'multidropdown', //!wrong - need to adapt this along with current_value
-        // type: isMultiType ? 'multidropdown' : 'dropdown',
+        type: isMultiType ? 'multidropdown' : 'dropdown',
         label: `specific '${name}' column`, //todo different label for multiple
         // no ts error! praise be!
         values,
-        //this is not what we want to show in a dropdown... this is what a component will be fed if it has opted for 'active selection' mode
-        current_value: current_value ? [`${current_value}`] : [],
+        current_value: value,
         func: action((v) => {
-            // we don't set current_value here, we use the setSelectedColumn function
-            // props.current_value = isMultiType ? v : v[0];
-            // const value = `${Object.keys(subgroups)[0]}|${v[0]} (${Object.keys(subgroups)[0]})|${0}`;
             // @ts-expect-error maybe we'll make it so that we have a hook returning a setSelectedLinkedColumn function of narrower type
-            setSelectedColumn(isMultiType ? v : v[0])
+            setSelectedColumn(v);
         })
-    })), [values, name, isMultiType, setSelectedColumn, current_value]);
+    })), [values, name, isMultiType, setSelectedColumn, value]);
     // const { current_value } = spec;
     return (
         <div className="flex flex-col" style={{ textAlign: 'left' }}>
