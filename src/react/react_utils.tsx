@@ -34,7 +34,7 @@ const MaterialWrapper = observer(function MaterialWrapper({
                     MuiPopper: { defaultProps },
                     MuiPopover: { defaultProps },
                     MuiDialog: { defaultProps },
-                    MuiAutocomplete: { defaultProps: { disablePortal: true, filterOptions } },
+                    MuiAutocomplete: { defaultProps: { filterOptions } },
                     // There is a bit of a general issue with material-ui favouring less dense layouts
                     // than we would tend to want - it is aiming for a more mobile-friendly UX...
                     MuiTextField: { defaultProps: { size: "small" }},
