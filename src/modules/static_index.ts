@@ -74,11 +74,12 @@ const staticFolder = urlParams.get("static") !== null; //!dir.startsWith("/proje
 const project_id = dir.split("/").pop();
 
 // getting the project name by passing project id
-const project_name = await getProjectName(Number(project_id));
+getProjectName(Number(project_id)).then((project_name) => {
+    document.title = `MDV - ${project_name}`
+});
 /// --- end of messy section ---
 
 // set title of page to the data directory
-document.title = `MDV - ${project_name}`;
 if (isPopout) document.title = "MDV popout";
 
 // TODO make a better type for this, put it somewhere more sensible.
