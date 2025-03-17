@@ -24,8 +24,7 @@ function useActiveLink<T extends CTypes, M extends boolean>(props: ColumnSelecti
     // apply it to the app state / mutate whenever... this is very un-functional/react... which is a shame (really).
     const [queryObj] = useState(() => {
         if (props.current_value) {
-            //@ts-expect-error grrr
-            const v = props.multiple ? props.current_value[0] : props.current_value;
+            const v = isArray(props.current_value) ? props.current_value[0] : props.current_value;
             if (v instanceof RowsAsColsQuery) return v;
         }
         return new RowsAsColsQuery(link, linkedDs.name, defaultMaxItems);
@@ -34,7 +33,7 @@ function useActiveLink<T extends CTypes, M extends boolean>(props: ColumnSelecti
         queryObj.maxItems = v;
     }), []);
     const activateLink = useCallback(() => {
-        //@ts-expect-error grrr
+        //@ts-expect-error setSelectedColumn generic not behaving nicely
         props.setSelectedColumn(props.multiple ? [queryObj] : queryObj);
     }, [props, queryObj]);
 
