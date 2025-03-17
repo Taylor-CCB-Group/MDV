@@ -243,7 +243,6 @@ function makeResizable(el, config = {}) {
     //https://codepen.io/jkasun/pen/QrLjXP
     //(actually, mostly copilot filling in very similar code...)
 
-
     // List of all the resizers based on directions and corresponding css classes
     const directions = [
         // The top resizers are messing with title bar buttons causing bad UX, commenting for now
@@ -254,21 +253,21 @@ function makeResizable(el, config = {}) {
         // { dir: "ne", className: "resizer-ne" },
         // { dir: "nw", className: "resizer-nw" },
         { dir: "se", className: "resizer-se" },
-        { dir: "sw", className: "resizer-sw" }
-      ];
-    
-      directions.forEach(({ className }) => {
+        { dir: "sw", className: "resizer-sw" },
+    ];
+
+    directions.forEach(({ className }) => {
         const resizeEl = createEl(
-                    "div",
-                    {
-                        classes: [className],
-                    },
-                    el,
-                );
+            "div",
+            {
+                classes: [className],
+            },
+            el,
+        );
         resizeEl.addEventListener("mousedown", initDrag, false);
-      });
-    
-      function initDrag(e) {
+    });
+
+    function initDrag(e) {
         e.preventDefault();
         if (config.onResizeStart) config.onResizeStart();
         const startX = e.clientX;
@@ -277,57 +276,72 @@ function makeResizable(el, config = {}) {
         const startHeight = el.offsetHeight;
         const startLeft = el.offsetLeft;
         const startTop = el.offsetTop;
-    
+
         // Determine the direction from the target's class list
         const target = e.target;
-        const directionObj = directions.find(({ className }) => target.classList.contains(className));
+        const directionObj = directions.find(({ className }) =>
+            target.classList.contains(className),
+        );
         const dir = directionObj ? directionObj.dir : "";
-    
+
         function doDrag(e) {
             // Change in coordinates
-          const dx = e.clientX - startX;
-          const dy = e.clientY - startY;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
 
-          let newWidth = startWidth;
-          let newHeight = startHeight;
-          let newLeft = startLeft;
-          let newTop = startTop;
-    
-          if (dir.includes("e")) {
-            newWidth = startWidth + dx;
-          }
-          if (dir.includes("w")) {
-            newWidth = startWidth - dx;
-            newLeft = startLeft + dx;
-          }
-          if (dir.includes("s")) {
-            newHeight = startHeight + dy;
-          }
-          if (dir.includes("n")) {
-            newHeight = startHeight - dy;
-            newTop = startTop + dy;
-          }
-          el.style.width = `${newWidth}px`;
-          el.style.height = `${newHeight}px`;
-          el.style.left = `${newLeft}px`;
-          el.style.top = `${newTop}px`;
+            let newWidth = startWidth;
+            let newHeight = startHeight;
+            let newLeft = startLeft;
+            let newTop = startTop;
+
+            if (dir.includes("e")) {
+                newWidth = startWidth + dx;
+            }
+            if (dir.includes("w")) {
+                newWidth = startWidth - dx;
+                newLeft = startLeft + dx;
+            }
+            if (dir.includes("s")) {
+                newHeight = startHeight + dy;
+            }
+            if (dir.includes("n")) {
+                newHeight = startHeight - dy;
+                newTop = startTop + dy;
+            }
+            el.style.width = `${newWidth}px`;
+            el.style.height = `${newHeight}px`;
+            el.style.left = `${newLeft}px`;
+            el.style.top = `${newTop}px`;
         }
-    
+
         // Cleanup
         function stopDrag() {
-          el.__doc__.documentElement.removeEventListener("mousemove", doDrag, false);
-          el.__doc__.documentElement.removeEventListener("mouseup", stopDrag, false);
-          if (config.onresizeend) {
-            config.onresizeend(el.offsetWidth, el.offsetHeight, el.offsetLeft, el.offsetTop);
-          }
+            el.__doc__.documentElement.removeEventListener(
+                "mousemove",
+                doDrag,
+                false,
+            );
+            el.__doc__.documentElement.removeEventListener(
+                "mouseup",
+                stopDrag,
+                false,
+            );
+            if (config.onresizeend) {
+                config.onresizeend(
+                    el.offsetWidth,
+                    el.offsetHeight,
+                    el.offsetLeft,
+                    el.offsetTop,
+                );
+            }
         }
-    
+
         el.__doc__.documentElement.addEventListener("mousemove", doDrag, false);
         el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
-      }
-    
-      el.__resizeinfo__ = ri;
-  }
+    }
+
+    el.__resizeinfo__ = ri;
+}
 
 // function makeResizable(el, config = {}) {
 //     //already resizable
@@ -395,7 +409,6 @@ function makeResizable(el, config = {}) {
 //     }
 //     el.__resizeinfo__ = ri;
 // }
-  
 
 function removeResizable(el) {
     if (!el.__resizeinfo__) {
