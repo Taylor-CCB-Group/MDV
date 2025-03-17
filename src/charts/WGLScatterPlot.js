@@ -332,24 +332,7 @@ class WGLScatterPlot extends WGLChart {
         }
         this.minMaxX = this.dataStore.getMinMaxForColumn(this.x);
         this.minMaxY = this.dataStore.getMinMaxForColumn(this.y);
-        const c = this.config;
         const colorFunc = this.afterAppCreation();
-        this.app.setBackGroundColor(c.background_color);
-
-        this.app.addHandler("brush_stopped", (range, is_poly) => {
-            this.resetButton.style.display = "inline";
-            this.app.setFilter(true);
-            if (!is_poly) {
-                this._createFilter(range);
-            } else {
-                this._createPolyFilter(range);
-            }
-        });
-
-        if (c.background_image) {
-            c.image_opacity = c.image_opacity == null ? 1 : c.image_opacity;
-            this.addBackgroundImage(c.background_image);
-        }
         const cx = this.dataStore.columnIndex[this.x];
         const cy = this.dataStore.columnIndex[this.y];
         //will get some loss of precision for int32 plus no updating on data changed
@@ -361,17 +344,9 @@ class WGLScatterPlot extends WGLChart {
             colorFunc: colorFunc,
         });
 
-        this.defaultRadius = this._calculateRadius();
-
-        c.radius = c.radius || 2;
-
-        c.opacity = c.opacity == null ? 0.8 : c.opacity;
-
-        this.app.setPointRadius(this.config.radius);
-        this.app.setPointOpacity(this.config.opacity);
 
         this.onDataFiltered();
-        
+        this.updateAxis();
         super.drawChart();
     }
 

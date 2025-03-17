@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useState, useMemo, useId, useCallback, useEffect } from "react";
+import { useMemo, useId, useCallback } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -10,21 +10,18 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { v4 as uuid } from "uuid";
-import { Button, Chip, FormControl, FormControlLabel, MenuItem, Radio, RadioGroup, Select, Slider, Typography } from "@mui/material";
+import { Button, Chip, FormControl, FormControlLabel, Radio, RadioGroup, Slider, Typography } from "@mui/material";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import JsonView from "react18-json-view";
 import { ChartProvider } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
-import { g, isArray, notEmpty } from "@/lib/utils";
+import { isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
-import ReusableDialog from "@/charts/dialogs/ReusableDialog";
-import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
@@ -128,34 +125,20 @@ function isMultiSpec(props: ColumnSelectionSpec): props is GuiSpec<"multicolumn"
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSelectionSpec }) => {
-    // multiple...
-    // proably want to change the type of ColumnSelectionProps anyway...
-    // perhaps we should be looking at other places where it's used & make them use this,
-    // with a different evolution of the API.
-    // currently this is not showing the current_value, among other missing features...
-    /** this needs fixing... and we should be able to observe mobx state for column queries 
-     * which should persist when the dialog (entire react root) is closed.
-    */
+    // multiple etc... this is the level above ColumnSelectionComponent I need to be focusing on.
    const multiple = isMultiSpec(props);
 
-    // const setSelectedColumn = useCallback(action((v: FieldSpec | FieldSpecs) => {
-    //     props.current_value = v;
-    //     //@ts -expect-error string is not assignable to FieldSpecs, type of v is wrong here
-    //     props.func?.(v);
-    // }), [multiple]); //as of this writing, biome is right that props is not a dependency
-    const filter = props.columnSelection?.filter;
+   const filter = props.columnType;
     // not only is the filter not working, but we need to decide how to express "multiple"
     const props2 = useMemo(() => inferGenericColumnSelectionProps({
         // fixing this stuff is high priority
-        //@ts -expect-error ColumnSelection setSelectedColumn type
+        //@ts-expect-error ColumnSelection setSelectedColumn(v: never)???
         setSelectedColumn: action((v) => {
             props.current_value = v;
-            //@ts-expect-error setSelectedColumn type
             props.func?.(v);
         }),
         type: filter, //is it ok for this to be optional?
         multiple,
-        //@ts-expect-error ColumnSelection current_value type
         current_value: props.current_value //! ideally this would also react to changes in the mobx store, why doesn't it?
         // current_value: props.current_value... maybe want to be more mobx-y about this
     }), [filter, props, props.current_value, multiple]);
@@ -231,20 +214,6 @@ function useDropdownOptions(props: DropdownSpec) {
         (v: string) => options.some((item) => item.value === v),
         [options],
     );
-    // some type checking / evaluation
-    // if (props.type === "multidropdown") {
-    //     const t: "multidropdown" = props.type;
-    //     const arr: string[] = props.current_value;
-    //     const func: GuiSpec<"multidropdown">['func'] = props.func;
-    // } else {
-    //     const t: "dropdown" = props.type;
-    //     //@ts-expect-error
-    //     const arr: string = v;
-    //     const arr2: string = props.current_value;
-    //     if (props.func) {
-    //         const func: (v: string) => void = props.func;
-    //     }
-    // }
     const isVArray = isArray(v);
     const allValid = isVArray ? v.every(validVal) : validVal(v);
     const okValue = allValid ? v : isVArray ? v.filter(validVal) : null;

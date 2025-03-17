@@ -1,6 +1,6 @@
 import { getRandomString } from "@/utilities/Utilities";
 import type BaseChart from "./BaseChart";
-import { action, makeAutoObservable } from "mobx";
+import { action, type IReactionDisposer, makeAutoObservable } from "mobx";
 import type { FieldSpec } from "@/lib/columnTypeHelpers";
 import { RowsAsColsQuery, type RowsAsColsQuerySerialized } from "@/links/link_utils";
 import type { DataSource, FieldName } from "./charts";
@@ -49,51 +49,26 @@ export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
     return result;
 }
 
-export function getConcreteFieldName(fieldSpec: FieldSpec) {
+export function getConcreteFieldNames(fieldSpec: FieldSpec) {
     if (isArray(fieldSpec)) {
         throw new Error("Not implemented");
     }
-    return typeof fieldSpec === "string" ? fieldSpec : fieldSpec.fields[0];
+    //! nb, previously unused, now changing the signature to return string array
+    //(I've had it with checking for array or string)
+    return typeof fieldSpec === "string" ? [fieldSpec] : fieldSpec.fields;
 }
+
 
 /**
- * For charts that aren't able to accept observable props for columns,
- * this function will replace any query objects with the corresponding field name(s).
- * 
- * It takes as input a config object that may contain serialised queries, and returns a new object
- * with the queries replaced by the field names as of the moment at which the method is run.
- * 
- * @param config object in serialised form
+ * We use this only as an intermediate step in AddChartDialogReact, as of this writing.
  */
-// export function getConcreteConfig(config: any) {
-//     // return concrete;
-// }
-
-export class ColumnQueryMapper<T> {
-    // constructor(chart: BaseChart<T>) {
-
-    // }
-}
-
-export function serialiseQueries(chart: BaseChart<any>) {
-    const { activeQueries } = chart;
-    const serialized: Record<string, any> = {};
-    for (const k in activeQueries) {
-        serialized[k] = activeQueries[k].map(q => {
-            if (q instanceof RowsAsColsQuery) {
-                return q.serialized;
-            }
-            return q;
-        });
-    }
-    return serialized;
-}
-
 export function serialiseConfig(config: any) {
     // we should find any mapped column queries and replace relevant values with a representation of that
     //the idea is that anywhere we previously had a column name, we can have a query object
     // Is this enough?
     // (as long as we don't have some vanilla chart with column query nonsense in it...)
+    // n.b. now using `toJSON()` in favour of `toString()` where possible - but there isn't a default `toJSON()` 
+    // for arbitrary objects, so still using stringification here.
     const serialized = JSON.parse(JSON.stringify(config));
     
     //! pending more generic approach to serialising queries...
@@ -134,40 +109,6 @@ export function deserialiseConfig(ds: DataStore, serialConfig: any) {
     return exceptions.length ? { config, exceptions } : config;
 }
 
-export function serialiseChart<T extends BaseChart<any>>(chart: T) {
-    const { config } = chart;
-    // thinking about config vs state, in the context of dynamic virtual columns...
-    // if we just have a record of paramSpecs, then we can use those in this representation
-    // while the config object itself will have the actual evaluated runtime state of the values
-    // then if we also keep a record of other `configEntriesUsingColumns`, that should, hypothetically,
-    // be enough information?
-    // - wouldn't like to count on that.
-    // If we make sure that any special config values are of some type other than string, 
-    // then we should be easily able to traverse the config object for them... however, it works the other way around:
-    // the config object is liable to have computed strings & we want to get the 'special value' from that.
-
-    // get the BaseChart.types entry for this chart, 
-    // use it to determine any `configEntriesUsingColumns`...
-    const serialized = JSON.parse(JSON.stringify(config));
-    
-    // we should find any mapped column queries and replace relevant values with a representation of that
-    //the idea is that anywhere we previously had a column name, we can have a query object
-    for (const k in chart.activeQueries) {
-        // this is a different approach where we have a 'queries' property which has a method name as a key
-        // so the contents of `param` are less relevant...
-        // indeed, we could call this something like `columns` and use it in place of `param`...
-        // would mostly apply to non-react charts though, or I'd be more keen on this approach...
-        // serialized.queries = serialiseQueries(chart);
-    }
-    const serialisedQueries = serialiseQueries(chart);
-    const colorByColumn = serialisedQueries['colorByColumn'];
-    if (colorByColumn) {
-        // serialized.colorByColumn = getConcreteFieldName(chart.activeQueries['colorByColumn'][0]);
-        serialized.color_by = colorByColumn[0];
-    }
-    console.log('processed config:', serialized);
-    return serialized;
-}
 
 /**
  * This will be called by the chart constructor to set up the config object, as well as properties on the chart object
@@ -195,12 +136,14 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     //or rather than relying on that property we can traverse the config object for any special values
     //for now, only operating on the param property of the config object
     //also we move around where actual loading of column data currently done by ChartManager happens
-    //todo process entire config object, not just param
+    //todo process entire config object, not just param<<<
     //@ts-expect-error todo distinguish type of serialised vs runtime config
     const param: SerialisedParams = config.param;
     const processed = param.map(p => deserialiseParam(chart.dataStore, p));
     config.param = processed;
-    //pending more generic approach to serialising queries...
+    //pending more generic approach to deserialising queries...
+    //we should be doing something like a reverse lookup of the methodToConfigMap
+    //we don't have that yet... although... by the time we setTimeout, we will...
     if (originalConfig.color_by) {
         //@ts-expect-error color_by
         const colorBy = isArray(originalConfig.color_by) ? deserialiseParam(chart.dataStore, originalConfig.color_by[0]) : config.color_by = deserialiseParam(chart.dataStore, originalConfig.color_by);
@@ -214,15 +157,37 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             chart.colorByColumn?.(colorBy);
         })
     }
+    if ((originalConfig as any).tooltip?.column) {
+        const tooltipColumn = deserialiseParam(chart.dataStore, (originalConfig as any).tooltip.column);
+        (config as any).tooltip.column = getConcreteFieldNames(tooltipColumn)[0];
+        setTimeout(() => {
+            if (chart.setToolTipColumn) chart.setToolTipColumn(tooltipColumn);
+        })
+    }
     console.log(config.type, 'processed config:', config);
     //temporary way of prototyping query
+    //any methodsUsingColumns that don't have an associated ColumnQueryMapper methodToConfigMap will
+    //will be handled here
     //may return to something like this for non-react charts as it requires less boilerplate & chart specific code
     setTimeout(action(() => {
         const c = config as any;
         const queries = c.queries;
         for (const method in queries) {
-            const q = queries[method].map((v: any) => deserialiseParam(chart.dataStore, v));
-            (chart as any)[method](q);
+            // if we want to handle multiple arguments that had been provided to some function, this would be the place
+            // this should be more robust than earlier versions of this code...
+            // but most things are avoiding it now, so it's not really tested...        
+            const sq = queries[method];
+            if (!sq) {
+                continue;
+            }
+            const multi = isArray(sq); //! hang on... first argument is the thing we should be processing...
+            const qa = multi ? sq : [sq];
+            const q = qa.map((v: any) => deserialiseParam(chart.dataStore, v));
+            try {
+                (chart as any)[method](multi ? q : q[0]);
+            } catch (e) {
+                console.error('failed to run query', method, config.type, q, e);
+            }
         }
     }));
 

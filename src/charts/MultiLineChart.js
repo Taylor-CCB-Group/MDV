@@ -5,6 +5,7 @@ import { select } from "d3-selection";
 import { scaleBand, scaleLinear } from "d3-scale";
 import { axisLeft } from "d3-axis";
 import BaseChart from "./BaseChart";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class MultiLineChart extends SVGChart {
     constructor(dataStore, div, config) {
@@ -55,6 +56,32 @@ class MultiLineChart extends SVGChart {
         this.onDataFiltered();
     }
 
+    @loadColumnData
+    setParams(params) {
+        const oldXName = this.dataStore.getColumnName(this.config.param[0]);
+        this.config.param = params;
+        const config = this.getConfig();
+        const x_name = this.dataStore.getColumnName(config.param[0]);
+        config.axis.x.label = x_name;
+        //nb - tried automatic update of title, but it didn't work?
+        const c = this.config;
+        //set default band width
+        const mm = this.dataStore.getMinMaxForColumn(c.param[0]);
+        let xx = mm.slice(0);
+        if (config.scaletrim) {
+            xx = [0, 1];
+        }
+        this.x_scale.domain(xx);
+        //this.y_scale.domain(yy);
+        this.defaultBandWidth = (mm[1] - mm[0]) / 100;
+
+        // this.stackLines(c.stacked);
+        // this.scaleTrim(c.scaletrim);
+        this.updateAxis();
+        // const dim = this.dataStore.getDimension("catrange_dimension");
+        this.onDataFiltered("new params");
+    }
+
     stackLines(st) {
         this.config.stacked = st;
         if (st) {
@@ -73,7 +100,8 @@ class MultiLineChart extends SVGChart {
         }
     }
 
-    changeCategories(column, val1, val2) {
+    @loadColumnData
+    changeCategories(column) {
         this.config.param[1] = column;
         this.onDataFiltered();
     }
@@ -234,13 +262,13 @@ class MultiLineChart extends SVGChart {
         s.splice(
             1,
             0,
-            {
+            {   /// todo use generic ParamSettingsGui instead of this, once it's working...
                 type: "dropdown",
                 current_value: c.param[1],
                 label: "Change Cetegories (y axis)",
                 values: [cols, "name", "field"],
                 func: (x) => {
-                    this.changeCategories(x, "val1", "val2");
+                    this.changeCategories(x);
                 },
             },
             {
@@ -318,7 +346,7 @@ class MultiLineChart extends SVGChart {
 BaseChart.types["multi_line_chart"] = {
     class: MultiLineChart,
     name: "Multi Line Chart",
-    methodsUsingColumns: ["changeCategories"],
+    // methodsUsingColumns: ["changeCategories"],
     params: [
         {
             type: "number",

@@ -209,6 +209,7 @@ export type RowsAsColslink = {
      * This can be used in the formation of a {@link FieldName}
      */
     valueToRowIndex: Map<string, number>;
+    initPromise: Promise<void>;
 }
 /**
  * Represents an active query for a set of columns based on the currently highlighted or filtered rows.
@@ -219,11 +220,24 @@ export type RowsAsColslink = {
 export interface MultiColumnQuery {
     columns: DataColumn<DataType>[]; //could have a generic type for this?
     fields: FieldName[];
+    /**
+     * When the query is first created, it may need to perform some async initialization:
+     * in the case of a `RowsAsColsQuery`, it needs to know the values of the `name_column` 
+     * in the linked dataSource.
+     * 
+     * Implementation note: as far as this interface is concerned, maybe this
+     * could be optional - we could have a conformant `MultiColumnQuery`
+     * that doesn't need any async initialization. For example, if it was for
+     * generating mock data.
+     */
+    initialize(): Promise<void>;
 }
-export interface ColumnQuery {
-    column: DataColumn<DataType>;
-    field: FieldName;
-}
+
+// unused
+// export interface ColumnQuery {
+//     column: DataColumn<DataType>;
+//     field: FieldName;
+// }
 
 type RowsAsColsPrefs = {
     //todo: properties for setting the link to pause / choose between highlighted or filtered data.
@@ -247,7 +261,7 @@ export type RowsAsColsQuerySerialized = {
  * @param link - the link configuration object, with observable properties
  * @param maxItems - the maximum number of columns to return
  * 
- * 
+ * ! we should really have sg as well as linkedDsName
  */
 export class RowsAsColsQuery implements MultiColumnQuery {
     // it may be logical to make this class be the thing that encapsulates a listener,
@@ -260,24 +274,22 @@ export class RowsAsColsQuery implements MultiColumnQuery {
     }
     @computed
     get columns() {
+        //how would we pause this?
         return this.link.observableFields.slice(0, this.maxItems).map(f => f.column);
     }
     @computed
     get fields() {
         return this.columns.map(c => c.field);
     }
-    @computed
-    get serialized() {
-        return { linkedDsName: this.linkedDsName, maxItems: this.maxItems, type: "RowsAsColsQuery" };
+    async initialize() {
+        return this.link.initPromise;
     }
     /**
-     * Returns a string that should have enough information to represent a JSON serialisation of the query.
+     * JSON serialisation that can be used to recreate the query object.
      */
-    toString() {
-        // will this be enough that JSON.stringify(config) will get the right thing without needing a custom replacer?
-        // (or traversing the object to find the right thing)
-        // probably ok for things that are able to take the config object without things like decorator for turning into a string...
-        return JSON.stringify(this.serialized);
+    toJSON() {
+        // I was previously naively using toString() for serialization - now I know better.
+        return { linkedDsName: this.linkedDsName, maxItems: this.maxItems, type: "RowsAsColsQuery" };
     }
     static fromSerialized(ds: DataStore, serialized: RowsAsColsQuerySerialized) {
         const link = getRowsAsColumnsLinks(ds).find(l => l?.linkedDs.name === serialized.linkedDsName)?.link;
@@ -297,19 +309,29 @@ export function getFieldName(sg: string, value: string, index: number) {
  * ! design needs review to account for multiple subgroups
  */
 async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
-    if (link.observableFields !== undefined) return;
+    if (link.initPromise !== undefined) return link.initPromise;
+    link.initPromise = new Promise<void>((resolve, reject) => {
+        initRacListenerImpl(link, ds, tds).then(resolve, reject);
+    });
+    return link.initPromise;
+}
+async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: DataStore) {
+    // didn't want to re-indent this block, so it's only valid to call once as in the above function.
+    if (link.initPromise !== undefined) throw new Error("initPromise already set");
     const cm = window.mdv.chartManager;
     const nameCol = tds.columnIndex[link.name_column];
     if (!nameCol) {
         console.error(`Column ${link.name_column} not found in DataStore ${ds.name}`);
         return;
     }
+    // make sure this happens before any async stuff so the check above is valid and subsequent calls return early.
+    link.observableFields = []; //this will be populated by setFieldsFromFilter below
+    makeObservable(link, { observableFields: true });
     await cm.loadColumnSetAsync([link.name_column], tds.name);
     if (!isColumnLoaded(nameCol)) {
         throw new Error(`Column ${link.name_column} not loaded`);
     }
 
-    link.observableFields = []; //this will be populated by setFieldsFromFilter below
     // we should also add a data structure mapping each name_column value (string) to the index of the corresponding row
     // which seems to assume a 1:1 mapping between name_column values and rows? Or not? 
     // While we're here, check for anything that may be inconsistent with our assumptions.
@@ -326,7 +348,6 @@ async function initRacListener(link: RowsAsColslink, ds: DataStore, tds: DataSto
     link.valueToRowIndex = valueToRowIndex;
     
     
-    makeObservable(link, { observableFields: true });
     
     //! we have an assumption here that there is only one subgroup
     //(nb, I think this is the thing that there'd be a radio-button for in the UI)
@@ -415,7 +436,7 @@ export function getRowsAsColumnsLinks(dataStore: DataStore) {
                 // There are also multiple subgroups within a single linked dataSource - also important to support.
                 // UI should be simpler for the common case with a single linked dataSource/sg.
                 // Are there any crazy edge cases we should consider - like indirect links? links to self?
-                // !! this should be right now, but we should test with multiple links.
+                // !! this should be ok now, but we should test with multiple links.
                 const linkedDs = dataSources.find(
                     (ds) => ds.name === linkedDsName,
                 );

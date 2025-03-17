@@ -106,7 +106,7 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
             throw new Error("config.param should always be an array");
         }
         // const param = chart.config.param as FieldName[]; // up for review with query objects etc.
-        //@ts-expect-error non-string 'name' as index
+        //@ts-expect-error non-string 'name' as index; if we had 'concrete fieldName' version of config.param?
         return param.map((name) => columnIndex[name]);
     }, [chart.config.param, columnIndex]) as DataColumn<DataType>[];
     // note that columns is 'any' here as of this writing

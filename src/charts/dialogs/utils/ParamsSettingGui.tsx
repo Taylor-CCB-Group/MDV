@@ -15,7 +15,9 @@ function getCurrentParam<T extends BaseConfig>(chart: BaseChart<T>, i: number) {
     // we only call this in the context of a chart type that has params
     if (!params) throw new Error("No params for chart type");
     const isMultiType = isMultiColumn(params[i].type);
-    const currentParams = config.param;
+    
+    // const currentParams = config.param;
+    const currentParams = chart.activeQueries.userValues['setParams'] || config.param;
     const n = currentParams.length;
     const hasMulti = params.some(p => isMultiColumn(p.type));
     if (isMultiType) {
@@ -31,11 +33,12 @@ function getCurrentParam<T extends BaseConfig>(chart: BaseChart<T>, i: number) {
     }
     if (hasMulti) {
         // there is a multi-column parameter, and this is not it.
-        // we need to figure out where it is in the array
-        const multiIndex = params.findIndex(p => isMultiColumn(p.type));
-        const nBefore = multiIndex < i ? multiIndex : multiIndex - 1;
-        const nAfter = n - nBefore - 1;
-        return currentParams.slice(nBefore, n - nAfter);
+        // we already handled the case where we are the multi-column parameter
+        // that means we should be either first or last in the array.
+        if (i === 0) {
+            return currentParams[0];
+        }
+        return currentParams[n - 1];
     }
     // there is no multi-column parameter; happy days
     return currentParams[i];
@@ -102,14 +105,12 @@ export default function getParamsGuiSpec<T extends BaseConfig>(chart: BaseChart<
     if (multiCount > 1) throw new Error("More than one multi-column parameter, abandon hope");
     const p = params.map((param, i) => {
         const isMultiType = isMultiColumn(param.type);
-        //! this is dangerous with _multi...
-        //even if !isMultiType, we still need to think about whether another param is multi...
-        // const current_value = isMultiType ? config.param[i] : [config.param[i]];
         const current_value = getCurrentParam(chart, i);
         return g({
             type: isMultiType ? "multicolumn" : "column",
             label: param.name,
             current_value,
+            columnType: param.type,
             func: v => {
                 // this check doesn't give an adequate type-guard
                 // if (isArray(v) !== isMultiType) throw new Error("Type mismatch");

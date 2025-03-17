@@ -8,14 +8,12 @@ class WGL2DI {
      * Creates a new wg2di instance
      * @param {string|object} div - The id of the div to house the instance or jquery element
      * @param {object} config (optional)
-     * <ul>
-     * <li> in_view_only - if true then only those objects in view will be drawn after panning/zooming.This will
-     * speed things up if maniluplating individual objects but slow down panning and zooming</li>
-     * <li> allow_object_drag - if true individual objects can be dragged </li>
-     * <li> default_brush - if true then brushing will be the default drag behavior - uses shift for panning
+     * - in_view_only - if true then only those objects in view will be drawn after panning/zooming.This will
+     * speed things up if maniluplating individual objects but slow down panning and zooming
+     * - allow_object_drag - if true individual objects can be dragged 
+     * - default_brush - if true then brushing will be the default drag behavior - uses shift for panning
      *  Otherwise panning is default and shift used for brushing
-     *
-     * </ul>
+     * - noCameraControl - if true then it won't use pan/zoom controls
      */
     constructor(div, config) {
         if (!config) {
@@ -1132,6 +1130,7 @@ class WGL2DI {
     }
 
     _addHandlers() {
+        const { noCameraControl } = this.config;
         //some listeners are on window while brush is active, and removed when brush is finished
         //allows dragging outside the canvas
         const mousemoveDragging = (e) => {
@@ -1193,12 +1192,14 @@ class WGL2DI {
                             this.offset[0] += x_amount;
                         }
                         this.offset[1] += y_amount;
-                        for (const i in this.handlers.pan_or_zoom) {
-                            this.handlers.pan_or_zoom[i](
-                                this.offset,
-                                this.x_scale,
-                                this.y_scale,
-                            );
+                        if (!noCameraControl) {
+                            for (const i in this.handlers.pan_or_zoom) {
+                                this.handlers.pan_or_zoom[i](
+                                    this.offset,
+                                    this.x_scale,
+                                    this.y_scale,
+                                );
+                            }
                         }
                     }
                 }
@@ -1265,6 +1266,7 @@ class WGL2DI {
         this.div_container.addEventListener(
             "wheel",
             (event) => {
+                if (noCameraControl) return;
                 event.preventDefault();
                 const position = this._getActualPosition(
                     this._getMousePosition(event),

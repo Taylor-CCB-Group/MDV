@@ -10,9 +10,8 @@ import type { BaseDialog } from "@/utilities/Dialog";
 import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
-import { serialiseChart, initialiseChartConfig } from "./chartConfigUtils";
-import type { MultiColumnQuery } from "@/links/link_utils";
-import { decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
+import { initialiseChartConfig } from "./chartConfigUtils";
+import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
 import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
 export type ChartEventType = string;
@@ -69,10 +68,8 @@ class BaseChart<T extends BaseConfig> {
     width = 0;
     height = 0;
     legend: any;
-    // activeQueries: Record<string, FieldSpec> = {};
-    // thinking of making this a class with a bit more logic, for now, this is a record of queries...
-    activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
-    // _hasDecorated: Set<string> = new Set();
+    // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
+    activeQueries: ColumnQueryMapper<T>;
     /**
      * The base constructor
      * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
@@ -102,6 +99,14 @@ class BaseChart<T extends BaseConfig> {
         //   but there are issues with mobx actions that result in mutations to the config
         //... so perhaps the idea of keeping that property to react charts is a good one?
         this.config = initialiseChartConfig(config, this);
+        //thinking about having arguments like `@loadColumnData(['param'])`, but requires a bit of work
+        //and would break compatibility with `"methodsUsingColumns"` forcing us to update all charts using that.
+        this.activeQueries = new ColumnQueryMapper(this, {
+            setParams: ["param"],
+            //! warning - we do still need some manual intervention in deserialisation
+            setToolTipColumn: "tooltip.column",
+            colorByColumn: "color_by",
+        });
         //this needs to be called after we initialise the config
         decorateChartColumnMethods(this);
 
@@ -386,7 +391,7 @@ class BaseChart<T extends BaseConfig> {
      */
     onDataFiltered(dim?: Dimension) {}
 
-    setToolTipColumn?(column: FieldName): void;
+    setToolTipColumn?(column: FieldSpec): void;
     setBackgroundFilter?(column: FieldName): void;
     changeContourParameter?(column: FieldName): void;
     colorByColumn?(c: FieldName): void;
@@ -605,11 +610,21 @@ class BaseChart<T extends BaseConfig> {
     }
     removeLayout?(): void;
     
+    /**
+     * Sets the params array in the config and redraws the chart.
+     * 
+     * Note that if an active query is set, the first argument will have the concrete column names as strings,
+     * as processed by `@loadColumnData`,
+     * while the second argument will have the FieldSpecs objects, unprocessed by the decorator.
+     */
     //@ts-expect-error - the decorator thinks it might not be setting an array value...
     @loadColumnData
     setParams(params: FieldSpecs) {
         //! now the config will just have string[] - we want to allow things that can understand to have other objects
         this.config.param = params;
+        // if we keep liveParams around it could be useful when serialising the chart
+        // although how can we be sure that the liveParams are up to date?
+        // maybe as a rule, this method is the only way to set the params...
         this.drawChart();
     }
     /**
@@ -649,6 +664,15 @@ class BaseChart<T extends BaseConfig> {
                     this.setTitle(v);
                 },
             },
+            {
+                type: "text",
+                label: "Chart Legend",
+                current_value: c.legend,
+                func: (v) => {
+                    c.legend = v;
+                    this.legendIcon.setAttribute("aria-label", v);
+                }
+            }
         ];
         const paramsSettings = getParamsGuiSpec(this);
         if (paramsSettings) {
@@ -684,7 +708,7 @@ class BaseChart<T extends BaseConfig> {
                 type: "column",
                 //@ts-expect-error LegacyColorBy should be gone by here
                 current_value: c.color_by,
-                columnSelection: { filter },
+                columnType: filter,
                 func: (x) => {
                     if (x === "_none") {
                         c.color_by = undefined;
@@ -910,10 +934,12 @@ class BaseChart<T extends BaseConfig> {
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
             };
         }
-        return serialiseChart(this);
+        // return serialiseChart(this);
+        return this.activeQueries.serialiseChartConfig();
     }
     
     /**
+     * Note: prefer `toJSON()` for serializing the chart config.
      * Returns a string representation of the chart's config, such that a simple call
      * a simple call to `JSON.stringify(chart)` will return the config.
      * 
@@ -922,6 +948,9 @@ class BaseChart<T extends BaseConfig> {
      */
     toString(): SerialString<T> {
         return JSON.stringify(this.getConfig());
+    }
+    toJSON() {
+        return this.getConfig().toJSON();
     }
 
     getColorOptions(): ColorOptions {

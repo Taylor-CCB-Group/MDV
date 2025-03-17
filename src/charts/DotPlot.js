@@ -5,7 +5,6 @@ import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
-import { serialiseQueries } from "./chartConfigUtils";
 import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class DotPlot extends SVGChart {
@@ -37,13 +36,12 @@ class DotPlot extends SVGChart {
         //this.fractionScale = scaleSqrt().domain([0, 100]);
     }
     
-    // todo figure out why annotation version isn't fully working - need methodsUsingColumns as well???
-    //if called with objects representing queries, this will cause the method to be called with column names
-    //and again whenever the column data changes
-    //but when we clone a chart like that, at the moment the old chart stops responding to changes
-    @loadColumnData 
+    // removing this decorator as it muddies the waters with setParams.
+    // - both methods having the annotation didn't particularly cause an issue..
+    //   as long as we had the workaround in `setParams()` to manually look for activeQuery
+    //   but that was itself a hack.
+    // @loadColumnData
     setFields(fieldNames) {
-        const cm = window.mdv.chartManager;
         //! we don't want to mutate the config object... 
         // we want to have a special value which signifies that it should use this behaviour.
         // then when we save state, it will have the appropriate value.
@@ -58,7 +56,6 @@ class DotPlot extends SVGChart {
     setParams(params) {
         this.config.param = params;
         this.setFields(params.slice(1));
-        this.onDataFiltered();
     }
 
     remove(notify = true) {
@@ -129,17 +126,6 @@ class DotPlot extends SVGChart {
         const l = this.linkThicknessLegend;
         if (l) {
             config.fraction_legend.position = [l.offsetLeft, l.offsetTop];
-        }
-        // it looks as though individual charts may be on the hook to serialise their queries
-        // because only they really know how they relate to order of params in the config
-        // in the case of react charts, they should hypothetically respond to changes in the config already
-        // - we just need to make that aware of queries in appropriate hooks?
-        // as for non-react... I suppose if they all have a contract whereby setConfig method will set appropriate state
-        const fieldQuery = serialiseQueries(this)['setFields'];
-        // if we have a way of interpreting this we'd be good to go
-        if (fieldQuery) {
-            console.log('DotPlot fieldQuery', fieldQuery);
-            config.param = [config.param[0], ...fieldQuery];
         }
         return config;
     }
@@ -360,28 +346,6 @@ class DotPlot extends SVGChart {
                     c.color_scale.log = v;
                     this.setColorFunction();
                     this.drawChart();
-                },
-            },
-            // this should be redundant now
-            {
-                // perhaps the GuiType should be more aligned with params type - i.e. _multi_column:number
-                // * we should then be able to expose all params in the settings in a more consistent way *
-                // then we wouldn't want current_value to be this.fieldNames, but the entries in config.param
-                // corresponding to fields... as defined in BaseChart.types["dot_plot"].params
-                // - param is a flat array - so we'd need to mimic the behaviour of spreading values from here
-                // there's a more general question of whether settings operates on the mobx mutable config object
-                // ... in many cases we could avoid having a `func`...
-                type: "multicolumn", //maybe this should be `"_multi_column:number"`
-                label: "Fields on x axis",
-                // this is more of a nuisance than type: "_multi_column:number"
-                // ^ need to figure out what we use is the generic adapter for this
-                columnSelection: {
-                    filter: ["double", "integer", "int32"]
-                },
-                current_value: this.fieldNames,
-                func: (v) => {
-                    // given that this is "multicolumn", we should be able to assume that v is an array
-                    this.setFields(Array.isArray(v) ? v : [v]);
                 },
             },
         ]);

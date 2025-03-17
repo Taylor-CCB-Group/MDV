@@ -16,7 +16,7 @@ import { action, observable, reaction, toJS } from "mobx";
 import z from "zod";
 import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
-import { columnMatchesType } from "@/lib/columnTypeHelpers";
+import { columnMatchesType, isMultiColumn } from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
 import { isArray } from "@/lib/utils.js";
 import { serialiseConfig } from "../chartConfigUtils.js";
@@ -140,7 +140,7 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
         label: control.label,
         current_value: control.defaultVal,
         // values: control.values,
-    //@ts-expect-error - need to think about what we're actually trying to do here
+    //@ts-expect-error controlToGuiSpec WIP
     } satisfies GuiSpec<T>;
     if (draftSpec.type === "dropdown" || draftSpec.type === "multidropdown") {
         // we run into this irritating logic with format that dropdown values can come in
@@ -151,7 +151,7 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
         const values = control.values;
         // if (!control.defaultVal) draftSpec.current_value = useObjectKeys ? values[0][0][values[0][2]] : values[0][0];
         // todo - add some type predicate so we know we're assigning the right type
-        //@ts-expect-error - need to think about what we're actually trying to do here
+        //@ts-expect-error controlToGuiSpec WIP
         if (!control.defaultVal) draftSpec.current_value = values[0]["name"];
         //(draftSpec as any).values = control.values; //doesn't give runtime error, doesn't work
         (draftSpec as any).values = [values, "name", "value"];
@@ -165,9 +165,9 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
     // if (!spec.current_value) throw new Error(`current_value should be set - no default in '${JSON.stringify(control)}'`);
     // strict typescript warns us about spec.current_value being potentially undefined, and it's dead right.
     // IMO much of the faffing around I'm doing getting this all to work could be avoided with better types.
-    //@ts-expect-error - need to think about what we're actually trying to do here
+    //@ts-expect-error controlToGuiSpec WIP
     reaction(() => spec.current_value, onChange);
-    //@ts-expect-error - need to think about what we're actually trying to do here
+    //@ts-expect-error controlToGuiSpec WIP
     return spec;
 }
 function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<T>, config: ChartConfig): GuiSpec<T> {
@@ -332,30 +332,34 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                     >
                         {chartType?.params && <Typography variant="h6">Columns</Typography>}
                         {chartType?.params?.map((p, i) => (
-                            <ColumnSelectionComponent key={p.name} placeholder={p.name} //multiple={false}
-                            // this may be changing - perhaps we always pass mobx object to ColumnSelectionComponent
-                            // but we definitely need to know whether it's a multi-column or not & be able to set the value accordingly
-                            //@ts-expect-error setSelectedColumn type needs to be fixed
-                            setSelectedColumn={action((column) => {
-                                // !! in the original AddChartDialog, we use a "ChooseColumnDialog" for multi-column
-                                // that sets `this.multiColumns` which in `submit` is concatenated to `config.param`
-                                if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
-                                
-                                // the type of config.param is string[] - but this could be a multi-column or virtual column query...
-                                // we need to decide at which point to apply these transformations.
-                                // - to deal with string[] we should be able to specify multiple={false} which could change the return type
-                                //... could we set up a reaction to update the config when the column changes?
+                            <>
+                                <Typography key={`label_${p.name}`} fontSize="small">
+                                    {p.name}:
+                                </Typography>
+                                <ColumnSelectionComponent key={p.name} placeholder={p.name}
+                                multiple={isMultiColumn(p.type)}
+                                // this may be changing - perhaps we always pass mobx object to ColumnSelectionComponent
+                                // but we definitely need to know whether it's a multi-column or not & be able to set the value accordingly
+                                //@ts-expect-error setSelectedColumn(c: never)???
+                                setSelectedColumn={action((column) => {
+                                    // !! in the original AddChartDialog, we use a "ChooseColumnDialog" for multi-column
+                                    // that sets `this.multiColumns` which in `submit` is concatenated to `config.param`
+                                    if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
+                                    
+                                    // the type of config.param is string[] - but this could be a multi-column or virtual column query...
+                                    // we need to decide at which point to apply these transformations.
+                                    // - to deal with string[] we should be able to specify multiple={false} which could change the return type
+                                    //... could we set up a reaction to update the config when the column changes?
 
-                                // if (typeof column !== "string") throw new Error("Expected string column name");
-                                //@ts-expect-error - we should be handling array ok now, but MultiColumnQuery is tbd
-                                config.param[i] = column; //issue now is that because ref is stable, we don't re-flatten the param
-                                // grumble grumble
-                                config._updated = new Date();
-                            })}
-                            type={p.type}
-                            //@ts-expect-error - fix incompatible type for config param
-                            current_value={config.param?.[i]}
-                            />
+                                    // if (typeof column !== "string") throw new Error("Expected string column name");
+                                    config.param[i] = column; //issue now is that because ref is stable, we don't re-flatten the param
+                                    // grumble grumble
+                                    config._updated = new Date();
+                                })}
+                                type={p.type}
+                                current_value={config.param?.[i]}
+                                />
+                            </>
                         ))}
                         {extraControls && <h2>Extra Controls</h2>}
                         {extraControls}

@@ -45,8 +45,7 @@ class DataStore {
         this.filterSize = size;
         /** why doesn't this column annotation work?
          * @typedef {import("@/charts/charts.js").DataType} DataType
-         * @typedef {import("@/charts/charts.js").DataColumn<DataType>} DataColumn
-         * @type {Array.<DataColumn<DataType>>} */
+         * @type {import("@/charts/charts.js").DataColumn<DataType>[]} */
         this.columns = [];
         /**
          * @type {{[k: string]: import("@/charts/charts.js").DataColumn<DataType> | undefined}} */
@@ -236,8 +235,8 @@ class DataStore {
 
     /**
      * Removes all filters from the datastore,
-     * More efficient than removing each filter individuallu
-     * Filters oo dimnensions with a noclear property will not
+     * More efficient than removing each filter individually
+     * Filters on dimnensions with a noclear property will not
      * be removed
      */
     removeAllFilters() {
@@ -1754,8 +1753,16 @@ class DataStore {
         return c.minMax[1] - c.minMax[0];
     }
 
+    /**
+     * @param {string} column if this is in the form of a link `FieldName` it will first attempt to
+     * `addColumnFromField()`...
+     */
     getColumnInfo(column) {
+        if (column.includes("|")) {
+            this.addColumnFromField(column);
+        }
         const c = this.columnIndex[column];
+        if (!c) throw `no metadata for column '${column}' in ds '${this.name}'`;
         return {
             name: c.name,
             field: c.field,

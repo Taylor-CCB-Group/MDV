@@ -64,6 +64,7 @@ import { createMdvPortal } from "@/react/react_utils";
 import FilterComponentReactWrapper from "@/react/components/FilterComponentReactWrapper";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
+import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 
 
 //order of column data in an array buffer
@@ -1697,6 +1698,9 @@ export class ChartManager {
         );
     }
 
+    /**
+     * @param {{dataStore: DataStore}} ds
+     */
     _setUpMenu(ds) {
         const dataStore = ds.dataStore;
         createMenuIcon(
@@ -1973,6 +1977,7 @@ export class ChartManager {
             // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
             // when it goes wrong, it can cause problems outside the creation of this chart
             // - other charts wanting to use similar neededCols end up not having data?
+            // links should be initialised here as well...
             await this._getColumnsAsync(dataSource, neededCols);
             this._addChart(dataSource, config, div, notify);
         } catch (error) {
@@ -2061,9 +2066,19 @@ export class ChartManager {
     }
 
     async _getColumnsAsync(dataSource, columns) {
+        // there could be links as well as column `fields` in columns.
+        // let's make a mechanism for awaiting the link - and initial linked cols.
+        const ds = this.dsIndex[dataSource].dataStore;
+        const links = columns.map((c) => deserialiseParam(ds, c)).filter(c => typeof c !== 'string');
+        const linkPromises = links.map(link => link.initialize());
+        await Promise.all(linkPromises);
+        const linkedFields = links.flatMap(link => link.fields);
+        const allColumns = columns.concat(linkedFields);
+        
+
         // let's add some error handling here...
         const result = await new Promise((resolve) => {
-            this._getColumnsThen(dataSource, columns, resolve);
+            this._getColumnsThen(dataSource, allColumns, resolve);
         });
         return result;
     }
@@ -2184,23 +2199,22 @@ export class ChartManager {
         div.style.alignItems = "";
         div.style.justifyContent = "";
         const chartType = BaseChart.types[config.type];
-        // if (!chartType.allowDynamicColumns) {
-            // turn the config into a static one...
-            // the above property name is not the way I'm currently thinking of approaching this...
-        // }
-        const newParams = chartType.params?.map((param, i) => {
-            if (!param.reactive) {
-                // try to find the corresponding entry in `config.param`...
-                // issue with that being that multicolumn params will be arbitrarily long, 
-                // so we can't really 'know' that we are doing the right thing here...
-                // most charts with _multi params, it's at index 0. 
-                // 15 (heat_map) & 24 (dot_plot) are exceptions (both have two params, with 'something else' first).
-                // Anyway - importantly, there are no charts with more than one _multi param.
-                
-                // param.type.startsWith('_multi')
-            }
-        });
+        // sometimes the constructor doesn't understand active link, but chart.setParams() does...
+        // it somewhat appears to work if we first manifest concrete field names, 
+        // then set the real params in a setTimeout()...
+        // but we're resorting to setTimeout for a few things and it's going to be hard to manage...
+        // are we sure that this timeout will happen after the one that instruments decorators etc?
+        // seems dodgy to rely on setTimeout order.
+        // Also setParams() itself is not always going to work - depends on the chart.
+        const originalParam = config.param.map(p => deserialiseParam(ds, p));
+        config.param = originalParam.flatMap(getConcreteFieldNames);
         const chart = new chartType.class(ds.dataStore, div, config);
+        if (originalParam.some(p => typeof p !== 'string')) {
+            console.log('setting param with active queries in timeout');
+            setTimeout(() => {
+                chart.setParams(originalParam);
+            });
+        }
         this.charts[chart.config.id] = {
             chart: chart,
             dataSource: ds,
