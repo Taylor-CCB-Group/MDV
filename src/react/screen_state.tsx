@@ -1,9 +1,9 @@
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { observer } from "mobx-react-lite";
-import { createContext, useContext, useEffect, useId, useState } from "react";
-import type { createMdvPortal } from './react_utils';
-import createCache, { EmotionCache } from '@emotion/cache'
+import { createContext, useContext, useId } from "react";
+import type { createMdvPortal } from "./react_utils";
+import createCache, { type EmotionCache } from "@emotion/cache";
 import { CacheProvider } from "@emotion/react";
 
 /** All charts and dialogs have this as an `observable` property that can be passed to
@@ -36,13 +36,13 @@ export function generateCacheKey() {
 const cacheMap = new Map<HTMLElement, EmotionCache>();
 
 // Getting or creating EmotionCache for storing cache using CacheProvider
-export function emotionCache(container: HTMLElement) {
-  let cache = cacheMap.get(container);
-  if (!cache) {
-    cache = createCache({ key: generateCacheKey(), container });
-    cacheMap.set(container, cache);
-  }
-  return cache;
+export function useEmotionCache(container: HTMLElement) {
+    let cache = cacheMap.get(container);
+    if (!cache) {
+        cache = createCache({ key: generateCacheKey(), container });
+        cacheMap.set(container, cache);
+    }
+    return cache;
 }
 /**
  * As of now we only ever use react to render charts & dialogs, and they should be mobx observable
@@ -50,16 +50,12 @@ export function emotionCache(container: HTMLElement) {
  * hopefully the implementation will be easy to change if/when necessary.
  */
 export const OuterContainerProvider = observer(
-    ({
-        children,
-        parent,
-    }: { children: JSX.Element; parent?: BaseChart<any> | BaseDialog }) => {
+    ({ children, parent }: { children: JSX.Element; parent?: BaseChart<any> | BaseDialog }) => {
+        const cache = useEmotionCache(parent?.observable?.container || document.body);
         return (
-            <OuterContainerContext.Provider
-                value={parent?.observable?.container || document.body}
-            >
-                <CacheProvider value={emotionCache(parent?.observable?.container || document.body)}>
-                {children}
+            <OuterContainerContext.Provider value={parent?.observable?.container || document.body}>
+                <CacheProvider value={cache}>
+                    {children}
                 </CacheProvider>
             </OuterContainerContext.Provider>
         );
