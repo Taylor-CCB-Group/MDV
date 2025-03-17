@@ -13,12 +13,10 @@ const SaveViewDialogComponent = (props: {
     action?: () => void;
 }) => {
     const cm = window.mdv.chartManager;
-    const { getState, _callListeners } = cm;
 
     const onSave = () => {
-        //todo - refactor this function to eliminate the usage of apply function
-        const state = getState.apply(cm, []);
-        _callListeners.apply(cm, ["state_saved", state]);
+        const state = cm.getState();
+        cm._callListeners("state_saved", state);
     };
 
     return (

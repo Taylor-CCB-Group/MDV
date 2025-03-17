@@ -19,17 +19,7 @@ const AddViewDialogComponent = (props: {
     const [isCloneView, setIsCloneView] = useState(false);
     const [checkedDs, setCheckedDs] = useState<{ [name: string]: boolean }>({});
     const cm = window.mdv.chartManager;
-    const {
-        viewManager,
-        viewData,
-        gridStack,
-        dsIndex,
-        removeAllCharts,
-        getState,
-        _callListeners,
-        contentDiv,
-        _init,
-    } = cm;
+    const { viewManager, viewData, dsIndex, contentDiv } = cm;
 
     useEffect(() => {
         // Initialising the checkedDs with the data sources inside the view
@@ -49,7 +39,6 @@ const AddViewDialogComponent = (props: {
     };
 
     const onCreate = () => {
-        //todo - refactor this function to eliminate the usage of apply function
         viewManager.setAllViews([...viewManager.all_views, viewName]);
 
         // Optionally make it the current view
@@ -58,12 +47,12 @@ const AddViewDialogComponent = (props: {
             //remove all charts and links
             for (const ds in viewData.dataSources) {
                 if (viewData.dataSources[ds].layout === "gridstack") {
-                    gridStack.destroy.apply(cm, [dsIndex[ds]]);
+                    cm.gridStack.destroy(dsIndex[ds]);
                 }
             }
-            removeAllCharts.apply(cm, []);
+            cm.removeAllCharts();
             viewData.links = [];
-            const state = getState.apply(cm, []);
+            const state = cm.getState();
             state.view.initialCharts = {};
             state.view.dataSources = {};
             //only one datasource
@@ -79,14 +68,14 @@ const AddViewDialogComponent = (props: {
                     }
                 }
             }
-            _callListeners.apply(cm, ["state_saved", state]);
+            cm._callListeners("state_saved", state);
             contentDiv.innerHTML = "";
-            _init.apply(cm, [state.view]);
+            cm._init(state.view);
         } else {
-            const state = getState.apply(cm, []);
+            const state = cm.getState();
             console.log("state add new: ", state);
-            _callListeners.apply(cm, ["state_saved", state]);
-            _init.apply(cm, [state.view]);
+            cm._callListeners("state_saved", state);
+            cm._init(state.view);
         }
         props.onClose();
     };
