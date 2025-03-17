@@ -18,10 +18,7 @@ For each new chart type, an entry should be added to `BaseChart.types['ChartName
 
 [^1] It is possible to have multiple descriptions of chart-types that use the same `"class"`, but with different resulting configuration, which is interpreted by the same JS class to render a wide variation of actual charts. Where possible, it may be useful to try to adopt this approach more widely to avoid the need to create extra boilerplate for code that is mostly react-based, gradually re-factoring existing functionality in a way that suits the React paradigm.
 
-### Settings vs "Add Chart" configuration
 
-`get`
-## 
 ## State management
 
 `useConfig()` can be used to return `config` object that can be used to store mutable state. This is a `Proxy` that will trigger re-rendering of the component when it is mutated. This is the recommended way to store state that is specific to a particular chart instance and that will be persisted when 'save view' is called. For volatile sate, we are using `useState()` and Zustand (with the React context API).
