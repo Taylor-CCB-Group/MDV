@@ -83,5 +83,6 @@ class ViewDialogWrapper extends BaseDialog {
     }
 }
 
-BaseDialog.experiment["ViewDialogWrapper"] = ViewDialogWrapper;
+// mercifully, this isn't necessary
+// BaseDialog.experiment["ViewDialogWrapper"] = ViewDialogWrapper;
 export default ViewDialogWrapper;
