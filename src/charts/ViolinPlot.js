@@ -18,18 +18,17 @@ class ViolinPlot extends WGLChart {
             };
         }
         super(dataStore, div, config, { x: { type: "band" }, y: {} });
-        //disable scroll zoom / pan
         this.config.type = "violin_plot"; //<<< I don't like the look of this
         if (!config.title) {
             // --- causes some nasty exception... let's not do that for now
             this.useDefaultTitle = true;
             config.title = `${x_name} x ${y_name}`;
         }
-
-        //todo review general design around mutation of config in constructor / mobx
+        
         const c = this.config;
         c.brush = c.brush || "poly";
-
+        
+        //disable scroll zoom / pan
         const appConf = { brush: c.brush, noCameraControl: true };
 
         this.app = new WGL2DI(this.graphDiv, appConf);
