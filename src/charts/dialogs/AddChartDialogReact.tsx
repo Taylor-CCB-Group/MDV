@@ -348,18 +348,16 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                         ))}
                         {extraControls && <h2>Extra Controls</h2>}
                         {extraControls}
-                        <Dialog open={false}>
+                        {/* <Dialog open={false}>
                             <JsonView src={chartType} collapsed/>
-                        </Dialog>
+                        </Dialog> */}
                     </Grid>
                 </Grid>
             </Grid>
             <Divider />
-            <div>
-                {/* NOTE - before config._updated was added, this causes update when config.legend chages,
-                    otherwise not unless we spread config... and then nested `config.params[i] = c` updates didn't work */}
-                <ChartPreview config={{...config}} />
-            </div>
+            {/* NOTE - before config._updated was added, this causes update when config.legend chages,
+                otherwise not unless we spread config... and then nested `config.params[i] = c` updates didn't work */}
+            {/* <ChartPreview config={{...config}} /> */}
             </DialogContent>
             <DialogActions sx={{justifyContent: "center"}}>
                 <Button
@@ -491,5 +489,5 @@ class AddChartDialogReact extends BaseDialog {
     }
 }
 // https://github.com/Taylor-CCB-Group/MDV/discussions/44
-BaseDialog.experiment["AddChartDialogReact"] = AddChartDialogReact;
-export default "AddChartDialogReact loaded";
+// BaseDialog.experiment["AddChartDialogReact"] = AddChartDialogReact;
+export default AddChartDialogReact;
