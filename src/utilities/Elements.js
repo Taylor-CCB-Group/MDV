@@ -217,17 +217,19 @@ function makeSortable(list, config = {}) {
 }
 
 function makeResizable(el, config = {}) {
-    if (el.__resizeinfo__) return;
-  
-    const doc = config.doc || document;
-    el.__doc__ = doc;
-
+    //already resizable
+    if (el.__resizeinfo__) {
+        return;
+    }
     const ri = {
-      resize: el.style.resize,
-      overflow: el.style.overflow,
+        resize: el.style.resize,
+        overflow: el.style.overflow,
     };
+    //document can change if in another window
+    el.__doc__ = config.doc || document;
+    // el.style.resize="both"; //standard resizer is sometimes visible when it shouldn't be.
     el.style.overflow = "hidden";
-  
+    //el.style.zIndex="0";
     if (config.onresizeend) {
         ri.onresize = addResizeListener(
             el,
@@ -237,14 +239,20 @@ function makeResizable(el, config = {}) {
             config.onResizeStart,
         );
     }
+    //workaround for Safari bug #50
+    //https://codepen.io/jkasun/pen/QrLjXP
+    //(actually, mostly copilot filling in very similar code...)
 
+
+    // List of all the resizers based on directions and corresponding css classes
     const directions = [
-        { dir: "n", className: "resizer-n" },
+        // The top resizers are messing with title bar buttons causing bad UX, commenting for now
+        // { dir: "n", className: "resizer-n" },
         { dir: "s", className: "resizer-s" },
         { dir: "e", className: "resizer-e" },
         { dir: "w", className: "resizer-w" },
-        { dir: "ne", className: "resizer-ne" },
-        { dir: "nw", className: "resizer-nw" },
+        // { dir: "ne", className: "resizer-ne" },
+        // { dir: "nw", className: "resizer-nw" },
         { dir: "se", className: "resizer-se" },
         { dir: "sw", className: "resizer-sw" }
       ];
@@ -270,14 +278,16 @@ function makeResizable(el, config = {}) {
         const startLeft = el.offsetLeft;
         const startTop = el.offsetTop;
     
-        // Determine the direction from the target's class list.
+        // Determine the direction from the target's class list
         const target = e.target;
         const directionObj = directions.find(({ className }) => target.classList.contains(className));
         const dir = directionObj ? directionObj.dir : "";
     
         function doDrag(e) {
+            // Change in coordinates
           const dx = e.clientX - startX;
           const dy = e.clientY - startY;
+
           let newWidth = startWidth;
           let newHeight = startHeight;
           let newLeft = startLeft;
@@ -303,6 +313,7 @@ function makeResizable(el, config = {}) {
           el.style.top = `${newTop}px`;
         }
     
+        // Cleanup
         function stopDrag() {
           el.__doc__.documentElement.removeEventListener("mousemove", doDrag, false);
           el.__doc__.documentElement.removeEventListener("mouseup", stopDrag, false);
