@@ -47,7 +47,9 @@ const AddViewDialogComponent = (props: {
             //remove all charts and links
             for (const ds in viewData.dataSources) {
                 if (viewData.dataSources[ds].layout === "gridstack") {
-                    cm.gridStack.destroy(dsIndex[ds]);
+                    const d = dsIndex[ds];
+                    if (!d) continue;
+                    cm.gridStack.destroy(d);
                 }
             }
             cm.removeAllCharts();
