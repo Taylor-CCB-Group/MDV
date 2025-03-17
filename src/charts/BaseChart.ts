@@ -708,7 +708,7 @@ class BaseChart<T extends BaseConfig> {
                 type: "column",
                 //@ts-expect-error LegacyColorBy should be gone by here
                 current_value: c.color_by,
-                columnSelection: { filter },
+                columnType: filter,
                 func: (x) => {
                     if (x === "_none") {
                         c.color_by = undefined;

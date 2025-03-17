@@ -52,23 +52,24 @@ export type ColumnSelectionProps<T extends CTypes, M extends boolean,
 /** 
  * Given a `ColumnSelectionProps` object, this function should return the same object with the correct type annotations.
  */
-export function inferGenericColumnSelectionProps<T extends CTypes, M extends boolean>(
-    props: ColumnSelectionProps<T, M>
-): ColumnSelectionProps<T, M> {
+export function inferGenericColumnSelectionProps<T extends CTypes, M extends boolean,
+V = M extends true ? FieldSpecs : FieldName | MultiColumnQuery>(
+    props: ColumnSelectionProps<T, M, V>
+): ColumnSelectionProps<T, M, V> {
     return props;
 }
 
 export function isMultiColumn(type: CTypes): type is MultiColumnPrefix | Param[] {
     return typeof type === "string" && type.startsWith("_multi_column:");
 }
-export function inferGenericColumnGuiProps<T extends CTypes, M extends boolean>(
-    props: ColumnSelectionProps<T, M>
-): ColumnSelectionProps<T, M> {
-    return props;
+function isNumeric(type: Param): boolean {
+    return type.match(/double|float|int|number/) !== null;
 }
 // need a version of this that understand DataType as well as Param
-export function paramAcceptsNumeric<T extends CTypes>(param: T): boolean {
-    return param === "number" || (Array.isArray(param) && param.includes("number"));
+export function paramAcceptsNumeric<T extends CTypes>(param?: T): boolean {
+    if (param === undefined) return true;
+    // return param === "number" || (Array.isArray(param) && param.includes("number"));
+    return isArray(param) ? param.some(isNumeric) : isNumeric(param);
 }
 /**
  * This is for filtering columns based on some relatively complex type specification potentially including things like `"_multi_column:number"`...

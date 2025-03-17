@@ -6,7 +6,7 @@ import { observer } from "mobx-react-lite";
 import { Paper, useTheme } from "@mui/material";
 import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
 import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers.js";
-import { isMultiColumn } from "@/lib/columnTypeHelpers";
+import { isMultiColumn, paramAcceptsNumeric } from "@/lib/columnTypeHelpers";
 import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
 import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import ActiveLinkComponent from "./ActiveLinkComponent.js";
@@ -45,6 +45,16 @@ const TabHeader = ({ activeTab, setActiveTab, tabName, activeMode }: TabHeaderPr
     );
 }
 
+/**
+ * Currently, the only type of 'link' that we are referring to is a `RowsAsCols` link.
+ * That is only compatible with numeric types.
+ */
+function useIsLinkCompatible<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) {
+    const numeric = paramAcceptsNumeric(props.type);
+    const linkProps = useRowsAsColumnsLinks();
+    const rowLinkProps = linkProps[0];
+    return (numeric && rowLinkProps) || false;
+}
 /**
  * A component for selecting a column from the data store - which can entail quite complex UI
  * and state for things like synthesising columns from linked data etc.
@@ -86,12 +96,16 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
     }, [initialActiveTab]);
 
 
+    const iIsLinkCompatible = useIsLinkCompatible(props);
     const linkProps = useRowsAsColumnsLinks();
     const rowLinkProps = linkProps[0]; //todo: not our responsibility to select the link here, children should do that.
-    // only show extra UI if there is a link and the thing we are setting is compatible with number values...
+    //! only show extra UI if there is a link and the thing we are setting is compatible with number values...
+    // - we need to check if the param is compatible with number values
+    
+
     // also, active links don't make much sense if the corresponding datasource isn't visible in the view 
     // - but we might change how views work so we don't have the separate panes...
-    if (!linkProps) return <ColumnDropdownComponent {...props} />;
+    if (!iIsLinkCompatible) return <ColumnDropdownComponent {...props} />;
 
     return (
         <>

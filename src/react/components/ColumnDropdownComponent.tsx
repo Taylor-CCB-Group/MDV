@@ -1,4 +1,4 @@
-import { columnMatchesType, inferGenericColumnGuiProps } from "@/lib/columnTypeHelpers";
+import { columnMatchesType, inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
 import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { useDataStore } from "../context";
 import type { DataColumn, DataType } from "@/charts/charts";
@@ -27,7 +27,7 @@ function isMultiColProp<T extends CTypes, M extends boolean>(p: ColumnSelectionP
 
 const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
 
-    const props = inferGenericColumnGuiProps(gProps);
+    const props = inferGenericColumnSelectionProps(gProps);
     const { setSelectedColumn, placeholder, type, current_value } = props;
     
     const isMultiType = isMultiColProp(props);

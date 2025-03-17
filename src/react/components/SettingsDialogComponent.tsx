@@ -132,7 +132,7 @@ export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSel
     // not only is the filter not working, but we need to decide how to express "multiple"
     const props2 = useMemo(() => inferGenericColumnSelectionProps({
         // fixing this stuff is high priority
-        //@ts-expect-error ColumnSelection setSelectedColumn(never)???
+        //@ts-expect-error ColumnSelection setSelectedColumn(v: never)???
         setSelectedColumn: action((v) => {
             props.current_value = v;
             props.func?.(v);
