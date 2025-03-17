@@ -65,6 +65,7 @@ import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import ToggleThemeWrapper from "./dialogs/ToggleTheme";
+import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 
 
 //order of column data in an array buffer
@@ -120,7 +121,7 @@ function listenPreferredColorScheme(callback) {
 * The object to manage charts [Chart Manager](../../docs/extradocs/chartmanager.md)
 * 
 * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
-* @param {object[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
+* @param {import("@/charts/charts").DataSource[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
 * Each config must contain the size parameter, giving the number of rows in the DataStore.
 * @param {object} dataloader - An object containing the following
 *   - function - The [function](../../docs/extradocs/dataloader.md) to load the data
@@ -177,7 +178,7 @@ export class ChartManager {
          *  name - the name given to this data source
          *  menuBar the dom menu associated with this element
          *  contentDiv the div that the charts associated with the datastore will be added
-         * @typedef {import("@/charts/charts/DataSource")} DataSource
+         * @typedef {import("@/charts/charts").DataSource} DataSource
          * @type {DataSource[]}
          */
         this.dataSources = [];
@@ -1103,13 +1104,15 @@ export class ChartManager {
             //*but there could be other config entries / methods that refer to columns*
             // return [];
         } else if (typeof p === "string") {
-            set.add(p);
+            // pretty sure there's nothing in BaseChart.types that would get here - single param is ["string"]
+            throw `Unexpected param string '${config.param}' for ${config.name} - expected array`;
         } else {
             for (const i of p) {
                 set.add(i);
             }
         }
         if (config.color_by) {
+            // LegacyColorBy - can we nip it in the bud so we can use narrower types elsehwere?
             if (config.color_by.column) {
                 set.add(config.color_by.column.field);
             } else {
@@ -1127,6 +1130,9 @@ export class ChartManager {
 
         //are there any config entries that refer to column(s)
         const t = BaseChart.types[config.type];
+        // this will probably be handled differently in the (near) future
+        // maybe later we could use a decorator to add this to the config?
+        // (not sure it'd be necessary - as long as they have a consistent interface)
         if (t.configEntriesUsingColumns) {
             t.configEntriesUsingColumns.forEach((x) => {
                 let e = config[x];
@@ -1439,6 +1445,11 @@ export class ChartManager {
      * @param {number} [threads=2]  the number of concurrent requests
      */
     loadColumnSet(columns, dataSource, callback, split = 10, threads = 2) {
+        const ds = this.getDataSource(dataSource);
+        // nb, if any items are in columnsLoading, we don't filter them here
+        // because we'd have to think of how to listen for their completion before calling the callback
+        // !! could be an issue if a column has been edited by another user and this method is supposed to reload it?
+        columns = columns.filter((x) => !ds.columnsWithData.includes(x));
         if (columns.length === 0) {
             callback(); //should there be any args? hard to tell without types
             return;
@@ -1479,6 +1490,11 @@ export class ChartManager {
         for (let n = 0; n < max; n++) {
             this._loadColumnData(t, dataSource);
         }
+    }
+    loadColumnSetAsync(columns, dataSource, split = 10, threads = 2) {
+        return new Promise((resolve, reject) => {
+            this.loadColumnSet(columns, dataSource, resolve, split, threads);
+        });
     }
 
     _loadColumnData(trans, dataSource) {
@@ -1567,6 +1583,9 @@ export class ChartManager {
         );
     }
 
+    /**
+     * @param {{dataStore: DataStore}} ds
+     */
     _setUpMenu(ds) {
         const dataStore = ds.dataStore;
         createMenuIcon(
@@ -1580,7 +1599,7 @@ export class ChartManager {
                     new AddChartDialog(ds, (config) =>
                         this.addChart(ds.name, config, true),
                     );
-                    // new BaseDialog.experiment["AddChartDialogReact"](dataStore);
+                    if (import.meta.env.DEV) new BaseDialog.experiment["AddChartDialogReact"](dataStore);
                 },
             },
             ds.menuBar,
@@ -1843,6 +1862,7 @@ export class ChartManager {
             // this can go wrong if the dataSource doesn't have data or a dynamic dataLoader.
             // when it goes wrong, it can cause problems outside the creation of this chart
             // - other charts wanting to use similar neededCols end up not having data?
+            // links should be initialised here as well...
             await this._getColumnsAsync(dataSource, neededCols);
             this._addChart(dataSource, config, div, notify);
         } catch (error) {
@@ -1931,9 +1951,19 @@ export class ChartManager {
     }
 
     async _getColumnsAsync(dataSource, columns) {
+        // there could be links as well as column `fields` in columns.
+        // let's make a mechanism for awaiting the link - and initial linked cols.
+        const ds = this.dsIndex[dataSource].dataStore;
+        const links = columns.map((c) => deserialiseParam(ds, c)).filter(c => typeof c !== 'string');
+        const linkPromises = links.map(link => link.initialize());
+        await Promise.all(linkPromises);
+        const linkedFields = links.flatMap(link => link.fields);
+        const allColumns = columns.concat(linkedFields);
+        
+
         // let's add some error handling here...
         const result = await new Promise((resolve) => {
-            this._getColumnsThen(dataSource, columns, resolve);
+            this._getColumnsThen(dataSource, allColumns, resolve);
         });
         return result;
     }
@@ -1987,8 +2017,15 @@ export class ChartManager {
             const col = dStore.columnIndex[x];
             //no record of column- need to load it (plus metadata)
             if (!col) {
-                dStore.addColumnFromField(x);
-                return true;
+                // what if x is something like a MulticolumnQuery?
+                if (typeof x !== "string") {
+                    // we could make dataStore understand it as a 'field'...
+                    // or if we return false to filter it out, chart deserialise can handle it?
+                    return false;
+                } else {
+                    dStore.addColumnFromField(x);
+                    return true;
+                }
             }
             //only load if has no data
             return !col.data;
@@ -2025,40 +2062,6 @@ export class ChartManager {
 
     }*/
 
-    //need to ensure that column data is loaded before calling method
-    _decorateColumnMethod(method, chart, dataSource) {
-        const newMethod = `_${method}`;
-        chart[newMethod] = chart[method];
-        //if original method is called check whether column has data
-        chart[method] = (column) => {
-            this._getColumnsThen(dataSource, [column], () =>
-                chart[newMethod](column),
-            );
-        };
-    }
-
-    //supercedes previous method - more genric
-    //method must be specified in the method UsingColumns in types of dictionary
-    __decorateColumnMethod(method, chart, dataSource) {
-        const newMethod = `_${method}`;
-        chart[newMethod] = chart[method];
-        //if original method is called check whether column has data
-        //first argument must be column(s) needed
-        chart[method] = () => {
-            //column not needed
-            if (arguments[0] == null) {
-                chart[newMethod](...arguments);
-            } else {
-                const cols = Array.isArray(arguments[0])
-                    ? arguments[0]
-                    : [arguments[0]];
-                this._getColumnsThen(dataSource, cols, () =>
-                    chart[newMethod](...arguments),
-                );
-            }
-        };
-    }
-
     //check all columns have loaded - if not recursive call after
     //time out, otherwise add the chart
     _haveColumnsLoaded(neededCols, dataSource, func) {
@@ -2081,7 +2084,22 @@ export class ChartManager {
         div.style.alignItems = "";
         div.style.justifyContent = "";
         const chartType = BaseChart.types[config.type];
+        // sometimes the constructor doesn't understand active link, but chart.setParams() does...
+        // it somewhat appears to work if we first manifest concrete field names, 
+        // then set the real params in a setTimeout()...
+        // but we're resorting to setTimeout for a few things and it's going to be hard to manage...
+        // are we sure that this timeout will happen after the one that instruments decorators etc?
+        // seems dodgy to rely on setTimeout order.
+        // Also setParams() itself is not always going to work - depends on the chart.
+        const originalParam = config.param.map(p => deserialiseParam(ds, p));
+        config.param = originalParam.flatMap(getConcreteFieldNames);
         const chart = new chartType.class(ds.dataStore, div, config);
+        if (originalParam.some(p => typeof p !== 'string')) {
+            console.log('setting param with active queries in timeout');
+            setTimeout(() => {
+                chart.setParams(originalParam);
+            });
+        }
         this.charts[chart.config.id] = {
             chart: chart,
             dataSource: ds,
@@ -2106,40 +2124,6 @@ export class ChartManager {
                 this._removeLinks(chart);
                 this._callListeners("chart_removed", chart);
             });
-
-        //need to decorate any method that uses column data as data may
-        //have to be loaded before method can execute
-        // @ts-ignore
-        if (chart.colorByColumn) {
-            this._decorateColumnMethod("colorByColumn", chart, dataSource);
-        }
-        // @ts-ignore
-        if (chart.setToolTipColumn) {
-            this._decorateColumnMethod("setToolTipColumn", chart, dataSource);
-        }
-        // @ts-ignore
-        if (chart.setBackgroundFilter) {
-            this._decorateColumnMethod(
-                "setBackgroundFilter",
-                chart,
-                dataSource,
-            );
-        }
-        // @ts-ignore
-        if (chart.changeContourParameter) {
-            this._decorateColumnMethod(
-                "changeContourParameter",
-                chart,
-                dataSource,
-            );
-        }
-
-        //new preferred way to decorate column methods
-        if (chartType.methodsUsingColumns) {
-            for (const meth of chartType.methodsUsingColumns) {
-                this.__decorateColumnMethod(meth, chart, dataSource);
-            }
-        }
 
         // @ts-ignore
         if (chart.setupLinks) {

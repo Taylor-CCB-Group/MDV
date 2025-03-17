@@ -143,8 +143,8 @@ function useCreateMeasure() {
     const [endPixels, setEnd] = useState<P>([0, 0]);
     return { startPixels, setStart, endPixels, setEnd };
 }
-//@ts-expect-error maybe we can have a generic that describes appropriate types of chart
-function useCreateSpatialAnnotationState(chart: BaseChart) {
+//add generic that extends SpatialConfig?
+function useCreateSpatialAnnotationState(chart: BaseChart<any>) {
     // should we use zustand for this state?
     // doesn't matter too much as it's just used once by SpatialAnnotationProvider
     // consider for project-wide annotation stuff as opposed to ephemeral selections
@@ -156,8 +156,8 @@ function useCreateSpatialAnnotationState(chart: BaseChart) {
 export function SpatialAnnotationProvider({
     chart,
     children,
-//@ts-expect-error maybe we can have a generic that describes appropriate types of chart
-}: { chart: BaseChart } & React.PropsWithChildren) {
+    //add generic that extends SpatialConfig?
+}: { chart: BaseChart<any> } & React.PropsWithChildren) {
     const annotationState = useCreateSpatialAnnotationState(chart);
     return (
         <SpatialAnnotationState.Provider value={annotationState}>

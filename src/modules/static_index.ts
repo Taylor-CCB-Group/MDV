@@ -14,7 +14,7 @@ import {
 import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
 import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
-import type { DataColumn } from "@/charts/charts";
+import type { DataColumn, DataSource } from "@/charts/charts";
 import { getProjectName } from "./ProjectContext";
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
@@ -82,15 +82,6 @@ getProjectName(Number(project_id)).then((project_name) => {
 // set title of page to the data directory
 if (isPopout) document.title = "MDV popout";
 
-// TODO make a better type for this, put it somewhere more sensible.
-export type Datasource = {
-    name: string;
-    columns: { name: string; type: string }[];
-    images?: any;
-    size: number;
-    columnGroups?: any[];
-};
-
 async function loadData() {
     // setupDebug();
     if (isPopout) return;
@@ -99,7 +90,7 @@ async function loadData() {
     const datasources = (await fetchJsonConfig(
         `${root}/datasources.json`,
         root,
-    )) as Datasource[];
+    )) as DataSource[];
     const config = await fetchJsonConfig(`${root}/state.json`, root);
     config.popouturl = undefined;
     const views = await fetchJsonConfig(`${root}/views.json`, root);
@@ -153,7 +144,11 @@ async function loadData() {
             const views = await fetchJsonConfig(`${root}/views.json`, root);
             const state = await fetchJsonConfig(`${root}/state.json`, root);
 
-            new DebugJsonReactWrapper({ datasources, views, state });
+            const chartTypes = Object.entries(BaseChart.types).map(([k, v]) => {
+                const { class: omit, ...props } = v;
+                return [k, props];
+            })
+            new DebugJsonReactWrapper({ chartTypes, datasources, views, state });
         },
         true //
     );

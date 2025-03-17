@@ -1,15 +1,19 @@
 import { getRandomString } from "../utilities/Utilities";
 import { ContextMenu } from "../utilities/ContextMenu.js";
 import { createEl } from "../utilities/Elements.js";
-import { type ChartTypeMap, chartTypes } from "./ChartTypes";
+import { chartTypes } from "./ChartTypes";
 import DebugJsonDialogReactWrapper from "../react/components/DebugJsonDialogReactWrapper";
 import SettingsDialogReactWrapper from "../react/components/SettingsDialogReactWrapper";
-import { makeAutoObservable, action } from "mobx";
+import { makeAutoObservable, action, autorun, type IReactionDisposer, type IAutorunOptions } from "mobx";
 import type DataStore from "@/datastore/DataStore";
 import type { BaseDialog } from "@/utilities/Dialog";
-import type { DataColumn, FieldName, GuiSpec, GuiSpecs } from "./charts";
+import type { DataColumn, FieldName, GuiSpecs, Quantiles } from "./charts";
 import type Dimension from "@/datastore/Dimension";
 import { g } from "@/lib/utils";
+import { initialiseChartConfig } from "./chartConfigUtils";
+import { ColumnQueryMapper, decorateChartColumnMethods, loadColumnData } from "@/datastore/decorateColumnMethod";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import getParamsGuiSpec from "./dialogs/utils/ParamsSettingGui";
 export type ChartEventType = string;
 export type Listener = (type: ChartEventType, data: any) => void;
 export type LegacyColorBy = { column: DataColumn<any> }
@@ -19,16 +23,35 @@ export type BaseConfig = {
     title: string;
     legend: string;
     type: string;
-    param: FieldName[]; // | string,
-    //nb we might want to represent columns as something other than string soon, in which case this will need to be updated
-    color_by?: FieldName | LegacyColorBy;
+    param: FieldSpecs;
     title_color?: string;
+} & ColorConfig;
+/**
+ * All chart config types include a color configuration, (although not all charts use it).
+ * 
+ * It may also be possible to have nested properties of this kind - such as a chart with multiple layers, 
+ * each with its own color config.
+ */
+export type ColorConfig = {
+    //nb this needs to be updated...
+    color_by?: FieldSpec | LegacyColorBy;
+    color_legend?: any;
+    log_color_scale?: boolean;
+    trim_color_scale?: keyof Quantiles | "none";
+    color_overlay?: number;
+    fallbackOnZero?: boolean;    
 };
 export type ColumnChangeEvent = { columns: FieldName[], hasFiltered: boolean };
 export type ColorOptions = any;
 export type ContextMenuItem = { text: string, icon: string, func: () => void };
-class BaseChart<T> {
-    config: any;
+/**
+ * A JSON string representing a chart configuration.
+ * 
+ * The generic parameter `T` is the type of the chart configuration - maybe overkill, or maybe useful at some point.
+ */
+export type SerialString<T extends BaseConfig> = string;
+class BaseChart<T extends BaseConfig> {
+    config: T;
     __doc__: Document;
     dataStore: DataStore;
     listeners: Record<string, Listener>;
@@ -45,33 +68,51 @@ class BaseChart<T> {
     width = 0;
     height = 0;
     legend: any;
+    // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
+    activeQueries: ColumnQueryMapper<T>;
     /**
      * The base constructor
      * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
      * @param {string | HTMLDivElement} div - The id of the div element or the element itself to house the chart
      * @param {Object} config - The config describing the chart
      */
-    constructor(dataStore: DataStore, div: HTMLDivElement | string, config: T & BaseConfig) {
+    constructor(dataStore: DataStore, div: HTMLDivElement | string, config: T) {
         //******adapt legacy configs
         if (config.color_by) {
             const { color_by } = config;
             //nb we might want to represent columns as something other than string soon, in which case this will need to be updated
+            //@ts-expect-error color_by.column type
             if (typeof color_by !== "string" && color_by.column) {
+                //@ts-expect-error color_by.column type
                 config.color_by = color_by.column.field;
             }
         }
         //**********
+        // this needs to be set before we initialise the config
+        this.dataStore = dataStore;
+        
+        //copy the config, 
+        // this.config = JSON.parse(JSON.stringify(config));
+        //^^ previously, only react charts had observable config
+        //and make it observable etc... may apply some other processing e.g. in case of 'virtual columns'
+        //   we've been experimenting with applying this to all charts
+        //   but there are issues with mobx actions that result in mutations to the config
+        //... so perhaps the idea of keeping that property to react charts is a good one?
+        this.config = initialiseChartConfig(config, this);
+        //thinking about having arguments like `@loadColumnData(['param'])`, but requires a bit of work
+        //and would break compatibility with `"methodsUsingColumns"` forcing us to update all charts using that.
+        this.activeQueries = new ColumnQueryMapper(this, {
+            setParams: ["param"],
+            //! warning - we do still need some manual intervention in deserialisation
+            setToolTipColumn: "tooltip.column",
+            colorByColumn: "color_by",
+        });
+        //this needs to be called after we initialise the config
+        decorateChartColumnMethods(this);
 
-        //copy the config
-        this.config = JSON.parse(JSON.stringify(config));
-        //give it a random id if one isn't supplied
-        if (!this.config.id) {
-            this.config.id = getRandomString();
-        }
         //required in case added to separate browser window
         this.__doc__ = document;
 
-        this.dataStore = dataStore;
         this.listeners = {};
 
         //create the DOM elements
@@ -143,7 +184,7 @@ class BaseChart<T> {
                 func: () => {
                     window.mdv.debugChart = this;
                     this.dialogs.push(
-                        new DebugJsonDialogReactWrapper(this.config, this),
+                        new DebugJsonDialogReactWrapper(this.getConfig(), this),
                     );
                 },
             });
@@ -236,6 +277,12 @@ class BaseChart<T> {
             container: this.__doc__.body,
         });
     }
+    reactionDisposers: IReactionDisposer[] = [];
+    mobxAutorun(fn: ()=>void, opts?: IAutorunOptions) {
+        const disposer = autorun(fn, opts);
+        this.reactionDisposers.push(disposer);
+        return disposer;
+    }
     _getContentDimensions() {
         return {
             //PJT to review re. gridstack.
@@ -246,7 +293,14 @@ class BaseChart<T> {
         };
     }
     get dataSource() {
-        return window.mdv.chartManager.charts[this.config.id].dataSource;
+        //this fails if we're still in chart construction
+        //return window.mdv.chartManager.charts[this.config.id].dataSource;
+        const name = this.dataStore.name;
+        const ds = window.mdv.chartManager.dataSources.find((ds) => ds.name === name);
+        if (!ds) {
+            throw new Error(`failed to find dataSource ${name}`);
+        }
+        return ds;
     }
 
     getFilter(): any {}
@@ -337,6 +391,9 @@ class BaseChart<T> {
      */
     onDataFiltered(dim?: Dimension) {}
 
+    setToolTipColumn?(column: FieldSpec): void;
+    setBackgroundFilter?(column: FieldName): void;
+    changeContourParameter?(column: FieldName): void;
     colorByColumn?(c: FieldName): void;
     colorByDefault?(): void;
     /**Check if chart is composed of any columns whose data has
@@ -351,7 +408,8 @@ class BaseChart<T> {
         //update any charts which use data from the columns
         //(if they haven't already been updated by the filter changing)
         if (!data.hasFiltered) {
-            let cols = this.config.param;
+            //@ts-expect-error param type - want a version of config with concrete column names as strings
+            let cols: string | string[] = this.config.param;
             let isDirty = false;
             if (typeof this.config.param === "string") {
                 cols = [this.config.param];
@@ -367,19 +425,23 @@ class BaseChart<T> {
             }
         }
         //recolor any charts coloured by the column
+        //@ts-expect-error coloy_by/columns type
         if (columns.indexOf(this.config.color_by) !== -1) {
+            //@ts-expect-error color_by => string
             this.colorByColumn?.(this.config.color_by);
         }
     }
-
+    
     getColorLegend() {
         const conf = {
             overideValues: {
                 colorLogScale: this.config.log_color_scale,
             },
         };
+        //@ts-expect-error color_by => string
         this._addTrimmedColor(this.config.color_by, conf);
-
+        
+        //@ts-expect-error color_by => string
         return this.dataStore.getColorLegend(this.config.color_by, conf);
     }
 
@@ -388,8 +450,10 @@ class BaseChart<T> {
     _addTrimmedColor(column: FieldName, conf: any) {
         const tr = this.config.trim_color_scale;
         const col = this.dataStore.columnIndex[column];
+        if (!col) throw `expected color column '${column}' in columnIndex for ${this.dataStore.name}`;
         if (tr && tr !== "none") {
-            if (col.quantiles && col.quantiles !== "NA") {
+            if (col.quantiles) {
+                if (col.quantiles as any === "NA") return;
                 conf.overideValues.min = col.quantiles[tr][0];
                 conf.overideValues.max = col.quantiles[tr][1];
             }
@@ -402,7 +466,7 @@ class BaseChart<T> {
      * get colorLegend method
      */
     setColorLegend() {
-        if (!this.config.color_legend.display) {
+        if (!this.config.color_legend?.display) {
             if (this.legend) {
                 this.config.color_legend.pos = [
                     this.legend.offsetLeft,
@@ -539,16 +603,37 @@ class BaseChart<T> {
         for (const d of this.dialogs) {
             d.close();
         }
+        for (const disposer of this.reactionDisposers) {
+            disposer();
+        }
         // dynamic props?
     }
     removeLayout?(): void;
+    
+    /**
+     * Sets the params array in the config and redraws the chart.
+     * 
+     * Note that if an active query is set, the first argument will have the concrete column names as strings,
+     * as processed by `@loadColumnData`,
+     * while the second argument will have the FieldSpecs objects, unprocessed by the decorator.
+     */
+    //@ts-expect-error - the decorator thinks it might not be setting an array value...
+    @loadColumnData
+    setParams(params: FieldSpecs) {
+        //! now the config will just have string[] - we want to allow things that can understand to have other objects
+        this.config.param = params;
+        // if we keep liveParams around it could be useful when serialising the chart
+        // although how can we be sure that the liveParams are up to date?
+        // maybe as a rule, this method is the only way to set the params...
+        this.drawChart();
+    }
     /**
      * Returns information about which controls to add to the settings dialog.
      * Subclasses should call this method and then add their own controls e.g.
-     * <pre style='background:lightgray;padding:10px'>
+     * ```
      * getSettings(){
      *     let settings = super.getSettings();
-     *     return settings.concat([{
+     *     return settings.concat([g({
      *       label:"A value"
      *       type:"slider",
      *       default_value:this.config.value,
@@ -558,12 +643,14 @@ class BaseChart<T> {
      *           this.config.value=x;
      *           //update chart
      *       }
-     *     }]);
+     *     })]);
      * }
-     * </pre>
+     * ```
      *
      * wrapping controls with a call to @{link g} will perform type checking
      * todo- specifiy the link to `g` above properly/ document better
+     * at the moment it has no other purpose - but it is possbile we may
+     * use it for other housekeeping tasks in the future.
      * @returns an array of objects describing tweakable parameters
      */
     getSettings() {
@@ -577,7 +664,20 @@ class BaseChart<T> {
                     this.setTitle(v);
                 },
             },
+            {
+                type: "text",
+                label: "Chart Legend",
+                current_value: c.legend,
+                func: (v) => {
+                    c.legend = v;
+                    this.legendIcon.setAttribute("aria-label", v);
+                }
+            }
         ];
+        const paramsSettings = getParamsGuiSpec(this);
+        if (paramsSettings) {
+            settings.push(paramsSettings);
+        }
         const colorOptions = this.getColorOptions();
 
         if (colorOptions.colorby) {
@@ -606,14 +706,17 @@ class BaseChart<T> {
             colorSettings.push(g({
                 label: "Color By",
                 type: "column",
+                //@ts-expect-error LegacyColorBy should be gone by here
                 current_value: c.color_by,
-                // filter: filter,
+                columnType: filter,
                 func: (x) => {
                     if (x === "_none") {
                         c.color_by = undefined;
                         this.colorByDefault?.();
                     } else {
+                        //@ts -expect-error color_by will have been co-erced to string by here as of now, and colorByColumn expects that
                         c.color_by = x;
+                        //@ts-expect-error color_by will have been co-erced to string by here as of now
                         this.colorByColumn?.(x);
                     }
                 },
@@ -622,9 +725,11 @@ class BaseChart<T> {
                 colorSettings.push({
                     label: "Color Overlay",
                     type: "slider",
-                    current_value: c.color_overlay,
+                    //@ts-expect -error default 0 probably ok here, but maybe review
+                    current_value: c.color_overlay || 0,
                     func: (x) => {
                         c.color_overlay = x;
+                        //@ts-expect-error color_by
                         this.colorByColumn?.(c.color_by);
                     },
                 });
@@ -646,10 +751,11 @@ class BaseChart<T> {
                 label: "SymLog Color Scale",
                 type: "check",
 
-                current_value: c.log_color_scale,
+                current_value: c.log_color_scale || false,
                 func: (x) => {
                     c.log_color_scale = x;
                     if (c.color_by) {
+                        //@ts-expect-error color_by
                         this.colorByColumn?.(c.color_by);
                     }
                 },
@@ -658,10 +764,11 @@ class BaseChart<T> {
                 label: "Treat zero as missing",
                 type: "check",
 
-                current_value: c.fallbackOnZero,
+                current_value: c.fallbackOnZero || false,
                 func: (x) => {
                     c.fallbackOnZero = x;
                     if (c.color_by) {
+                        //@ts-expect-error color_by
                         this.colorByColumn?.(c.color_by);
                     }
                 },
@@ -675,10 +782,12 @@ class BaseChart<T> {
                     ["0.001", "0.001"],
                     ["0.01", "0.01"],
                     ["0.05", "0.05"],
-                ],
+                ] as const,
                 func: (v) => {
+                    //@ts-ignore we could type this, but it's a bit fussy
                     c.trim_color_scale = v;
                     if (c.color_by) {
+                        //@ts-expect-error color_by
                         this.colorByColumn?.(c.color_by);
                     }
                 },
@@ -752,17 +861,6 @@ class BaseChart<T> {
         if (this.addToContextMenu) {
             menu = menu.concat(this.addToContextMenu());
         }
-        menu.push({
-            text: "experimental settings dialog",
-            icon: "fas fa-cog",
-            func: async () => {
-                const m = await import(
-                    "../react/components/SettingsDialogReactWrapper"
-                );
-                const SettingsDialogReactWrapper = m.default;
-                this.dialogs.push(new SettingsDialogReactWrapper(this));
-            },
-        });
         return menu;
     }
 
@@ -802,15 +900,20 @@ class BaseChart<T> {
         }
         if (this.extra_legends) {
             for (const l of this.extra_legends) {
-                //@ts-expect-error
+                //@ts-expect-error extra_legends
                 if (this[l]) {
-                    //@ts-expect-error
+                    //@ts-expect-error extra_legends
                     this[l].__doc__ = doc;
                 }
             }
         }
     }
 
+    /**
+     * Only used by HistogramChart as of this writing.
+     * Should probably be removed?
+     * @deprecated
+     */
     _setConfigValue(conf: T, value: keyof T, def: any) {
         if (conf[value] === undefined) {
             conf[value] = def;
@@ -821,7 +924,8 @@ class BaseChart<T> {
     drawChart() {}
 
     /**
-     * Returns a copy of the chart's config
+     * Returns a copy of the chart's config in serialized form
+     * (todo central place for documentation describing this)
      */
     getConfig() {
         if (this.legend) {
@@ -830,7 +934,23 @@ class BaseChart<T> {
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
             };
         }
-        return JSON.parse(JSON.stringify(this.config));
+        // return serialiseChart(this);
+        return this.activeQueries.serialiseChartConfig();
+    }
+    
+    /**
+     * Note: prefer `toJSON()` for serializing the chart config.
+     * Returns a string representation of the chart's config, such that a simple call
+     * a simple call to `JSON.stringify(chart)` will return the config.
+     * 
+     * The type alias is hoped to allow for code involved in manipulating the config to be able
+     * to know what it is dealing with.
+     */
+    toString(): SerialString<T> {
+        return JSON.stringify(this.getConfig());
+    }
+    toJSON() {
+        return this.getConfig().toJSON();
     }
 
     getColorOptions(): ColorOptions {
@@ -941,13 +1061,12 @@ class BaseChart<T> {
             callback(canvas, ctx);
         };
     }
-    static types: ChartTypeMap;
+    /**
+     * A dictionary of all the chart types
+     */
+    static types = chartTypes;
 }
 
-/**
- * A dictionary of all the chart types
- */
-BaseChart.types = chartTypes;
 
 function copyStylesInline(
     destinationNode: HTMLElement,

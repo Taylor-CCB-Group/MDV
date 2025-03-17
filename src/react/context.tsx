@@ -4,11 +4,12 @@ import { createContext, useContext } from "react";
 import type DataStore from "../datastore/DataStore";
 import type { VivConfig } from "./components/avivatorish/state";
 import type BaseChart from "@/charts/BaseChart";
+import type { BaseConfig } from "@/charts/BaseChart";
 
 export const ChartContext = createContext<BaseChart<any>>(null as any);
 export const DataStoreContext = createContext<DataStore>(null as any);
 
-export function ChartProvider<T = any>({
+export function ChartProvider<T extends BaseConfig>({
     chart,
     children,
 }: { chart: BaseChart<T> } & React.PropsWithChildren) {
@@ -21,11 +22,15 @@ export function ChartProvider<T = any>({
         </ChartContext.Provider>
     );
 }
-
-export function useChart() {
-    const chart = useContext(ChartContext);
-    if (!chart) throw new Error("no chart context");
+// infer?
+function typedChart<T extends BaseConfig>(chart: BaseChart<T>) {
+    const t = chart.config.type; //would need to look up the type in the chart registry to infer the type.
+    return chart;
+}
+export function useChart<T extends BaseConfig>(): BaseChart<T> {
     //todo: typing...
+    const chart = typedChart(useContext(ChartContext));
+    if (!chart) throw new Error("no chart context");
     return chart;
 }
 export function useDataStore(foreignDataStore?: DataStore) {

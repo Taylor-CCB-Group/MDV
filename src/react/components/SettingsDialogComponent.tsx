@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useState, useMemo, useId, useCallback, useEffect } from "react";
+import { useMemo, useId, useCallback } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -10,21 +10,25 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { v4 as uuid } from "uuid";
-import { Button, Chip, Dialog, FormControl, FormControlLabel, MenuItem, Radio, RadioGroup, Select, Slider, Typography } from "@mui/material";
+import { Button, Chip, FormControl, FormControlLabel, Radio, RadioGroup, Slider, Typography } from "@mui/material";
 import Checkbox from "@mui/material/Checkbox";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import JsonView from "react18-json-view";
 import { ChartProvider } from "../context";
-import type { ColumnSelectionProps } from "./ColumnSelectionComponent";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
-import { g, isArray } from "@/lib/utils";
+import { inferGenericColumnSelectionProps } from "@/lib/columnTypeHelpers";
+import { isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
+import type { BaseConfig } from "@/charts/BaseChart";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
-export const MLabel = observer(({ props, htmlFor }: { props: GuiSpec<any>, htmlFor?: string }) => (
-    <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", paddingRight: 2}}>{props.label}</Typography>
+export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
+    <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
+        {props.label} 
+        {/* <em className="opacity-30"> ({props.type})</em> */}
+    </Typography>
     // todo fix justifySelf - it's not working as expected
     // <FormControlLabel
     //     sx={{ justifySelf: "right" }}
@@ -74,7 +78,7 @@ const SliderComponent = ({ props }: { props: GuiSpec<"slider"> }) => (
             onChange={action((_, value) => {
                 // const value = Number.parseFloat(e.target.value);
                 if (Array.isArray(value))
-                    throw "slider callback should have multiple values";
+                    throw new Error("slider callback should have multiple values");
                 props.current_value = value;
                 if (props.func) props.func(value);
             })}
@@ -102,27 +106,42 @@ const SpinnerComponent = ({ props }: { props: GuiSpec<"spinner"> }) => (
     </>
 );
 export type ColumnSelectionSpec = GuiSpec<"column"> | GuiSpec<"multicolumn">;
+
+/**
+ * 
+ * 
+ * The situation with trying to marshall types of column widgets, for settings vs addChartDialog,
+ * is making this all a bit of a mess. There should be a simpler way to express this stuff - which
+ * may reviewing the ways widgets are defined in different contexts.
+ */
+function isMultiSpec(props: ColumnSelectionSpec): props is GuiSpec<"multicolumn"> {
+    return props.type === "multicolumn";
+}
+
+
 /**
  * Wrap the ColumnSelectionComponent in a setting GUI component.
  *
  * nb, for some weird reason if this is defined in ColumnSelectionComponent.tsx HMR doesn't work...
  */
 export const ColumnSelectionSettingGui = observer(({ props }: { props: ColumnSelectionSpec }) => {
-    // proably want to change the type of ColumnSelectionProps anyway...
-    // perhaps we should be looking at other places where it's used & make them use this,
-    // with a different evolution of the API.
-    // currently this is not showing the current_value, among other missing features...
-    const setSelectedColumn = useCallback(action((v: string) => {
-        props.current_value = v;
-        //@ts-expect-error //! this is genuinely not fully implemented yet, when it is, types should be right
-        props.func?.(v);
-    }), []); //as of this writing, biome is right that props is not a dependency
+    // multiple etc... this is the level above ColumnSelectionComponent I need to be focusing on.
+   const multiple = isMultiSpec(props);
 
-    const props2: ColumnSelectionProps = useMemo(() => ({
-        setSelectedColumn,
-        // type: props.type,
-        multiple: false,
-    }), [setSelectedColumn]);
+   const filter = props.columnType;
+    // not only is the filter not working, but we need to decide how to express "multiple"
+    const props2 = useMemo(() => inferGenericColumnSelectionProps({
+        // fixing this stuff is high priority
+        //@ts-expect-error ColumnSelection setSelectedColumn(v: never)???
+        setSelectedColumn: action((v) => {
+            props.current_value = v;
+            props.func?.(v);
+        }),
+        type: filter, //is it ok for this to be optional?
+        multiple,
+        current_value: props.current_value //! ideally this would also react to changes in the mobx store, why doesn't it?
+        // current_value: props.current_value... maybe want to be more mobx-y about this
+    }), [filter, props, props.current_value, multiple]);
     return (
         <>
             <MLabel props={props} />
@@ -140,12 +159,12 @@ export type DropdownSpec = GuiSpec<"dropdown"> | GuiSpec<"multidropdown">;
 function getOptionAsObjectHelper(values: DropDownValues) {
     const useObjectKeys = values.length === 3;
     const [_valueObjectArray, labelKey, valueKey] = useObjectKeys ? values : ["X", "X", "X"];
-    if (!labelKey || !valueKey) throw "DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys";
+    if (!labelKey || !valueKey) throw new Error("DropdownAutocompleteComponent requires labelKey and valueKey for useObjectKeys");
     type Option = { label: string, value: string, original: any };
     // might put some more elaborate types here on original at some point
     return (original: string | any): Option => {
         const isString = typeof original === "string";
-        if (isString === useObjectKeys) throw "DropdownAutocompleteComponent requires values to be either all strings or all objects";
+        if (isString === useObjectKeys) throw new Error("DropdownAutocompleteComponent requires values to be either all strings or all objects");
         if (isString) {
             return { label: original, value: original, original };
         }
@@ -156,7 +175,7 @@ function getOptionAsObjectHelper(values: DropDownValues) {
 }
 function useDropdownOptions(props: DropdownSpec) {
     // this check should be redundant with current types, but leaving it in for now
-    if (!props.values) throw "DropdownAutocompleteComponent requires props.values - probable logic error in type definitions";
+    if (!props.values) throw new Error("DropdownAutocompleteComponent requires props.values - probable logic error in type definitions");
     const toOption = useCallback(getOptionAsObjectHelper(props.values), []);
     type OptionType = ReturnType<typeof toOption>;
     const NO_OPTIONS = [{ label: "No options (error - sorry...)", value: "", original: "" }];
@@ -195,34 +214,20 @@ function useDropdownOptions(props: DropdownSpec) {
         (v: string) => options.some((item) => item.value === v),
         [options],
     );
-    // some type checking / evaluation
-    // if (props.type === "multidropdown") {
-    //     const t: "multidropdown" = props.type;
-    //     const arr: string[] = props.current_value;
-    //     const func: GuiSpec<"multidropdown">['func'] = props.func;
-    // } else {
-    //     const t: "dropdown" = props.type;
-    //     //@ts-expect-error
-    //     const arr: string = v;
-    //     const arr2: string = props.current_value;
-    //     if (props.func) {
-    //         const func: (v: string) => void = props.func;
-    //     }
-    // }
     const isVArray = isArray(v);
     const allValid = isVArray ? v.every(validVal) : validVal(v);
     const okValue = allValid ? v : isVArray ? v.filter(validVal) : null;
     //map from 'value' string to option object
     const okOption = (isArray(okValue)
         ? okValue.map((v) => options.find((o) => o.value === v))
-        : [options.find((o) => o.value === v)])
+        : [options.find((o) => o.value === v)]).filter(notEmpty);
     // : options.find((o) => o.value === v); //not-multiple...
 
     return {options, single, label, val, okOption};
 }
 function isMultidropdown(props: DropdownSpec): props is GuiSpec<"multidropdown"> {
     const multi = props.type === "multidropdown";
-    if (multi !== isArray(props.current_value)) throw "current_value should be an array if (and only if) type is multidropdown";
+    if (multi !== isArray(props.current_value)) throw new Error("current_value should be an array if (and only if) type is multidropdown");
     return multi;
 }
 function inferDropdownType<T extends "dropdown" | "multidropdown">(props: GuiSpec<T>): GuiSpec<T> {
@@ -232,7 +237,7 @@ function getCurrentValue(props: DropdownSpec) {
     const multi = isMultidropdown(props);
     if (multi) return props.current_value; //ts correctly infers this is an array
     // return props.current_value; //.. fails to infer this is a string
-    if (isArray(props.current_value)) throw "current_value should be an array if and only if type is multidropdown";
+    if (isArray(props.current_value)) throw new Error("current_value should be an array if and only if type is multidropdown");
     return props.current_value;
 }
 export const DropdownAutocompleteComponent = observer(({
@@ -243,7 +248,7 @@ export const DropdownAutocompleteComponent = observer(({
     // const props = inferDropdownType(propsAmbiguous);
     const multiple = isMultidropdown(props);
     // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
-    if (!props.values) throw "DropdownAutocompleteComponent requires props.values";
+    if (!props.values) throw new Error("DropdownAutocompleteComponent requires props.values");
     //todo handle multitext / tags properly.
 
     const {options, single, label, val, okOption} = useDropdownOptions(props);
@@ -267,13 +272,13 @@ export const DropdownAutocompleteComponent = observer(({
                     //added type annotation above because mobx seems to fluff the inference to `never`
                     if (value === null) return;
                     if (isArray(value)) {
-                        if (!multiple) throw "shouldn't get an array here";
+                        if (!multiple) throw new Error("shouldn't get an array here");
                         const vals = value.map(val);
                         props.current_value = vals;
                         props.func?.(vals);
                         return;
                     }
-                    if (multiple) throw "shouldn't get a single value here";
+                    if (multiple) throw new Error("shouldn't get a single value here");
                     const v = val(value);
                     props.current_value = v;
                     if (props.func) props.func(v);
@@ -426,8 +431,8 @@ const ButtonComponent = ({ props }: { props: GuiSpec<"button"> }) => (
         <Button
             variant="contained"
             onClick={() => {
-                //is there a nicer way to write this / define GuiValueTypes?
-                if (props.func) props.func(undefined as never);
+                //@ts-expect-error button `func(v: never)` - passing `undefined as never` works, is there a nicer way to write this / define GuiValueTypes?
+                if (props.func) props.func();
             }}
         >
             {props.label}
@@ -485,26 +490,10 @@ const Components: {
     multicolumn: ColumnSelectionSettingGui,
 } as const;
 
-const ErrorComponent = observer(({ props, label }: { props: any, label: string }) => {
-    const [expanded, setExpanded] = useState(true);
-    return (
-        <>
-        <Dialog open={expanded}
-            className="border-red-500 border-2 border-solid"
-            >
-            <h2>Settings Dialog Error...</h2>
-            <JsonView src={props} collapsed={1} />
-            <Button
-                onClick={() => setExpanded(!expanded)}
-                >ok</Button>
-        </Dialog>
-        <label className="text-red-500">Error in component:</label>
-        <label className="text-red-500">{label}</label>
-        </>
-    );
-});
-
 // how close is this to something we could use from AddChartDialog?
+/**
+ * A component for rendering a GUI setting.
+ */
 export const AbstractComponent = observer(
     ({ props }: { props: AnyGuiSpec | GuiSpec<GuiSpecType> }) => {
         // would like to lose this `as` cast - maybe a newer/future typescript might manage it better?
@@ -515,11 +504,27 @@ export const AbstractComponent = observer(
             //todo use zod to validate the props object
             console.error(`Unknown component type: '${props.type}'`);
             const errorObj = { props, error: `Unknown component type: ${props.type}` };
-            return <ErrorComponent props={errorObj} label={props.label} />;
+            return (
+                <div className="col-span-3 w-full"> 
+                    <ErrorComponentReactWrapper title={errorObj.error} error={{message: errorObj.error}} extraMetaData={errorObj.props} />
+                </div>
+            );
         }
         return (
-            <div className="grid grid-cols-2 p-1 justify-items-start">
-                <ErrorBoundary fallback={<ErrorComponent props={props} label={props.label} />}>
+            <div className="grid p-2 pr-4 justify-items-start" style={{ gridTemplateColumns: "1fr 2fr" }}>
+                <ErrorBoundary
+                    FallbackComponent={({error}) =>
+                        (
+                        <div className="col-span-3 w-full"> 
+                            <ErrorComponentReactWrapper 
+                                error={{message: error.message, stack: error.stack}} 
+                                extraMetaData={props} 
+                                title={`Error displaying '${props.label}'. Click to view details`}
+                            />
+                        </div>
+                        )
+                    }
+                >
                     <Component props={props} />
                 </ErrorBoundary>
             </div>
@@ -527,7 +532,7 @@ export const AbstractComponent = observer(
     },
 );
 
-export default observer(<T,>({ chart }: { chart: BaseChart<T> }) => {
+export default observer(<T extends BaseConfig,>({ chart }: { chart: BaseChart<T> }) => {
     const settings = useMemo(() => {
         // is the id just for a key in this component, or should the type passed to the component recognise it?
         // for now, I don't think there's a benefit to including it in the type.

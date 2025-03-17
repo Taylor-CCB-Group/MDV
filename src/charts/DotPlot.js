@@ -5,6 +5,7 @@ import SVGChart from "./SVGChart.js";
 import { scaleSqrt } from "d3-scale";
 import { schemeReds } from "d3";
 import { getColorLegendCustom } from "../utilities/Color.js";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class DotPlot extends SVGChart {
     constructor(dataStore, div, config) {
@@ -14,9 +15,16 @@ class DotPlot extends SVGChart {
             y: { type: "band" },
             ry: {},
         });
-        const p = this.config.param;
-        const yLabels = [];
-        const c = this.config;
+        //! this.config is not the object that was passed in, it's been processed by super()
+        const c = this.config; 
+        
+        this.addToolTip();
+        this.dim = this.dataStore.getDimension("catcol_dimension");
+        this.colorScheme = schemeReds[8];
+        console.log('setting fields for dot plot', c.param.slice(1));
+        //this works ok because the method is decorated... which I think means if there's a query object,
+        //`setFields` won't actually be called until the link is properly initialised
+        this.setFields(c.param.slice(1));
         //work out color scales
         c.color_scale = c.color_scale || { log: false };
         if (!c.color_legend) {
@@ -25,15 +33,29 @@ class DotPlot extends SVGChart {
         if (!c.fraction_legend) {
             c.fraction_legend = { display: true };
         }
-        this.fractionScale = scaleSqrt().domain([0, 100]);
-        for (let x = 1; x < p.length; x++) {
-            yLabels.push(this.dataStore.getColumnName(p[x]));
-        }
+        //this.fractionScale = scaleSqrt().domain([0, 100]);
+    }
+    
+    // removing this decorator as it muddies the waters with setParams.
+    // - both methods having the annotation didn't particularly cause an issue..
+    //   as long as we had the workaround in `setParams()` to manually look for activeQuery
+    //   but that was itself a hack.
+    // @loadColumnData
+    setFields(fieldNames) {
+        //! we don't want to mutate the config object... 
+        // we want to have a special value which signifies that it should use this behaviour.
+        // then when we save state, it will have the appropriate value.
+        //this.config.param = [p0, ...fieldNames]; //first is the category column
+        this.fieldNames = fieldNames;
+        // await cm.loadColumnSetAsync(fieldNames, this.dataStore.name);
+        const yLabels = fieldNames.map(f => this.dataStore.getColumnName(f));
         this.x_scale.domain(yLabels);
-        this.dim = this.dataStore.getDimension("catcol_dimension");
-        this.addToolTip();
         this.onDataFiltered();
-        this.colorScheme = schemeReds[8];
+    }
+    @loadColumnData
+    setParams(params) {
+        this.config.param = params;
+        this.setFields(params.slice(1));
     }
 
     remove(notify = true) {
@@ -48,7 +70,7 @@ class DotPlot extends SVGChart {
     }
 
     setColorFunction() {
-        const p = this.config.param;
+        const f = this.fieldNames[0];
         const mm = this.data.mean_range;
         const conf = {
             useValue: true,
@@ -59,7 +81,7 @@ class DotPlot extends SVGChart {
                 min: mm[0],
             },
         };
-        this.colorFunction = this.dataStore.getColorFunction(p[1], conf);
+        this.colorFunction = this.dataStore.getColorFunction(f, conf);
         this.setColorLegend();
     }
 
@@ -75,7 +97,7 @@ class DotPlot extends SVGChart {
             },
             name: "Mean Expression",
         };
-        return this.dataStore.getColorLegend(this.config.param[1], conf);
+        return this.dataStore.getColorLegend(this.fieldNames[0], conf);
     }
 
     showFractionLegend() {
@@ -107,6 +129,18 @@ class DotPlot extends SVGChart {
         }
         return config;
     }
+    normaliseFractionScale() {
+        const { data } = this.data;
+        const getMaxFrac = () => {
+            let maxFraction = 0;
+            for (const d of data) {
+                const f = d.values.map(x => x.frac);
+                maxFraction = Math.max(maxFraction, ...f);
+            }
+            return maxFraction;
+        }
+        this.fractionScale = scaleSqrt().domain([0, getMaxFrac()]);
+    }
 
     onDataFiltered(dim) {
         //no need to change anything
@@ -122,15 +156,16 @@ class DotPlot extends SVGChart {
             method: "averages_simple",
             threshold: this.config.threshold_value,
         };
-
+        const p = [this.config.param[0], ...this.fieldNames];
         this.dim.getAverages(
             (data) => {
                 this.data = data;
-
+                //perhaps normalise should be optional
+                this.normaliseFractionScale();
                 this.setColorFunction();
                 this.drawChart();
             },
-            this.config.param,
+            p,
             config,
         );
     }
@@ -150,7 +185,7 @@ class DotPlot extends SVGChart {
             .duration(tTime)
             .ease(easeLinear);
         const dim = this._getContentDimensions();
-        const cWidth = dim.width / (this.config.param.length - 1);
+        const cWidth = dim.width / (this.fieldNames.length);
         const fa = this.dim.filterMethod;
         this.setColorFunction();
         const vals = this.dataStore.getColumnValues(this.config.param[0]);
@@ -206,8 +241,9 @@ class DotPlot extends SVGChart {
                     .on("mouseover pointermove", (e, d) => {
                         // ['id', 'total', 'count', 'frac', 'mean', 'cat_id']
                         //const tip = { category: vals[d.cat_id], value: d.id, fraction: d.frac };
-                        this.showToolTip(e, `(<em>${d.id}, ${vals[d.cat_id]}</em>)<br>percentage: ${d.frac.toFixed(0)}%`);
-                        // this.showToolTip(e, `fraction: <em>${d.frac}</em>`);
+                        const category = this.dataStore.columnIndex[this.config.param[0]].name;
+                        const id = this.dataStore.columnIndex[d.id].name;
+                        this.showToolTip(e, `${d.id}<br />${category}: ${vals[d.cat_id]}<br>percentage: ${d.frac.toFixed(0)}%`);
                     })
                     .on("mouseout", () => {
                         this.hideToolTip();
@@ -228,7 +264,7 @@ class DotPlot extends SVGChart {
 
             .attr("cx", (d, i) => i * cWidth + 0.5 * cWidth)
             .attr("cy", cyPos)
-            .attr("r", (d) => this.fractionScale(d.frac))
+            .attr("r", (d) => this.fractionScale(d.frac)) // 
             .attr("fill", (d, i) => {
                 return this.colorFunction(d.mean);
             });
@@ -319,14 +355,16 @@ class DotPlot extends SVGChart {
 BaseChart.types["dot_plot"] = {
     name: "Dot Plot",
     class: DotPlot,
+    // methodsUsingColumns: ["setFields"], //no longer necessary, @loadColumnData decorator will handle this
     params: [
         {
             type: "text",
-            name: "Categories on x-axis",
+            name: "Categories on y-axis",
         },
         {
             type: "_multi_column:number",
-            name: "Fields on y axis",
+            name: "Fields on x axis",
+            //maybe we could have some information here about which method this corresponds to
         },
     ],
 };

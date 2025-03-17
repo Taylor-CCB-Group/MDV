@@ -2,6 +2,7 @@ import SVGChart from "./SVGChart.js";
 import { createEl } from "../utilities/Elements.js";
 import { hexToRGB } from "../datastore/DataStore.js";
 import "d3-transition";
+// import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class WGLChart extends SVGChart {
     constructor(dataStore, div, config, axisTypes) {
@@ -88,6 +89,7 @@ class WGLChart extends SVGChart {
         return colorFunc;
     }
 
+    // @loadColumnData
     setToolTipColumn(column) {
         this.config.tooltip.column = column;
     }
@@ -100,7 +102,9 @@ class WGLChart extends SVGChart {
         this.tooltip.style.display = "block";
         this.tooltip.style.left = `${x}px`;
         this.tooltip.style.top = `${y}px`;
-        this.tooltip.textContent = row[this.config.tooltip.column];
+        const c = this.config.tooltip.column;
+        const column = this.dataStore.columnIndex[c];
+        this.tooltip.textContent = `${column.name}: ${row[c]}`;
     }
 
     getSetupConfig() {
@@ -161,6 +165,7 @@ class WGLChart extends SVGChart {
         this.app.refresh();
     }
 
+    // @loadColumnData
     colorByColumn(column) {
         this.config.color_by = column;
         const colorFunc = this.getColorFunction(column, true);
@@ -285,11 +290,14 @@ class WGLChart extends SVGChart {
                 },
             },
             {
-                type: "dropdown",
+                type: "column",
                 label: "Tooltip value",
                 current_value: c.tooltip.column || cols[0].field,
-                values: [cols, "name", "field"],
+                // values: [cols, "name", "field"],
                 func: (x) => {
+                    // checkbox won't update as a result of this...
+                    //todo consider how we have more state-full settings
+                    c.tooltip.show = true;
                     this.setToolTipColumn(x);
                 },
             },
