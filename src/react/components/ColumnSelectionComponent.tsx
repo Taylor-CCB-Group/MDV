@@ -6,7 +6,7 @@ import { observer } from "mobx-react-lite";
 import { Paper, useTheme } from "@mui/material";
 import { useRowsAsColumnsLinks } from "../chartLinkHooks.js";
 import type { CTypes, ColumnSelectionProps } from "@/lib/columnTypeHelpers.js";
-import { isMultiColumn, paramAcceptsNumeric } from "@/lib/columnTypeHelpers";
+import { paramAcceptsNumeric } from "@/lib/columnTypeHelpers";
 import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
 import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import ActiveLinkComponent from "./ActiveLinkComponent.js";
@@ -97,19 +97,11 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
 
 
     const iIsLinkCompatible = useIsLinkCompatible(props);
-    const linkProps = useRowsAsColumnsLinks();
-    const rowLinkProps = linkProps[0]; //todo: not our responsibility to select the link here, children should do that.
-    //! only show extra UI if there is a link and the thing we are setting is compatible with number values...
-    // - we need to check if the param is compatible with number values
-    
-
-    // also, active links don't make much sense if the corresponding datasource isn't visible in the view 
-    // - but we might change how views work so we don't have the separate panes...
     if (!iIsLinkCompatible) return <ColumnDropdownComponent {...props} />;
 
     return (
         <>
-            {rowLinkProps ? (
+            {iIsLinkCompatible ? (
                 <Paper className="mx-auto w-full" variant="outlined" sx={{ backgroundColor: "transparent" }}>
                     <div className="w-full flex justify-around text-xs font-light">
                         <TabHeader activeMode={activeMode} activeTab={activeTab} setActiveTab={setActiveTab} tabName="column" />
@@ -122,11 +114,10 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
                                 <ColumnDropdownComponent {...props} />
                             )}
                             {activeTab === "link" && (
-                                <div><LinkToColumnComponent {...rowLinkProps} {...props} /></div>
-
+                                <LinkToColumnComponent {...props} />
                             )}
                             {activeTab === "active link" && (
-                                <div><ActiveLinkComponent {...rowLinkProps} {...props} /></div>
+                                <ActiveLinkComponent {...props} />
                             )}
                         </div>
                     </ErrorBoundary>

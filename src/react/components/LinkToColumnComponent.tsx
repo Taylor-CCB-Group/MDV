@@ -1,12 +1,12 @@
-import type { CTypes } from "@/lib/columnTypeHelpers";
+import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { observer } from "mobx-react-lite";
-import type { RowsAsColsProps } from "./LinksComponent";
 import type { DropdownMappedValues, GuiSpec } from "@/charts/charts";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { action, makeAutoObservable, observe, runInAction } from "mobx";
+import { action, makeAutoObservable, observe } from "mobx";
 import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import { g, isArray } from "@/lib/utils";
 import { getFieldName } from "@/links/link_utils";
+import { useRowsAsColumnsLinks } from "../chartLinkHooks";
 /**
  * A hook for managing the state of manually chosen columns from a rows-as-columns link.
  * 
@@ -16,8 +16,8 @@ import { getFieldName } from "@/links/link_utils";
  * 
  * In the end... just bundling everything about state management for this component into a hook, returning a spec.
  */
-function useLinkSpec<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) {
-    const { linkedDs, link } = props;
+function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) {
+    const { linkedDs, link } = useRowsAsColumnsLinks()[0];
     const { name_column, name, subgroups } = link;
     const targetColumn = linkedDs.dataStore.columnIndex[name_column];
     if (!targetColumn) {
@@ -143,7 +143,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: RowsAsColsProps
  * `subgroup|value (subgroup)|index`, where `subgroup` is the name of the user-selected subgroup, `value (subgroup)` is a human-readable
  * representation of the value, and `index` is the index of the value in the column.
  */
-const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(props: RowsAsColsProps<T, M>) => {
+const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
     // is all of the complexity being in the hook really making this component simpler?
     // at least it feels simple if you ignore everything in the hook...
     const spec = useLinkSpec(props);
