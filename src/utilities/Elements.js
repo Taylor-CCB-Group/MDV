@@ -242,47 +242,112 @@ function makeResizable(el, config = {}) {
     //workaround for Safari bug #50
     //https://codepen.io/jkasun/pen/QrLjXP
     //(actually, mostly copilot filling in very similar code...)
-    const bottomRight = createEl(
-        "div",
-        {
-            classes: ["resizer-both"],
-        },
-        el,
-    );
-    bottomRight.addEventListener("mousedown", initDrag, false);
+
+    // List of all the resizers based on directions and corresponding css classes
+    const directions = [
+        // The top resizers are messing with title bar buttons causing bad UX, commenting for now
+        // { dir: "n", className: "resizer-n" },
+        { dir: "s", className: "resizer-s" },
+        { dir: "e", className: "resizer-e" },
+        { dir: "w", className: "resizer-w" },
+        // { dir: "ne", className: "resizer-ne" },
+        // { dir: "nw", className: "resizer-nw" },
+        { dir: "se", className: "resizer-se" },
+        { dir: "sw", className: "resizer-sw" },
+    ];
+
+    const resizeEls = directions.map(({ className }) => {
+        const resizeEl = createEl(
+            "div",
+            {
+                classes: [className],
+            },
+            el,
+        );
+        resizeEl.addEventListener("mousedown", initDrag, false);
+        return resizeEl;
+    });
+
+    ri.removeChildren = () => {
+        resizeEls.forEach((el) => {
+            el.remove();
+        });
+    }
     function initDrag(e) {
-        ri.startX = e.clientX;
-        ri.startY = e.clientY;
-        ri.startWidth = Number.parseInt(
-            document.defaultView.getComputedStyle(el).width,
-            10,
+        e.preventDefault();
+        if (config.onResizeStart) config.onResizeStart();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startWidth = el.offsetWidth;
+        const startHeight = el.offsetHeight;
+        const startLeft = el.offsetLeft;
+        const startTop = el.offsetTop;
+
+        // Determine the direction from the target's class list
+        const target = e.target;
+        const directionObj = directions.find(({ className }) =>
+            target.classList.contains(className),
         );
-        ri.startHeight = Number.parseInt(
-            document.defaultView.getComputedStyle(el).height,
-            10,
-        );
+        const dir = directionObj ? directionObj.dir : "";
+
+        function doDrag(e) {
+            // Change in coordinates
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            let newWidth = startWidth;
+            let newHeight = startHeight;
+            let newLeft = startLeft;
+            let newTop = startTop;
+
+            if (dir.includes("e")) {
+                newWidth = startWidth + dx;
+            }
+            if (dir.includes("w")) {
+                newWidth = startWidth - dx;
+                newLeft = startLeft + dx;
+            }
+            if (dir.includes("s")) {
+                newHeight = startHeight + dy;
+            }
+            if (dir.includes("n")) {
+                newHeight = startHeight - dy;
+                newTop = startTop + dy;
+            }
+            el.style.width = `${newWidth}px`;
+            el.style.height = `${newHeight}px`;
+            el.style.left = `${newLeft}px`;
+            el.style.top = `${newTop}px`;
+        }
+
+        // Cleanup
+        function stopDrag() {
+            el.__doc__.documentElement.removeEventListener(
+                "mousemove",
+                doDrag,
+                false,
+            );
+            el.__doc__.documentElement.removeEventListener(
+                "mouseup",
+                stopDrag,
+                false,
+            );
+            if (config.onresizeend) {
+                config.onresizeend(
+                    el.offsetWidth,
+                    el.offsetHeight,
+                    el.offsetLeft,
+                    el.offsetTop,
+                );
+            }
+        }
+
         el.__doc__.documentElement.addEventListener("mousemove", doDrag, false);
         el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
     }
-    function doDrag(e) {
-        el.style.width = `${ri.startWidth + e.clientX - ri.startX}px`;
-        el.style.height = `${ri.startHeight + e.clientY - ri.startY}px`;
-    }
-    function stopDrag(e) {
-        el.__doc__.documentElement.removeEventListener(
-            "mousemove",
-            doDrag,
-            false,
-        );
-        el.__doc__.documentElement.removeEventListener(
-            "mouseup",
-            stopDrag,
-            false,
-        );
-    }
+
     el.__resizeinfo__ = ri;
 }
-
 function removeResizable(el) {
     if (!el.__resizeinfo__) {
         return;
@@ -293,6 +358,7 @@ function removeResizable(el) {
     if (ri.onresize) {
         el.removeEventListener("mouseup", ri.onresize);
     }
+    ri.removeChildren?.();
     el.__resizeinfo__ = undefined;
 }
 
@@ -371,6 +437,12 @@ function makeDraggable(el, config = {}) {
     function dragMouseDown(e) {
         e = e || window.event;
         e.preventDefault();
+
+        //! current fix for the dropdown issue while dragging, check for any side effects
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+
         // get the mouse cursor position at startup:
         pos3 = e.clientX;
         pos4 = e.clientY;

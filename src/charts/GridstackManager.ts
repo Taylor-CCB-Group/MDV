@@ -53,6 +53,9 @@ export default class GridStackManager {
                     handle: this.dragHandle,
                     float: true,
                     oneColumnSize: 400,
+                    resizable: {
+                        handles: "e,se,s,sw,w",
+                    }
                     // these options not working as expected...
                     // margin: 10
                     // column
