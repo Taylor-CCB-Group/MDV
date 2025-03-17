@@ -18,7 +18,7 @@ import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from 
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
 import { columnMatchesType, isMultiColumn } from "@/lib/columnTypeHelpers";
 import type { Param } from "@/lib/columnTypeHelpers.js";
-import { isArray } from "@/lib/utils.js";
+import { g, isArray } from "@/lib/utils.js";
 import { serialiseConfig } from "../chartConfigUtils.js";
 import "react18-json-view/src/style.css";
 // If dark mode is needed, import `dark.css`.
@@ -33,9 +33,7 @@ import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWr
 // we're not validating data coming in, we're just using it to define the shape of the data 
 // - the whole schema-isation is really a separate concern that I very much want to have - but in the right place/time
 // we don't want a schema for the live version of the object, only for the serialised version
-const RowsAsColsQuerySchema = z.object({
-
-});
+// const RowsAsColsQuerySchema = z.object({});
 
 const ParamzSchema = z.optional(z.array(z.union([z.string(), z.array(z.string())])));
 type Paramz = z.infer<typeof ParamzSchema>;
@@ -52,16 +50,6 @@ const ChartConfigSchema = z.object({
 });
 type ChartConfig = z.infer<typeof ChartConfigSchema>;
 
-// may want something like this... or to obviate the need for it, ideally.
-function actionWithUpdate<T extends any[]>(
-    config: ChartConfig,
-    fn: (...args: T) => void
-): (...args: T) => void {
-    return action((...args: T): void => {
-        fn(...args);
-        config._updated = new Date();
-    });
-}
 
 function flattenParams(param: Paramz) {
     if (!param) return []; //would quite like it to remain undefined
@@ -134,14 +122,13 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
  * adapted so we can use SettingsDialogComponent widgets
  * When the returned GuiSpec is updated, the property of config corresponding to the control is updated
 */
-function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T>, onChange: (v: GuiValueTypes[T]) => void): GuiSpec<T> {
+function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T>, onChange: (v?: GuiValueTypes[T]) => void): GuiSpec<T> {
     const draftSpec = {
         type: control.type,
         label: control.label,
         current_value: control.defaultVal,
         // values: control.values,
-    //@ts-expect-error controlToGuiSpec WIP
-    } satisfies GuiSpec<T>;
+    } satisfies Partial<GuiSpec<T>>;
     if (draftSpec.type === "dropdown" || draftSpec.type === "multidropdown") {
         // we run into this irritating logic with format that dropdown values can come in
         // >the props.values may be a tuple of [valueObjectArray, textKey, valueKey],
@@ -165,10 +152,9 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
     // if (!spec.current_value) throw new Error(`current_value should be set - no default in '${JSON.stringify(control)}'`);
     // strict typescript warns us about spec.current_value being potentially undefined, and it's dead right.
     // IMO much of the faffing around I'm doing getting this all to work could be avoided with better types.
-    //@ts-expect-error controlToGuiSpec WIP
     reaction(() => spec.current_value, onChange);
     //@ts-expect-error controlToGuiSpec WIP
-    return spec;
+    return g(spec);
 }
 function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<T>, config: ChartConfig): GuiSpec<T> {
     const spec = useMemo(() => {
@@ -202,7 +188,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 // nb `t.required.every(r => r in dataStore)` seems like it should work,
                 // but since we're in glorious JS land, we have things like `dataStore['interactions'] = undefined`
                 // which means that `'interactions' in dataStore` is true, but `!!dataStore['interactions']` is false.
-                //@ts-ignore for the moment
+                //@ts-ignore DataStore string index on things 'required' for chart types
                 return t.required.every(r => !!dataStore[r]);
             }
             return true;
@@ -211,7 +197,6 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     const paramColumns = useMemo(
-        //@ts- expect-error - this isn't final, we need to handle MultiColumnQuery
         () => config.param ? flattenParams(config.param)?.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
     [config.param, dataStore]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
