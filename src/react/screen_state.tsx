@@ -51,9 +51,10 @@ export function useEmotionCache(container: HTMLElement) {
  */
 export const OuterContainerProvider = observer(
     ({ children, parent }: { children: JSX.Element; parent?: BaseChart<any> | BaseDialog }) => {
-        const cache = useEmotionCache(parent?.observable?.container || document.body);
+        const container = parent?.observable?.container || document.body;
+        const cache = useEmotionCache(container);
         return (
-            <OuterContainerContext.Provider value={parent?.observable?.container || document.body}>
+            <OuterContainerContext.Provider value={container}>
                 <CacheProvider value={cache}>
                     {children}
                 </CacheProvider>
