@@ -155,9 +155,9 @@ const Dashboard: React.FC = () => {
                         color="inherit"
                     >
                         {mode === "dark" ? (
-                            <Brightness7Icon />
-                        ) : (
                             <Brightness4Icon />
+                        ) : (
+                            <Brightness7Icon />
                         )}
                     </IconButton>
                 </Toolbar>
