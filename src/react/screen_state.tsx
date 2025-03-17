@@ -14,16 +14,32 @@ import { CacheProvider } from "@emotion/react";
 export type OuterContainerObservable = { container: HTMLElement };
 const OuterContainerContext = createContext<HTMLElement>(null as any);
 
+let idCounter = 0;
+
+function numberToAlpha(n: number): string {
+    let result = "";
+    while (n > 0) {
+      const remainder = (n - 1) % 26;
+      result = String.fromCharCode(97 + remainder) + result;
+      n = Math.floor((n - 1) / 26);
+    }
+    return result;
+}
+
+// unique key generator
+export function generateCacheKey() {
+  idCounter++;
+  return `mui-${numberToAlpha(idCounter)}`;
+}
+
 // Cache map for storing EmotionCache for separate windows
 const cacheMap = new Map<HTMLElement, EmotionCache>();
-
-const id = useId();
 
 // Getting or creating EmotionCache for storing cache using CacheProvider
 export function emotionCache(container: HTMLElement) {
   let cache = cacheMap.get(container);
   if (!cache) {
-    cache = createCache({ key: `mui-${id}`, container });
+    cache = createCache({ key: generateCacheKey(), container });
     cacheMap.set(container, cache);
   }
   return cache;
