@@ -5,6 +5,7 @@ import SVGChart from "./SVGChart.js";
 import { scaleLinear } from "d3-scale";
 import { getHierarchicalNodes } from "../utilities/clustering.js";
 import { axisLeft } from "d3";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class HeatMap extends SVGChart {
     constructor(dataStore, div, config) {
@@ -16,9 +17,13 @@ class HeatMap extends SVGChart {
         });
 
         const p = this.config.param;
+        //! we used this.fieldNames instead of `param[1, ...]` 
+        // to avoid mutating config - which is observable - in setFields - which may be in an action
+        // also note that a lot of this was actually because of the way active links worked during development
+        // this is less needed now (although we still have the reaction -> mutation issue)
+        this.fieldNames = p.slice(1);
         const vals = this.dataStore.getColumnValues(p[0]);
         this.x_scale.domain(vals.slice(0));
-        const yLabels = [];
         const c = this.config;
         c.method = c.method || "mean";
         //work out color scales
@@ -27,19 +32,31 @@ class HeatMap extends SVGChart {
             c.color_legend = { display: true };
         }
         this.setColorFunction();
-
-        for (let x = 1; x < p.length; x++) {
-            yLabels.push(this.dataStore.getColumnName(p[x]));
-        }
         this.cat_scale = scaleLinear().range([0, 40]);
         this.cat_axis_svg = this.svg.append("g");
         this.cat_axis_call = axisLeft(this.cat_scale).ticks(3);
-        this.y_scale.domain(yLabels);
         this.dim = this.dataStore.getDimension("catcol_dimension");
         if (c.cluster_rows) {
             this.margins.right = 70;
         }
         this.addToolTip();
+        this.setFields(p.slice(1));
+    }
+    @loadColumnData
+    setParams(params) {
+        this.config.param = params;
+        this.setFields(params.slice(1));
+        this.config.title = this.dataStore.getColumnName(params[0]);
+        this.x_scale.domain(this.dataStore.getColumnValues(params[0]));
+        this.setColorFunction();
+        this.onDataFiltered();
+    }
+    // @loadColumnData
+    setFields(p) {
+        this.fieldNames = p;
+        const yLabels = this.fieldNames.map(f => this.dataStore.getColumnName(f));
+        this.y_scale.domain(yLabels);
+        // this.config.param = [this.config.param[0]].concat(p);
         this.onDataFiltered();
     }
 
@@ -130,7 +147,8 @@ class HeatMap extends SVGChart {
             this.resetButton.style.display = "none";
         }
         const config = { method: this.config.method, scaleVals: [] };
-        const p = this.config.param;
+        // const p = this.config.param;
+        const p = [this.config.param[0], ...this.fieldNames];
         const q =
             this.config.color_scale.trim === "none"
                 ? null
@@ -154,7 +172,7 @@ class HeatMap extends SVGChart {
                     console.error("Error drawing heatmap:", e);
                 }
             },
-            this.config.param,
+            p,
             config,
         );
     }
@@ -166,14 +184,13 @@ class HeatMap extends SVGChart {
             this.margins.right = 70;
             this.y_scale.domain(
                 this.rowClusterNodes.order.map((x) =>
-                    this.dataStore.getColumnName(this.config.param[x + 1]),
+                    this.dataStore.getColumnName(this.fieldNames[x]),
                 ),
             );
         } else {
             this.rowClusterNodes = undefined;
             this.y_scale.domain(
-                this.config.param
-                    .slice(1)
+                this.fieldNames
                     .map((x) => this.dataStore.getColumnName(x)),
             );
             this.margins.right = 10;
@@ -220,7 +237,7 @@ class HeatMap extends SVGChart {
             this.data.catTotals[x._id],
             x._id,
         ]);
-        const recHeight = dim.height / (this.config.param.length - 1);
+        const recHeight = dim.height / (this.fieldNames.length);
         this.graph_area
             .selectAll(".heatmap-row")
             .data(this.data.averages)
@@ -246,7 +263,7 @@ class HeatMap extends SVGChart {
             .attr("height", recHeight)
             .attr("width", recWidth)
             .on("click", (e, d) => {
-                const row = this.config.param[d.row_id + 1];
+                const row = this.fieldNames[d.row_id];
                 this._callListeners("cell_clicked", {
                     row: row,
                     col: vals[d.col_id],
@@ -255,7 +272,7 @@ class HeatMap extends SVGChart {
             })
             .on("mouseover pointermove", (e, d) => {
                 const row =
-                    this.dataStore.columnIndex[this.config.param[d.row_id + 1]]
+                    this.dataStore.columnIndex[this.fieldNames[d.row_id]]
                         .name;
 
                 this.showToolTip(
@@ -321,7 +338,7 @@ class HeatMap extends SVGChart {
         if (this.rowClusterNodes) {
             this.drawYTree(
                 this.rowClusterNodes.nodes,
-                this.config.param.length - 1,
+                this.fieldNames.length,
             );
         }
         if (this.columnClusterNodes) {
@@ -423,6 +440,7 @@ class HeatMap extends SVGChart {
 BaseChart.types["heat_map"] = {
     name: "Heat Map",
     class: HeatMap,
+    // methodsUsingColumns: ["setFields"],
     params: [
         {
             type: "text",

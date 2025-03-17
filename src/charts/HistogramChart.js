@@ -3,13 +3,15 @@ import { easeLinear } from "d3-ease";
 import SVGChart from "./SVGChart.js";
 import BaseChart from "./BaseChart";
 import { brushX } from "d3-brush";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class HistogramChart extends SVGChart {
     constructor(dataStore, div, config) {
-        if (Array.isArray(config.param)) {
-            config.param = config.param[0];
+        if (!Array.isArray(config.param)) {
+            config.param = [config.param];
         }
-        const pname = dataStore.getColumnName(config.param);
+        const param = config.param[0];
+        const pname = dataStore.getColumnName(param);
         if (!config.axis) {
             config.axis = {
                 x: { size: 30, label: pname, textsize: 13 },
@@ -24,7 +26,7 @@ class HistogramChart extends SVGChart {
         const c = this.config;
         c.type = "bar_chart";
 
-        const mm = this.dataStore.getMinMaxForColumn(config.param);
+        const mm = this.dataStore.getMinMaxForColumn(param);
         this._setConfigValue(c, "display_max", mm[1]);
         this._setConfigValue(c, "display_min", mm[0]);
         this._setConfigValue(c, "bin_number", 10);
@@ -46,6 +48,18 @@ class HistogramChart extends SVGChart {
         this.filter = null;
         this.binFiltered = new Array(this.config.bin_number).fill(false);
         this.onDataFiltered(null, true);
+    }
+    @loadColumnData
+    setParams(params) {
+        const param = params[0];
+        const pname = this.dataStore.getColumnName(param);
+        const oldTitle = this.config.title;
+        const oldPName = this.dataStore.getColumnName(this.config.param[0]);
+        this.config.title = oldTitle === oldPName ? pname : oldTitle;
+        this.config.axis.x.label = pname;
+        
+        this.config.param = params;        
+        this.onDataFiltered(); //the arguments! they do nothing!
     }
 
     _setBrushExtent() {
@@ -99,7 +113,7 @@ class HistogramChart extends SVGChart {
     setRange(start, end) {
         this.filter = [start, end];
         this._calculateFilterBins();
-        this.dim.filter("filterRange", [this.config.param], {
+        this.dim.filter("filterRange", this.config.param, {
             min: start,
             max: end,
         });
@@ -112,7 +126,7 @@ class HistogramChart extends SVGChart {
             return null;
         }
         const f = {};
-        f[this.config.param] = this.filter.slice(0);
+        f[this.config.param[0]] = this.filter.slice(0);
         return f;
     }
 
@@ -142,7 +156,7 @@ class HistogramChart extends SVGChart {
                 this.binData[bn - 1] += data[bn];
                 this.drawChart();
             },
-            this.config.param,
+            this.config.param[0],
             config,
         );
     }

@@ -4,8 +4,12 @@
 //   partly just using them as a form of documentation / notes-to-self.
 
 // todo rearrange - maybe have a datastore.d.ts etc
+import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
+/**
+ * The are the names used to refer to the types of data can be stored in a column.
+ */
 export type DataType =
     | "integer"
     | "double"
@@ -14,9 +18,20 @@ export type DataType =
     | "unique"
     | "multitext"
     | "int32";
+/**
+ * To denote cases where any categorical data can be used,
+ * this is the union of the {@link DataType}s that share related properties.
+ */
 export type CategoricalDataType = "text" | "text16" | "multitext";
+/**
+ * To denote cases where any numerical data can be used,
+ * this is the union of the {@link DataType}s that share related properties.
+ */
 export type NumberDataType = "integer" | "double" | "int32";
 
+/**
+ * Associates a {@link DataType} with the corresponding `TypedArray` type that will be used to store the data.
+ */
 type DataStructureTypes = {
     integer: Uint32Array;
     double: Float32Array; //why is it called 'double'???
@@ -26,6 +41,10 @@ type DataStructureTypes = {
     unique: Uint8Array; //raw bytes of strings to be decoded
     int32: Int32Array;
 };
+/**
+ * Union of all the possible data structures that can be used to store column data.
+ */
+export type ColumnData = DataStructureTypes[keyof DataStructureTypes];
 // even if they're just aliases, these could be useful for documentation / clarity
 export type ColumnName = string; //this will probably change to ColumnSpecifier with more structured data
 // ^^ I'd prefer that to having to reason about the string format everywhere
@@ -39,9 +58,11 @@ type Quantiles = {
 };
 type Colors = (string | number[])[];
 type SubgroupName = string;
-// wouldn't it be nice to have a type that determins that we know we have data?
+/**
+ * Represents a column of data in a {@link DataStore}.
+ */
 export type DataColumn<T extends DataType> = {
-    /** human-readable column */
+    /** human-readable column name, to be displayed in GUI etc */
     name: ColumnName; //nb - we should check use of 'name' vs 'field'
     /** id of the column, used internally */
     field: FieldName;
@@ -55,10 +76,11 @@ export type DataColumn<T extends DataType> = {
      */
     datatype: T;
     /** whether the column's data can be changed */
-    editable?: boolean,
+    editable?: boolean;
     /**In the case of a double/integer (number) column, the array
      * buffer should be the appropriate size to contain float32s. For text it should be Uint8
      * and contain numbers corresponding to the indexes in the values parameter. For a column of
+     * type unique it should be a JavaScript array. This parameter is optional as the data can
      * be added later see {@link DataStore#setColumnData}.
      * A {@link LoadedDataColumn<T>} can be used to represent a column that is known to have loaded data.
      */
@@ -88,7 +110,8 @@ export type DataColumn<T extends DataType> = {
     sgindex?: number;
     sgtype?: "dense" | "sparse"; //?? any other options?
 };
-export type LoadedDataColumn<T extends DataType> = DataColumn<T> & Required<Pick<DataColumn<T>, "data">>;
+export type LoadedDataColumn<T extends DataType> = DataColumn<T> &
+    Required<Pick<DataColumn<T>, "data">>;
 // function test(column: LoadedDataColumn<"text">) {
 //     column.data;
 //     column.values; //why does this degrade to 'any'?
@@ -106,10 +129,16 @@ export type LoadedDataColumn<T extends DataType> = DataColumn<T> & Required<Pick
 export type RowsAsColumnsLink = {
     name: string;
     name_column: FieldName;
-    subgroups: Record<string, { label: string, name: string, type: "dense" | string }>;
-}
+    subgroups: Record<
+        string,
+        { label: string; name: string; type: "dense" | string }
+    >;
+};
 
-export type DataSourceLinks = Record<DataSourceName, {rows_as_columns?: RowsAsColumnsLink}>;
+export type DataSourceLinks = Record<
+    DataSourceName,
+    { rows_as_columns?: RowsAsColumnsLink }
+>;
 
 export type DataSource = {
     name: DataSourceName;
@@ -120,13 +149,15 @@ export type DataSource = {
     images?: Record<string, any>;
     regions?: Record<string, any>;
     links?: DataSourceLinks;
+    size: number;
+    columns: DataColumn<DataType>[];
 };
 
 type DropdownMappedValue<T extends string, V extends string> = {
     [P in T]: string;
 } & { [P in V]: string };
 /** tuple of `[{textKey: string, valueKey: string}[], textKey, valueKey]` where `textKey` and `valueKey` are string properties of the object. */
-type DropdownMappedValues<TextKey extends string, ValueKey extends string> = [
+export type DropdownMappedValues<TextKey extends string, ValueKey extends string> = [
     Array<DropdownMappedValue<TextKey, ValueKey>>,
     TextKey,
     ValueKey,
@@ -156,24 +187,17 @@ export type GuiValueTypes = {
     // when you are choosing a column, you need to be able to specify
     // - the type of column you can accept
     // - whether you can accept multiple
-    // The type you get back ColumnName is going to change into ColumnSpecifier to allow for more complex column references
+    // The type you get back FieldName is going to change into ColumnSpecifier to allow for more complex column references
     // (for now we continue to parse things in a format as in LinkDataDialog)
     // (and we have several keys for different types of column references)
     // There should also be a general way of expressing that a property (like radius) can be set to a
     // number or a column (with modifiers) - this is where the node editor comes in...
-    column: FieldName;
-    multicolumn: FieldName[]; //easier to have distinct 'multicolumn' type than overly generic 'column'?
+    column: FieldSpec;
+    multicolumn: FieldSpecs; //easier to have distinct 'multicolumn' type than overly generic 'column'?
 };
 export type GuiSpecType = keyof GuiValueTypes;
-export type ColumnSelectionParameters = {
-    filter?: DataType[];
-    multiple?: boolean;
-    exclude?: string[];
-}
-// type GuiFunc<T extends GuiSpecType, V = GuiValueTypes<T>, F = (v: V) => void> = F;//T extends "folder" ? never : (v: V) => void;
-// export type GuiSpec<T extends GuiSpecType, V = GuiValueTypes<T>, F = GuiFunc<T>> = {
 type GV<T extends GuiSpecType> = GuiValueTypes[T];
-type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => (void | Promise<void>);
+type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => void | Promise<void>;
 // type GuiSpecExperiment<T extends keyof GuiSpecType> = T extends infer K
 //     ? K extends keyof GuiValueTypes
 //         ? {
@@ -185,6 +209,20 @@ type GuiFunc<T extends GuiSpecType> = (v: GV<T>) => (void | Promise<void>);
 //         : never
 //     : never;
 
+/**
+ * This type describes an object that can be used to specify a GUI element in the settings dialog.
+ * The type parameter `T` is used to specify the type of the GUI element (such as `"slider"`, `"dropdown"` etc),
+ * from which we can infer `GV<T>` (`GuiValueType[T]`) used to specify the type of the `current_value` property of the object,
+ * as well as some other associated properties that might be expected.
+ * 
+ * For example, a `GuiSpec<"slider">` has `current_value: number`,
+ * in which case (because `GV<T> extends number`) we may also expect to have associated properties like `min` & `max`.
+ * The `GuiValueType["doubleslider"]` is `[number, number]`, which also means that there are `min` & `max` properties etc.
+ * For other types, `min` & `max` are not expected, so they are `never`.
+ * 
+ * There is a type-helper function `g({...})` that can be used when creating these objects, which can help with type inference,
+ * and allow for editor feedback to suggest properties etc.
+ */
 export type GuiSpec<T extends GuiSpecType> = {
     readonly type: T;
     label: string;
@@ -193,27 +231,74 @@ export type GuiSpec<T extends GuiSpecType> = {
     func?: GuiFunc<T>;
     //@ts-check !this is for review... it should *not* be optional, but if I make it non-optional then it demands values for 'never'...
     values?: T extends "dropdown" | "multidropdown" ? DropDownValues : never;
-    // choices is only used for radiobuttons, so we should infer if T is radiobuttons, otherwise never
+    /**
+     * Used by `"radiobuttons"` to specify the choices available.
+     * This is a tuple of `[string, string][]` where the first element of each tuple is the label to display,
+     * and the second element is the value to be used when the radio button is selected.
+     */
     choices?: T extends "radiobuttons" ? [string, string][] : never;
     //thouht we could make these non-optional and only have it insist for number types, but that's not happening for some reason
-    min?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
-    max?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
-    step?: GV<T> extends number ? number : GV<T> extends [number, number] ? number : never;
-    continuous?: GV<T> extends number ? boolean : GV<T> extends [number, number] ? boolean : never;
+    min?: GV<T> extends number
+        ? number
+        : GV<T> extends [number, number]
+          ? number
+          : never;
+    max?: GV<T> extends number
+        ? number
+        : GV<T> extends [number, number]
+          ? number
+          : never;
+    step?: GV<T> extends number
+        ? number
+        : GV<T> extends [number, number]
+          ? number
+          : never;
+    continuous?: GV<T> extends number
+        ? boolean
+        : GV<T> extends [number, number]
+          ? boolean
+          : never;
     defaultVal?: GV<T>;
-    columnSelection?: T extends "column" ? ColumnSelectionParameters : never;//what about multicolumn?
+    /**
+     * Expresses the type of column that can be selected in a column selection dialog.
+     * Can be in the form of {@link DataType} as in {@link DataColumn#datatype}, 
+     * or other form like `"_multi_column:number" | "number"`.
+     */
+    columnType?: T extends ("column" | "multicolumn") ? CTypes : never;
 };
 // export type GuiSpecs = Array<GuiSpec<GuiSpecType>>;
-// This creates a union of `GuiSpec<"folder"> | GuiSpec<"slider"> | ...`
-// rather than `GuiSpec<"folder" | "slider" | ...>` which can cause co/contra-variance issues (or something like that...)
+/**
+ * This creates a discriminated union of `GuiSpec<"folder"> | GuiSpec<"slider"> | ...`, which can be preferable to the more
+ * obvious seeming `GuiSpec<GuiSpecType>`, which evaluates to `GuiSpec<"folder" | "slider" | ...>` - causing
+ * some obscure co/contra-variance issues, often resulting in irritating and incomprehensible error messages.
+ * 
+ * For example, in the Settings Dialog, we have an array of settings - which could be any kind of gui spec - and
+ * we want to iterate over them and pass them to `AbstractComponent` - which will then render the appropriate
+ * component for each setting, while also inferring that the types are correct.
+ * 
+ * If we have `GuiSpec<GuiSpecType>` then we can't pass that to `AbstractComponent` because it will complain,
+ * with a lengthy error message that includes something like
+ * ```
+ * Type 'AnyGuiSpec' is not assignable to type 'GuiSpec<keyof GuiValueTypes>'.
+ *  Type 'GuiSpec<"text">' is not assignable to type 'GuiSpec<keyof GuiValueTypes>'.
+ *      Types of property 'func' are incompatible.
+ *      Type 'GuiFunc<"text"> | undefined' is not assignable to type 'GuiFunc<keyof GuiValueTypes> | undefined'.
+ *          Type 'GuiFunc<"text">' is not assignable to type 'GuiFunc<keyof GuiValueTypes>'.
+ *          Type 'keyof GuiValueTypes' is not assignable to type '"text"'.
+ *              Type '"dropdown"' is not assignable to type '"text"'.ts(2322)```
+ * which is not very helpful.
+ */
 export type AnyGuiSpec = {
     [T in GuiSpecType]: GuiSpec<T>;
 }[GuiSpecType];
 
-type GuiSpecs = Array<AnyGuiSpec>;
+export type GuiSpecs = Array<AnyGuiSpec>;
 // type TestFunc<T extends GuiSpecType> = GuiSpec<T>['func'];
 // const f: TestFunc<'multidropdown'> = (v) => { };
 // todo common interface for AddChartDialog & SettingsDialog - from an end-user perspective, not just types
+/**
+ * This represents widgets used by Add Chart dialog of charts with `extra_controls` specified.
+ */
 export type ExtraControl<T extends GuiSpecType> = {
     type: T;
     name: string;

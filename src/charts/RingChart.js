@@ -32,8 +32,8 @@ class RingChart extends CategoryChart {
         this.graph_area.attr("transform", `translate(${x},${y})`);
         this.arc.innerRadius(radius * 0.5).outerRadius(radius * 0.9);
         const fontSize = Math.floor(radius / 8);
-        const vals = this.dataStore.getColumnValues(this.config.param);
-        const colors = this.dataStore.getColumnColors(this.config.param);
+        const vals = this.dataStore.getColumnValues(this.config.param[0]);
+        const colors = this.dataStore.getColumnColors(this.config.param[0]);
 
         //only get categories with >1 count
         const data = this.pie(this.rowData.filter((x) => x[0] !== 0));

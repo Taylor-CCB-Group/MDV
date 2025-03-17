@@ -9,12 +9,13 @@ export type ErrorComponentType = {
         message: string,
         stack?: string
     },
+    title?: string,
     height?: number,
     width?: number,
     extraMetaData?: ErrorMetadata,
 };
 
-const ErrorComponent = ({error, extraMetaData}: ErrorComponentType) => {
+const ErrorComponent = ({error, extraMetaData, title}: ErrorComponentType) => {
     const [open, setOpen] = useState(false);
     const handleClose = () => setOpen(false);
     const handleOpen = () => setOpen(true);
@@ -62,7 +63,7 @@ const ErrorComponent = ({error, extraMetaData}: ErrorComponentType) => {
                             },
                         }}
                     >
-                        {error.message} (click to view details or submit a bug report)
+                        {title ? title : "ERROR: Click to view details"}
                     </Button>
                 </Alert>
                 <ReusableDialog
@@ -85,9 +86,9 @@ const ErrorComponent = ({error, extraMetaData}: ErrorComponentType) => {
 
 
 
-const ErrorComponentReactWrapper = ({error, height, width, extraMetaData}: ErrorComponentType) => {
+const ErrorComponentReactWrapper = ({error, height, width, extraMetaData, title}: ErrorComponentType) => {
     return (
-        <ErrorComponent error={error} height={height} width={width} extraMetaData={extraMetaData} />
+        <ErrorComponent error={error} height={height} width={width} extraMetaData={extraMetaData} title={title} />
     );
 };
 

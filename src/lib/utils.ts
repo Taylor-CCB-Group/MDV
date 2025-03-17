@@ -1,22 +1,12 @@
 import type { Param } from "@/charts/ChartTypes";
-import type { CategoricalDataType, DataColumn, DataType, GuiSpec, GuiSpecType, GuiValueTypes, NumberDataType } from "@/charts/charts";
+import type { CategoricalDataType, DataColumn, DataType, GuiSpec, GuiSpecType, GuiValueTypes, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
-export function columnMatchesType(column: DataColumn<DataType>, type?: Param | Param[]): boolean {
-    if (type === undefined) return true;
-    if (isArray(type)) return type.some(t => columnMatchesType(column, t));
-    if (type === "_multi_column:all") return true;
-    // this was allowing a "text" column to be selected for "number" without the '!!'?
-    // we should unit-test this function...
-    const isNumeric = !!column.datatype.match(/double|float|int/);
-    if (type === "_multi_column:number") return isNumeric;
-    if (type === "number" && isNumeric) return true;
-    return column.datatype === type;
-}
+// nb columnMatchesType has been moved to columnTypeHelpers.ts
 /**
  * Check whether given value is an array
  * Acts as a type-predicate, so can be used for narrowing the type of subsequent code.
@@ -26,6 +16,10 @@ export function isArray(v: unknown): v is any[] {
 }
 export function toArray<T>(v: T | T[]) {
     return isArray(v) ? v : [v];
+}
+//https://github.com/microsoft/TypeScript/issues/45097#issuecomment-882526325
+export function notEmpty<TValue>(value: TValue | null | undefined): value is TValue {
+    return value !== null && value !== undefined;
 }
 export type Entries<T> = {
     [K in keyof T]: [K, T[K]];
@@ -50,6 +44,14 @@ export function isDatatypeCategorical(t: DataType): t is CategoricalDataType {
  * 
  * As of now, this doesn't do anything at runtime - if we want to have some centralised processing of the GuiSpec objects,
  * we could consider adding that here, or may want to keep it separate.
+ * 
+ * Sometimes the error messages that it generates can be confusing - for example, if you specify
+ * a `current_value` for a `"multidropdown"` that is not a `string[]` (which as of this writing is specified
+ * as the legal data-type for `GuiSpec<"multidropdown">`), you may get an error message that
+ * includes something like
+ * ```
+ * '"multidropdown"' is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of constraint 'keyof GuiValueTypes'
+ * ```
  */
 export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
     return spec;

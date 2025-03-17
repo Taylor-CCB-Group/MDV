@@ -61,7 +61,7 @@ class SVGChart extends BaseChart {
             this.x_axis_label = this.x_axis_svg
                 .append("text")
                 .style("text-anchor", "middle")
-                .style("fill", "black")
+                .style("fill", "hsl(var(--foreground))")
                 .attr("alignment-baseline", "auto");
         }
 
@@ -74,7 +74,7 @@ class SVGChart extends BaseChart {
             this.y_axis_label = this.y_axis_svg
                 .append("text")
                 .attr("text-anchor", "middle")
-                .style("fill", "black")
+                .style("fill", "hsl(var(--foreground))")
                 .attr("alignment-baseline", "auto");
         }
         const rya = axisTypes["ry"];

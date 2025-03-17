@@ -17,7 +17,7 @@ const untyped = {
 const a: GuiSpec<'dropdown'> = {
     type: 'dropdown',
     label: 'label',
-    //@ts-expect-error
+    //@ts-expect-error there is no 'name' property - used to mistakenly think there was
     name: 'name',
     current_value: 'current_value',
     func: (v) => {},
@@ -71,7 +71,7 @@ const specArray: GuiSpecs = [
         }
     })
 ]
-
+const stringArray = ["a", "b"];
 specArray.concat([
     g({
         type: "check",
@@ -84,7 +84,8 @@ specArray.concat([
     g({
         type: "multidropdown",
         label: "label",
-        current_value: ["current_value"],
+        current_value: stringArray,
+        values: [stringArray],
         func(v) {
             this.current_value = v.slice();
         }

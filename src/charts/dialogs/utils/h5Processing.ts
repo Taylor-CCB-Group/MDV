@@ -12,7 +12,7 @@ type GroupName =
     | "varp";
 type H5DataType = number | string | boolean;
 type DatasetValue = H5DataType[] | TypedArray | null;
-type MatrixValue = number[][] | TypedArray | null;
+type MatrixValue = number[][] | TypedArray | Record<string, any> | null;
 
 type TypedArray =
     | Int8Array
@@ -197,6 +197,14 @@ const isCloseable = (entity: unknown): entity is H5Entity => {
     );
 };
 
+// Helper function to convert any value to a number
+const toNumber = (value: any): number => {
+    if (typeof value === "boolean") {
+      return value ? 1 : 0;
+    }
+    return Number(value);
+  };
+
 // Optimized helper function to handle different TypedArray conversions
 const convertTypedArrayToNumbers = (value: TypedArray): number[] => {
     const length = value.length;
@@ -309,7 +317,6 @@ const readMatrix = async (
         return matrix;
     }, "Failed to read matrix");
 };
-
 const readMatrixGroup = async (
     groupName: GroupName,
     h5File: hdf5.File,
@@ -348,11 +355,11 @@ const readMatrixGroup = async (
 
                 checkMemoryUsage(0.8);
 
-                const dataset = group.get(key);
-                if (!dataset || !(dataset instanceof hdf5.Dataset)) return;
+                const dataItem = group.get(key);
+                if (!dataItem) return;
 
-                if (isCloseable(dataset)) {
-                    entities.push(dataset);
+                if (isCloseable(dataItem)) {
+                    entities.push(dataItem);
                 }
 
                 const datasetTracker: ProgressTracker = {
@@ -361,11 +368,120 @@ const readMatrixGroup = async (
                     onProgress: tracker.onProgress,
                 };
 
-                result[key] = await readMatrix(
-                    dataset as unknown as H5Dataset,
-                    chunkSize,
-                    datasetTracker,
-                );
+                // Handle nested groups
+                if (dataItem instanceof hdf5.Group) {
+                    // Check if this is a UMAP-like structure (has '0' and '1' keys)
+                    const subKeys = Array.from(dataItem.keys());
+                    if (subKeys.includes("0") && subKeys.includes("1")) {
+                        const dim0 = dataItem.get("0");
+                        const dim1 = dataItem.get("1");
+
+                        if (
+                            dim0 instanceof hdf5.Dataset &&
+                            dim1 instanceof hdf5.Dataset
+                        ) {
+                            if (isCloseable(dim0)) entities.push(dim0);
+                            if (isCloseable(dim1)) entities.push(dim1);
+
+                            const values0 = await readDatasetChunked(
+                                dim0 as unknown as H5Dataset,
+                                chunkSize,
+                                datasetTracker,
+                            );
+
+                            const values1 = await readDatasetChunked(
+                                dim1 as unknown as H5Dataset,
+                                chunkSize,
+                                datasetTracker,
+                            );
+
+                            // Combine the coordinates into a matrix
+                            if (
+                                Array.isArray(values0) &&
+                                Array.isArray(values1)
+                            ) {
+                                const rows = values0.length;
+                                const matrix: number[][] = new Array(rows);
+
+                                for (let i = 0; i < rows; i++) {
+                                    matrix[i] = [
+                                      toNumber(values0[i]),
+                                      toNumber(values1[i])
+                                    ];
+                                  }
+
+                                result[key] = matrix;
+                            }
+                        }
+                    } else {
+                        // For other nested structures, flatten with compound keys
+                        await Promise.all(
+                            subKeys.map(async (subKey) => {
+                                if (
+                                    typeof subKey !== "string" ||
+                                    subKey === "_index"
+                                )
+                                    return;
+
+                                const subItem = dataItem.get(subKey);
+                                if (!subItem) return;
+
+                                if (isCloseable(subItem)) {
+                                    entities.push(subItem);
+                                }
+
+                                // Use a compound key format
+                                const compoundKey = `${key}_${subKey}`;
+
+                                if (subItem instanceof hdf5.Dataset) {
+                                    result[compoundKey] = await readMatrix(
+                                        subItem as unknown as H5Dataset,
+                                        chunkSize,
+                                        datasetTracker,
+                                    );
+                                } else if (subItem instanceof hdf5.Group) {
+                                    // For deeper nesting, handle one more level
+                                    const deepKeys = Array.from(subItem.keys());
+                                    await Promise.all(
+                                        deepKeys.map(async (deepKey) => {
+                                            if (typeof deepKey !== "string")
+                                                return;
+
+                                            const deepItem =
+                                                subItem.get(deepKey);
+                                            if (
+                                                !deepItem ||
+                                                !(
+                                                    deepItem instanceof
+                                                    hdf5.Dataset
+                                                )
+                                            )
+                                                return;
+
+                                            if (isCloseable(deepItem)) {
+                                                entities.push(deepItem);
+                                            }
+                                            const deepCompoundKey = `${compoundKey}_${deepKey}`;
+                                            result[deepCompoundKey] =
+                                                await readMatrix(
+                                                    deepItem as unknown as H5Dataset,
+                                                    chunkSize,
+                                                    datasetTracker,
+                                                );
+                                        }),
+                                    );
+                                }
+                            }),
+                        );
+                    }
+                } else if (dataItem instanceof hdf5.Dataset) {
+                    // Handle regular datasets
+                    result[key] = await readMatrix(
+                        dataItem as unknown as H5Dataset,
+                        chunkSize,
+                        datasetTracker,
+                    );
+                }
             }),
         );
 
@@ -693,5 +809,12 @@ const processH5File = async (
 };
 
 export { NonAnnDataError, CompressionError };
-export type { H5Metadata, MatrixValue, DatasetValue, ProcessOptions, H5DataType, TypedArray };
+export type {
+    H5Metadata,
+    MatrixValue,
+    DatasetValue,
+    ProcessOptions,
+    H5DataType,
+    TypedArray,
+};
 export default processH5File;
