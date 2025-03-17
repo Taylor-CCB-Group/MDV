@@ -1,8 +1,11 @@
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { observer } from "mobx-react-lite";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useId, useState } from "react";
 import type { createMdvPortal } from './react_utils';
+import createCache, { EmotionCache } from '@emotion/cache'
+import { CacheProvider } from "@emotion/react";
+
 /** All charts and dialogs have this as an `observable` property that can be passed to
  * {@link createMdvPortal} to allow access to the container they should render things like
  * which allows Mobx Observer components to {@link useOuterContainer} for access to the container they should render things like
@@ -10,6 +13,21 @@ import type { createMdvPortal } from './react_utils';
  */
 export type OuterContainerObservable = { container: HTMLElement };
 const OuterContainerContext = createContext<HTMLElement>(null as any);
+
+// Cache map for storing EmotionCache for separate windows
+const cacheMap = new Map<HTMLElement, EmotionCache>();
+
+const id = useId();
+
+// Getting or creating EmotionCache for storing cache using CacheProvider
+export function emotionCache(container: HTMLElement) {
+  let cache = cacheMap.get(container);
+  if (!cache) {
+    cache = createCache({ key: `mui-${id}`, container });
+    cacheMap.set(container, cache);
+  }
+  return cache;
+}
 /**
  * As of now we only ever use react to render charts & dialogs, and they should be mobx observable
  * in as much as any `changeBaseDocument()` or `setParent()` will cause this to update...
@@ -24,7 +42,9 @@ export const OuterContainerProvider = observer(
             <OuterContainerContext.Provider
                 value={parent?.observable?.container || document.body}
             >
+                <CacheProvider value={emotionCache(parent?.observable?.container || document.body)}>
                 {children}
+                </CacheProvider>
             </OuterContainerContext.Provider>
         );
     },
