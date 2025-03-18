@@ -467,14 +467,14 @@ function makeDraggable(el, config = {}) {
         pos3 = e.clientX;
         pos4 = e.clientY;
         // set the element's new position:
-        const nt = el.offsetTop - pos2;
-        const nl = el.offsetLeft - pos1;
+        let nt = el.offsetTop - pos2;
+        let nl = el.offsetLeft - pos1;
         if (cont) {
             if (
                 nt < 0 ||
                 (nt + cont.c_bb.height > cont.p_bb.height &&
                     cont.dir !== "topleft")
-            ) {
+                ) {
                 return;
             }
             if (
@@ -484,10 +484,27 @@ function makeDraggable(el, config = {}) {
             ) {
                 return;
             }
+        } else {
+            // Preventing the dialog to exceed beyond the window
+            
+            // Top and left
+            if (nt < 0) nt = 0;
+            if (nl < 0) nl = 0;
+
+            // Bottom and right
+            const dialogHeight = el.offsetHeight;
+            const windowHeight = el.__doc__.documentElement.clientHeight;
+            if (nt + dialogHeight > windowHeight) {
+                nt = windowHeight - dialogHeight;
+            }
+            const dialogWidth = el.offsetWidth;
+            const windowWidth = el.__doc__.documentElement.clientWidth;
+            if (nl + dialogWidth > windowWidth) {
+                nl = windowWidth - dialogWidth;
+            }
         }
-        if (!config.y_axis) {
-            el.style.top = `${nt}px`;
-        }
+        // Assigning the new top and left position (if changed)
+        el.style.top = `${nt}px`;
         el.style.left = `${nl}px`;
     }
 
