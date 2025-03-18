@@ -64,6 +64,13 @@ export default function popoutChart(chart: BaseChart<any>) {
         addStyleElement(styleElement as HTMLStyleElement | HTMLLinkElement);
     });
 
+    // Explicitly load font files for Firefox
+    if (navigator.userAgent.indexOf("Firefox") !== -1) {
+        const fontStyle = popoutWindow.document.createElement("style");
+        fontStyle.textContent = preloadFonts();
+        popoutWindow.document.head.appendChild(fontStyle);        
+    }
+
     // Observe the main window's head for new stylesheets and style elements
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
@@ -137,4 +144,34 @@ function pushSetStyles(chart: BaseChart<any>) {
         div.style.left = styles.left;
         chart.setSize();
     };
+}
+
+// Preload the font files for the Firefox browser for the icons to appear in popout window
+function preloadFonts() {
+        const preloadContent = `
+            @font-face {
+            font-family: 'Font Awesome 5 Free';
+            font-style: normal;
+            font-weight: 900;
+            font-display: block;
+            src: url(${window.location.origin}/src/css/webfonts/fa-solid-900.woff2) format('woff2');
+            }
+            
+            @font-face {
+            font-family: 'Font Awesome 5 Free';
+            font-style: normal;
+            font-weight: 400;
+            font-display: block;
+            src: url(${window.location.origin}/src/css/webfonts/fa-regular-400.woff2) format('woff2');
+            }
+            
+            @font-face {
+            font-family: 'Font Awesome 5 Brands';
+            font-style: normal;
+            font-weight: 400;
+            font-display: block;
+            src: url(${window.location.origin}/src/css/webfonts/fa-brands-400.woff2) format('woff2');
+            }
+        `;
+        return preloadContent;
 }
