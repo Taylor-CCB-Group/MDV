@@ -58,7 +58,6 @@ import { addChartLink } from "../links/link_utils";
 import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
-import { AddChartDialog } from "./dialogs/AddChartDialog";
 import { createMdvPortal } from "@/react/react_utils";
 import FilterComponentReactWrapper from "@/react/components/FilterComponentReactWrapper";
 import ViewManager from "./ViewManager";
@@ -66,6 +65,7 @@ import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWr
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import ToggleThemeWrapper from "./dialogs/ToggleTheme";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
+import AddChartDialogReact from "./dialogs/AddChartDialogReact";
 
 
 //order of column data in an array buffer
@@ -1596,10 +1596,11 @@ export class ChartManager {
                     position: "bottom-right",
                 },
                 func: () => {
-                    new AddChartDialog(ds, (config) =>
-                        this.addChart(ds.name, config, true),
-                    );
-                    if (import.meta.env.DEV) new BaseDialog.experiment["AddChartDialogReact"](dataStore);
+                    // new AddChartDialog(ds, (config) =>
+                    //     this.addChart(ds.name, config, true),
+                    // );
+                    // if (import.meta.env.DEV) new BaseDialog.experiment["AddChartDialogReact"](dataStore);
+                    new AddChartDialogReact(dataStore);
                 },
             },
             ds.menuBar,

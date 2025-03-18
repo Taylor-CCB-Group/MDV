@@ -61,7 +61,10 @@ function getActiveMode<T extends CTypes, M extends boolean>(props: ColumnSelecti
     const { current_value } = props;
     if (current_value) {
         if (props.multiple !== isArray(current_value)) {
-            throw new Error("Multiple type mismatch");
+            // throw new Error("Multiple type mismatch");
+            //oops... this happens (e.g. in AddChartDialog DotPlot)
+            //undefined value? should be allowed...
+            console.error("Multiple type mismatch");
         }
         const v = isArray(current_value) ? current_value[0] : current_value;
         if (typeof v === 'string') {

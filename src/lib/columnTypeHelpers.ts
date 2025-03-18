@@ -63,7 +63,7 @@ export function isMultiColumn(type: CTypes): type is MultiColumnPrefix | Param[]
     return typeof type === "string" && type.startsWith("_multi_column:");
 }
 function isNumeric(type: Param): boolean {
-    return type.match(/double|float|int|number/) !== null;
+    return type.match(/double|float|int|number|all/) !== null;
 }
 // need a version of this that understand DataType as well as Param
 export function paramAcceptsNumeric<T extends CTypes>(param?: T): boolean {
