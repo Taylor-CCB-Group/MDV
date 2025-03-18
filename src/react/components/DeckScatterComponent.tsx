@@ -1,7 +1,7 @@
 import DeckGL from "@deck.gl/react";
 import { OrthographicView, OrbitView } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
-import { useChartSize, useConfig, useFilteredIndices, useParamColumns } from "../hooks";
+import { useChartSize, useConfig, useParamColumns } from "../hooks";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { useEffect, useId, useMemo, useState } from "react";
@@ -56,7 +56,9 @@ function useZoomOnFilter(data: Uint32Array) {
             const oldViewState = config.viewState;
             config.viewState = {
                 target: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
-                zoom: Math.log2(Math.min(width / (maxX - minX), height / (maxY - minY))) - 0.1,
+                zoom: Math.log2(Math.min(width / (maxX - minX), height / (maxY - minY))) - 0.2,
+                // any kind of interpolator would probably mean changing how we handle viewState
+                // transitionInterpolator: new FlyToInterpolator({speed: 1.2}),
             };
             if (config.dimension === "3d") {
                 // a bit clunktastic, might make more fancy typescript-y way to do this
@@ -96,6 +98,14 @@ function useSimplerFilteredIndices() {
     return filteredIndices;
 }
 
+/**
+ * Currently this implementation is somewhat separate from VivMDVReact / scatter_state,
+ * but it should be more unified in the future.
+ * 
+ * Things that need work:
+ * - GeoJsonEditableLayer & associated state
+ * - density (in future, more different types of layers)
+ */
 export default observer(function DeckScatterComponent() {
     const id = useId();
     const [width, height] = useChartSize();
@@ -136,13 +146,21 @@ export default observer(function DeckScatterComponent() {
         getFillColor: colorBy ?? [61, 126, 180],
         getLineColor: [0, 0, 0],
         updateTriggers: {
-            //! is this triggering? why don't I see the color change?
-            //(only seeing the gray layer - probably missing other relevant changes to scatter_state)
             getFillColor: colorBy,
+            getPosition: [cx.data, cy.data, cz?.data],
         },
         billboard: true,
         parameters: {
             depthTest: false,
+        },
+        transitions: {
+            //todo make this common for all layers, control from config...
+            getPosition: {
+                duration: 100,
+                //https://easings.net/#easeInOutCubic
+                easing: (x: number) => x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2,
+                // type: "spring",
+            },
         }
     }), [data, cx, cy, cz, colorBy, opacity, radiusScale, id]);
 
