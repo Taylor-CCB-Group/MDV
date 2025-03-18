@@ -1,8 +1,11 @@
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { observer } from "mobx-react-lite";
-import { createContext, useContext, useEffect, useState } from "react";
-import type { createMdvPortal } from './react_utils';
+import { createContext, useContext, useId } from "react";
+import type { createMdvPortal } from "./react_utils";
+import createCache, { type EmotionCache } from "@emotion/cache";
+import { CacheProvider } from "@emotion/react";
+
 /** All charts and dialogs have this as an `observable` property that can be passed to
  * {@link createMdvPortal} to allow access to the container they should render things like
  * which allows Mobx Observer components to {@link useOuterContainer} for access to the container they should render things like
@@ -10,21 +13,51 @@ import type { createMdvPortal } from './react_utils';
  */
 export type OuterContainerObservable = { container: HTMLElement };
 const OuterContainerContext = createContext<HTMLElement>(null as any);
+
+let idCounter = 0;
+
+function numberToAlpha(n: number): string {
+    let result = "";
+    while (n > 0) {
+      const remainder = (n - 1) % 26;
+      result = String.fromCharCode(97 + remainder) + result;
+      n = Math.floor((n - 1) / 26);
+    }
+    return result;
+}
+
+// unique key generator
+export function generateCacheKey() {
+  idCounter++;
+  return `mui-${numberToAlpha(idCounter)}`;
+}
+
+// Cache map for storing EmotionCache for separate windows
+const cacheMap = new Map<HTMLElement, EmotionCache>();
+
+// Getting or creating EmotionCache for storing cache using CacheProvider
+export function useEmotionCache(container: HTMLElement) {
+    let cache = cacheMap.get(container);
+    if (!cache) {
+        cache = createCache({ key: generateCacheKey(), container });
+        cacheMap.set(container, cache);
+    }
+    return cache;
+}
 /**
  * As of now we only ever use react to render charts & dialogs, and they should be mobx observable
  * in as much as any `changeBaseDocument()` or `setParent()` will cause this to update...
  * hopefully the implementation will be easy to change if/when necessary.
  */
 export const OuterContainerProvider = observer(
-    ({
-        children,
-        parent,
-    }: { children: JSX.Element; parent?: BaseChart<any> | BaseDialog }) => {
+    ({ children, parent }: { children: JSX.Element; parent?: BaseChart<any> | BaseDialog }) => {
+        const container = parent?.observable?.container || document.body;
+        const cache = useEmotionCache(container);
         return (
-            <OuterContainerContext.Provider
-                value={parent?.observable?.container || document.body}
-            >
-                {children}
+            <OuterContainerContext.Provider value={container}>
+                <CacheProvider value={cache}>
+                    {children}
+                </CacheProvider>
             </OuterContainerContext.Provider>
         );
     },
