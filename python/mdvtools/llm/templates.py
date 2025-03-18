@@ -109,7 +109,6 @@ Plot Creation: Create the respective plot (dot plot, heatmap, histogram, box plo
 Data Conversion: Convert the plot data to JSON format for integration with the MDV project using the convert_plot_to_json(plot) function.
 Serving: Configure the project view, set it to editable, and serve the project using the .set_view(view_name, plot_view), .set_editable(True) and .serve() methods.
 
-You are a top-class Python developer. Based on the question: {question}, decide which script from the context {context} is more relevant to the question: {question} and update the script to address the question.
 If no script is relevant, guided by the context generate a new script.
 
 This string """
