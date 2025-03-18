@@ -484,25 +484,26 @@ function makeDraggable(el, config = {}) {
             ) {
                 return;
             }
-        } else {
-            // Preventing the dialog to exceed beyond the window
+        } 
+        // else {
+        //     // Preventing the dialog to exceed beyond the window
             
-            // Top and left
-            if (nt < 0) nt = 0;
-            if (nl < 0) nl = 0;
+        //     // Top and left
+        //     if (nt < 0) nt = 0;
+        //     if (nl < 0) nl = 0;
 
-            // Bottom and right
-            const dialogHeight = el.offsetHeight;
-            const windowHeight = el.__doc__.documentElement.clientHeight;
-            if (nt + dialogHeight > windowHeight) {
-                nt = windowHeight - dialogHeight;
-            }
-            const dialogWidth = el.offsetWidth;
-            const windowWidth = el.__doc__.documentElement.clientWidth;
-            if (nl + dialogWidth > windowWidth) {
-                nl = windowWidth - dialogWidth;
-            }
-        }
+        //     // Bottom and right
+        //     const dialogHeight = el.offsetHeight;
+        //     const windowHeight = el.__doc__.documentElement.clientHeight;
+        //     if (nt + dialogHeight > windowHeight) {
+        //         nt = windowHeight - dialogHeight;
+        //     }
+        //     const dialogWidth = el.offsetWidth;
+        //     const windowWidth = el.__doc__.documentElement.clientWidth;
+        //     if (nl + dialogWidth > windowWidth) {
+        //         nl = windowWidth - dialogWidth;
+        //     }
+        // }
         // Assigning the new top and left position (if changed)
         el.style.top = `${nt}px`;
         el.style.left = `${nl}px`;
@@ -513,6 +514,26 @@ function makeDraggable(el, config = {}) {
         if (config.ondragend) {
             config.ondragend();
         }
+        let nt = el.offsetTop - pos2;
+        let nl = el.offsetLeft - pos1;
+
+        if (nt < 0) nt = 0;
+        if (nl < 0) nl = 0;
+
+        const dialogHeight = el.offsetHeight;
+        const windowHeight = el.__doc__.documentElement.clientHeight;
+        if (nt + dialogHeight > windowHeight) {
+            nt = windowHeight - dialogHeight;
+        }
+        const dialogWidth = el.offsetWidth;
+        const windowWidth = el.__doc__.documentElement.clientWidth;
+        if (nl + dialogWidth > windowWidth) {
+            nl = windowWidth - dialogWidth;
+        }
+
+        el.style.top = `${nt}px`;
+        el.style.left = `${nl}px`;
+
         el.__doc__.onmouseup = null;
         el.__doc__.onmousemove = null;
     }
