@@ -475,7 +475,7 @@ function makeDraggable(el, config = {}) {
 
         // if it is (nearly) off the left-hand side of the window, reset it to 0
         const { right } = el.getBoundingClientRect();
-        if (right < 20) {
+        if (right < 100) {
             el.style.left = "0px";
         }
 
