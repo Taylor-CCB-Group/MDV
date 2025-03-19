@@ -29,14 +29,14 @@ from langchain.chains import LLMChain
 
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
-from .code_manipulation import prepare_code
+from .code_manipulation import parse_view_name, prepare_code
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
 
 # packages for memory
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.memory import ConversationBufferMemory
-from langchain.chat_models import ChatOpenAI  # Use appropriate model
+#from langchain.chat_models import ChatOpenAI  # Use appropriate model
 from langchain.schema import HumanMessage
 from langchain.chains.combine_documents import create_stuff_documents_chain
 
@@ -356,7 +356,7 @@ class ProjectChat:
                 question_answer_chain = create_stuff_documents_chain(self.code_llm, qa_prompt)
                 rag_chain = create_retrieval_chain(self.history_aware_retriever, question_answer_chain)
 
-                context = retriever
+                #context = retriever
                 output_qa = rag_chain.invoke({"chat_history": self.chat_history, "input": question, "question": question})
                 self.chat_history.extend([HumanMessage(content=question), output_qa["answer"]])
                 result = output_qa["answer"]
