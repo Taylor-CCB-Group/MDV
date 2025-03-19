@@ -2,9 +2,9 @@ import { columnMatchesType, inferGenericColumnSelectionProps } from "@/lib/colum
 import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { useDataStore } from "../context";
 import type { DataColumn, DataType } from "@/charts/charts";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { Autocomplete, Box, Checkbox, Chip } from "@mui/material";
+import { Autocomplete, Box, Checkbox, Chip, Divider, FormControlLabel, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
 import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';
@@ -58,7 +58,6 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
             return columns.find(c => c.field === current_value);
         }
     }, [current_value, columns, isMultiType]);
-    console.log("value", value);
 
     const setValue = useMemo(() => {
         if (isMultiType) {
@@ -87,12 +86,37 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
  */
 const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
     const { placeholder, isMultiType, columns, value, setValue } = useColumnDropdownValue(gProps);
-    
+    //todo fix this type error
+    //@ts-expect-error
+    const [selectAll, setSelectAll] = useState(isMultiType ? columns.length === value?.length : false);
+
+    useEffect(() => {
+        if (isMultiType) {
+            //todo fix this type error
+            //@ts-expect-error
+            setSelectAll(value?.length === columns.length);
+        }
+    }, [value, columns.length, isMultiType]);
     // should we be using a `GuiSpec<"dropdown"> | GuiSpec<"multidropdown">` here?
     // we decided against - we have some extra adornments we add and we don't want to have to deal with that in GuiSpec
     // (at least, not yet - might be tempted but there's a serious risk of types getting further out of hand)
     type ColumnOption = DataColumn<DataType>;
     type ColumnValue = M extends true ? ColumnOption[] : ColumnOption | null;
+
+    const handleSelectAll = () => {
+        if (!isMultiType) throw new Error("expected multitype here");
+        if (selectAll) {
+            //todo remove this ts-expect-error
+            // @ts-expect-error
+            setValue([]);
+            setSelectAll(false);
+        } else {
+            //todo remove this ts-expect-error
+            // @ts-expect-error
+            setValue(columns);
+            setSelectAll(true);
+        }
+    };
     
     return (
         <Grid className="w-full items-center" container>
@@ -108,6 +132,15 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                         // *sigh*. time to move on.
                         if (!value) return; //! check if this is correct
                         if (!(isMultiType === isArray(value))) throw new Error("type mismatch");
+                        if (isMultiType) {
+                            //todo fix this type error
+                            //@ts-expect-error
+                            if (value.length === columns.length) {
+                                setSelectAll(true);
+                            } else {
+                                console.log("inside else");
+                            }
+                        }
                         //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
                         setValue(value);
                     }}
@@ -124,25 +157,33 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                             />
                         );
                     }}
-                    renderTags={(value, getTagProps) => (
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            width: "100%",
-                          }}
-                        >
-                          {value.map((option, index) => {
-                            const { key, ...tagProps } = getTagProps({ index });
-                            return (
-                            <Chip
-                              key={key}
-                              label={option.name}
-                              {...tagProps}
-                            />
-                          )})}
-                        </Box>
-                    )}
+                    renderTags={(value, getTagProps) => {
+                        // custom logic to limit the tags, this is required because we are overriding the way tags are rendered
+                        const limit = 5;
+                        const displayed = value.slice(0, limit);
+                        const remaining = value.length - limit;
+
+                        return (
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    width: "100%",
+                                }}
+                            >
+                                {displayed.map((option, index) => {
+                                    const { key, ...tagProps } = getTagProps({ index });
+                                    return (
+                                    <Chip
+                                        key={key}
+                                        label={option.name}
+                                        {...tagProps}
+                                    />
+                                )})}
+                                {remaining > 0 && <Chip label={`+${remaining}`} />}
+                            </Box>
+                        );
+                    }}
                     renderOption={(props, column: DataColumn<DataType>) => {
                         const { key, ...p } = props as typeof props & {
                             key: string;
@@ -177,6 +218,34 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                             </li>
                         );
                     }}
+                    PaperComponent={(paperProps) => {
+                        const { children, ...restPaperProps } = paperProps;
+                        return (
+                          <Paper {...restPaperProps}>
+                            {isMultiType &&
+                            (<>
+                                <Box
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    py={1}
+                                    px={2}
+                                >
+                                    <FormControlLabel
+                                        onClick={(e) => {
+                                        e.preventDefault();
+                                        handleSelectAll();
+                                        }}
+                                        label="Select All"
+                                        control={
+                                        <Checkbox id="select-all-checkbox" checked={selectAll} />
+                                        }
+                                    />
+                                </Box>
+                                <Divider />
+                            </>)}
+                            {children}
+                          </Paper>
+                        );
+                      }}
                 />
             </Grid>
         </Grid>
