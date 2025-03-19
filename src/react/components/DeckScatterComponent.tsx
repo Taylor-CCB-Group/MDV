@@ -103,8 +103,17 @@ function useSimplerFilteredIndices() {
  * but it should be more unified in the future.
  * 
  * Things that need work:
- * - GeoJsonEditableLayer & associated state
+ * - GeoJsonEditableLayer & associated selection state
+ *  - think about selection in 3d
  * - density (in future, more different types of layers)
+ *  - fancy ways of e.g. selecting things based on density (metaballs)
+ * - fix mouse events in popout
+ * - auto-scaling of radius (including when parameter changes)
+ * - different scaling along different axes when not using physical units
+ * - highlighting
+ * - tooltips
+ *   - enhanced version with more info (in general for all charts, or at least new ones)
+ * - axis configuration (including via direct manipulation)
  */
 export default observer(function DeckScatterComponent() {
     const id = useId();
@@ -233,8 +242,8 @@ export default observer(function DeckScatterComponent() {
     // This implementation will mean that the whole react component will re-render when the viewState changes.
     // This is not very good for performance - we may consider using refs or something to avoid this, 
     // and/or debouncing the viewState changes.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: we need to recompute these when the viewState changes
     const ranges = useMemo(() => {
+        viewState;
         // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
         try {
             const p = scatterplotLayer.unproject([0, 0]);
