@@ -212,6 +212,7 @@ class ProjectChat:
 
                     prompt = ChatPromptTemplate.from_messages([
                         ("system", prompt_data),
+                        MessagesPlaceholder(variable_name="chat_history"),
                         ("human", "{input}"),
                         ("ai", "{agent_scratchpad}"),
                     ])
