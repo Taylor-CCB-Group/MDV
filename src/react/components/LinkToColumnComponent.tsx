@@ -44,7 +44,8 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
     
     // return values in a format that can be used by the dropdown component
     const values = useMemo(() => {
-        const labelValueObjects = link.valueToRowIndex.entries().map(([value, rowIndex]) => ({
+        // fix issue with safari Map.entries() not being iterable/not having a map method
+        const labelValueObjects = [...link.valueToRowIndex.entries()].map(([value, rowIndex]) => ({
             label: value,
             fieldName: getFieldName(sg, value, rowIndex)
         }));
