@@ -485,10 +485,17 @@ function makeDraggable(el, config = {}) {
         // If it exceeds the window, reset it to 0
         if (nt < 0) nt = 0;
 
-        // if it is (nearly) off the left-hand side of the window, reset it to 0
-        const { right } = el.getBoundingClientRect();
+        // if it is (nearly) off the side of the window, keep it within 100px
+        const { top, right, left } = el.getBoundingClientRect();
+        const parentBB = el.parentElement.getBoundingClientRect();
         if (right < 100) {
-            el.style.left = "0px";
+            el.style.left = `${100 - el.offsetWidth}px`;
+        }
+        if (top > (parentBB.height - 100)) {
+            nt = parentBB.height - 100;
+        }
+        if (left > (parentBB.width - 100)) {
+            el.style.left = `${parentBB.width - 100}px`;
         }
 
         // Assign the new top value (if changed)
