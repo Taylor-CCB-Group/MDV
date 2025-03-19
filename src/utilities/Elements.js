@@ -10,10 +10,7 @@ function createSVGEl(type, attrs, parent) {
 
     if (attrs) {
         for (const idx in attrs) {
-            if (
-                (idx === "styles" || idx === "style") &&
-                typeof attrs[idx] === "object"
-            ) {
+            if ((idx === "styles" || idx === "style") && typeof attrs[idx] === "object") {
                 for (const prop in attrs[idx]) {
                     el.style[prop] = attrs[idx][prop];
                 }
@@ -38,8 +35,7 @@ function splitPane(el, config = {}) {
     const dir = config.direction || "horizontal";
     const number = config.number || 2;
     const panes = [];
-    const classes =
-        dir === "horizontal" ? ["split-horizontal"] : ["split-vertical"];
+    const classes = dir === "horizontal" ? ["split-horizontal"] : ["split-vertical"];
     for (let i = 0; i < number; i++) {
         panes.push(createEl("div", { classes: classes }, el));
     }
@@ -88,10 +84,7 @@ function createMenuIcon(icon, config, parent) {
 }
 function addElProps(el, attrs) {
     for (const idx in attrs) {
-        if (
-            (idx === "styles" || idx === "style") &&
-            typeof attrs[idx] === "object"
-        ) {
+        if ((idx === "styles" || idx === "style") && typeof attrs[idx] === "object") {
             for (const prop in attrs[idx]) {
                 el.style[prop] = attrs[idx][prop];
             }
@@ -130,9 +123,7 @@ export function createFilterElement(selectEl, parent) {
     filter.oninput = () => {
         const val = filter.value.toLowerCase().split(" ");
         for (const o of selectEl.options) {
-            const filter = val.some(
-                (v) => o.text.toLowerCase().indexOf(v) === -1,
-            );
+            const filter = val.some((v) => o.text.toLowerCase().indexOf(v) === -1);
             if (filter) {
                 o.style.display = "none";
             } else {
@@ -272,7 +263,7 @@ function makeResizable(el, config = {}) {
         resizeEls.forEach((el) => {
             el.remove();
         });
-    }
+    };
     function initDrag(e) {
         e.preventDefault();
         if (config.onResizeStart) config.onResizeStart();
@@ -285,9 +276,7 @@ function makeResizable(el, config = {}) {
 
         // Determine the direction from the target's class list
         const target = e.target;
-        const directionObj = directions.find(({ className }) =>
-            target.classList.contains(className),
-        );
+        const directionObj = directions.find(({ className }) => target.classList.contains(className));
         const dir = directionObj ? directionObj.dir : "";
 
         function doDrag(e) {
@@ -322,23 +311,10 @@ function makeResizable(el, config = {}) {
 
         // Cleanup
         function stopDrag() {
-            el.__doc__.documentElement.removeEventListener(
-                "mousemove",
-                doDrag,
-                false,
-            );
-            el.__doc__.documentElement.removeEventListener(
-                "mouseup",
-                stopDrag,
-                false,
-            );
+            el.__doc__.documentElement.removeEventListener("mousemove", doDrag, false);
+            el.__doc__.documentElement.removeEventListener("mouseup", stopDrag, false);
             if (config.onresizeend) {
-                config.onresizeend(
-                    el.offsetWidth,
-                    el.offsetHeight,
-                    el.offsetLeft,
-                    el.offsetTop,
-                );
+                config.onresizeend(el.offsetWidth, el.offsetHeight, el.offsetLeft, el.offsetTop);
             }
         }
 
@@ -470,18 +446,10 @@ function makeDraggable(el, config = {}) {
         const nt = el.offsetTop - pos2;
         const nl = el.offsetLeft - pos1;
         if (cont) {
-            if (
-                nt < 0 ||
-                (nt + cont.c_bb.height > cont.p_bb.height &&
-                    cont.dir !== "topleft")
-                ) {
+            if (nt < 0 || (nt + cont.c_bb.height > cont.p_bb.height && cont.dir !== "topleft")) {
                 return;
             }
-            if (
-                nl < 0 ||
-                (nl + cont.c_bb.width > cont.p_bb.width &&
-                    cont.dir !== "topleft")
-            ) {
+            if (nl < 0 || (nl + cont.c_bb.width > cont.p_bb.width && cont.dir !== "topleft")) {
                 return;
             }
         }
@@ -489,7 +457,7 @@ function makeDraggable(el, config = {}) {
         if (!config.y_axis) {
             el.style.top = `${nt}px`;
         }
-        
+
         el.style.left = `${nl}px`;
     }
 
@@ -504,6 +472,12 @@ function makeDraggable(el, config = {}) {
 
         // If it exceeds the window, reset it to 0
         if (nt < 0) nt = 0;
+
+        // if it is (nearly) off the left-hand side of the window, reset it to 0
+        const { right } = el.getBoundingClientRect();
+        if (right < 20) {
+            el.style.left = "0px";
+        }
 
         // Assign the new top value (if changed)
         el.style.top = `${nt}px`;
@@ -532,8 +506,7 @@ function addResizeListener(element, endCallback, startCallback) {
 
 function getElDim(el) {
     const rect = el.getBoundingClientRect();
-    const scrollLeft =
-        window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     return {
         top: rect.top + scrollTop,
