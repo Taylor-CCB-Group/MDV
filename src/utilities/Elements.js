@@ -380,6 +380,19 @@ class MDVProgress {
     }
 }
 
+/**
+ * Make an element draggable
+ * @param {HTMLElement} el - the element to be made draggable
+ * @param {object} config
+ * @param {HTMLElement} [config.handle] - the element that will be used to drag the main element
+ * @param {HTMLElement} [config.contain] - the element that will contain the draggable element
+ * @param {string} [config.y_axis] - if set, the element will only be draggable on the y-axis
+ * @param {function} [config.ondragstart] - a function that is called when dragging starts
+ * @param {function} [config.ondragend] - a function that is called when dragging ends
+ * @param {Document} [config.doc] - the document object to which the event listeners
+ * will be added. This is useful when the draggable element is in a different window
+ * @returns {void}
+ */
 function makeDraggable(el, config = {}) {
     if (!config.doc) {
         config.doc = document;
@@ -391,7 +404,6 @@ function makeDraggable(el, config = {}) {
     let pos4 = 0;
     const handle = config.handle ? el.querySelector(config.handle) : el;
     let cont = null;
-    const is_moving = false;
     if (config.contain) {
         cont = {
             dir: config.contain,
