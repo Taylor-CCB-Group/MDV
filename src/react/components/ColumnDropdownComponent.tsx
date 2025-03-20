@@ -2,7 +2,7 @@ import { columnMatchesType, inferGenericColumnSelectionProps } from "@/lib/colum
 import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { useDataStore } from "../context";
 import type { DataColumn, DataType } from "@/charts/charts";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Autocomplete, Box, Checkbox, Chip, Divider, FormControlLabel, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import { useCloseOnIntersection } from "../hooks";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -89,6 +90,8 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
     //todo fix this type error
     //@ts-expect-error
     const [selectAll, setSelectAll] = useState(isMultiType ? columns.length === value?.length : false);
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isMultiType) {
@@ -97,6 +100,8 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
             setSelectAll(value?.length === columns.length);
         }
     }, [value, columns.length, isMultiType]);
+
+    useCloseOnIntersection(ref, () => setOpen(false));
     // should we be using a `GuiSpec<"dropdown"> | GuiSpec<"multidropdown">` here?
     // we decided against - we have some extra adornments we add and we don't want to have to deal with that in GuiSpec
     // (at least, not yet - might be tempted but there's a serious risk of types getting further out of hand)
@@ -127,6 +132,10 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                     multiple={isMultiType}
                     value={value as ColumnValue}
                     disableCloseOnSelect={isMultiType}
+                    open={open}
+                    onOpen={() => setOpen(true)}
+                    onClose={() => setOpen(false)}
+                    ref={ref}
                     onChange={(_, value) => {
                         //! now that we say `value as ColumnValue`, MUI thinks the value for onChange is not an array - which it could be.
                         // *sigh*. time to move on.
