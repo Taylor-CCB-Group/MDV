@@ -1,4 +1,6 @@
-# React-based charts in MDV
+# React in MDV
+
+## Charts
 
 In order to make a new type of `Chart` that will integrate with MDV, there are a few subtle details that need to be attended to such that:
 
@@ -11,10 +13,11 @@ In order to make a new type of `Chart` that will integrate with MDV, there are a
 
 For each new chart type, an entry should be added to `BaseChart.types['ChartName']`, similar to other existing charts. Often[^1] this will mean that there will be a new JS class extending `BaseReactChart`, associated with this entry. In turn, associated with this will generally be a functional React component responsible for the actual React rendering.
 
-`BaseReactChart` has a constructor similar to `BaseChart`, but with one additional `ReactComponentFunction` parameter.
+`BaseReactChart` has a constructor similar to `BaseChart`, but with one additional `ReactComponentFunction` parameter. Subclasses of that class call `super()` with an appropriate reference.
 
 
 [^1] It is possible to have multiple descriptions of chart-types that use the same `"class"`, but with different resulting configuration, which is interpreted by the same JS class to render a wide variation of actual charts. Where possible, it may be useful to try to adopt this approach more widely to avoid the need to create extra boilerplate for code that is mostly react-based, gradually re-factoring existing functionality in a way that suits the React paradigm.
+
 
 ## State management
 

@@ -50,9 +50,9 @@ def main():
     size = [792, 472]
     position = [10, 10]
 
-    bandwith = 0.1
-    intervals = 40
-    scale = "0.001"
+    #bandwith = 0.1
+    #intervals = 40
+    #scale = "0.001"
 
     color_legend = {"display" : True,
                     "pos" : [375,1]}

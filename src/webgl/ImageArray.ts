@@ -3,6 +3,7 @@ import { getProjectURL } from "../dataloaders/DataLoaderUtil";
 import type DataStore from "../datastore/DataStore";
 import type { DataModel } from "../table/DataModel";
 import { createEl } from "../utilities/Elements";
+import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 
 export type ImageArrayConfig = {
     base_url: string;
@@ -88,6 +89,7 @@ export class ImageArray {
         const { image_type, image_key, width, height } = config;
         const base_url = getProjectURL(config.base_url);
         const col = ds.columnIndex[image_key];
+        if (!isColumnLoaded(col)) throw "expected column to be loaded - purpose of method is to load associated images";
         const texture = this.texture;
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
@@ -130,8 +132,11 @@ export class ImageArray {
         );
         let nLoaded = 0;
         function getTextArray(): string[] {
+            if (!isColumnLoaded(col)) throw "expected column to be loaded";
             if (!isUnique) {
-                if (col.values === undefined) return col.data; //not really a string array, but whatever
+                //@ts-expect-error //not really a string array, but whatever
+                if (col.values === undefined) return col.data;
+                //@ts-expect-error complaining about iterator - surely data is known to be TypedArray & should be ok here?
                 return [...col.data].map((d) => col.values[d]); //slightly garbagey, never mind
             }
             const tc = new TextDecoder();

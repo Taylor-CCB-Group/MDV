@@ -3,8 +3,7 @@ import react from '@vitejs/plugin-react';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
 
-const flaskURL = "http://127.0.0.1:5055"; // default to docker flask server
-//const flaskURL_ = "http://127.0.0.1:5050"; // hack for single project mode / chat experiment
+const flaskURL = "http://127.0.0.1:5055";
 const port = 5170;
 // setting output path: use --outDir
 // todo review --assetsDir / nofont / cleanup & consolidate entrypoints
@@ -39,6 +38,7 @@ function getRollupOptions(): RollupOptions {
             input: {
                 'mdv': 'src/modules/static_index.ts',
                 'catalog': 'src/catalog/catalog_index.tsx',
+                'login': 'src/login/login_index.tsx',
             },
             output: {
                 entryFileNames: 'js/[name].js',

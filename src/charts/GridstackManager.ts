@@ -3,7 +3,7 @@ import { GridStack } from "gridstack";
 import { debounce } from "../utilities/Utilities";
 import type { ChartManager, DataSource } from "./charts";
 import type BaseChart from "./BaseChart";
-export type Chart = BaseChart<unknown>;
+export type Chart = BaseChart<any>;
 function clearPosition(div: HTMLElement) {
     div.style.position = "";
     div.style.left = "";
@@ -53,6 +53,9 @@ export default class GridStackManager {
                     handle: this.dragHandle,
                     float: true,
                     oneColumnSize: 400,
+                    resizable: {
+                        handles: "e,se,s,sw,w",
+                    }
                     // these options not working as expected...
                     // margin: 10
                     // column

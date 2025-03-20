@@ -10,42 +10,59 @@ class TableChart extends BaseChart {
         super(dataStore, div, config);
         this.config.type = "table_chart";
         let cols = [];
-        //add the index column (unless told not to)
-        if (config.include_index !== false)
-            cols = [
-                {
-                    field: "__index__",
-                    id: "__index__",
-                    name: "index",
-                    datatype: "integer",
+        // react to changes in config.param
+        this.mobxAutorun(() => {
+            const { config, dataStore } = this;
+            cols = [];
+            //add the index column (unless told not to)
+            if (config.include_index !== false)
+                cols = [
+                    {
+                        field: "__index__",
+                        id: "__index__",
+                        name: "index",
+                        datatype: "integer",
+                        sortable: true,
+                        width: 100,
+                    },
+                ];
+            const cw = config.column_widths || {};
+            const oldCols = this.grid?.getColumns() || [];
+            oldCols.forEach(c => {
+                cw[c.field] = c.width;
+            });
+            for (const c of config.param) {
+                const column = dataStore.columnIndex[c];
+                const col = {
+                    id: column.field,
+                    field: column.field,
+                    name: column.name,
+                    datatype: column.datatype,
                     sortable: true,
-                    width: 100,
-                },
-            ];
-        const cw = config.column_widths || {};
-        for (const c of this.config.param) {
-            const column = dataStore.columnIndex[c];
-            const col = {
-                id: column.field,
-                field: column.field,
-                name: column.name,
-                datatype: column.datatype,
-                sortable: true,
-                width: cw[c] ? cw[c] : 100,
-            };
-            // TODO review PJT coerce multitext internally... for now(?)
-            if (column.datatype === "multitext") col.datatype = "text";
-
-            if (column.editable) {
-                col.editor = TextEditor;
-            }
-            if (column.is_url) {
-                col.formatter = (row, cell, value, columnDef, dataContext) => {
-                    return `<a href="${value}" target="_blank">${value}</a>`;
+                    width: cw[c] ? cw[c] : 100,
                 };
+                // TODO review PJT coerce multitext internally... for now(?)
+                if (column.datatype === "multitext") col.datatype = "text";
+
+                if (column.editable) {
+                    col.editor = TextEditor;
+                }
+                if (column.is_url) {
+                    col.formatter = (row, cell, value, columnDef, dataContext) => {
+                        return `<a href="${value}" target="_blank">${value}</a>`;
+                    };
+                }
+                cols.push(col);
             }
-            cols.push(col);
-        }
+            window.mdv.chartManager.loadColumnSet(config.param, dataStore.name, () => {
+                this.grid?.setColumns(cols);
+                this.dataModel?.setColumns(config.param);
+                this.grid?.render();
+                try {
+                    this.onDataFiltered();
+                } catch {}
+            })
+        });
         this.options = {
             enableCellNavigation: true,
             enableColumnReorder: false,

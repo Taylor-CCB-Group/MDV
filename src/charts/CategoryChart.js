@@ -2,13 +2,17 @@ import SVGChart from "./SVGChart.js";
 
 class CategoryChart extends SVGChart {
     constructor(dataStore, div, config, axisTypes) {
-        if (Array.isArray(config.param)) {
-            config.param = config.param[0];
+        if (!Array.isArray(config.param)) {
+            // as much as it's nice to have a simple single value, we are now more formally consistently
+            // making config.param an array, so we need to make sure it is one here.
+            // Currently, the amount of extra faff using config.param[0] here 
+            // is much less than would be needed elsewhere with more generic code.
+            config.param = [config.param];
         }
-        config.title = config.title || dataStore.getColumnName(config.param);
+        config.title = config.title || dataStore.getColumnName(config.param[0]);
         super(dataStore, div, config, axisTypes);
         this.dim = this.dataStore.getDimension("category_dimension");
-        this.colors = this.dataStore.getColumnColors(config.param);
+        this.colors = this.dataStore.getColumnColors(config.param[0]);
         this.filter = [];
     }
 
@@ -33,7 +37,7 @@ class CategoryChart extends SVGChart {
             if (this.filter.indexOf(cat) !== -1) {
                 this.filter = this.filter.filter((x) => x !== cat);
             } else if (this.filter.length === 0) {
-                const vs = this.dataStore.getColumnValues(this.config.param);
+                const vs = this.dataStore.getColumnValues(this.config.param[0]);
                 this.filter = vs.filter((x) => x !== cat);
             } else {
                 this.filter.push(cat);
@@ -43,7 +47,7 @@ class CategoryChart extends SVGChart {
         }
         this.resetButton.style.display = "inline";
         this.drawChart(100);
-        this.dim.filter("filterCategories", [this.config.param], this.filter);
+        this.dim.filter("filterCategories", [this.config.param[0]], this.filter);
     }
 
     getFilter() {
@@ -51,7 +55,7 @@ class CategoryChart extends SVGChart {
         if (!this.filter || this.filter.length === 0) {
             return null;
         }
-        f[this.config.param] = this.filter.slice(0);
+        f[this.config.param[0]] = this.filter.slice(0);
         return f;
     }
 
@@ -110,7 +114,7 @@ class CategoryChart extends SVGChart {
                 this.updateData();
                 this.drawChart();
             },
-            this.config.param,
+            this.config.param[0],
             config,
         );
     }

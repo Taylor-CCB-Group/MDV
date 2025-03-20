@@ -10,10 +10,7 @@ function createSVGEl(type, attrs, parent) {
 
     if (attrs) {
         for (const idx in attrs) {
-            if (
-                (idx === "styles" || idx === "style") &&
-                typeof attrs[idx] === "object"
-            ) {
+            if ((idx === "styles" || idx === "style") && typeof attrs[idx] === "object") {
                 for (const prop in attrs[idx]) {
                     el.style[prop] = attrs[idx][prop];
                 }
@@ -38,8 +35,7 @@ function splitPane(el, config = {}) {
     const dir = config.direction || "horizontal";
     const number = config.number || 2;
     const panes = [];
-    const classes =
-        dir === "horizontal" ? ["split-horizontal"] : ["split-vertical"];
+    const classes = dir === "horizontal" ? ["split-horizontal"] : ["split-vertical"];
     for (let i = 0; i < number; i++) {
         panes.push(createEl("div", { classes: classes }, el));
     }
@@ -88,10 +84,7 @@ function createMenuIcon(icon, config, parent) {
 }
 function addElProps(el, attrs) {
     for (const idx in attrs) {
-        if (
-            (idx === "styles" || idx === "style") &&
-            typeof attrs[idx] === "object"
-        ) {
+        if ((idx === "styles" || idx === "style") && typeof attrs[idx] === "object") {
             for (const prop in attrs[idx]) {
                 el.style[prop] = attrs[idx][prop];
             }
@@ -130,9 +123,7 @@ export function createFilterElement(selectEl, parent) {
     filter.oninput = () => {
         const val = filter.value.toLowerCase().split(" ");
         for (const o of selectEl.options) {
-            const filter = val.some(
-                (v) => o.text.toLowerCase().indexOf(v) === -1,
-            );
+            const filter = val.some((v) => o.text.toLowerCase().indexOf(v) === -1);
             if (filter) {
                 o.style.display = "none";
             } else {
@@ -242,47 +233,97 @@ function makeResizable(el, config = {}) {
     //workaround for Safari bug #50
     //https://codepen.io/jkasun/pen/QrLjXP
     //(actually, mostly copilot filling in very similar code...)
-    const bottomRight = createEl(
-        "div",
-        {
-            classes: ["resizer-both"],
-        },
-        el,
-    );
-    bottomRight.addEventListener("mousedown", initDrag, false);
+
+    // List of all the resizers based on directions and corresponding css classes
+    const directions = [
+        // The top resizers are messing with title bar buttons causing bad UX, commenting for now
+        // { dir: "n", className: "resizer-n" },
+        { dir: "s", className: "resizer-s" },
+        { dir: "e", className: "resizer-e" },
+        { dir: "w", className: "resizer-w" },
+        // { dir: "ne", className: "resizer-ne" },
+        // { dir: "nw", className: "resizer-nw" },
+        { dir: "se", className: "resizer-se" },
+        { dir: "sw", className: "resizer-sw" },
+    ];
+
+    const resizeEls = directions.map(({ className }) => {
+        const resizeEl = createEl(
+            "div",
+            {
+                classes: [className],
+            },
+            el,
+        );
+        resizeEl.addEventListener("mousedown", initDrag, false);
+        return resizeEl;
+    });
+
+    ri.removeChildren = () => {
+        resizeEls.forEach((el) => {
+            el.remove();
+        });
+    };
     function initDrag(e) {
-        ri.startX = e.clientX;
-        ri.startY = e.clientY;
-        ri.startWidth = Number.parseInt(
-            document.defaultView.getComputedStyle(el).width,
-            10,
-        );
-        ri.startHeight = Number.parseInt(
-            document.defaultView.getComputedStyle(el).height,
-            10,
-        );
+        e.preventDefault();
+        if (config.onResizeStart) config.onResizeStart();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startWidth = el.offsetWidth;
+        const startHeight = el.offsetHeight;
+        const startLeft = el.offsetLeft;
+        const startTop = el.offsetTop;
+
+        // Determine the direction from the target's class list
+        const target = e.target;
+        const directionObj = directions.find(({ className }) => target.classList.contains(className));
+        const dir = directionObj ? directionObj.dir : "";
+
+        function doDrag(e) {
+            // Change in coordinates
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            let newWidth = startWidth;
+            let newHeight = startHeight;
+            let newLeft = startLeft;
+            let newTop = startTop;
+
+            if (dir.includes("e")) {
+                newWidth = startWidth + dx;
+            }
+            if (dir.includes("w")) {
+                newWidth = startWidth - dx;
+                newLeft = startLeft + dx;
+            }
+            if (dir.includes("s")) {
+                newHeight = startHeight + dy;
+            }
+            if (dir.includes("n")) {
+                newHeight = startHeight - dy;
+                newTop = startTop + dy;
+            }
+            el.style.width = `${newWidth}px`;
+            el.style.height = `${newHeight}px`;
+            el.style.left = `${newLeft}px`;
+            el.style.top = `${newTop}px`;
+        }
+
+        // Cleanup
+        function stopDrag() {
+            el.__doc__.documentElement.removeEventListener("mousemove", doDrag, false);
+            el.__doc__.documentElement.removeEventListener("mouseup", stopDrag, false);
+            if (config.onresizeend) {
+                config.onresizeend(el.offsetWidth, el.offsetHeight, el.offsetLeft, el.offsetTop);
+            }
+        }
+
         el.__doc__.documentElement.addEventListener("mousemove", doDrag, false);
         el.__doc__.documentElement.addEventListener("mouseup", stopDrag, false);
     }
-    function doDrag(e) {
-        el.style.width = `${ri.startWidth + e.clientX - ri.startX}px`;
-        el.style.height = `${ri.startHeight + e.clientY - ri.startY}px`;
-    }
-    function stopDrag(e) {
-        el.__doc__.documentElement.removeEventListener(
-            "mousemove",
-            doDrag,
-            false,
-        );
-        el.__doc__.documentElement.removeEventListener(
-            "mouseup",
-            stopDrag,
-            false,
-        );
-    }
+
     el.__resizeinfo__ = ri;
 }
-
 function removeResizable(el) {
     if (!el.__resizeinfo__) {
         return;
@@ -293,6 +334,7 @@ function removeResizable(el) {
     if (ri.onresize) {
         el.removeEventListener("mouseup", ri.onresize);
     }
+    ri.removeChildren?.();
     el.__resizeinfo__ = undefined;
 }
 
@@ -338,6 +380,22 @@ class MDVProgress {
     }
 }
 
+/**
+ * Make an element draggable
+ * @param {HTMLElement} el - the element to be made draggable
+ * @param {object} config
+ * @param {HTMLElement} [config.handle] - the element that will be used to drag the main element
+ * @param {HTMLElement} [config.contain] - the element that will contain the draggable element
+ * @param {string} [config.y_axis] - if set, the element will only be draggable on the y-axis
+ * @param {function} [config.ondragstart] - a function that is called when dragging starts
+ * @param {function} [config.ondragend] - a function that is called when dragging ends
+ * @param {Document} [config.doc] - the document object to which the event listeners
+ * will be added. This is useful when the draggable element is in a different window
+ * @param {boolean} [config.snapback] - if set, if the drag is released with the element off 
+ * the side of its container, it will snap back to the edge. This has known issues and is
+ * currently only being used for Dialogs.
+ * @returns {void}
+ */
 function makeDraggable(el, config = {}) {
     if (!config.doc) {
         config.doc = document;
@@ -349,7 +407,6 @@ function makeDraggable(el, config = {}) {
     let pos4 = 0;
     const handle = config.handle ? el.querySelector(config.handle) : el;
     let cont = null;
-    const is_moving = false;
     if (config.contain) {
         cont = {
             dir: config.contain,
@@ -371,6 +428,12 @@ function makeDraggable(el, config = {}) {
     function dragMouseDown(e) {
         e = e || window.event;
         e.preventDefault();
+
+        //! current fix for the dropdown issue while dragging, check for any side effects
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+
         // get the mouse cursor position at startup:
         pos3 = e.clientX;
         pos4 = e.clientY;
@@ -398,24 +461,18 @@ function makeDraggable(el, config = {}) {
         const nt = el.offsetTop - pos2;
         const nl = el.offsetLeft - pos1;
         if (cont) {
-            if (
-                nt < 0 ||
-                (nt + cont.c_bb.height > cont.p_bb.height &&
-                    cont.dir !== "topleft")
-            ) {
+            if (nt < 0 || (nt + cont.c_bb.height > cont.p_bb.height && cont.dir !== "topleft")) {
                 return;
             }
-            if (
-                nl < 0 ||
-                (nl + cont.c_bb.width > cont.p_bb.width &&
-                    cont.dir !== "topleft")
-            ) {
+            if (nl < 0 || (nl + cont.c_bb.width > cont.p_bb.width && cont.dir !== "topleft")) {
                 return;
             }
         }
+
         if (!config.y_axis) {
             el.style.top = `${nt}px`;
         }
+
         el.style.left = `${nl}px`;
     }
 
@@ -424,6 +481,33 @@ function makeDraggable(el, config = {}) {
         if (config.ondragend) {
             config.ondragend();
         }
+
+        // Getting the top position after dragging
+        let nt = el.offsetTop - pos2;
+
+        // If it exceeds the window, reset it to 0
+        if (nt < 0) nt = 0;
+
+        if (config.snapback) {
+            // if it is (nearly) off the side of the window, keep it within 100px
+            const { top, right, left } = el.getBoundingClientRect();
+            //! current logic for comparisons with parentBB is bad when applied to e.g. charts
+            //need to think differently about relative coordinates
+            const parentBB = el.parentElement.getBoundingClientRect();
+            if (right < 100) {
+                el.style.left = `${100 - el.offsetWidth}px`;
+            }
+            if (top > (parentBB.height - 100)) {
+                nt = parentBB.height - 100;
+            }
+            if (left > (parentBB.width - 100)) {
+                el.style.left = `${parentBB.width - 100}px`;
+            }
+        }
+
+        // Assign the new top value (if changed)
+        el.style.top = `${nt}px`;
+
         el.__doc__.onmouseup = null;
         el.__doc__.onmousemove = null;
     }
@@ -448,8 +532,7 @@ function addResizeListener(element, endCallback, startCallback) {
 
 function getElDim(el) {
     const rect = el.getBoundingClientRect();
-    const scrollLeft =
-        window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     return {
         top: rect.top + scrollTop,

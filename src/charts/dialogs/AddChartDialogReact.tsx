@@ -7,22 +7,41 @@ import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 
 import BaseChart from "../BaseChart";
-import type { Param } from "@/charts/ChartTypes.js";
 import { DataStoreContext, useDataStore } from "@/react/context.js";
 import JsonView from "react18-json-view";
-import { AppBar, Button, Dialog, Grid, Paper } from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Paper, Typography } from "@mui/material";
+import Grid from "@mui/material/Grid2";
 import ColumnSelectionComponent from "@/react/components/ColumnSelectionComponent.js";
 import { action, observable, reaction, toJS } from "mobx";
 import z from "zod";
-import type { ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
+import type { DataColumn, DataType, ExtraControl, GuiSpec, GuiValueTypes } from "../charts.js";
 import { AbstractComponent } from "@/react/components/SettingsDialogComponent.js";
-import { columnMatchesType } from "@/lib/utils.js";
+import { columnMatchesType, isMultiColumn } from "@/lib/columnTypeHelpers";
+import type { Param } from "@/lib/columnTypeHelpers.js";
+import { g, isArray } from "@/lib/utils.js";
+import { serialiseConfig } from "../chartConfigUtils.js";
+import "react18-json-view/src/style.css";
+// If dark mode is needed, import `dark.css`.
+import "react18-json-view/src/dark.css";
+import "../../utilities/css/JsonDialogStyles.css";
+import { Close as CloseIcon } from "@mui/icons-material";
+import { ErrorBoundary } from "react-error-boundary";
+import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper.js";
+
+// how do I match this with the type in link_utils?
+//! using zod here is an extra layer of complexity and it's not at all clear that this is the place for it
+// we're not validating data coming in, we're just using it to define the shape of the data 
+// - the whole schema-isation is really a separate concern that I very much want to have - but in the right place/time
+// we don't want a schema for the live version of the object, only for the serialised version
+// const RowsAsColsQuerySchema = z.object({});
+
+const ParamzSchema = z.optional(z.array(z.union([z.string(), z.array(z.string())])));
+type Paramz = z.infer<typeof ParamzSchema>;
 
 const ChartConfigSchema = z.object({
     title: z.string(),
     legend: z.string(),
-    // in future, allow for "virtual" / "computed" / "smart" columns
-    param: z.optional(z.array(z.string())),
+    param: ParamzSchema,
     type: z.string(),
     // in the original AddChartDialog, extra props are on the root object, not nested
     // so when we pass this to ChartManager, we'll need to flatten it
@@ -31,15 +50,12 @@ const ChartConfigSchema = z.object({
 });
 type ChartConfig = z.infer<typeof ChartConfigSchema>;
 
-// may want something like this... or to obviate the need for it, ideally.
-function actionWithUpdate<T extends any[]>(
-    config: ChartConfig,
-    fn: (...args: T) => void
-): (...args: T) => void {
-    return action((...args: T): void => {
-        fn(...args);
-        config._updated = new Date();
-    });
+
+function flattenParams(param: Paramz) {
+    if (!param) return []; //would quite like it to remain undefined
+    //! todo change the type so that it can also include column-query... probably not defined by zod
+    const result = param?.flatMap(p => isArray(p) ? [...p] : p);
+    return result;
 }
 
 const ChartPreview = observer(({config}: {config: ChartConfig}) => {
@@ -53,6 +69,7 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
     // todo rearrange so that the same code is used for adding actual chart
     const scratchProps = useMemo(() => {
         const scratchConfig = toJS(config);
+        scratchConfig.param = flattenParams(scratchConfig.param);
         const { extra, _updated, ...props } = scratchConfig;
         // flatten the config into props
         chartType?.extra_controls?.(dataStore).forEach(control => {
@@ -85,10 +102,18 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
     }, [config, dataStore, chartType]);
     const { _updated, ...configWithoutUpdated } = toJS(config);
     return (
-        <div className="grid grid-cols-2">
+        <div className="grid grid-cols-2 px-3 py-5">
             {/* <h2>Chart Preview</h2> */}
-            <JsonView src={configWithoutUpdated} collapsed collapseStringsAfterLength={10} />
-            <JsonView src={scratchProps} collapsed />
+            <JsonView style={{
+                    backgroundColor: 'transparent',
+                    fontSize: '0.875rem',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                }} src={configWithoutUpdated} collapseStringsAfterLength={10} collapsed={1} />
+            <JsonView style={{
+                    backgroundColor: 'transparent',
+                    fontSize: '0.875rem',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                }} src={scratchProps} collapsed={1} />
         </div>
     );
 });
@@ -97,14 +122,13 @@ const ChartPreview = observer(({config}: {config: ChartConfig}) => {
  * adapted so we can use SettingsDialogComponent widgets
  * When the returned GuiSpec is updated, the property of config corresponding to the control is updated
 */
-function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T>, onChange: (v: GuiValueTypes[T]) => void): GuiSpec<T> {
+function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T>, onChange: (v?: GuiValueTypes[T]) => void): GuiSpec<T> {
     const draftSpec = {
         type: control.type,
         label: control.label,
         current_value: control.defaultVal,
         // values: control.values,
-    //@ts-expect-error - need to think about what we're actually trying to do here
-    } satisfies GuiSpec<T>;
+    } satisfies Partial<GuiSpec<T>>;
     if (draftSpec.type === "dropdown" || draftSpec.type === "multidropdown") {
         // we run into this irritating logic with format that dropdown values can come in
         // >the props.values may be a tuple of [valueObjectArray, textKey, valueKey],
@@ -114,7 +138,7 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
         const values = control.values;
         // if (!control.defaultVal) draftSpec.current_value = useObjectKeys ? values[0][0][values[0][2]] : values[0][0];
         // todo - add some type predicate so we know we're assigning the right type
-        //@ts-expect-error - need to think about what we're actually trying to do here
+        //@ts-expect-error controlToGuiSpec WIP
         if (!control.defaultVal) draftSpec.current_value = values[0]["name"];
         //(draftSpec as any).values = control.values; //doesn't give runtime error, doesn't work
         (draftSpec as any).values = [values, "name", "value"];
@@ -128,10 +152,9 @@ function controlToGuiSpec<T extends keyof GuiValueTypes>(control: ExtraControl<T
     // if (!spec.current_value) throw new Error(`current_value should be set - no default in '${JSON.stringify(control)}'`);
     // strict typescript warns us about spec.current_value being potentially undefined, and it's dead right.
     // IMO much of the faffing around I'm doing getting this all to work could be avoided with better types.
-    //@ts-expect-error - need to think about what we're actually trying to do here
     reaction(() => spec.current_value, onChange);
-    //@ts-expect-error - need to think about what we're actually trying to do here
-    return spec;
+    //@ts-expect-error controlToGuiSpec WIP
+    return g(spec);
 }
 function useGuiSpecControl<T extends keyof GuiValueTypes>(control: ExtraControl<T>, config: ChartConfig): GuiSpec<T> {
     const spec = useMemo(() => {
@@ -165,7 +188,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 // nb `t.required.every(r => r in dataStore)` seems like it should work,
                 // but since we're in glorious JS land, we have things like `dataStore['interactions'] = undefined`
                 // which means that `'interactions' in dataStore` is true, but `!!dataStore['interactions']` is false.
-                //@ts-ignore for the moment
+                //@ts-ignore DataStore string index on things 'required' for chart types
                 return t.required.every(r => !!dataStore[r]);
             }
             return true;
@@ -174,7 +197,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
     const chartNames = chartTypes.map(t => t.name).sort((a, b) => a.localeCompare(b));
     // const [chartTypeName, setChartTypeName] = useState(chartNames[0]);
     const paramColumns = useMemo(
-        () => config.param?.map(p => dataStore.columnIndex[p]) ?? [],
+        () => config.param ? flattenParams(config.param)?.map(p => dataStore.columnIndex[p] as DataColumn<DataType>) : [],
     [config.param, dataStore]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: need to figure out mobx/biome linting...
     const setChartTypeName = useCallback(action((chartTypeName: string) => {
@@ -227,6 +250,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                 // if (!control.defaultVal)
             }
         });
+        props.param = flattenParams(props.param);
         for (const [k, v] of Object.entries(extra)) {
             //@ts-ignore
             props[k] = v;
@@ -245,18 +269,31 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
 
         // this is where we'd call the chart manager to add the chart
         if (!window.mdv.chartManager) throw new Error("chartManager not found");
-        window.mdv.chartManager.addChart(dataStore.name, props, true);
+        const finalConfig = serialiseConfig(props);
+        window.mdv.chartManager.addChart(dataStore.name, finalConfig, true);
         // and then close the dialog...
         onDone();
     }, [config, dataStore, onDone, chartType]);
     return (
-        <>
-            <Grid container spacing={2} sx={{margin: 1, width: '50em'}}>
-                <Grid item xs={6}>
+        <ErrorBoundary FallbackComponent={({error}) =>
+            (
+            <div className="flex items-center" style={{width: 600, height: 420}}> 
+                <ErrorComponentReactWrapper 
+                    error={{message: error.message, stack: error.stack}} 
+                    extraMetaData={config} 
+                    title={chartType?.name 
+                        ? `Error creating '${chartType?.name}'. Click to view details`
+                        : 'Something went wrong. Click to view details'}
+                />
+            </div>
+            )
+        }>
+            <DialogContent dividers>
+            <Grid container spacing={2} sx={{paddingBottom: 2, width: "100%"}}>
+                <Grid size={6}>
                     <Grid container direction={"column"} spacing={1}
-                    sx={{gap: 1}}
                     >
-                        <h2>Chart Type</h2>
+                        <Typography variant="h6">Chart Type</Typography>
                         <Autocomplete
                             options={chartNames}
                             value={config.type}
@@ -264,6 +301,7 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                             renderInput={(params) => (
                                 <TextField {...params} label="Chart Type" />
                             )}
+                            sx={{pt: 1}}
                         />
                         <TextField label="Title" size="small" onChange={action((e) => config.title = e.target.value)} />
                         <TextField label="Description" size="small"
@@ -273,34 +311,64 @@ const ConfigureChart = observer(({config, onDone}: {config: ChartConfig, onDone:
                         />
                     </Grid>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={6}>
                     <Grid container direction={"column"} spacing={1}
                     sx={{gap: 1}}
                     >
-                        {chartType?.params && <h2>Columns</h2>}
+                        {chartType?.params && <Typography variant="h6">Columns</Typography>}
                         {chartType?.params?.map((p, i) => (
-                            <ColumnSelectionComponent key={p.name} placeholder={p.name}
-                            setSelectedColumn={action((column) => {
-                                if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
-                                config.param[i] = column;
-                                // grumble grumble
-                                config._updated = new Date();
-                            })}
-                            type={p.type}
-                            />
+                            <>
+                                <Typography key={`label_${p.name}`} fontSize="small">
+                                    {p.name}:
+                                </Typography>
+                                <ColumnSelectionComponent key={p.name} placeholder={p.name}
+                                multiple={isMultiColumn(p.type)}
+                                // this may be changing - perhaps we always pass mobx object to ColumnSelectionComponent
+                                // but we definitely need to know whether it's a multi-column or not & be able to set the value accordingly
+                                //@ts-expect-error setSelectedColumn(c: never)???
+                                setSelectedColumn={action((column) => {
+                                    // !! in the original AddChartDialog, we use a "ChooseColumnDialog" for multi-column
+                                    // that sets `this.multiColumns` which in `submit` is concatenated to `config.param`
+                                    if (!config.param) throw new Error("it shouldn't be possible for config.param to be undefined here");
+                                    
+                                    // the type of config.param is string[] - but this could be a multi-column or virtual column query...
+                                    // we need to decide at which point to apply these transformations.
+                                    // - to deal with string[] we should be able to specify multiple={false} which could change the return type
+                                    //... could we set up a reaction to update the config when the column changes?
+
+                                    // if (typeof column !== "string") throw new Error("Expected string column name");
+                                    config.param[i] = column; //issue now is that because ref is stable, we don't re-flatten the param
+                                    // grumble grumble
+                                    config._updated = new Date();
+                                })}
+                                type={p.type}
+                                current_value={config.param?.[i]}
+                                />
+                            </>
                         ))}
                         {extraControls && <h2>Extra Controls</h2>}
                         {extraControls}
-                        <Dialog open={false}>
+                        {/* <Dialog open={false}>
                             <JsonView src={chartType} collapsed/>
-                        </Dialog>
+                        </Dialog> */}
                     </Grid>
                 </Grid>
             </Grid>
-            <AppBar position="absolute" sx={{ top: 'auto', bottom: 0 }}>
-                <Button variant="contained" color="primary" onClick={addChart}>Add Chart</Button>
-            </AppBar>
-        </>
+            <Divider />
+            {/* NOTE - before config._updated was added, this causes update when config.legend chages,
+                otherwise not unless we spread config... and then nested `config.params[i] = c` updates didn't work */}
+            {/* <ChartPreview config={{...config}} /> */}
+            </DialogContent>
+            <DialogActions sx={{justifyContent: "center"}}>
+                <Button
+                    variant="contained"
+                    onClick={addChart}
+                    disabled={!chartType}
+                >
+                    Add Chart
+                </Button>
+            </DialogActions>
+        </ErrorBoundary>
     );
 });
 
@@ -310,16 +378,16 @@ const AddChartDialogComponent = observer(
         return (
             <>
                 <DataStoreContext.Provider value={dataStore}>
-                    <div className="align-top">
+                    {/* <div className="align-top"> */}
                     <ConfigureChart config={config} onDone={onDone} />
-                    </div>
+                    {/* </div> */}
                     {/* NOTE - before config._updated was added, this causes update when config.legend chages,
                     otherwise not unless we spread config... and then nested `config.params[i] = c` updates didn't work */}
                     {/* <div>
                         <p>Chart Preview: "{config.legend}"</p>
                         <JsonView src={{...config}} />
                     </div> */}
-                    <ChartPreview config={{...config}} />
+                    {/* <ChartPreview config={{...config}} /> */}
                 </DataStoreContext.Provider>
             </>
         )
@@ -361,13 +429,38 @@ const Wrapper = (props: { dataStore: DataStore, modal: boolean, onDone: () => vo
         return <AddChartDialogComponent {...props} config={config} />;
     }
     return (
-        <Dialog open={open} fullScreen disableEscapeKeyDown={true}>
-            <div className="h-screen flex items-center justify-center">
-                <Paper elevation={2} sx={{ p: 2 }}>
-                    <h1>Add Chart in "{props.dataStore.name}"...</h1>
+        <Dialog open={open} disableEscapeKeyDown={true}
+            PaperProps={{
+                style: { //copied from FileUploadDialog, should maybe be part of theme.
+                //     backgroundColor: "var(--fade_background_color)",
+                //     backdropFilter: "blur(1px)",
+                border: "1px solid var(--border_menu_bar_color)"
+                },
+            }}
+            fullWidth
+            onClose={() => {
+                setOpen(false);
+                props.onDone();
+            }} 
+        >
+            <DialogTitle>
+                Add Chart in "{props.dataStore.name}"
+                        <IconButton
+                            aria-label="close"
+                                            onClick={() => {
+                                                setOpen(false);
+                                                props.onDone();
+                                            }}
+                                            sx={{
+                                                position: "absolute",
+                                                right: 8,
+                                                top: 8,
+                                            }}
+                            >
+                            <CloseIcon />
+                        </IconButton>
+                    </DialogTitle>
                     <AddChartDialogComponent {...props} config={config} />
-                </Paper>
-            </div>
         </Dialog>
     );
 }
@@ -382,7 +475,7 @@ class AddChartDialogReact extends BaseDialog {
             },
             null,
         );
-        const modal = false; //doesn't work on fullscreen panel as of writing, also needs some redesign of "add chart" button in particular
+        const modal = true; //doesn't work on fullscreen panel as of writing, also needs some redesign of "add chart" button in particular
         this.root = createMdvPortal(
             <Wrapper dataStore={dataStore} modal={modal} onDone={() => this.close()}/>,
             this.dialog,
@@ -396,5 +489,5 @@ class AddChartDialogReact extends BaseDialog {
     }
 }
 // https://github.com/Taylor-CCB-Group/MDV/discussions/44
-BaseDialog.experiment["AddChartDialogReact"] = AddChartDialogReact;
-export default "AddChartDialogReact loaded";
+// BaseDialog.experiment["AddChartDialogReact"] = AddChartDialogReact;
+export default AddChartDialogReact;

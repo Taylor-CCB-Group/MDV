@@ -4,7 +4,7 @@ import {
     getArrayBufferDataLoader,
     getLocalCompressedBinaryDataLoader,
     decompressData,
-} from "../dataloaders/DataLoaders.js";
+} from "../dataloaders/DataLoaders";
 import { setProjectRoot } from "../dataloaders/DataLoaderUtil";
 import { fetchJsonConfig } from "../dataloaders/DataLoaderUtil";
 

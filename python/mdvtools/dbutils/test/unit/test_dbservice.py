@@ -1,11 +1,12 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from mdvtools.dbutils.dbservice import ProjectService, FileService
-from mdvtools.dbutils.dbmodels import Project, File
+#from mdvtools.dbutils.dbmodels import Project, File
 from datetime import datetime
 
 class TestProjectService(unittest.TestCase):
     
+    @patch('mdvtools.dbutils.dbmodels.Project.query')
     @patch('mdvtools.dbutils.dbmodels.Project.query')
     def test_get_active_projects_success(self, mock_query):
         mock_query.filter_by.return_value.all.return_value = [MagicMock(), MagicMock()]
@@ -14,12 +15,16 @@ class TestProjectService(unittest.TestCase):
     
     @patch('mdvtools.dbutils.dbmodels.db.session.query')
     @patch('mdvtools.dbutils.dbmodels.db.func.max')
+    @patch('mdvtools.dbutils.dbmodels.db.session.query')
+    @patch('mdvtools.dbutils.dbmodels.db.func.max')
     def test_get_next_project_id_success(self, mock_max, mock_query):
         mock_max.return_value = 5
         mock_query.return_value.scalar.return_value = 5
         result = ProjectService.get_next_project_id()
         self.assertEqual(result, 6)
     
+    @patch('mdvtools.dbutils.dbmodels.db.session')
+    @patch('mdvtools.dbutils.dbmodels.Project')
     @patch('mdvtools.dbutils.dbmodels.db.session')
     @patch('mdvtools.dbutils.dbmodels.Project')
     def test_add_new_project_success(self, mock_project, mock_session):

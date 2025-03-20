@@ -6,6 +6,7 @@ avocato.config.js
 mlv.dev.config.js
 mlv.dev.stream.js
 .vscode
+*.obsidian
 _mlv/
 _avocato/
 project1/
@@ -44,6 +45,7 @@ data/
 xvenv/
 secrets/
 app_logs/
+docker-secrets-local.yml
 
 LLM/cache
 LLM/key.json

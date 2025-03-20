@@ -70,18 +70,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
-    const [shouldNavigate, setShouldNavigate] = useState(false);
-
-    useEffect(() => {
-        if (shouldNavigate) {
-            // todo - review how we do stuff like this
-            const base = import.meta.env.DEV
-                ? "http://localhost:5170?dir=/"
-                : "";
-            window.location.href = `${base}project/${id}`;
-        }
-    }, [shouldNavigate, id]);
-
+    
+    // todo - review how we do stuff like this
+    const base = import.meta.env.DEV
+        ? "http://localhost:5170?dir=/"
+        : "";
+    const href = `${base}project/${id}`;
+    
     const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
         setAnchorEl(event.currentTarget);
@@ -89,10 +84,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 
     const handleMenuClose = () => {
         setAnchorEl(null);
-    };
-
-    const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
-        setShouldNavigate(true);
     };
 
     return (
@@ -105,8 +96,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 position: "relative",
             }}
         >
-            <div
-                onClick={handleCardClick}
+            <a
+                href={href}
                 style={{
                     cursor: "pointer",
                     flexGrow: 1,
@@ -153,7 +144,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         Last modified: {lastModified}
                     </Typography>
                 </CardContent>
-            </div>
+            </a>
 
             <IconButton
                 className="menu-button"
@@ -221,28 +212,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     </ListItemIcon>
                     <ListItemText>Project Access</ListItemText>
                 </MenuItem>
-                {/* <MenuItem
-                    onClick={() => {
-                        setIsSettingsModalOpen(true);
-                        handleMenuClose();
-                    }}
-                >
-                    <ListItemIcon>
-                        <Settings fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Project Settings</ListItemText>
-                </MenuItem> */}
-                {/* <MenuItem
-                    onClick={() => {
-                        setIsShareModalOpen(true);
-                        handleMenuClose();
-                    }}
-                >
-                    <ListItemIcon>
-                        <Share fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Share Project</ListItemText>
-                </MenuItem> */}
             </Menu>
 
             <ProjectInfoModal

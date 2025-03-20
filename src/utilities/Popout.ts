@@ -26,6 +26,21 @@ export default function popoutChart(chart: BaseChart<any>) {
     if (!popoutWindow) throw "Failed to open popout window";
     popoutWindow.document.body.style.overflow = "hidden";
 
+    // Function to synchronize the theme by syncing the class names
+    const syncTheme = () => {
+        popoutWindow.document.documentElement.className = document.documentElement.className;
+    };
+  
+    // Initial sync
+    syncTheme();
+  
+    // Set up a MutationObserver on the main window
+    const themeObserver = new MutationObserver(syncTheme);
+    themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class'],
+    });
+
     // Function to add a stylesheet or style element to the popout window
     const addStyleElement = (
         styleElement: HTMLStyleElement | HTMLLinkElement,
@@ -93,6 +108,7 @@ export default function popoutChart(chart: BaseChart<any>) {
         //@ts-ignore
         chartManager.charts[chart.config.id].win = mainWindow;
         chart.changeBaseDocument(document);
+        themeObserver.disconnect();
         observer.disconnect();
     });
     mainWindow.addEventListener("unload", () => {

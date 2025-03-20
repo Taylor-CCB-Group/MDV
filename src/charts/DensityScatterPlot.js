@@ -4,8 +4,33 @@ import { geoPath } from "d3-geo";
 import { scaleLinear } from "d3-scale";
 import { createEl } from "../utilities/Elements.js";
 import "../datastore/DensityDimension.js";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class DensityScatterPlot extends WGLScatterPlot {
+    @loadColumnData
+    setParams(p) {
+        // super.setParams(p);
+        this.config.param = p;
+        // this.afterAppCreation();
+        this._updateParamScale(p);
+        this.onDataFiltered();
+        this.drawChart();
+        super.drawChart();
+    }
+    _updateParamScale(p) {
+        
+        const mm1 = this.dataStore.getMinMaxForColumn(p[0]);
+        const mm2 = this.dataStore.getMinMaxForColumn(p[1]);
+        const w = mm1[1] - mm1[0];
+        const h = mm2[1] - mm2[0];
+        this.whRatio = w / h;
+        this.catKeys = [-1, -1];
+        // this.data = [null, null];
+        this.orig_y_scale = this.y_scale.domain();
+        this.orig_x_scale = this.x_scale.domain();
+        this.or_y_scale = [0, 400 / this.whRatio];
+        this.or_x_scale = [0, 400];
+    }
     afterAppCreation() {
         //make sure svg is on top of scatter plot and events pass through
         this.contentDiv.prepend(this.app.div_container);
@@ -14,18 +39,9 @@ class DensityScatterPlot extends WGLScatterPlot {
         c.contour_bandwidth = c.contour_bandwidth || 5;
         c.contour_intensity = c.contour_intensity || 0.7;
         c.contour_opacity = c.contour_opacity || 1;
-        const p = c.param;
-        const mm1 = this.dataStore.getMinMaxForColumn(p[0]);
-        const mm2 = this.dataStore.getMinMaxForColumn(p[1]);
-        const w = mm1[1] - mm1[0];
-        const h = mm2[1] - mm2[0];
-        this.whRatio = w / h;
-        this.catKeys = [-1, -1];
         this.data = [null, null];
-        this.orig_y_scale = this.y_scale.domain();
-        this.orig_x_scale = this.x_scale.domain();
-        this.or_y_scale = [0, 400 / this.whRatio];
-        this.or_x_scale = [0, 400];
+        const p = c.param;
+        this._updateParamScale(p);
         this.app.addHandler(
             "pan_or_zoom",
             (offset, x_scale, y_scale) => {
@@ -188,7 +204,7 @@ class DensityScatterPlot extends WGLScatterPlot {
 
         cats.push({ t: "None" });
 
-        s.push(
+        const contourSettings = [
             {
                 type: "dropdown",
                 label: "Contour Parameter",
@@ -303,7 +319,12 @@ class DensityScatterPlot extends WGLScatterPlot {
                     this.drawChart();
                 },
             },
-        );
+        ];
+        s.push({
+            type: "folder",
+            label: "Contour Settings",
+            current_value: contourSettings
+        });
         return s;
     }
 }

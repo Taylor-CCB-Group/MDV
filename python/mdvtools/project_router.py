@@ -1,9 +1,10 @@
-from flask import Flask, Response, jsonify
+import os
+from flask import Flask, Response, request, jsonify, session, redirect, url_for
 from typing import Dict, Any, Callable, Tuple
 import re
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
-
+import functools
 
 """
 This should work as a drop-in replacement for `Blueprint` in the context
@@ -86,6 +87,9 @@ class ProjectBlueprint_v2:
     # Class-level constant for the timestamp update interval
     TIMESTAMP_UPDATE_INTERVAL = timedelta(hours=1)
 
+    # Normalize ENABLE_AUTH to a boolean
+    AUTH_ENABLED = os.getenv("ENABLE_AUTH", "true").strip().lower() in {"1", "yes", "true"}
+
     @staticmethod
     def register_app(app: Flask) -> None:
         @app.route(
@@ -100,6 +104,8 @@ class ProjectBlueprint_v2:
             It will look up the project_id in ProjectBlueprint_v2.blueprints and call the method with the given subpath.
             The ProjectBlueprint_v2 instance is responsible for routing the request to the correct method etc.
             """
+            if ProjectBlueprint_v2.AUTH_ENABLED and not ProjectBlueprint_v2.is_authenticated():
+                return redirect(url_for('login_dev'))
             
             if project_id in ProjectBlueprint_v2.blueprints:
                 try:
@@ -110,6 +116,11 @@ class ProjectBlueprint_v2:
                 except Exception as e:
                     return {"status": "error", "message": str(e)}
             return {"status": "error", "message": "invalid project_id or method"}, 500
+    
+    @staticmethod
+    def is_authenticated() -> bool:
+        """Checks if the user is authenticated."""
+        return 'token' in session
 
     def __init__(self, name: str, _ignored: str, url_prefix: str) -> None:
         self.name = name
@@ -197,7 +208,7 @@ class ProjectBlueprint_v2:
             
         raise ValueError(f"no matching route for {subpath}")
 
-import functools
+
 
 class SingleProjectShim:
     def __init__(self, app: Flask) -> None:

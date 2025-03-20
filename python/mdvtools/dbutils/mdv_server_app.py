@@ -5,10 +5,9 @@ import shutil
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
-# import random
-# import string
 # from flask import Flask, render_template, jsonify, request
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
@@ -16,6 +15,21 @@ from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService
+from flask import redirect, url_for, session, jsonify
+
+# Read environment flag for authentication
+ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
+
+if ENABLE_AUTH:
+    
+    from authlib.integrations.flask_client import OAuth
+    from mdvtools.auth.auth0_provider import Auth0Provider
+
+    oauth = OAuth()  # Initialize OAuth only if auth is enabled
+    #except ImportError:
+    #    print("Auth library not found. Ensure poetry installs `auth` dependencies when ENABLE_AUTH=1.")
+    #    exit(1)  # Fail early if auth is enabled but libraries are missing
+
 from mdvtools.websocket import mdv_socketio
 
 def create_flask_app(config_name=None):
@@ -26,11 +40,21 @@ def create_flask_app(config_name=None):
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
     app.url_map.strict_slashes = False
     app.after_request(add_safe_headers)
+    
+    app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,   # Prevent JavaScript from accessing cookies
+    SESSION_COOKIE_SECURE=True,     # Only send cookies over HTTPS
+    SESSION_COOKIE_SAMESITE="Lax"   # Prevent cross-site cookie usage
+)
+    app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+    if not app.secret_key:
+        raise ValueError("FLASK_SECRET_KEY environment variable is not set!")
 
     
     try:
-        print("**Adding config.json details to app config")
-        load_config(app, config_name)
+        print("** Adding config.json details to app config")
+        load_config(app, config_name, ENABLE_AUTH)
     except Exception as e:
         print(f"Error loading configuration: {e}")
         exit(1)
@@ -64,8 +88,6 @@ def create_flask_app(config_name=None):
             # Routes registration and application setup
             print("Registering the blueprint (register_app)")
             ProjectBlueprint.register_app(app)
-            
-
     except OperationalError as oe:
         print(f"OperationalError: {oe}")
         exit(1)
@@ -73,6 +95,111 @@ def create_flask_app(config_name=None):
         print(f"Error during app setup: {e}")
         exit(1)
 
+    # Register OAuth with the app
+    if ENABLE_AUTH:
+        try:
+            print("Initializing OAuth for authentication")
+            oauth.init_app(app)
+        except Exception as e:
+            print(f"Error initializing OAuth: {e}")
+            exit(1)
+
+    # Global variable for Auth0 provider
+    auth0_provider = None  # This should be set when Auth0 routes are registered
+
+    def is_authenticated():
+        """Check if the user is authenticated, considering Auth0 and Shibboleth."""
+        if not ENABLE_AUTH:
+            return True  # Authentication is disabled, allow access
+        
+        if session.get("auth_method") == "shibboleth":
+            return True  # Shibboleth users are already authenticated
+        
+        return "token" in session and session["token"]
+
+    # Authentication check function
+    def is_authenticated_token():
+        """Check if the user is authenticated (works for both Auth0 and Shibboleth)."""
+        # Check if auth0_provider is initialized
+        if not auth0_provider:
+            print("<<<<<<1")
+            # If auth0_provider is not available, return False as we can't check authentication for Auth0 yet
+            return False
+        
+        # Check if Auth0 is enabled and if the token is in session
+        if session.get('auth_method') == 'auth0' and 'token' in session:
+            print("<<<<<<2")
+            # For Auth0, we need to validate the token to ensure it's not expired or invalid
+            try:
+                # Validate the token with Auth0 (this will depend on your token structure and verification method)
+                if auth0_provider.is_token_valid(session['token']):
+                    print("--------88888")
+                    return True  # Token is valid, user is authenticated
+                else:
+                    # Token is invalid or expired
+                    print("Auth0 token is invalid or expired.")
+                    session.clear()  # Clear session if token is invalid
+                    return False
+            except Exception as e:
+                print(f"Error during Auth0 token validation: {e}")
+                session.clear()  # Clear session if there was an error during validation
+                return False
+        
+        # Check for Shibboleth authentication
+        elif session.get('auth_method') == 'shibboleth':
+            # For Shibboleth, if the token is not available in the session, we cannot validate like Auth0
+            # So, we assume that the presence of 'auth_method' is the sign of successful authentication
+            # You may adjust this depending on your specific Shibboleth setup.
+            if 'auth_method' in session and session['auth_method'] == 'shibboleth':
+                return True  # Assume user is authenticated after successful Shibboleth login
+            
+            return False  # If no 'auth_method' is found for Shibboleth, user is not authenticated
+        
+        return False  # Default to False if neither Auth0 nor Shibboleth is used
+
+
+    # Whitelist of routes that do not require authentication
+    whitelist_routes = [
+        '/login_dev',
+        '/login_sso',
+        '/login',
+        '/callback',
+        '/favicon.ico',        # Allow access to favicon
+        '/flask/js/',  # Allow access to login JS
+        '/static',
+        '/flask/assets',
+        '/flask/img'
+    ]
+
+    @app.before_request
+    def enforce_authentication():
+        """Redirect unauthenticated users to login if required."""
+        if not ENABLE_AUTH:
+            print(":::::1")
+            return None  # Skip authentication check if auth is disabled
+
+        requested_path = request.path
+        if any(requested_path.startswith(route) for route in whitelist_routes):
+            print(":::::2")
+            return None  # Allow access to whitelisted routes
+
+        if not is_authenticated():
+            print(":::::3")
+            redirect_uri = app.config["LOGIN_REDIRECT_URL"]
+            print(f"Unauthorized access attempt to {requested_path}. Redirecting to /login_dev.")
+            return redirect(redirect_uri)
+
+        return None
+
+    if ENABLE_AUTH:
+        try:
+            print("Registering authentication routes")
+            register_auth0_routes(app)  # Register Auth0-related routes like /login and /callback
+        except Exception as e:
+            print(f"Error registering authentication routes: {e}")
+            exit(1)
+
+    # Register other routes (base routes like /, /projects, etc.)
     try:
         # Register routes
         print("Registering base routes: /, /projects, /create_project, /delete_project")
@@ -98,8 +225,7 @@ def wait_for_database():
             print("*************** Database is ready! *************")
             return
         except OperationalError as oe:
-            print(f"OperationalError: {oe}")
-            print(f"Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1} of {max_retries})")
+            print(f"OperationalError: {oe}. Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1} of {max_retries})")
             time.sleep(delay)
         except Exception as e:
             print(f"An unexpected error occurred while waiting for the database: {e}")
@@ -113,7 +239,7 @@ def wait_for_database():
 
 
 
-def load_config(app,config_name=None):
+def load_config(app, config_name=None, enable_auth=False):
     try:
         config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
         with open(config_file_path) as config_file:
@@ -137,7 +263,7 @@ def load_config(app,config_name=None):
             app.config['PREFERRED_URL_SCHEME'] = 'http'
             app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
         else:
-            app.config['PREFERRED_URL_SCHEME'] = 'http'
+            app.config['PREFERRED_URL_SCHEME'] = 'https'
             
             # Load sensitive data from Docker secrets
             def read_secret(secret_name):
@@ -158,6 +284,31 @@ def load_config(app,config_name=None):
                 raise ValueError("Error: One or more required secrets or configurations are missing.")
             
             app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+
+
+            # Only configure Auth0 if ENABLE_AUTH is True
+            if enable_auth:
+                auth0_domain = os.getenv('AUTH0_DOMAIN') or config.get('AUTH0_DOMAIN')
+                auth0_client_id = os.getenv('AUTH0_CLIENT_ID') or config.get('AUTH0_CLIENT_ID')
+                auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET') or read_secret("auth0_client_secret")
+
+                if not all([auth0_domain, auth0_client_id, auth0_client_secret]):
+                    raise ValueError("Error: Missing Auth0 configuration.")
+
+                app.config['AUTH0_DOMAIN'] = auth0_domain
+                app.config['AUTH0_CLIENT_ID'] = auth0_client_id
+                app.config['AUTH0_CLIENT_SECRET'] = auth0_client_secret
+                app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL') or config.get('AUTH0_CALLBACK_URL')
+                app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
+                app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
+
+                app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
+
+                app.config["SHIBBOLETH_LOGIN_URL"] = os.getenv('SHIBBOLETH_LOGIN_URL') or config.get('SHIBBOLETH_LOGIN_URL')
+                app.config["SHIBBOLETH_LOGOUT_URL"] = os.getenv('SHIBBOLETH_LOGOUT_URL') or config.get('SHIBBOLETH_LOGOUT_URL')
+
+                
+
 
     except Exception as e:
         print(f"An unexpected error occurred while configuring the database: {e}")
@@ -234,7 +385,7 @@ def serve_projects_from_db(app):
                 e = f"Error serving project #{project.id}: path '{project.path}' does not exist."
                 print(e)
                 failed_projects.append((project.id, e))
-                
+               
     except Exception as e:
         print(f"Error serving projects from database: {e}")
         raise
@@ -306,7 +457,6 @@ def serve_projects_from_filesystem(app, base_dir):
 
                             except RuntimeError as file_error:
                                 print(f"Failed to add or update file '{file_name}' in the database: {file_error}")
-
                 except Exception as e:
                     print(f"In create_projects_from_filesystem: Error creating project at path '{project_path}': {e}")
                     raise
@@ -316,6 +466,150 @@ def serve_projects_from_filesystem(app, base_dir):
     except Exception as e:
         print(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
         raise
+
+
+# The function that registers the Auth0 routes
+def register_auth0_routes(app):
+    """
+    Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
+    with centralized and route-specific error handling.
+    """
+    print("Registering AUTH routes...")
+
+    try:
+        # Initialize the Auth0Provider
+        auth0_provider = Auth0Provider(
+            app,
+            oauth=oauth,
+            client_id=app.config['AUTH0_CLIENT_ID'],
+            client_secret=app.config['AUTH0_CLIENT_SECRET'],
+            domain=app.config['AUTH0_DOMAIN']
+        )
+
+        # Route for login (redirects to Auth0 for authentication)
+        @app.route('/login')
+        def login():
+            try:
+                print("$$$$$$$$$$$$$$$ app-login")
+                session.clear()  
+                return auth0_provider.login()
+            except Exception as e:
+                print(f"In register_auth0_routes : Error during login: {e}")
+                return jsonify({"error": "Failed to start login process."}), 500
+
+        # Route for the callback after login (handles the callback from Auth0)
+        @app.route('/callback')
+        def callback():
+            try:
+                print("$$$$$$$$$$$$$$$ app-callback")
+                code = request.args.get('code')  # Get the code from the callback URL
+                if not code:
+                    print("Missing 'code' parameter in the callback URL.")
+                    session.clear()  # Clear session if there's no code
+                    return jsonify({"error": "Authorization code not provided."}), 400
+                
+                print("$$$$$$$$$$$$$$$ app-callback  1")
+                access_token = auth0_provider.handle_callback()
+                if not access_token:  # If token retrieval fails, prevent redirecting
+                    print("Authentication failed: No valid token received.")
+                    session.clear()  # Clear session in case of failure
+                    return jsonify({"error": "Authentication failed."}), 401
+                
+                print(" $$$$$$$$$$$$$$$ app-callback 2")
+                return redirect(url_for('index'))  # Redirect to the home page or any protected page
+            except Exception as e:
+                print(f"In register_auth0_routes : Error during callback: {e}")
+                session.clear()  # Clear session on error
+                return jsonify({"error": "Failed to complete authentication process."}), 500
+
+        # Route for logout (clears the session and redirects to home)
+        @app.route('/logout')
+        def logout():
+            try:
+                # Check what authentication method was used (Auth0 or Shibboleth)
+                auth_method = session.get('auth_method', None)
+
+                if auth_method == 'auth0':
+                    # If the user logged in via Auth0, log them out from Auth0
+                    return auth0_provider.logout()
+                    
+
+                # If the user logged in via Shibboleth, redirect to Shibboleth IdP's logout URL
+                elif auth_method == 'shibboleth':
+                    # Shibboleth does not handle the session clearing, so we first clear the session
+                    session.clear()
+                    # Then, redirect to the Shibboleth IdP logout URL
+                    shibboleth_logout_url = app.config.get('SHIBBOLETH_LOGOUT_URL', None)
+
+                    if shibboleth_logout_url:
+                        # Redirect to the provided Shibboleth IdP logout URL
+                        return redirect(shibboleth_logout_url)
+                    else:
+                        # If no Shibboleth logout URL is configured, return an error
+                        return jsonify({"error": "Shibboleth logout URL not provided."}), 500
+
+                # Clear the session data after logging out from either Auth0 or Shibboleth
+                session.clear()
+
+                # No need to redirect here if auth0_provider.logout() already handles redirection
+                return jsonify({"message": "Logged out successfully"}), 200
+
+            except Exception as e:
+                print(f"In register_auth0_routes: Error during logout: {e}")
+                session.clear()
+                return jsonify({"error": "Failed to log out."}), 500
+
+
+        # You can also add a sample route to check the user's profile or token
+        @app.route('/profile')
+        def profile():
+            try:
+                token = session.get('token')
+                if token:
+                    user_info = auth0_provider.get_user(token)
+                    return jsonify(user_info)
+                else:
+                    print("Token not found in session.")
+                    return jsonify({"error": "Not authenticated."}), 401
+            except Exception as e:
+                print(f"In register_auth0_routes: Error during profile retrieval: {e}")
+                return jsonify({"error": "Failed to retrieve user profile."}), 500
+        
+
+        @app.route('/login_sso')
+        def login_sso():
+            """Redirect user to Shibboleth-protected login page on Apache."""
+            try:
+                # Clear any existing session data to ensure we start with a fresh session
+                session.clear()
+                
+                # Store the authentication method as Shibboleth
+                session["auth_method"] = "shibboleth"  # Indicate Shibboleth login
+
+                # Check if the Shibboleth login URL is provided in the environment
+                shibboleth_login_url = app.config.get('SHIBBOLETH_LOGIN_URL', None)
+
+                if shibboleth_login_url:
+                    # Redirect the user to Shibboleth login page if the URL is configured
+                    print("Redirecting to Shibboleth login page...")
+                    return redirect(shibboleth_login_url)
+                else:
+                    # If Shibboleth URL is not provided, inform the user
+                    print("Shibboleth login URL not provided.")
+                    return jsonify({"error": "Shibboleth login URL not provided."}), 500
+
+            except Exception as e:
+                # In case of error, clear the session and handle the error
+                session.clear()  # Ensure session is cleared in case of failure
+                print(f"In login_sso: Error during login: {e}")
+                return jsonify({"error": "Failed to start login process using SSO."}), 500
+
+        print("Auth0 routes registered successfully!")
+
+    except Exception as e:
+        print(f"Error registering AUTH routes: {e}")
+        raise
+
 
 
 def register_routes(app):
@@ -332,6 +626,11 @@ def register_routes(app):
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /")
+
+        @app.route('/login_dev')
+        def login_dev():
+            return render_template('login.html')
+        print("Route registered: /login_dev")
 
         @app.route('/projects')
         def get_projects():
@@ -375,7 +674,6 @@ def register_routes(app):
                 project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
 
                 # Create and serve the MDVProject
-                # Create and serve the MDVProject
                 try:
                     print("Creating and serving the new project")
                     p = MDVProject(project_path, backend_db= True)
@@ -392,6 +690,7 @@ def register_routes(app):
                 if new_project:
                     return jsonify({"id": new_project.id, "name": new_project.name, "status": "success"})
                 
+                
 
             except Exception as e:
                 print(f"In register_routes - /create_project : Error creating project: {e}")
@@ -407,7 +706,7 @@ def register_routes(app):
                 # Optional: Remove project routes from Flask app if needed
                 if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(next_id)]
-                    print(f"In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
+                    print("In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
                 
                 return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -415,7 +714,7 @@ def register_routes(app):
 
         @app.route("/delete_project/<project_id>", methods=["DELETE"])
         def delete_project(project_id: int):
-            project_removed_from_blueprints = False
+            #project_removed_from_blueprints = False
             try:
                 print(f"Deleting project '{project_id}'")
                 
@@ -435,7 +734,7 @@ def register_routes(app):
                 # Remove the project from the ProjectBlueprint.blueprints dictionary
                 if str(project_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(project_id)]
-                    project_removed_from_blueprints = True  # Mark as removed
+                    #project_removed_from_blueprints = True  # Mark as removed
                     print(f"In register_routes - /delete_project : Removed project '{project_id}' from ProjectBlueprint.blueprints")
                 
                 # Soft delete the project
@@ -552,5 +851,3 @@ if __name__ == '__main__':
     #wait_for_database()
     
     app.run(host='0.0.0.0', debug=True, port=5055)
-    
-    

@@ -31,7 +31,7 @@ RUN poetry config virtualenvs.create false
 #16 20.81 In a future version of Poetry this warning will become an error!
 # seems to be ok to first install with --no-root for dependencies, then install the root package later
 # we don't want to set package-mode = false in pyproject.toml
-RUN poetry install --with dev,backend --no-root
+RUN poetry install --with dev,backend,auth --no-root
 
 WORKDIR /app
 # copy the package.json and package-lock.json as a separate step so npm install can be cached
@@ -56,10 +56,13 @@ WORKDIR /app/python
 # installing again so we have mdvtools as a module, on top of the previous install layer with dependencies
 # this step should be very fast
 # if we don't have this, the server itself runs, but anything that doesn't run from this workdir will fail to import mdvtools
-RUN poetry install --with dev,backend 
+RUN poetry install --with dev,backend,auth 
 
 # Expose the port that Flask will run on
 EXPOSE 5055 
+
+# something changed causing npm to need this in order for `source` to work in npm scripts
+RUN npm config set script-shell "/bin/bash"
 
 # Command to run Gunicorn
 # nb -t 0 means no timeout, this is a dev setting, chat requests are long running & should be made async

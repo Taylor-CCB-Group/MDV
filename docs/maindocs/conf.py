@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.abspath("../"))
 # -- Project information -----------------------------------------------------
 
 project = "MDV"
-copyright = "2021, Martin Sergeant"
-author = "Martin Sergeant"
+# copyright = "2021, Martin Sergeant"
+# author = "Martin Sergeant"
 
 # The short X.Y version
 version = ""
@@ -44,7 +44,6 @@ extensions = [
     "autoapi.extension",
     "sphinx.ext.napoleon",
     "sphinx_rtd_theme",
-    "sphinx_js",
 ]
 autoapi_type = "python"  # i think this is the default and only values allowed
 autoapi_dirs = ["../../python/mdvtools"]
@@ -66,8 +65,8 @@ html_theme_options = {
 
 # is there a simpler way to sepcify than having to list every folder?
 # js_source_path = ['../../src/charts','../../src/dataloaders','../../src/utilities']
-js_source_path = ["../../src/datastore", "../../src/charts", "../../src/dataloaders"]
-root_for_relative_js_paths = "../../src"
+# js_source_path = ["../../src/datastore", "../../src/charts", "../../src/dataloaders"]
+# root_for_relative_js_paths = "../../src"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -110,10 +109,22 @@ html_theme = "sphinx_rtd_theme"
 #
 # html_theme_options = {}
 
+# Add any css files to style the webpage
+html_css_files = ["https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.5.0/css/all.css"]
+
+# Add any js files for custom logic
+html_js_files = ["https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.5.0/js/all.js"]
+
+# For showing copyright section
+html_show_copyright = False
+
+# For showing Built by Sphinx section
+html_show_sphinx = False
+
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+# html_static_path = ["maindocs/_static"]
 
 
 # Custom sidebar templates, must be a dictionary that maps document names
@@ -153,16 +164,16 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
-latex_documents = [
-    (master_doc, "MDV.tex", "MDV Documentation", "Martin Sergeant", "manual"),
-]
+# latex_documents = [
+#     (master_doc, "MDV.tex", "MDV Documentation", "Martin Sergeant", "manual"),
+# ]
 
 
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "MDV", "MDV Documentation", [author], 1)]
+# man_pages = [(master_doc, "MDV", "MDV Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output ----------------------------------------------
@@ -175,7 +186,7 @@ texinfo_documents = [
         master_doc,
         "MDV",
         "MDV Documentation",
-        author,
+        # author,
         "MDV",
         "One line description of project.",
         "Miscellaneous",

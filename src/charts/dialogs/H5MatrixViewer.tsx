@@ -13,7 +13,7 @@ import {
     Typography,
 } from "@mui/material";
 import type React from "react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export type Matrix = number[][];
 export type MatrixRecord = Record<string, Matrix | null>;
@@ -61,6 +61,7 @@ const DEFAULT_VISIBLE_ITEMS = 10;
 const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
     const [activeMatrixTab, setActiveMatrixTab] = useState<number>(0);
     const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
+    const [matrixKey, setMatrixKey] = useState<string>("");
 
     const matrixEntries = useMemo<MatrixEntries>(() => {
         // Find the first non-empty matrix category
@@ -84,6 +85,21 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
         }
         return [] as MatrixEntries;
     }, [matrices]);
+
+    useEffect(() => {
+        let newKey = "";
+        if (matrices.X) newKey = "X";
+        else if (Object.keys(matrices.layers).length > 0) newKey = "layers";
+        else if (Object.keys(matrices.obsm).length > 0) newKey = "obsm";
+        else if (Object.keys(matrices.varm).length > 0) newKey = "varm";
+        else if (Object.keys(matrices.obsp).length > 0) newKey = "obsp";
+        else if (Object.keys(matrices.varp).length > 0) newKey = "varp";
+        
+        if (newKey !== matrixKey) {
+            setMatrixKey(newKey);
+            setActiveMatrixTab(0);
+        }
+    }, [matrices, matrixKey]);
 
     const calculateStats = useCallback((matrix: Matrix): MatrixStats => {
         if (!matrix?.length) {
@@ -168,6 +184,9 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
             const { rows, hasMoreRows, hasMoreCols, colIndices, rowIndices } =
                 visibleMatrixData;
 
+            const formatNumber = (value: number) =>
+                Number.isNaN(value) ? " - " : value.toFixed(4);
+
             return (
                 <Box sx={{ width: "100%" }}>
                     <Stack
@@ -182,7 +201,9 @@ const H5MatrixViewer: React.FC<H5MatrixViewerProps> = ({ matrices }) => {
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 Dimensions: {stats.dimensions} | Range: [
-                                {stats.min}, {stats.max}] | Mean: {stats.mean}
+                                {formatNumber(stats.min)},{" "}
+                                {formatNumber(stats.max)}] | Mean:{" "}
+                                {formatNumber(stats.mean)}
                             </Typography>
                         </Stack>
                     </Stack>

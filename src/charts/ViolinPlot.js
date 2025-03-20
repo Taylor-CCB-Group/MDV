@@ -4,8 +4,10 @@ import { curveBasis, line } from "d3-shape";
 import { easeLinear } from "d3-ease";
 import { select } from "d3-selection";
 import BaseChart from "./BaseChart";
+import { loadColumnData } from "@/datastore/decorateColumnMethod";
 
 class ViolinPlot extends WGLChart {
+    useDefaultTitle = false;
     constructor(dataStore, div, config) {
         const x_name = dataStore.getColumnName(config.param[0]);
         const y_name = dataStore.getColumnName(config.param[1]);
@@ -15,19 +17,24 @@ class ViolinPlot extends WGLChart {
                 y: { size: 45, label: y_name, textsize: 13 },
             };
         }
+        super(dataStore, div, config, { x: { type: "band" }, y: {} });
+        this.config.type = "violin_plot"; //<<< I don't like the look of this
         if (!config.title) {
+            // --- causes some nasty exception... let's not do that for now
+            this.useDefaultTitle = true;
             config.title = `${x_name} x ${y_name}`;
         }
-        super(dataStore, div, config, { x: { type: "band" }, y: {} });
-        this.config.type = "violin_plot";
-
+        
         const c = this.config;
         c.brush = c.brush || "poly";
-
-        const appConf = { brush: c.brush };
+        
+        //disable scroll zoom / pan
+        const appConf = { brush: c.brush, noCameraControl: true };
 
         this.app = new WGL2DI(this.graphDiv, appConf);
+        //this appears problematic with active color column selection
         const colorFunc = this.afterAppCreation();
+        this.colorFunc = colorFunc;
         const len = this.dataStore.size;
         this.xPosBuff = new SharedArrayBuffer(len * 4);
         this.xPos = new Float32Array(this.xPosBuff);
@@ -39,22 +46,8 @@ class ViolinPlot extends WGLChart {
             this.xPos[i] = cats[i] * 50 + 4 + Math.random() * 42;
         }
 
-        //set default band width
-        const mm = this.dataStore.getMinMaxForColumn(c.param[1]);
-        this.defaultBandWidth = (mm[1] - mm[0]) / 100;
-        c.band_width = c.band_width || this.defaultBandWidth;
-        c.intervals = c.intervals || 20;
-
         this.dim = this.dataStore.getDimension("catrange_dimension");
         this.x_scale.domain(this.values);
-        const cy = this.dataStore.columnIndex[c.param[1]];
-        this.app.addCircles({
-            x: this.xPos,
-            y: cy.datatype === "int32" ? new Float32Array(cy.data) : cy.data,
-            localFilter: this.dim.getLocalFilter(),
-            globalFilter: this.dataStore.getFilter(),
-            colorFunc: colorFunc,
-        });
         this.app.addHandler("brush_stopped", (range, is_poly) => {
             this.resetButton.style.display = "inline";
             this.app.setFilter(true);
@@ -64,15 +57,79 @@ class ViolinPlot extends WGLChart {
                 this._createPolyFilter(range);
             }
         });
-
+        
         c.radius = c.radius || 5;
         c.opacity = c.opacity || 0.8;
-
+        
         this.app.setPointRadius(this.config.radius);
         this.app.setPointOpacity(this.config.opacity);
         this.data = [];
+        this.setValueField(c.param[1]);
+    }
+    @loadColumnData
+    colorByColumn(column) {
+        super.colorByColumn(column);
+        // trying to extract relavant code from WGLChart.afterAppCreation
+        const c = this.config;
+        const conf = {
+            asArray: true,
+            overideValues: {
+                colorLogScale: this.config.log_color_scale,
+            },
+        };
+        this._addTrimmedColor(column, conf);
+        const colorFunc = this.dataStore.getColorFunction(column, conf);
+        if (!c.color_legend) {
+            c.color_legend = {
+                display: true,
+            };
+        }
+
+        this.setColorLegend();
+        this.colorFunc = colorFunc;
+        this.drawChart();
+    }
+    // @computed get bandwidth() {
+    //     const mm = this.dataStore.getMinMaxForColumn(this.valueFieldName);
+    // }
+
+    // @loadColumnData
+    setValueField(field) {        
+        //this.config.param[1] = field; //NO - don't call us, we'll call you
+        if (!field) {
+            console.warn("No field provided for setValueField");
+            return;
+        }
+        console.log("Setting value field", field);
+        this.valueField = field;
+
+        // set default band width
+        const mm = this.dataStore.getMinMaxForColumn(field);
+        this.defaultBandWidth = (mm[1] - mm[0]) / 100;
+        // ! violating mobx rules...
+        const c = this.config;
+        c.band_width = c.band_width || this.defaultBandWidth;
+        c.intervals = c.intervals || 20;
+        const cy = this.dataStore.columnIndex[field];
+        c.axis.y.label = cy.name;
+        this.app.addCircles({
+            x: this.xPos,
+            y: cy.datatype === "int32" ? new Float32Array(cy.data) : cy.data,
+            localFilter: this.dim.getLocalFilter(),
+            globalFilter: this.dataStore.getFilter(),
+            colorFunc: this.colorFunc,
+        });
+        //! todo make sure legend is updated.
         this.centerGraph();
         this.onDataFiltered();
+    }
+    // @computed get valueFieldName() {
+    //      return getConcreteFieldName(this.config.param[1]);
+    // }
+    @loadColumnData
+    setParams(params) {
+        this.config.param = params;
+        this.setValueField(params[1]);
     }
 
     _createFilter(range) {
@@ -90,7 +147,7 @@ class ViolinPlot extends WGLChart {
             ];
             this.dim(
                 "filterSquare",
-                [this.xPos, this.config.param[1]],
+                [this.xPos, this.valueField],
                 { range1: this.filter[0], range2: this.filter[1] },
                 [this.xPos, 1],
             );
@@ -109,6 +166,7 @@ class ViolinPlot extends WGLChart {
                 this.app.setFilter(false);
                 this.resetButton.style.display = "none";
             }
+            this.config
             const c = this.config;
             this.ticks = this.y_scale.ticks(c.intervals);
             this.dim.getKernalDensity(
@@ -116,7 +174,7 @@ class ViolinPlot extends WGLChart {
                     this.data = data;
                     this.drawChart();
                 },
-                c.param,
+                [c.param[0], this.valueField],
                 {
                     ticks: this.ticks,
                     bandwidth: c.band_width,
@@ -251,7 +309,7 @@ class ViolinPlot extends WGLChart {
         }
         this.xPos = newX;
         config.x = newX;
-        config.y = this.dataStore.getRawColumn(p[1]);
+        config.y = this.dataStore.getRawColumn(this.valueField);
         //update the filter with the extra data
         if (this.dim.filterColumns) {
             this.dimFilterColumns[0] = newX;
@@ -267,7 +325,7 @@ class ViolinPlot extends WGLChart {
     }
 
     centerGraph() {
-        const mm = this.dataStore.getMinMaxForColumn(this.config.param[1]);
+        const mm = this.dataStore.getMinMaxForColumn(this.valueField);
         const max_x = this.data.length * 50;
         const max_y = mm[1];
         const min_x = 0;
@@ -295,9 +353,14 @@ class ViolinPlot extends WGLChart {
     getSettings() {
         const s = super.getSettings();
         const c = this.config;
-        const mm = this.dataStore.getMinMaxForColumn(c.param[1]);
+        // note that we previously relied on this.valueField as distinct from c.param[1]
+        // but we could now just use c.param[1] directly
+        const p1 = this.valueField;
+        const mm = this.dataStore.getMinMaxForColumn(p1);
 
         s.splice(
+            //not sure what this splice is for, now we have generic Parameters
+            //in an unusual place...
             1,
             0,
             {
@@ -341,7 +404,7 @@ class ViolinPlot extends WGLChart {
             }
         }
         this.filter = vs;
-        this.dim.filter("filterPoly", [this.xPos, this.config.param[1]], vs);
+        this.dim.filter("filterPoly", [this.xPos, this.valueField], vs);
         this.app.refresh();
     }
 }

@@ -15,24 +15,28 @@ export type SelectionDialogFilter = CategoryFilter | MultiTextFilter | UniqueFil
 export type SelectionDialogConfig = {
     type: "selection_dialog";
     filters: Record<string, SelectionDialogFilter | null>;
-};
+} & BaseConfig;
 
 class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
     constructor(dataStore: DataStore, div: HTMLDivElement, config: SelectionDialogConfig & BaseConfig) {
         if (!config.filters) {
             config.filters = {};
+            //@ts -ignore ! @ts-expect-error is inconsistent between editor & cli???
             for (const col of config.param) {
+                //@ts-expect-error MultiColumnQuery cannot be used as index
                 config.filters[col] = null;
             }
         }
         for (const col of config.param) {
+            //@ts-expect-error MultiColumnQuery cannot be used as index
             if (!config.filters[col]) {
+                //@ts-expect-error MultiColumnQuery cannot be used as index
                 config.filters[col] = null;
             }
         }
         // makeAutoObservable(config); //super will do this
         //nb, considered `this.mobxAutorun` for showing/hiding reset button, but we use a hook.
-        super(dataStore, div, config, observer(SelectionDialogComponent));
+        super(dataStore, div, config, SelectionDialogComponent);
     }
     removeFilter(): void {
         action(() => {
@@ -40,24 +44,6 @@ class SelectionDialogReact extends BaseReactChart<SelectionDialogConfig> {
                 this.config.filters[key] = null;
             }
         })();
-    }
-    getSettings() {
-        // todo: add settings widget for 'column' with some properties somewhat similar to params type.
-        const settings = super.getSettings();
-        // //@ts-expect-error seems like some dodgy jsdoc typing issue? why only here?
-        // >>> it is indeed broken at runtime - need general development of multi-column settings
-        // and how they relate to the mobx config store.
-        // settings.push(g({
-        //     //!!this should be properly implemented...
-        //     type: "multicolumn",
-        //     label: "Columns To filter",
-        //     current_value: this.config.param,
-        //     func: (v) => {
-        //         this.config.param = v;
-        //         // this.removeFilter();
-        //     }
-        // }));
-        return settings;
     }
 }
 
