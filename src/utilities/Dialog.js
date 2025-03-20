@@ -90,6 +90,7 @@ class BaseDialog {
         makeDraggable(this.outer, {
             doc: config.doc,
             handle: ".ciview-dlg-header",
+            snapback: true,
         });
 
         if (config.columns) {
@@ -164,6 +165,7 @@ class BaseDialog {
             makeDraggable(this.outer, {
                 doc: parent.ownerDocument,
                 handle: ".ciview-dlg-header",
+                snapback: true,
             });
         } else {
             this.config.doc.body.append(this.outer);
@@ -176,6 +178,7 @@ class BaseDialog {
             makeDraggable(this.outer, {
                 doc: this.config.doc,
                 handle: ".ciview-dlg-header",
+                snapback: true,
             });
         }
     }

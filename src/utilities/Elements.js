@@ -391,6 +391,9 @@ class MDVProgress {
  * @param {function} [config.ondragend] - a function that is called when dragging ends
  * @param {Document} [config.doc] - the document object to which the event listeners
  * will be added. This is useful when the draggable element is in a different window
+ * @param {boolean} [config.snapback] - if set, if the drag is released with the element off 
+ * the side of its container, it will snap back to the edge. This has known issues and is
+ * currently only being used for Dialogs.
  * @returns {void}
  */
 function makeDraggable(el, config = {}) {
@@ -485,17 +488,21 @@ function makeDraggable(el, config = {}) {
         // If it exceeds the window, reset it to 0
         if (nt < 0) nt = 0;
 
-        // if it is (nearly) off the side of the window, keep it within 100px
-        const { top, right, left } = el.getBoundingClientRect();
-        const parentBB = el.parentElement.getBoundingClientRect();
-        if (right < 100) {
-            el.style.left = `${100 - el.offsetWidth}px`;
-        }
-        if (top > (parentBB.height - 100)) {
-            nt = parentBB.height - 100;
-        }
-        if (left > (parentBB.width - 100)) {
-            el.style.left = `${parentBB.width - 100}px`;
+        if (config.snapback) {
+            // if it is (nearly) off the side of the window, keep it within 100px
+            const { top, right, left } = el.getBoundingClientRect();
+            //! current logic for comparisons with parentBB is bad when applied to e.g. charts
+            //need to think differently about relative coordinates
+            const parentBB = el.parentElement.getBoundingClientRect();
+            if (right < 100) {
+                el.style.left = `${100 - el.offsetWidth}px`;
+            }
+            if (top > (parentBB.height - 100)) {
+                nt = parentBB.height - 100;
+            }
+            if (left > (parentBB.width - 100)) {
+                el.style.left = `${parentBB.width - 100}px`;
+            }
         }
 
         // Assign the new top value (if changed)
