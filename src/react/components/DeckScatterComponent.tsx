@@ -98,6 +98,16 @@ function useSimplerFilteredIndices() {
     return filteredIndices;
 }
 
+function useFilterArray() {
+    const ds = useDataStore();
+    //not what we really want here - would be good to check if we end up with multiple copies of the data
+    const data = useSimplerFilteredIndices();
+    return useMemo(() => {
+        data; //referencing this so it's a dependency
+        return ds.filterArray;
+    }, [ds.filterArray, data]);
+}
+
 /**
  * Currently this implementation is somewhat separate from VivMDVReact / scatter_state,
  * but it should be more unified in the future.
@@ -119,7 +129,7 @@ export default observer(function DeckScatterComponent() {
     const id = useId();
     const [width, height] = useChartSize();
     const [cx, cy, cz] = useParamColumns() as LoadedDataColumn<"double">[];
-    const data = useSimplerFilteredIndices();
+    const data = useSimplerFilteredIndices(); //leads to weird transition behaviour when filtering
     const config = useConfig<DeckScatterConfig>();
     const { opacity, radius, course_radius, viewState, on_filter, color_by } = config;
     // const is2d = dimension === "2d";
@@ -173,18 +183,12 @@ export default observer(function DeckScatterComponent() {
         }
     }), [data, cx, cy, cz, colorBy, opacity, radiusScale, id]);
 
-    // not the desired implmentation...
-    const indexSet = useMemo(() => {
-        if (greyOnFilter) {
-            return new Set(data);
-        }
-        return new Set();
-    }, [data, greyOnFilter]);
+    const filterValue = useFilterArray();
 
     const greyScatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatterplot-layer-grey-${id}`,
         data: { length: cx.data.length },
-        pickable: true,
+        // pickable: true,
         opacity,
         stroked: false,
         filled: true,
@@ -209,12 +213,15 @@ export default observer(function DeckScatterComponent() {
                 // type: "spring",
             },
         },
-        // this will be slow, !!!intention is to change this design!!!
         //@ts-expect-error - we could probably have a generic on the layer
-        getFilterValue: (_, { index }: { index: number }) => indexSet.has(index) ? 0 : 1,
+        getFilterValue: (_, { index }: { index: number }) => filterValue[index], //how do we just pass the buffer?
         filterRange: [0.5, 1],
+        updateTriggers: {
+            //! using `data` as a trigger as `filterValue` was behind by one frame or something
+            getFilterValue: data,
+        },
         extensions: [new DataFilterExtension()],
-    }), [cx, cy, cz, opacity, radiusScale, id, indexSet]);
+    }), [cx, cy, cz, opacity, radiusScale, id, filterValue, data]);
 
     // we need an OrthographicView to prevent wrapping etc...
     const view = useMemo(() => {
@@ -236,6 +243,7 @@ export default observer(function DeckScatterComponent() {
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
     const layers = greyOnFilter ? [scatterplotLayer, greyScatterplotLayer] : [scatterplotLayer];
+    // const layers = greyOnFilter ? [scatterplotLayer] : [scatterplotLayer];
     // todo - these need to be encapsulated better, the DeckGL component should be in a smaller
     // area with the axes outside of it.
     // axes need to respond to the viewState...
