@@ -87,17 +87,13 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
  */
 const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
     const { placeholder, isMultiType, columns, value, setValue } = useColumnDropdownValue(gProps);
-    //todo fix this type error
-    //@ts-expect-error
-    const [selectAll, setSelectAll] = useState(isMultiType ? columns.length === value?.length : false);
+    const [selectAll, setSelectAll] = useState(isMultiType && Array.isArray(value) ? columns.length === value?.length : false);
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isMultiType) {
-            //todo fix this type error
-            //@ts-expect-error
-            setSelectAll(value?.length === columns.length);
+            setSelectAll(Array.isArray(value) && value?.length === columns.length);
         }
     }, [value, columns.length, isMultiType]);
 
@@ -112,12 +108,12 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
         if (!isMultiType) throw new Error("expected multitype here");
         if (selectAll) {
             //todo remove this ts-expect-error
-            // @ts-expect-error
+            // @ts-expect-error: Incompatible types
             setValue([]);
             setSelectAll(false);
         } else {
             //todo remove this ts-expect-error
-            // @ts-expect-error
+            // @ts-expect-error: Incompatible types
             setValue(columns);
             setSelectAll(true);
         }
@@ -142,12 +138,10 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                         if (!value) return; //! check if this is correct
                         if (!(isMultiType === isArray(value))) throw new Error("type mismatch");
                         if (isMultiType) {
-                            //todo fix this type error
-                            //@ts-expect-error
-                            if (value.length === columns.length) {
+                            if (Array.isArray(value) && value.length === columns.length) {
                                 setSelectAll(true);
                             } else {
-                                console.log("inside else");
+                                setSelectAll(false);
                             }
                         }
                         //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
