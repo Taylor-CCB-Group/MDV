@@ -482,12 +482,6 @@ function makeDraggable(el, config = {}) {
             config.ondragend();
         }
 
-        // Getting the top position after dragging
-        let nt = el.offsetTop - pos2;
-
-        // If it exceeds the window, reset it to 0
-        if (nt < 0) nt = 0;
-
         if (config.snapback) {
             // if it is (nearly) off the side of the window, keep it within 100px
             const { top, right, left } = el.getBoundingClientRect();
@@ -498,15 +492,16 @@ function makeDraggable(el, config = {}) {
                 el.style.left = `${100 - el.offsetWidth}px`;
             }
             if (top > (parentBB.height - 100)) {
-                nt = parentBB.height - 100;
+                el.style.top = `${parentBB.height - 100}px`;
             }
             if (left > (parentBB.width - 100)) {
                 el.style.left = `${parentBB.width - 100}px`;
             }
+            // if it is going out of the window at the top, bring the top to 0
+            if (top < 0) {
+                el.style.top = '0px';
+            }
         }
-
-        // Assign the new top value (if changed)
-        el.style.top = `${nt}px`;
 
         el.__doc__.onmouseup = null;
         el.__doc__.onmousemove = null;

@@ -105,14 +105,12 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
     type ColumnValue = M extends true ? ColumnOption[] : ColumnOption | null;
 
     const handleSelectAll = () => {
-        if (!isMultiType) throw new Error("expected multitype here");
+        if (!isMultiType) console.error("expected multitype here");
         if (selectAll) {
-            //todo remove this ts-expect-error
             // @ts-expect-error: Incompatible types
             setValue([]);
             setSelectAll(false);
         } else {
-            //todo remove this ts-expect-error
             // @ts-expect-error: Incompatible types
             setValue(columns);
             setSelectAll(true);
