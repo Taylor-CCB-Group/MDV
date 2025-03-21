@@ -230,16 +230,16 @@ export default observer(function DeckScatterComponent() {
             controller: true,
             width: chartWidth,
             height: chartHeight,
-            x: margin.left,
-            y: margin.top,
+            x: margin.left + 1,
+            y: margin.top - 1,
             flipY: false,
         }) : new OrbitView({
             id: `scatterplot-view-${id}`,
             controller: true,
             width: chartWidth,
             height: chartHeight,
-            x: margin.left,
-            y: margin.top,
+            x: margin.left + 1,
+            y: margin.top - 1,
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
     const layers = greyOnFilter ? [scatterplotLayer, greyScatterplotLayer] : [scatterplotLayer];
