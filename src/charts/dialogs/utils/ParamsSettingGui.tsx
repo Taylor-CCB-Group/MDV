@@ -27,6 +27,8 @@ function getCurrentParam<T extends BaseConfig>(chart: BaseChart<T>, i: number) {
             const end = currentParams.length - nOthers;
             return currentParams.slice(0, end);
         }
+        // If param type is _multi but it's not the first element of params array
+        if (i > 0 && params[i].type.toString().includes("_multi")) return currentParams;
         // we want the tail of the array...
         const start = n - nOthers;
         return currentParams.slice(start);
