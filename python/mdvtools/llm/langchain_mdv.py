@@ -13,29 +13,28 @@ from langchain.schema.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import Language
-# https://python.langchain.com/api_reference/langchain/chains/langchain.chains.retrieval_qa.base.RetrievalQA.html
-# Deprecated since version 0.1.17: This class is deprecated.
-# Use the create_retrieval_chain constructor instead.
-# See migration guide here: https://python.langchain.com/docs/versions/migrating_chains/retrieval_qa/
-from langchain.chains import RetrievalQA # why can't I see the type for this? see above comment...
-# from langchain_core.output_parsers import StrOutputParser
-# from langchain_core.runnables import RunnablePassthrough
 
 from langchain.prompts import PromptTemplate
-import langchain_experimental.agents.agent_toolkits.pandas.base as lp
+
 from dotenv import load_dotenv
 from mdvtools.websocket import ChatSocketAPI
 
 # packages for custom langchain agent
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_experimental.tools.python.tool import PythonAstREPLTool
 from langchain.agents import create_openai_functions_agent, AgentExecutor
-
+from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
-from .templates import get_createproject_prompt_RAG, prompt_data, get_updateproject_prompt_RAG
+from .templates import get_createproject_prompt_RAG, prompt_data
 from .code_manipulation import parse_view_name, prepare_code
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
+
+# packages for memory
+from langchain.chains import create_history_aware_retriever, create_retrieval_chain
+from langchain.memory import ConversationBufferMemory
+from langchain.schema import HumanMessage
+from langchain.chains.combine_documents import create_stuff_documents_chain
 
 import matplotlib
 
@@ -103,14 +102,6 @@ with time_block("b2: Text splitter initialising"):
     print('# Split the code documents into chunks using the text splitter')
     texts = text_splitter.split_documents(code_strings)
 
-#assert(len(texts) > 0)
-
-# Set the number of queries per minute (QPM) for embedding requests
-# EMBEDDING_QPM = 100 # unused
-
-# Set the number of batches for processing embeddings
-# EMBEDDING_NUM_BATCH = 5 # unused
-
 print('# Initialize an instance of the OpenAIEmbeddings class')
 with time_block("b3: Embeddings creating"):
     embeddings = OpenAIEmbeddings(
@@ -167,18 +158,15 @@ class ProjectChat:
             with time_block("b7: Initialising LLM for agent"):
                 self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
             with time_block("b8: Pandas agent creating"):
-                #CUSTOM AGENT:
-                def create_custom_pandas_agent(llm, dfs, prompt_data, verbose=False):
+                #Custom langchain agent:
+                def create_custom_pandas_agent(llm, dfs: dict, prompt_data, verbose=False):
                     """
                     Creates a LangChain agent that can interact with Pandas DataFrames using a Python REPL tool.
-                    
-                    :param llm: The LLM to use (e.g., OpenAI GPT-4).
-                    :param dfs: A dictionary of named Pandas DataFrames.
-                    :param verbose: If True, prints debug information.
-                    :return: An agent that can answer questions about the DataFrames.
                     """
-                    
-                    # Step 1: Create the Python REPL Tool (Dynamically Injecting DataFrames)
+                    # Step 1: Initialize Memory with Chat History
+                    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+                    # Step 2: Create the Python REPL Tool
                     python_tool = PythonAstREPLTool()
                     
                     if python_tool.globals is None:
@@ -199,28 +187,66 @@ class ProjectChat:
                     ## New fixes:
                     python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
 
+                    # Step 3: Define Contextualization Chain
+
+                    contextualize_q_system_prompt = """Given a chat history and the latest user question \
+                    which might reference context in the chat history, formulate a standalone question \
+                    which can be understood without the chat history. Do NOT answer the question, \
+                    just reformulate it if needed and otherwise return it as is."""
+
+                    contextualize_prompt = ChatPromptTemplate.from_messages([
+                        ("system", contextualize_q_system_prompt),
+                        ("human", "Chat History:\n{chat_history}\n\nUser Question:\n{input}"),])
+                    
+                    contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
+
+                    # Step 4: Define the Agent Prompt
+
                     prompt_data = f"""You have access to the following Pandas DataFrames: 
                     {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
                     If you need to check their structure, use `df.info()` or `df.head()`.
                     Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
-                    # Step 2: Define a Prompt Template
                     prompt = ChatPromptTemplate.from_messages([
                         ("system", prompt_data),
+                        MessagesPlaceholder(variable_name="chat_history"),
                         ("human", "{input}"),
                         ("ai", "{agent_scratchpad}"),
                     ])
 
-                    # Step 3: Create the Agent
+                    # Step 5: Create the Agent
                     agent = create_openai_functions_agent(llm, [python_tool], prompt)
 
-                    # Step 4: Wrap in an Agent Executor (Finalized Agent)
-                    return AgentExecutor(agent=agent, tools=[python_tool], verbose=verbose)
+                    # Step 6: Wrap in an Agent Executor (Finalized Agent)
+                    agent_executor = AgentExecutor(agent=agent, tools=[python_tool], memory=memory, verbose=verbose)
+
+                    # Step 7: Wrapper Function to Use Contextualization and Preserve Memory
+                    def agent_with_contextualization(question):
+                        standalone_question = contextualize_chain.run(input=question)
+                        response = agent_executor.invoke({"input": standalone_question})
+                        memory.save_context({"input": question}, {"output": response.get("output", str(response))})
+                        return response
+
+                    return agent_with_contextualization
 
                 self.agent = create_custom_pandas_agent(self.dataframe_llm, {"df1": df_list[0], "df2": df_list[1]}, prompt_data, verbose=True)
-                #self.agent = lp.create_pandas_dataframe_agent(
-                #    self.dataframe_llm, df_list, verbose=True, allow_dangerous_code=True,
-                #    handle_parsing_errors = True)
+
+            
+
+            with time_block("b9: RAG pipeline memory setting up"):
+                # Setup RAG prompts
+                contextualize_q_system_prompt = """Given a chat history and the latest user question \
+                which might reference context in the chat history, formulate a standalone question \
+                which can be understood without the chat history. Do NOT answer the question, \
+                just reformulate it if needed and otherwise return it as is."""
+
+                contextualize_q_prompt = ChatPromptTemplate.from_messages([
+                    ("system", contextualize_q_system_prompt),
+                    MessagesPlaceholder("chat_history"),
+                    ("human", "{input}"),])
+
+                self.history_aware_retriever = create_history_aware_retriever(self.code_llm, retriever, contextualize_q_prompt)
+                self.chat_history = []
     
             self.ok = True
         except Exception as e:
@@ -245,9 +271,9 @@ class ProjectChat:
                 'import mdvtools\nprint("mdvtools import ok")'
             )
             return f"mdvtools import ok? {ok}\n\nstdout: {strdout}\n\nstderr: {stderr}"
-        with time_block("b9a: Pandas agent invoking"):  # ~0.005% of time
+        with time_block("b10a: Agent invoking"):  # ~0.005% of time
             self.socket_api.update_chat_progress(
-                "Pandas agent invoking", id, progress, 0
+                "Agent invoking", id, progress, 0
             )
             # shortly after this...
             # Error in StdOutCallbackHandler.on_chain_start callback: AttributeError("'NoneType' object has no attribute 'get'")
@@ -259,16 +285,16 @@ class ProjectChat:
             # provide an update to the user that we're working on it, using provided id.
             logger.info(f"Question asked by user: {question}")
         try:
-            with time_block("b9b: Pandas agent invoking"):  # ~31.4% of time
+            with time_block("b10b: Pandas agent invoking"):  # ~31.4% of time
                 self.socket_api.update_chat_progress(
                     "Pandas agent invoking...", id, progress, 31
                 )
                 progress += 31
                 # Argument of type "str" cannot be assigned to parameter "input" of type "Dict[str, Any]"
                 # response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]})  # type: ignore for now
-                response = self.agent.invoke({"input": question})
+                response = self.agent(question)
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
-            with time_block("b10: RAG prompt preparation"):  # ~0.003% of time
+            with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
                 self.socket_api.update_chat_progress(
                     "RAG prompt preparation...", id, progress, 1
                 )
@@ -295,9 +321,6 @@ class ProjectChat:
                 else:
                     raise FileNotFoundError("No CSV or H5AD file found in the directory.")
 
-                # path_to_data now contains the correct file path
-                #path_to_data = "data_cells.csv"
-                datasource_name = self.ds_name
                 datasource_names = [ds['name'] for ds in self.project.datasources[:2]]  # Get names of up to 2 datasources
 
                 #!!!!!! for now, assuming there will be an anndata.h5ad file in the project directory and will fail ungacefully if there isn't!!!!
@@ -306,28 +329,26 @@ class ProjectChat:
                 # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
                 # and the assert in the function is being triggered even though it should be fine
                 prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output']) #self.ds_name, response['output'])
-                prompt_RAG_template = PromptTemplate(
-                    template=prompt_RAG,
-                    input_variables=["context", "question"]
-                )
 
-            with time_block("b11: RAG chain"):  # ~60% of time
+                qa_prompt = ChatPromptTemplate.from_messages([
+                    ("system", prompt_RAG),
+                    MessagesPlaceholder("chat_history"),
+                    ("human", "{context}\n\n{input}\n\n{question}"),])
+
+            with time_block("b12: RAG chain"):  # ~60% of time
                 self.socket_api.update_chat_progress(
                     "Invoking RAG chain...", id, progress, 60
                 )
                 progress += 60
-                qa_chain = RetrievalQA.from_llm(
-                    llm=self.code_llm,
-                    prompt=prompt_RAG_template,
-                    retriever=retriever,
-                    return_source_documents=True,
-                )
-                context = retriever
-                output_qa = qa_chain.invoke({"context": context, "query": question})
-                result = output_qa["result"]
+
+                question_answer_chain = create_stuff_documents_chain(self.code_llm, qa_prompt)
+                rag_chain = create_retrieval_chain(self.history_aware_retriever, question_answer_chain)
+                output_qa = rag_chain.invoke({"chat_history": self.chat_history, "input": question, "question": question})
+                self.chat_history.extend([HumanMessage(content=question), output_qa["answer"]])
+                result = output_qa["answer"]
                 print(result)
 
-            with time_block("b12: Prepare code"):  # <0.1% of time
+            with time_block("b13: Prepare code"):  # <0.1% of time
                 final_code = prepare_code(
                     result,
                     self.df,
@@ -340,9 +361,9 @@ class ProjectChat:
             # log_to_google_sheet(sheet, str(context_information_metadata_name), output_qa['query'], prompt_RAG, code)
             # todo - save code at various stages of processing...
             # log_chat(output_qa, prompt_RAG, final_code)
-            with time_block("b13: Chat logging by MDV"):  # <0.1% of time
+            with time_block("b14: Chat logging by MDV"):  # <0.1% of time
                 self.project.log_chat_item(output_qa, prompt_RAG, final_code)
-            with time_block("b14: Execute code"):  # ~9% of time
+            with time_block("b15: Execute code"):  # ~9% of time
                 self.socket_api.update_chat_progress(
                     "Executing code...", id, progress, 9
                 )
