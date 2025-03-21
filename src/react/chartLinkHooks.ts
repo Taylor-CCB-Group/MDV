@@ -35,9 +35,10 @@ export const useViewStateLink = () => {
         const unsubscribe = viewerStore.subscribe(({ viewState }) => {
             thisChart.ignoreStateUpdate = true; //<< add a setting for this, make sure we get the logic right
             const originalZoom = viewState.zoom as number;
-            const ourPhysicalSize = metadata.Pixels.PhysicalSizeX;
+            const ourPhysicalSize = metadata?.Pixels.PhysicalSizeX;
             if (!ourPhysicalSize) {
-                console.warn("no physical size in metadata - or unexpected metadata format?");
+                //! todo - allow this link to work without physical size/viv context.
+                console.warn("no physical size in metadata, unexpected metadata format, or used outside viv context?");
                 return;
             }
             const ourUnits = metadata.Pixels.PhysicalSizeXUnit;
@@ -78,8 +79,8 @@ export const useViewStateLink = () => {
     }, [
         viewerStore,
         id,
-        metadata.Pixels.PhysicalSizeX,
-        metadata.Pixels.PhysicalSizeXUnit,
+        metadata?.Pixels.PhysicalSizeX,
+        metadata?.Pixels.PhysicalSizeXUnit,
     ]);
 };
 
