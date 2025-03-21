@@ -69,7 +69,7 @@ export const scatterDefaults: ScatterPlotConfig = {
     contour_intensity: 1,
     contour_opacity: 0.5,
     dimension: "2d",
-    on_filter: "grey",
+    on_filter: "hide", //safer in case of large datasets
 };
 
 
