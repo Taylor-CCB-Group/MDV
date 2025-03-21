@@ -56,13 +56,13 @@ def log_chat(output: Any, prompt_template: str, response: str):
     output: result of invoke 'from langchain.chains import RetrievalQA'
     """
     print("Logging to json file...")
-    context_information = output['source_documents']
+    context_information = output['context']
     context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
     context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
 
     if file is not None:
         try:
-            log_to_json(context_information_metadata_url, output['query'], prompt_template, response)
+            log_to_json(context_information_metadata_url, output['input'], prompt_template, response)
         except Exception as e:
             print(f"Error logging to json file: {e}")
     else:

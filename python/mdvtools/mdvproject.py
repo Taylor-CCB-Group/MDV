@@ -1784,13 +1784,12 @@ class MDVProject:
         """
         log_chat(output, prompt_template, response)
         
-        context_information = output['source_documents']
+        context_information = output['context']
         context_information_metadata = [context_information[i].metadata for i in range(len(context_information))]
         context_information_metadata_url = [context_information_metadata[i]['url'] for i in range(len(context_information_metadata))]
-        context_information_metadata_name = [s[82:] for s in context_information_metadata_url]
 
-        context = str(context_information_metadata_name)
-        query = output['query']
+        context = str(context_information_metadata_url)
+        query = output['question']
 
         # this is NOT the format we want to save the chat log in long term
         self.chat_log.append(
