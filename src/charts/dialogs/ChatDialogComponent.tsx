@@ -199,7 +199,6 @@ const Chatbot = () => {
                     <Message key={message.id} {...message} />
                 ))}
                 {requestProgress && <Progress {...requestProgress} verboseProgress={verboseProgress} />}
-                Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quisquam recusandae harum, sint voluptates ex nobis repellendus blanditiis esse, optio perspiciatis doloribus et minus iusto! Minima atque odio pariatur aut nobis!
                 {/* {
                 isSending && 
                 (<div className="animate-pulse flex justify-center p-4">{progressText}</div>)} */}
