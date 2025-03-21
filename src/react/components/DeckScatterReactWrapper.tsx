@@ -93,6 +93,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
 
 
         return settings.concat([
+            //todo standard tooltip setting (with multi-choice)
             g({
                 type: "check",
                 label: "Show Tooltip",
@@ -156,6 +157,19 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                 continuous: true,
                 func: (x) => {
                     c.opacity = x * x;
+                },
+            }),
+            g({
+                type: "radiobuttons",
+                label: "Action on Filter",
+                choices: [
+                    ["Hide Points", "hide"],
+                    ["Gray Out Points", "grey"],
+                ],
+                current_value: c.on_filter,
+                func: (x) => {
+                    //@ts-ignore x is a string, but we have a narrow "hide" | "grey" type
+                    c.on_filter = x;
                 },
             }),
             g({
