@@ -12,6 +12,8 @@ import type { OrbitViewState } from "@deck.gl/core";
 import type { LoadedDataColumn } from "@/charts/charts";
 import { Axis, Scale } from "@visx/visx";
 import "../../charts/css/charts.css";
+import { SpatialAnnotationProvider } from "../spatial_context";
+import SelectionOverlay from "./SelectionOverlay";
 
 const margin = { top: 10, right: 10, bottom: 40, left: 60 };
 /** todo this should be common for viv / scatter_state, pending refactor
@@ -125,7 +127,7 @@ function useFilterArray() {
  *   - enhanced version with more info (in general for all charts, or at least new ones)
  * - axis configuration (including via direct manipulation)
  */
-export default observer(function DeckScatterComponent() {
+const DeckScatter = observer(function DeckScatterComponent() {
     const id = useId();
     const [width, height] = useChartSize();
     const [cx, cy, cz] = useParamColumns() as LoadedDataColumn<"double">[];
@@ -326,3 +328,15 @@ export default observer(function DeckScatterComponent() {
         </>
     );
 });
+
+export default () => {
+    const chart = useChart();
+    // in order for SelectionOverlay to work, we need to review how our implementation works
+    // vs useScatterplotLayer in spatial_context.tsx
+    return (
+        <SpatialAnnotationProvider chart={chart}>
+            <DeckScatter />
+            {/* <SelectionOverlay /> */}
+        </SpatialAnnotationProvider>
+    );
+};
