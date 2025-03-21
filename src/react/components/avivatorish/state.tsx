@@ -350,10 +350,15 @@ export const useLoader = () => {
 //! todo review the typing here...
 export type Metadata = OME_TIFF['metadata'];// | OME_ZARR['metadata'] | BIO_ZARR['metadata'];
 //export type Metadata = TiffPreviewProps["metadata"];
-export const useMetadata = (): Metadata => {
-    const image = useChannelsStore((store) => store.image);
-    const metadata = useViewerStore((store) => store.metadata);
-    return Array.isArray(metadata) ? metadata[image] : metadata;
+export const useMetadata = (): Metadata | undefined => {
+    try {
+        const image = useChannelsStore((store) => store.image);
+        const metadata = useViewerStore((store) => store.metadata);
+        return Array.isArray(metadata) ? metadata[image] : metadata;
+    } catch (e) {
+        // we now sometimes call this hook outside of a Viv context, so this is expected.
+        // console.error("no metadata", e);
+    }
 };
 
 /** Add default values to a *config* (not an instance of actual store) that may have been serialized before
