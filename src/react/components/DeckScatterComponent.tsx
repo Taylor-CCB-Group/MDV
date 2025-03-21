@@ -162,6 +162,10 @@ export default observer(function DeckScatterComponent() {
         // maybe we want a kind of concrete config synthesis that means we have colorBy as a function...
         // also maybe getPosition...
         // to what extent is that stuff we want to generalise?
+        // ! note if we want to have `data` include all indices & filter with `DataFilterExtension`,
+        // (which would help with transitions on filtered data)
+        // it ends up being much slower than just using the filtered indices
+        // and we need to adapt the colorBy function as it will no longer be passed the index as first argument.
         getFillColor: colorBy ?? [61, 126, 180],
         getLineColor: [0, 0, 0],
         updateTriggers: {
@@ -213,16 +217,17 @@ export default observer(function DeckScatterComponent() {
                 // type: "spring",
             },
         },
-        //@ts-expect-error - we could probably have a generic on the layer
-        getFilterValue: (_, { index }: { index: number }) => filterValue[index], //how do we just pass the buffer?
+        getFilterValue: (_: any, { index }: { index: number }) => filterValue[index] || 0, //how do we just pass the buffer?
         filterRange: [0.5, 1],
         updateTriggers: {
             //! using `data` as a trigger as `filterValue` was behind by one frame or something
             getFilterValue: data,
+            getPosition: [cx.data, cy.data, cz?.data],
         },
         extensions: [new DataFilterExtension()],
-    }), [cx, cy, cz, opacity, radiusScale, id, filterValue, data]);
-
+        visible: greyOnFilter,
+    }), [cx, cy, cz, opacity, radiusScale, id, filterValue, data, greyOnFilter]);
+    
     // we need an OrthographicView to prevent wrapping etc...
     const view = useMemo(() => {
         return config.dimension === "2d" ? new OrthographicView({
@@ -242,8 +247,8 @@ export default observer(function DeckScatterComponent() {
             y: margin.top - 1,
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
-    const layers = greyOnFilter ? [scatterplotLayer, greyScatterplotLayer] : [scatterplotLayer];
-    // const layers = greyOnFilter ? [scatterplotLayer] : [scatterplotLayer];
+    //! deck doesn't like it if we change the layers array - better to toggle visibility
+    const layers = [scatterplotLayer, greyScatterplotLayer];
     // todo - these need to be encapsulated better, the DeckGL component should be in a smaller
     // area with the axes outside of it.
     // axes need to respond to the viewState...
