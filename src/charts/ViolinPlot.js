@@ -111,6 +111,7 @@ class ViolinPlot extends WGLChart {
         c.band_width = c.band_width || this.defaultBandWidth;
         c.intervals = c.intervals || 20;
         const cy = this.dataStore.columnIndex[field];
+        c.axis.y.label = cy.name;
         this.app.addCircles({
             x: this.xPos,
             y: cy.datatype === "int32" ? new Float32Array(cy.data) : cy.data,

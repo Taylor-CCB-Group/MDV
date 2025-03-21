@@ -205,7 +205,14 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const value = fVal;
     // const value = fVal;
     const isInteger = column.datatype.match(/int/);
-    const step = isInteger ? 1 : 0.001;
+    const { minMax } = column;
+    const step = useMemo(() => {
+        if (isInteger) return 1;
+        // not sure this is totally correct - but there was a problem with very small ranges
+        // this should be better...
+        const small = Math.min(...minMax.map((v) => Math.abs(v)));
+        return small < 0.001 ? small/1000 : 0.001;
+    }, [isInteger, minMax]);
     const [debouncedValue] = useDebounce(value, 10);
 
     // Effect to manage the filter state

@@ -197,7 +197,6 @@ export function useFilteredIndices() {
     const [filteredOutIndices, setFilteredOutIndices] = useState(
         new Uint32Array(),
     );
-    // biome-ignore lint/correctness/useExhaustiveDependencies: shouldn't be ignoring this, but some deps don't tend to change as of now.
     useEffect(() => {
         // return
         let cancelled = false;
@@ -213,7 +212,7 @@ export function useFilteredIndices() {
             dataStore.name,
             catColumns,
         );
-        Promise.all([indexPromise, colPromise]).then(([indices]) => {
+        Promise.all([indexPromise, colPromise, dataStore._filteredIndicesPromise]).then(([indices]) => {
             if (cancelled) return;
             if (filterColumn) {
                 const cols = catFilters.map(
@@ -274,6 +273,9 @@ export function useFilteredIndices() {
         filterColumn,
         config.background_filter,
         config.category_filters,
+        dataStore.columnIndex,
+        dataStore.getFilteredIndices,
+        dataStore.name,
     ]);
     return filteredIndices;
 }

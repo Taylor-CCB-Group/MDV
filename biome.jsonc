@@ -10,7 +10,8 @@
 			"complexity": {
 				"useLiteralKeys": "off",
 				"noForEach": "off",
-				"noUselessSwitchCase": "info"
+				"noUselessSwitchCase": "info",
+				"noUselessFragments": "off"
 			},
 			"suspicious": {
 				"noExplicitAny": "off",
@@ -51,7 +52,11 @@
 			"./src/legacy/**/*",
 			"./src/browser/**/*",
 			"./src/table/Slick*",
-			"./src/venn/**/*"
+			"./src/venn/**/*",
+			"./src/table/css/slick*",
+			"./src/tailwind.css",
+			"./src/utilities/css/**/*",
+			"./src/css/**/*"
 		]
 	}
 }
