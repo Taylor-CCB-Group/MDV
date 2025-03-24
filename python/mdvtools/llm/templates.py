@@ -114,17 +114,6 @@ If no script is relevant, guided by the context generate a new script.
 This string """
         + final_answer
         + """ specifies the names of the data fields that need to be plotted, for example in the params field. Get the structure of params definition from the context.
-DO NOT forget to use the f-string, or formatted string literal, python structure in the parameters, params or param.
-
-Generate Python code that correctly uses formatted string literals.
-Ensure all strings requiring variable substitution use the 'f' prefix.
-
-Example:
-# Correct:
-message = f"Hello, {question}!"
-
-Incorrect:
-message = "Hello, {question}!"
 
 If the prompt asks for a gene, make sure you load this datasource and that you create a link between the two datasets.
 

@@ -201,8 +201,8 @@ else:
         # not at all robust... won't be needed in future
         final_code = final_code.replace("project.add_datasource", "# project.add_datasource")
 
-        final_code = final_code.replace("project.add_rows_as_columns_link", "# project.add_rows_as_columns_link")
-        final_code = final_code.replace("project.add_rows_as_columns_subgroup", "# project.add_rows_as_columns_subgroup") 
+        #final_code = final_code.replace("project.add_rows_as_columns_link", "# project.add_rows_as_columns_link")
+        #final_code = final_code.replace("project.add_rows_as_columns_subgroup", "# project.add_rows_as_columns_subgroup") 
 
         # make sure the final code does not contain p.static
         final_code = final_code.replace("project.convert_to_static_page", "# project.convert_to_static_page")
