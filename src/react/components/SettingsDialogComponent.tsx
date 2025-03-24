@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useMemo, useId, useCallback } from "react";
+import { useMemo, useId, useCallback, useState, useRef } from "react";
 import type { AnyGuiSpec, DropDownValues, GuiSpec, GuiSpecType } from "../../charts/charts";
 import { action, makeAutoObservable } from "mobx";
 import { ErrorBoundary } from "react-error-boundary";
@@ -23,6 +23,7 @@ import { isArray, notEmpty } from "@/lib/utils";
 import type BaseChart from "@/charts/BaseChart";
 import type { BaseConfig } from "@/charts/BaseChart";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
+import { useCloseOnIntersection } from "../hooks";
 
 export const MLabel = observer(({ props, htmlFor }: { props: AnyGuiSpec, htmlFor?: string }) => (
     <Typography fontSize="small" sx={{alignSelf: "center", justifySelf: "end", textAlign: "right", paddingRight: 2}}>
@@ -245,6 +246,8 @@ export const DropdownAutocompleteComponent = observer(({
 }: { props: DropdownSpec }) => {
     // todo review 'virtualization' for large lists
     const id = useId();
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLInputElement>(null);
     // const props = inferDropdownType(propsAmbiguous);
     const multiple = isMultidropdown(props);
     // the props.values may be a tuple of [valueObjectArray, textKey, valueKey], or an array of length 1 - [string[]]
@@ -252,6 +255,8 @@ export const DropdownAutocompleteComponent = observer(({
     //todo handle multitext / tags properly.
 
     const {options, single, label, val, okOption} = useDropdownOptions(props);
+
+    useCloseOnIntersection(ref, () => setOpen(false));
 
     type Option = typeof options[number]; // hopefully we can improve `{ original: any }`
     // still not entirely sure about the type for onChange...
@@ -265,9 +270,14 @@ export const DropdownAutocompleteComponent = observer(({
                 size="small"
                 id={id}
                 options={options}
+                limitTags={5}
                 disableCloseOnSelect={multiple}
                 getOptionLabel={label}
                 value={okOption.filter((a) => a !== undefined)}
+                open={open}
+                onOpen={() => setOpen(true)}
+                onClose={() => setOpen(false)}
+                ref={ref}
                 onChange={action((_, value: OVal) => {
                     //added type annotation above because mobx seems to fluff the inference to `never`
                     if (value === null) return;
