@@ -194,9 +194,13 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const radiusScale = radius * course_radius;
 
     const data = useFilteredIndices();
-    //! not keen on third param potentially being contourParameter of cz
-    // let's change how config works.
-    const [cx, cy, contourParameter] = useParamColumns();
+    //! not keen on third param potentially being either contourParameter or cz
+    // n.b. Viv version already has config.contourParameter (maybe should be densityParameter)
+    // param[2] is set to the same value for some kind of backward compatibility?
+    // or as the result of still using old BaseChart.init()
+    // const [cx, cy, contourParameter] = useParamColumns();
+    const params = useParamColumns();
+    const [cx, cy, cz] = params;
     const hoverInfoRef = useRef<PickingInfo | null>(null);
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
@@ -250,6 +254,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         return [new ScatterSquareExtension()];
     }, [point_shape]);
     const scatterplotLayer = useMemo(() => {
+        const is3d = config.dimension === "3d";
         return new SpatialLayer({
             //new
             // loaders //<< this will be interesting to learn about
@@ -257,6 +262,11 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             data,
             opacity,
             radiusScale,
+            billboard: true,
+            // antialiasing has artefacts on edges in 3d.
+            // may also consider option to turn off antialiasing for performance?
+            // (if it even has a significant impact)
+            antialiasing: !is3d,
             getFillColor: colorBy ?? [255, 255, 255],
             getRadius: 1 / scale,
             // todo review buffer data / accessors / filters...
@@ -264,7 +274,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 if (typeof i !== "number") throw new Error("expected index");
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
-                target[2] = 0;
+                target[2] = cz?.minMax ? cz.data[i] : 0;
                 return target as unknown as Float32Array; // deck.gl types are wrong AFAICT
             },
             modelMatrix,
@@ -273,7 +283,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 // modelMatrix: modelMatrix, // this is not necessary, manipulating the matrix works anyway
                 // getLineWith: clickIndex, // this does not work, seems to need something like a function
                 getLineWidth,
-                getPosition: [cx, cy],
+                getPosition: [cx, cy, cz],
                 //as of now, the SpatialLayer implemetation needs to figure this out for each sub-layer.
                 // getContourWeight1: config.category1,
             },
@@ -318,13 +328,21 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         colorBy,
         cx,
         cy,
+        cz,
         scale,
         modelMatrix,
         extensions,
         chart,
         getLineWidth,
         contourLayers,
+        config.dimension,
     ]);
+    // this should take into account axis margins... not chart.contentDiv,
+    // but the actual area where the scatterplot is rendered
+    // (which may in future be a smaller region within the deck.gl canvas itself)
+    const boundingClientRect = useMemo(() => {
+        return chart.contentDiv.getBoundingClientRect();
+    }, [chart.contentDiv.getBoundingClientRect]);
     const unproject = useCallback(
         (e: MouseEvent | React.MouseEvent | P) => {
             // never liked this... and then it was actually causing an infinite loop
@@ -332,10 +350,10 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             //     throw new Error("scatterplotLayer not ready");
             // also not massively keen on try/catch, but much better the dodgy currentLayerHasRendered
             try {
-                if (Array.isArray(e))
+                if (Array.isArray(e)) {
                     e = { clientX: e[0], clientY: e[1] } as MouseEvent;
-                // this should take into account axis margins
-                const r = chart.contentDiv.getBoundingClientRect();
+                }
+                const r = boundingClientRect;
                 const x = e.clientX - r.left;
                 const y = e.clientY - r.top;
                 const p = scatterplotLayer.unproject([x, y]) as P;
@@ -354,8 +372,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         [
             scatterplotLayer,
             modelMatrix,
-            // currentLayerHasRendered,
-            chart.contentDiv.getBoundingClientRect,
+            boundingClientRect,
         ],
     );
     return useMemo(
