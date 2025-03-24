@@ -183,9 +183,6 @@ const Main = observer(() => {
             //todo figure out why GPU usage is so high (and why commenting and then uncommenting this line fixes it...)
             layers: [jsonLayer, scatterplotLayer, selectionLayer],
             id: `${id}deck`,
-            onAfterRender: () => {
-                scatterProps.onAfterRender();
-            },
             glOptions: {
                 // no longer working with new deck.gl version?
                 preserveDrawingBuffer: true,
@@ -200,7 +197,6 @@ const Main = observer(() => {
             jsonLayer,
             id,
             getTooltip,
-            scatterProps.onAfterRender,
         ],
     );
     if (!viewState) return <div>Loading...</div>; //this was causing uniforms["sizeScale"] to be NaN, errors in console, no scalebar units...
