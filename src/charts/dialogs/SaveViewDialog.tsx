@@ -12,11 +12,10 @@ const SaveViewDialogComponent = (props: {
     onClose: () => void;
     action?: () => void;
 }) => {
-    const cm = window.mdv.chartManager;
+    const { viewManager } = window.mdv.chartManager;
 
     const onSave = () => {
-        const state = cm.getState();
-        cm._callListeners("state_saved", state);
+        viewManager.saveView();
     };
 
     return (

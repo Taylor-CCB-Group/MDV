@@ -989,6 +989,7 @@ export class ChartManager {
             }
         }
         await Promise.all(chartPromises);
+        this.viewManager.setLastSavedState(this.getState());
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
         this._inInit = false;
@@ -1027,45 +1028,7 @@ export class ChartManager {
     }
 
     changeView(view) {
-        for (const ds in this.viewData.dataSources) {
-            if (this.viewData.dataSources[ds].layout === "gridstack") {
-                this.gridStack.destroy(this.dsIndex[ds]);
-            }
-        }
-        this.removeAllCharts();
-        this.contentDiv.innerHTML = "";
-        this.viewManager.setView(view);
-        this.viewLoader(view).then((data) => {
-            this._init(data);
-        });
-    }
-
-    deleteCurrentView() {
-        //remove the view choice and change view to the next one
-        const view = this.viewManager.current_view;
-
-        // update the views
-        const updatedViews = this.viewManager.all_views.filter((v) => v !== view);
-        this.viewManager.setAllViews(updatedViews);
-
-        const state = this.getState();
-
-        //want to delete view and update any listeners
-        state.view = null;
-
-        this._callListeners("state_saved", state);
-
-        if (updatedViews.length > 0) {
-            // set current view to initial view
-            const nextView = updatedViews[0];
-            this.viewManager.setView(nextView);
-            this.changeView(nextView);
-        } else {
-            // no other views exist
-            this.removeAllCharts();
-            this.viewData = {};
-            this.showAddViewDialog();
-        }
+        this.viewManager.checkStateChange(() => this.viewManager.changeView(view));
     }
 
     _columnRemoved(ds, col) {

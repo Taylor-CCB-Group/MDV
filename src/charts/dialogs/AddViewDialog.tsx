@@ -18,8 +18,7 @@ const AddViewDialogComponent = (props: {
     const [viewName, setViewName] = useState("");
     const [isCloneView, setIsCloneView] = useState(false);
     const [checkedDs, setCheckedDs] = useState<{ [name: string]: boolean }>({});
-    const cm = window.mdv.chartManager;
-    const { viewManager, viewData, dsIndex, contentDiv } = cm;
+    const { viewManager, viewData } = window.mdv.chartManager;
 
     useEffect(() => {
         // Initialising the checkedDs with the data sources inside the view
@@ -39,46 +38,7 @@ const AddViewDialogComponent = (props: {
     };
 
     const onCreate = () => {
-        viewManager.setAllViews([...viewManager.all_views, viewName]);
-
-        // Optionally make it the current view
-        viewManager.setView(viewName);
-        if (!isCloneView) {
-            //remove all charts and links
-            for (const ds in viewData.dataSources) {
-                if (viewData.dataSources[ds].layout === "gridstack") {
-                    const d = dsIndex[ds];
-                    if (!d) continue;
-                    cm.gridStack.destroy(d);
-                }
-            }
-            cm.removeAllCharts();
-            viewData.links = [];
-            const state = cm.getState();
-            state.view.initialCharts = {};
-            state.view.dataSources = {};
-            //only one datasource
-            if (Object.keys(viewData.dataSources)?.length === 1) {
-                const name = Object.keys(viewData.dataSources)?.[0];
-                state.view.initialCharts[name] = [];
-                state.view.dataSources[name] = {};
-            } else {
-                for (const ds in dsIndex) {
-                    if (checkedDs[ds]) {
-                        state.view.initialCharts[ds] = [];
-                        state.view.dataSources[ds] = {};
-                    }
-                }
-            }
-            cm._callListeners("state_saved", state);
-            contentDiv.innerHTML = "";
-            cm._init(state.view);
-        } else {
-            const state = cm.getState();
-            console.log("state add new: ", state);
-            cm._callListeners("state_saved", state);
-            cm._init(state.view);
-        }
+        viewManager.addView(viewName, checkedDs, isCloneView);
         props.onClose();
     };
     return (
