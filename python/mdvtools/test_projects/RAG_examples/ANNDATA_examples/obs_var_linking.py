@@ -105,10 +105,10 @@ def main():
 
     
     # DotPlot parameters
-    gene_name = "TNF"
-    gene_index = data_frame_var.index.get_loc("gene_name")
+    param2 = "param2"
+    param2_index = data_frame_var.index.get_loc(param2)
     dot_title = "Dot plot example title"
-    dot_params = ["param1", {"linkedDsName":datasource_name_2,"maxItems":10,"type":"RowsAsColsQuery"}]
+    dot_params = ["param1", f"link|{param2}(link)|{param2_index}"]
 
     # DotPlot parameters
     dot_title = "Example Title"
@@ -124,8 +124,10 @@ def main():
     dot_plot = create_dot_plot(dot_title, dot_params, dot_size, dot_position, dot_colorscale)
     
     # BoxPlot parameters
+    param2 = "param2"
+    param2_index = data_frame_var.index.get_loc(param2)
     box_title = "Example title"
-    box_params = ["param1", {"linkedDsName":datasource_name_2,"maxItems":10,"type":"RowsAsColsQuery"}]
+    box_params = ["param1", f"link|{param2}(link)|{param2_index}"]
     box_size = [615, 557]
     box_position = [500, 500]
     
@@ -141,8 +143,8 @@ def main():
     view_config = {'initialCharts': {datasource_name: [scatter_plot_json, dot_plot_json, box_plot_json]}}
 
     # creating the link between the two datasets so that selecting a subset of genes to add the expression in cells is enabled
-    project.add_rows_as_columns_link(datasource_name,datasource_name_2,"variable_name","Gene Expression")
-    project.add_rows_as_columns_subgroup(datasource_name,datasource_name_2,"Gene expression",adata.X.toarray()) #add the gene expression 
+    project.add_rows_as_columns_link(datasource_name,datasource_name_2,"variable_name","link")
+    project.add_rows_as_columns_subgroup(datasource_name,datasource_name_2,"link",adata.X.toarray()) #add the link, could be gene expression 
     
     project.set_view(view_name, view_config)
     project.set_editable(True)
