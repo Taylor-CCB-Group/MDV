@@ -89,9 +89,10 @@ export function useRegionScale() {
         console.warn(
             `physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`,
         );
-    if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
+    // if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
+    if (!Pixels.PhysicalSizeX) return 1;
     const scale = Pixels.PhysicalSizeX / regionScale;
-    return scale;
+    return Number.isFinite(scale) ? scale : 1;
 }
 
 
@@ -193,6 +194,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const radiusScale = radius * course_radius;
 
     const data = useFilteredIndices();
+    //! not keen on third param potentially being contourParameter of cz
+    // let's change how config works.
     const [cx, cy, contourParameter] = useParamColumns();
     const hoverInfoRef = useRef<PickingInfo | null>(null);
     const highlightedIndex = useHighlightedIndex();
@@ -218,7 +221,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         },
         [tooltipCol, data],
     );
-    // biome-ignore lint/correctness/useExhaustiveDependencies: fix this
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
         () => {
@@ -233,7 +235,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`
             );
         },
-        [hoverInfoRef, getTooltipVal, config.tooltip.show],
+        [getTooltipVal, config.tooltip.show, config.tooltip.column],
     );
 
     const scale = useRegionScale();
@@ -241,15 +243,13 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const viewState = useZoomOnFilter(modelMatrix);
     const { point_shape } = config;
 
+    // could probably bring this more into SpatialLayer...
     const extensions = useMemo(() => {
         if (point_shape === "circle") return [];
         if (point_shape === "gaussian") return [new ScatterDensityExension()];
         return [new ScatterSquareExtension()];
     }, [point_shape]);
-    const [currentLayerHasRendered, setCurrentLayerHasRendered] =
-        useState(false);
     const scatterplotLayer = useMemo(() => {
-        setCurrentLayerHasRendered(false); //<<< this is fishy
         return new SpatialLayer({
             //new
             // loaders //<< this will be interesting to learn about
@@ -273,6 +273,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 // modelMatrix: modelMatrix, // this is not necessary, manipulating the matrix works anyway
                 // getLineWith: clickIndex, // this does not work, seems to need something like a function
                 getLineWidth,
+                getPosition: [cx, cy],
                 //as of now, the SpatialLayer implemetation needs to figure this out for each sub-layer.
                 // getContourWeight1: config.category1,
             },
@@ -326,33 +327,36 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     ]);
     const unproject = useCallback(
         (e: MouseEvent | React.MouseEvent | P) => {
-            if (!currentLayerHasRendered || !scatterplotLayer.internalState)
-                throw new Error("scatterplotLayer not ready");
-            if (Array.isArray(e))
-                e = { clientX: e[0], clientY: e[1] } as MouseEvent;
-            const r = chart.contentDiv.getBoundingClientRect();
-            const x = e.clientX - r.left;
-            const y = e.clientY - r.top;
-            const p = scatterplotLayer.unproject([x, y]) as P;
-            //still need to reason better about transforms...
-            // const scale = 1; //this was only right when Pixels.PhysicalSizeX === regions.scale
-            // const p2 = p.map(v => v * scale) as P;
-            const m = modelMatrix.invert();
-            const p3 = m.transform(p) as P;
-            m.invert();
-            return p3;
+            // never liked this... and then it was actually causing an infinite loop
+            // if (!currentLayerHasRendered || !scatterplotLayer.internalState)
+            //     throw new Error("scatterplotLayer not ready");
+            // also not massively keen on try/catch, but much better the dodgy currentLayerHasRendered
+            try {
+                if (Array.isArray(e))
+                    e = { clientX: e[0], clientY: e[1] } as MouseEvent;
+                // this should take into account axis margins
+                const r = chart.contentDiv.getBoundingClientRect();
+                const x = e.clientX - r.left;
+                const y = e.clientY - r.top;
+                const p = scatterplotLayer.unproject([x, y]) as P;
+                //still need to reason better about transforms...
+                // const scale = 1; //this was only right when Pixels.PhysicalSizeX === regions.scale
+                // const p2 = p.map(v => v * scale) as P;
+                const m = modelMatrix.invert();
+                const p3 = m.transform(p) as P;
+                m.invert();
+                return p3;                
+            } catch (e) {
+                //console.error("unproject error", e);
+                return [0, 0];
+            }
         },
         [
             scatterplotLayer,
             modelMatrix,
-            currentLayerHasRendered,
+            // currentLayerHasRendered,
             chart.contentDiv.getBoundingClientRect,
         ],
-    );
-    // const project =
-    const onAfterRender = useCallback(
-        () => setCurrentLayerHasRendered(true),
-        [],
     );
     return useMemo(
         () => ({
@@ -360,8 +364,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             getTooltip,
             modelMatrix,
             viewState,
-            currentLayerHasRendered,
-            onAfterRender,
             unproject,
         }),
         [
@@ -369,8 +371,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             getTooltip,
             modelMatrix,
             viewState,
-            currentLayerHasRendered,
-            onAfterRender,
             unproject,
         ],
     );
