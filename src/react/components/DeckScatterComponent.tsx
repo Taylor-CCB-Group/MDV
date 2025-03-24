@@ -1,7 +1,7 @@
 import DeckGL from "@deck.gl/react";
 import { OrthographicView, OrbitView } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
-import { useChartSize, useConfig, useParamColumns } from "../hooks";
+import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns, useSimplerFilteredIndices } from "../hooks";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { useEffect, useId, useMemo, useState } from "react";
@@ -12,7 +12,7 @@ import type { OrbitViewState } from "@deck.gl/core";
 import type { LoadedDataColumn } from "@/charts/charts";
 import { Axis, Scale } from "@visx/visx";
 import "../../charts/css/charts.css";
-import { SpatialAnnotationProvider } from "../spatial_context";
+import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
 
 const margin = { top: 10, right: 10, bottom: 40, left: 60 };
@@ -79,36 +79,6 @@ function useZoomOnFilter(data: Uint32Array) {
     }, [data, cx, cy, width, height, config, pendingRecenter, chart]);
 }
 
-/** 
- * The implementation of useFilteredIndices in `scatter_state` presuposes that the config
- * will have a `background_filter`, which is used for filtering to image region... and then we also
- * added `category_filters` as an extra feature... but it adds up to returning zero-length arrays here
- * where we don't have those filters... and actually, now I'm thinking of a more general way of charts having
- * local filters.
- * 
- * Additionally, I want to change the approach for how we use filtered indices in deck.gl so that rather than
- * only rendering those points, we render all points, but with a filter that makes them invisible and allows for transitions.
- * n.b. I don't really mean that we render all points either, we also need to consider cases where we have a large number of points
- */
-function useSimplerFilteredIndices() {
-    const ds = useDataStore();
-    const [filteredIndices, setFilteredIndices] = useState<Uint32Array>(new Uint32Array(0));
-    useEffect(() => {
-        ds._filteredIndicesPromise; //referencing this so it's a dependency
-        ds.getFilteredIndices().then(i => setFilteredIndices(i));
-    }, [ds._filteredIndicesPromise, ds.getFilteredIndices]);
-    return filteredIndices;
-}
-
-function useFilterArray() {
-    const ds = useDataStore();
-    //not what we really want here - would be good to check if we end up with multiple copies of the data
-    const data = useSimplerFilteredIndices();
-    return useMemo(() => {
-        data; //referencing this so it's a dependency
-        return ds.filterArray;
-    }, [ds.filterArray, data]);
-}
 
 /**
  * Currently this implementation is somewhat separate from VivMDVReact / scatter_state,
@@ -131,7 +101,8 @@ const DeckScatter = observer(function DeckScatterComponent() {
     const id = useId();
     const [width, height] = useChartSize();
     const [cx, cy, cz] = useParamColumns() as LoadedDataColumn<"double">[];
-    const data = useSimplerFilteredIndices(); //leads to weird transition behaviour when filtering
+    // const data = useSimplerFilteredIndices();
+    const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
     const { opacity, radius, course_radius, viewState, on_filter, color_by } = config;
     // const is2d = dimension === "2d";
@@ -146,6 +117,11 @@ const DeckScatter = observer(function DeckScatterComponent() {
     useZoomOnFilter(data);
 
     const greyOnFilter = on_filter === "grey";
+
+    const { scatterProps, selectionLayer } = useSpatialLayers();
+    // this is now somewhat able to render for "2d", pending further tweaks
+    // const { scatterplotLayer, getTooltip } = scatterProps;
+
 
     const scatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatterplot-layer-${id}`,

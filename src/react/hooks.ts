@@ -198,6 +198,9 @@ export function useFilteredIndices() {
     // I really want to sort out how I use types here...
     const config = useConfig<VivRoiConfig>();
     const filterColumn = config.background_filter?.column;
+    const simpleFilteredIndices = useSimplerFilteredIndices();
+    //!! extremely abusive of rules of hooks quick experiment
+    if (!filterColumn) return simpleFilteredIndices;
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
     const [filteredOutIndices, setFilteredOutIndices] = useState(
@@ -286,16 +289,37 @@ export function useFilteredIndices() {
     return filteredIndices;
 }
 
-/** this should really understand things like background_filter */
-export function useFilteredOutIndices() {
-    const filteredIndices = useFilteredIndices();
-    const filteredOutIndices = useMemo(() => {
-        const allIndices = new Set(filteredIndices);
-        return Array.from({ length: filteredIndices.length }, (_, i) => i).filter(
-            (i) => !allIndices.has(i),
-        );
-    }, [filteredIndices]);
+/** 
+ * The implementation of useFilteredIndices in `scatter_state` presuposes that the config
+ * will have a `background_filter`, which is used for filtering to image region... and then we also
+ * added `category_filters` as an extra feature... but it adds up to returning zero-length arrays here
+ * where we don't have those filters... and actually, now I'm thinking of a more general way of charts having
+ * local filters.
+ * 
+ * Additionally, I want to change the approach for how we use filtered indices in deck.gl so that rather than
+ * only rendering those points, we render all points, but with a filter that makes them invisible and allows for transitions.
+ * n.b. I don't really mean that we render all points either, we also need to consider cases where we have a large number of points
+ */
+export function useSimplerFilteredIndices() {
+    const ds = useDataStore();
+    const [filteredIndices, setFilteredIndices] = useState<Uint32Array>(new Uint32Array(0));
+    useEffect(() => {
+        ds._filteredIndicesPromise; //referencing this so it's a dependency
+        ds.getFilteredIndices().then(i => setFilteredIndices(i));
+    }, [ds._filteredIndicesPromise, ds.getFilteredIndices]);
+    return filteredIndices;
 }
+
+export function useFilterArray() {
+    const ds = useDataStore();
+    //not what we really want here - would be good to check if we end up with multiple copies of the data
+    const data = useSimplerFilteredIndices();
+    return useMemo(() => {
+        data; //referencing this so it's a dependency
+        return ds.filterArray;
+    }, [ds.filterArray, data]);
+}
+
 
 export function useCategoryFilterIndices(
     contourParameter?: DataColumn<CategoricalDataType>,
