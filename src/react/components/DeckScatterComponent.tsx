@@ -120,10 +120,10 @@ const DeckScatter = observer(function DeckScatterComponent() {
 
     const { scatterProps, selectionLayer } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
-    // const { scatterplotLayer, getTooltip } = scatterProps;
+    const { scatterplotLayer, getTooltip } = scatterProps;
 
 
-    const scatterplotLayer = useMemo(() => new ScatterplotLayer({
+    const XscatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatterplot-layer-${id}`,
         data,
         pickable: true,
@@ -226,7 +226,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [scatterplotLayer, greyScatterplotLayer];
+    const layers = [selectionLayer, scatterplotLayer, greyScatterplotLayer];
     // todo - these need to be encapsulated better, the DeckGL component should be in a smaller
     // area with the axes outside of it.
     // axes need to respond to the viewState...
@@ -311,8 +311,8 @@ export default () => {
     // vs useScatterplotLayer in spatial_context.tsx
     return (
         <SpatialAnnotationProvider chart={chart}>
+            <SelectionOverlay />
             <DeckScatter />
-            {/* <SelectionOverlay /> */}
         </SpatialAnnotationProvider>
     );
 };
