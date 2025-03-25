@@ -66,7 +66,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
     }, [setSelectedColumn]);
     
     const getSafeInternalValue = useCallback((v: typeof props.current_value) => {
-        const defaultVal = props.multiple ? [] : values[0][0].fieldName;
+        const defaultVal = props.multiple ? [] : "";
         if (!v) return defaultVal;
         if (props.multiple) {
             // does the current value look like ours? we're not assuming it should:
@@ -81,8 +81,13 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
             if (typeof firstValue !== 'string') {
                 return defaultVal;
             }
+            // extracting value
+            if (!firstValue.includes("|")) {
+                return defaultVal;
+            }
             // check that the current value is in the list of possible values
-            if (!firstValue.includes("|") || !link.valueToRowIndex.has(firstValue)) {
+            const val = firstValue.split("|")[1].split(`(${sg})`)[0].trimEnd();
+            if (!link.valueToRowIndex.has(val)) {
                 return defaultVal;
             }
             return v;
@@ -94,13 +99,18 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
             if (typeof v !== 'string') {
                 return defaultVal;
             }
+            if (!v.includes("|")) {
+                return defaultVal;
+            }
+            // extracting value
+            const val = v.split("|")[1].split(`(${sg})`)[0].trimEnd();
             // check that the current value is in the list of possible values
-            if (!v.includes("|") || !link.valueToRowIndex.has(v)) {
+            if (!link.valueToRowIndex.has(val)) {
                 return defaultVal;
             }
             return v;
         }
-    }, [values, link.valueToRowIndex, props.multiple]);
+    }, [link.valueToRowIndex, props.multiple, sg]);
     const [initialValue] = useState(() => getSafeInternalValue(props.current_value));
 
     /// we don't want a new spec every time the value changes... we want to give it an observable value
