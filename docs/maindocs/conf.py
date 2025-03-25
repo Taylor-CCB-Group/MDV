@@ -54,6 +54,12 @@ autoapi_keep_files = True
 autoapi_generate_api_docs = True
 autoapi_add_toctree_entry = False
 
+# enable extensions for myst parser
+myst_enable_extensions = [
+    "html_image",
+    "attrs_inline",
+]
+
 
 html_logo = "../../images/mdv_logo.png"
 html_theme_options = {

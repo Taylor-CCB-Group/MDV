@@ -36,7 +36,7 @@ Once uploaded, the data is displayed in appropriate views:
 When tracks, graphs, or columns are added and you have edit permissions, they are **permanently** added to the project. However, layout changes (resizing, repositioning) are **not** saved automatically.
 
 To save these layout changes:
-1. Click the **Save** button (<img src="img/save.png" style="height: 1em; vertical-align: middle;">).
+1. Click the **Save** button (![Save Icon](img/save.png){height=20px}).
 2. If working on a public project, select **Save As** to create your own copy.
 
 ---
@@ -55,8 +55,8 @@ Charts help visualize data and allow intuitive filtering by selecting regions on
 2. Select a **Chart type**.
 3. Choose the **fields** to display.
 4. **Name** the chart.
-5. Adjust **settings** using the **gear icon (<img src="img/settings.png" style="height: 1em; vertical-align: middle;">)**.
-6. The **palette icon** is used to select channels with spatial omics data **(<img src="img/palette.png" style="height: 1em; vertical-align: middle;">)**.
+5. Adjust **settings** using the **gear icon (![Settings](img/settings.png){height=20px})**.
+6. The **palette icon** is used to select channels with spatial omics data **(![Palette](img/palette.png){height=20px})**.
 
 
 #### Settings
@@ -68,21 +68,19 @@ Furthermore, for when changes axes it is possible to refer to a:
 
 For example, a scatterplot is made based on the values of the column UMAP_1 and UMAP_2 in the "cells" table of an anndata object. The points in the UMAP maybe be coloured to reflect using the "Color by" setting to reflect: 
 1. A property in the "cells" table.
-<p>
-<p align="left">
-  <img src="img/link_by_column.png" alt="Color by column example" width="400" />
-</p>
-2. The expression value of a particular gene in the "genes" table
-<p>
-<p align="left">
-  <img src="img/link_by_link.png" alt="Color by link example" width="400" />
-</p>
-3. The expression value of a particular gene in the gene table that automatically updates when you change the filter. You can also add multiple genes in the "genes" table and where the chart can display it (for example a dot plot of gene expression) you will see all the genes dynamically added to the chart.
-<p>
 
-<p align="left">
-  <img src="img/link_by_active_link.png" alt="Color by active link example" width="400" />
-</p>
+<img src="img/link_by_column.png" alt="Link by column example" width="400" />
+
+
+2. The expression value of a particular gene in the "genes" table
+
+<img src="img/link_by_link.png" alt="Link by link example" width="400" />
+
+
+3. The expression value of a particular gene in the gene table that automatically updates when you change the filter. You can also add multiple genes in the "genes" table and where the chart can display it (for example a dot plot of gene expression) you will see all the genes dynamically added to the chart.
+
+<img src="img/link_by_active_link.png" alt="Link by Active link example" width="400" />
+
 
 
 ---
@@ -97,9 +95,10 @@ Below is a list of all chart types in **alphabetical order**, with **context** (
 
 #### Examples
 
-<p align="left">
-  <img src="img/Abundance_Box_Plot.png" alt="Abundance Box Plot Example" width="400" />
-</p>
+
+![Abundance Box Plot example](img/Abundance_Box_Plot.png){width=400px}
+
+
 
 #### Context
 An **abundance box plot** is used to visualize the distribution of numerical values across different categories, often representing abundance levels in a dataset. It provides insights into the **median**, **interquartile range**, **outliers**, and overall spread of values within each category.
@@ -135,9 +134,7 @@ An **abundance box plot** is used to visualize the distribution of numerical val
 
 #### Examples
 
-<p align="left">
-  <img src="img/Box_Plot.png" alt="Box Plot Example" width="400" />
-</p>
+<img src="img/Box_Plot.png" alt="Box Plot Example" width="400" />
 
 #### Context  
 A **box plot** is a visualization used to summarize the distribution of numerical values across different categories. It highlights key statistical metrics such as the **median, quartiles, and outliers**, providing insights into the spread and variability of the data.
@@ -182,9 +179,8 @@ A **box plot** is a visualization used to summarize the distribution of numerica
 ---
 
 ### Density Scatter Plot
-<p align="left">
-  <img src="img/Density_Scatter_Plot.png" alt="Density Scatter Plot Example" width="400" />
-</p>
+
+<img src="img/Density_Scatter_Plot.png" alt="Density Scatter Plot Example" width="400" />
 
 #### Context  
 A **Density Scatter Plot** is a visualization that represents the density of data points in a two-dimensional space. It is useful for identifying clusters, patterns, and relationships between two numerical variables. The density is typically visualized using contours or color gradients.
@@ -248,9 +244,7 @@ A **Density Scatter Plot** is a visualization that represents the density of dat
 
 #### Examples
 
-<p align="left">
-  <img src="img/Dot_Plot.png" alt="Dot Plot Example" width="400" />
-</p>
+<img src="img/Dot_Plot.png" alt="Dot Plot Example" width="400" />
 
 #### Context  
 A **Dot Plot** is a graphical representation where individual data points are plotted along an axis to show frequency distributions, comparisons, or proportions. Each dot represents a value, and its size and color can be used to encode additional information. This chart is useful for visualizing categorical data with quantitative measures.
@@ -294,9 +288,7 @@ A **Dot Plot** is a graphical representation where individual data points are pl
 
 #### Examples
 
-<p align="left">
-  <img src="img/Heat_Map.png" alt="Heat Map Example" width="400" />
-</p>
+<img src="img/Heat_Map.png" alt="Heat Map Example" width="400" />
 
 #### Context  
 A **Heatmap** is a data visualization technique that represents values as colors in a matrix format. It is useful for identifying patterns, correlations, and variations across multiple data points. Colors indicate intensity or frequency, making heatmaps effective for comparative analysis.
@@ -340,9 +332,7 @@ A **Heatmap** is a data visualization technique that represents values as colors
 
 #### Examples
 
-<p align="left">
-  <img src="img/Histogram.png" alt="Histogram Example" width="400" />
-</p>
+<img src="img/Histogram.png" alt="Histogram Example" width="400" />
 
 #### Context  
 A **Histogram** is a graphical representation of the distribution of numerical data. It groups values into **bins** and displays the frequency of occurrences within each bin. This visualization is particularly useful for analyzing the shape, spread, and central tendency of a dataset.
@@ -373,9 +363,7 @@ A **Histogram** is a graphical representation of the distribution of numerical d
 
 #### Examples
 
-<p align="left">
-  <img src="img/Multi_Line_Chart.png" alt="Multi Line Chart Example" width="400" />
-</p>
+<img src="img/Multi_Line_Chart.png" alt="Multi Line Chart Example" width="400" />
 
 #### Context  
 A **Line Plot** is used to visualize trends and patterns over time or continuous data. It connects data points with lines, making it ideal for identifying increases, decreases, and cyclical patterns.
@@ -416,9 +404,7 @@ A **Line Plot** is used to visualize trends and patterns over time or continuous
 
 #### Examples
 
-<p align="left">
-  <img src="img/Pie_Chart.png" alt="Pie Chart Example" width="400" />
-</p>
+<img src="img/Pie_Chart.png" alt="Pie Chart Example" width="400" />
 
 #### Context  
 A **Category Bar Chart** visualizes categorical data distribution, where each category is represented by a bar whose length corresponds to its value. This type of chart is useful for comparing different groups within a dataset.
@@ -445,9 +431,7 @@ A **Category Bar Chart** visualizes categorical data distribution, where each ca
 
 #### Examples
 
-<p align="left">
-  <img src="img/Row_Chart.png" alt="Row Chart Example" width="400" />
-</p>
+<img src="img/Row_Chart.png" alt="Row Chart Example" width="400" />
 
 #### Context  
 A **Row Chart** or **Category Frequency Chart** visualizes the frequency of categorical variables in a dataset. It helps identify patterns and compare the distribution of categories.
@@ -481,9 +465,7 @@ A **Row Chart** or **Category Frequency Chart** visualizes the frequency of cate
 
 #### Examples
 
-<p align="left">
-  <img src="img/Row_Summary_Box.png" alt="Row Summary Box Example" width="400" />
-</p>
+<img src="img/Row_Summary_Box.png" alt="Row Summary Box Example" width="400" />
 
 #### Context  
 A **Row Summary Box** provides a compact summary of key values for a dataset's rows. It is useful for quick insights and comparisons between multiple attributes in tabular data.
@@ -505,9 +487,7 @@ A **Row Summary Box** provides a compact summary of key values for a dataset's r
 
 #### Examples
 
-<p align="left">
-  <img src="img/Sankey_Diagram.png" alt="Sankey Diagram Example" width="400" />
-</p>
+<img src="img/Sankey_Diagram.png" alt="Sankey Diagram Example" width="400" />
 
 #### Context  
 A **Group Comparison Chart** allows for a visual comparison between two selected categorical groups. This chart is useful for analyzing differences in distributions, frequencies, or statistical summaries across groups.
@@ -534,9 +514,7 @@ A **Group Comparison Chart** allows for a visual comparison between two selected
 
 #### Examples
 
-<p align="left">
-  <img src="img/Selection_Dialog.png" alt="Selection Dialog Example" width="400" />
-</p>
+<img src="img/Selection_Dialog.png" alt="Selection Dialog Example" width="400" />
 
 #### Context  
 A **Selection Dialog** or **Column Filter Chart** enables the selection and filtering of specific columns within a dataset. This chart is useful for focusing on particular variables or subsets of data. 
@@ -564,9 +542,7 @@ If this column was a numeric type, e.g. total_counts (counts of reads per cell) 
 
 #### Examples
 
-<p align="left">
-  <img src="img/Stacked_Row_Chart.png" alt="Stacked Row Chart Example" width="400" />
-</p>
+<img src="img/Stacked_Row_Chart.png" alt="Stacked Row Chart Example" width="400" />
 
 #### Context  
 A **Stacked Row Chart** or **Categorical Heatmap** is a visualization that represents data through a color-coded matrix. Each cell in the heatmap corresponds to a category on the X and Y axes, with color intensity indicating the value of the relationship between them.
@@ -605,9 +581,7 @@ A **Stacked Row Chart** or **Categorical Heatmap** is a visualization that repre
 
 #### Examples
 
-<p align="left">
-  <img src="img/Table.png" alt="Table Example" width="400" />
-</p>
+<img src="img/Table.png" alt="Table Example" width="400" />
 
 #### Context
 A straightforward tabular display of data with sorting options. Useful for reviewing raw data.
@@ -634,9 +608,7 @@ A straightforward tabular display of data with sorting options. Useful for revie
 
 #### Examples
 
-<p align="left">
-  <img src="img/Text_Box.png" alt="Text Box Example" width="400" />
-</p>
+<img src="img/Text_Box.png" alt="Text Box Example" width="400" />
 
 #### Context  
 A **Text Box** is a simple visualization component used to display markdown-formatted text. It is useful for adding descriptions, annotations, or contextual information to a dashboard.
@@ -662,9 +634,7 @@ This component is ideal for adding explanatory notes, instructions, or additiona
 
 #### Examples
 
-<p align="left">
-  <img src="img/2D_Scatter_Plot.png" alt="2D Scatter Plot Example" width="400" />
-</p>
+<img src="img/2D_Scatter_Plot.png" alt="2D Scatter Plot Example" width="400" />
 
 #### Context  
 A **2D Scatter Plot** and **3D Scatter Plot** is a visualization that displays points on a two-dimensional graph to reveal relationships between two numerical variables. Each point represents an observation in the dataset.
@@ -721,9 +691,7 @@ This scatter plot is a powerful way to visualize relationships between variables
 
 #### Examples
 
-<p align="left">
-  <img src="img/Violin_Plot.png" alt="Violin Plot Example" width="400" />
-</p>
+<img src="img/Violin_Plot.png" alt="Violin Plot Example" width="400" />
 
 #### Context
 Violin plots combine a **box plot** with a **density plot**, illustrating the full distribution shape for each category. Excellent for comparing distributions when you also want to see their shape.
@@ -771,9 +739,7 @@ Violin plots combine a **box plot** with a **density plot**, illustrating the fu
 
 #### Examples
 
-<p align="left">
-  <img src="img/Word_Cloud.png" alt="Word Cloud Example" width="400" />
-</p>
+<img src="img/Word_Cloud.png" alt="Word Cloud Example" width="400" />
 
 #### Context  
 A **word cloud** is a visual representation of text data where the size of each word corresponds to its frequency or importance. This type of visualization is useful for quickly identifying key themes in a dataset.
