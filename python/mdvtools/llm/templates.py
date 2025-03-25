@@ -31,8 +31,9 @@ from the second DataFrame while selecting the remaining columns from the first D
     - Text box: Requires no columns, just text.  
     - Violin plot: Requires one categorical column and one numerical column.  
     - Wordcloud: Requires one categorical column.  
-6. Return the column names in a string format, e.g., "col1", "col2".  
-7. Do not provide additional explanations—only return the string.
+6. Return the column names in a string format, e.g., "col1", "col2". 
+7. If gene expression is required, look at the index of the second data source and find a gene id.
+8. Do not provide additional explanations—only return the string.
 """
 
 
@@ -85,9 +86,7 @@ def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasou
     path_to_data: str, path to an anndata object, subject to change
     datasouce_name: any, we need to better clarify how we reason about multi-ds queries etc...
     final_answer: str, output from the dataframe agent, which should contain a list of column names to be used in generating the view
-        - note: what does this mean in cases where we are trying to make multiple charts, belonging to different datasources, etc?
     """
-    # assert isinstance(project, MDVProject) # this has problems, with autoreload? was erroneously failing...
     prompt_RAG = (
         """
 Context: {context}
@@ -115,7 +114,24 @@ This string """
         + final_answer
         + """ specifies the names of the data fields that need to be plotted, for example in the params field. Get the structure of params definition from the context.
 
-If the prompt asks for a gene, make sure you load this datasource and that you create a link between the two datasets.
+DO NOT forget to use the f-string, or formatted string literal, python structure in the parameters, params or param.
+
+Generate Python code that correctly uses formatted string literals.
+Use Python formatted string literals (f-strings) for any string interpolation.
+Ensure all strings requiring variable substitution use the 'f' prefix.
+
+Example:
+# Correct:
+message = f"Hello, {question}!"
+
+Incorrect:
+message = "Hello, {question}!"
+
+If the prompt asks for linking the two datasets, for example by requesting gene expression, make sure that:
+1. You load both datasources that need linking, e.g. cells and genes.
+2. If gene expression is required, make sure the gene id, is given as a param in this format: f"link|{{param2}}(link)|{{param2_index}}", with param2 and param2_index given by param2 = "param2"
+    param2_index = data_frame_var.index.get_loc(param2)
+3. Make sure you create a link between the two datasets.
 
 The data_path are given by this variable `""" + path_to_data + """`
 The datasource_name is given by this variable `""" + datasouce_name + """`

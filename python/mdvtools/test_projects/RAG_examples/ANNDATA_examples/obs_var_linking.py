@@ -69,7 +69,8 @@ def main():
     data_frame_obs = pd.DataFrame(adata.obs)
 
     data_frame_var = pd.DataFrame(adata.var)
-    data_frame_var['variable_name'] = pd.DataFrame(adata.var_names)
+    data_frame_var['variable_name'] = adata.var_names.to_list()
+
     
     # Add datasource
     project.add_datasource(datasource_name, data_frame_obs)
@@ -77,7 +78,7 @@ def main():
     
     # ScatterPlot parameters
     scatter_title = "Scatter Plot"
-    scatter_params = ["param1", "param2"]
+    scatter_params = ["param3", "param4"]
     scatter_size = [792, 472]
     scatter_position = [820, 10]
 
@@ -106,13 +107,11 @@ def main():
     
     # DotPlot parameters
     param2 = "param2"
-    param2_index = data_frame_var.index.get_loc(param2)
-    dot_title = "Dot plot example title"
-    dot_params = ["param1", f"link|{param2}(link)|{param2_index}"]
+    param2_index = data_frame_var['variable_name'].tolist().index(param2)
 
     # DotPlot parameters
-    dot_title = "Example Title"
-    dot_params = ["param1", "param2"]
+    dot_title = "Dot plot example title"
+    dot_params = ["param1", f"link|{param2}(link)|{param2_index}"]
     dot_size = [400, 250]
     dot_position = [10, 500]
 
@@ -125,7 +124,7 @@ def main():
     
     # BoxPlot parameters
     param2 = "param2"
-    param2_index = data_frame_var.index.get_loc(param2)
+    param2_index = data_frame_var.variable_name.get_loc(param2)
     box_title = "Example title"
     box_params = ["param1", f"link|{param2}(link)|{param2_index}"]
     box_size = [615, 557]
