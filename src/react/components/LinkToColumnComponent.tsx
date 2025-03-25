@@ -82,7 +82,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
                 return defaultVal;
             }
             // check that the current value is in the list of possible values
-            if (!firstValue.includes("|") || link.valueToRowIndex.has(firstValue)) {
+            if (!firstValue.includes("|") || !link.valueToRowIndex.has(firstValue)) {
                 return defaultVal;
             }
             return v;
@@ -95,7 +95,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
                 return defaultVal;
             }
             // check that the current value is in the list of possible values
-            if (!v.includes("|") || link.valueToRowIndex.has(v)) {
+            if (!v.includes("|") || !link.valueToRowIndex.has(v)) {
                 return defaultVal;
             }
             return v;
