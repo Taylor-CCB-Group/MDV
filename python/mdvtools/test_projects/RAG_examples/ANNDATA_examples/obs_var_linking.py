@@ -75,6 +75,9 @@ def main():
     # Add datasource
     project.add_datasource(datasource_name, data_frame_obs)
     project.add_datasource(datasource_name_2, data_frame_var)
+
+    # Update datasource
+    project.set_column(datasource_name_2, "variable_name", data_frame_var['variable_name'])
     
     # ScatterPlot parameters
     scatter_title = "Scatter Plot"
@@ -124,7 +127,7 @@ def main():
     
     # BoxPlot parameters
     param2 = "param2"
-    param2_index = data_frame_var.variable_name.get_loc(param2)
+    param2_index = data_frame_var..tolist().index(param2)
     box_title = "Example title"
     box_params = ["param1", f"link|{param2}(link)|{param2_index}"]
     box_size = [615, 557]

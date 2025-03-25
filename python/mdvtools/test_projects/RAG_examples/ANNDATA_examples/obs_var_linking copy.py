@@ -45,6 +45,9 @@ def main():
     project.add_datasource(datasource_name, data_frame_obs)
     project.add_datasource(datasource_name_2, data_frame_var)
     
+    # Update datasource
+    project.set_column(datasource_name_2, "variable_name", data_frame_var['variable_name'])
+
     # DotPlot parameters
     param2 = "param2"
     param2_index = data_frame_var['variable_name'].tolist().index(param2)
