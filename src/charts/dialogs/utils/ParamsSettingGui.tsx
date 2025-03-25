@@ -21,6 +21,7 @@ function getCurrentParam<T extends BaseConfig>(chart: BaseChart<T>, i: number) {
     const n = currentParams.length;
     const hasMulti = params.some(p => isMultiColumn(p.type));
     if (isMultiType) {
+        //! as far as we know, we only ever see params ordered like [_multi] or [single, _multi]
         const nOthers = params.length - 1;
         if (i === 0) {
             // we want the head of the array... the length minus however many other params there are
@@ -28,10 +29,8 @@ function getCurrentParam<T extends BaseConfig>(chart: BaseChart<T>, i: number) {
             return currentParams.slice(0, end);
         }
         // If param type is _multi but it's not the first element of params array
-        if (i > 0 && params[i].type.toString().includes("_multi")) return currentParams;
-        // we want the tail of the array...
-        const start = n - nOthers;
-        return currentParams.slice(start);
+        // we want the tail of the array, starting from where the nOthers single params end
+        return currentParams.slice(nOthers);
     }
     if (hasMulti) {
         // there is a multi-column parameter, and this is not it.
