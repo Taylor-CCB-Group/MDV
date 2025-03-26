@@ -86,6 +86,8 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
                 return defaultVal;
             }
             // check that the current value is in the list of possible values
+            //! this could be somewhere as a helper function... 
+            // given a field name, figure out the row value that would have been used to generate it.
             const val = firstValue.split("|")[1].split(`(${sg})`)[0].trimEnd();
             if (!link.valueToRowIndex.has(val)) {
                 return defaultVal;
