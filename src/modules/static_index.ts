@@ -107,7 +107,6 @@ async function loadData() {
             const resp = await getPostData(`${root}/save_state`, data);
             if (resp.success) {
                 cm.createInfoAlert("State saved", { duration: 2000 });
-                cm.viewManager.setLastSavedState(data);
                 cm.setAllColumnsClean();
             } else {
                 cm.createInfoAlert("State save failed", {

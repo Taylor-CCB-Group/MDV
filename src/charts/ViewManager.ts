@@ -25,7 +25,9 @@ class ViewManager {
         this.cm = window.mdv.chartManager;
         this.current_view = current_view;
         this.all_views = all_views;
-        // this.lastSavedState = this.cm.getState();
+        setTimeout(() => {
+            this.lastSavedState = this.cm.getState();
+        }, 1000);
     }
 
     @action
@@ -44,9 +46,8 @@ class ViewManager {
     }
 
     @action
-    changeView(view: string) {
+    _changeView(view: string) {
         const { viewData, dsIndex, contentDiv } = this.cm;
-        this.hasUnsavedChanges();
         for (const ds in this.cm.viewData.dataSources) {
             if (viewData.dataSources[ds].layout === "gridstack") {
                 this.cm.gridStack.destroy(dsIndex[ds] as DataSource);
@@ -55,17 +56,31 @@ class ViewManager {
         this.cm.removeAllCharts();
         contentDiv.innerHTML = "";
         this.setView(view);
-        this.cm.viewLoader(view).then((data: object) => {
-            this.cm._init(data);
+        this.cm.viewLoader(view).then(async (data: object) => {
+            await this.cm._init(data);
+            const state = this.cm.getState();
+            this.setLastSavedState(state);
         });
+    }
+
+    @action
+    changeView(view: string, isDelete=false) {
+        if (this.hasUnsavedChanges() && !isDelete) {
+            this.cm.showSaveViewDialog(() => {
+                this._changeView(view);
+            });
+        } else {
+            this._changeView(view);
+        }
+        
     }
 
     // Helper to check if the current state differs from the last saved state
     hasUnsavedChanges() {
-        const currentState = this.cm.getState();
+        const currentState = JSON.parse(JSON.stringify(this.cm.getState()));
+        const prevState = JSON.parse(JSON.stringify(this.lastSavedState));
         if (this.lastSavedState === null) return true;
-        console.log("has unsaved", !_.isEqual(currentState, this.lastSavedState));
-        return !_.isEqual(currentState, this.lastSavedState);
+        return !_.isEqual(currentState, prevState);
     }
 
 
@@ -140,7 +155,7 @@ class ViewManager {
             // set current view to initial view
             const nextView = updatedViews[0];
             this.setView(nextView);
-            this.cm.changeView(nextView);
+            this.changeView(nextView);
         } else {
             // no other views exist
             this.cm.removeAllCharts();
