@@ -25,6 +25,7 @@ class ViewManager {
         this.cm = window.mdv.chartManager;
         this.current_view = current_view;
         this.all_views = all_views;
+        // this.lastSavedState = this.cm.getState();
     }
 
     @action
@@ -45,7 +46,7 @@ class ViewManager {
     @action
     changeView(view: string) {
         const { viewData, dsIndex, contentDiv } = this.cm;
-        this.checkStateChange();
+        this.hasUnsavedChanges();
         for (const ds in this.cm.viewData.dataSources) {
             if (viewData.dataSources[ds].layout === "gridstack") {
                 this.cm.gridStack.destroy(dsIndex[ds] as DataSource);
@@ -59,12 +60,20 @@ class ViewManager {
         });
     }
 
+    // Helper to check if the current state differs from the last saved state
+    hasUnsavedChanges() {
+        const currentState = this.cm.getState();
+        if (this.lastSavedState === null) return true;
+        console.log("has unsaved", !_.isEqual(currentState, this.lastSavedState));
+        return !_.isEqual(currentState, this.lastSavedState);
+    }
 
 
     @action
     saveView() {
         const state = this.cm.getState();
         this.cm._callListeners("state_saved", state);
+        this.setLastSavedState(state);
     }
 
     @action
@@ -138,13 +147,6 @@ class ViewManager {
             this.cm.viewData = {};
             this.cm.showAddViewDialog();
         }
-    }
-
-    checkStateChange() {
-        const currentState = JSON.parse(JSON.stringify(this.cm.getState()));
-        const prevState = JSON.parse(JSON.stringify(this.lastSavedState));
-        console.log("state", prevState, currentState);
-        console.log("isEqual", _.isEqual(prevState, currentState));
     }
 
 };
