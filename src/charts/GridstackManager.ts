@@ -55,9 +55,9 @@ export default class GridStackManager {
                     oneColumnSize: 400,
                     resizable: {
                         handles: "e,se,s,sw,w",
-                    }
-                    // these options not working as expected...
-                    // margin: 10
+                    },
+                    // now working - as a have inner and outer containers
+                     margin: "3px"
                     // column
                 },
                 div,
@@ -92,15 +92,17 @@ export default class GridStackManager {
             return;
         }
         const div = ds.contentDiv;
-        //store sizes/positions of div elements
+        //store sizes/positions of div elements so we can 
+        //use them to calculate the new absolute positions
         const sizes = new Map();
         for (const chart of gi.charts) {
-            const d = chart.getDiv();
-            sizes.set(d, [
-                d.offsetWidth,
-                d.offsetHeight,
-                d.offsetLeft,
-                d.offsetTop,
+            //bit of a hack to get the outer gridstack container
+            const d = chart.getDiv().parentElement?.parentElement;
+            sizes.set(chart, [
+                d?.offsetWidth,
+                d?.offsetHeight,
+                d?.offsetLeft,
+                d?.offsetTop,
             ]);
             chart.removeLayout?.();
             chart.config.gssize = undefined;
@@ -112,15 +114,15 @@ export default class GridStackManager {
         //convert back to absolute positioning plus other clean up on the div
         for (const chart of gi.charts) {
             const d = chart.getDiv();
-            const s = sizes.get(d);
+            const s = sizes.get(chart);
             d.style.position = "absolute";
-            d.style.width = `${s[0] - 5}px`;
-            d.style.height = `${s[1] - 5}px`;
+            d.style.width = `${s[0] - 6}px`;
+            d.style.height = `${s[1] - 6}px`;
             d.style.left = `${s[2]}px`;
             d.style.top = `${s[3]}px`;
-            chart.config.size = [s[0] - 5, s[1] - 5];
+            chart.config.size = [s[0] - 6, s[1] - 6];
             chart.config.position = [s[2], s[3]];
-            d.classList.remove("grid-stack-item");
+            //d.classList.remove("grid-stack-item");
         }
         div.classList.remove("grid-stack");
         gi.icon.remove();
@@ -143,13 +145,17 @@ export default class GridStackManager {
         const grid = gridInstance.grid;
         gridInstance.charts.add(chart);
         const div = chart.getDiv();
+        //work out the size location of the chart in gridstack
+        //doesn't work that well with complex layouts
         const rect = div.getBoundingClientRect();
-        let w = Math.round(rect.width / grid.cellWidth());
-        let h = Math.round(rect.height / this.cellHeight);
+        let w = Math.round((rect.width+6) / grid.cellWidth());
+        let h = Math.round((rect.height+6) / this.cellHeight);
         let x = Math.round(div.offsetLeft / grid.cellWidth()); //relative location
         //cases where the old container was wider than the current one
         x = x > 11 ? 11 : x;
         let y = Math.floor(div.offsetTop / this.cellHeight); //relative location
+        //if the chart has gridstack data i.e. in saved view or being re-added from a popout
+        //then use these
         if (chart.config.gsposition) {
             [x, y] = chart.config.gsposition;
             [w, h] = chart.config.gssize;
@@ -159,6 +165,31 @@ export default class GridStackManager {
         //current version seems to be working moderately ok.
         clearPosition(div);
         div.style.transition = "filter 0.5s ease";
+
+
+         // Add the "move" cursor
+        const handle = div.querySelector(this.dragHandle) as HTMLElement;
+        if (handle) {
+            handle.style.cursor = "move"; // Add the "move" cursor
+        }
+
+        // a bit long-winded but for gridstack to work correctly we 
+        // the chart wrapped in an outer and inner container
+        const outer = document.createElement("div");
+        const inner = document.createElement("div");
+        inner.classList.add("grid-stack-item-content");
+        inner.style.overflow = "visible"; // able to see shadow
+        div.style.height="100%";
+        outer.appendChild(inner);
+        inner.appendChild(div);
+        grid.el.appendChild(outer);
+
+        //saves thr chart's position and size to the chart's config
+        const saveChartPosition = () => { 
+            const { x, y, w, h } = outer.gridstackNode;
+            chart.config.gssize = [w, h];
+            chart.config.gsposition = [x, y];
+        }
 
         // using ResizeObserver rather than gridstack callbacks
         // means we have closure on 'chart' without needing to maintain another data structure
@@ -171,10 +202,24 @@ export default class GridStackManager {
                     // or the view is opened on a different screen... we need to think about how
                     // we serialize the layout information.
                     chart.setSize();
+                    saveChartPosition();
+
                 } catch {}
             }, 20),
         );
-        ro.observe(div);
+        ro.observe(outer);
+
+        //stores the position and size of the chart is repositioned
+        //could also check if width, height has changed as well and have one observer,
+        //but probably best to use the proper resize observer above
+        const mo = new MutationObserver(
+            debounce(() => {
+                try {
+                    saveChartPosition();
+                } catch {}
+            }, 20),
+        );
+        mo.observe(outer, { attributes: true, attributeFilter: ["style"] });
         // workaround for absolute positioning still being saved in config
         // this interferes with detecting unsaved changes
         // but if we want to compare state with state from server, it won't work.
@@ -184,22 +229,20 @@ export default class GridStackManager {
             chart.deferredInit(() => chart.setSize(), 100);
         }
 
-        // div.remove();
-        // grid.addWidget(div, {w, h, x, y, autoPosition});
+        grid.makeWidget(outer);
 
-        grid.makeWidget(div);
         //nb, autoPosition property doesn't apply in update()?
         //passing options to makeWidget() or addWidget() does not evoke joy.
         if (!autoPosition) {
             console.log("gridstack:", chart.config.type, { w, h, x, y });
-            grid.update(div, { w, h, x, y });
+            grid.update(outer, { w, h, x, y });
         } else {
-            grid.update(div, { w, h });
+            grid.update(outer, { w, h });
         }
+    
 
-        const oldChangeBase = addPopOutHandler(); //revertModifications() used here refers to values stored by subsequent calls
         const lockButton = addPositionLock();
-        const oldRemove = addRemoveHandler();
+        
         function addPositionLock() {
             let locked = false;
             const lockButton = chart.addMenuIcon(
@@ -216,22 +259,32 @@ export default class GridStackManager {
             });
             return lockButton;
         }
+        //could this be handled by a decorator?
+        const oldRemove = addRemoveHandler();
         function addRemoveHandler() {
             const { remove } = chart;
             chart.remove = () => {
-                grid.removeWidget(div, true);
-                gridInstance?.charts.delete(chart);
-
-                //div.gridstackNode = undefined; //doesn't help
+                //grid.removeWidget(div, true);
+                chart.removeLayout?.();
                 remove.apply(chart);
             };
             return remove;
         }
+
+        div.gridstackPopoutCallback = () => {
+            chart.removeLayout?.();
+        };
+
+        //the below was leading subtle errors
+        //not sure why you need to alter changeBaseDocument?
+        /*
         function addPopOutHandler() {
             const { changeBaseDocument } = chart;
             div.gridstackPopoutCallback = () => {
                 // console.log('removing from gridstack');
                 grid.removeWidget(div, true);
+                if (chart.removeLayout)
+                    chart.removeLayout();
             };
             chart.changeBaseDocument = (doc: Document) => {
                 //by now, it's too late... the parent element is no longer the grid.
@@ -253,14 +306,29 @@ export default class GridStackManager {
             // lockButton.remove();
             chart.remove = oldRemove;
             chart.changeBaseDocument = oldChangeBase;
-        }
+        }*/
+
+        //cleanup - this is called when the chart is removed from the gridstack
+        //a) we transfer the chart to a popout
+        //b) we remove the chart completely
+        //c) we change the layout back to absolute positioning
         chart.removeLayout = () => {
-            grid.removeWidget(div, false); //doesn't remove listeners from handle...
+            //remove the chart from the gridstack
+            grid.removeWidget(outer, false);
+            //take the chart out of the containers
+            grid.el.append(div);
+            //destroy the containers
+            outer.remove();
+            inner.remove();
             lockButton.remove();
             div.gridstackPopoutCallback = undefined;
+            chart.removeLayout = undefined;
             chart.remove = oldRemove;
-            chart.changeBaseDocument = oldChangeBase;
+            if (handle) {
+                handle.style.cursor = ""; // Reset to default cursor
+            }
             ro.disconnect();
+            mo.disconnect();
         };
     }
 }
@@ -377,6 +445,5 @@ export function positionChart(dataSource: DataSource, config: Config) {
         left = config.gsposition ? Math.round(config.gsposition[0] * (cellDim[0] + 5)) : 20;
         top = config.gsposition ? Math.floor(config.gsposition[1] * (cellDim[1] + 5)) : 20;
     }
-
     return { width, height, left, top };
 }

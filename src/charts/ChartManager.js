@@ -714,15 +714,16 @@ export class ChartManager {
                 removeDraggable(div);
             });
         }
-        //add new ones
+        
         view.layout = type;
-        if (type === "absolute") {
-            this.getAllCharts(ds.name).forEach((x) => this._makeChartRD(x, ds));
-        } else if (type === "gridstack") {
-            this.getAllCharts(ds.name).forEach((chart) => {
-                this.gridStack.manageChart(chart, ds, this._inInit);
-            });
-        }
+        //will add the appropriate layout depending on the current layout type
+        this.getAllCharts(ds.name).forEach((x) => {
+            //the chart is popped out so not subject to the layout manager
+            if (x.__doc__ !== document){
+                return;
+            }
+            this._makeChartRD(x, ds)
+        });
     }
 
     _setupThemeContextMenu() {
@@ -1250,24 +1251,15 @@ export class ChartManager {
         }
         for (const chid in this.charts) {
             const chInfo = this.charts[chid];
-
             const chart = chInfo.chart;
             const config = chart.getConfig();
             const div = chart.getDiv();
             const d = this.viewData.dataSources[chInfo.dataSource.name];
             if (d.layout === "gridstack") {
-                config.gsposition = [
-                    Number.parseInt(div.getAttribute("gs-x")),
-                    Number.parseInt(div.getAttribute("gs-y")),
-                ];
-                config.gssize = [
-                    Number.parseInt(div.getAttribute("gs-w")),
-                    Number.parseInt(div.getAttribute("gs-h")),
-                ];
+               //this is handled by gridstack now
             } else {
                 config.position = [div.offsetLeft, div.offsetTop];
             }
-
             initialCharts[chInfo.dataSource.name].push(config);
         }
 
