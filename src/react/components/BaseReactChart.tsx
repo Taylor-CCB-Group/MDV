@@ -1,7 +1,4 @@
 import { createMdvPortal } from "@/react/react_utils";
-import { toPng, toSvg } from "html-to-image";
-import { autorun, makeAutoObservable } from "mobx";
-import type { IAutorunOptions, IReactionDisposer } from "mobx";
 import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
 import { createEl } from "../../utilities/ElementsTyped";
@@ -57,6 +54,8 @@ export abstract class BaseReactChart<T extends BaseConfig> extends BaseChart<T> 
         ReactComponentFunction: TComponent<T> = Fallback,
     ) {
         super(dataStore, div, config);
+        //! for review - can we bypass this in react charts after a bit more evolution of the state management?
+        //delete this.activeQueries.methodToConfigMap['setParams'];
         config = this.config; //original config will be copied by super, before doing things like adding id to it...
         // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
         // that worked, with extra extraneous number that changed to be observed by the hook...

@@ -53,7 +53,8 @@ function updateMultiParam<T extends BaseConfig>(chart: BaseChart<T>, i: number, 
     if (!isMultiColumn(params[i].type)) throw new Error("Not a multi-column parameter");
     const nParams = params.length;
     if (nParams === 1) {
-        chart.config.param = value;
+        //chart.config.param = value;
+        chart.setParams(value);
         return;
     }
     const currentParams = config.param;
