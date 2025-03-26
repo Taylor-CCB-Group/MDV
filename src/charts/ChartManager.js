@@ -1828,7 +1828,7 @@ export class ChartManager {
             // - other charts wanting to use similar neededCols end up not having data?
             // links should be initialised here as well...
             await this._getColumnsAsync(dataSource, neededCols);
-            this._addChart(dataSource, config, div, notify);
+            await this._addChart(dataSource, config, div, notify);
         } catch (error) {
             this.clearInfoAlerts();
             spinner.remove();
@@ -2040,7 +2040,7 @@ export class ChartManager {
         func();
     }
 
-    _addChart(dataSource, config, div, notify = false) {
+    async _addChart(dataSource, config, div, notify = false) {
         //**convert legacy data***********
         const ds = this.dsIndex[dataSource];
         div.innerHTML = "";
@@ -2109,6 +2109,7 @@ export class ChartManager {
         }
 
         //I think this is obsolete now
+        //(the above comment is itself very old)
         const cll = ds.column_link_to;
         // @ts-ignore
         if (cll && chart.createColumnLinks) {
@@ -2123,6 +2124,8 @@ export class ChartManager {
                 func,
             );
         }
+
+        await chart.deferredInitsReady();
 
         if (notify) {
             this._callListeners("chart_added", chart);

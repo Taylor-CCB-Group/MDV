@@ -277,6 +277,24 @@ class BaseChart<T extends BaseConfig> {
             container: this.__doc__.body,
         });
     }
+    _deferredInits: Promise<void>[] = [];
+    /**
+     * During chart initialisation, we defer some actions until after the constructor has returned.
+     * This is particularly used for active column queries in cases where we call methods with deserialised data
+     * on chart methods that may not be ready yet.
+     * @param callback - a function that will be called in a `setTimeout` after the js event loop has completed.
+     */
+    deferredInit(callback: () => void) {
+        const promise = new Promise<void>((resolve) => {
+            callback();
+            resolve();
+        });
+        this._deferredInits.push(promise);
+        setTimeout(callback);
+    }
+    async deferredInitsReady() {
+        return Promise.allSettled(this._deferredInits);
+    }
     reactionDisposers: IReactionDisposer[] = [];
     mobxAutorun(fn: ()=>void, opts?: IAutorunOptions) {
         const disposer = autorun(fn, opts);
