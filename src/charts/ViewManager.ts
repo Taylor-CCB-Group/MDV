@@ -45,6 +45,7 @@ class ViewManager {
     @action
     changeView(view: string) {
         const { viewData, dsIndex, contentDiv } = this.cm;
+        this.checkStateChange();
         for (const ds in this.cm.viewData.dataSources) {
             if (viewData.dataSources[ds].layout === "gridstack") {
                 this.cm.gridStack.destroy(dsIndex[ds] as DataSource);
@@ -139,15 +140,11 @@ class ViewManager {
         }
     }
 
-    checkStateChange(action: () => void) {
-        const currentState = this.cm.getState();
-        console.log("state", this.lastSavedState, currentState);
-        console.log("isEqual", !_.isEqual(this.lastSavedState, currentState));
-        if (!(_.isEqual(this.lastSavedState, currentState))) {
-            this.cm.showSaveViewDialog(action);
-        } else {
-            action();
-        }
+    checkStateChange() {
+        const currentState = JSON.parse(JSON.stringify(this.cm.getState()));
+        const prevState = JSON.parse(JSON.stringify(this.lastSavedState));
+        console.log("state", prevState, currentState);
+        console.log("isEqual", _.isEqual(prevState, currentState));
     }
 
 };

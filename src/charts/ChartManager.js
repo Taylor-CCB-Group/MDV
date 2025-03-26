@@ -989,7 +989,7 @@ export class ChartManager {
             }
         }
         await Promise.all(chartPromises);
-        this.viewManager.setLastSavedState(this.getState());
+
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
         this._inInit = false;
@@ -1028,7 +1028,7 @@ export class ChartManager {
     }
 
     changeView(view) {
-        this.viewManager.checkStateChange(() => this.viewManager.changeView(view));
+        this.viewManager.changeView(view);
     }
 
     _columnRemoved(ds, col) {
