@@ -73,12 +73,34 @@ export default class GridStackManager {
                 ds.name,
                 "fas fa-compress-arrows-alt",
                 "compact layout",
-                () => grid.compact(),
+                () => this.compact(ds),
             );
             this.grids.set(ds, { grid: grid, charts: new Set(), icon: i });
         }
 
         return this.grids.get(ds);
+    }
+
+    //when the grid calls compact the size and move observers are not called
+    //therefore need to do it manually
+    compact(ds: DataSource) {
+        const gi = this.grids.get(ds);
+        if (!gi) {
+            console.error(`no gridstack for ${ds.name}`);
+            return;
+        }
+        gi.grid.compact();
+        //store gs position of each chart
+        for (const chart of gi.charts) {
+            const div = chart.getDiv();
+            const d = div.parentElement?.parentElement;
+            if (d){
+                const { x, y, w, h } = d.gridstackNode;
+                chart.config.gssize = [w, h];
+                chart.config.gsposition = [x, y];
+            }
+
+        }
     }
 
     destroy(ds: DataSource) {
@@ -92,38 +114,35 @@ export default class GridStackManager {
             return;
         }
         const div = ds.contentDiv;
-        //store sizes/positions of div elements so we can 
-        //use them to calculate the new absolute positions
-        const sizes = new Map();
-        for (const chart of gi.charts) {
+        //get an array - don't want to loop through set as removeLayout 
+        //will remove the chart from the set
+        const charts = Array.from(gi.charts);
+        for (const chart of charts){
+            const cdiv = chart.getDiv();
             //bit of a hack to get the outer gridstack container
-            const d = chart.getDiv().parentElement?.parentElement;
-            sizes.set(chart, [
-                d?.offsetWidth,
-                d?.offsetHeight,
-                d?.offsetLeft,
-                d?.offsetTop,
-            ]);
-            chart.removeLayout?.();
+            const d = cdiv.parentElement?.parentElement;
+            if (d){
+                //get the size and position of the chart in gridstack
+                const w =  d.offsetWidth;
+                const h = d.offsetHeight;
+                const l = d.offsetLeft;
+                const t= d .offsetTop;
+                //apply these to the chart's div for absolute positioning
+                cdiv.style.position = "absolute";
+                cdiv.style.width = `${w - 6}px`;
+                cdiv.style.height = `${h - 6}px`;
+                cdiv.style.left = `${l}px`;
+                cdiv.style.top = `${t}px`;
+                chart.config.size = [w- 6, h - 6];
+                chart.config.position = [l,t]
+            }
+            //remove the gridstack data from the chart's config
             chart.config.gssize = undefined;
             chart.config.gsposition = undefined;
+            chart.removeLayout?.();
         }
 
         gi.grid.destroy(false);
-
-        //convert back to absolute positioning plus other clean up on the div
-        for (const chart of gi.charts) {
-            const d = chart.getDiv();
-            const s = sizes.get(chart);
-            d.style.position = "absolute";
-            d.style.width = `${s[0] - 6}px`;
-            d.style.height = `${s[1] - 6}px`;
-            d.style.left = `${s[2]}px`;
-            d.style.top = `${s[3]}px`;
-            chart.config.size = [s[0] - 6, s[1] - 6];
-            chart.config.position = [s[2], s[3]];
-            //d.classList.remove("grid-stack-item");
-        }
         div.classList.remove("grid-stack");
         gi.icon.remove();
         this.grids.delete(ds);
@@ -333,7 +352,9 @@ export default class GridStackManager {
             if (handle) {
                 handle.style.cursor = ""; // Reset to default cursor
             }
-
+            //remove chart
+            gridInstance.charts.delete(chart);
+            //remove the observers
             ro.disconnect();
             mo.disconnect();
         };
