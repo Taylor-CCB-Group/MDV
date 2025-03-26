@@ -5,8 +5,8 @@ import { RowsAsColsQuery } from "@/links/link_utils";
 import { action, type IReactionDisposer } from "mobx";
 
 /**
- * Apply the {@link loadColumnData} decorator to a method on a chart class manually at runtime, rather than using the `@loadColumnData` syntax
- * which as of this writing is only working with vanilla ts code - not js or react.
+ * Apply the {@link loadColumnData} decorator to a method on a chart class manually at runtime,
+ * rather than using the `@loadColumnData` syntax
  */
 function decorateColumnMethod<T extends BaseChart<any>>(method: string, chart: T) {
     // could try to make `method: keyof T`, but that would require a more type juggling...
@@ -102,7 +102,6 @@ export function loadColumnData<This extends BaseChart<any>, Args extends any[], 
             this.activeQueries.setActiveQuery(target.name, [null, ...args], () => {});
             target.call(this, inputCol, ...args);
         } else {
-            // this should only happen if there are any live columns...
             const multiCol = isArray(inputCol);
             const colsOriginalArr = multiCol ? inputCol : [inputCol];
             // changing this mechanism to use ColumnQueryMapper rather than managing disposer here
@@ -177,7 +176,7 @@ export class ColumnQueryMapper<T extends BaseConfig> {
      * @param userValue the value passed to the method before any transformation
      */
     setActiveQuery(methodName: DecoratedMethodName, userValue: UserArgs, callback: () => void) {
-        const alreadyInSetQuery = this.inSetQuery;        
+        const alreadyInSetQuery = this.inSetQuery;
         this.inSetQuery = true;
         if (this.reactionDisposers.has(methodName)) {
             const disposer = this.reactionDisposers.get(methodName);

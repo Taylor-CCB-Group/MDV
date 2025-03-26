@@ -39,6 +39,7 @@ release = ""
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "myst_parser",
     "sphinx.ext.viewcode",
     "sphinx.ext.autodoc",
     "autoapi.extension",
@@ -52,6 +53,12 @@ autoapi_keep_files = True
 # don't build all the api docs - spcificc ones will be added manually
 autoapi_generate_api_docs = True
 autoapi_add_toctree_entry = False
+
+# enable extensions for myst parser
+myst_enable_extensions = [
+    "html_image",
+    "attrs_inline",
+]
 
 
 html_logo = "../../images/mdv_logo.png"
@@ -74,8 +81,8 @@ templates_path = ["_templates"]
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-# source_suffix = ['.rst', '.md']
-source_suffix = ".rst"
+source_suffix = ['.rst', '.md']
+# source_suffix = ".rst"
 
 # The master toctree document.
 master_doc = "index"

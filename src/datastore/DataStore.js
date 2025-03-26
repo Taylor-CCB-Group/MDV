@@ -311,10 +311,11 @@ class DataStore {
     /**
      * This method calls any listeners to 'highlight' any rows specified e.g.
      * rows in a table or points in a scatter plot
-     * @param {array} indexes an array of indexes to items that should be highlighted
+     * @param {number[]} indexes an array of indexes to items that should be highlighted
      * @param {object} source the object doing the highlighting
      */
     dataHighlighted(indexes, source) {
+        indexes.sort((a, b) => a - b);
         this.highightedData = indexes;
         this.loadRowData(indexes[0]).then((data) =>
             this._callListeners("data_highlighted", { indexes, source, data }),

@@ -4,3 +4,4 @@ sphinx-autoapi==3.6.0
 sphinx-js==4.0.0
 esbonio==0.16.5
 astroid==3.3.8
+myst_parser

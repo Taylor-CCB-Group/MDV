@@ -273,7 +273,10 @@ export const DropdownAutocompleteComponent = observer(({
                 limitTags={5}
                 disableCloseOnSelect={multiple}
                 getOptionLabel={label}
-                value={okOption.filter((a) => a !== undefined)}
+                value={multiple ? 
+                    okOption.filter((a) => a !== undefined) 
+                    : okOption.length > 0 ? okOption : null
+                }
                 open={open}
                 onOpen={() => setOpen(true)}
                 onClose={() => setOpen(false)}
