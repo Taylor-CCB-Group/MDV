@@ -179,6 +179,7 @@ export default class GridStackManager {
         const inner = document.createElement("div");
         inner.classList.add("grid-stack-item-content");
         inner.style.overflow = "visible"; // able to see shadow
+        const origHeight = div.style.height;;
         div.style.height="100%";
         outer.appendChild(inner);
         inner.appendChild(div);
@@ -197,7 +198,11 @@ export default class GridStackManager {
         const ro = new ResizeObserver(
             debounce(() => {
                 try {
-                    // this leads to a condition in which initial chart.config.size is not stable
+                    //this is causing 'No data for row chart' error
+                    //when loading as saved view
+                    //it redraws chart before the data is processed
+
+                    // also leads to a condition in which initial chart.config.size is not stable
                     // immediately after adding it... and also if the window is resized, 
                     // or the view is opened on a different screen... we need to think about how
                     // we serialize the layout information.
@@ -315,6 +320,7 @@ export default class GridStackManager {
         chart.removeLayout = () => {
             //remove the chart from the gridstack
             grid.removeWidget(outer, false);
+            div.style.height = origHeight;
             //take the chart out of the containers
             grid.el.append(div);
             //destroy the containers
@@ -327,6 +333,7 @@ export default class GridStackManager {
             if (handle) {
                 handle.style.cursor = ""; // Reset to default cursor
             }
+
             ro.disconnect();
             mo.disconnect();
         };
