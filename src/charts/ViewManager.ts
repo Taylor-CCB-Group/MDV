@@ -155,7 +155,7 @@ class ViewManager {
             // set current view to initial view
             const nextView = updatedViews[0];
             this.setView(nextView);
-            this.changeView(nextView);
+            this.changeView(nextView, true);
         } else {
             // no other views exist
             this.cm.removeAllCharts();
