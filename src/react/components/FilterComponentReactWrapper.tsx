@@ -17,8 +17,8 @@ const FilterDropdown = observer(() => {
             onChange={(_event, newValue) => {
                 if (newValue) {
                     // Updating state and changing view
-                    const state = cm.getState();
-                    cm._callListeners("state_saved", state);
+                    // const state = cm.getState();
+                    // cm._callListeners("state_saved", state);
                     cm.changeView(newValue);
                 }
             }}
