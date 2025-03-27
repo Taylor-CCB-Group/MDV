@@ -216,7 +216,7 @@ class ViewManager {
                     {},
                 );
             };
-            console.log("diff", diff(currentState, prevState));
+            // console.log("diff", diff(currentState, prevState));
         }
         return !_.isEqual(currentState, prevState);
     }
