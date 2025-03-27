@@ -63,8 +63,9 @@ class ViewManager {
             // check for anything that might escape our more formal logic
             setTimeout(() => {
                 if (this.hasUnsavedChanges()) {
-                    // debugger; // uncomment this line to break into the debugger
+                    // this happens when changing to a view with gridstack layout
                     console.warn("Unexpected unsaved changes shortly after changing view");
+                    this.hasUnsavedChanges(true);
                 } else {
                     console.log("✅ View changed without unexpected unsaved changes being detected");
                 }
@@ -85,10 +86,17 @@ class ViewManager {
     }
 
     // Helper to check if the current state differs from the last saved state
-    hasUnsavedChanges() {
+    hasUnsavedChanges(verbose = false) {
+        if (this.lastSavedState === null) return true;
         const currentState = JSON.parse(JSON.stringify(this.cm.getState()));
         const prevState = JSON.parse(JSON.stringify(this.lastSavedState));
-        if (this.lastSavedState === null) return true;
+        if (verbose) {
+            console.log("currentState", currentState);
+            console.log("prevState", prevState);
+            // doesn't seem to be as useful as hoped for showing what's different...
+            // we may want more of this in the future.
+            // console.log("diff", _.differenceWith([currentState], [prevState], _.isEqual));
+        }
         return !_.isEqual(currentState, prevState);
     }
 
