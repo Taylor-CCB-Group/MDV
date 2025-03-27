@@ -6,7 +6,33 @@ from mdvtools.mdvproject import MDVProject
 from mdvtools.charts.dot_plot import DotPlot
 from mdvtools.charts.box_plot import BoxPlot
 from mdvtools.charts.scatter_plot import ScatterPlot
-import json 
+import json
+  
+
+def should_add_link(project, datasource, link_name):
+    """
+    Returns True if the given link_name or its expected structure is missing or mismatched.
+    Returns False if everything is present and correctly structured.
+    """
+    links = project.get_datasource_metadata(datasource).get("links") 
+    if not links:
+        return True  # links missing
+    link_entry = links.get("genes")
+    if not link_entry:
+        return True  # 'genes' link missing
+    rows_as_columns = link_entry.get("rows_as_columns")
+    if not rows_as_columns:
+        return True  # rows_as_columns missing
+    subgroups = rows_as_columns.get("subgroups")
+    if not subgroups:
+        return True  # subgroups missing or empty
+    name_field = rows_as_columns.get("name")
+    if name_field != link_name:
+        return True  # name field doesn't match expected link_name
+    if link_name not in subgroups:
+        return True  # specified link_name not present in subgroups
+    return False  # structure is complete and valid
+
 
 def create_scatter_plot(title, params, size, position, color, brush, opacity, radius, legend_display, legend_position, xaxis_properties, yaxis_properties):
     """Create and configure a ScatterPlot instance with the given parameters."""
@@ -69,7 +95,7 @@ def main():
     data_frame_obs = pd.DataFrame(adata.obs)
 
     data_frame_var = pd.DataFrame(adata.var)
-    data_frame_var['variable_name'] = adata.var_names.to_list()
+    data_frame_var['name'] = adata.var_names.to_list()
 
     
     # Add datasource
@@ -77,7 +103,7 @@ def main():
     project.add_datasource(datasource_name_2, data_frame_var)
 
     # Update datasource
-    project.set_column(datasource_name_2, "variable_name", data_frame_var['variable_name'])
+    # project.set_column(datasource_name_2, "variable_name", data_frame_var['variable_name'])
     
     # ScatterPlot parameters
     scatter_title = "Scatter Plot"
@@ -110,7 +136,7 @@ def main():
     
     # DotPlot parameters
     param2 = "param2"
-    param2_index = data_frame_var['variable_name'].tolist().index(param2)
+    param2_index = data_frame_var['name'].tolist().index(param2)
 
     # DotPlot parameters
     dot_title = "Dot plot example title"
@@ -127,9 +153,9 @@ def main():
     
     # BoxPlot parameters
     param2 = "param2"
-    param2_index = data_frame_var..tolist().index(param2)
+    param2_index = data_frame_var['name'].tolist().index(param2)
     box_title = "Example title"
-    box_params = ["param1", f"link|{param2}(link)|{param2_index}"]
+    box_params = ["param4", f"link|{param2}(link)|{param2_index}"]
     box_size = [615, 557]
     box_position = [500, 500]
     
@@ -145,9 +171,10 @@ def main():
     view_config = {'initialCharts': {datasource_name: [scatter_plot_json, dot_plot_json, box_plot_json]}}
 
     # creating the link between the two datasets so that selecting a subset of genes to add the expression in cells is enabled
-    project.add_rows_as_columns_link(datasource_name,datasource_name_2,"variable_name","link")
-    project.add_rows_as_columns_subgroup(datasource_name,datasource_name_2,"link",adata.X.toarray()) #add the link, could be gene expression 
-    
+    if should_add_link(project, datasource_name, "link"):
+        project.add_rows_as_columns_link(datasource_name,datasource_name_2,"name","link")
+        project.add_rows_as_columns_subgroup(datasource_name,datasource_name_2,"link",adata.X) #add the link, could be gene expression 
+
     project.set_view(view_name, view_config)
     project.set_editable(True)
     project.serve()
