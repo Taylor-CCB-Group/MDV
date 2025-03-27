@@ -283,8 +283,10 @@ class BaseChart<T extends BaseConfig> {
      * This is particularly used for active column queries in cases where we call methods with deserialised data
      * on chart methods that may not be ready yet.
      * @param callback - a function that will be called in a `setTimeout` after the js event loop has completed.
+     * @param delay - an optional delay to wait before calling the callback, most actions shouldn't need this,
+     * but things related to layout might do.
      */
-    deferredInit(callback: () => void) {
+    deferredInit(callback: () => void, delay = 0) {
         if (this._alreadyCheckedDeferReady) {
             //! the current implementation isn't sophisticated enough to handle this...
             console.error("called deferredInit after deferredInitsReady");
@@ -294,7 +296,7 @@ class BaseChart<T extends BaseConfig> {
             resolve();
         });
         this._deferredInits.push(promise);
-        setTimeout(callback);
+        setTimeout(callback, delay);
     }
     _alreadyCheckedDeferReady = false;
     /**
@@ -967,7 +969,8 @@ class BaseChart<T extends BaseConfig> {
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
             };
         }
-        // return serialiseChart(this);
+        // there is a general issue with config.size/position when not using "absolute" layout
+        // what would happen if we just remove it in that case???
         return this.activeQueries.serialiseChartConfig();
     }
     
