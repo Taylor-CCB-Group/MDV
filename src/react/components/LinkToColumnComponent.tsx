@@ -44,8 +44,8 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
     
     // return values in a format that can be used by the dropdown component
     const values = useMemo(() => {
-        // fix issue with safari Map.entries() not being iterable/not having a map method
-        // it is possible to get to here with undefined link.valueToRowIndex...
+        // it was possible to get to here with undefined link.valueToRowIndex...
+        // should now be avoided by only rendering the component that uses this hook when the link is ready.
         if (!link.valueToRowIndex) {
             // because in certain instances the link isn't ready yet...
             // we can handle that here, but ideally we should do it earlier in the process
@@ -55,6 +55,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
             })
             return [[], "label", "fieldName"] as DropdownMappedValues<"label", "fieldName">;
         }
+        // fix issue with safari Map.entries() not being iterable/not having a map method
         const labelValueObjects = [...link.valueToRowIndex.entries()].map(([value, rowIndex]) => ({
             label: value,
             fieldName: getFieldName(sg, value, rowIndex)
@@ -178,4 +179,23 @@ const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(pro
     )
 })
 
-export default LinkToColumnComponent;
+/**
+ * Avoid dealing with internal state of the link until it's ready.
+ */
+const LinkToColumnComponentInit = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
+    const { link } = useRowsAsColumnsLinks()[0];
+    //wanted to initialise this with ~init.linkPromise.resolved but apparently that's not a thing
+    //so we have an initial re-render even if the link is already resolved.
+    const [ready, setReady] = useState(false);
+    useEffect(() => {
+        link.initPromise.then(() => {
+            setReady(true);
+        });
+    }, [link.initPromise]);
+    if (!ready) {
+        return null;
+    }
+    return <LinkToColumnComponent {...props} />;
+});
+
+export default LinkToColumnComponentInit;
