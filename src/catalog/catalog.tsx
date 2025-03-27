@@ -75,7 +75,7 @@ export default function App() {
             <h1 className="text-6xl text-center m-10">MDV</h1>
             <ProjectTemplates />
             <Projects />
-            <ChatExperiment />
+            {/* <ChatExperiment /> */}
         </div>
     );
 }
