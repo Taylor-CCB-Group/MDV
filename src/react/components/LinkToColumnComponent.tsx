@@ -45,6 +45,16 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
     // return values in a format that can be used by the dropdown component
     const values = useMemo(() => {
         // fix issue with safari Map.entries() not being iterable/not having a map method
+        // it is possible to get to here with undefined link.valueToRowIndex...
+        if (!link.valueToRowIndex) {
+            // because in certain instances the link isn't ready yet...
+            // we can handle that here, but ideally we should do it earlier in the process
+            console.warn("Link not ready yet - waiting to get values for UI... should be handled differently.");
+            link.initPromise.then(() => {
+                console.log(link.valueToRowIndex);
+            })
+            return [[], "label", "fieldName"] as DropdownMappedValues<"label", "fieldName">;
+        }
         const labelValueObjects = [...link.valueToRowIndex.entries()].map(([value, rowIndex]) => ({
             label: value,
             fieldName: getFieldName(sg, value, rowIndex)
@@ -52,7 +62,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
         // tricky type here... but 'satisfies' gives us a bit of confidence that we're getting something that will work
         // ! better than `as` typecasting when possible.
         return [[...labelValueObjects], "label", "fieldName"] satisfies DropdownMappedValues<"label", "fieldName">;
-    }, [sg, link.valueToRowIndex]);
+    }, [sg, link.valueToRowIndex, link.initPromise]);
 
 
     const { setSelectedColumn } = props;
@@ -89,7 +99,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
             //! this could be somewhere as a helper function... 
             // given a field name, figure out the row value that would have been used to generate it.
             const val = firstValue.split("|")[1].split(`(${sg})`)[0].trimEnd();
-            if (!link.valueToRowIndex.has(val)) {
+            if (!link.valueToRowIndex?.has(val)) {
                 return defaultVal;
             }
             return v;
@@ -107,7 +117,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
             // extracting value
             const val = v.split("|")[1].split(`(${sg})`)[0].trimEnd();
             // check that the current value is in the list of possible values
-            if (!link.valueToRowIndex.has(val)) {
+            if (!link.valueToRowIndex?.has(val)) {
                 return defaultVal;
             }
             return v;

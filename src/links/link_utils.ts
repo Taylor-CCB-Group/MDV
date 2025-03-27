@@ -207,8 +207,10 @@ export type RowsAsColslink = {
     /** 
      * Added at runtime, given a value appearing in `name_column`, the index of a row corresponding to that value.
      * This can be used in the formation of a {@link FieldName}
+     * ! note, we should be able to use 'unique' values in the name_column, and would like to do away with this
+     * It is now optional to reflect that it will not be available until `initPromise` resolves.
      */
-    valueToRowIndex: Map<string, number>;
+    valueToRowIndex?: Map<string, number>;
     initPromise: Promise<void>;
 }
 /**
