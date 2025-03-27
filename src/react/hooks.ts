@@ -1,3 +1,4 @@
+import type React from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
@@ -406,3 +407,25 @@ export function useRangeDimension2D() {
     const removeFilter = useCallback(() => rangeDimension.removeFilter(), [rangeDimension]);
     return { filterPoly, removeFilter, rangeDimension };
 }
+
+
+export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement>, onClose: () => void) => {
+    useEffect(() => {
+        if (!ref.current) return;
+        // Observer to observe the an element and close it when it intersects the parent element (most likely while scrolling)
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                // If less than half of the element is intersecting, call onClose
+                if (entry.intersectionRatio < 0.2) {
+                    onClose();
+                }
+              });
+            }, {threshold: 0.2}
+        );
+        observer.observe(ref.current);
+        return () => {
+            if (ref.current) observer.unobserve(ref.current);
+            observer.disconnect();
+        }
+    }, [ref.current, onClose]);
+};

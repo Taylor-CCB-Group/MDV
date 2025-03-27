@@ -1,6 +1,6 @@
-import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Paper, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
 
@@ -48,6 +48,8 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
 }
 const filterOptions = createFilterOptions<any>({ limit: 100 });
 const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { values } = column;
@@ -60,6 +62,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             filters[column.field] = newFilter;
         })();
     }, [filters, column.field, filter]);
+    useCloseOnIntersection(ref, () => setOpen(false));
     // react to changes in value and update the filter
     useEffect(() => {
         // filter could be undefined - but we previously checked for null causing component to crash
@@ -94,6 +97,10 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             onChange={(_, newValue) => setValue(newValue)}
             onFocus={() => setHasFocus(true)}
             onBlur={() => setHasFocus(false)}
+            open={open}
+            onOpen={() => setOpen(true)}
+            onClose={() => setOpen(false)}
+            ref={ref}
             renderInput={(props) => {
                 const { key, ...p } = props as typeof props & {
                     key: string;
@@ -147,6 +154,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                 //todo improve styling - bad from UX perspective at the moment when it overflows.
                 return <div className="max-h-32 overflow-auto">{chips}</div>;
             }}
+            // PaperComponent={(paperProps) => <Paper ref={ref} {...paperProps} />}
         />
     );
 });
