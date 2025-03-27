@@ -203,6 +203,11 @@ class ProjectBlueprint_v2:
                         print("required_access_level is editable, fetched project is ", project)
                         if project.access_level != 'editable':
                             return jsonify({"status": "error", "message": "This project is read-only and cannot be modified."}), 403
+                        print(f"updating timestamp for project {project_id} '{subpath}'")
+                        # calling this here means that any edits done via any edit route will update the timestamp...
+                        # this could almost be the *only* place where we call this method
+                        # - although other methods executed by scripts etc rather than web interface will not go through here
+                        ProjectService.set_project_update_timestamp(project_id)
                 
                 return method(*match.groups())
             
