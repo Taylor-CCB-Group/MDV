@@ -37,26 +37,21 @@ const AddViewDialogComponent = (props: {
         return viewManager.all_views.includes(name);
     };
 
+    const checkDsSelected = () => {
+        const checkedDsArray = Object.values(checkedDs)?.filter?.((ds) => ds === true);
+        return checkedDsArray.length > 0;
+    };
+
     const onCreate = () => {
         viewManager.addView(viewName, checkedDs, isCloneView);
         props.onClose();
     };
     return (
-        <Dialog
-            open={props.open}
-            onClose={props.onClose}
-            fullWidth
-            maxWidth="xs"
-        >
+        <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
             <DialogTitle>Add New View</DialogTitle>
             <DialogContent dividers>
                 <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={isCloneView}
-                            onChange={(e) => setIsCloneView(e.target.checked)}
-                        />
-                    }
+                    control={<Checkbox checked={isCloneView} onChange={(e) => setIsCloneView(e.target.checked)} />}
                     label="Clone current view"
                 />
 
@@ -68,9 +63,7 @@ const AddViewDialogComponent = (props: {
                     value={viewName}
                     onChange={(e) => setViewName(e.target.value)}
                     error={checkInvalidName(viewName)}
-                    helperText={
-                        checkInvalidName(viewName) && "Name already exists"
-                    }
+                    helperText={checkInvalidName(viewName) && "Name already exists"}
                 />
 
                 {Object.keys(viewData.dataSources).length > 1 && (
@@ -82,9 +75,7 @@ const AddViewDialogComponent = (props: {
                                     <Checkbox
                                         // This !! is to ensure that the component is controlled and only boolean value is accepted
                                         checked={!!checkedDs[ds]}
-                                        onChange={() =>
-                                            handleCheckboxChange(ds)
-                                        }
+                                        onChange={() => handleCheckboxChange(ds)}
                                         disabled={isCloneView}
                                     />
                                 }
@@ -95,13 +86,15 @@ const AddViewDialogComponent = (props: {
                 )}
             </DialogContent>
             <DialogActions>
-                <Button onClick={props.onClose}>Cancel</Button>
                 <Button
                     color="primary"
                     onClick={onCreate}
-                    disabled={checkInvalidName(viewName) || !viewName}
+                    disabled={checkInvalidName(viewName) || !viewName || (!checkDsSelected() && !isCloneView)}
                 >
-                    Create New View
+                    Create View
+                </Button>
+                <Button color="error" onClick={props.onClose}>
+                    Cancel
                 </Button>
             </DialogActions>
         </Dialog>

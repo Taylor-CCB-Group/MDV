@@ -1,19 +1,21 @@
 import { action, observable } from "mobx";
 import type ChartManager from "./ChartManager";
 import type { DataSource } from "./charts";
-import _ from 'lodash';
+import _ from "lodash";
 
 export type View = any;
 export type UpdatedColumns = any;
 export type MetaData = any;
 
-export type State = {
-    view: View;
-    currentView: string;
-    all_views: string[] | null;
-    updatedColumns: UpdatedColumns;
-    metadata: MetaData;
-} | undefined;
+export type State =
+    | {
+          view: View;
+          currentView: string;
+          all_views: string[] | null;
+          updatedColumns: UpdatedColumns;
+          metadata: MetaData;
+      }
+    | undefined;
 
 class ViewManager {
     @observable accessor current_view = "";
@@ -30,6 +32,7 @@ class ViewManager {
         }, 1000);
     }
 
+    // Setters
     @action
     setView(view: string) {
         this.current_view = view;
@@ -45,8 +48,31 @@ class ViewManager {
         this.lastSavedState = state;
     }
 
+    // Check for any unsaved changes and show add view dialog
     @action
-    _changeView(view: string) {
+    checkAndAddView() {
+        if (this.hasUnsavedChanges()) {
+            this.cm.showSaveViewDialog(() => this.cm.showAddViewDialog());
+        } else {
+            this.cm.showAddViewDialog();
+        }
+    }
+
+    // Check for any unsaved changes and change view
+    @action
+    checkAndChangeView(view: string, isDelete = false) {
+        if (this.hasUnsavedChanges() && !isDelete) {
+            this.cm.showSaveViewDialog(() => {
+                this.changeView(view);
+            });
+        } else {
+            this.changeView(view);
+        }
+    }
+
+    // Change the current view
+    @action
+    changeView(view: string) {
         const { viewData, dsIndex, contentDiv } = this.cm;
         for (const ds in this.cm.viewData.dataSources) {
             if (viewData.dataSources[ds].layout === "gridstack") {
@@ -73,53 +99,7 @@ class ViewManager {
         });
     }
 
-    @action
-    changeView(view: string, isDelete=false) {
-        if (this.hasUnsavedChanges() && !isDelete) {
-            this.cm.showSaveViewDialog(() => {
-                this._changeView(view);
-            });
-        } else {
-            this._changeView(view);
-        }
-        
-    }
-
-    // Helper to check if the current state differs from the last saved state
-    hasUnsavedChanges(verbose = false) {
-        if (this.lastSavedState === null) return true;
-        const currentState = JSON.parse(JSON.stringify(this.cm.getState()));
-        const prevState = JSON.parse(JSON.stringify(this.lastSavedState));
-        if (verbose) {
-            console.log("currentState", currentState);
-            console.log("prevState", prevState);
-            // doesn't seem to be as useful as hoped for showing what's different...
-            // console.log("diff", _.differenceWith([currentState], [prevState], _.isEqual));
-            // https://stackoverflow.com/a/48181184/279703 with changes... 
-            // seems to be managing deep diff of objects subject to further testing
-            // we may want more of this in the future... should be a utility function.
-            const diff = (obj1: any, obj2: any) => {
-                return _.reduce(obj1, (result: any, value: any, key: string) => {
-                    if (_.isPlainObject(value)) {
-                        const d = diff(value, obj2[key]);
-                        if (!_.isEmpty(d)) {
-                            result[key] = d;
-                        }
-                    } else if (!_.isEqual(value, obj2[key])) {
-                        // different from SO answer, which wouldn't diff arrays.
-                        result[key] = diff(value, obj2[key]);
-                    } else {
-                        delete result[key];
-                    }
-                    return result;
-                }, {});
-            };
-            console.log("diff", diff(currentState, prevState));
-        }
-        return !_.isEqual(currentState, prevState);
-    }
-
-
+    // Save the current state
     @action
     saveView() {
         const state = this.cm.getState();
@@ -127,10 +107,10 @@ class ViewManager {
         this.setLastSavedState(state);
     }
 
+    // Add a new view
     @action
-    addView(viewName: string, checkedDs: {[name: string]: boolean;}, isCloneView: boolean) {
-
-        const {viewData, dsIndex, contentDiv} = this.cm;
+    async addView(viewName: string, checkedDs: { [name: string]: boolean }, isCloneView: boolean) {
+        const { viewData, dsIndex, contentDiv } = this.cm;
         this.setAllViews([...this.all_views, viewName]);
 
         // Optionally make it the current view
@@ -163,14 +143,16 @@ class ViewManager {
                 }
             }
             contentDiv.innerHTML = "";
-            this.cm._init(state.view);
+            await this.cm._init(state.view);
+            this.saveView();
         } else {
             const state = this.cm.getState();
-            console.log("state add new: ", state);
-            this.cm._init(state.view);
+            await this.cm._init(state.view);
+            this.saveView();
         }
     }
 
+    // Delete current view
     @action
     deleteView() {
         //remove the view choice and change view to the next one
@@ -191,7 +173,7 @@ class ViewManager {
             // set current view to initial view
             const nextView = updatedViews[0];
             this.setView(nextView);
-            this.changeView(nextView, true);
+            this.checkAndChangeView(nextView, true);
         } else {
             // no other views exist
             this.cm.removeAllCharts();
@@ -200,6 +182,43 @@ class ViewManager {
         }
     }
 
-};
+    // Helper to check if the current state differs from the last saved state
+    hasUnsavedChanges(verbose = false) {
+        if (this.lastSavedState === null) return true;
+        const currentState = JSON.parse(JSON.stringify(this.cm.getState()));
+        const prevState = JSON.parse(JSON.stringify(this.lastSavedState));
+        if (verbose) {
+            console.log("currentState", currentState);
+            console.log("prevState", prevState);
+            // doesn't seem to be as useful as hoped for showing what's different...
+            // console.log("diff", _.differenceWith([currentState], [prevState], _.isEqual));
+            // https://stackoverflow.com/a/48181184/279703 with changes...
+            // seems to be managing deep diff of objects subject to further testing
+            // we may want more of this in the future... should be a utility function.
+            const diff = (obj1: any, obj2: any) => {
+                return _.reduce(
+                    obj1,
+                    (result: any, value: any, key: string) => {
+                        if (_.isPlainObject(value)) {
+                            const d = diff(value, obj2[key]);
+                            if (!_.isEmpty(d)) {
+                                result[key] = d;
+                            }
+                        } else if (!_.isEqual(value, obj2[key])) {
+                            // different from SO answer, which wouldn't diff arrays.
+                            result[key] = diff(value, obj2[key]);
+                        } else {
+                            delete result[key];
+                        }
+                        return result;
+                    },
+                    {},
+                );
+            };
+            console.log("diff", diff(currentState, prevState));
+        }
+        return !_.isEqual(currentState, prevState);
+    }
+}
 
 export default ViewManager;

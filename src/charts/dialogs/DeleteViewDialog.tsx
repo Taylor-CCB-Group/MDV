@@ -1,11 +1,4 @@
-import {
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Typography,
-} from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 
 const DeleteViewDialogComponent = (props: {
     open: boolean;
@@ -15,16 +8,10 @@ const DeleteViewDialogComponent = (props: {
 
     const onDelete = () => {
         viewManager.deleteView();
-
         props.onClose();
     };
     return (
-        <Dialog
-            open={props.open}
-            onClose={props.onClose}
-            fullWidth
-            maxWidth="xs"
-        >
+        <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
             <DialogTitle>Delete View</DialogTitle>
             <DialogContent dividers>
                 <Typography>Do you want to delete the current view?</Typography>

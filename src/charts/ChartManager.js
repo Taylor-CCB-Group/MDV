@@ -288,8 +288,7 @@ export class ChartManager {
                         position: "bottom-right",
                     },
                     func: () => {
-                        const state = this.getState();
-                        this._callListeners("state_saved", state);
+                        this.viewManager.saveView();
                     },
                 },
                 this.leftMenuBar,
@@ -305,7 +304,7 @@ export class ChartManager {
                         position: "bottom-right",
                     },
                     func: () => {
-                        this.showSaveViewDialog(() => this.showAddViewDialog());
+                        this.viewManager.checkAndAddView();
                     },
                 },
                 this.leftMenuBar,
@@ -1021,11 +1020,11 @@ export class ChartManager {
     }
 
     showAddViewDialog() {
-        new ViewDialogWrapper("create");
+        new ViewDialogWrapper("add");
     }
 
-    showSaveViewDialog(action) {
-        new ViewDialogWrapper("save", action);
+    showSaveViewDialog(action, content) {
+        new ViewDialogWrapper("save", action, content);
     }
 
     showDeleteViewDialog() {
@@ -1033,7 +1032,7 @@ export class ChartManager {
     }
 
     changeView(view) {
-        this.viewManager.changeView(view);
+        this.viewManager.checkAndChangeView(view);
     }
 
     _columnRemoved(ds, col) {
