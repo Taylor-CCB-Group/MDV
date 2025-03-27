@@ -183,6 +183,14 @@ class ViewManager {
         }
     }
 
+    checkUnsavedState(action: () => void) {
+        if (this.hasUnsavedChanges()) {
+            this.cm.showSaveViewDialog(action);
+        } else {
+            action();
+        }
+    }
+
     // Helper to check if the current state differs from the last saved state
     hasUnsavedChanges(verbose = false) {
         if (this.lastSavedState === null) return true;

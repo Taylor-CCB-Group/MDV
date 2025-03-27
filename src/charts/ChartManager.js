@@ -252,9 +252,11 @@ export class ChartManager {
                 func: () => {
                     // const state = this.getState();
                     // this._callListeners("state_saved", state);
-                    window.location.href = import.meta.env.DEV
-                        ? `${window.location.origin}/catalog_dev`
-                        : `${window.location.origin}/../`;
+                    this.viewManager.checkUnsavedState(() => {
+                        window.location.href = import.meta.env.DEV
+                            ? `${window.location.origin}/catalog_dev`
+                            : `${window.location.origin}/../`;
+                    })
                 },
             },
             this.leftMenuBar,
