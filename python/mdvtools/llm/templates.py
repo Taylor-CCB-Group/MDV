@@ -4,8 +4,12 @@ prompt_data = """
 Your task is to:  
 1. Identify the type of data the user needs (e.g., categorical, numerical, etc.).  
 2. Select the most relevant column names from the first DataFrame provided unless handling a gene-related query.  
-3. If the query is gene-related (e.g., most expressing gene, target expression, etc.), retrieve gene names 
-from the second DataFrame while selecting the remaining columns from the first DataFrame.
+3. If the query is gene-related (e.g., gene expression value, most expressing gene, target expression, etc.), retrieve gene identifiers from the second DataFrame by:
+   - Identifying the column that contains gene identifiers (either gene IDs or gene names). This is usually the column whose name is "name".
+   - If the user specifies a gene identifier, check if it exists in the identified column:
+     - If it does, use it.  
+     - If it does not, select a valid gene identifier from that column.
+   - Return the gene identifier along with the necessary columns selected from the first DataFrame.
 4. Do NOT create new DataFrames. Always use the existing ones provided.
 5. Ensure that the selected columns match the visualization requirements:  
     - Abundance Box plot: Requires three categorical columns.  
@@ -31,8 +35,9 @@ from the second DataFrame while selecting the remaining columns from the first D
     - Text box: Requires no columns, just text.  
     - Violin plot: Requires one categorical column and one numerical column.  
     - Wordcloud: Requires one categorical column.  
-6. Return the column names in a string format, e.g., "col1", "col2". 
-7. If gene expression is required, look at the index of the second data source and find a gene id.
+6. Return the column names in a string format, e.g., "col1", "col2", unless the query is gene-related.
+7. If the query is gene-related (e.g., most expressing gene, target expression, etc.), return the columns names and the gene id
+in a string format, e.g. "col1", "col2", "gene id1".
 8. Do not provide additional explanations—only return the string.
 """
 
@@ -114,18 +119,15 @@ This string """
         + final_answer
         + """ specifies the names of the data fields that need to be plotted, for example in the params field. Get the structure of params definition from the context.
 
-DO NOT forget to use the f-string, or formatted string literal, python structure in the parameters, params or param.
+IMPORTANT: All string interpolations MUST use Python formatted string literals (f-strings).
 
-Generate Python code that correctly uses formatted string literals.
-Use Python formatted string literals (f-strings) for any string interpolation.
-Ensure all strings requiring variable substitution use the 'f' prefix.
 
 Example:
 # Correct:
-message = f"Hello, {question}!"
+message = f"link|{{param2}}(link)|{{param2_index}}"
 
-Incorrect:
-message = "Hello, {question}!"
+# Common mistake to avoid:
+WRONG: message = "link|{{param2}}(link)|{{param2_index}}"
 
 If the prompt asks for linking the two datasets, for example by requesting gene expression, make sure that:
 1. You load both datasources that need linking, e.g. cells and genes.
