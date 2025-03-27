@@ -44,6 +44,17 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
     
     // return values in a format that can be used by the dropdown component
     const values = useMemo(() => {
+        // it was possible to get to here with undefined link.valueToRowIndex...
+        // should now be avoided by only rendering the component that uses this hook when the link is ready.
+        if (!link.valueToRowIndex) {
+            // because in certain instances the link isn't ready yet...
+            // we can handle that here, but ideally we should do it earlier in the process
+            console.warn("Link not ready yet - waiting to get values for UI... should be handled differently.");
+            link.initPromise.then(() => {
+                console.log(link.valueToRowIndex);
+            })
+            return [[], "label", "fieldName"] as DropdownMappedValues<"label", "fieldName">;
+        }
         // fix issue with safari Map.entries() not being iterable/not having a map method
         const labelValueObjects = [...link.valueToRowIndex.entries()].map(([value, rowIndex]) => ({
             label: value,
@@ -52,7 +63,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
         // tricky type here... but 'satisfies' gives us a bit of confidence that we're getting something that will work
         // ! better than `as` typecasting when possible.
         return [[...labelValueObjects], "label", "fieldName"] satisfies DropdownMappedValues<"label", "fieldName">;
-    }, [sg, link.valueToRowIndex]);
+    }, [sg, link.valueToRowIndex, link.initPromise]);
 
 
     const { setSelectedColumn } = props;
@@ -89,7 +100,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
             //! this could be somewhere as a helper function... 
             // given a field name, figure out the row value that would have been used to generate it.
             const val = firstValue.split("|")[1].split(`(${sg})`)[0].trimEnd();
-            if (!link.valueToRowIndex.has(val)) {
+            if (!link.valueToRowIndex?.has(val)) {
                 return defaultVal;
             }
             return v;
@@ -107,7 +118,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
             // extracting value
             const val = v.split("|")[1].split(`(${sg})`)[0].trimEnd();
             // check that the current value is in the list of possible values
-            if (!link.valueToRowIndex.has(val)) {
+            if (!link.valueToRowIndex?.has(val)) {
                 return defaultVal;
             }
             return v;
@@ -168,4 +179,23 @@ const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(pro
     )
 })
 
-export default LinkToColumnComponent;
+/**
+ * Avoid dealing with internal state of the link until it's ready.
+ */
+const LinkToColumnComponentInit = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
+    const { link } = useRowsAsColumnsLinks()[0];
+    //wanted to initialise this with ~init.linkPromise.resolved but apparently that's not a thing
+    //so we have an initial re-render even if the link is already resolved.
+    const [ready, setReady] = useState(false);
+    useEffect(() => {
+        link.initPromise.then(() => {
+            setReady(true);
+        });
+    }, [link.initPromise]);
+    if (!ready) {
+        return null;
+    }
+    return <LinkToColumnComponent {...props} />;
+});
+
+export default LinkToColumnComponentInit;

@@ -724,7 +724,7 @@ class DataStore {
      * so it is advisable not to use it for many rows at once.
      * @param {number} index - The index of the row
      * @param {string[]?} columns - The ids of columns to use. If not provided, `columnsWithData` will be used.
-     * @returns {Object} An object containing key(field)/value pairs. An extra
+     * @returns {Record<string, object>} An object containing key(field)/value pairs. An extra
      * variable 'index' containing the row index is also added to the object
      */
     getRowAsObject(index, columns) {
