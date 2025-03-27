@@ -94,8 +94,27 @@ class ViewManager {
             console.log("currentState", currentState);
             console.log("prevState", prevState);
             // doesn't seem to be as useful as hoped for showing what's different...
-            // we may want more of this in the future.
             // console.log("diff", _.differenceWith([currentState], [prevState], _.isEqual));
+            // https://stackoverflow.com/a/48181184/279703 with changes... 
+            // seems to be managing deep diff of objects subject to further testing
+            // we may want more of this in the future... should be a utility function.
+            const diff = (obj1: any, obj2: any) => {
+                return _.reduce(obj1, (result: any, value: any, key: string) => {
+                    if (_.isPlainObject(value)) {
+                        const d = diff(value, obj2[key]);
+                        if (!_.isEmpty(d)) {
+                            result[key] = d;
+                        }
+                    } else if (!_.isEqual(value, obj2[key])) {
+                        // different from SO answer, which wouldn't diff arrays.
+                        result[key] = diff(value, obj2[key]);
+                    } else {
+                        delete result[key];
+                    }
+                    return result;
+                }, {});
+            };
+            console.log("diff", diff(currentState, prevState));
         }
         return !_.isEqual(currentState, prevState);
     }
