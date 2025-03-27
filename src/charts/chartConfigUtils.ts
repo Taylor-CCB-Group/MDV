@@ -41,6 +41,8 @@ import type { BaseConfig } from "./BaseChart";
 type SerialisedColumnParam = (FieldName | RowsAsColsQuerySerialized);
 type SerialisedParams = SerialisedColumnParam[];
 export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
+    //! should we consider making this whole thing async so that we can know that whatever is needed is loaded?
+    // this may not be the best place to do that, but it's a thought...
     const result = typeof param === "string" ? param : RowsAsColsQuery.fromSerialized(ds, param);
     if (!result) {
         // this happens with unexpected array...
