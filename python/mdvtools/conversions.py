@@ -99,12 +99,10 @@ def convert_scanpy_to_mdv(
     gene_table[f"{label}name"] = gene_table.index
     gene_table = _add_dims(gene_table, scanpy_object.varm, max_dims)
 
-    #me column should be of type unique
-    columns=[{
-        "name":"name",
-        "datatype":"unique"
-    }]
-    mdv.add_datasource(f"{label}genes", gene_table,columns)
+    #originally column had to be unique - but now is just text
+    #need to coerce gene name column to unique
+    #columns=[{"name":"name","datatype":"text16"}]
+    mdv.add_datasource(f"{label}genes", gene_table)
 
     # link the two datasets
     mdv.add_rows_as_columns_link(f"{label}cells", f"{label}genes", f"{label}name", "Gene Expr")
@@ -173,7 +171,10 @@ def convert_mudata_to_mdv(folder,mudata_object,max_dims=3,delete_existing=False,
         p.add_datasource(mod,mdata.var)
         #adds the index to the data as a name column
         #This is usually the unique gene name - but not always
-        p.set_column(mod,{"name":"name","datatype":"unique"},mdata.var.index)
+        column ="name"
+        #no longer unique
+        #column = {"name":"name","datatype":"unique"}
+        p.set_column(mod,column,mdata.var.index)
         #mod is used as both the tag and the label
         #the name column is specified as the identifier that the user will use
         #it is derived from the index and is usually the gene 'name'
