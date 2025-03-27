@@ -60,6 +60,15 @@ class ViewManager {
             await this.cm._init(data);
             const state = this.cm.getState();
             this.setLastSavedState(state);
+            // check for anything that might escape our more formal logic
+            setTimeout(() => {
+                if (this.hasUnsavedChanges()) {
+                    // debugger; // uncomment this line to break into the debugger
+                    console.warn("Unexpected unsaved changes shortly after changing view");
+                } else {
+                    console.log("✅ View changed without unexpected unsaved changes being detected");
+                }
+            }, 500);
         });
     }
 

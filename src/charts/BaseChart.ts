@@ -264,7 +264,7 @@ class BaseChart<T extends BaseConfig> {
 
         //work out width and height based on container
         this._setDimensions();
-        setTimeout(() => {
+        this.deferredInit(() => {
             try {
                 //some charts weren't properly initialising the color legend, so doing it here may help that to be more consistent.
                 //there is an implementation of the method here in BaseChart, but we wrap in a try/catch as it assumes other associated methods are also implemented.
@@ -285,6 +285,10 @@ class BaseChart<T extends BaseConfig> {
      * @param callback - a function that will be called in a `setTimeout` after the js event loop has completed.
      */
     deferredInit(callback: () => void) {
+        if (this._alreadyCheckedDeferReady) {
+            //! the current implementation isn't sophisticated enough to handle this...
+            console.error("called deferredInit after deferredInitsReady");
+        }
         const promise = new Promise<void>((resolve) => {
             callback();
             resolve();
@@ -292,7 +296,18 @@ class BaseChart<T extends BaseConfig> {
         this._deferredInits.push(promise);
         setTimeout(callback);
     }
+    _alreadyCheckedDeferReady = false;
+    /**
+     * This method should be called during chart initialisation, at a time when all deferred initialisations have been added.
+     * It returns a promise that resolves when all deferred initialisations have been completed,
+     * which should indicate that the chart is fully initialised - meaning that calling getConfig()
+     * should return a valid configuration, with a value that will not change until some kind of user interaction.
+     */
     async deferredInitsReady() {
+        if (this._alreadyCheckedDeferReady) {
+            console.warn("repeated call to deferredInitsReady");
+        }
+        this._alreadyCheckedDeferReady = true;
         return Promise.allSettled(this._deferredInits);
     }
     reactionDisposers: IReactionDisposer[] = [];

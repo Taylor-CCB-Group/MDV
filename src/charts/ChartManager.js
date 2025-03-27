@@ -988,7 +988,12 @@ export class ChartManager {
                 chartPromises.push(this.addChart(ds, ch));
             }
         }
+        console.log('before await Promise.all(chartPromises);');
         await Promise.all(chartPromises);
+        // it prints some "decorated loadColumnData method called" after this line...
+        // is it ever with a value that would cause the chart.getConfig() to have a different result?
+        // We are relying on the config being stable/settled when these promises resolve.
+        console.log('after await Promise.all(chartPromises);');
 
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
@@ -2053,14 +2058,18 @@ export class ChartManager {
         // then set the real params in a setTimeout()...
         // but we're resorting to setTimeout for a few things and it's going to be hard to manage...
         // are we sure that this timeout will happen after the one that instruments decorators etc?
-        // seems dodgy to rely on setTimeout order.
-        // Also setParams() itself is not always going to work - depends on the chart.
+        // seems dodgy to rely on setTimeout order. 
+        // *We now have chart.deferredInit() for this purpose*
+        // As long as the order in which these methods are called, this should allow us to at least
+        // assert that the initialisation is complete before we consider the chart (and ultimately the view) to be loaded.
+        // Also setParams() itself *should* always work - but depends on the chart implementation,
+        // and not all charts implement that.
         const originalParam = config.param.map(p => deserialiseParam(ds, p));
         config.param = originalParam.flatMap(getConcreteFieldNames);
         const chart = new chartType.class(ds.dataStore, div, config);
         if (originalParam.some(p => typeof p !== 'string')) {
             console.log('setting param with active queries in timeout');
-            setTimeout(() => {
+            chart.deferredInit(() => {
                 chart.setParams(originalParam);
             });
         }

@@ -82,6 +82,7 @@ export function serialiseConfig(config: any) {
 /**
  * 
  * ! this may be precisely the kind of place where zod would be appropriate.
+ * not currently used
  * 
  * @returns resulting `config` object if there were no errors, otherwise an object with
  *  the potentially compromised result, and a list of err
