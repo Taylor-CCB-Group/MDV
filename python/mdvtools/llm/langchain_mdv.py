@@ -69,10 +69,6 @@ print('# setting keys and variables')
 load_dotenv()
 # OPENAI_API_KEY environment variable will be used internally by OpenAI modules
 
-# todo - add some testing so that we notice if we introduce breaking changes like this
-# mypath = os.path.dirname(__file__)
-# path_to_data = os.path.join(mypath, "sample_data/bcell_viz_ready_revised.h5ad")
-
 print('# Crawl the local repository to get a list of relevant file paths')
 with time_block("b1: Local repo crawling"):
     code_files_urls = crawl_local_repo()
@@ -184,7 +180,7 @@ class ProjectChat:
                     # globals = python_tool.globals
                     # python_tool.globals["list_globals"] = lambda: list(globals.keys()) # concise but less safe rather than more
 
-                    ## New fixes:
+                    # New fixes:
                     python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
 
                     # Step 3: Define Contextualization Chain
@@ -204,7 +200,7 @@ class ProjectChat:
 
                     prompt_data = f"""You have access to the following Pandas DataFrames: 
                     {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
-                    If you need to check their structure, use `df.info()` or `df.head()`.
+                    If you need to check their structure, use `df.info()` or `df.head()`. 
                     Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
                     prompt = ChatPromptTemplate.from_messages([
