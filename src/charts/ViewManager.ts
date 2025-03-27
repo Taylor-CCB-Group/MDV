@@ -147,6 +147,7 @@ class ViewManager {
             this.saveView();
         } else {
             const state = this.cm.getState();
+            contentDiv.innerHTML = "";
             await this.cm._init(state.view);
             this.saveView();
         }
