@@ -3,6 +3,7 @@ import {
     Autocomplete,
     Box,
     Button,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -25,6 +26,7 @@ import { useState } from "react";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import useProjectShare from "./hooks/useProjectShare";
+import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 
 export interface ProjectShareModalProps {
     open: boolean;
@@ -33,8 +35,17 @@ export interface ProjectShareModalProps {
 }
 
 const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, projectId }) => {
-    const { username, setUsername, sharedUsers, setSharedUsers, addUser, updateSharedUsers } =
-        useProjectShare(projectId);
+    const {
+        username,
+        setUsername,
+        sharedUsers,
+        setSharedUsers,
+        addUser,
+        updateSharedUsers,
+        isLoading,
+        errorMessage,
+        userList,
+    } = useProjectShare(projectId);
 
     const theme = useTheme();
 
@@ -86,23 +97,25 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
             </DialogTitle>
             <DialogContent dividers>
                 <Box sx={{ mt: 2 }}>
-                    {/* <Typography variant="subtitle1" gutterBottom>
-                        Add New User
-                    </Typography> */}
                     <Box sx={{ display: "flex", gap: 1, mb: 5 }}>
                         <Autocomplete
                             fullWidth
                             size="small"
-                            options={[]}
+                            options={userList}
                             sx={{ color: "inherit" }}
                             renderInput={(params) => (
-                                <TextField {...params} placeholder="Enter username of the user you want to add" />
+                                <TextField {...params} placeholder="Enter username to search for the user" />
                             )}
                             value={username}
                             onChange={(_, value) => value && setUsername(value)}
                         />
-                        <Button variant="contained" color="primary" onClick={handleAddNewUser} endIcon={<AddIcon />}>
-                            Add
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleAddNewUser}
+                            disabled={isLoading || !username}
+                        >
+                            {isLoading ? <CircularProgress size="1.5rem" /> : "Add"}
                         </Button>
                     </Box>
                     <Table
@@ -147,8 +160,14 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                 </Box>
             </DialogContent>
             <DialogActions sx={{ py: 2 }}>
-                <Button onClick={handleUpdate} variant="outlined" color="primary" sx={{ fontWeight: "bold" }}>
-                    Update
+                <Button
+                    onClick={handleUpdate}
+                    variant="outlined"
+                    color="primary"
+                    sx={{ fontWeight: "bold" }}
+                    disabled={isLoading}
+                >
+                    {isLoading ? <CircularProgress size="1.5rem" /> : "Update"}
                 </Button>
                 <Button onClick={onClose} color="error" variant="outlined" sx={{ fontWeight: "bold" }}>
                     Cancel
