@@ -59,7 +59,7 @@ import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { createMdvPortal } from "@/react/react_utils";
-import FilterComponentReactWrapper from "@/react/components/FilterComponentReactWrapper";
+import ViewSelector from "@/react/components/ViewSelectorComponent";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
@@ -276,7 +276,7 @@ export class ChartManager {
 
             // Filter view component
             createMdvPortal(
-                FilterComponentReactWrapper(),
+                ViewSelector(),
                 filterWrapperNode,
             );
         }
