@@ -6,7 +6,7 @@ import {
     LockPerson as LockPersonIcon,
     MoreVert,
     Settings,
-    Share,
+    Share as ShareIcon,
 } from "@mui/icons-material";
 import {
     Card,
@@ -26,8 +26,8 @@ import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
-import ProjectShareModal from "./ProjectShareModal";
 import type { ProjectAccessType } from "./utils/projectUtils";
+import ProjectShareModal from "./ProjectShareModal";
 
 export interface ProjectCardProps {
     id: string;
@@ -212,6 +212,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     </ListItemIcon>
                     <ListItemText>Project Access</ListItemText>
                 </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setIsShareModalOpen(true);
+                        handleMenuClose();
+                    }}
+                >
+                    <ListItemIcon>
+                        <ShareIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Share Project</ListItemText>
+                </MenuItem>
             </Menu>
 
             <ProjectInfoModal
@@ -240,7 +251,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             <ProjectShareModal
                 open={isShareModalOpen}
                 onClose={() => setIsShareModalOpen(false)}
-                onAddCollaborator={onAddCollaborator}
                 projectId={id}
             />
 

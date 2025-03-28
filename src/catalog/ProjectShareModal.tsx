@@ -1,57 +1,76 @@
+import { Close as CloseIcon, ContentCopy as ContentCopyIcon, Email as EmailIcon } from "@mui/icons-material";
 import {
-    Close as CloseIcon,
-    ContentCopy as ContentCopyIcon,
-    Email as EmailIcon,
-} from "@mui/icons-material";
-import {
+    Autocomplete,
     Box,
     Button,
     Dialog,
+    DialogActions,
     DialogContent,
     DialogTitle,
     IconButton,
+    MenuItem,
+    Select,
     Snackbar,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableRow,
     TextField,
     Typography,
+    useTheme,
 } from "@mui/material";
 import type React from "react";
 import { useState } from "react";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import useProjectShare from "./hooks/useProjectShare";
 
 export interface ProjectShareModalProps {
     open: boolean;
     onClose: () => void;
-    onAddCollaborator: (email: string) => void;
     projectId: string;
 }
 
-const ProjectShareModal: React.FC<ProjectShareModalProps> = ({
-    open,
-    onClose,
-    onAddCollaborator,
-    projectId,
-}) => {
-    const [email, setEmail] = useState("");
-    const [copySuccess, setCopySuccess] = useState(false);
+const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, projectId }) => {
+    const { username, setUsername, sharedUsers, setSharedUsers, addUser, updateSharedUsers } =
+        useProjectShare(projectId);
 
-    const projectUrl = `${window.location.origin}/projects/${projectId}`;
+    const theme = useTheme();
 
-    const handleAdd = () => {
-        if (email) {
-            onAddCollaborator(email);
-            setEmail(""); // Clear input field after adding
+    const handleAddNewUser = async () => {
+        if (username) {
+            // todo: update api logic
+            // await addUser(username);
+            setUsername("");
         }
     };
 
-    const handleCopyLink = () => {
-        navigator.clipboard.writeText(projectUrl).then(() => {
-            setCopySuccess(true);
+    const handlePermissionChange = async (permission: string, index: number) => {
+        setSharedUsers((prev) => {
+            const updatedUsers = [...prev];
+            updatedUsers[index].permission = permission;
+            return updatedUsers;
         });
+    };
+
+    const handleDeleteUser = async (index: number) => {
+        setSharedUsers((prev) => {
+            const updatedUsers = [...prev];
+            updatedUsers.splice(index, 1);
+            return updatedUsers;
+        });
+    };
+
+    const handleUpdate = async () => {
+        // todo: update api logic
+        // await updateSharedUsers(sharedUsers);
     };
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>
-                Share Project
+                Manage Project Sharing
                 <IconButton
                     aria-label="close"
                     onClick={onClose}
@@ -65,62 +84,76 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({
                     <CloseIcon />
                 </IconButton>
             </DialogTitle>
-            <DialogContent>
+            <DialogContent dividers>
                 <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                        Invite Collaborator
-                    </Typography>
-                    <Box sx={{ display: "flex", gap: 1, mb: 3 }}>
-                        <TextField
+                    {/* <Typography variant="subtitle1" gutterBottom>
+                        Add New User
+                    </Typography> */}
+                    <Box sx={{ display: "flex", gap: 1, mb: 5 }}>
+                        <Autocomplete
                             fullWidth
                             size="small"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="example@mail.com"
-                            variant="outlined"
+                            options={[]}
+                            sx={{ color: "inherit" }}
+                            renderInput={(params) => (
+                                <TextField {...params} placeholder="Enter username of the user you want to add" />
+                            )}
+                            value={username}
+                            onChange={(_, value) => value && setUsername(value)}
                         />
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={handleAdd}
-                            startIcon={<EmailIcon />}
-                        >
-                            Invite
+                        <Button variant="contained" color="primary" onClick={handleAddNewUser} endIcon={<AddIcon />}>
+                            Add
                         </Button>
                     </Box>
-                    <Typography variant="subtitle1" gutterBottom>
-                        Deep link
-                    </Typography>
-                    <Box sx={{ display: "flex", gap: 1 }}>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            value={projectUrl}
-                            InputProps={{
-                                readOnly: true,
-                            }}
-                            variant="outlined"
-                            onClick={(e) =>
-                                (e.target as HTMLInputElement).select()
-                            }
-                        />
-                        <Button
-                            variant="outlined"
-                            onClick={handleCopyLink}
-                            startIcon={<ContentCopyIcon />}
-                        >
-                            Copy
-                        </Button>
-                    </Box>
+                    <Table
+                        sx={{
+                            mb: 3,
+                            "& .MuiTableCell-head": {
+                                fontWeight: 600,
+                            },
+                        }}
+                    >
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>Shared Users</TableCell>
+                                <TableCell>Permission</TableCell>
+                                <TableCell align="right">Remove</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {sharedUsers.map((user, index) => (
+                                <TableRow key={`${user.name}-${index}`}>
+                                    <TableCell>{user.name}</TableCell>
+                                    <TableCell>
+                                        <Select
+                                            value={user.permission}
+                                            size="small"
+                                            fullWidth
+                                            onChange={(e) => handlePermissionChange(e.target.value, index)}
+                                        >
+                                            <MenuItem value="view">View</MenuItem>
+                                            <MenuItem value="edit">Edit</MenuItem>
+                                        </Select>
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <IconButton onClick={() => handleDeleteUser(index)}>
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </Box>
             </DialogContent>
-            <Snackbar
-                open={copySuccess}
-                autoHideDuration={2000}
-                onClose={() => setCopySuccess(false)}
-                message="Link copied to clipboard"
-            />
+            <DialogActions sx={{ py: 2 }}>
+                <Button onClick={handleUpdate} variant="outlined" color="primary" sx={{ fontWeight: "bold" }}>
+                    Update
+                </Button>
+                <Button onClick={onClose} color="error" variant="outlined" sx={{ fontWeight: "bold" }}>
+                    Cancel
+                </Button>
+            </DialogActions>
         </Dialog>
     );
 };
