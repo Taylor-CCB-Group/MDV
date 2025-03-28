@@ -67,6 +67,11 @@ matplotlib.use('Agg') # this should prevent it making any windows etc
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY
 load_dotenv()
+LANGSMITH_TRACING=True
+LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
+LANGSMITH_API_KEY="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"
+LANGSMITH_PROJECT="pr-plaintive-undertaker-21"
+
 # OPENAI_API_KEY environment variable will be used internally by OpenAI modules
 
 print('# Crawl the local repository to get a list of relevant file paths')
