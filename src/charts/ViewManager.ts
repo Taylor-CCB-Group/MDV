@@ -40,6 +40,9 @@ class ViewManager {
 
     @action
     setAllViews(all_views: string[]) {
+        if (_.isEqual(this.all_views, all_views)) {
+            return;
+        }
         this.all_views = all_views;
     }
 
@@ -226,7 +229,9 @@ class ViewManager {
             };
             // console.log("diff", diff(currentState, prevState));
         }
-        return !_.isEqual(currentState, prevState);
+        // nb, we should consider updatedColumns, maybe some other things...
+        // but not the entire state (e.g. not all_views)
+        return !_.isEqual(currentState.view, prevState.view);
     }
 }
 

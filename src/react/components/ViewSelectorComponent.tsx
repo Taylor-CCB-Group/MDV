@@ -1,14 +1,38 @@
+import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
+import { useProject } from "@/modules/ProjectContext";
 import { Autocomplete, TextField } from "@mui/material";
 import { observer } from "mobx-react-lite";
 import { useEffect, useState } from "react";
+import { useChartManager, useViewManager } from "../hooks";
 
 export type DropdownType = {
     options: string[];
 };
 
+function useUpdateViewList() {
+    const viewManager = useViewManager();
+    const { root } = useProject();
+    useEffect(() => {
+        const interval = setInterval(async () => {
+            const config = await fetchJsonConfig(`${root}/state.json`, root);
+            // we should consider zod validation here... but let's just try not to mess up
+            if (!config.all_views) {
+                console.warn(`expected state.json, got ${config}`);
+                return;
+            }
+            viewManager.setAllViews(config.all_views);
+        }, 500);
+        return () => {
+            clearInterval(interval);
+        }
+    });
+}
+
+
 const FilterDropdown = observer(() => {
-    const cm = window.mdv.chartManager;
-    const { viewManager } = cm;
+    const cm = useChartManager();
+    const viewManager = useViewManager();
+    useUpdateViewList();
     const options = viewManager.all_views;
     const [dirty, setDirty] = useState(false);
     useEffect(() => {
