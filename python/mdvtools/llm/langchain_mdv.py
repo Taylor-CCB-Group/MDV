@@ -48,6 +48,26 @@ file_handler.setLevel(logging.INFO)
 logger.addHandler(file_handler)
 logger.info(time.asctime())
 
+
+# Create new file handler
+# create a separate logger for chat debugging
+chat_debug_logger = logging.getLogger('chat_debug')
+chat_debug_logger.setLevel(logging.DEBUG)
+
+# create file handler for chat_debug
+chat_debug_handler = logging.FileHandler('chat_debug.log')
+chat_debug_handler.setLevel(logging.DEBUG)
+
+# optional: formatter (re-use if you already have one)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+chat_debug_handler.setFormatter(formatter)
+
+# attach the handler
+chat_debug_logger.addHandler(chat_debug_handler)
+
+
+
+
 @contextmanager
 def time_block(name):
     start_time = time.time()  # Setup: Start timing
@@ -67,12 +87,6 @@ matplotlib.use('Agg') # this should prevent it making any windows etc
 print('# setting keys and variables')
 # .env file should have OPENAI_API_KEY
 load_dotenv()
-LANGSMITH_TRACING=True
-LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
-LANGSMITH_API_KEY="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"
-LANGSMITH_PROJECT="pr-plaintive-undertaker-21"
-
-# OPENAI_API_KEY environment variable will be used internally by OpenAI modules
 
 print('# Crawl the local repository to get a list of relevant file paths')
 with time_block("b1: Local repo crawling"):
@@ -294,6 +308,7 @@ class ProjectChat:
                 # Argument of type "str" cannot be assigned to parameter "input" of type "Dict[str, Any]"
                 # response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]})  # type: ignore for now
                 response = self.agent(question)
+                chat_debug_logger.info(f"Agent Response: {response}")
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
                 self.socket_api.update_chat_progress(
@@ -330,6 +345,7 @@ class ProjectChat:
                 # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
                 # and the assert in the function is being triggered even though it should be fine
                 prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output']) #self.ds_name, response['output'])
+                chat_debug_logger.info(f"RAG Prompt Created:\n{prompt_RAG}")
 
                 qa_prompt = ChatPromptTemplate.from_messages([
                     ("system", prompt_RAG),
@@ -341,11 +357,14 @@ class ProjectChat:
                     "Invoking RAG chain...", id, progress, 60
                 )
                 progress += 60
-
+                chat_debug_logger.info(f"Invoking RAG chain with question: {question}")
+                chat_debug_logger.info(f"Chat History before RAG: {self.chat_history}")
                 question_answer_chain = create_stuff_documents_chain(self.code_llm, qa_prompt)
                 rag_chain = create_retrieval_chain(self.history_aware_retriever, question_answer_chain)
                 output_qa = rag_chain.invoke({"chat_history": self.chat_history, "input": question, "question": question})
+                chat_debug_logger.info(f"RAG Output: chat_history: {output_qa['chat_history']}, input: {output_qa['input']}, question: {output_qa['question']}")
                 self.chat_history.extend([HumanMessage(content=question), output_qa["answer"]])
+                chat_debug_logger.info(f"Updated Chat History: {self.chat_history}")
                 result = output_qa["answer"]
                 print(result)
 
@@ -362,6 +381,7 @@ class ProjectChat:
             # log_to_google_sheet(sheet, str(context_information_metadata_name), output_qa['query'], prompt_RAG, code)
             # todo - save code at various stages of processing...
             # log_chat(output_qa, prompt_RAG, final_code)
+            chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             with time_block("b14: Chat logging by MDV"):  # <0.1% of time
                 self.project.log_chat_item(output_qa, prompt_RAG, final_code)
             with time_block("b15: Execute code"):  # ~9% of time
@@ -372,6 +392,10 @@ class ProjectChat:
                 ok, stdout, stderr = execute_code(
                     final_code, open_code=False, log=self.log
                 )
+                chat_debug_logger.info(f"Code Execution Result - OK: {ok}")
+                chat_debug_logger.info(f"Code Execution STDOUT:\n{stdout}")
+                chat_debug_logger.info(f"Code Execution STDERR:\n{stderr}")
+
             if not ok:
                 return f"# Error: code execution failed\n> {stderr}"
             else:
