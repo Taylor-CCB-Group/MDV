@@ -46,7 +46,7 @@ const ErrorDisplay = ({
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const [userComments, setUserComments] = useState<string>();
-    const { buildInfo } = useProject();
+    // const { buildInfo } = useProject();
 
     // Send the error details and the user's comments (if any) to the support email address
     const handleSend = () => {
@@ -55,7 +55,7 @@ const ErrorDisplay = ({
             traceback: error?.traceback,
             userComments: userComments ? userComments : null,
             extraMetadata: extraMetadata ? extraMetadata : null,
-            buildInfo
+            // buildInfo
         };
         //todo: Add the logic to send the error details to the email address and display the corresponding message to user
         console.log("Send", errorDetails);
@@ -189,7 +189,7 @@ const ErrorDisplay = ({
                                         <JsonView
                                             src={{
                                                 ...extraMetadata,
-                                                buildInfo,
+                                                // buildInfo,
                                                 stackTrace: error?.traceback,
                                             }}
                                             collapsed={1}
