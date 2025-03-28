@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react';
 import type { RollupOptions } from 'rollup'; // Import RollupOptions from rollup
 import * as path from 'node:path';
+import { execSync } from 'node:child_process';
 
 const flaskURL = "http://127.0.0.1:5055";
 const port = 5170;
@@ -109,7 +110,20 @@ const proxy = [
 //     target: "/catalog_dev.html"
 // };
 
-export default defineConfig(env => ({
+export default defineConfig(env => {
+    const commitDate = execSync('git log -1 --format=%cI').toString().trimEnd();
+    const branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trimEnd();
+    const commitHash = execSync('git rev-parse HEAD').toString().trimEnd();
+    const lastCommitMessage = execSync('git show -s --format=%s').toString().trimEnd();
+
+    process.env.VITE_GIT_COMMIT_DATE = commitDate;
+    process.env.VITE_GIT_BRANCH_NAME = branchName;
+    process.env.VITE_GIT_COMMIT_HASH = commitHash;
+    process.env.VITE_GIT_LAST_COMMIT_MESSAGE = lastCommitMessage;
+    process.env.VITE_GIT_DIRTY = execSync('git diff --quiet || echo "dirty"').toString().trimEnd();
+    process.env.VITE_BUILD_DATE = new Date().toISOString();
+
+    return ({
     base: "./",
     server: {
         headers: {
@@ -154,4 +168,4 @@ export default defineConfig(env => ({
             "@": path.resolve(__dirname, "./src"),
         }
     }
-}))
+})})

@@ -1,8 +1,16 @@
 import { getExportCsvStream } from "@/datastore/dataExportUtils";
 
 class DataModel {
+    /**
+     * * @typedef {import("@/datastore/DataStore").default} DataStore
+     * @param {DataStore} dataStore
+     * @param {Object} config
+     * @param {boolean?} config.autoupdate if true (or by default), listen for "filtered" in the dataStore and update the model
+     */
     constructor(dataStore, config = {}) {
+        /** @type {DataStore} */
         this.dataStore = dataStore;
+        // why??? maybe it should make an initial call to updateModel?
         this.data = new Int32Array(0);
         const len = 0;
         for (let n = 0; n < len; n++) {
@@ -77,6 +85,10 @@ class DataModel {
         }
     }
 
+    /**
+     * @param {string} name
+     * @param {string} cloneCol
+     */
     createColumn(name, cloneCol) {
         const col = {
             name: name,

@@ -975,7 +975,7 @@ class BaseChart<T extends BaseConfig> {
         this._setDimensions();
     }
 
-    _setDimensions() {
+    @action _setDimensions() {
         const rect = this.div.getBoundingClientRect();
         const y = Math.round(rect.height);
         const x = Math.round(rect.width);

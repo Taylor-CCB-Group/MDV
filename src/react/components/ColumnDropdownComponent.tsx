@@ -87,13 +87,13 @@ const useColumnDropdownValue = <T extends CTypes, M extends boolean>(gProps: Col
  */
 const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(gProps: ColumnSelectionProps<T, M>) => {
     const { placeholder, isMultiType, columns, value, setValue } = useColumnDropdownValue(gProps);
-    const [selectAll, setSelectAll] = useState(isMultiType && Array.isArray(value) ? columns.length === value?.length : false);
+    const [selectAll, setSelectAll] = useState(isMultiType && isArray(value) ? columns.length === value?.length : false);
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isMultiType) {
-            setSelectAll(Array.isArray(value) && value?.length === columns.length);
+            setSelectAll(isArray(value) && value?.length === columns.length);
         }
     }, [value, columns.length, isMultiType]);
 
@@ -136,7 +136,7 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                         if (!value) return; //! check if this is correct
                         if (!(isMultiType === isArray(value))) throw new Error("type mismatch");
                         if (isMultiType) {
-                            if (Array.isArray(value) && value.length === columns.length) {
+                            if (isArray(value) && value.length === columns.length) {
                                 setSelectAll(true);
                             } else {
                                 setSelectAll(false);

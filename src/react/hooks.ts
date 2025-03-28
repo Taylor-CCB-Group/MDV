@@ -416,11 +416,11 @@ export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement>, onClos
         const observer = new IntersectionObserver((entries) => {
             entries.forEach((entry) => {
                 // If less than half of the element is intersecting, call onClose
-                if (entry.intersectionRatio < 0.5) {
+                if (entry.intersectionRatio < 0.2) {
                     onClose();
                 }
               });
-            },
+            }, {threshold: 0.2}
         );
         observer.observe(ref.current);
         return () => {
