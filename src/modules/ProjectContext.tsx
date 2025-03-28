@@ -21,7 +21,7 @@ export type ProjectInfo = {
     staticFolder: boolean;
     chartManager: ChartManager;
     projectName: string;
-    buildInfo: BuildInfo;
+    // buildInfo: BuildInfo;
 };
 
 export type Project = {
@@ -78,7 +78,7 @@ export function getProjectInfo(): ProjectInfo {
         staticFolder,
         projectName,
         chartManager,
-        buildInfo: getBuildInfo(),
+        // buildInfo: getBuildInfo(),
     };   
 }
 

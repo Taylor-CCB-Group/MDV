@@ -10,20 +10,18 @@ import DeleteViewDialogComponent from "./DeleteViewDialog";
 const Wrapper = (props: {
     onDone: () => void;
     dialogType: DialogType;
-    action?: () => void;
+    saveDialogAction?: () => void;
+    saveDialogContent?: string;
 }) => {
     const [open, setOpen] = useState(true);
 
     return (
         <ErrorBoundary
             FallbackComponent={({ error }) => (
-                <ErrorDisplay
-                    error={error}
-                    title="Unexpected Error: please report to developers."
-                />
+                <ErrorDisplay error={error} title="Unexpected Error: please report to developers." />
             )}
         >
-            {props.dialogType === "create" ? (
+            {props.dialogType === "add" ? (
                 <AddViewDialogComponent
                     open={open}
                     onClose={() => {
@@ -46,18 +44,19 @@ const Wrapper = (props: {
                         setOpen(false);
                         props.onDone();
                     }}
-                    action={props?.action}
+                    action={props?.saveDialogAction}
+                    content={props?.saveDialogContent}
                 />
             )}
         </ErrorBoundary>
     );
 };
 
-type DialogType = "save" | "create" | "delete";
+type DialogType = "save" | "add" | "delete";
 
 class ViewDialogWrapper extends BaseDialog {
     root: ReturnType<typeof createMdvPortal>;
-    constructor(dialogType: DialogType, action?: () => void) {
+    constructor(dialogType: DialogType, saveDialogAction?: () => void, saveDialogContent?: string) {
         super(
             {
                 // title: `Add View'`,
@@ -70,7 +69,8 @@ class ViewDialogWrapper extends BaseDialog {
             <Wrapper
                 onDone={() => this.close()}
                 dialogType={dialogType}
-                action={action}
+                saveDialogAction={saveDialogAction}
+                saveDialogContent={saveDialogContent}
             />,
             this.dialog,
             this,
