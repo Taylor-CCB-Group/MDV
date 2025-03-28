@@ -26,7 +26,12 @@ export function useConfig<T>() {
     const { config } = useChart();
     return config as T & BaseConfig; //todo: strict/inferred typing
 }
-
+export function useChartManager() {
+    return window.mdv.chartManager;
+}
+export function useViewManager() {
+    return useChartManager().viewManager;
+}
 export function useChartSize() {
     const chart = useChart();
     // return chart.config.size; // not so well behaved?

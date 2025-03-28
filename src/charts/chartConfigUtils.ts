@@ -84,6 +84,7 @@ export function serialiseConfig(config: any) {
 /**
  * 
  * ! this may be precisely the kind of place where zod would be appropriate.
+ * not currently used
  * 
  * @returns resulting `config` object if there were no errors, otherwise an object with
  *  the potentially compromised result, and a list of err
@@ -150,7 +151,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
         //@ts-expect-error color_by
         const colorBy = isArray(originalConfig.color_by) ? deserialiseParam(chart.dataStore, originalConfig.color_by[0]) : config.color_by = deserialiseParam(chart.dataStore, originalConfig.color_by);
         config.color_by = undefined;
-        setTimeout(() => {
+        chart.deferredInit(() => {
             if (!chart.colorByColumn) {
                 console.error('chart does not have colorByColumn method, but had color_by in config');
                 return;
@@ -162,7 +163,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     if ((originalConfig as any).tooltip?.column) {
         const tooltipColumn = deserialiseParam(chart.dataStore, (originalConfig as any).tooltip.column);
         (config as any).tooltip.column = getConcreteFieldNames(tooltipColumn)[0];
-        setTimeout(() => {
+        chart.deferredInit(() => {
             if (chart.setToolTipColumn) chart.setToolTipColumn(tooltipColumn);
         })
     }
@@ -171,7 +172,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
     //any methodsUsingColumns that don't have an associated ColumnQueryMapper methodToConfigMap will
     //will be handled here
     //may return to something like this for non-react charts as it requires less boilerplate & chart specific code
-    setTimeout(action(() => {
+    chart.deferredInit(action(() => {
         const c = config as any;
         const queries = c.queries;
         for (const method in queries) {
@@ -209,6 +210,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
         },
     });
 
+    //? had some weird issue with chart.deferredInit() here...
     setTimeout(() => {
         // defer this until after the constructor has finished
         chart.mobxAutorun(() => {
@@ -219,7 +221,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             // we can now safely call this.setTitle() without warnings as it avoids unnecessary config.title changes.
             chart.setTitle(config.title);
         });
-    }, 0);
+    });
     // note: a previous version of this used makeObservable for keeping track of onDataFiltered...
     // that worked, with extra extraneous number that changed to be observed by the hook...
     // What I have now done is change DataStore to be observable, and added a method for getting filtered indices
