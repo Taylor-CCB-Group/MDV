@@ -18,8 +18,7 @@ const AddViewDialogComponent = (props: {
     const [viewName, setViewName] = useState("");
     const [isCloneView, setIsCloneView] = useState(false);
     const [checkedDs, setCheckedDs] = useState<{ [name: string]: boolean }>({});
-    const cm = window.mdv.chartManager;
-    const { viewManager, viewData, dsIndex, contentDiv } = cm;
+    const { viewManager, viewData } = window.mdv.chartManager;
 
     useEffect(() => {
         // Initialising the checkedDs with the data sources inside the view
@@ -38,65 +37,21 @@ const AddViewDialogComponent = (props: {
         return viewManager.all_views.includes(name);
     };
 
-    const onCreate = () => {
-        viewManager.setAllViews([...viewManager.all_views, viewName]);
+    const checkDsSelected = () => {
+        const checkedDsArray = Object.values(checkedDs)?.filter?.((ds) => ds === true);
+        return checkedDsArray.length > 0;
+    };
 
-        // Optionally make it the current view
-        viewManager.setView(viewName);
-        if (!isCloneView) {
-            //remove all charts and links
-            for (const ds in viewData.dataSources) {
-                if (viewData.dataSources[ds].layout === "gridstack") {
-                    const d = dsIndex[ds];
-                    if (!d) continue;
-                    cm.gridStack.destroy(d);
-                }
-            }
-            cm.removeAllCharts();
-            viewData.links = [];
-            const state = cm.getState();
-            state.view.initialCharts = {};
-            state.view.dataSources = {};
-            //only one datasource
-            if (Object.keys(viewData.dataSources)?.length === 1) {
-                const name = Object.keys(viewData.dataSources)?.[0];
-                state.view.initialCharts[name] = [];
-                state.view.dataSources[name] = {};
-            } else {
-                for (const ds in dsIndex) {
-                    if (checkedDs[ds]) {
-                        state.view.initialCharts[ds] = [];
-                        state.view.dataSources[ds] = {};
-                    }
-                }
-            }
-            cm._callListeners("state_saved", state);
-            contentDiv.innerHTML = "";
-            cm._init(state.view);
-        } else {
-            const state = cm.getState();
-            console.log("state add new: ", state);
-            cm._callListeners("state_saved", state);
-            cm._init(state.view);
-        }
+    const onCreate = () => {
+        viewManager.addView(viewName, checkedDs, isCloneView);
         props.onClose();
     };
     return (
-        <Dialog
-            open={props.open}
-            onClose={props.onClose}
-            fullWidth
-            maxWidth="xs"
-        >
+        <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
             <DialogTitle>Add New View</DialogTitle>
             <DialogContent dividers>
                 <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={isCloneView}
-                            onChange={(e) => setIsCloneView(e.target.checked)}
-                        />
-                    }
+                    control={<Checkbox checked={isCloneView} onChange={(e) => setIsCloneView(e.target.checked)} />}
                     label="Clone current view"
                 />
 
@@ -108,9 +63,7 @@ const AddViewDialogComponent = (props: {
                     value={viewName}
                     onChange={(e) => setViewName(e.target.value)}
                     error={checkInvalidName(viewName)}
-                    helperText={
-                        checkInvalidName(viewName) && "Name already exists"
-                    }
+                    helperText={checkInvalidName(viewName) && "Name already exists"}
                 />
 
                 {Object.keys(viewData.dataSources).length > 1 && (
@@ -122,9 +75,7 @@ const AddViewDialogComponent = (props: {
                                     <Checkbox
                                         // This !! is to ensure that the component is controlled and only boolean value is accepted
                                         checked={!!checkedDs[ds]}
-                                        onChange={() =>
-                                            handleCheckboxChange(ds)
-                                        }
+                                        onChange={() => handleCheckboxChange(ds)}
                                         disabled={isCloneView}
                                     />
                                 }
@@ -135,13 +86,15 @@ const AddViewDialogComponent = (props: {
                 )}
             </DialogContent>
             <DialogActions>
-                <Button onClick={props.onClose}>Cancel</Button>
                 <Button
                     color="primary"
                     onClick={onCreate}
-                    disabled={checkInvalidName(viewName) || !viewName}
+                    disabled={checkInvalidName(viewName) || !viewName || (!checkDsSelected() && !isCloneView)}
                 >
-                    Create New View
+                    Create View
+                </Button>
+                <Button color="error" onClick={props.onClose}>
+                    Cancel
                 </Button>
             </DialogActions>
         </Dialog>

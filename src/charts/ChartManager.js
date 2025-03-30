@@ -59,7 +59,7 @@ import { toPng } from "html-to-image";
 import popoutChart from "@/utilities/Popout";
 import { makeObservable, observable, action } from "mobx";
 import { createMdvPortal } from "@/react/react_utils";
-import FilterComponentReactWrapper from "@/react/components/FilterComponentReactWrapper";
+import ViewSelector from "@/react/components/ViewSelectorComponent";
 import ViewManager from "./ViewManager";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
 import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
@@ -252,9 +252,11 @@ export class ChartManager {
                 func: () => {
                     // const state = this.getState();
                     // this._callListeners("state_saved", state);
-                    window.location.href = import.meta.env.DEV
-                        ? `${window.location.origin}/catalog_dev`
-                        : `${window.location.origin}/../`;
+                    this.viewManager.checkUnsavedState(() => {
+                        window.location.href = import.meta.env.DEV
+                            ? `${window.location.origin}/catalog_dev`
+                            : `${window.location.origin}/../`;
+                    })
                 },
             },
             this.leftMenuBar,
@@ -274,7 +276,7 @@ export class ChartManager {
 
             // Filter view component
             createMdvPortal(
-                FilterComponentReactWrapper(),
+                ViewSelector(),
                 filterWrapperNode,
             );
         }
@@ -288,8 +290,7 @@ export class ChartManager {
                         position: "bottom-right",
                     },
                     func: () => {
-                        const state = this.getState();
-                        this._callListeners("state_saved", state);
+                        this.viewManager.saveView();
                     },
                 },
                 this.leftMenuBar,
@@ -305,7 +306,7 @@ export class ChartManager {
                         position: "bottom-right",
                     },
                     func: () => {
-                        this.showSaveViewDialog(() => this.showAddViewDialog());
+                        this.viewManager.checkAndAddView();
                     },
                 },
                 this.leftMenuBar,
@@ -988,7 +989,13 @@ export class ChartManager {
                 chartPromises.push(this.addChart(ds, ch));
             }
         }
+        console.log('before await Promise.all(chartPromises);');
         await Promise.all(chartPromises);
+        // it prints some "decorated loadColumnData method called" after this line...
+        // is it ever with a value that would cause the chart.getConfig() to have a different result?
+        // We are relying on the config being stable/settled when these promises resolve.
+        console.log('after await Promise.all(chartPromises);');
+
         //this could be a time to _callListeners("view_loaded",this.currentView)
         //but I'm not going to interfere with the current logic
         this._inInit = false;
@@ -1015,11 +1022,11 @@ export class ChartManager {
     }
 
     showAddViewDialog() {
-        new ViewDialogWrapper("create");
+        new ViewDialogWrapper("add");
     }
 
-    showSaveViewDialog(action) {
-        new ViewDialogWrapper("save", action);
+    showSaveViewDialog(action, content) {
+        new ViewDialogWrapper("save", action, content);
     }
 
     showDeleteViewDialog() {
@@ -1027,45 +1034,7 @@ export class ChartManager {
     }
 
     changeView(view) {
-        for (const ds in this.viewData.dataSources) {
-            if (this.viewData.dataSources[ds].layout === "gridstack") {
-                this.gridStack.destroy(this.dsIndex[ds]);
-            }
-        }
-        this.removeAllCharts();
-        this.contentDiv.innerHTML = "";
-        this.viewManager.setView(view);
-        this.viewLoader(view).then((data) => {
-            this._init(data);
-        });
-    }
-
-    deleteCurrentView() {
-        //remove the view choice and change view to the next one
-        const view = this.viewManager.current_view;
-
-        // update the views
-        const updatedViews = this.viewManager.all_views.filter((v) => v !== view);
-        this.viewManager.setAllViews(updatedViews);
-
-        const state = this.getState();
-
-        //want to delete view and update any listeners
-        state.view = null;
-
-        this._callListeners("state_saved", state);
-
-        if (updatedViews.length > 0) {
-            // set current view to initial view
-            const nextView = updatedViews[0];
-            this.viewManager.setView(nextView);
-            this.changeView(nextView);
-        } else {
-            // no other views exist
-            this.removeAllCharts();
-            this.viewData = {};
-            this.showAddViewDialog();
-        }
+        this.viewManager.checkAndChangeView(view);
     }
 
     _columnRemoved(ds, col) {
@@ -1865,7 +1834,7 @@ export class ChartManager {
             // - other charts wanting to use similar neededCols end up not having data?
             // links should be initialised here as well...
             await this._getColumnsAsync(dataSource, neededCols);
-            this._addChart(dataSource, config, div, notify);
+            await this._addChart(dataSource, config, div, notify);
         } catch (error) {
             this.clearInfoAlerts();
             spinner.remove();
@@ -2077,7 +2046,7 @@ export class ChartManager {
         func();
     }
 
-    _addChart(dataSource, config, div, notify = false) {
+    async _addChart(dataSource, config, div, notify = false) {
         //**convert legacy data***********
         const ds = this.dsIndex[dataSource];
         div.innerHTML = "";
@@ -2090,14 +2059,18 @@ export class ChartManager {
         // then set the real params in a setTimeout()...
         // but we're resorting to setTimeout for a few things and it's going to be hard to manage...
         // are we sure that this timeout will happen after the one that instruments decorators etc?
-        // seems dodgy to rely on setTimeout order.
-        // Also setParams() itself is not always going to work - depends on the chart.
+        // seems dodgy to rely on setTimeout order. 
+        // *We now have chart.deferredInit() for this purpose*
+        // As long as the order in which these methods are called, this should allow us to at least
+        // assert that the initialisation is complete before we consider the chart (and ultimately the view) to be loaded.
+        // Also setParams() itself *should* always work - but depends on the chart implementation,
+        // and not all charts implement that.
         const originalParam = config.param.map(p => deserialiseParam(ds, p));
         config.param = originalParam.flatMap(getConcreteFieldNames);
         const chart = new chartType.class(ds.dataStore, div, config);
         if (originalParam.some(p => typeof p !== 'string')) {
             console.log('setting param with active queries in timeout');
-            setTimeout(() => {
+            chart.deferredInit(() => {
                 chart.setParams(originalParam);
             });
         }
@@ -2146,6 +2119,7 @@ export class ChartManager {
         }
 
         //I think this is obsolete now
+        //(the above comment is itself very old)
         const cll = ds.column_link_to;
         // @ts-ignore
         if (cll && chart.createColumnLinks) {
@@ -2160,6 +2134,8 @@ export class ChartManager {
                 func,
             );
         }
+
+        await chart.deferredInitsReady();
 
         if (notify) {
             this._callListeners("chart_added", chart);

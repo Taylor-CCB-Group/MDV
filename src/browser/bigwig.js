@@ -523,14 +523,19 @@ class BWReader{
     }
 
     async loadRPTree(offset) {
+        //check cache
         let rpTree = this.rpTreeCache[offset];
         //sometimes the rptree loads but has no root node if there was a network error
-        if (!rpTree && rpTree.rootNode) {
+        //therefore need to reload it in this circumstance as well
+        if (rpTree && rpTree.rootNode) {
+            return rpTree
+        }
+        //need to (re)load it
+        else{
             rpTree = new RPTree(offset, this.contentLength, this.config, this.littleEndian);
             this.rpTreeCache[offset] = rpTree;
-            await rpTree.load()
+            return await rpTree.load()
         }
-        return rpTree;
     }
 }
 

@@ -812,6 +812,7 @@ class MDVProject:
             raise AttributeError(
                 f"genome browser track already exists for {datasource}"
             )
+        track_name = f"{secure_filename(datasource)}.bed"
         if not custom_track:
             # get all the genome locations
             loc = [self.get_column(datasource, x) for x in parameters]
@@ -824,17 +825,16 @@ class MDVProject:
                 o.write(f"{chr}\t{start}\t{end}\t{c}\n")
             o.close()
             # indexed_bed = join(self.trackfolder, "loc_{name}.bed") # reverting to Martin's original
-            indexed_bed = join(self.trackfolder, "loc.bed")
+            indexed_bed = join(self.trackfolder, track_name)
             create_bed_gz_file(bed, indexed_bed)
             os.remove(bed)
         else:
-            custom_track["location"]
             # copy the custom track to the tracks folder
-            shutil.copy(custom_track["location"], join(self.trackfolder, "loc.bed.gz"))
+            shutil.copy(custom_track["location"], join(self.trackfolder, f"{track_name}.gz"))
             # copy index file
             shutil.copy(
                 custom_track["location"] + ".tbi",
-                join(self.trackfolder, "loc.bed.gz.tbi"),
+                join(self.trackfolder, f"{track_name}.gz.tbi"),
             )
 
         if not name:
@@ -842,7 +842,7 @@ class MDVProject:
         gb = {
             "location_fields": parameters,
             # "default_track": {"url": "tracks/loc_{name}.bed.gz", "label": name}, # reverting to Martin's original
-            "default_track": {"url": "tracks/loc.bed.gz", "label": name},
+            "default_track": {"url": f"tracks/{track_name}.gz", "label": name},
         }
         if custom_track:
             gb["default_track"]["type"] = custom_track["type"]
@@ -1135,6 +1135,7 @@ class MDVProject:
         name: Optional[str] = None,
         label: Optional[str] = None,
         sparse=False,
+        chunk_data=False
     ):
         """Add rows as columns in a subgroup."""
         name = name if name else stub
@@ -1160,14 +1161,39 @@ class MDVProject:
         else:
             # Fallback to dense or convertible
             try:
-                dense_data = data.toarray() if hasattr(data, 'toarray') else numpy.asarray(data)
-                total_len = dense_data.shape[0] * dense_data.shape[1]
-                gr.create_dataset(
-                    "x", (total_len,),
-                    data=dense_data.flatten(order="F"),
-                    dtype=numpy.float32
-                )
-                gr["length"] = [dense_data.shape[0]]
+                #Requires a lot of RAM leads to memory errors on smaller machines
+                if not chunk_data:
+                    dense_data = data.toarray() if hasattr(data, 'toarray') else numpy.asarray(data)
+                    total_len = dense_data.shape[0] * dense_data.shape[1]
+                    gr.create_dataset(
+                        "x", (total_len,),
+                        data=dense_data.flatten(order="F"),
+                        dtype=numpy.float32
+                    )
+                    gr["length"] = [dense_data.shape[0]]
+                else:
+                    # Create the dataset with chunking and compression - slow
+                    num_rows, num_cols = data.shape
+                    chunk_size = num_cols
+                    total_len = num_rows * num_cols
+                
+                    dset = gr.create_dataset(
+                        "x", (total_len,),
+                        dtype=numpy.float32,
+                        chunks=(chunk_size,),
+                        compression="gzip"
+                    )
+                    gr.create_dataset("length", data=[num_rows])
+
+                    # Process the data in chunks to avoid high memory usage
+                    # A flat single array is not the ideal storage but in theory 
+                    # only small arrays will be dense. However large arrays are common due to
+                    # normalization creating (different) non zero values in each gene for 0 reads
+                    # Transposing the array without loading into memmory would probably take the 
+                    # same amount of time
+                    for i in range(0, num_cols,1000):
+                        dset[i*num_rows:(i+1000)*num_rows] = data[:,i:i+1000].flatten("F")
+
             except Exception as e:
                 raise TypeError(f"Unsupported data type for dense processing: {type(data)}. Original error: {e}")
 
@@ -1904,9 +1930,10 @@ def add_column_to_group(
         quantiles = [0.001, 0.01, 0.05]
         col["quantiles"] = {}
         for q in quantiles:
+            #quantiles must be of type float else won't serialise to json
             col["quantiles"][str(q)] = [
-                numpy.percentile(na, 100 * q),
-                numpy.percentile(na, 100 * (1 - q)),
+                float(numpy.percentile(na, 100 * q)),
+                float(numpy.percentile(na, 100 * (1 - q))),
             ]
 
 def get_column_info(columns, dataframe, supplied_columns_only):
