@@ -30,7 +30,7 @@ def execute_plt_test():
         except Exception as e:
             print(f"execute_plt_test caught error: {str(e)}")
 
-def execute_code(final_code: str, open_code=False, log: callable = print):
+def execute_code(final_code: str, open_code=False, log = print):
     """
     Executes the code provided in the `final_code` string, returning `True` if the execution was successful,
     of `False` if an unhandled exception was raised or the execution resulted in an error code being returned.
@@ -75,7 +75,7 @@ def execute_code(final_code: str, open_code=False, log: callable = print):
                 return False, stdout, stderr
 
 
-def run_subprocess(command: list[str]) -> tuple[str, str]:
+def run_subprocess(command: list[str]) -> tuple[str | None, str]:
     try:
         # Capture standard output and standard error
         result = subprocess.run(
@@ -86,13 +86,13 @@ def run_subprocess(command: list[str]) -> tuple[str, str]:
             stderr=subprocess.PIPE,
             # text=True
         )
-        return result.stdout, result.stderr
+        return result.stdout.decode(), result.stderr.decode()
     except subprocess.CalledProcessError as e:
         # Handle subprocess errors
         print(f"Subprocess error: {e}")
         print(f"Standard Output: {e.stdout}")
         print(f"Standard Error: {e.stderr}")
-        return None, e.stderr
+        return None, e.stderr.decode()
     except Exception as e:
         # Handle other exceptions
         print(f"General error: {e}")
