@@ -278,8 +278,8 @@ export default class GridStackManager {
                 locked = !locked;
                 lockIcon.classList.toggle("fa-lock", locked);
                 lockIcon.classList.toggle("fa-unlock", !locked);
-                grid.update(div, { locked });
-                div.classList.toggle("gridLock", locked);
+                grid.update(outer, { locked });
+                outer.classList.toggle("gridLock", locked);
             });
             return lockButton;
         }
