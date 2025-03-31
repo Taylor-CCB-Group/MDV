@@ -40,7 +40,7 @@ def mdv_socketio(app: Flask):
 
     @socketio.on("message")
     def message(data):
-        # 'hello world'... if we have need for more logic here, we'll probably use a dictionay of functions for each message type.
+        # 'hello world'... if we have need for more logic here, we'll probably use a dictionary of functions for each message type.
         if data['type'] == "popout":
             log(f"popout: {data}")
         if data['type'] == "ping":
