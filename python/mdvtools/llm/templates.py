@@ -5,11 +5,11 @@ Your task is to:
 1. Identify the type of data the user needs (e.g., categorical, numerical, etc.).  
 2. Select the most relevant column names from the first DataFrame provided unless handling a gene-related query.  
 3. If the query is gene-related (e.g., gene expression value, most expressing gene, target expression, etc.), retrieve gene identifiers from the second DataFrame by:
-   - Identifying the column that contains gene identifiers (either gene IDs or gene names). This is usually the column whose name is "name".
-   - If the user specifies a gene identifier, check if it exists in the identified column:
-     - If it does, use it.  
-     - If it does not, select a valid gene identifier from that column.
-   - Return the gene identifier along with the necessary columns selected from the first DataFrame.
+  - Identifying the column that contains gene identifiers (the column named "name").
+  - If the user specifies a gene identifier, check if it exists in the "name" column:
+      - If it exists, use it.
+      - If it does not, select a valid gene identifier from that column.
+  - Always return the selected gene identifier along with the relevant columns from the first DataFrame.
 4. Do NOT create new DataFrames. Always use the existing ones provided.
 5. Ensure that the selected columns match the visualization requirements:  
     - Abundance Box plot: Requires three categorical columns.  
@@ -36,8 +36,8 @@ Your task is to:
     - Violin plot: Requires one categorical column and one numerical column.  
     - Wordcloud: Requires one categorical column.  
 6. Return the column names in a string format, e.g., "col1", "col2", unless the query is gene-related.
-7. If the query is gene-related (e.g., most expressing gene, target expression, etc.), return the columns names and the gene id
-in a string format, e.g. "col1", "col2", "gene id1".
+7. If the query is gene-related, return the selected columns from the first DataFrame and the selected gene identifier 
+from the second DataFrame in a string format, e.g., "col1", "col2", "gene name".
 8. Do not provide additional explanations—only return the string.
 """
 
@@ -70,16 +70,15 @@ from mdvtools.charts.sankey_plot import SankeyPlot
 import json
 import numpy as np
 import sys
-
-def load_data(path):
-    #Load data from the specified CSV file.
-    return pd.read_csv(path, low_memory=False)
-
-def convert_plot_to_json(plot):
-    #Convert plot data to JSON format.
-    return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
-
 """
+# def load_data(path):
+#     #Load data from the specified CSV file.
+#     return pd.read_csv(path, low_memory=False)
+
+# def convert_plot_to_json(plot):
+#     #Convert plot data to JSON format.
+#     return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
+
 
 def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasouce_name: any, final_answer: str) -> str:
     """
