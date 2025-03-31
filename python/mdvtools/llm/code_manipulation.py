@@ -259,9 +259,11 @@ def parse_view_name(code: str):
     This doesn't have any side-effects, but it's probably not very robust.
     """
     # when it it parses this - it should be greedy about matching to the last \" in the line...
-    name_match = re.search(r"view_name = \"(.+)\"", code)
+    #name_match = re.search(r"view_name = \"(.+)\"", code)
+    name_match = re.search(r'view_name\s*=\s*"([^"]+)"', code)
     if name_match:
         view_name = name_match.group(1)
+        print(f"test: {view_name}")
         # try to escape e.g. any quotes or other special characters in the view_name...
         # this seems to be a somewhat accepted method (at least, for this particular local problem)
         # view_name = json.dumps(view_name) # this will be done in the patch_viewname function
