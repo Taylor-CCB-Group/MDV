@@ -68,33 +68,34 @@ const ErrorDisplay = ({
     }, [extraMetadata, error]);
     // const { buildInfo } = useProject();
 
+    // todo: Uncomment later
+    //todo: Add the logic to send the error details to the email address and display the corresponding message to user
     // Send the error details and the user's comments (if any) to the support email address
-    const handleSend = async () => {
-        setIsLoading(true);
-        setEmailSent(false);
-        setEmailNotSent(false);
-        const errorDetails = {
-            message: error.message,
-            userComments: userComments ? userComments : null,
-            extraMetadata: metaData ? metaData : null,
-            // buildInfo
-        };
-        //todo: Add the logic to send the error details to the email address and display the corresponding message to user
-        try {
-            const res = await axios.post(
-                "/send-error",
-                JSON.stringify(errorDetails),
-            );
-            const data = res.data;
-            setEmailSent(true);
-        } catch (e) {
-            console.log("error", e);
-            setEmailNotSent(true);
-        } finally {
-            setIsLoading(false);
-        }
-        console.log("Send", errorDetails);
-    };
+    // const handleSend = async () => {
+    //     setIsLoading(true);
+    //     setEmailSent(false);
+    //     setEmailNotSent(false);
+    //     const errorDetails = {
+    //         message: error.message,
+    //         userComments: userComments ? userComments : null,
+    //         extraMetadata: metaData ? metaData : null,
+    //         // buildInfo
+    //     };
+    //     try {
+    //         const res = await axios.post(
+    //             "/send-error",
+    //             JSON.stringify(errorDetails),
+    //         );
+    //         const data = res.data;
+    //         setEmailSent(true);
+    //     } catch (e) {
+    //         console.log("error", e);
+    //         setEmailNotSent(true);
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    //     console.log("Send", errorDetails);
+    // };
 
     const handleCopy = async () => {
         try {
@@ -304,16 +305,15 @@ const ErrorDisplay = ({
                             </Typography>
                             <Typography sx={{ mb: 2 }}>
                                 To help us diagnose and fix the problem, please
-                                click on the send button below to send error
-                                details.
+                                copy the error information on the top right corner and send us.
                             </Typography>
                             {metaData && (
                                 <Typography sx={{ mb: 2 }}>
                                     Please remove any sensitive information from
-                                    the error details above.
+                                    the error details above before sending.
                                 </Typography>
                             )}
-                            <TextareaAutosize
+                            {/* <TextareaAutosize
                                 minRows={3}
                                 style={{
                                     width: "100%",
@@ -330,7 +330,6 @@ const ErrorDisplay = ({
                                     setUserComments(e.target.value)
                                 }
                             />
-                            {/* Error message when email is not sent */}
                             {emailNotSent && (
                                 <Typography
                                     sx={{
@@ -348,7 +347,7 @@ const ErrorDisplay = ({
                                 onClick={handleSend}
                             >
                                 Send
-                            </Button>
+                            </Button> */}
                         </Container>
                     </>
                 )}
