@@ -7,10 +7,11 @@
 import type { CTypes, FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import type DataStore from "../datastore/DataStore";
 import type BaseChart from "./BaseChart";
+// import type { DataType } from "../datatypes";
 /**
  * The are the names used to refer to the types of data can be stored in a column.
  */
-export type DataType =
+export type DataType = 
     | "integer"
     | "double"
     | "text"
@@ -31,27 +32,30 @@ export type NumberDataType = "integer" | "double" | "int32";
 
 /**
  * Associates a {@link DataType} with the corresponding `TypedArray` type that will be used to store the data.
+ * 
+ * This should be associated with definitions in `datatypes.ts`.
  */
 type DataStructureTypes = {
-    integer: Uint32Array;
-    double: Float32Array; //why is it called 'double'???
-    text: Uint8Array;
-    text16: Uint16Array;
-    multitext: Uint16Array;
-    unique: Uint8Array; //raw bytes of strings to be decoded
     int32: Int32Array;
+    double: Float32Array; //why is it called 'double'???
+    integer: Uint32Array;
+    text16: Uint16Array;
+    text: Uint8Array;
+    unique: Uint8Array; //raw bytes of strings to be decoded
+    multitext: Uint8Array;
 };
+export type { DataType, DataStructureTypes };
 /**
  * Union of all the possible data structures that can be used to store column data.
  */
-export type ColumnData = DataStructureTypes[keyof DataStructureTypes];
+export type ColumnData = DataStructureTypes[DataType];
 // even if they're just aliases, these could be useful for documentation / clarity
 export type ColumnName = string; //this will probably change to ColumnSpecifier with more structured data
 // ^^ I'd prefer that to having to reason about the string format everywhere
 export type DataSourceName = string;
 export type FieldName = string;
 
-type Quantiles = {
+export type Quantiles = {
     "0.001": [number, number];
     "0.01": [number, number];
     "0.05": [number, number];
@@ -140,6 +144,13 @@ export type DataSourceLinks = Record<
     { rows_as_columns?: RowsAsColumnsLink }
 >;
 
+/**
+ * nb - there should be a type for the entries in `datasources.json`...
+ * *but this is not that type!* even though it is being used in places where that type is expected.
+ * There is some confusion here about the internal representation in `ChartManager` of a panel with
+ * charts, menuBar etc, and the representation of a datasource in `datasources.json`.
+ * We may add a zod schema for the latter, and re-evaluate where this is used.
+ */
 export type DataSource = {
     name: DataSourceName;
     charts: Chart[];
