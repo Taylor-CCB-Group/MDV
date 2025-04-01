@@ -1,3 +1,4 @@
+import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import { useProject } from "@/modules/ProjectContext";
 import {
     Check,
@@ -46,7 +47,7 @@ const ErrorDisplay = ({
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const [userComments, setUserComments] = useState<string>();
-    const info = useProject();
+    const info = useBuildInfo();
     const buildInfo = info?.buildInfo || {};
 
     // Send the error details and the user's comments (if any) to the support email address
