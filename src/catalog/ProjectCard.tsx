@@ -155,7 +155,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     top: 8,
                     right: 8,
                     bgcolor: "background.paper",
-                    "&:hover": { bgcolor: "action.hover" },
+                    "&:hover": { bgcolor: "grey.500" },
                     zIndex: 1,
                 }}
             >
