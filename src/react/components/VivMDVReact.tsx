@@ -23,7 +23,7 @@ import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
-import { g, toArray } from "@/lib/utils";
+import { g, isArray, toArray } from "@/lib/utils";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -75,18 +75,20 @@ export type ScatterPlotConfig = {
     course_radius: number;
     radius: number;
     opacity: number;
-    color_by?: ColumnName;
-    color_legend: {
-        display: boolean;
-        // todo: add more options here...
-    };
+    // part of ColorConfig
+    // color_by?: ColumnName; 
+    // color_legend: {
+    //     display: boolean;
+    //     // todo: add more options here...
+    // };
     category_filters: Array<CategoryFilter>;
     //on_filter: "hide" | "grey", //todo
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
 } & TooltipConfig &
-    DualContourLegacyConfig;
-const scatterDefaults: ScatterPlotConfig = {
+    DualContourLegacyConfig & BaseConfig;
+//@ts- expect-error things like 'id' are expected... subject to review.
+const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
     course_radius: 1,
     radius: 10,
     opacity: 1,
@@ -128,13 +130,13 @@ export type VivMdvReactConfig = ScatterPlotConfig &
     //     overviewOn: boolean,
     //     image_properties: ChannelsState
     // }
-    VivRoiConfig & { channel: number };
+    VivRoiConfig;
 export type VivMDVReact = VivMdvReact;
 
-function adaptConfig(originalConfig: VivMdvReactConfig & BaseConfig) {
+function adaptConfig(originalConfig: VivMdvReactConfig) {
     const config = { ...scatterDefaults, ...originalConfig };
-    if (!config.channel) config.channel = 0;
     // in future we might have something like an array of layers with potentially ways of describing parameters...
+    //@ts-expect-error contourParameter type
     if (!config.contourParameter) config.contourParameter = config.param[2];
     // === some dead code ===
     // if (config.type === 'VivMdvRegionReact') {
@@ -166,11 +168,12 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
 
     /** set to true when this is the source of a viewState change etc to prevent circular update */
     ignoreStateUpdate = false;
-    constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: VivMdvReactConfig & BaseConfig) {
+    constructor(dataStore: DataStore, div: HTMLDivElement, originalConfig: VivMdvReactConfig) {
         // is this where I should be initialising vivStores? (can't refer to 'this' before super)
         // this.vivStores = createVivStores(this);
         const config = adaptConfig(originalConfig);
         super(dataStore, div, config, VivScatterChartRoot);
+        //@ts-expect-error color_by legacy options
         this.colorByColumn(config.color_by);
         makeObservable(this, {
             colorBy: observable,
@@ -211,6 +214,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
+        //@ts-expect-error category column values...
         const ocats = this.dataStore.getColumnValues(c.param[2]).slice() || [];
         const cats = ocats.map((x) => {
             return { t: x };
@@ -227,7 +231,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const filters = c.category_filters.map((f) => {
             // what we really want is to have a type that is fairly specific to category filters...
             // able to handle an array of them with controls for adding/removing...
-            const values = this.dataStore.columnIndex[f.column].values.slice();
+            const values = this.dataStore.columnIndex[f.column]?.values?.slice();
+            if (!values) throw `failed assertion that we should have a categorical '${f.column}' here`;
             values.unshift("all");
             return g({
                 type: "multidropdown",
@@ -243,8 +248,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         //   ^^ kinda want a more react-y SettingsDialog for that...
         // todo make sure associated json etc switches when region changes
         const ds = this.dataStore;
-        const imageRegionKeys = Object.keys(ds.regions.all_regions).filter(
-            (r) => ds.regions.all_regions[r].viv_image,
+        const imageRegionKeys = Object.keys(ds.regions?.all_regions).filter(
+            (r) => ds.regions?.all_regions[r].viv_image,
         );
         const images = imageRegionKeys.map((r) => ({ name: r, value: r }));
 
@@ -252,7 +257,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         return settings.concat([
             g({
                 type: "dropdown",
-                label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
+                label: `Image (${ds.getColumnName(ds.regions?.region_field)})`,
                 current_value: c.region,
                 values: [images, "name", "value"],
                 func(v) {
@@ -373,12 +378,14 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                                 //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
                                 label: "Contour parameter",
                                 // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
+                                //@ts-expect-error contourParameter type
                                 current_value: c.contourParameter || c.param[2],
                                 values: [catCols, "name", "field"],
                                 func: (x) => {
                                     if (x === c.contourParameter) return;
                                     // could we change 'cats' and have the dropdowns update?
                                     // was thinking this might mean a more general refactoring of the settings...
+                                    if (!isArray(c.param)) throw "expected param array";
                                     c.contourParameter = c.param[2] = x; //this isn't causing useParamColumns to update...
                                     // but maybe it's not necessary if 'cats' is observable... fiddly to get right...
                                     const newCats = (

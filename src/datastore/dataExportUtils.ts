@@ -28,7 +28,7 @@ export async function getExportCsvStream(
                 for (let i = 0; i < len; i++) {
                     const index = indexes[i];
                     const o = dataStore.getRowAsObject(index, columns);
-                    const line = [i].concat(columns.map((x) => o[x])).join(delimiter) + newline;
+                    const line = [i.toString()].concat(columns.map((x) => o[x].toString())).join(delimiter) + newline;
 
                     // Enqueue each encoded line to the stream
                     controller.enqueue(encoder.encode(line));

@@ -7,11 +7,11 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
-			// we will make things stricter in the future
 			"complexity": {
 				"useLiteralKeys": "off",
 				"noForEach": "off",
-				"noUselessSwitchCase": "info"
+				"noUselessSwitchCase": "info",
+				"noUselessFragments": "off"
 			},
 			"suspicious": {
 				"noExplicitAny": "off",
@@ -28,7 +28,7 @@
 				"noParameterAssign": "off",
 				"useTemplate": "info",
 				"useSingleVarDeclarator": "info",
-				"noUselessElse": "info",
+				"noUselessElse": "off",
 				"noArguments": "off"
 			},
 			"a11y": {
@@ -43,7 +43,8 @@
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "space",
-		"indentWidth": 4 // considering changing to 2, but most of the codebase uses 4
+		"indentWidth": 4, // considering changing to 2, but most of the codebase uses 4
+		"lineWidth": 120
 	},
 	"files": {
 		// todo - fix other code and remove these ignores (notwithstanding legacy)
@@ -51,7 +52,11 @@
 			"./src/legacy/**/*",
 			"./src/browser/**/*",
 			"./src/table/Slick*",
-			"./src/venn/**/*"
+			"./src/venn/**/*",
+			"./src/table/css/slick*",
+			"./src/tailwind.css",
+			"./src/utilities/css/**/*",
+			"./src/css/**/*"
 		]
 	}
 }

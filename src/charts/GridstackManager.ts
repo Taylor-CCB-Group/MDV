@@ -3,7 +3,7 @@ import { GridStack } from "gridstack";
 import { debounce } from "../utilities/Utilities";
 import type { ChartManager, DataSource } from "./charts";
 import type BaseChart from "./BaseChart";
-export type Chart = BaseChart<unknown>;
+export type Chart = BaseChart<any>;
 function clearPosition(div: HTMLElement) {
     div.style.position = "";
     div.style.left = "";
@@ -53,6 +53,9 @@ export default class GridStackManager {
                     handle: this.dragHandle,
                     float: true,
                     oneColumnSize: 400,
+                    resizable: {
+                        handles: "e,se,s,sw,w",
+                    }
                     // these options not working as expected...
                     // margin: 10
                     // column
@@ -163,11 +166,23 @@ export default class GridStackManager {
         const ro = new ResizeObserver(
             debounce(() => {
                 try {
+                    // this leads to a condition in which initial chart.config.size is not stable
+                    // immediately after adding it... and also if the window is resized, 
+                    // or the view is opened on a different screen... we need to think about how
+                    // we serialize the layout information.
                     chart.setSize();
                 } catch {}
             }, 20),
         );
         ro.observe(div);
+        // workaround for absolute positioning still being saved in config
+        // this interferes with detecting unsaved changes
+        // but if we want to compare state with state from server, it won't work.
+        // it would still also have a false positive if window is resized.
+        // only applies during chart init, so not when _alreadyCheckedDeferReady is true.
+        if (!chart._alreadyCheckedDeferReady) {
+            chart.deferredInit(() => chart.setSize(), 100);
+        }
 
         // div.remove();
         // grid.addWidget(div, {w, h, x, y, autoPosition});

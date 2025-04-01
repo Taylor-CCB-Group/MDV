@@ -28,8 +28,8 @@ class RowChart extends CategoryChart {
     }
 
     drawWordCloud(data) {
-        const vals = this.dataStore.getColumnValues(this.config.param);
-        const colors = this.dataStore.getColumnColors(this.config.param);
+        const vals = this.dataStore.getColumnValues(this.config.param[0]);
+        const colors = this.dataStore.getColumnColors(this.config.param[0]);
         const color = (word) => {
             const filtered =
                 this.filter.length > 0 && this.filter.indexOf(word) === -1;
@@ -75,8 +75,8 @@ class RowChart extends CategoryChart {
         const chartHeight =
             this.height - this.margins.bottom - this.margins.top;
 
-        const colors = this.dataStore.getColumnColors(this.config.param);
-        const vals = this.dataStore.getColumnValues(this.config.param);
+        const colors = this.dataStore.getColumnColors(this.config.param[0]);
+        const vals = this.dataStore.getColumnValues(this.config.param[0]);
 
         const units = chartWidth / this.maxCount;
         let data = this.rowData;

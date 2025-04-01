@@ -155,15 +155,15 @@ const Dashboard: React.FC = () => {
                         color="inherit"
                     >
                         {mode === "dark" ? (
-                            <Brightness7Icon />
-                        ) : (
                             <Brightness4Icon />
+                        ) : (
+                            <Brightness7Icon />
                         )}
                     </IconButton>
                 </Toolbar>
             </AppBar>
 
-            <Container maxWidth="lg" sx={{ mt: 4 }}>
+            <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
                 <Grid container spacing={3} sx={{ mb: 4 }}>
                     <Grid item xs={12} sm={6} md={3}>
                         <ButtonBase

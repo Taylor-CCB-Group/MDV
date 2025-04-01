@@ -11,7 +11,7 @@ Welcome to MDV's documentation
    :maxdepth: 3
    :caption: Contents:
 
-      User Docs <userdocs/index.rst>
+      User Docs <userdocs/index.md>
       Developer Docs <devdocs/index.rst>
    
 

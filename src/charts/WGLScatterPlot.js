@@ -315,6 +315,40 @@ class WGLScatterPlot extends WGLChart {
 
         this.onDataFiltered();
     }
+    
+    drawChart() {
+        const { config } = this;
+        const x_name = this.dataStore.getColumnName(config.param[0]);
+        const y_name = this.dataStore.getColumnName(config.param[1]);
+        config.axis.x.label = x_name;
+        config.axis.y.label = y_name;
+
+        this.x = this.config.param[0];
+        this.y = this.config.param[1];
+        this.dim = this.getDimension();
+        const bf = config.background_filter;
+        if (bf) {
+            this.dim.setBackgroundFilter(bf.column, bf.category);
+        }
+        this.minMaxX = this.dataStore.getMinMaxForColumn(this.x);
+        this.minMaxY = this.dataStore.getMinMaxForColumn(this.y);
+        const colorFunc = this.afterAppCreation();
+        const cx = this.dataStore.columnIndex[this.x];
+        const cy = this.dataStore.columnIndex[this.y];
+        //will get some loss of precision for int32 plus no updating on data changed
+        this.app.addCircles({
+            x: cx.datatype === "int32" ? new Float32Array(cx.data) : cx.data,
+            y: cy.datatype === "int32" ? new Float32Array(cy.data) : cy.data,
+            localFilter: this.dim.getLocalFilter(),
+            globalFilter: this.dataStore.getFilter(),
+            colorFunc: colorFunc,
+        });
+
+
+        this.onDataFiltered();
+        this.updateAxis();
+        super.drawChart();
+    }
 
     /**
      * If called more than once, will result in more than one "RangeDimension" being created

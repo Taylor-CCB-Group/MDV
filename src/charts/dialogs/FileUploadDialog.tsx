@@ -95,9 +95,11 @@ const DropzoneContainer = forwardRef(
 // not sure if there's a better type for `htmlFor`.
 const FileInputLabel = ({
     children,
+    htmlFor,
     ...props
 }: PropsWithChildren & { className: string; htmlFor: string }) => (
     <label
+        htmlFor={htmlFor}
         {...props}
         className="mt-8 px-5 py-2.5 border bg-stone-200 hover:bg-stone-300 rounded cursor-pointer inline-block my-2.5 dark:bg-stone-600 dark:hover:bg-stone-500"
     >
@@ -235,7 +237,7 @@ const ErrorHeading = ({ children }: PropsWithChildren) => (
 //@ts-ignore CBA
 const DatasourceNameInput = ({ value, onChange, isDisabled }) => (
     <div className="flex-left items-center space-x-2 pr-4">
-        <label className="text-lg text-gray-700 dark:text-white my-1">
+        <label className="text-lg text-gray-700 dark:text-white my-1" htmlFor="datasourceName">
             <strong>Datasouce Name:</strong>
         </label>
         <input

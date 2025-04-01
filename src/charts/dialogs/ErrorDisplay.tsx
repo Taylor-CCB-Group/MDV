@@ -1,3 +1,4 @@
+import { useProject } from "@/modules/ProjectContext";
 import {
     Check,
     ContentCopy,
@@ -65,6 +66,7 @@ const ErrorDisplay = ({
                 ...(error?.stack != null && { stack: error?.stack }),
             });
     }, [extraMetadata, error]);
+    // const { buildInfo } = useProject();
 
     // Send the error details and the user's comments (if any) to the support email address
     const handleSend = async () => {
@@ -75,6 +77,7 @@ const ErrorDisplay = ({
             message: error.message,
             userComments: userComments ? userComments : null,
             extraMetadata: metaData ? metaData : null,
+            // buildInfo
         };
         //todo: Add the logic to send the error details to the email address and display the corresponding message to user
         try {
@@ -267,7 +270,10 @@ const ErrorDisplay = ({
                                         <Collapse in={expanded}>
                                             <JsonView
                                                 editable
-                                                src={metaData}
+                                                src={{
+                                                    ...metaData, 
+                                                    // buildInfo: buildInfo
+                                                }}
                                                 onAdd={(params) =>
                                                     setMetaData(params.src)
                                                 }

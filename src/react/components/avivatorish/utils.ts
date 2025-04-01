@@ -118,7 +118,7 @@ type OmeTiffImage = OME_TIFF;
 async function getTotalImageCount(sources: OmeTiffImage[]) {
     const firstOmeTiffImage = sources[0];
     const firstPixelSource = firstOmeTiffImage.data[0];
-    //@ts-expect-error - this is a private method
+    //@ts-ignore - this is a private method
     const representativeGeoTiffImage = await firstPixelSource._indexer({
         c: 0,
         z: 0,

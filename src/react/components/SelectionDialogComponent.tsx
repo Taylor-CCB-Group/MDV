@@ -1,8 +1,8 @@
-import { useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
+import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, TextField, type TextFieldProps, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Paper, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
@@ -14,7 +14,7 @@ import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
 import { action, runInAction } from "mobx";
-import { useChart } from "../context";
+import { useChart, useDataStore } from "../context";
 import ColumnSelectionComponent from "./ColumnSelectionComponent";
 import type RangeDimension from "@/datastore/RangeDimension";
 import { useDebounce } from "use-debounce";
@@ -22,6 +22,9 @@ import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../ch
 import * as d3 from 'd3';
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
+import { TextFieldExtended } from "./TextFieldExtended";
+import { isArray } from "@/lib/utils";
+import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -43,23 +46,10 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
         : RangeFilter) | null;
     return filter;
 }
-
-/** Modified version of TextField that allows a `customEndAdornment`
- * along with the standard endAdornment passed in `InputProps`.
- */
-const TextFieldExtended = (props: TextFieldProps & { customEndAdornment?: JSX.Element }) => {
-    const { InputProps, customEndAdornment, ...rest } = props;
-    const inputProps = {
-        ...InputProps,
-        endAdornment: (
-            <>{customEndAdornment} {InputProps?.endAdornment}</>
-        )
-    };
-    return <TextField {...rest} InputProps={inputProps} />;
-}
-
 const filterOptions = createFilterOptions<any>({ limit: 100 });
 const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
     const { values } = column;
@@ -72,6 +62,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             filters[column.field] = newFilter;
         })();
     }, [filters, column.field, filter]);
+    useCloseOnIntersection(ref, () => setOpen(false));
     // react to changes in value and update the filter
     useEffect(() => {
         // filter could be undefined - but we previously checked for null causing component to crash
@@ -106,6 +97,10 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             onChange={(_, newValue) => setValue(newValue)}
             onFocus={() => setHasFocus(true)}
             onBlur={() => setHasFocus(false)}
+            open={open}
+            onOpen={() => setOpen(true)}
+            onClose={() => setOpen(false)}
+            ref={ref}
             renderInput={(props) => {
                 const { key, ...p } = props as typeof props & {
                     key: string;
@@ -159,6 +154,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                 //todo improve styling - bad from UX perspective at the moment when it overflows.
                 return <div className="max-h-32 overflow-auto">{chips}</div>;
             }}
+            // PaperComponent={(paperProps) => <Paper ref={ref} {...paperProps} />}
         />
     );
 });
@@ -217,7 +213,14 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
     const value = fVal;
     // const value = fVal;
     const isInteger = column.datatype.match(/int/);
-    const step = isInteger ? 1 : 0.001;
+    const { minMax } = column;
+    const step = useMemo(() => {
+        if (isInteger) return 1;
+        // not sure this is totally correct - but there was a problem with very small ranges
+        // this should be better...
+        const small = Math.abs(minMax[1] - minMax[0]);
+        return small < 0.001 ? small/1000 : 0.001;
+    }, [isInteger, minMax]);
     const [debouncedValue] = useDebounce(value, 10);
 
     // Effect to manage the filter state
@@ -377,8 +380,17 @@ const Histogram = observer((props: RangeProps) => {
 
     const [hasQueried, setHasQueried] = useState(false);
     useEffect(() => {
-        queryHistogram();
-    }, [queryHistogram]);
+        if (!ref.current) return;
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && !hasQueried) {
+                setHasQueried(true);
+                queryHistogram();
+            }
+        }, { rootMargin: '0px 0px 100px 0px' });
+        observer.observe(ref.current);
+        // queryHistogram();
+        return () => observer.disconnect();
+    }, [queryHistogram, hasQueried]);
 
     // Generate the points for the polyline
     // ??? useMemo was wrong ????
@@ -482,6 +494,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
         e.stopPropagation();
         runInAction(() => {
             delete filters[column.field];
+            if (!isArray(config.param)) throw new Error("expected param array");
             config.param = config.param.filter((p) => p !== column.field);
         });
         console.log('Delete item');
@@ -533,8 +546,11 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
 });
 
 const AddRowComponent = observer(() => {
+    //! warning, as well as being disabled for now, this was not working properly
+    //(something about setSelectedColumn was going wrong with other recent changes)
     const config = useConfig<SelectionDialogConfig>();
     const { filters, param } = useConfig<SelectionDialogConfig>();
+    if (!isArray(param)) throw new Error("expected param array");
     const setSelectedColumn = useCallback((column: string) => {
         if (!column) return;
         if (param.includes(column)) return;
@@ -546,23 +562,31 @@ const AddRowComponent = observer(() => {
     }, [filters, param, config]);
     return (
         <div className="p-5">
-        <ColumnSelectionComponent
-        setSelectedColumn={setSelectedColumn}
-        placeholder="Add a filter column"
-        exclude={param}
-        />
+            <ColumnSelectionComponent
+                //@ts-expect-error !!! setSelectedColumn needs appropriate type
+                setSelectedColumn={setSelectedColumn}
+                placeholder="Add a filter column"
+                //@ts-expect-error 'exclude' design still under review?
+                exclude={param}
+                // type="_multi_column:all" //not sure about this...
+                type={["text", "text16", "multitext", "unique", "integer", "double", "int32"]}
+            />
         </div>
     )
 })
 
-const ForeignRows = () => {
+const ForeignRows = observer(() => {
+    // const rlink = useRowsAsColumnsLinks();
+    // //!breaking rule of hooks here, but in a way that should be ok at runtime as of now
+    // //! (just testing "infinte loop with no link" fix)
+    // if (rlink.length === 0) return null; //todo: 30sec video clip
     const [filter, setFilter] = useState("");
     const [max, setMax] = useState(10);
     const [debouncedFilter] = useDebounce(filter, 300);
     const rlink = useRowsAsColumnsLinks();
     const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter);
-    if (!rlink) return null;
-    const { linkedDs, link } = rlink;
+    if (!rlink[0]) return null;
+    const { linkedDs, link } = rlink[0];
     return (
         <div className="p-3">
             <Typography variant="h6" sx={{ marginBottom: '0.5em' }}>Columns associated with selected '{linkedDs.name}':</Typography>
@@ -576,7 +600,7 @@ const ForeignRows = () => {
             {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );
-}
+});
 
 /**
  * This will control the behaviour of the reset menuIcon in the chart header - not rendered with react.
@@ -590,19 +614,51 @@ function useResetButton() {
         console.log("hasFilter changed (in hook): ", hasFilter);
         chart.resetButton.style.display = hasFilter ? "inline" : "none";
     }, [hasFilter, chart.resetButton]);
+    // we also need to respond to the 'reset all' button
+    const ds = useDataStore();
+    const id = useId();
+    useEffect(() => {
+        const k = `SelectionDialog-${id}`;
+        const resetAll = (type: string, data: string) => {
+            if (type !== "filtered" || data !== "all_removed") return;
+            runInAction(() => {
+                for (const key in filters) {
+                    delete filters[key];
+                }
+            });
+        };
+        ds.addListener(k, resetAll);
+        return () => ds.removeListener(k);
+    }, [ds, id, filters]);
 }
 
 const SelectionDialogComponent = () => {
     //!! this component doesn't update with HMR and introducing another wrapper component makes things worse
     //(currently changes here aren't reflected in the browser, but the rest of the components are
     //if we wrap this, then any change causes whole page to reload)
+    //! since this is outside the ErrorBoundary, problems in this hook are not well handled
+    //we could consider returning some kind of `Result` object from this hook...
     const cols = useParamColumnsExperimental();
     useResetButton();
+    const showAddRow = false;
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
-            <AddRowComponent />
-            <ForeignRows />
+            {showAddRow && <ErrorBoundary FallbackComponent={
+                ({ error }) => 
+                    (
+                        <div className="col-span-3 w-full"> 
+                            <ErrorComponentReactWrapper 
+                                error={{message: error.message, stack: error.stack}} 
+                                //todo assign proper meta data
+                                // extraMetaData={} 
+                                title="Error displaying 'AddRowComponent'. Click to view details"
+                            />
+                        </div>
+                        )
+            }>
+                <AddRowComponent />
+            </ErrorBoundary>}
         </div>
     );
 };

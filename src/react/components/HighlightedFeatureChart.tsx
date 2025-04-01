@@ -3,11 +3,11 @@ import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
 import type DataStore from "../../datastore/DataStore";
 import { BaseReactChart } from "./BaseReactChart";
 import { HighlightedFeatureComponent } from "./HighlightedFeatureComponent";
-import type { GuiSpec } from "@/charts/charts";
+import { g, isArray } from "@/lib/utils";
 
-type HighlightedFeatureConfig = {
+export type HighlightedFeatureConfig = {
     text: string;
-};
+} & BaseConfig;
 
 class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureConfig> {
     constructor(
@@ -20,28 +20,28 @@ class HighlightedFeatureChartWrapper extends BaseReactChart<HighlightedFeatureCo
     }
     getSettings() {
         const c = this.config;
+        if (!isArray(this.config.param)) throw "expected param array";
         return [
             ...super.getSettings(),
-            {
-                type: "dropdown",
-                // name: "Column",
+            g({
+                // untested / chart is generally unused
+                type: "multicolumn",
                 label: "Column",
-                current_value: this.config.param[0],
-                values: [this.dataSource.dataStore.columns.map((c) => c.name)],
-                func: action((v: string) => {
-                    this.config.param[0] = v;
-                }),
-            },
-            {
+                current_value: this.config.param,
+                func: (v) => {
+                    this.config.param = v;
+                },
+            }),
+            g({
                 label: "Markdown Text",
                 // name: "text",
                 type: "textbox",
                 current_value: c.text || "",
-                func: action((x) => {
+                func(x) {
                     c.text = x;
-                }),
-            },
-        ] as GuiSpec<any>[];
+                },
+            }),
+        ];
     }
 }
 
