@@ -5,8 +5,6 @@ export default function popoutChart(chart: BaseChart<any>) {
     const { chartManager } = window.mdv;
     const mainWindow = window;
     const div = chart.getDiv();
-    const originalParent = div.parentElement;
-    if (!originalParent) throw "Chart div has no parent element";
     const wtop = window.screenTop ? window.screenTop : window.screenY;
     const wleft = window.screenLeft ? window.screenLeft : window.screenX;
     const { width, height, left, top } = div.getBoundingClientRect();
@@ -15,6 +13,10 @@ export default function popoutChart(chart: BaseChart<any>) {
     const l = Math.floor(left + wleft);
     const t = Math.floor(top + wtop);
     if (div.gridstackPopoutCallback) div.gridstackPopoutCallback();
+    //moved this to after the callback as this will ensure the 
+    //parent element is correct
+    const originalParent = div.parentElement;
+    if (!originalParent) throw "Chart div has no parent element";
     removeResizable(div);
     removeDraggable(div);
     const popoutWindow = window.open(
@@ -104,7 +106,9 @@ export default function popoutChart(chart: BaseChart<any>) {
     popoutWindow.addEventListener("beforeunload", () => {
         popStyles();
         originalParent.appendChild(div);
-        chartManager._makeChartRD(chart);
+        //this will enable the chart position, size to be manipulated 
+        //in the current layout manager (absolute or gridstack)
+        chartManager._makeChartRD(chart,chart.dataSource);
         //@ts-ignore
         chartManager.charts[chart.config.id].win = mainWindow;
         chart.changeBaseDocument(document);
