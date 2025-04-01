@@ -46,7 +46,8 @@ const ErrorDisplay = ({
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const [userComments, setUserComments] = useState<string>();
-    const { buildInfo } = useProject();
+    const info = useProject();
+    const buildInfo = info?.buildInfo || {};
 
     // Send the error details and the user's comments (if any) to the support email address
     const handleSend = () => {

@@ -19,7 +19,7 @@ const useProjectShare = (projectId: string) => {
     const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
     const [userList, setUserList] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState("");
+    const [error, setError] = useState<Error>();
 
     useEffect(() => {
         if (projectId) {
@@ -39,13 +39,21 @@ const useProjectShare = (projectId: string) => {
                     Accept: "application/json",
                 },
             });
-            if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`);
+            if (res.ok) {
+                // todo: update user list with this data
+                const data = await res.json();
+                console.log("getAllUsers", res);
+            } else {
+                throw new Error("An unknown error occurred.")
             }
-            const data = await res.json();
-            console.log("getAllUsers", res);
+
+
+            if (res.status === 500) {
+                throw new Error("Internal Server Error.");
+            }
         } catch (error) {
-            console.log("error", error);
+            const err = error instanceof Error ? error : new Error("Error fetching users data.");
+            setError(err);
         } finally {
             setIsLoading(false);
         }
@@ -61,7 +69,17 @@ const useProjectShare = (projectId: string) => {
             });
 
             console.log("addUser", res);
+
+            if (!res.ok) {
+                throw new Error("An unknown error occurred.");
+            }
+
+            if (res.status === 500) {
+                throw new Error("Internal Server Error.");
+            }
         } catch (error) {
+            const err = error instanceof Error ? error : new Error("Error fetching users data.");
+            setError(err);
         } finally {
             setIsLoading(false);
         }
@@ -77,7 +95,17 @@ const useProjectShare = (projectId: string) => {
             });
 
             console.log("updateSharedUsers", res);
+
+            if (!res.ok) {
+                throw new Error("An unknown error occurred.");
+            }
+
+            if (res.status === 500) {
+                throw new Error("Internal Server Error.");
+            }
         } catch (error) {
+            const err = error instanceof Error ? error : new Error("Error fetching users data.");
+            setError(err);
         } finally {
             setIsLoading(false);
         }
@@ -92,8 +120,8 @@ const useProjectShare = (projectId: string) => {
         updateSharedUsers,
         getAllUsers,
         isLoading,
-        errorMessage,
-        userList
+        error,
+        userList,
     };
 };
 
