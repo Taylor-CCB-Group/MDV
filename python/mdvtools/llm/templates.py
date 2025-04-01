@@ -123,16 +123,15 @@ IMPORTANT: All string interpolations MUST use Python formatted string literals (
 
 Example:
 # Correct:
-message = f"link|{{param2}}(link)|{{param2_index}}"
+message = f"gs|{{param2}}(gs)|{{param2_index}}"
 
 # Common mistake to avoid:
-WRONG: message = "link|{{param2}}(link)|{{param2_index}}"
+WRONG: message = "gs|{{param2}}(gs)|{{param2_index}}"
 
-If the prompt asks for linking the two datasets, for example by requesting gene expression, make sure that:
-1. You load both datasources that need linking, e.g. cells and genes.
-2. If gene expression is required, make sure the gene id, is given as a param in the formatted string literal format: f"link|{{param2}}(link)|{{param2_index}}", with param2 and param2_index given by param2 = "param2"
+If the prompt asks for a gene-related query (e.g., gene expression value, most expressing gene, target expression, etc.), make sure that:
+1. You load both datasources that are needed, e.g. cells and genes.
+2. If gene expression is required, make sure the gene id, is given as a param in the formatted string literal format: f"gs|{{param2}}(gs)|{{param2_index}}", with param2 and param2_index given by param2 = "param2"
     param2_index = data_frame_var.index.get_loc(param2)
-3. Make sure you create a link between the two datasets.
 
 The data_path are given by this variable `""" + path_to_data + """`
 The datasource_name is given by this variable `""" + datasouce_name + """`
