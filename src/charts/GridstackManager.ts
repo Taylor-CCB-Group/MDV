@@ -220,6 +220,9 @@ export default class GridStackManager {
                     //this is causing 'No data for row chart' error
                     //when loading as saved view
                     //it redraws chart before the data is processed
+                    //^ perhaps we could use something related to chart.deferredInit if this is a problem
+                    //would possibly need to improve the design of that mechanism, 
+                    //we could possibly move `ro` creation to after that promise resolves.
 
                     // also leads to a condition in which initial chart.config.size is not stable
                     // immediately after adding it... and also if the window is resized, 
