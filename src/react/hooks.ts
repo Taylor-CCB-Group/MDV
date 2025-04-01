@@ -26,7 +26,12 @@ export function useConfig<T>() {
     const { config } = useChart();
     return config as T & BaseConfig; //todo: strict/inferred typing
 }
-
+export function useChartManager() {
+    return window.mdv.chartManager;
+}
+export function useViewManager() {
+    return useChartManager().viewManager;
+}
 export function useChartSize() {
     const chart = useChart();
     // return chart.config.size; // not so well behaved?
@@ -318,7 +323,7 @@ export function useCategoryFilterIndices(
  */
 export function useImgUrl(): string {
     const region = useRegion();
-    const avivator = useDataStore().regions.avivator;
+    const avivator = useDataStore().regions?.avivator;
     const url = useMemo(() => {
         // if (config.imageURL) return config.imageURL; //deprecated
         const i = region.viv_image;

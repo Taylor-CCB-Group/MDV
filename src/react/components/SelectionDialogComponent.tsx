@@ -218,7 +218,7 @@ function useRangeFilter(column: DataColumn<NumberDataType>) {
         if (isInteger) return 1;
         // not sure this is totally correct - but there was a problem with very small ranges
         // this should be better...
-        const small = Math.min(...minMax.map((v) => Math.abs(v)));
+        const small = Math.abs(minMax[1] - minMax[0]);
         return small < 0.001 ? small/1000 : 0.001;
     }, [isInteger, minMax]);
     const [debouncedValue] = useDebounce(value, 10);

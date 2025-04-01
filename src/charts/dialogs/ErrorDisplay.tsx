@@ -56,7 +56,7 @@ const ErrorDisplay = ({
             traceback: error?.traceback,
             userComments: userComments ? userComments : null,
             extraMetadata: extraMetadata ? extraMetadata : null,
-            buildInfo
+            // buildInfo
         };
         //todo: Add the logic to send the error details to the email address and display the corresponding message to user
         console.log("Send", errorDetails);
@@ -190,7 +190,7 @@ const ErrorDisplay = ({
                                         <JsonView
                                             src={{
                                                 ...extraMetadata,
-                                                buildInfo,
+                                                // buildInfo,
                                                 stackTrace: error?.traceback,
                                             }}
                                             collapsed={1}

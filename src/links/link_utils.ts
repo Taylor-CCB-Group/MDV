@@ -425,11 +425,11 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     await setFieldsFromFilter();
     console.log("link initialized", link);
 }
-
 export function getRowsAsColumnsLinks(dataStore: DataStore) {
     const dataSources = window.mdv.chartManager.dataSources;
     if (dataStore.links) {
         const result = Object.keys(dataStore.links).map((linkedDsName) => {
+            if (!dataStore.links) throw "unreachable";
             const links = dataStore.links[linkedDsName];
             if (links.rows_as_columns) {
                 // first pass... there can be only one or zero.
