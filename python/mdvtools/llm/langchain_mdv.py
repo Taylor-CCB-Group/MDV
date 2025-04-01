@@ -65,9 +65,6 @@ chat_debug_handler.setFormatter(formatter)
 # attach the handler
 chat_debug_logger.addHandler(chat_debug_handler)
 
-
-
-
 @contextmanager
 def time_block(name):
     start_time = time.time()  # Setup: Start timing
@@ -238,7 +235,15 @@ class ProjectChat:
                     # Step 7: Wrapper Function to Use Contextualization and Preserve Memory
                     def agent_with_contextualization(question):
                         standalone_question = contextualize_chain.run(input=question)
+                        # Point 1: Log reformulation
+                        chat_debug_logger.info(f"Original Question: {question}")
+                        chat_debug_logger.info(f"Standalone Reformulated Question: {standalone_question}")
+                        # Point 2: Log what you're sending to the agent
+                        chat_debug_logger.info("Sending to agent_executor with input:")
+                        chat_debug_logger.info(f"{standalone_question}")
                         response = agent_executor.invoke({"input": standalone_question})
+                        # Point 3: Log agent output
+                        chat_debug_logger.info(f"Agent Raw Response: {response}")
                         memory.save_context({"input": question}, {"output": response.get("output", str(response))})
                         return response
 
