@@ -13,7 +13,7 @@ export type ProjectInfo = {
     staticFolder: boolean;
     chartManager: ChartManager;
     projectName: string;
-    // buildInfo: BuildInfo;
+    buildInfo: BuildInfo;
 };
 
 export type Project = {
