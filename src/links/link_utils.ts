@@ -207,8 +207,10 @@ export type RowsAsColslink = {
     /** 
      * Added at runtime, given a value appearing in `name_column`, the index of a row corresponding to that value.
      * This can be used in the formation of a {@link FieldName}
+     * ! note, we should be able to use 'unique' values in the name_column, and would like to do away with this
+     * It is now optional to reflect that it will not be available until `initPromise` resolves.
      */
-    valueToRowIndex: Map<string, number>;
+    valueToRowIndex?: Map<string, number>;
     initPromise: Promise<void>;
 }
 /**
@@ -423,11 +425,11 @@ async function initRacListenerImpl(link: RowsAsColslink, ds: DataStore, tds: Dat
     await setFieldsFromFilter();
     console.log("link initialized", link);
 }
-
 export function getRowsAsColumnsLinks(dataStore: DataStore) {
     const dataSources = window.mdv.chartManager.dataSources;
     if (dataStore.links) {
         const result = Object.keys(dataStore.links).map((linkedDsName) => {
+            if (!dataStore.links) throw "unreachable";
             const links = dataStore.links[linkedDsName];
             if (links.rows_as_columns) {
                 // first pass... there can be only one or zero.

@@ -264,7 +264,7 @@ class BaseChart<T extends BaseConfig> {
 
         //work out width and height based on container
         this._setDimensions();
-        setTimeout(() => {
+        this.deferredInit(() => {
             try {
                 //some charts weren't properly initialising the color legend, so doing it here may help that to be more consistent.
                 //there is an implementation of the method here in BaseChart, but we wrap in a try/catch as it assumes other associated methods are also implemented.
@@ -276,6 +276,41 @@ class BaseChart<T extends BaseConfig> {
         this.observable = makeAutoObservable({
             container: this.__doc__.body,
         });
+    }
+    _deferredInits: Promise<void>[] = [];
+    /**
+     * During chart initialisation, we defer some actions until after the constructor has returned.
+     * This is particularly used for active column queries in cases where we call methods with deserialised data
+     * on chart methods that may not be ready yet.
+     * @param callback - a function that will be called in a `setTimeout` after the js event loop has completed.
+     * @param delay - an optional delay to wait before calling the callback, most actions shouldn't need this,
+     * but things related to layout might do.
+     */
+    deferredInit(callback: () => void, delay = 0) {
+        if (this._alreadyCheckedDeferReady) {
+            //! the current implementation isn't sophisticated enough to handle this...
+            console.error("called deferredInit after deferredInitsReady");
+        }
+        const promise = new Promise<void>((resolve) => {
+            callback();
+            resolve();
+        });
+        this._deferredInits.push(promise);
+        setTimeout(callback, delay);
+    }
+    _alreadyCheckedDeferReady = false;
+    /**
+     * This method should be called during chart initialisation, at a time when all deferred initialisations have been added.
+     * It returns a promise that resolves when all deferred initialisations have been completed,
+     * which should indicate that the chart is fully initialised - meaning that calling getConfig()
+     * should return a valid configuration, with a value that will not change until some kind of user interaction.
+     */
+    async deferredInitsReady() {
+        if (this._alreadyCheckedDeferReady) {
+            console.warn("repeated call to deferredInitsReady");
+        }
+        this._alreadyCheckedDeferReady = true;
+        return Promise.allSettled(this._deferredInits);
     }
     reactionDisposers: IReactionDisposer[] = [];
     mobxAutorun(fn: ()=>void, opts?: IAutorunOptions) {
@@ -934,7 +969,8 @@ class BaseChart<T extends BaseConfig> {
                 pos: [this.legend.offsetLeft, this.legend.offsetTop],
             };
         }
-        // return serialiseChart(this);
+        // there is a general issue with config.size/position when not using "absolute" layout
+        // what would happen if we just remove it in that case???
         return this.activeQueries.serialiseChartConfig();
     }
     
@@ -975,7 +1011,7 @@ class BaseChart<T extends BaseConfig> {
         this._setDimensions();
     }
 
-    _setDimensions() {
+    @action _setDimensions() {
         const rect = this.div.getBoundingClientRect();
         const y = Math.round(rect.height);
         const x = Math.round(rect.width);

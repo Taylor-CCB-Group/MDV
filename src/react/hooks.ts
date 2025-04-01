@@ -1,3 +1,4 @@
+import type React from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChart, useDataStore } from "./context";
 import { getProjectURL, loadColumn } from "../dataloaders/DataLoaderUtil";
@@ -25,7 +26,12 @@ export function useConfig<T>() {
     const { config } = useChart();
     return config as T & BaseConfig; //todo: strict/inferred typing
 }
-
+export function useChartManager() {
+    return window.mdv.chartManager;
+}
+export function useViewManager() {
+    return useChartManager().viewManager;
+}
 export function useChartSize() {
     const chart = useChart();
     // return chart.config.size; // not so well behaved?
@@ -197,7 +203,6 @@ export function useFilteredIndices() {
     const [filteredOutIndices, setFilteredOutIndices] = useState(
         new Uint32Array(),
     );
-    // biome-ignore lint/correctness/useExhaustiveDependencies: shouldn't be ignoring this, but some deps don't tend to change as of now.
     useEffect(() => {
         // return
         let cancelled = false;
@@ -213,7 +218,7 @@ export function useFilteredIndices() {
             dataStore.name,
             catColumns,
         );
-        Promise.all([indexPromise, colPromise]).then(([indices]) => {
+        Promise.all([indexPromise, colPromise, dataStore._filteredIndicesPromise]).then(([indices]) => {
             if (cancelled) return;
             if (filterColumn) {
                 const cols = catFilters.map(
@@ -274,6 +279,9 @@ export function useFilteredIndices() {
         filterColumn,
         config.background_filter,
         config.category_filters,
+        dataStore.columnIndex,
+        dataStore.getFilteredIndices,
+        dataStore.name,
     ]);
     return filteredIndices;
 }
@@ -315,7 +323,7 @@ export function useCategoryFilterIndices(
  */
 export function useImgUrl(): string {
     const region = useRegion();
-    const avivator = useDataStore().regions.avivator;
+    const avivator = useDataStore().regions?.avivator;
     const url = useMemo(() => {
         // if (config.imageURL) return config.imageURL; //deprecated
         const i = region.viv_image;
@@ -404,3 +412,25 @@ export function useRangeDimension2D() {
     const removeFilter = useCallback(() => rangeDimension.removeFilter(), [rangeDimension]);
     return { filterPoly, removeFilter, rangeDimension };
 }
+
+
+export const useCloseOnIntersection = (ref: React.RefObject<HTMLElement>, onClose: () => void) => {
+    useEffect(() => {
+        if (!ref.current) return;
+        // Observer to observe the an element and close it when it intersects the parent element (most likely while scrolling)
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                // If less than half of the element is intersecting, call onClose
+                if (entry.intersectionRatio < 0.2) {
+                    onClose();
+                }
+              });
+            }, {threshold: 0.2}
+        );
+        observer.observe(ref.current);
+        return () => {
+            if (ref.current) observer.unobserve(ref.current);
+            observer.disconnect();
+        }
+    }, [ref.current, onClose]);
+};

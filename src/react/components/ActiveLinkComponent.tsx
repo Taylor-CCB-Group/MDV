@@ -10,7 +10,7 @@ import { action } from "mobx";
 function useActiveLink<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) {
     const { link, linkedDs } = useRowsAsColumnsLinks()[0]; //pending multiple link support
     const sg = Object.values(link.subgroups)[0]; //pending subgroup support
-    const highlightedForeignRows = useHighlightedForeignRows();
+    // const highlightedForeignRows = useHighlightedForeignRows();
     const isActive = useMemo(() => {
         const ov = props.current_value;
         const v = isArray(ov) ? ov[0] : ov;
@@ -47,7 +47,7 @@ function useActiveLink<T extends CTypes, M extends boolean>(props: ColumnSelecti
         setMaxItems,
         link,
         sg,
-        highlightedForeignRows,
+        // highlightedForeignRows,
     };
 }
 

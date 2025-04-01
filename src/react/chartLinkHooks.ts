@@ -104,6 +104,8 @@ export function useRowsAsColumnsLinks() {
         throw "no dataStore!!!";
     }
     // if it was possible for user to edit this at runtime, we'd want this to be reactive
+    //nb, not making this async because of how it's used for deserisation...
+    //! we could check initPromise of each link & only return resolved ones...
     return getRowsAsColumnsLinks(dataStore);
 }
 

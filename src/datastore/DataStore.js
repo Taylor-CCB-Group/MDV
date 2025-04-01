@@ -15,35 +15,39 @@ import { makeObservable, observable, action } from "mobx";
 import { isColumnNumeric, isColumnText } from "../utilities/Utilities";
 import { isDatatypeNumeric } from "@/lib/utils";
 
-/**
- * Creates an empty data structure
- * 
- * [Data Source](../../docs/extradocs/datasource.md)
- *  
- * @param {number} size - the number of rows(items) of the data structure
- * @param {Object} [config] - setup information for the datastore.
- * @param {Object[]} [config.columns] - an array of column objects, specifying
- * the metadata for data structure, see {@link DataStore#addColumn}
- * @param {Object[]} [config.columnGroups] - an array of objects each has
- * name, and a list of columns in that group
- * @param {Object} [config.links] - an object describing how this DataStore
- * links with other DataStore
- * @param {Object} [config.images] - an object describing thumbnails which
- * are associated with each item/row in the DataStore
- * @param {Object} [config.large_iamges] - an object describing large images which
- * are associated with each item/row in the DataStore
- * @param {Object} [config.offsets] - an object specifying which columns can
- * have values that can be transformed and rotated and any transformations/
- * rotations applied to them
- */
 
 class DataStore {
+    /**
+     * Creates a data store object based on the given configuration. Does not
+     * initially load any data, but will hold references to column data once loaded.
+     * 
+     * [Data Source](../../docs/extradocs/datasource.md)
+     * @typedef {import("@/charts/charts").DataSource} DataSource
+     * @param {number} size - the number of rows(items) of the data structure
+     * @param {DataSource} [config] - setup information for the datastore.
+     * @param {Object[]} [config.columns] - an array of column objects, specifying
+     * the metadata for data structure, see {@link DataStore#addColumn}
+     * @param {Object[]} [config.columnGroups] - an array of objects each has
+     * name, and a list of columns in that group
+     * @param {Object} [config.links] - an object describing how this DataStore
+     * links with other DataStore
+     * @param {Object} [config.images] - an object describing thumbnails which
+     * are associated with each item/row in the DataStore
+     * @param {Object} [config.large_iamges] - an object describing large images which
+     * are associated with each item/row in the DataStore
+     * @param {Object} [config.offsets] - an object specifying which columns can
+     * have values that can be transformed and rotated and any transformations/
+     * rotations applied to them
+     */
     constructor(size, config = {}, dataLoader = null) {
+        // by keeping a reference to the original config metadata, we can later compare
+        // it to new config from server to determine if it has changed etc.
+        this.config = config;
         /** @type {number} */
         this.size = size;
         /** @type {number} */
         this.filterSize = size;
-        /** why doesn't this column annotation work?
+        /**
          * @typedef {import("@/charts/charts.js").DataType} DataType
          * @type {import("@/charts/charts.js").DataColumn<DataType>[]} */
         this.columns = [];
@@ -311,10 +315,11 @@ class DataStore {
     /**
      * This method calls any listeners to 'highlight' any rows specified e.g.
      * rows in a table or points in a scatter plot
-     * @param {array} indexes an array of indexes to items that should be highlighted
+     * @param {number[]} indexes an array of indexes to items that should be highlighted
      * @param {object} source the object doing the highlighting
      */
     dataHighlighted(indexes, source) {
+        indexes.sort((a, b) => a - b);
         this.highightedData = indexes;
         this.loadRowData(indexes[0]).then((data) =>
             this._callListeners("data_highlighted", { indexes, source, data }),
@@ -350,7 +355,7 @@ class DataStore {
     }
 
     /**
-     * @returns {array} The indexes of items that have been highligted
+     * @returns The indexes of items that have been highligted
      */
     getHighlightedData() {
         return this.highightedData;
@@ -365,6 +370,7 @@ class DataStore {
 
     /**
      * Tag that the colunm's data has changed and is not synched with the backend
+     * @param {string} col - the column that has been modified
      */
     setColumnIsDirty(col) {
         //new column anyway so column already 'dirty'
@@ -490,15 +496,13 @@ class DataStore {
     /**
      * This method will return (case-insensitive) any values in the column
      * which contain the specified text (unique/text/multitext columns only)
-     * @param {*} text - the query value
-     * @param {*} column - the column to query
-     * @param {*} number  - the maximum number of results to return
-     * @returns {object[]} An array of objects with
-     * <ul>
-     *  <li>value - the actual text match   </li>
-     *  <li>index - for unique columns, the row index and for
-     *   text/multitext its index in the column's values array</li>
-     * </ul>
+     * @param {string} text - the query value
+     * @param {string} column - the column to query
+     * @param {number} number  - the maximum number of results to return
+     * @returns {{value: string, index: number}[]} An array of objects with
+     *  - value - the actual text match
+     *  - index - for unique columns, the row index and for
+     *   text/multitext its index in the column's values array
      */
     getSuggestedValues(text, column, number = 10) {
         const col = this.columnIndex[column];
@@ -622,7 +626,7 @@ class DataStore {
 
     /**
      * returns a list of column name and fields (which have data) sorted by name
-     * @param {Array|string} [filter] - can be either be a string -'number', 'string', 'all' or a column type.
+     * @param {string[]|string} [filter] - can be either be a string -'number', 'string', 'all' or a column type.
      * Or an array of column types
      * @param {boolean} [addNone=false] if true then an extra object will be added to the list
      * with name 'None' and field '__none__'
@@ -723,7 +727,7 @@ class DataStore {
      * so it is advisable not to use it for many rows at once.
      * @param {number} index - The index of the row
      * @param {string[]?} columns - The ids of columns to use. If not provided, `columnsWithData` will be used.
-     * @returns {Object} An object containing key(field)/value pairs. An extra
+     * @returns {Record<string, object>} An object containing key(field)/value pairs. An extra
      * variable 'index' containing the row index is also added to the object
      */
     getRowAsObject(index, columns) {
@@ -830,7 +834,7 @@ class DataStore {
      * Return an array of containing all the filtered values for
      * the specified column - inefficient for large data sets
      * @param {string} column - the column's field.id
-     * @returns {string[]|number[]}  An array pf filtered values
+     * @returns {string[]|number[]}  An array of filtered values
      */
     getFilteredValues(column) {
         const arr = new Array(this.filterSize);

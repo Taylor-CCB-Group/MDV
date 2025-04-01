@@ -1,38 +1,29 @@
-import {
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Typography,
-} from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 
 const SaveViewDialogComponent = (props: {
     open: boolean;
     onClose: () => void;
     action?: () => void;
+    content?: string;
 }) => {
-    const cm = window.mdv.chartManager;
+    const { viewManager } = window.mdv.chartManager;
 
     const onSave = () => {
-        const state = cm.getState();
-        cm._callListeners("state_saved", state);
+        viewManager.saveView();
     };
 
     return (
-        <Dialog
-            open={props.open}
-            onClose={props.onClose}
-            fullWidth
-            maxWidth="xs"
-        >
+        <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
             <DialogTitle>Save View</DialogTitle>
             <DialogContent dividers>
-                <Typography>Do you want to save the current view?</Typography>
+                <Typography>
+                    {props?.content
+                        ? props?.content
+                        : "You have unsaved changes, do you want to save the current view?"}
+                </Typography>
             </DialogContent>
             <DialogActions>
                 <Button
-                    color="primary"
                     onClick={() => {
                         onSave();
                         props?.action?.();
@@ -49,6 +40,14 @@ const SaveViewDialogComponent = (props: {
                     }}
                 >
                     No
+                </Button>
+                <Button
+                    color="error"
+                    onClick={() => {
+                        props.onClose();
+                    }}
+                >
+                    Cancel
                 </Button>
             </DialogActions>
         </Dialog>
