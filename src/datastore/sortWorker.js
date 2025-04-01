@@ -1,4 +1,4 @@
-import datatypes from "./datatypes.js";
+import datatypes from "./datatypes";
 
 // biome-ignore lint/suspicious/noGlobalAssign: <explanation>
 onmessage = (e) => {
