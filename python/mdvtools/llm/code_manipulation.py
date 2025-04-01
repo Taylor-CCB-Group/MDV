@@ -12,8 +12,9 @@ def extract_code_from_response(response: str):
 
     if match:
         # Extract the matched code and strip any leading/trailing whitespaces
-        return match.group(1).strip()
-    return None
+        return f"{match.group(1).strip()}"
+    # we should at least issue a warning here, no good will come of this...
+    return ""
 
 def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
     # if isinstance(dataframe, str):

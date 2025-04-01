@@ -200,7 +200,7 @@ class ProjectChat:
                     # python_tool.globals["list_globals"] = lambda: list(globals.keys()) # concise but less safe rather than more
 
                     # New fixes:
-                    python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
+                    python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys()) # type: ignore
 
                     # Step 3: Define Contextualization Chain
 
