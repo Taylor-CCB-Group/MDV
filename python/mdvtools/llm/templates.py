@@ -39,6 +39,7 @@ Your task is to:
 7. If the query is gene-related, return the selected columns from the first DataFrame and the selected gene identifier 
 from the second DataFrame in a string format, e.g., "col1", "col2", "gene name".
 8. Do not provide additional explanations—only return the string.
+9. ALWAYS return a string of columns, even when the query does not define them.
 """
 
 

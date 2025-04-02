@@ -230,7 +230,7 @@ class ProjectChat:
                     agent = create_openai_functions_agent(llm, [python_tool], prompt)
 
                     # Step 6: Wrap in an Agent Executor (Finalized Agent)
-                    agent_executor = AgentExecutor(agent=agent, tools=[python_tool], memory=memory, verbose=verbose)
+                    agent_executor = AgentExecutor(agent=agent, tools=[python_tool], memory=memory, verbose=verbose, return_intermediate_steps=True)
 
                     # Step 7: Wrapper Function to Use Contextualization and Preserve Memory
                     def agent_with_contextualization(question):
@@ -308,10 +308,10 @@ class ProjectChat:
                 )
                 progress += 31
                 # Argument of type "str" cannot be assigned to parameter "input" of type "Dict[str, Any]"
-                # response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]})  # type: ignore for now
+                #response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]})  # type: ignore for now
                 #response = self.agent(full_prompt)#(question)
                 response = self.agent(question)
-                chat_debug_logger.info(f"Agent Response: {response}")
+                #chat_debug_logger.info(f"Agent Response: {response}")
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
