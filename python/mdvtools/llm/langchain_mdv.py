@@ -33,7 +33,7 @@ from .chatlog import LangchainLoggingHandler
 # packages for memory
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.memory import ConversationBufferMemory
-from langchain.schema import HumanMessage
+from langchain.schema import HumanMessage, AIMessage
 from langchain.chains.combine_documents import create_stuff_documents_chain
 
 import matplotlib
@@ -214,13 +214,13 @@ class ProjectChat:
 
                     # Step 4: Define the Agent Prompt
 
-                    prompt_data = f"""You have access to the following Pandas DataFrames: 
+                    prompt_data_template = f"""You have access to the following Pandas DataFrames: 
                     {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
                     If you need to check their structure, use `df.info()` or `df.head()`. 
                     Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
                     prompt = ChatPromptTemplate.from_messages([
-                        ("system", prompt_data),
+                        ("system", prompt_data_template),
                         MessagesPlaceholder(variable_name="chat_history"),
                         ("human", "{input}"),
                         ("ai", "{agent_scratchpad}"),
@@ -239,8 +239,7 @@ class ProjectChat:
                         chat_debug_logger.info(f"Original Question: {question}")
                         chat_debug_logger.info(f"Standalone Reformulated Question: {standalone_question}")
                         # Point 2: Log what you're sending to the agent
-                        chat_debug_logger.info("Sending to agent_executor with input:")
-                        chat_debug_logger.info(f"{standalone_question}")
+                        chat_debug_logger.info(f"Sending to agent_executor with input: {standalone_question}")
                         response = agent_executor.invoke({"input": standalone_question})
                         # Point 3: Log agent output
                         chat_debug_logger.info(f"Agent Raw Response: {response}")
@@ -251,7 +250,6 @@ class ProjectChat:
 
                 self.agent = create_custom_pandas_agent(self.dataframe_llm, {"df1": df_list[0], "df2": df_list[1]}, prompt_data, verbose=True)
 
-            
 
             with time_block("b9: RAG pipeline memory setting up"):
                 # Setup RAG prompts
@@ -301,7 +299,6 @@ class ProjectChat:
             if not self.ok:
                 return "This agent is not ready to answer questions"
             full_prompt = prompt_data + "\nQuestion: " + question
-            print(full_prompt)
             # provide an update to the user that we're working on it, using provided id.
             logger.info(f"Question asked by user: {question}")
         try:
@@ -312,8 +309,10 @@ class ProjectChat:
                 progress += 31
                 # Argument of type "str" cannot be assigned to parameter "input" of type "Dict[str, Any]"
                 # response = self.agent.invoke(full_prompt, config={"callbacks": [self.langchain_logging_handler]})  # type: ignore for now
+                #response = self.agent(full_prompt)#(question)
                 response = self.agent(question)
                 chat_debug_logger.info(f"Agent Response: {response}")
+                chat_debug_logger.info(f"Agent Response - output: {response['output']}")
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
                 self.socket_api.update_chat_progress(
@@ -353,25 +352,44 @@ class ProjectChat:
                 chat_debug_logger.info(f"RAG Prompt Created:\n{prompt_RAG}")
 
                 qa_prompt = ChatPromptTemplate.from_messages([
-                    ("system", prompt_RAG),
-                    MessagesPlaceholder("chat_history"),
-                    ("human", "{context}\n\n{input}\n\n{question}"),])
+                   ("system", prompt_RAG),
+                   MessagesPlaceholder("chat_history"),
+                   ("human", "{context}\n\n{input}\n\n{question}"),])
+                
+                # qa_prompt = ChatPromptTemplate([
+                #     ("system", prompt_RAG),
+                #     MessagesPlaceholder("chat_history"),
+                #     ("human", "{input}")])
 
             with time_block("b12: RAG chain"):  # ~60% of time
                 self.socket_api.update_chat_progress(
                     "Invoking RAG chain...", id, progress, 60
                 )
                 progress += 60
-                chat_debug_logger.info(f"Invoking RAG chain with question: {question}")
-                chat_debug_logger.info(f"Chat History before RAG: {self.chat_history}")
                 question_answer_chain = create_stuff_documents_chain(self.code_llm, qa_prompt)
                 rag_chain = create_retrieval_chain(self.history_aware_retriever, question_answer_chain)
-                output_qa = rag_chain.invoke({"chat_history": self.chat_history, "input": question, "question": question})
-                chat_debug_logger.info(f"RAG Output: chat_history: {output_qa['chat_history']}, input: {output_qa['input']}, question: {output_qa['question']}")
-                self.chat_history.extend([HumanMessage(content=question), output_qa["answer"]])
+                #output_qa = rag_chain.invoke({"chat_history": self.chat_history, "input": question})
+
+                chat_debug_logger.info("📤 RAG Chain Invocation Breakdown:")
+                chat_debug_logger.info(f"🔸 User Question: {question}")
+                chat_debug_logger.info(f"🔸 Agent Output (input):\n{response['output']}")
+                chat_debug_logger.info(f"🔸 Prompt System Message:\n{prompt_RAG}")
+
+                # You may want to log retrieved context if you have it
+                formatted_context = "<context snippet from retriever if available>"
+                chat_debug_logger.info(f"🔸 Retrieved Context:\n{formatted_context}")
+
+                chat_debug_logger.info(f"🔸 Full Prompt Template:\n{qa_prompt}")
+                chat_debug_logger.info(f"🔸 Passing to RAG chain as:\n"
+                                    f"chat_history = {self.chat_history}\n"
+                                    f"input = {response['output']}\n"
+                                    f"question = {question}")
+
+                output_qa = rag_chain.invoke({"chat_history": self.chat_history, "input": response['output'], "question": question})
+                #self.chat_history.extend([HumanMessage(content=question), output_qa["answer"]])
+                self.chat_history.extend([HumanMessage(content=question), AIMessage(content=output_qa["answer"])])
                 chat_debug_logger.info(f"Updated Chat History: {self.chat_history}")
                 result = output_qa["answer"]
-                print(result)
 
             with time_block("b13: Prepare code"):  # <0.1% of time
                 final_code = prepare_code(

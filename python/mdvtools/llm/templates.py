@@ -120,7 +120,6 @@ This string """
 
 IMPORTANT: All string interpolations MUST use Python formatted string literals (f-strings).
 
-
 Example:
 # Correct:
 message = f"gs|{{param2}}(gs)|{{param2_index}}"
@@ -128,47 +127,21 @@ message = f"gs|{{param2}}(gs)|{{param2_index}}"
 # Common mistake to avoid:
 WRONG: message = "gs|{{param2}}(gs)|{{param2_index}}"
 
-If the prompt asks for a gene-related query (e.g., gene expression value, most expressing gene, target expression, etc.), make sure that:
+The human will provide a question for you to try to plot a graph based on the above instructions.
+
+If the question asks for a gene-related query (e.g., gene expression value, most expressing gene, target expression, etc.), make sure that:
 1. You load both datasources that are needed, e.g. cells and genes.
 2. If gene expression is required, make sure the gene id, is given as a param in the formatted string literal format: f"gs|{{param2}}(gs)|{{param2_index}}", with param2 and param2_index given by param2 = "param2"
     param2_index = data_frame_var.index.get_loc(param2)
 
 The data_path are given by this variable `""" + path_to_data + """`
 The datasource_name is given by this variable `""" + datasouce_name + """`
+
 """
     )
     return prompt_RAG
 
 # The data should be loaded in the same way as in the examples.
 
-# different prompt for experimenting with update project - unused as of now
-def get_updateproject_prompt_RAG(project_name: str, ds_name: str, final_answer: str):
-    prompt_RAG = (
-        """
-Context: {context}]
 
-The collection of Python scripts provided in the context, is designed to generate various types of data visualizations
-using the mdvtools library. Each script focuses on a specific type of plot and follows a common structure that includes loading
-an existing MDV project, creating a plot using specific parameters, and adding the visualization to the project.
-
-All scripts in the context share a common workflow:
-
-Setup: Define the project path, which should always be: project_path = os.path.expanduser('~/mdv/"""
-        + project_name
-        + """')
-Plot function definition: Define the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot) using a function in the same way as the context.
-Project Creation: Initialize an MDVProject instance using the method: MDVProject(project_path).
-Data Loading: Data can be retrieved from an existing datasource in the project as a pandas DataFrame using the method: project.get_datasource_as_dataframe(ds_name).
-Plot Creation: Create the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot) and define the plot paramaters in the same way as in the context.
-Data Conversion: Convert the plot data to JSON format for integration with the MDV project using the convert_plot_to_json(plot) function.
-
-You are a top-class Python developer. Based on the question: {question}, decide which script from the context {context} is more relevant to the question: {question} and update the script to address the question.
-If no script is relevant, guided by the context generate a new script.
-
-This list """
-        + final_answer
-        + """ specifies the names of the data fields that need to be plotted, for example in the params field. Get the structure of params definition from the context.
-DO NOT forget to use the f-string, or formatted string literal, python structure in the parameters, params or param.
-"""
-    )
-    return prompt_RAG
+#The prompt is given by `""" + final_question + """`
