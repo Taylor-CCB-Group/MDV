@@ -30,7 +30,8 @@ from datetime import datetime, timedelta
 import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
-from mdvtools.llm.langchain_mdv import ProjectChat
+from mdvtools.llm.chat_protocol import ProjectChatProtocol, ProjectChat
+
 routes = set()
 
 
@@ -138,20 +139,17 @@ def create_app(
         """
         current prototype using 'websocket' as a flag that we interpret as 'enable chatMDV' for now.
         """
-        bot: Optional[ProjectChat] = None
+        bot: Optional[ProjectChatProtocol] = None
         print(f"websocket/chat enabled for {route}")
-        # could come from a config file - was passed as argument previously
-        # but I'm reducing how far this prototype reaches into wider code
-        chat_welcome = "Hello, I'm an AI assistant that has access to the data in this project and is designed to help build views for visualising it. What can I help you with?"
         # what if we make `log` a thing that streams to the client via websocket?
         @project_bp.route("/chat_init", methods=["POST"])
         def chat_init():
             print("chat_init")
             # logger.info("chat_init")
-            nonlocal bot, chat_welcome
+            nonlocal bot
             if bot is None:
                 bot = ProjectChat(project)
-            return {"message": chat_welcome}
+            return {"message": bot.welcome}
         @project_bp.route("/chat", methods=["POST"])
         def chat():
             nonlocal bot
@@ -168,15 +166,17 @@ def create_app(
                 try:
                     # this can give a confusing error if we don't explicitly catch it...
                     view_name = parse_view_name(final_code)
+                    if view_name is None:
+                        raise Exception(final_code)
                     bot.log(f"view_name: {view_name}")
                     return {"message": final_code, "view": view_name, "id": id}
                 except Exception as e:
                     bot.log(f"final_code returned by bot.ask_question is bad, probably an earlier error: {e}")
                     # final_code is probably an error message, at this point.
-                    return final_code, 500
+                    return {"message": final_code}
             except Exception as e:
                 print(e)
-                return str(e), 500
+                return {"message": str(e)}
             return {"message": f"bleep bloop I'm a robot, you said: {message}"}
 
     @project_bp.route("/")
@@ -209,6 +209,9 @@ def create_app(
         if project.dir is None:
             return "Project directory not found", 404
         path = safe_join(project.dir, file + ".json")
+        # print(f"get_json_file: '{path}' for project {project.id}")
+
+        
         if path is None or not os.path.exists(path):
             return "File not found", 404
         if file == "state":

@@ -175,16 +175,16 @@ def create_flask_app(config_name=None):
     def enforce_authentication():
         """Redirect unauthenticated users to login if required."""
         if not ENABLE_AUTH:
-            print(":::::1")
+            # print(":::::1")
             return None  # Skip authentication check if auth is disabled
 
         requested_path = request.path
         if any(requested_path.startswith(route) for route in whitelist_routes):
-            print(":::::2")
+            # print(":::::2")
             return None  # Allow access to whitelisted routes
 
         if not is_authenticated():
-            print(":::::3")
+            # print(":::::3")
             redirect_uri = app.config["LOGIN_REDIRECT_URL"]
             print(f"Unauthorized access attempt to {requested_path}. Redirecting to /login_dev.")
             return redirect(redirect_uri)

@@ -9,6 +9,56 @@ import { dracula } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import RobotPandaSVG from './PandaSVG';
 import LinearProgress from '@mui/material/LinearProgress';
 import { Button } from '@mui/material';
+import { useChartManager } from '@/react/hooks';
+import { fetchJsonConfig } from '@/dataloaders/DataLoaderUtil';
+import { useProject } from '@/modules/ProjectContext';
+import type { DataSource } from '../charts';
+import _ from 'lodash';
+import ErrorDisplay from './ErrorDisplay';
+
+
+/**
+ * prototype for new ways of handling project state...
+ */
+// function useCheckDataStore() {
+//     const cm = useChartManager();
+    
+//     const { root } = useProject();
+//     useEffect(() => {
+//         // we want something that will respond via socket.io to changes in dataStore etc...
+//         // this could be wrapped in a new more general-purpose hook, with an initial poll
+//         // and then a socket.io connection to listen for changes
+//         // but in either case we should be able to have a hook that returns the current state
+//         // updated whenever it changes
+//         const interval = setInterval(async () => {
+//             // todo zod validation/schema
+//             const config = await fetchJsonConfig(`${root}/datasources.json`, root) as DataSource[];
+//             if (!config) {
+//                 console.warn(`expected datasources.json, got ${config}`);
+//                 return;
+//             }
+//             for (const ds of config) {
+//                 const { name } = ds;
+//                 // how ambitious do we want to be here in the short term?
+//                 // we could just note that the state has changed, and therefore we need to refresh
+//                 // but it would be much better to be able to update the state in place.
+//                 // if we wanted to update size, that would be a problem, but we should be able to add
+//                 // columns/links, new datasources... would be logical to have a DataStore.update method
+//                 // but I'm inclined to have a function in a different module that is more strongly typed
+//                 // and doesn't bloat the DataStore class
+//                 if (!cm.dsIndex[name]) {
+//                     console.log(`adding datasource ${name}`);
+//                 }
+//                 const old = cm.dsIndex[name]?.dataStore.config;
+//                 if (!_.isEqual(old, ds)) {
+//                     console.log(`updating datasource ${name}`);
+//                 }
+//             }
+//         }, 1000);
+//         return () => clearInterval(interval);
+//     }, [cm, root]);
+// }
+
 
 const Message = ({ text, sender, view }: ChatMessage) => {
     const isUser = sender === 'user';
@@ -17,6 +67,7 @@ const Message = ({ text, sender, view }: ChatMessage) => {
         text = JSON.parse(text);
     } catch (e) {
     }
+    const isError = sender === 'bot' && !view;
     return (//setting `select-all` here doesn't help because * selector applies it to children, so we have custom class in tailwind theme
         <div className='selectable'>
             {isUser ? <MessageCircleQuestion className=''/> : <BotMessageSquare className='scale-x-[-1]' />}
@@ -24,7 +75,7 @@ const Message = ({ text, sender, view }: ChatMessage) => {
                 isUser ? 'bg-teal-200 self-end dark:bg-teal-900' : 'bg-slate-200 dark:bg-slate-800 self-start'
                 }`}>
                 {/* <JsonView src={text} /> */}
-                <MessageMarkdown text={text} />
+                {isError ? <ErrorDisplay error={{ message: text }} /> : <MessageMarkdown text={text} />}
             </div>
             {/* {pythonSections.map((section, index) => (
                 <PythonCode key={index} code={section} />
@@ -165,6 +216,7 @@ const Chatbot = () => {
     const { messages, isSending, sendAPI, requestProgress, verboseProgress } = useChat();
     const [input, setInput] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    // useCheckDataStore();
 
     const handleSend = async () => {
         if (!input.trim()) return;

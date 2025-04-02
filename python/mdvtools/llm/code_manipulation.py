@@ -158,7 +158,7 @@ def reorder_parameters(script: str, dataframe: str | pd.DataFrame):
 
     return script
 
-def prepare_code(result: str, data: str | pd.DataFrame, project: MDVProject, log: callable = print, 
+def prepare_code(result: str, data: str | pd.DataFrame, project: MDVProject, log = print, 
                  modify_existing_project=False, view_name="default"):
     """Given a response from the LLM, extract the code and post-process it, 
     attempting to ensure that 
@@ -231,6 +231,8 @@ def patch_viewname(code: str, project: MDVProject):
     """
     # Error: 'MDVProject' object is not callable... not sure where or why.
     view_name = parse_view_name(code)
+    if view_name is None:
+        raise ValueError("No view name found in the code.")
     print(f'original view_name: {view_name}')
     escaped_view_name = json.dumps(view_name) # this should escape any quotes in the view_name
     # but it also adds quotes around the view_name, so we need to remove them...
@@ -271,4 +273,4 @@ def parse_view_name(code: str):
         return view_name
     print("View name assignment not found in code.")
     print(code)
-    return "default"
+    return None

@@ -5,6 +5,7 @@ import os
 
 # Code Generation using Retrieval Augmented Generation + LangChain
 # from typing import Callable
+from mdvtools.llm.chat_protocol import ProjectChatProtocol
 from mdvtools.mdvproject import MDVProject
 
 from langchain_openai import ChatOpenAI
@@ -14,7 +15,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import Language
 
-from langchain.prompts import PromptTemplate
+# from langchain.prompts import PromptTemplate
 
 from dotenv import load_dotenv
 from mdvtools.websocket import ChatSocketAPI
@@ -26,7 +27,7 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.chains import LLMChain
 from .local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
 from .templates import get_createproject_prompt_RAG, prompt_data
-from .code_manipulation import parse_view_name, prepare_code
+from .code_manipulation import prepare_code
 from .code_execution import execute_code
 from .chatlog import LangchainLoggingHandler
 
@@ -140,9 +141,17 @@ with time_block("b5: Retriever creating"):
 mock_agent = False
 
 
-class ProjectChat:
+class ProjectChat(ProjectChatProtocol):
     def __init__(self, project: MDVProject):
         self.project = project
+        # could come from a config file - was passed as argument previously
+        # but I'm reducing how far this prototype reaches into wider code
+        self.welcome = (
+            "Hello, I'm an AI assistant that has access to the data in this project"
+            "and is designed to help build views for visualising it. What can I help you with?"
+        )
+
+
         self.socket_api = ChatSocketAPI(project)
         logger = self.socket_api.logger
         self.langchain_logging_handler = LangchainLoggingHandler(logger)
@@ -164,6 +173,7 @@ class ProjectChat:
             df_list = [project.get_datasource_as_dataframe(project.datasources[0]['name'])]
         self.ds_name = project.datasources[0]['name']
         try:
+            # raise ValueError("test error")
             self.df = project.get_datasource_as_dataframe(self.ds_name)
             with time_block("b6: Initialising LLM for RAG"):
                 self.code_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
@@ -266,12 +276,13 @@ class ProjectChat:
                 self.history_aware_retriever = create_history_aware_retriever(self.code_llm, retriever, contextualize_q_prompt)
                 self.chat_history = []
     
-            self.ok = True
+            self.init_error = None
         except Exception as e:
             # raise ValueError(f"An error occurred while trying to create the agent: {e[:500]}")
             log(f"An error occurred while trying to create the agent: {str(e)[:500]}")
-            # todo keep better track of the state of the agent, what went wrong etc
-            self.ok = False
+            
+            self.welcome = str(e)
+            self.init_error = e
 
     def ask_question(self, question: str, id: str):  # async?
         """
@@ -296,8 +307,12 @@ class ProjectChat:
             # shortly after this...
             # Error in StdOutCallbackHandler.on_chain_start callback: AttributeError("'NoneType' object has no attribute 'get'")
             self.log(f"Asking the LLM: '{question}'")
-            if not self.ok:
-                return "This agent is not ready to answer questions"
+            if self.init_error:
+                # let's think about doing something better here.
+                self.socket_api.update_chat_progress(
+                    f"Agent initialisation error: {str(self.init_error)}", id, 100, 0
+                )
+                return f"The agent had an error during initialisation: \n\n{str(self.init_error)[:500]}"
             full_prompt = prompt_data + "\nQuestion: " + question
             # provide an update to the user that we're working on it, using provided id.
             logger.info(f"Question asked by user: {question}")
@@ -429,4 +444,7 @@ class ProjectChat:
                 # we want to know the view_name to navigate to as well... for now we do that in the calling code
                 return f"I ran some code for you:\n\n```python\n{final_code}```"
         except Exception as e:
+            self.socket_api.update_chat_progress(
+                f"Error: {str(e)[:500]}", id, 100, 0
+            )
             return f"Error: {str(e)[:500]}"
