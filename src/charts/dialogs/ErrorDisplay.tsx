@@ -117,6 +117,7 @@ const ErrorDisplay = ({
                 margin: "20px auto",
                 // width: "90%",
                 width: "45vw",
+                maxWidth: "1000px",
                 minHeight: "45vh",
                 display: "flex",
                 justifyContent: "center",
