@@ -17,7 +17,6 @@ class User(db.Model):
     auth0_id = db.Column(db.String(255), unique=True, nullable=False)  # Store Auth0 User ID only
     projects = db.relationship('UserProject', backref='user', lazy=True)
     jobs = db.relationship('Job', backref='user', lazy=True)
-    permissions = db.relationship('Permission', backref='user', lazy=True)
     preferences = db.relationship('UserPreference', backref='user', lazy=True)
     #shared_objects = db.relationship('SharedObject', foreign_keys='SharedObject.shared_with', backref='shared_with_user', lazy=True)
 
