@@ -6,7 +6,7 @@ db = SQLAlchemy()
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    email = db.Column(db.String(255), unique=True, nullable=False, default='')
+    email = db.Column(db.String(255), unique=False, nullable=False, default='')
     confirmed_at = db.Column(db.DateTime, nullable=True)
     password = db.Column(db.String(255), nullable=False, default='')
     is_active = db.Column(db.Boolean, nullable=False, default=False)
