@@ -41,6 +41,15 @@ To save these layout changes:
 
 ---
 
+## Views
+ 
+Views are the *canvas* that you add your charts to. You can access all the available views in the drop down filter at the top left of the MDV project window (<img src="img/view_filter.png" height="2em">).
+If your screen is getting very crowded with charts, then add a new view.
+ 
+### Adding a View
+ 
+You can *add* or *delete* a view using the **+** or **-** buttons next to the **Select View** drop down menu. When you do this MDV will ask you if you want to save the view (as a reminder, in case you need to save your work) as you will be moving to a new View and anything not saved will be lost. Then it will give you options to **Clone the current view** which will allow you to make a copy of that View complete with the underlying data and charts.  It will then switch to that View.
+
 ## Adding Graphs/Charts
 
 Charts help visualize data and allow intuitive filtering by selecting regions on plots or interacting with chart elements. Each filter automatically updates **all charts**, the **table**, and the **browser** to reflect the filtered data.
