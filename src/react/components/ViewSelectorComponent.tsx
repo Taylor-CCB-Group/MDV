@@ -35,7 +35,12 @@ function useKeyboardShortcuts() {
             if (event.key === "s" && (event.ctrlKey || event.metaKey)) {
                 event.preventDefault();
                 // Save the current view
-                viewManager.saveView();
+                try {
+                    viewManager.saveView();
+                } catch (error) {
+                    console.error("Error saving view:", error);
+                    // we should consider an error dialog here
+                }
             }
         };
         window.addEventListener("keydown", handleKeyDown);
