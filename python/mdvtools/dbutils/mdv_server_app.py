@@ -19,7 +19,7 @@ from flask import redirect, url_for, session, jsonify
 
 #Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
-print("((((((((((((((((((((((()))))))))))))))))))))))")
+print(" ((((((((((((((((((((((()))))))))))))))))))))))")
 print(ENABLE_AUTH)
 
 if ENABLE_AUTH:
@@ -743,7 +743,7 @@ def register_routes(app, ENABLE_AUTH):
 
                 # Step 2: If authentication is enabled, handle user-based filtering
                 if ENABLE_AUTH:
-                    
+
                     current_auth0_id = get_jwt_identity()  # Get authenticated user ID from JWT
                     print("±±±±±±±±±±±±±±±±±±±±±±±±±±")
                     print(current_auth0_id)
