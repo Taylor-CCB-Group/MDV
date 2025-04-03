@@ -260,7 +260,7 @@ def sync_auth0_users_to_db(app):
                 new_user = User(auth0_id=user['user_id'])
 
             # Step 2: Fetch user's roles from Auth0
-            roles = auth0.users.roles(user['user_id'])
+            roles = auth0.users.list_roles(user['user_id'])
 
             # Step 3: Check if the user has the 'admin' role
             is_admin = any(role['name'] == 'admin' for role in roles['roles'])
