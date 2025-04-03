@@ -120,30 +120,32 @@ function listenPreferredColorScheme(callback) {
 /**
 * The object to manage charts [Chart Manager](../../docs/extradocs/chartmanager.md)
 * 
-* @param {string|HTMLElement} div - The DOM element or id of the element to house the app
-* @param {import("@/charts/charts").DataSource[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
-* Each config must contain the size parameter, giving the number of rows in the DataStore.
-* @param {object} dataloader - An object containing the following
-*   - function - The [function](../../docs/extradocs/dataloader.md) to load the data
-    (can be omitted if data loaded from a file)
-*   - viewLoader - The function that will load the each view  (not necessay if only one view)
-*   - rowDataLoader - (optional) an asunc function which is given the datasource name and row index
-*     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
-*   - files - specifies the files to load the data 
-* @param {Object} config extra settings
-* @param {Object[]} [config.initialCharts] A list of chart configs to initially load if
-* no views are specified
-* @param {string[]} [config.all_views] A list of views that can be loaded (a suitable 
-* view loader is required to atually load the view)
-* @param {string} [config.current_view] the current view (only used with all views)
-* @param {string} [config.permisson] the level of permission the user has. This just makes certain
-* options unavaliable. Any logic should be handled when a state_saved event is broadcast
-* @param {boolean} [config.gridstack] whether to arrange the charts in a grid
-* @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
-* beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
-* 
 */
 export class ChartManager {
+    /**
+     * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
+     * @param {import("@/charts/charts").DataSource[]} dataSources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
+     * Each config must contain the size parameter, giving the number of rows in the DataStore.
+     * @param {object} dataloader - An object containing the following
+     *   - function - The [function](../../docs/extradocs/dataloader.md) to load the data
+     *   (can be omitted if data loaded from a file)
+     *   - viewLoader - The function that will load the each view  (not necessay if only one view)
+     *   - rowDataLoader - (optional) an asunc function which is given the datasource name and row index
+     *     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
+     *   - files - specifies the files to load the data 
+     * @param {Object} config extra settings
+     * @param {Object[]} [config.initialCharts] A list of chart configs to initially load if
+     * no views are specified
+     * @param {string[]} [config.all_views] A list of views that can be loaded (a suitable 
+     * view loader is required to atually load the view)
+     * @param {string} [config.current_view] the current view (only used with all views)
+     * @param {string} [config.permisson] the level of permission the user has. This just makes certain
+     * options unavaliable. Any logic should be handled when a state_saved event is broadcast
+     * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
+     * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
+     * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
+     * 
+     */
     constructor(div, dataSources, dataLoader, config = {}, listener = null) {
         if (!window.isSecureContext) {
             alert(
@@ -712,15 +714,16 @@ export class ChartManager {
                 removeDraggable(div);
             });
         }
-        //add new ones
+        
         view.layout = type;
-        if (type === "absolute") {
-            this.getAllCharts(ds.name).forEach((x) => this._makeChartRD(x, ds));
-        } else if (type === "gridstack") {
-            this.getAllCharts(ds.name).forEach((chart) => {
-                this.gridStack.manageChart(chart, ds, this._inInit);
-            });
-        }
+        //will add the appropriate layout depending on the current layout type
+        this.getAllCharts(ds.name).forEach((x) => {
+            //the chart is popped out so not subject to the layout manager
+            if (x.__doc__ !== document){
+                return;
+            }
+            this._makeChartRD(x, ds)
+        });
     }
 
     _setupThemeContextMenu() {
@@ -1248,24 +1251,15 @@ export class ChartManager {
         }
         for (const chid in this.charts) {
             const chInfo = this.charts[chid];
-
             const chart = chInfo.chart;
             const config = chart.getConfig();
             const div = chart.getDiv();
             const d = this.viewData.dataSources[chInfo.dataSource.name];
             if (d.layout === "gridstack") {
-                config.gsposition = [
-                    Number.parseInt(div.getAttribute("gs-x")),
-                    Number.parseInt(div.getAttribute("gs-y")),
-                ];
-                config.gssize = [
-                    Number.parseInt(div.getAttribute("gs-w")),
-                    Number.parseInt(div.getAttribute("gs-h")),
-                ];
+               //this is handled by gridstack now
             } else {
                 config.position = [div.offsetLeft, div.offsetTop];
             }
-
             initialCharts[chInfo.dataSource.name].push(config);
         }
 

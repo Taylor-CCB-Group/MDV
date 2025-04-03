@@ -248,8 +248,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         //   ^^ kinda want a more react-y SettingsDialog for that...
         // todo make sure associated json etc switches when region changes
         const ds = this.dataStore;
-        const imageRegionKeys = Object.keys(ds.regions.all_regions).filter(
-            (r) => ds.regions.all_regions[r].viv_image,
+        const imageRegionKeys = Object.keys(ds.regions?.all_regions).filter(
+            (r) => ds.regions?.all_regions[r].viv_image,
         );
         const images = imageRegionKeys.map((r) => ({ name: r, value: r }));
 
@@ -257,7 +257,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         return settings.concat([
             g({
                 type: "dropdown",
-                label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
+                label: `Image (${ds.getColumnName(ds.regions?.region_field)})`,
                 current_value: c.region,
                 values: [images, "name", "value"],
                 func(v) {

@@ -323,7 +323,7 @@ export function useCategoryFilterIndices(
  */
 export function useImgUrl(): string {
     const region = useRegion();
-    const avivator = useDataStore().regions.avivator;
+    const avivator = useDataStore().regions?.avivator;
     const url = useMemo(() => {
         // if (config.imageURL) return config.imageURL; //deprecated
         const i = region.viv_image;

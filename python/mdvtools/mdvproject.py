@@ -1075,7 +1075,7 @@ class MDVProject:
         """Convert plot data to JSON format."""
         return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
 
-    def insert_link(self, datasource, linkto, linktype, data):
+    def insert_link(self, datasource: str, linkto: str, linktype: str, data):
         """
         Adds a link between two datasources.
         datasource is the name of the datasource to which the link will be added.
@@ -1845,7 +1845,7 @@ def add_column_to_group(
         or col["datatype"] == "text16"
     ):
         
-        if data.dtype == "category":
+        if data.dtype == "category": # type: ignore not sure what's best here
             data = data.cat.add_categories("ND")
             data = data.fillna("ND")
         else:
@@ -1899,7 +1899,7 @@ def add_column_to_group(
             b = i * maxv
             try:
                 v = data[i]  # may raise KeyError if data is None at this index
-                if v == "" or not isinstance(v, str):
+                if not isinstance(v, str) or v == "":
                     continue
                 vs = v.split(delim)
                 vs = [x.strip() for x in vs]

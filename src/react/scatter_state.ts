@@ -24,8 +24,8 @@ import { useLegacyDualContour } from "./contour_state";
 export function useRegionScale() {
     const metadata = useMetadata();
     const chart = useChart();
-    const regionScale = chart.dataStore.regions.scale;
-    const regionUnit = chart.dataStore.regions.scale_unit;
+    const regionScale = chart.dataStore.regions?.scale;
+    const regionUnit = chart.dataStore.regions?.scale_unit;
 
     //see also getPhysicalScalingMatrix
     //- consider state, matrices for image, scatterplot/other layers, and options to manipulate them
