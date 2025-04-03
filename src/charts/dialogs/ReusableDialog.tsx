@@ -44,7 +44,7 @@ const ReusableDialog = ({
 
             <div
                 className="flex items-center justify-center"
-                style={{marginTop: "20vh"}}
+                style={{marginTop: "20vh", marginBottom: "20vh"}}
             >
                 <Paper elevation={24} sx={{ p: 2 }}>
                     <Container>{component}</Container>
