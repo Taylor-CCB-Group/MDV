@@ -25,7 +25,7 @@ print(ENABLE_AUTH)
 if ENABLE_AUTH:
     
     from authlib.integrations.flask_client import OAuth
-    from auth0.v3.management import Auth0
+    from auth0.management import Auth0
     from mdvtools.auth.auth0_provider import Auth0Provider
 
     oauth = OAuth()  # Initialize OAuth only if auth is enabled
