@@ -6,20 +6,14 @@ db = SQLAlchemy()
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    email = db.Column(db.String(255), unique=True, nullable=False, default='')
-    confirmed_at = db.Column(db.DateTime, nullable=True)
-    password = db.Column(db.String(255), nullable=False, default='')
-    is_active = db.Column(db.Boolean, nullable=False, default=False)
-    first_name = db.Column(db.String(50), nullable=False, default='')
-    last_name = db.Column(db.String(50), nullable=False, default='')
-    administrator = db.Column(db.Boolean, nullable=False, default=False)
-    institution = db.Column(db.Text, nullable=True)
+    auth0_id = db.Column(db.String(255), unique=True, nullable=False)  # Store Auth0 User ID only
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)  # Track user creation
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)  # Track updates
     projects = db.relationship('UserProject', backref='user', lazy=True)
     jobs = db.relationship('Job', backref='user', lazy=True)
-    permissions = db.relationship('Permission', backref='user', lazy=True)
-    preferences = db.relationship('UserPreference', backref='user', lazy=True)
     #shared_objects = db.relationship('SharedObject', foreign_keys='SharedObject.shared_with', backref='shared_with_user', lazy=True)
-
+    def __repr__(self):
+        return f"<User {self.auth0_id}>"
 class Project(db.Model):
     __tablename__ = 'projects'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -61,11 +55,18 @@ class File(db.Model):
     
 class UserProject(db.Model):
     __tablename__ = 'user_projects'
+    
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    can_read = db.Column(db.Boolean, nullable=False, default=False)
+    
+    # Permissions at project level
+    can_read = db.Column(db.Boolean, nullable=False, default=True)
     can_write = db.Column(db.Boolean, nullable=False, default=False)
+    is_owner = db.Column(db.Boolean, nullable=False, default=False)  # Owner flag
+
+    def __repr__(self):
+        return f"<UserProject user={self.user_id}, project={self.project_id}>"
 
 class Genome(db.Model):
     __tablename__ = 'genomes'
@@ -95,13 +96,6 @@ class Job(db.Model):
     finished_on = db.Column(db.DateTime)
     is_deleted = db.Column(db.Boolean, nullable=False, default=False)
     type = db.Column(db.String(200))
-
-class Permission(db.Model):
-    __tablename__ = 'permissions'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    permission = db.Column(db.String(200), nullable=False)
-    value = db.Column(db.String(200), nullable=False)
 
 class SharedObject(db.Model):
     __tablename__ = 'shared_objects'

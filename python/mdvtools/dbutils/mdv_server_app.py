@@ -11,7 +11,7 @@ from flask import Flask, render_template, jsonify, request
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
-from mdvtools.dbutils.dbmodels import db, Project
+from mdvtools.dbutils.dbmodels import db, Project, User
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 from flask import redirect, url_for, session, jsonify
@@ -24,6 +24,7 @@ print(ENABLE_AUTH)
 if ENABLE_AUTH:
     
     from authlib.integrations.flask_client import OAuth
+    from auth0.v3.management import Auth0
     from mdvtools.auth.auth0_provider import Auth0Provider
 
     oauth = OAuth()  # Initialize OAuth only if auth is enabled
@@ -85,6 +86,13 @@ def create_flask_app(config_name=None):
             else:
                 print("Database tables already exist")
 
+            if ENABLE_AUTH:
+                try:
+                    print("Syncing users from Auth0 into the database...")
+                    sync_auth0_users_to_db()
+                except Exception as e:
+                    raise e
+            
             # Routes registration and application setup
             print("Registering the blueprint (register_app)")
             ProjectBlueprint.register_app(app)
@@ -210,6 +218,54 @@ def create_flask_app(config_name=None):
 
     return app
 
+from auth0.v3.management import Auth0
+from flask import current_app
+from datetime import datetime
+from app import db  # Import db object to interact with the database
+from models import User  # Import your User model to access the users table
+
+def sync_auth0_users_to_db():
+    """
+    This function syncs users from Auth0 into the application's database.
+    It fetches users from Auth0 and inserts or updates them in the 'users' table.
+    """
+    try:
+        # Access configuration from Flask app
+        auth0_domain = current_app.config['AUTH0_DOMAIN']
+        client_id = current_app.config['AUTH0_CLIENT_ID']  # Using the same client_id as app client and mgmt client
+        client_secret = current_app.config['AUTH0_CLIENT_SECRET']  # Using the same client_secret
+        auth0_db_connection = current_app.config['AUTH0_DB_CONNECTION']  # Database connection name (e.g., Username-Password-Authentication)
+
+        # Initialize the Auth0 Management API client using the app client ID and secret
+        auth0 = Auth0(auth0_domain, client_id, client_secret)
+
+        # Fetch users from the Auth0 Management API for the specified connection
+        users = auth0.users.list(q=f'identities.connection:"{auth0_db_connection}"', per_page=100)
+
+        # Iterate over each user fetched from Auth0
+        for user in users['users']:
+            print("€€€€€€€€€€€€€€€€€€€")
+            print(f"Syncing user: {user['email']} - {user['user_id']}")
+
+            # Check if the user already exists in the database based on their Auth0 User ID
+            existing_user = User.query.filter_by(auth0_id=user['user_id']).first()
+
+            if existing_user:
+                # If the user exists, we can choose to update the record (optional, if you want to sync updates)
+                existing_user.updated_at = datetime.utcnow()
+                db.session.commit()
+            else:
+                # If the user does not exist in the database, create a new record
+                new_user = User(auth0_id=user['user_id'])
+                db.session.add(new_user)
+                db.session.commit()
+
+        # Print the number of users synced from Auth0
+        print(f"Synced {len(users['users'])} users from Auth0.")
+    
+    except Exception as e:
+        print(f"sync_auth0_users_to_db : An unexpected error occurred: {e}")
+        raise
 
 
 def wait_for_database():

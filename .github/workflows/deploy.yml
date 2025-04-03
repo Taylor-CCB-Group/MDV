@@ -46,7 +46,7 @@ jobs:
         run: |
           echo "Building and pushing multi-architecture image for linux/amd64 and linux/arm64..."
           
-          docker buildx build --platform linux/amd64,linux/arm64 \
+          docker buildx build --platform linux/amd64 \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest \
             --push .
