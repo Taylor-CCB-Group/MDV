@@ -235,14 +235,14 @@ def sync_auth0_users_to_db(app):
         audience = f"https://{auth0_domain}/api/v2/"
 
         # Step 1: Get Management API Token
-        get_token = GetToken(domain=auth0_domain,client_id=client_id,client_secret=client_secret)
+        get_token = GetToken(domain=auth0_domain, client_id=client_id, client_secret=client_secret)
         token_response = get_token.client_credentials(audience=audience)
         mgmt_api_token = token_response["access_token"]
         # Initialize the Auth0 Management API client using the app client ID and secret
         auth0 = Auth0(auth0_domain, mgmt_api_token)
 
         # Fetch users from the Auth0 Management API for the specified connection
-        users = auth0.users.list(q=f'identities.connection:"{auth0_db_connection}"',per_page=100)
+        users = auth0.users.list(q=f'identities.connection:"{auth0_db_connection}"', per_page=100)
 
         # Iterate over each user fetched from Auth0
         for user in users['users']:
@@ -255,12 +255,25 @@ def sync_auth0_users_to_db(app):
             if existing_user:
                 # If the user exists, we can choose to update the record (optional, if you want to sync updates)
                 existing_user.updated_at = datetime.utcnow()
-                db.session.commit()
             else:
                 # If the user does not exist in the database, create a new record
                 new_user = User(auth0_id=user['user_id'])
+
+            # Step 2: Fetch user's roles from Auth0
+            roles = auth0.users.roles(user['user_id'])
+
+            # Step 3: Check if the user has the 'admin' role
+            is_admin = any(role['name'] == 'admin' for role in roles['roles'])
+
+            # Update or set the 'is_admin' flag in the database
+            if existing_user:
+                existing_user.is_admin = is_admin
+            else:
+                new_user.is_admin = is_admin
                 db.session.add(new_user)
-                db.session.commit()
+
+            # Commit changes to the database
+            db.session.commit()
 
         # Print the number of users synced from Auth0
         print(f"Synced {len(users['users'])} users from Auth0.")
@@ -268,6 +281,7 @@ def sync_auth0_users_to_db(app):
     except Exception as e:
         print(f"sync_auth0_users_to_db : An unexpected error occurred: {e}")
         raise
+
 
 
 def wait_for_database():
