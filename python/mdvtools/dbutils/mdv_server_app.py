@@ -27,7 +27,7 @@ if ENABLE_AUTH:
     from authlib.integrations.flask_client import OAuth
     from auth0.management import Auth0
     from auth0.authentication import GetToken
-    from flask_jwt_extended import get_jwt_identity
+    from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
     from mdvtools.auth.auth0_provider import Auth0Provider
 
     oauth = OAuth()  # Initialize OAuth only if auth is enabled
@@ -744,19 +744,40 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 2: If authentication is enabled, handle user-based filtering
                 if ENABLE_AUTH:
 
-                    current_auth0_id = get_jwt_identity()  # Get authenticated user ID from JWT
-                    print("±±±±±±±±±±±±±±±±±±±±±±±±±±")
-                    print(current_auth0_id)
+                    auth0_provider = Auth0Provider(
+                        app,
+                        oauth=oauth,
+                        client_id=app.config['AUTH0_CLIENT_ID'],
+                        client_secret=app.config['AUTH0_CLIENT_SECRET'],
+                        domain=app.config['AUTH0_DOMAIN']
+                    )
+                
+                    # Retrieve the token from the session
+                    token = auth0_provider.get_token()
 
-                    if not current_auth0_id:
+                    # If no token is present, return error
+                    if not token:
                         return jsonify({"error": "Authentication required"}), 401
 
-                    # Fetch user from the database using auth0_id
-                    user = User.query.filter_by(auth0_id=current_auth0_id).first()
+                    # Validate the token
+                    if not auth0_provider.is_token_valid(token):
+                        return jsonify({"error": "Invalid or expired token"}), 401
+
+                    # Retrieve user info using the token
+                    user_info = auth0_provider.get_user({"access_token": token})
+
+                    if not user_info:
+                        return jsonify({"error": "User not found"}), 404
+
+                    # Get the auth0_id (user identifier from Auth0)
+                    auth0_id = user_info.get("sub")
+                    
+                    # Fetch user from the database based on the decoded user info (e.g., user_id)
+                    user = User.query.filter_by(auth0_id=auth0_id).first()
                     if not user:
                         return jsonify({"error": "User not found"}), 404
 
-                    # Step 3: Get user-specific projects where they have access (can_read, can_write, is_owner)
+                    # Get user-specific projects where they have access (can_read, can_write, is_owner)
                     user_projects = UserProject.query.filter_by(user_id=user.id).all()
 
                     # Extract project IDs where the user has read, write, or ownership access

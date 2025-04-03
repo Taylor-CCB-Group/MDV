@@ -145,6 +145,7 @@ class Auth0Provider(AuthProvider):
                 user_metadata = raw_data.get("user_metadata", {})
 
                 user_data = {
+                    "sub": raw_data.get("sub"),
                     "first_name": user_metadata.get("first_name", "Unknown"),
                     "last_name": user_metadata.get("last_name", "Unknown"),
                     "email": raw_data.get("email", ""),
