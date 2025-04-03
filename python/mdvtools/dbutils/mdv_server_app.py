@@ -26,6 +26,7 @@ if ENABLE_AUTH:
     
     from authlib.integrations.flask_client import OAuth
     from auth0.management import Auth0
+    from auth0.authentication import GetToken
     from mdvtools.auth.auth0_provider import Auth0Provider
 
     oauth = OAuth()  # Initialize OAuth only if auth is enabled
@@ -231,12 +232,17 @@ def sync_auth0_users_to_db(app):
         client_id = app.config['AUTH0_CLIENT_ID']  # Using the same client_id as app client and mgmt client
         client_secret = app.config['AUTH0_CLIENT_SECRET']  # Using the same client_secret
         auth0_db_connection = app.config['AUTH0_DB_CONNECTION']  # Database connection name (e.g., Username-Password-Authentication)
+        audience = f"https://{auth0_domain}/api/v2/"
 
+        # Step 1: Get Management API Token
+        get_token = GetToken(domain=auth0_domain,client_id=client_id,client_secret=client_secret)
+        token_response = get_token.client_credentials(audience=audience)
+        mgmt_api_token = token_response["access_token"]
         # Initialize the Auth0 Management API client using the app client ID and secret
-        auth0 = Auth0(auth0_domain, client_id, client_secret)
+        auth0 = Auth0(auth0_domain, mgmt_api_token)
 
         # Fetch users from the Auth0 Management API for the specified connection
-        users = auth0.users.list(q=f'identities.connection:"{auth0_db_connection}"', per_page=100)
+        users = auth0.users.list(q=f'identities.connection:"{auth0_db_connection}"',per_page=100)
 
         # Iterate over each user fetched from Auth0
         for user in users['users']:
