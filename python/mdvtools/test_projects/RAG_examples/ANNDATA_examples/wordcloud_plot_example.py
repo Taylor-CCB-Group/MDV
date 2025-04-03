@@ -31,16 +31,21 @@ def main():
     data_path = "path_to_data"
     view_name = "default"
     datasource_name = "datasource_name"
+    datasource_name_2 = "datasource_name_2"
     
     # Create project
     project = MDVProject(project_path, delete_existing=True)
     
     # Load data
     adata = sc.read_h5ad(data_path)
-    data_frame = pd.DataFrame(adata.obs)
+    data_frame_obs = pd.DataFrame(adata.obs)
 
+    data_frame_var = pd.DataFrame(adata.var)
+    data_frame_var['name'] = adata.var_names.to_list()
+    
     # Add datasource
-    project.add_datasource(datasource_name, data_frame)
+    project.add_datasource(datasource_name, data_frame_obs)
+    project.add_datasource(datasource_name_2, data_frame_var)
     
     # Wordcloud parameters
     title = "Wordcloud Plot Example"

@@ -232,7 +232,7 @@ class ProjectChat(ProjectChatProtocol):
                     prompt = ChatPromptTemplate.from_messages([
                         ("system", prompt_data_template),
                         MessagesPlaceholder(variable_name="chat_history"),
-                        ("human", "{input}"),
+                        ("human", prompt_data_template + "{input}"),
                         ("ai", "{agent_scratchpad}"),
                     ])
 
@@ -363,13 +363,13 @@ class ProjectChat(ProjectChatProtocol):
                 # this should be more robust, and also more flexible in terms of what reasoning this method may be able to do internally in the future
                 # I appear to have an issue though - the configuration of the devcontainer doesn't flag whether or not the thing we're passing is the right type
                 # and the assert in the function is being triggered even though it should be fine
-                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output']) #self.ds_name, response['output'])
+                prompt_RAG = get_createproject_prompt_RAG(self.project, path_to_data, datasource_names[0], response['output'], question) #self.ds_name, response['output'])
                 chat_debug_logger.info(f"RAG Prompt Created:\n{prompt_RAG}")
 
                 qa_prompt = ChatPromptTemplate.from_messages([
                    ("system", prompt_RAG),
                    MessagesPlaceholder("chat_history"),
-                   ("human", "{context}\n\n{input}\n\n{question}"),])
+                   ("human", prompt_RAG + "{context}\n\n{input}\n\n{question}"),])
                 
                 # qa_prompt = ChatPromptTemplate([
                 #     ("system", prompt_RAG),
@@ -390,10 +390,6 @@ class ProjectChat(ProjectChatProtocol):
                 chat_debug_logger.info(f"🔸 Agent Output (input):\n{response['output']}")
                 chat_debug_logger.info(f"🔸 Prompt System Message:\n{prompt_RAG}")
 
-                # You may want to log retrieved context if you have it
-                formatted_context = "<context snippet from retriever if available>"
-                chat_debug_logger.info(f"🔸 Retrieved Context:\n{formatted_context}")
-
                 chat_debug_logger.info(f"🔸 Full Prompt Template:\n{qa_prompt}")
                 chat_debug_logger.info(f"🔸 Passing to RAG chain as:\n"
                                     f"chat_history = {self.chat_history}\n"
@@ -401,9 +397,13 @@ class ProjectChat(ProjectChatProtocol):
                                     f"question = {question}")
 
                 output_qa = rag_chain.invoke({"chat_history": self.chat_history, "input": response['output'], "question": question})
+                # You may want to log retrieved context if you have it
+                #formatted_context = output_qa['']
+                #chat_debug_logger.info(f"🔸 Retrieved Context:\n{formatted_context}")
                 #self.chat_history.extend([HumanMessage(content=question), output_qa["answer"]])
                 self.chat_history.extend([HumanMessage(content=question), AIMessage(content=output_qa["answer"])])
                 chat_debug_logger.info(f"Updated Chat History: {self.chat_history}")
+                chat_debug_logger.info(f"Output qa: {output_qa}")
                 result = output_qa["answer"]
 
             with time_block("b13: Prepare code"):  # <0.1% of time

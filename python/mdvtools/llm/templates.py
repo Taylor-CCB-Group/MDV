@@ -81,7 +81,7 @@ import sys
 #     return json.loads(json.dumps(plot.plot_data, indent=2).replace("\\\\", ""))
 
 
-def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasouce_name: any, final_answer: str) -> str:
+def get_createproject_prompt_RAG(project: MDVProject, path_to_data: str, datasouce_name: any, final_answer: str, question: str) -> str:
     """
     Returns the prompt for the create project RAG.
     
@@ -128,12 +128,12 @@ message = f"gs|{{param2}}(gs)|{{param2_index}}"
 # Common mistake to avoid:
 WRONG: message = "gs|{{param2}}(gs)|{{param2_index}}"
 
-The human will provide a question for you to try to plot a graph based on the above instructions.
+The question for you to try to plot a graph based on the above instructions is given by this question: """ + question + """
 
 If the question asks for a gene-related query (e.g., gene expression value, most expressing gene, target expression, etc.), make sure that:
 1. You load both datasources that are needed, e.g. cells and genes.
 2. If gene expression is required, make sure the gene id, is given as a param in the formatted string literal format: f"gs|{{param2}}(gs)|{{param2_index}}", with param2 and param2_index given by param2 = "param2"
-    param2_index = data_frame_var.index.get_loc(param2)
+and param2_index = data_frame_var.index.get_loc(param2) respecitvely.
 
 The data_path are given by this variable `""" + path_to_data + """`
 The datasource_name is given by this variable `""" + datasouce_name + """`
