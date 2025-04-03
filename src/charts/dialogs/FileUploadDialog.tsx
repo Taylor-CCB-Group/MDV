@@ -4,8 +4,7 @@ import {
     useCallback,
     useReducer,
     type PropsWithChildren,
-    forwardRef,
-    useEffect,
+    forwardRef
 } from "react";
 import { useDropzone } from "react-dropzone";
 import { observer } from "mobx-react-lite";
@@ -28,12 +27,10 @@ import { TiffMetadataTable } from "./TiffMetadataTable";
 import TiffVisualization from "./TiffVisualization";
 import { DatasourceDropdown } from "./DatasourceDropdown";
 import {
-    Close as CloseIcon,
-    CloudUpload as CloudUploadIcon,
+    CloudUpload as CloudUploadIcon
 } from "@mui/icons-material";
-import { Dialog, IconButton, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
-import processH5File, { CompressionError } from "./utils/h5Processing";
+// import processH5File from "./utils/h5Processing";
 import H5MetadataPreview from "./H5MetadataPreview";
 import ErrorDisplay from "./ErrorDisplay";
 import AnndataConflictDialog from "./AnndataConflictDialog";
@@ -663,6 +660,9 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                         }
                         case "h5": {
                             try {
+                                const processH5File = (await import(
+                                    "./utils/h5Processing"
+                                )).default;
                                 const h5Metadata = await processH5File(file);
                                 dispatch({
                                     type: "SET_H5_METADATA",
