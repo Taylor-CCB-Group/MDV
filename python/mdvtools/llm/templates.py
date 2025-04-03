@@ -145,4 +145,63 @@ The datasource_name is given by this variable `""" + datasouce_name + """`
 # The data should be loaded in the same way as in the examples.
 
 
-#The prompt is given by `""" + final_question + """`
+def get_createproject_prompt_RAG_copy(project: MDVProject, path_to_data: str, datasouce_name: any, final_answer: str, question: str) -> str:
+    """
+    Returns the prompt for the create project RAG.
+    
+    Args:
+    project: MDVProject we pass in the project object to get the project directory - previously we were passing the project id
+      and making (wrong) assumptions about the project directory based on that - while also being less.
+    path_to_data: str, path to an anndata object, subject to change
+    datasouce_name: any, we need to better clarify how we reason about multi-ds queries etc...
+    final_answer: str, output from the dataframe agent, which should contain a list of column names to be used in generating the view
+    """
+    prompt_RAG = (
+        """
+Context: {context}
+
+The collection of Python scripts provided in the context, is designed to generate various types of data visualizations
+using the mdvtools library. Each script focuses on a specific type of plot and follows a common structure that includes loading
+data from a file, creating a plot using specific parameters, and serving the visualization through an MDV project.
+
+All scripts in the context share a common workflow:
+
+Setup: Define the project path, data path, and view name, the project path should always be: project_path = '"""
+        + project.dir
+        + """'
+Plot function definition: Define the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot) using a function in the same way as the context.
+Project Creation: Initialize an MDVProject instance using the method: MDVProject(project_path, delete_existing=True).
+Data Loading: Load data from the specified file into a pandas DataFrame using the load_data(data_path) function.
+Data adding: Add the data source to the project using the method: project.add_datasource(datasource_name, data).
+Plot Creation: Create the respective plot (dot plot, heatmap, histogram, box plot, scatter plot, 3D scatter plot, pie/ring chart, stacked row plot) and define the plot paramaters in the same way as in the context.
+Data Conversion: Convert the plot data to JSON format for integration with the MDV project using the convert_plot_to_json(plot) function.
+Serving: Configure the project view, set it to editable, and serve the project using the .set_view(view_name, plot_view), .set_editable(True) and .serve() methods.
+
+If no script is relevant, guided by the context generate a new script.
+
+This string """
+        + final_answer
+        + """ specifies the names of the data fields that need to be plotted, for example in the params field. Get the structure of params definition from the context.
+
+IMPORTANT: All string interpolations MUST use Python formatted string literals (f-strings).
+
+Example:
+# Correct:
+message = f"gs|{{param2}}(gs)|{{param2_index}}"
+
+# Common mistake to avoid:
+WRONG: message = "gs|{{param2}}(gs)|{{param2_index}}"
+
+The question for you to try to plot a graph based on the above instructions is given by this question: {question}""" + question + """
+
+If the question asks for a gene-related query (e.g., gene expression value, most expressing gene, target expression, etc.), make sure that:
+1. You load both datasources that are needed, e.g. cells and genes.
+2. If gene expression is required, make sure the gene id, is given as a param in the formatted string literal format: f"gs|{{param2}}(gs)|{{param2_index}}", with param2 and param2_index given by param2 = "param2"
+and param2_index = data_frame_var.index.get_loc(param2) respecitvely.
+
+The data_path are given by this variable `""" + path_to_data + """`
+The datasource_name is given by this variable `""" + datasouce_name + """`
+
+"""
+    )
+    return prompt_RAG
