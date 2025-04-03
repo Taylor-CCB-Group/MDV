@@ -255,9 +255,13 @@ def sync_auth0_users_to_db(app):
             if existing_user:
                 # If the user exists, we can choose to update the record (optional, if you want to sync updates)
                 existing_user.updated_at = datetime.utcnow()
+                existing_user.email = user.get('email', '')  # Update email address
             else:
                 # If the user does not exist in the database, create a new record
-                new_user = User(auth0_id=user['user_id'])
+                new_user = User(
+                    auth0_id=user['user_id'],
+                    email=user.get('email', '')  # Set email for the new user
+                )
 
             # Step 2: Fetch user's roles from Auth0
             roles = auth0.users.list_roles(user['user_id'])
