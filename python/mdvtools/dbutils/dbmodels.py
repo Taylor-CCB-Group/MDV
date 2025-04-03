@@ -69,6 +69,18 @@ class UserProject(db.Model):
     can_write = db.Column(db.Boolean, nullable=False, default=False)
     is_owner = db.Column(db.Boolean, nullable=False, default=False)
 
+    def __init__(self, user_id, project_id, is_owner=False, can_read=False, can_write=False):
+        self.user_id = user_id
+        self.project_id = project_id
+        self.is_owner = is_owner
+        # Automatically set can_read and can_write if the user is the owner
+        if self.is_owner:
+            self.can_read = True
+            self.can_write = True
+        else:
+            self.can_read = can_read
+            self.can_write = can_write
+
 class Genome(db.Model):
     __tablename__ = 'genomes'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

@@ -12,7 +12,7 @@ from flask import Flask, render_template, jsonify, request
 from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
-from mdvtools.dbutils.dbmodels import db, Project, User
+from mdvtools.dbutils.dbmodels import db, Project, User, UserProject
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 from flask import redirect, url_for, session, jsonify
@@ -27,6 +27,7 @@ if ENABLE_AUTH:
     from authlib.integrations.flask_client import OAuth
     from auth0.management import Auth0
     from auth0.authentication import GetToken
+    from flask_jwt_extended import get_jwt_identity
     from mdvtools.auth.auth0_provider import Auth0Provider
 
     oauth = OAuth()  # Initialize OAuth only if auth is enabled
@@ -213,7 +214,7 @@ def create_flask_app(config_name=None):
     try:
         # Register routes
         print("Registering base routes: /, /projects, /create_project, /delete_project")
-        register_routes(app)
+        register_routes(app, ENABLE_AUTH)
     except Exception as e:
         print(f"Error registering routes: {e}")
         raise e
@@ -271,13 +272,35 @@ def sync_auth0_users_to_db(app):
 
             # Update or set the 'is_admin' flag in the database
             if existing_user:
+                # Update existing user
                 existing_user.is_admin = is_admin
+                db.session.commit()
             else:
-                new_user.is_admin = is_admin
+                # Create new user
+                new_user = User(
+                    auth0_id=user['user_id'],
+                    email=user.get('email', ''),
+                    is_admin=is_admin
+                )
                 db.session.add(new_user)
+                db.session.commit()
 
-            # Commit changes to the database
-            db.session.commit()
+            # Fetch user from DB again after commit
+            db_user = User.query.filter_by(auth0_id=user['user_id']).first()
+
+            if is_admin:
+                # Assign all projects to this user as owner
+                projects = Project.query.all()
+                for project in projects:
+                    existing_user_project = UserProject.query.filter_by(user_id=db_user.id, project_id=project.id).first()
+                    if not existing_user_project:
+                        admin_project = UserProject(
+                            user_id=db_user.id,
+                            project_id=project.id,
+                            is_owner=True
+                        )
+                        db.session.add(admin_project)
+                db.session.commit()
 
         # Print the number of users synced from Auth0
         print(f"Synced {len(users['users'])} users from Auth0.")
@@ -690,7 +713,7 @@ def register_auth0_routes(app):
 
 
 
-def register_routes(app):
+def register_routes(app, ENABLE_AUTH):
     """Register routes with the Flask app."""
     print("Registering routes...")
 
@@ -715,24 +738,52 @@ def register_routes(app):
             print('/projects queried...')
             try:
                 # Query the database to get all projects that aren't deleted
-                projects = ProjectService.get_active_projects()
+                # Step 1: Retrieve the list of active projects
+                active_projects = ProjectService.get_active_projects()
+
+                # Step 2: If authentication is enabled, handle user-based filtering
+                if ENABLE_AUTH:
+                    
+                    current_auth0_id = get_jwt_identity()  # Get authenticated user ID from JWT
+                    print("±±±±±±±±±±±±±±±±±±±±±±±±±±")
+                    print(current_auth0_id)
+
+                    if not current_auth0_id:
+                        return jsonify({"error": "Authentication required"}), 401
+
+                    # Fetch user from the database using auth0_id
+                    user = User.query.filter_by(auth0_id=current_auth0_id).first()
+                    if not user:
+                        return jsonify({"error": "User not found"}), 404
+
+                    # Step 3: Get user-specific projects where they have access (can_read, can_write, is_owner)
+                    user_projects = UserProject.query.filter_by(user_id=user.id).all()
+
+                    # Extract project IDs where the user has read, write, or ownership access
+                    allowed_project_ids = {up.project_id for up in user_projects if up.can_read or up.can_write or up.is_owner}
+
+                    # Filter active projects to only include those the user has access to
+                    filtered_projects = [p for p in active_projects if p.id in allowed_project_ids]
+                else:
+                    # If authentication is not required, return all active projects
+                    filtered_projects = active_projects
                 
-                # Format each project with its id, name, and last modified timestamp as a string
+                # Step 4: Format response to return only the relevant fields
                 project_list = [
                     {
                         "id": p.id,
                         "name": p.name,
-                        "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S')  # Format datetime as string
+                        "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S')
                     }
-                    for p in projects
+                    for p in filtered_projects
                 ]
+
                 # Return the list of projects as JSON
                 return jsonify(project_list)
             
             except Exception as e:
                 print(f"In register_routes - /projects : Error retrieving projects: {e}")
                 return jsonify({"status": "error", "message": str(e)}), 500
-
         print("Route registered: /projects")
 
         @app.route("/create_project", methods=["POST"])

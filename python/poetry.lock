@@ -967,6 +967,25 @@ async = ["asgiref (>=3.2)"]
 dotenv = ["python-dotenv"]
 
 [[package]]
+name = "flask-jwt-extended"
+version = "4.7.1"
+description = "Extended JWT integration with Flask"
+optional = false
+python-versions = "<4,>=3.9"
+files = [
+    {file = "Flask_JWT_Extended-4.7.1-py2.py3-none-any.whl", hash = "sha256:52f35bf0985354d7fb7b876e2eb0e0b141aaff865a22ff6cc33d9a18aa987978"},
+    {file = "flask_jwt_extended-4.7.1.tar.gz", hash = "sha256:8085d6757505b6f3291a2638c84d207e8f0ad0de662d1f46aa2f77e658a0c976"},
+]
+
+[package.dependencies]
+Flask = ">=2.0,<4.0"
+PyJWT = ">=2.0,<3.0"
+Werkzeug = ">=0.14"
+
+[package.extras]
+asymmetric-crypto = ["cryptography (>=3.3.1)"]
+
+[[package]]
 name = "flask-socketio"
 version = "5.3.6"
 description = "Socket.IO integration for Flask applications"
@@ -4899,4 +4918,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "2e26229fa9087c458190f5a4f9a9ef09381627f45ea5c3f85afb07efaf2064e8"
+content-hash = "86662a74b55e6d1742db008224d02a6e41084802aa8bd9a200a37e863b870c35"
