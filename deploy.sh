@@ -68,6 +68,7 @@ create_or_validate_env_file() {
       echo "$(prompt_variable "AUTH0_CLIENT_SECRET" true)"
       echo "$(prompt_variable "AUTH0_CALLBACK_URL" false)"
       echo "$(prompt_variable "AUTH0_AUDIENCE" false)"
+      echo "$(prompt_variable "AUTH0_DB_CONNECTION" false)"
       echo "$(prompt_variable "AUTH0_PUBLIC_KEY_URI" false)"
       echo "$(prompt_variable "SHIBBOLETH_LOGIN_URL" false)"
       echo "$(prompt_variable "SHIBBOLETH_LOGOUT_URL" false)"

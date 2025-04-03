@@ -2,6 +2,7 @@ import os
 import time
 import json
 import shutil
+from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from flask import Flask, render_template, jsonify, request
@@ -89,7 +90,7 @@ def create_flask_app(config_name=None):
             if ENABLE_AUTH:
                 try:
                     print("Syncing users from Auth0 into the database...")
-                    sync_auth0_users_to_db()
+                    sync_auth0_users_to_db(app)
                 except Exception as e:
                     raise e
             
@@ -218,23 +219,18 @@ def create_flask_app(config_name=None):
 
     return app
 
-from auth0.v3.management import Auth0
-from flask import current_app
-from datetime import datetime
-from app import db  # Import db object to interact with the database
-from models import User  # Import your User model to access the users table
 
-def sync_auth0_users_to_db():
+def sync_auth0_users_to_db(app):
     """
     This function syncs users from Auth0 into the application's database.
     It fetches users from Auth0 and inserts or updates them in the 'users' table.
     """
     try:
         # Access configuration from Flask app
-        auth0_domain = current_app.config['AUTH0_DOMAIN']
-        client_id = current_app.config['AUTH0_CLIENT_ID']  # Using the same client_id as app client and mgmt client
-        client_secret = current_app.config['AUTH0_CLIENT_SECRET']  # Using the same client_secret
-        auth0_db_connection = current_app.config['AUTH0_DB_CONNECTION']  # Database connection name (e.g., Username-Password-Authentication)
+        auth0_domain = app.config['AUTH0_DOMAIN']
+        client_id = app.config['AUTH0_CLIENT_ID']  # Using the same client_id as app client and mgmt client
+        client_secret = app.config['AUTH0_CLIENT_SECRET']  # Using the same client_secret
+        auth0_db_connection = app.config['AUTH0_DB_CONNECTION']  # Database connection name (e.g., Username-Password-Authentication)
 
         # Initialize the Auth0 Management API client using the app client ID and secret
         auth0 = Auth0(auth0_domain, client_id, client_secret)
@@ -329,8 +325,6 @@ def load_config(app, config_name=None, enable_auth=False):
         else:
             app.config['PREFERRED_URL_SCHEME'] = 'https'
             
-            
-
             db_user = os.getenv('DB_USER') or read_secret('db_user')
             db_password = os.getenv('DB_PASSWORD') or read_secret('db_password')
             db_name = os.getenv('DB_NAME') or read_secret('db_name')
@@ -360,6 +354,7 @@ def load_config(app, config_name=None, enable_auth=False):
                 app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL') or config.get('AUTH0_CALLBACK_URL')
                 app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
                 app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
+                app.config["AUTH0_DB_CONNECTION"] = os.getenv('AUTH0_DB_CONNECTION') or config.get('AUTH0_DB_CONNECTION')
 
                 app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
 
