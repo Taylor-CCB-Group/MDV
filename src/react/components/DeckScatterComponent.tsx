@@ -113,14 +113,17 @@ const DeckScatter = observer(function DeckScatterComponent() {
     const colorBy = (chart as any).colorBy;
     // const colorBy = color_by;
     const chartWidth = width - margin.left - margin.right;
-    const chartHeight = height - margin.top - margin.bottom;
+    //there could be a potential off-by-one/two error somewhere down the line
+    //if we don't fully understand reasons for `- 2` here.
+    //prevents overlapping with x-axis.
+    const chartHeight = height - margin.top - margin.bottom - 2;
     useZoomOnFilter(data);
 
     const greyOnFilter = on_filter === "grey";
 
     const { scatterProps, selectionLayer } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
-    const { scatterplotLayer, getTooltip } = scatterProps;
+    const { scatterplotLayer, getTooltip, unproject } = scatterProps;
 
 
     const XscatterplotLayer = useMemo(() => new ScatterplotLayer({
@@ -207,22 +210,24 @@ const DeckScatter = observer(function DeckScatterComponent() {
     }), [cx, cy, cz, opacity, radiusScale, id, filterValue, data, greyOnFilter]);
     
     // we need an OrthographicView to prevent wrapping etc...
+    // if in future we have subgraphs sharing a canvas, we will need to
+    // make sure that the view is set up correctly for each subgraph.
     const view = useMemo(() => {
         return config.dimension === "2d" ? new OrthographicView({
             id: `scatterplot-view-${id}`,
             controller: true,
             width: chartWidth,
             height: chartHeight,
-            x: margin.left + 1,
-            y: margin.top - 1,
+            x: 0,
+            y: 0,
             flipY: false,
         }) : new OrbitView({
             id: `scatterplot-view-${id}`,
             controller: true,
             width: chartWidth,
             height: chartHeight,
-            x: margin.left + 1,
-            y: margin.top - 1,
+            x: 0,
+            y: 0,
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
     //! deck doesn't like it if we change the layers array - better to toggle visibility
@@ -237,15 +242,27 @@ const DeckScatter = observer(function DeckScatterComponent() {
         viewState;
         // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
         try {
-            const p = scatterplotLayer.unproject([0, 0]);
-            const p2 = scatterplotLayer.unproject([chartWidth, chartHeight]);
+            // this unproject is not getting the right values.
+            // we have another `unproject` from our useSpatialLayers hook - we should use that
+            // it is also currently not correct, but we should still switch to that, and then fix it.
+            // that should also fix issues with mouse events being in wrong coordinates.
+            //! this version of unproject currently expects coordinates in 'client space',
+            // as in `getBoundingClientRect` - we potentially want to change this...
+            // Really, we want to refactor more of this stuff.
+            //! the other problem is that it currently always throws internally because of scatterplotLayer.lifecycle
+            // which is always "Awaiting state".
+            // Are we always referring to the same layer?
+            // ^^ no, we should use context or some other way to keep the same state...
+            // using selectionLayer instead as a workaround pending refactor
+            const p = selectionLayer.unproject([0, 0]);
+            const p2 = selectionLayer.unproject([chartWidth, chartHeight]);
             const domainX = [p[0], p2[0]];
             const domainY = [p2[1], p[1]];
             return { domainX, domainY };
         } catch (e) {
             return { domainX: cx.minMax, domainY: cy.minMax };
         }
-    }, [cx.minMax, cy.minMax, chartWidth, chartHeight, scatterplotLayer, viewState]);
+    }, [cx.minMax, cy.minMax, viewState, chartWidth, chartHeight, selectionLayer]);
     const scaleX = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainX, // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
@@ -255,17 +272,26 @@ const DeckScatter = observer(function DeckScatterComponent() {
         range: [chartHeight + margin.top, margin.top],
     }), [chartHeight, ranges]);
 
+    const deckStyle = useMemo(() => ({
+        position: "absolute",
+        top: margin.top,
+        left: margin.left,
+        width: chartWidth,
+        height: chartHeight,
+    } as const), [chartWidth, chartHeight]);
     return (
         <>
-            <DeckGL
-                layers={layers}
-                useDevicePixels={true}
-                controller={true}
-                viewState={viewState}
-                // initialViewState={viewState} //consider not using react state for this        
-                views={view}
-                onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
-            />
+            <div style={deckStyle}>
+                <DeckGL
+                    layers={layers}
+                    useDevicePixels={true}
+                    controller={true}
+                    viewState={viewState}
+                    // initialViewState={viewState} //consider not using react state for this        
+                    views={view}
+                    onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
+                />
+            </div>
             <svg width={width} height={height}>
                 <Axis.AxisBottom
                     top={chartHeight + margin.top}
