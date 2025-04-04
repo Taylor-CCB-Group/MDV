@@ -42,8 +42,8 @@ const AddViewDialogComponent = (props: {
         return checkedDsArray.length > 0;
     };
 
-    const onCreate = () => {
-        viewManager.addView(viewName, checkedDs, isCloneView);
+    const onCreate = async () => {
+        await viewManager.addView(viewName, checkedDs, isCloneView);
         props.onClose();
     };
     return (

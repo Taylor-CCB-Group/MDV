@@ -39,7 +39,7 @@ const ToggleTheme = observer(() => {
     );
 });
 
-const ToggleThemeWrapper = (props: { theme: string; onClick: () => void }) => {
+const ToggleThemeWrapper = () => {
     return <ToggleTheme />;
 };
 

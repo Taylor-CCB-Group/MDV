@@ -1,7 +1,8 @@
-import { action, observable } from "mobx";
+import { action, observable, runInAction, toJS } from "mobx";
 import type ChartManager from "./ChartManager";
 import type { DataSource } from "./charts";
 import _ from "lodash";
+import { toPng } from "html-to-image";
 
 export type View = any;
 export type UpdatedColumns = any;
@@ -102,10 +103,32 @@ class ViewManager {
         });
     }
 
+    async createImageofView() {
+        const bounds = this.cm.containerDiv.getBoundingClientRect();
+        const aspect = bounds.width / bounds.height;
+        const dataUrl = await toPng(this.cm.containerDiv, {
+            canvasWidth: 400,
+            canvasHeight: 400 / aspect,
+        });
+        return dataUrl;
+    }
+
+    async getViewDetails() {
+        const viewList: { name: string; image: string }[] = [];
+        for (const view of this.all_views) {
+            const data = await this.cm.viewLoader(view);
+            viewList.push({ name: view, image: data.viewImage });
+            console.log(data);
+        }
+        return viewList;
+    }
+
     // Save the current state
     @action
-    saveView() {
+    async saveView() {
+        const imageUrl = await this.createImageofView();
         const state = this.cm.getState();
+        state.view.viewImage = imageUrl;
         this.cm._callListeners("state_saved", state);
         this.setLastSavedState(state);
     }
@@ -147,12 +170,12 @@ class ViewManager {
             }
             contentDiv.innerHTML = "";
             await this.cm._init(state.view);
-            this.saveView();
+            await this.saveView();
         } else {
             const state = this.cm.getState();
             contentDiv.innerHTML = "";
             await this.cm._init(state.view);
-            this.saveView();
+            await this.saveView();
         }
     }
 
@@ -197,11 +220,24 @@ class ViewManager {
     // Helper to check if the current state differs from the last saved state
     hasUnsavedChanges(verbose = false) {
         if (this.lastSavedState === null) return true;
-        const currentState = JSON.parse(JSON.stringify(this.cm.getState()));
-        const prevState = JSON.parse(JSON.stringify(this.lastSavedState));
+        
+        const removeImageProp = (state: State) => {
+            const cloneState = {...state};
+            if (cloneState?.view?.viewImage) {
+                cloneState.view.viewImage = undefined;
+            }
+            return cloneState;
+        }
+
+        const currentState = removeImageProp(toJS(this.cm.getState()));
+        const prevState = removeImageProp(toJS(this.lastSavedState));
+
+
+        console.log("currentState", currentState);
+        console.log("prevState", prevState);
         if (verbose) {
-            console.log("currentState", currentState);
-            console.log("prevState", prevState);
+            console.log("inside currentState", currentState);
+            console.log("inside prevState", prevState);
             // doesn't seem to be as useful as hoped for showing what's different...
             // console.log("diff", _.differenceWith([currentState], [prevState], _.isEqual));
             // https://stackoverflow.com/a/48181184/279703 with changes...

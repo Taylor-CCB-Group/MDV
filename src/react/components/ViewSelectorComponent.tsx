@@ -29,7 +29,7 @@ function useUpdateViewList() {
 }
 
 
-const FilterDropdown = observer(() => {
+const ViewSelectorDropdown = observer(() => {
     const cm = useChartManager();
     const viewManager = useViewManager();
     useUpdateViewList();
@@ -77,8 +77,8 @@ const FilterDropdown = observer(() => {
     );
 });
 
-const FilterComponentReactWrapper = () => {
-    return <FilterDropdown />;
+const ViewSelectorWrapper = () => {
+    return <ViewSelectorDropdown />;
 };
 
-export default FilterComponentReactWrapper;
+export default ViewSelectorWrapper;

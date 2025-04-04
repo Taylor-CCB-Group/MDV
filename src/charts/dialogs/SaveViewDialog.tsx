@@ -8,8 +8,10 @@ const SaveViewDialogComponent = (props: {
 }) => {
     const { viewManager } = window.mdv.chartManager;
 
-    const onSave = () => {
-        viewManager.saveView();
+    const onSave = async () => {
+        await viewManager.saveView();
+        props?.action?.();
+        props.onClose();
     };
 
     return (
@@ -23,13 +25,7 @@ const SaveViewDialogComponent = (props: {
                 </Typography>
             </DialogContent>
             <DialogActions>
-                <Button
-                    onClick={() => {
-                        onSave();
-                        props?.action?.();
-                        props.onClose();
-                    }}
-                >
+                <Button onClick={onSave}>
                     Yes
                 </Button>
                 <Button
