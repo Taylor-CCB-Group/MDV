@@ -1291,7 +1291,7 @@ export class ChartManager {
             metadata: metadata,
             //untested - what happens if we include this (including in what we save to server?)
             //could be useful... but I'm leaving it out now in case of unexpected issues.
-            // chartErrors, 
+            chartErrors, 
         };
     }
 
