@@ -194,19 +194,10 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
  * based on some property of the data - but for now we just return a number.
  */
 export function useScatterRadius() {
-    const chart = useChart();
-    const [radiusScale, setRadiusScale] = useState(0);
     const config = useConfig<ScatterPlotConfig>();
-    useEffect(() => {
-        // does this help? 
-        // ! it does - but this is not a good pattern.
-        return chart.mobxAutorun(() => {
-            const { radius, course_radius } = config;
-            //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
-            const radiusScale = radius * course_radius * 0.01;// * (is2d ? 1 : 0.01);
-            setRadiusScale(radiusScale);
-        });
-    });
+    const { radius, course_radius } = config;
+    //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
+    const radiusScale = radius * course_radius * 0.01;// * (is2d ? 1 : 0.01);
     return radiusScale;
 }
 
