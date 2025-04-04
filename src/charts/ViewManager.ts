@@ -111,9 +111,9 @@ class ViewManager {
 
     async createImageofView() {
         try {
-            const bounds = this.cm.containerDiv.getBoundingClientRect();
+            const bounds = this.cm.contentDiv.getBoundingClientRect();
             const aspect = bounds.width / bounds.height;
-            const dataUrl = await toPng(this.cm.containerDiv, {
+            const dataUrl = await toPng(this.cm.contentDiv, {
                 canvasWidth: 400,
                 canvasHeight: 400 / aspect,
             });

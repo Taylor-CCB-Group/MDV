@@ -9,7 +9,7 @@ import {
     FormGroup,
     TextField,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const AddViewDialogComponent = (props: {
     open: boolean;
@@ -19,15 +19,16 @@ const AddViewDialogComponent = (props: {
     const [isCloneView, setIsCloneView] = useState(false);
     const [checkedDs, setCheckedDs] = useState<{ [name: string]: boolean }>({});
     const { viewManager, viewData } = window.mdv.chartManager;
+    const dataSources = useMemo(() => Object.keys(viewData.dataSources), [viewData.dataSources]);
 
     useEffect(() => {
         // Initialising the checkedDs with the data sources inside the view
         const tempDs: { [name: string]: boolean } = {};
-        Object.keys(viewData.dataSources)?.forEach?.((ds) => {
+        dataSources?.forEach?.((ds) => {
             tempDs[ds] = false;
         });
         setCheckedDs(tempDs);
-    }, [viewData.dataSources]);
+    }, [dataSources]);
 
     const handleCheckboxChange = (ds: string) => {
         setCheckedDs((prevDs) => ({ ...prevDs, [ds]: !prevDs[ds] }));
@@ -38,6 +39,7 @@ const AddViewDialogComponent = (props: {
     };
 
     const checkDsSelected = () => {
+        if (dataSources.length < 2) return true; 
         const checkedDsArray = Object.values(checkedDs)?.filter?.((ds) => ds === true);
         return checkedDsArray.length > 0;
     };
@@ -66,9 +68,9 @@ const AddViewDialogComponent = (props: {
                     helperText={checkInvalidName(viewName) && "Name already exists"}
                 />
 
-                {Object.keys(viewData.dataSources).length > 1 && (
+                {dataSources.length > 1 && (
                     <FormGroup sx={{ mt: 2 }}>
-                        {Object.keys(viewData.dataSources)?.map?.((ds) => (
+                        {dataSources?.map?.((ds) => (
                             <FormControlLabel
                                 key={ds}
                                 control={

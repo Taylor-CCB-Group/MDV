@@ -1,4 +1,5 @@
 import {
+    Box,
     Button,
     Card,
     CardActionArea,
@@ -9,15 +10,17 @@ import {
     Divider,
     IconButton,
     Typography,
+    Grid2,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 
 export type ViewThumbnailDialogProps = {
     open: boolean;
     setOpen: Dispatch<SetStateAction<boolean>>;
 };
-
 
 const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     const viewManager = window.mdv.chartManager.viewManager;
@@ -31,7 +34,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     useEffect(() => {
         if (viewManager) {
             getViewList();
-        } 
+        }
     }, [viewManager, getViewList]);
 
     const onClose = () => {
@@ -61,19 +64,34 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                 </IconButton>
             </DialogTitle>
             <DialogContent dividers>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-                    {viewList.map((view, index) => (
-                        <Card key={`${view.name}-${index}`}>
-                            <CardActionArea onClick={() => handleCardClick(view.name)}>
-                                <img src={view.image} alt="" />
-                                <Divider />
-                                <div style={{ display: "flex", justifyContent: "center", padding: "3%" }}>
-                                    <Typography color="text.secondary">{view.name}</Typography>
-                                </div>
-                            </CardActionArea>
-                        </Card>
-                    ))}
-                </div>
+                <ErrorBoundary
+                    FallbackComponent={({ error }) => (
+                        <ErrorDisplay error={error} title="Error displaying view gallery" />
+                    )}
+                >
+                    <Box sx={{ flexGrow: 1 }}>
+                        <Grid2 container spacing={4}>
+                            {viewList.map((view, index) => (
+                                <Grid2 key={`${view.name}-${index}`} size={6}>
+                                    <Card sx={{ boxShadow: 20 }}>
+                                        <CardActionArea onClick={() => handleCardClick(view.name)}>
+                                            <Box sx={{ display: "flex", justifyContent: "center", padding: "2%" }}>
+                                                <Typography sx={{ fontWeight: "bold" }}>{view.name}</Typography>
+                                            </Box>
+                                            <Divider />
+                                            <Box sx={{ padding: "1%" }}>
+                                                <img
+                                                    src={view.image}
+                                                    alt={`${view.name} snapshot`}
+                                                />
+                                            </Box>
+                                        </CardActionArea>
+                                    </Card>
+                                </Grid2>
+                            ))}
+                        </Grid2>
+                    </Box>
+                </ErrorBoundary>
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} color="primary" sx={{ mr: 2 }}>
