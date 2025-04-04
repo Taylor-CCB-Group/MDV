@@ -180,8 +180,13 @@ export function useMeasure() {
     return measure;
 }
 
-/** work in progress... very much unstable return type etc, but starting to make use
- * and hopefully refactor into something coherent soon.
+/** 
+ * useSpatialLayers is a hook that provides access to the spatial layers and their properties.
+ * 
+ * This includes the selection layer, scatterplot layer (which is actually an instance
+ * of a more complex `SpatialLayer` with custom density/contour rendering), etc.
+ * 
+ * work in progress... unstable return type etc, and subject to future changes.
  */
 export function useSpatialLayers() {
     const { rectRange, scatterProps } = useContext(SpatialAnnotationState);

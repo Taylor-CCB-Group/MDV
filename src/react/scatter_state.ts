@@ -184,6 +184,13 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
 
 // type Tooltip = (PickingInfo) => string;
 export type P = [number, number];
+/**
+ * ! in its current form, this hook is only called by `useCreateSpatialAnnotationState`
+ * in future we may want to be able to have different arrangement of layers & rework this.
+ * 
+ * As of now, charts with appropriate spatial context can call `useSpatialLayers()` at any point
+ * to access the scatterplot layer, and the tooltip function.
+ */
 export function useScatterplotLayer(modelMatrix: Matrix4) {
     const id = useChartID();
     const chart = useChart();
