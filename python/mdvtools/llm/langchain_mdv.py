@@ -309,7 +309,7 @@ class ProjectChat(ProjectChatProtocol):
                     "Pandas agent invoking...", id, progress, 31
                 )
                 progress += 31
-                response = self.agent(question)
+                response = self.agent(full_prompt)#(question)
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
@@ -376,6 +376,7 @@ class ProjectChat(ProjectChatProtocol):
                 )
 
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
+            chat_debug_logger.info(f"RAG output:\n{output_qa}")
             # with time_block("b14: Chat logging by MDV"):  # <0.1% of time
             #     self.project.log_chat_item(output_qa, prompt_RAG, final_code)
             with time_block("b15: Execute code"):  # ~9% of time
