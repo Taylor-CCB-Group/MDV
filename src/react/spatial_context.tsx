@@ -32,6 +32,7 @@ export type MeasureState = {
 export type SpatialAnnotationState = {
     rectRange: RangeState;
     measure: MeasureState;
+    scatterProps: ReturnType<typeof useScatterplotLayer>;
 };
 
 // Could more usefully be thought of as SpatialContext?
@@ -150,7 +151,8 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>) {
     // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
-    return { rectRange, measure };
+    const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
+    return { rectRange, measure, scatterProps };
 }
 
 export function SpatialAnnotationProvider({
@@ -178,12 +180,19 @@ export function useMeasure() {
     return measure;
 }
 
-/** work in progress... very much unstable return type etc, but starting to make use
- * and hopefully refactor into something coherent soon.
+/** 
+ * useSpatialLayers is a hook that provides access to the spatial layers and their properties.
+ * 
+ * This includes the selection layer, scatterplot layer (which is actually an instance
+ * of a more complex `SpatialLayer` with custom density/contour rendering), etc.
+ * 
+ * work in progress... unstable return type etc, and subject to future changes.
  */
 export function useSpatialLayers() {
-    const { rectRange } = useContext(SpatialAnnotationState);
-    const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
+    const { rectRange, scatterProps } = useContext(SpatialAnnotationState);
+    // this should be in the context, useScatterplotLayer currently called *only* from there...
+    // if we want to use it in other places we need to refactor
+    // const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
     const { getTooltip } = scatterProps;
     // const layers = [rectRange.polygonLayer, scatterplotLayer]; /// should probably be in a CompositeLayer?
     return {
