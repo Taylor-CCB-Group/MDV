@@ -28,10 +28,33 @@ function useUpdateViewList() {
     });
 }
 
+function useKeyboardShortcuts() {
+    const viewManager = useViewManager();
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "s" && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                // Save the current view
+                try {
+                    viewManager.saveView();
+                } catch (error) {
+                    console.error("Error saving view:", error);
+                    // we should consider an error dialog here
+                }
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [viewManager]);
+}
+
 
 const ViewSelectorDropdown = observer(() => {
     const cm = useChartManager();
     const viewManager = useViewManager();
+    useKeyboardShortcuts();
     useUpdateViewList();
     const options = viewManager.all_views;
     const [dirty, setDirty] = useState(false);

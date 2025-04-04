@@ -1236,6 +1236,7 @@ export class ChartManager {
         const initialCharts = {};
         const updatedColumns = {};
         const metadata = {};
+        const chartErrors = [];
         // const twidth = this.contentDiv.offsetWidth;
         for (const ds of this.dataSources) {
             if (ds.contentDiv) {
@@ -1259,15 +1260,24 @@ export class ChartManager {
         for (const chid in this.charts) {
             const chInfo = this.charts[chid];
             const chart = chInfo.chart;
-            const config = chart.getConfig();
-            const div = chart.getDiv();
-            const d = this.viewData.dataSources[chInfo.dataSource.name];
-            if (d.layout === "gridstack") {
-               //this is handled by gridstack now
-            } else {
-                config.position = [div.offsetLeft, div.offsetTop];
+            try {
+                // as of now, some charts throw errors when calling getConfig()
+                // in particular, if they haven't finished loading properly
+                const config = chart.getConfig();
+                const div = chart.getDiv();
+                const d = this.viewData.dataSources[chInfo.dataSource.name];
+                if (d.layout === "gridstack") {
+                   //this is handled by gridstack now
+                } else {
+                    config.position = [div.offsetLeft, div.offsetTop];
+                }
+                initialCharts[chInfo.dataSource.name].push(config);
+            } catch (error) {
+                console.error(
+                    `chart ${chid} failed to getConfig - ${error.message}`,
+                );
+                chartErrors.push(error);
             }
-            initialCharts[chInfo.dataSource.name].push(config);
         }
 
         const view = JSON.parse(JSON.stringify(this.viewData));
@@ -1279,6 +1289,9 @@ export class ChartManager {
             all_views: all_views,
             updatedColumns: updatedColumns,
             metadata: metadata,
+            //untested - what happens if we include this (including in what we save to server?)
+            //could be useful... but I'm leaving it out now in case of unexpected issues.
+            // chartErrors, 
         };
     }
 
