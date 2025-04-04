@@ -7,6 +7,7 @@ import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useChartID, useRangeDimension2D } from "./hooks";
 import type BaseChart from "@/charts/BaseChart";
+import { observer } from "mobx-react-lite";
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -86,7 +87,7 @@ function useCreateRange(chart: BaseChart<any>) {
         chart.removeFilter = () => {
             setSelectionFeatureCollection(getEmptyFeatureCollection());
         }
-    });
+    }, [chart]);
     useEffect(() => {
         if (coords.length === 0) {
             chart.resetButton.style.display = "none";
@@ -155,7 +156,7 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>) {
     return { rectRange, measure, scatterProps };
 }
 
-export function SpatialAnnotationProvider({
+export const SpatialAnnotationProvider = observer(function SpatialAnnotationProvider({
     chart,
     children,
     //add generic that extends SpatialConfig?
@@ -166,7 +167,7 @@ export function SpatialAnnotationProvider({
             {children}
         </SpatialAnnotationState.Provider>
     );
-}
+});
 
 export function useRange() {
     const range = useContext(SpatialAnnotationState).rectRange;
