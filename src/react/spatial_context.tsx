@@ -152,6 +152,7 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>) {
     // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
+    // this doesn't update when props change, need to fix that
     const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
     return { rectRange, measure, scatterProps };
 }

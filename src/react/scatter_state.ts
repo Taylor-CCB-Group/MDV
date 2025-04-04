@@ -182,6 +182,34 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
     return viewState;
 }
 
+/**
+ * If we are in a 'region' then we might have some notion of physical size.
+ * If we are rendering abstract data, then we should probably have a normalised size
+ * with respect to the domain of the data.
+ * If we have very different scales in x and y, then we probably want to also scale each axis
+ * rather than assuming a 1:1 ratio - somewhat related concern... also need to consider that
+ * we still want circular points to be circular...
+ * 
+ * Also note that we would like in future to be able to set the size of individual points
+ * based on some property of the data - but for now we just return a number.
+ */
+export function useScatterRadius() {
+    const chart = useChart();
+    const [radiusScale, setRadiusScale] = useState(0);
+    const config = useConfig<ScatterPlotConfig>();
+    useEffect(() => {
+        // does this help? 
+        // ! it does - but this is not a good pattern.
+        return chart.mobxAutorun(() => {
+            const { radius, course_radius } = config;
+            //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
+            const radiusScale = radius * course_radius * 0.01;// * (is2d ? 1 : 0.01);
+            setRadiusScale(radiusScale);
+        });
+    });
+    return radiusScale;
+}
+
 // type Tooltip = (PickingInfo) => string;
 export type P = [number, number];
 /**
@@ -197,8 +225,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const colorBy = (chart as any).colorBy;
     const config = useConfig<ScatterPlotConfig>();
 
-    const { opacity, radius, course_radius } = config;
-    const radiusScale = radius * course_radius;
+    const { opacity } = config;
+    const radiusScale = useScatterRadius();
 
     const data = useFilteredIndices();
     //! not keen on third param potentially being either contourParameter or cz
@@ -291,6 +319,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 // getLineWith: clickIndex, // this does not work, seems to need something like a function
                 getLineWidth,
                 getPosition: [cx, cy, cz],
+                // getRadius: [radiusScale, scale],
                 //as of now, the SpatialLayer implemetation needs to figure this out for each sub-layer.
                 // getContourWeight1: config.category1,
             },
