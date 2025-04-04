@@ -343,6 +343,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const boundingClientRect = useMemo(() => {
         return chart.contentDiv.getBoundingClientRect();
     }, [chart.contentDiv.getBoundingClientRect]);
+    // maybe we should rename this `unprojectMouse` or something
     const unproject = useCallback(
         (e: MouseEvent | React.MouseEvent | P) => {
             // never liked this... and then it was actually causing an infinite loop

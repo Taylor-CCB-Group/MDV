@@ -242,27 +242,15 @@ const DeckScatter = observer(function DeckScatterComponent() {
         viewState;
         // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
         try {
-            // this unproject is not getting the right values.
-            // we have another `unproject` from our useSpatialLayers hook - we should use that
-            // it is also currently not correct, but we should still switch to that, and then fix it.
-            // that should also fix issues with mouse events being in wrong coordinates.
-            //! this version of unproject currently expects coordinates in 'client space',
-            // as in `getBoundingClientRect` - we potentially want to change this...
-            // Really, we want to refactor more of this stuff.
-            //! the other problem is that it currently always throws internally because of scatterplotLayer.lifecycle
-            // which is always "Awaiting state".
-            // Are we always referring to the same layer?
-            // ^^ no, we should use context or some other way to keep the same state...
-            // using selectionLayer instead as a workaround pending refactor
-            const p = selectionLayer.unproject([0, 0]);
-            const p2 = selectionLayer.unproject([chartWidth, chartHeight]);
+            const p = scatterplotLayer.unproject([0, 0]);
+            const p2 = scatterplotLayer.unproject([chartWidth, chartHeight]);
             const domainX = [p[0], p2[0]];
             const domainY = [p2[1], p[1]];
             return { domainX, domainY };
         } catch (e) {
             return { domainX: cx.minMax, domainY: cy.minMax };
         }
-    }, [cx.minMax, cy.minMax, viewState, chartWidth, chartHeight, selectionLayer]);
+    }, [cx.minMax, cy.minMax, viewState, chartWidth, chartHeight, scatterplotLayer]);
     const scaleX = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainX, // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
