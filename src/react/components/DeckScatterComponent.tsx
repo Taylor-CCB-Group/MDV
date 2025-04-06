@@ -231,7 +231,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [selectionLayer, scatterplotLayer, greyScatterplotLayer];
+    const layers = [scatterplotLayer, greyScatterplotLayer, selectionLayer];
     // todo - these need to be encapsulated better, the DeckGL component should be in a smaller
     // area with the axes outside of it.
     // axes need to respond to the viewState...
