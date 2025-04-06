@@ -51,10 +51,10 @@ def main():
     
     # HistogramPlot parameters
     title = "Example title"
-    param = "param1" #param1 should be a numerical variable. When the variable is named as "param", it can only take one data field. If it was "params" it would take more than one.
+    param = ["param1"] #param1 should be a numerical variable. When the variable is named as "param", it can only take one data field. If it was "params" it would take more than one.
     bin_number = 50
-    display_min = float(data_frame_obs[param].min()) # Convert to Python float to ensure compatibility with JSON serialization
-    display_max = float(data_frame_obs[param].max()) # Convert to Python float to ensure compatibility with JSON serialization
+    display_min = float(data_frame_obs.param.min()) # Convert to Python float to ensure compatibility with JSON serialization
+    display_max = float(data_frame_obs.param.max()) # Convert to Python float to ensure compatibility with JSON serialization
     size = [792, 472]
     position = [10, 10]
     
