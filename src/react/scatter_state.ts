@@ -195,10 +195,23 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
  */
 export function useScatterRadius() {
     const config = useConfig<ScatterPlotConfig>();
+    const params = useParamColumns();
+    const [cx, cy] = params;
+    const scale = useRegionScale();
     const { radius, course_radius } = config;
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
-    const radiusScale = radius * course_radius * 0.01;// * (is2d ? 1 : 0.01);
-    return radiusScale;
+    // this is reasonably ok looking, but even for abstract data it should really relate to axis labels
+    // (which implies that if we have a warped aspect ratio but making circles circular, they will be based on one or other axis)
+    const radiusScale = (radius * course_radius * 0.1)/scale;
+    return useMemo(() => {
+        if (cx.minMax && cy.minMax) {
+            const xRange = cx.minMax[1] - cx.minMax[0];
+            const yRange = cy.minMax[1] - cy.minMax[0];
+            const r = 100 / Math.max(xRange, yRange);
+            return radiusScale / r;
+        }
+        return radiusScale;
+    }, [cx.minMax, cy.minMax, radiusScale, cx, cy]);
 }
 
 // type Tooltip = (PickingInfo) => string;
@@ -294,7 +307,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             // (if it even has a significant impact)
             antialiasing: !is3d,
             getFillColor: colorBy ?? [255, 255, 255],
-            getRadius: 1 / scale,
+            // if we want different radii for different points, this is the place
+            // ^^ except that we probably want each density layer to have its own radius accessor
+            // getRadius: 1 / scale,
             // todo review buffer data / accessors / filters...
             getPosition: (i: unknown, { target }) => {
                 if (typeof i !== "number") throw new Error("expected index");
@@ -356,7 +371,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         cx,
         cy,
         cz,
-        scale,
         modelMatrix,
         extensions,
         chart,
