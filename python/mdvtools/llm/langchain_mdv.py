@@ -377,8 +377,8 @@ class ProjectChat(ProjectChatProtocol):
 
             chat_debug_logger.info(f"Prepared Code for Execution:\n{final_code}")
             chat_debug_logger.info(f"RAG output:\n{output_qa}")
-            # with time_block("b14: Chat logging by MDV"):  # <0.1% of time
-            #     self.project.log_chat_item(output_qa, prompt_RAG, final_code)
+            with time_block("b14: Chat logging by MDV"):  # <0.1% of time
+                self.project.log_chat_item(output_qa, prompt_RAG, final_code)
             with time_block("b15: Execute code"):  # ~9% of time
                 self.socket_api.update_chat_progress(
                     "Executing code...", id, progress, 9
