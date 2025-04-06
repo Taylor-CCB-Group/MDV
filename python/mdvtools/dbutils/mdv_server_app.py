@@ -51,7 +51,7 @@ def create_flask_app(config_name=None):
     )
     if ENABLE_AUTH:
         app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
-
+        app.config["JWT_SECRET_KEY"] = app.secret_key
         if not app.secret_key:
             raise ValueError(" FLASK_SECRET_KEY environment variable is not set!")
 

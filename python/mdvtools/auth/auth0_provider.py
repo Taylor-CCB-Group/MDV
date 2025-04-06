@@ -237,6 +237,8 @@ class Auth0Provider(AuthProvider):
                         return False
                     jwks = response.json()
 
+                    print("++++++++2-No")
+                    print("JWKS Response:", jwks)
                     # Find the key in the JWKS that matches the 'kid' in the token header
                     for key in jwks['keys']:
                         if key['kid'] == unverified_header['kid']:
