@@ -10,6 +10,7 @@ import {
 import { useDataStore } from "./context";
 import { useViewerStore } from "./components/avivatorish/state";
 import { useDebounce } from "use-debounce";
+import { useViewState } from "./deck_state";
 
 /** need to be clearer on which prop types are for which parts of layer spec...
  *
@@ -33,7 +34,7 @@ export type FieldContourProps = {
     bandwidth: number;
     intensity: number;
     opacity: number;
-    fields: DataColumn<CategoricalDataType>[];
+    fields: LoadedDataColumn<"double">[];
 }
 function rgb(
     r: number,
@@ -110,7 +111,8 @@ export function useCategoryContour(props: CategoryContourProps) {
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);
-    const { zoom } = useViewerStore((store) => store.viewState) ?? { zoom: 0 };
+    // what if we don't have viv stores?
+    const { zoom } = useViewState();
     // we can compensate so that we don't have radiusPixels, but it makes it very slow...
     //won't be necessary when we implement heatmap differently
     const [debounceZoom] = useDebounce(zoom, 500);
@@ -166,8 +168,7 @@ export function useFieldContour(props: FieldContourProps) {
     const data = useFilteredIndices();
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = viridis;
-    //! const { zoom } = useViewerStore((store) => store.viewState) ?? { zoom: 0 };//throws
-    const zoom = 4;
+    const { zoom } = useViewState();
     // we can compensate so that we don't have radiusPixels, but it makes it very slow...
     //won't be necessary when we implement heatmap differently
     const [debounceZoom] = useDebounce(zoom, 500);
@@ -255,9 +256,9 @@ export function useLegacyDualContour() {
     const commonProps = {
         parameter: config.contourParameter,
         fill: config.contour_fill || true,
-        bandwidth: config.contour_bandwidth || 100,
+        bandwidth: config.contour_bandwidth || 10,
         intensity: config.contour_intensity || 0.1,
-        opacity: config.contour_opacity || 1,
+        opacity: config.contour_opacity || 0.2,
     };
     const [cx, cy, ...fields] = useParamColumns() as LoadedDataColumn<"double">[];
     const fieldContours = useFieldContour({
