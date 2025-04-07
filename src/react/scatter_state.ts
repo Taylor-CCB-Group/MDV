@@ -182,6 +182,38 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
     return viewState;
 }
 
+/**
+ * If we are in a 'region' then we might have some notion of physical size.
+ * If we are rendering abstract data, then we should probably have a normalised size
+ * with respect to the domain of the data.
+ * If we have very different scales in x and y, then we probably want to also scale each axis
+ * rather than assuming a 1:1 ratio - somewhat related concern... also need to consider that
+ * we still want circular points to be circular...
+ * 
+ * Also note that we would like in future to be able to set the size of individual points
+ * based on some property of the data - but for now we just return a number.
+ */
+export function useScatterRadius() {
+    const config = useConfig<ScatterPlotConfig>();
+    const params = useParamColumns();
+    const [cx, cy] = params;
+    const scale = useRegionScale();
+    const { radius, course_radius } = config;
+    //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
+    // this is reasonably ok looking, but even for abstract data it should really relate to axis labels
+    // (which implies that if we have a warped aspect ratio but making circles circular, they will be based on one or other axis)
+    const radiusScale = (radius * course_radius)/scale;
+    return useMemo(() => {
+        if (cx.minMax && cy.minMax) {
+            const xRange = cx.minMax[1] - cx.minMax[0];
+            const yRange = cy.minMax[1] - cy.minMax[0];
+            const r = 10000 / Math.max(xRange, yRange);
+            return radiusScale / r;
+        }
+        return radiusScale;
+    }, [cx.minMax, cy.minMax, radiusScale, cx, cy]);
+}
+
 // type Tooltip = (PickingInfo) => string;
 export type P = [number, number];
 /**
@@ -197,8 +229,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const colorBy = (chart as any).colorBy;
     const config = useConfig<ScatterPlotConfig>();
 
-    const { opacity, radius, course_radius } = config;
-    const radiusScale = radius * course_radius;
+    const { opacity } = config;
+    const radiusScale = useScatterRadius();
 
     const data = useFilteredIndices();
     //! not keen on third param potentially being either contourParameter or cz
@@ -275,7 +307,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             // (if it even has a significant impact)
             antialiasing: !is3d,
             getFillColor: colorBy ?? [255, 255, 255],
-            getRadius: 1 / scale,
+            // if we want different radii for different points, this is the place
+            // ^^ except that we probably want each density layer to have its own radius accessor
+            // getRadius: 1 / scale,
             // todo review buffer data / accessors / filters...
             getPosition: (i: unknown, { target }) => {
                 if (typeof i !== "number") throw new Error("expected index");
@@ -291,6 +325,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 // getLineWith: clickIndex, // this does not work, seems to need something like a function
                 getLineWidth,
                 getPosition: [cx, cy, cz],
+                // getRadius: [radiusScale, scale],
                 //as of now, the SpatialLayer implemetation needs to figure this out for each sub-layer.
                 // getContourWeight1: config.category1,
             },
@@ -336,7 +371,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         cx,
         cy,
         cz,
-        scale,
         modelMatrix,
         extensions,
         chart,
