@@ -304,7 +304,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
             }),
             // side-note; what if "folders" could just be keyed objects?
             // also, it might be nice to remember which folders were open...
-            getDensitySettings(c, this.dataStore),
+            getDensitySettings(c, this),
             g({
                 type: "folder",
                 label: "Category Filters",
