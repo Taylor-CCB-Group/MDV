@@ -119,12 +119,7 @@ async function getView(view?: string) {
     try {
         return await getPostData(`${projectRoot}/get_view`, { view });
     } catch (e: any) {
-        //todo nicer dialog
-        const dialog = createEl("dialog", { title: "Error loading view" });
-        dialog.innerText = e.message;
-        dialog.addEventListener("click", () => dialog.close());
-        document.body.appendChild(dialog);
-        dialog.showModal();
+        //todo add an error dialog here to display error
         console.error(e);
         // return {initialCharts: {}};
         return undefined;
