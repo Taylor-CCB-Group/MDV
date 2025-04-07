@@ -15,6 +15,7 @@ const SaveViewDialogComponent = (props: {
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
+            if (!props.open) return; //probably doesn't happen, but no harm to check
             if (event.key === "y") {
                 event.preventDefault();
                 onSave();
@@ -28,11 +29,13 @@ const SaveViewDialogComponent = (props: {
             }            
         };
 
+        // seems ok to use window here since this is a modal dialog
+        // saves faffing about with refs
         window.addEventListener("keydown", handleKeyDown);
         return () => {
             window.removeEventListener("keydown", handleKeyDown);
         };
-    }, [props, onSave]);
+    }, [props, onSave, props.open]);
 
     return (
         <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
