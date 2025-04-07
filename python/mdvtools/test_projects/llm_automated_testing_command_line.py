@@ -14,10 +14,9 @@ from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import Language
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-import langchain_experimental.agents.agent_toolkits.pandas.base as lp
 
 # packages for custom langchain agent
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_experimental.tools.python.tool import PythonAstREPLTool
 from langchain.agents import create_openai_functions_agent, AgentExecutor
 
@@ -25,13 +24,59 @@ from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import initialize_agent
 
-from mdvtools.llm.local_files_utils import crawl_local_repo, extract_python_code_from_py, extract_python_code_from_ipynb
-from mdvtools.llm.templates import get_createproject_prompt_RAG, prompt_data
+from mdvtools.llm.local_files_utils import extract_python_code_from_py, extract_python_code_from_ipynb
+from mdvtools.llm.templates import get_createproject_prompt_RAG_copy, prompt_data
 from mdvtools.llm.code_manipulation import prepare_code
 from mdvtools.llm.code_execution import execute_code
 
+from langchain.chains import LLMChain
+from pydantic.v1 import BaseModel, Field
+
+
 import matplotlib
 matplotlib.use('Agg')  # Prevent GUI issues
+
+
+# ******************************************************
+# Get the directory of the current script
+mypath = os.path.dirname(__file__)
+
+# Define the relative path
+DIRECTORY_PATH = os.path.join(mypath, "../test_projects/RAG_examples/ANNDATA_examples_automation_testing/")
+
+def crawl_local_repo(
+    directory_path: str = DIRECTORY_PATH
+):
+    """
+    Crawls a local directory to retrieve file paths based on specified criteria.
+
+    Args:
+        directory_path (str): The path to the local project directory.
+
+    Returns:
+        list: List of file paths that match the criteria.
+    """
+
+    # List of files to ignore
+    ignore_list = ["__init__.py"]
+
+    # Initialize an empty list to store file URLs
+    files = []
+
+    # Walk through the directory tree
+    for root, dirs, file_names in os.walk(os.path.abspath(directory_path)):
+        # Skip hidden directories (those starting with '.')
+        dirs[:] = [d for d in dirs if not d.startswith('.')]
+
+        for file_name in file_names:
+            # Check if the file meets the criteria for inclusion
+            if file_name not in ignore_list and (file_name.endswith('.py') or file_name.endswith('.ipynb')):
+                file_path = os.path.join(root, file_name)
+                files.append(file_path)
+
+    # Return the list of collected file paths
+    return files
+# ******************************************************
 
 
 def setup_logging(log_file="mdv_llm.log"):
@@ -44,6 +89,7 @@ def setup_logging(log_file="mdv_llm.log"):
         ]
     )
     return logging.getLogger(__name__)
+
 
 
 def main(project_path, dataset_path, question_list_path, output_csv):
@@ -110,8 +156,11 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         :return: An agent that can answer questions about the DataFrames.
         """
         
-        # Step 1: Create the Python REPL Tool (Dynamically Injecting DataFrames)
-        python_tool = PythonAstREPLTool()
+        # Step 1: Initialize Memory with Chat History
+        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+        
+        # Step 2: Create the Python REPL Tool (Dynamically Injecting DataFrames)
+        python_tool = PythonAstREPLTool(globals={})
 
         if python_tool.globals is None:
             python_tool.globals = {}  # Ensure it's a dictionary
@@ -124,23 +173,55 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         ## New fixes:
         python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
 
-        prompt_data = f"""You have access to the following Pandas DataFrames: 
+        print(">>> keys in python_tool.globals:", python_tool.globals.keys())
+
+        for key, value in python_tool.globals.items():
+            print(f"{key}: {type(value)}")
+
+        # Step 3: Define Contextualization Chain
+
+        contextualize_q_system_prompt = """Given a chat history and the latest user question \
+        which might reference context in the chat history, formulate a standalone question \
+        which can be understood without the chat history. Do NOT answer the question, \
+        just reformulate it if needed and otherwise return it as is."""
+
+        contextualize_prompt = ChatPromptTemplate.from_messages([
+            ("system", contextualize_q_system_prompt),
+            ("human", "Chat History:\n{chat_history}\n\nUser Question:\n{input}"),])
+        
+        contextualize_chain = LLMChain(llm=llm, prompt=contextualize_prompt, memory=memory)
+
+        # Step 4: Define the Agent Prompt
+
+        prompt_data_template = f"""You have access to the following Pandas DataFrames: 
         {', '.join(dfs.keys())}. These are preloaded, so do not redefine them.
-        If you need to check their structure, use `df.info()` or `df.head()`.
+        If you need to check their structure, use `df.info()` or `df.head()`. 
         Before running any code, check available variables using `list_globals()`.""" + prompt_data
 
-        # Step 2: Define a Prompt Template
         prompt = ChatPromptTemplate.from_messages([
-            ("system", prompt_data),
-            ("human", "{input}"),
+            ("system", prompt_data_template),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", prompt_data_template + "{input}"),
             ("ai", "{agent_scratchpad}"),
         ])
 
-        # Step 3: Create the Agent
+        # Step 5: Create the Agent
         agent = create_openai_functions_agent(llm, [python_tool], prompt)
 
-        # Step 4: Wrap in an Agent Executor (Finalized Agent)
-        return AgentExecutor(agent=agent, tools=[python_tool], verbose=verbose)
+        # Step 6: Wrap in an Agent Executor (Finalized Agent)
+        agent_executor = AgentExecutor(agent=agent, tools=[python_tool], memory=memory, verbose=verbose, return_intermediate_steps=True)
+
+        # Step 7: Wrapper Function to Use Contextualization and Preserve Memory
+        def agent_with_contextualization(question):
+            standalone_question = contextualize_chain.run(input=question)
+            # Point 1: Log reformulation
+            # Point 2: Log what you're sending to the agent
+            response = agent_executor.invoke({"input": standalone_question})
+            # Point 3: Log agent output
+            memory.save_context({"input": question}, {"output": response.get("output", str(response))})
+            return response
+
+        return agent_with_contextualization
 
     ## pandas agent code
     #agent = lp.create_pandas_dataframe_agent(dataframe_llm, df_list, verbose=True, allow_dangerous_code=True)
@@ -151,19 +232,17 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     results = []
     for question in question_list:
         try:
-            ## pandas agent code
-            #response = agent.invoke(prompt_data + "\nQuestion: " + question)
-            print(prompt_data)
+            full_prompt = prompt_data + "\nQuestion: " + question
 
             ## custom agent code
             agent_executor = create_custom_pandas_agent(dataframe_llm, {"df1": df_list[0], "df2": df_list[1]}, prompt_data, verbose=True)
-            response = agent_executor.invoke({"input": question})
+            response = agent_executor(full_prompt)#.invoke({"input": full_prompt})
             
-            prompt_RAG = get_createproject_prompt_RAG(project, dataset_path, datasource_names[0], response['output'])
+            prompt_RAG = get_createproject_prompt_RAG_copy(project, dataset_path, datasource_names[0], response['output'], response['input'])
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
             
             qa_chain = RetrievalQA.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, return_source_documents=True)
-            output = qa_chain.invoke({"context": retriever, "query": question})
+            output = qa_chain.invoke({"context": retriever, "query": response['input']})
             result_code = prepare_code(output["result"], df_list[0], project, logger.info, modify_existing_project=True, view_name=question)
 
             context_information = output['source_documents']
