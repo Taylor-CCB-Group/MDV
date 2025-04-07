@@ -57,9 +57,12 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
 
     const onInputChange = (inputText: string) => {
         setViewName(inputText);
-        const input = inputText.toLowerCase();
+        const input = inputText.toLowerCase().split(" ");
         const tempList = viewList.filter((view) => {
-            if (view.name.toLowerCase().includes(input)) return view;
+            // if (view.name.toLowerCase().includes(input)) return view;
+            const name = view.name.toLowerCase();
+            // if any of the input words are not in the name, return false
+            if (!input.some(i => !name.includes(i))) return view;
         });
         setFilteredViewList(tempList);
     };
@@ -70,7 +73,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     };
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
             <DialogTitle>
                 Browse View Gallery
                 <IconButton
