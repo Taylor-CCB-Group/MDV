@@ -57,8 +57,9 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
 
     const onInputChange = (inputText: string) => {
         setViewName(inputText);
+        const input = inputText.toLowerCase();
         const tempList = viewList.filter((view) => {
-            if (view.name.includes(inputText)) return view;
+            if (view.name.toLowerCase().includes(input)) return view;
         });
         setFilteredViewList(tempList);
     };
