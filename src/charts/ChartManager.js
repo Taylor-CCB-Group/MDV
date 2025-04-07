@@ -1123,7 +1123,7 @@ export class ChartManager {
 
     _getColumnsRequiredForChart(config) {
         const set = new Set();
-        const p = config.param;
+        let p = config.param;
 
         if (!p) {
             //no 'parameters',
@@ -1131,7 +1131,11 @@ export class ChartManager {
             // return [];
         } else if (typeof p === "string") {
             // pretty sure there's nothing in BaseChart.types that would get here - single param is ["string"]
-            throw `Unexpected param string '${config.param}' for ${config.name} - expected array`;
+            // but the LLM might still generate a config with a single string, or an old config might have one
+            console.error(`Unexpected param string '${config.param}' for ${config.name} - expected array`);
+            set.add(p);
+            p = [p];
+            config.param = p;
         } else {
             for (const i of p) {
                 set.add(i);
@@ -1813,6 +1817,10 @@ export class ChartManager {
                 { type: "danger", duration: 2000 },
             );
             throw `Unknown chart type ${config.type}`;
+        }
+        if (typeof config.param === "string") {
+            console.error(`Unexpected param string '${config.param}' for ${config.name} - expected array`);
+            config.param = [config.param];
         }
         //check if columns need loading
         const neededCols = this._getColumnsRequiredForChart(config);
