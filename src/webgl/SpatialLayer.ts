@@ -2,12 +2,12 @@ import { CompositeLayer, type Layer, type LayersList } from "@deck.gl/core";
 import type { LayerContext } from "@deck.gl/core";
 import { type ScatterplotLayerProps, ScatterplotLayer } from "@deck.gl/layers";
 import { TriangleLayerContours } from "./HeatmapContourExtension";
-import type { useContour } from "@/react/contour_state";
+import type { ContourLayerProps } from "@/react/contour_state";
 import { HeatmapLayer } from "deck.gl";
 
 export type SpatialLayerProps = ScatterplotLayerProps & {
     //pending typing that allows for other kinds of layers etc
-    contourLayers: ReturnType<typeof useContour>[];
+    contourLayers: ContourLayerProps[];
 };
 
 export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {

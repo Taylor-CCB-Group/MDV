@@ -11,9 +11,9 @@ import { useDataStore } from "./context";
 import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
 import { g, isArray, toArray } from "@/lib/utils";
-import DataStore from "@/datastore/DataStore";
 import { observable } from "mobx";
 import type { BaseConfig } from "@/charts/BaseChart";
+import type BaseChart from "@/charts/BaseChart";
 
 /** need to be clearer on which prop types are for which parts of layer spec...
  *
@@ -162,6 +162,8 @@ export function useCategoryContour(props: CategoryContourProps) {
         opacity,
     ]);
 }
+/** pending better definition */
+export type ContourLayerProps = ReturnType<typeof useCategoryContour>;
 export function useFieldContour(props: FieldContourProps) {
     const { id, fill, bandwidth, intensity, opacity, fields } =
         props;
@@ -250,20 +252,17 @@ export type DualContourLegacyConfig = {
     category2?: string | string[];
 } & ContourVisualConfig;
 
-export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, dataStore: DataStore) {
-    const cols = dataStore.getColumnList();
-    const catCols = cols.filter((c) => c.datatype.match(/text/i));
-
-    //todo: observe contourParameter & update catsValues appropriately
-    const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
-    const cats = ocats.map((x) => {
-        return { t: x };
+export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, chart: BaseChart<any>) {
+    const { dataStore } = chart;
+    // make it so that if we change the parameter, we get the new values in the dropdowns
+    // empty array will be replaced with the new values
+    const catsValues = observable.array([[] as { t: string }[], "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
+    // this autorun will be disposed when the chart is disposed... really it should be tied to the settings dialog
+    chart.mobxAutorun(() => {
+        const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
+        const cats = ocats.map((x) => ({ t: x }));
+        catsValues[0] = cats;
     });
-    // could've sworn mobx observable had been working here at some point
-    // (changing contourParameter should immediately update "Contour Category" dropdowns)... it isn't now.
-    // and the type is dodgy - need to get on top of that with mobx in general.
-    const catsValues = observable.array([cats, "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
-    // const catsValues = [cats, "t", "t"];
     return g({
         type: "folder",
         label: "Density Visualisation",
@@ -274,38 +273,25 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, data
                 current_value: [
                     //maybe 2-spaces format is better...
                     g({
-                        type: "dropdown", //todo, make this "column" and fix odd behaviour with showing the value...
+                        type: "column", //todo, make this "column" and fix odd behaviour with showing the value...
                         //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
                         label: "Contour parameter",
-                        // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
-                        //@ts-expect-error contourParameter type
                         current_value: c.contourParameter || c.param[2],
-                        values: [catCols, "name", "field"],
+                        columnType: "text",
                         func: (x) => {
                             if (x === c.contourParameter) return;
-                            // could we change 'cats' and have the dropdowns update?
-                            // was thinking this might mean a more general refactoring of the settings...
                             if (!isArray(c.param)) throw "expected param array";
-                            c.contourParameter = c.param[2] = x; //this isn't causing useParamColumns to update...
-                            // but maybe it's not necessary if 'cats' is observable... fiddly to get right...
-                            const newCats = (
-                                dataStore.getColumnValues(x) || []
-                            ).map((t) => ({ t }));
-                            // newCats.push({ t: "None" });
-                            console.warn("changing contour parameter isn't properly updating dropdowns as of this writing...");
-                            catsValues[0] = newCats;
+                            //@ts-expect-error contourParameter type was written when it was a string
+                            c.contourParameter = c.param[2] = x;
                             //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
                             //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
-                            // c.category1 = c.category2 = null;  //maybe we can allow state to be invalid?
-                            //the dropdowns can set values to null if they're invalid rather than throw error?
-                            //is that a good idea?
+                            c.category1 = c.category2 = [];
                         },
                     }),
                     g({
                         type: "multidropdown",
                         label: "Contour Category 1",
                         current_value: toArray(c.category1 || "None"),
-                        // values: [cats, "t", "t"],
                         values: catsValues,
                         func(x) {
                             // if (x === "None") x = null;
@@ -316,7 +302,6 @@ export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, data
                         type: "multidropdown",
                         label: "Contour Category 2",
                         current_value: toArray(c.category2 || "None"),
-                        // values: [cats, "t", "t"],
                         values: catsValues,
                         func(x) {
                             // if (x === "None") x = null;
