@@ -202,12 +202,12 @@ export function useScatterRadius() {
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     // this is reasonably ok looking, but even for abstract data it should really relate to axis labels
     // (which implies that if we have a warped aspect ratio but making circles circular, they will be based on one or other axis)
-    const radiusScale = (radius * course_radius * 0.1)/scale;
+    const radiusScale = (radius * course_radius)/scale;
     return useMemo(() => {
         if (cx.minMax && cy.minMax) {
             const xRange = cx.minMax[1] - cx.minMax[0];
             const yRange = cy.minMax[1] - cy.minMax[0];
-            const r = 100 / Math.max(xRange, yRange);
+            const r = 10000 / Math.max(xRange, yRange);
             return radiusScale / r;
         }
         return radiusScale;
