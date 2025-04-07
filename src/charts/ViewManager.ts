@@ -112,11 +112,11 @@ class ViewManager {
     async createImageofView() {
         try {
             // aspect ratio doesn't work properly when the window is resized, commenting for now
-            // const bounds = this.cm.contentDiv.getBoundingClientRect();
-            // const aspect = bounds.width / bounds.height;
+            const bounds = this.cm.contentDiv.getBoundingClientRect();
+            const aspect = bounds.width / bounds.height;
             const dataUrl = await toPng(this.cm.contentDiv, {
-                canvasWidth: 400,
-                canvasHeight: 300,
+                canvasWidth: 200,
+                canvasHeight: 200/aspect,
             });
             return dataUrl;
         } catch (error) {
