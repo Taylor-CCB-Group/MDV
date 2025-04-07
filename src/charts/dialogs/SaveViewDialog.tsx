@@ -1,4 +1,5 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import { useEffect, useCallback } from "react";
 
 const SaveViewDialogComponent = (props: {
     open: boolean;
@@ -8,9 +9,30 @@ const SaveViewDialogComponent = (props: {
 }) => {
     const { viewManager } = window.mdv.chartManager;
 
-    const onSave = () => {
+    const onSave = useCallback(() => {
         viewManager.saveView();
-    };
+    }, [viewManager]);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "y") {
+                event.preventDefault();
+                onSave();
+                props?.action?.();
+                props.onClose();
+            }
+            if (event.key === "n") {
+                event.preventDefault();
+                props?.action?.();
+                props.onClose();
+            }            
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [props, onSave]);
 
     return (
         <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
