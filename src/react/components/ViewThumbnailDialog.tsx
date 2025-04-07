@@ -143,7 +143,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                 <>
                                     <Grid2 container spacing={4}>
                                         {filteredViewList.map((view, index) => (
-                                            <Grid2 key={`${view.name}-${index}`} size={{lg: 3, md: 4, sm: 6}}>
+                                            <Grid2 key={`${view.name}-${index}`} size={{md: 4, sm: 6}}>
                                                 <Card sx={{ boxShadow: 20 }}>
                                                     <CardActionArea onClick={() => handleCardClick(view.name)}>
                                                         <Box
@@ -162,7 +162,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                                             <img
                                                                 src={view.image}
                                                                 alt={`${view.name} snapshot`}
-                                                                style={{ objectFit: 'cover', aspectRatio: 4/3 }}
+                                                                style={{ objectFit: 'inherit', aspectRatio: 4/3 }}
                                                             />
                                                         </Box>
                                                     </CardActionArea>

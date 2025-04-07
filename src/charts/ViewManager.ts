@@ -115,8 +115,8 @@ class ViewManager {
             const bounds = this.cm.contentDiv.getBoundingClientRect();
             const aspect = bounds.width / bounds.height;
             const dataUrl = await toPng(this.cm.contentDiv, {
-                canvasWidth: 200,
-                canvasHeight: 200/aspect,
+                canvasWidth: 250,
+                canvasHeight: 250/aspect,
             });
             return dataUrl;
         } catch (error) {
