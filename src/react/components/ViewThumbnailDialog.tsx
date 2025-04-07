@@ -32,10 +32,10 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     }, [viewManager]);
 
     useEffect(() => {
-        if (viewManager) {
+        if (viewManager && open) {
             getViewList();
         }
-    }, [viewManager, getViewList]);
+    }, [viewManager, getViewList, open]);
 
     const onClose = () => {
         setOpen(false);
