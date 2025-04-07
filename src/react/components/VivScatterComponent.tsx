@@ -80,8 +80,7 @@ const Main = observer(() => {
     const detailId = `${id}detail-react`;
     const outerContainer = useOuterContainer();
 
-    // what I want to come out of here... n-JSON layers, scatterplot, editable geojson layer, etc.
-    // perhaps as a CompositeLayer.
+    // this isn't updating when we tweak the config...
     const { scatterProps, selectionLayer } = useSpatialLayers();
     const { scatterplotLayer, getTooltip } = scatterProps;
     const jsonLayer = useJsonLayer();
@@ -173,7 +172,7 @@ const Main = observer(() => {
             contrast,
         ],
     );
-    //@ts-expect-error Partial<DeckGLProps> should be fixed
+    //@ts-expect-error tooltip content should be fixed
     const deckProps: Partial<DeckGLProps> = useMemo(
         () => ({
             getTooltip,

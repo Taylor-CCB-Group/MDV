@@ -14,6 +14,7 @@ import { Axis, Scale } from "@visx/visx";
 import "../../charts/css/charts.css";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
+import { useScatterRadius } from "../scatter_state";
 
 const margin = { top: 10, right: 10, bottom: 40, left: 60 };
 /** todo this should be common for viv / scatter_state, pending refactor
@@ -104,10 +105,10 @@ const DeckScatter = observer(function DeckScatterComponent() {
     // const data = useSimplerFilteredIndices();
     const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
-    const { opacity, radius, course_radius, viewState, on_filter, color_by } = config;
+    const { opacity, viewState, on_filter, color_by } = config;
     // const is2d = dimension === "2d";
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
-    const radiusScale = radius * course_radius * 0.01;// * (is2d ? 1 : 0.01);
+    const radiusScale = useScatterRadius();
     const chart = useChart();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
     const colorBy = (chart as any).colorBy;
@@ -125,51 +126,9 @@ const DeckScatter = observer(function DeckScatterComponent() {
     // this is now somewhat able to render for "2d", pending further tweaks
     const { scatterplotLayer, getTooltip, unproject } = scatterProps;
 
-
-    const XscatterplotLayer = useMemo(() => new ScatterplotLayer({
-        id: `scatterplot-layer-${id}`,
-        data,
-        pickable: true,
-        opacity,
-        stroked: false,
-        filled: true,
-        radiusScale,
-        getPosition: (index, { target }) => {
-            target[0] = cx.data[index];
-            target[1] = cy.data[index];
-            if (cz) target[2] = cz.data[index];
-            return target as [number, number];
-        },
-        // maybe we want a kind of concrete config synthesis that means we have colorBy as a function...
-        // also maybe getPosition...
-        // to what extent is that stuff we want to generalise?
-        // ! note if we want to have `data` include all indices & filter with `DataFilterExtension`,
-        // (which would help with transitions on filtered data)
-        // it ends up being much slower than just using the filtered indices
-        // and we need to adapt the colorBy function as it will no longer be passed the index as first argument.
-        getFillColor: colorBy ?? [61, 126, 180],
-        getLineColor: [0, 0, 0],
-        updateTriggers: {
-            getFillColor: colorBy,
-            getPosition: [cx.data, cy.data, cz?.data],
-        },
-        billboard: true,
-        parameters: {
-            depthTest: false,
-        },
-        transitions: {
-            //todo make this common for all layers, control from config...
-            getPosition: {
-                duration: 100,
-                //https://easings.net/#easeInOutCubic
-                easing: (x: number) => x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2,
-                // type: "spring",
-            },
-        }
-    }), [data, cx, cy, cz, colorBy, opacity, radiusScale, id]);
-
     const filterValue = useFilterArray();
 
+    // this should move in to scatter_state, common with viv...
     const greyScatterplotLayer = useMemo(() => new ScatterplotLayer({
         id: `scatterplot-layer-grey-${id}`,
         data: { length: cx.data.length },
