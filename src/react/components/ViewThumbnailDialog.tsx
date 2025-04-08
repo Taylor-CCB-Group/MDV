@@ -15,7 +15,7 @@ import {
     TextField,
     InputAdornment,
 } from "@mui/material";
-import { Clear as ClearIcon, Close as CloseIcon } from "@mui/icons-material";
+import { Clear as ClearIcon, Close as CloseIcon, Image as ImageIcon } from "@mui/icons-material";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
@@ -23,6 +23,33 @@ import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 export type ViewThumbnailDialogProps = {
     open: boolean;
     setOpen: Dispatch<SetStateAction<boolean>>;
+};
+
+export type ViewImageComponentProps = {
+    imgSrc: string;
+    viewName: string;
+};
+
+export const ViewImageComponent = ({imgSrc, viewName}: ViewImageComponentProps) => {
+    const [hasError, setHasError] = useState(false);
+
+    return !hasError ? (
+        <img
+            src={imgSrc}
+            alt={`${viewName} snapshot`}
+            style={{ objectFit: 'inherit', aspectRatio: 4/3 }}
+            onError={() => setHasError(true)}
+        />
+    ) : (
+        <ImageIcon 
+            sx={{ 
+                width: "100%", 
+                height: "100%", 
+                objectFit: 'inherit', 
+                aspectRatio: 4/3 
+            }} 
+        />
+    );
 };
 
 const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
@@ -88,7 +115,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                     <CloseIcon />
                 </IconButton>
             </DialogTitle>
-            <DialogContent dividers>
+            <DialogContent dividers sx={{height: "95vh"}}>
                 <ErrorBoundary
                     FallbackComponent={({ error }) => (
                         <ErrorDisplay error={error} title="Error displaying view gallery" />
@@ -100,7 +127,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                 display: "flex",
                                 justifyContent: "center",
                                 alignItems: "center",
-                                height: "20vh",
+                                height: "100%",
                                 width: "100%",
                             }}
                         >
@@ -133,7 +160,6 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                         display: "flex",
                                         justifyContent: "center",
                                         alignItems: "center",
-                                        height: "20vh",
                                         width: "100%",
                                     }}
                                 >
@@ -159,11 +185,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                                         </Box>
                                                         <Divider />
                                                         <Box sx={{ padding: "1%" }}>
-                                                            <img
-                                                                src={view.image}
-                                                                alt={`${view.name} snapshot`}
-                                                                style={{ objectFit: 'inherit', aspectRatio: 4/3 }}
-                                                            />
+                                                            <ViewImageComponent imgSrc={view.image} viewName={view.name} />
                                                         </Box>
                                                     </CardActionArea>
                                                 </Card>
