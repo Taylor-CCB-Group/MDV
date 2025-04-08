@@ -524,7 +524,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     // could be interested in lensEnabled, zoomLock, panLock, etc.
                 },
             };
-            console.table(viv);
+            // console.table(viv);
             config.viv = {
                 ...config.viv,
                 ...viv,
