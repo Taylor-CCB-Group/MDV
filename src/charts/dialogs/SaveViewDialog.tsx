@@ -9,9 +9,11 @@ const SaveViewDialogComponent = (props: {
 }) => {
     const { viewManager } = window.mdv.chartManager;
 
-    const onSave = useCallback(() => {
-        viewManager.saveView();
-    }, [viewManager]);
+    const onSave = useCallback(async () => {
+        await viewManager.saveView();
+        props?.action?.();
+        props.onClose();
+    }, [viewManager, props]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -48,13 +50,7 @@ const SaveViewDialogComponent = (props: {
                 </Typography>
             </DialogContent>
             <DialogActions>
-                <Button
-                    onClick={() => {
-                        onSave();
-                        props?.action?.();
-                        props.onClose();
-                    }}
-                >
+                <Button onClick={onSave}>
                     Yes
                 </Button>
                 <Button
