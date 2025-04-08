@@ -78,6 +78,10 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
     };
 
     const handleCardClick = (name: string) => {
+        if (viewManager.hasUnsavedChanges()) {
+            // todo - show confirmation dialog, don't have time to test this now
+            console.warn("changing view with unsaved changes");
+        }
         viewManager.changeView(name);
         onClose();
     };

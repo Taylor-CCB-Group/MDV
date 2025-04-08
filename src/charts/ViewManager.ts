@@ -79,6 +79,8 @@ class ViewManager {
     // Change the current view
     @action
     changeView(view: string) {
+        // coderabbit had a comment about potential undefined state if there is an error here
+        // I think it is somewhat ok for now, but more robust rollback logic is worth considering
         try {
             const { viewData, dsIndex, contentDiv } = this.cm;
             for (const ds in this.cm.viewData.dataSources) {
