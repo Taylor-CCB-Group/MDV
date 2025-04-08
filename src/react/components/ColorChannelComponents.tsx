@@ -251,10 +251,15 @@ const ChannelHistogram = ({ index }: { index: number }) => {
         });
     }, [min, max, rasterData]);
     const [liveValue, setLiveValue] = useState<Range>([0, 0]);
-    const [debouncedValue] = useDebounce(liveValue, 10);
+    const [debouncedValue] = useDebounce(liveValue, 5);
     useEffect(() => {
         // this feels glitchy, need to iron out some issues
+        // maybe use useRef to store the value?
         if (!debouncedValue) return;
+        // wtf, why is this needed?
+        // maybe related to setValue(null), which we do sometimes when clearing the brush
+        // but it seems to be happening during other edits too?
+        if (debouncedValue.some(Number.isNaN)) return;
         if (debouncedValue[0] === 0 && debouncedValue[1] === 0) return;
         // debouncing won't help if we still have a dependency on limits
         const limits = channelsStore.getState().contrastLimits;
@@ -265,19 +270,21 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     }, [debouncedValue, index, channelsStore]);
 
     return (
-        <Histogram 
-            value={limit}
-            step={0.001} //todo make this dynamic
-            histogram={histogramData}
-            // todo add indicator for highightValue={pixelValue}
-            lowFraction={normalisedLow} // component should calculate these
-            highFraction={normalisedHigh}
-            queryHistogram={queryHistogram}
-            setValue={setLiveValue}
-            minMax={domain}
-            histoWidth={100}
-            histoHeight={50}
-        />
+        <div className="p-4">
+            <Histogram 
+                value={limit}
+                step={0.001} //todo make this dynamic
+                histogram={histogramData}
+                // todo add indicator for highightValue={pixelValue}
+                lowFraction={normalisedLow} // component should calculate these
+                highFraction={normalisedHigh}
+                queryHistogram={queryHistogram}
+                setValue={setLiveValue}
+                minMax={domain}
+                histoWidth={100}
+                histoHeight={50}
+            />
+        </div>
     )
 }
 
