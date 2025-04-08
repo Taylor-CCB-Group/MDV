@@ -278,12 +278,12 @@ export function getNameFromUrl(url: string) {
 type DIMENSION_FIELD = "z" | "t";
 /**
  * Return the midpoint of the global dimensions as a default selection.
- * 
+ *
  * n.b. some of the more abstract way in which dimension could be addressed has been
  * removed in favor of a more direct approach - would be good to verify that the premise
  * is still valid.
  */
-function getDefaultGlobalSelection(dimensions: {name: string, size: number}[]) {
+function getDefaultGlobalSelection(dimensions: { name: string, size: number }[]) {
     const globalSelectableDimensions = dimensions.filter((d) =>
         GLOBAL_SLIDER_DIMENSION_FIELDS.includes(d.name.toLowerCase()),
     ) as unknown as DIMENSION_FIELD[];
@@ -407,7 +407,7 @@ function narrowLimits(limits: number[]): limits is [number, number] {
 function narrowStats(stats: { domain: number[]; contrastLimits: number[] }): stats is { domain: [number, number]; contrastLimits: [number, number] } {
     return narrowLimits(stats.domain) && narrowLimits(stats.contrastLimits);
 }
-export async function getSingleSelectionStats2D({ loader, selection }: { loader: LOADER, selection: VivSelection}) {
+export async function getSingleSelectionStats2D({ loader, selection }: { loader: LOADER, selection: VivSelection }) {
     const data = Array.isArray(loader) ? loader[loader.length - 1] : loader;
     const raster = await data.getRaster({ selection });
     const selectionStats = getChannelStats(raster.data);
@@ -420,7 +420,7 @@ export async function getSingleSelectionStats2D({ loader, selection }: { loader:
         contrastLimits[0] = domain[0];
         contrastLimits[1] = domain[1];
     }
-    return { domain, contrastLimits };
+    return { domain, contrastLimits, raster };
 }
 
 export async function getSingleSelectionStats3D({ loader, selection }: { loader: LOADER, selection: VivSelection }) {
@@ -456,6 +456,7 @@ export async function getSingleSelectionStats3D({ loader, selection }: { loader:
                 statsTop.contrastLimits[1],
             ),
         ] satisfies [number, number],
+        raster: rasterMid // as Raster
     };
 }
 
@@ -474,6 +475,7 @@ export const getMultiSelectionStats = async ({ loader, selections, use3d }: { lo
     );
     const domains = stats.map((stat) => stat.domain);
     const contrastLimits = stats.map((stat) => stat.contrastLimits);
+    //const raster = stats.map(({raster}) => raster);
     return { domains, contrastLimits };
 };
 

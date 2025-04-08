@@ -45,11 +45,19 @@ function generateToggles<T extends {}>(
     });
     return toggles;
 }
+// todo type properly
+export type Raster = {
+    width: number,
+    height: number,
+    data: Float32Array //! TypedArray...
+}
 export type ChannelsState = {
     channelsVisible: boolean[];
     contrastLimits: [number, number][];
     colors: [number, number, number][];
     domains: [number, number][];
+    // for histogram/thumbnail
+    raster: Raster[];
     selections: { z: number; c: number; t: number }[];
     loader: any; //TBD
     image: number;
@@ -66,6 +74,7 @@ export const DEFAUlT_CHANNEL_STATE: ChannelsState = {
     contrast: [] as number[],
     colors: [],
     domains: [] as [number, number][],
+    raster: [] as Raster[],
     selections: [] as { z: number; c: number; t: number }[],
     ids: [],
     // not for serialization... think about this.
@@ -79,6 +88,7 @@ const DEFAUlT_CHANNEL_VALUES = {
     contrast: 0.5,
     colors: [255, 255, 255],
     domains: [0, 65535],
+    raster: { width: 0, height: 0, data: new Float32Array() }, //?
     selections: { z: 0, c: 0, t: 0 },
     ids: "",
 };
@@ -95,7 +105,7 @@ const DEFAULT_IMAGE_STATE = {
     xSlice: null as [number, number] | null,
     ySlice: null as [number, number] | null,
     zSlice: null as [number, number] | null,
-    onViewportLoad: () => {},
+    onViewportLoad: () => { },
 } as const;
 export type ImageState = typeof DEFAULT_IMAGE_STATE;
 const DEFAULT_VIEWER_STATE = {
