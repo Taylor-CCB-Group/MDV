@@ -31,13 +31,13 @@ export type ViewImageComponentProps = {
 };
 
 export const ViewImageComponent = ({imgSrc, viewName}: ViewImageComponentProps) => {
-    const [hasError, setHasError] = useState(false);
+    const [hasError, setHasError] = useState(!imgSrc);
 
     return !hasError ? (
         <img
             src={imgSrc}
             alt={`${viewName} snapshot`}
-            style={{ objectFit: 'inherit', aspectRatio: 4/3 }}
+            style={{ objectFit: 'contain', aspectRatio: 4/3 }}
             onError={() => setHasError(true)}
         />
     ) : (
