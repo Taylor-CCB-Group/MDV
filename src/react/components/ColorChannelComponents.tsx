@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { shallow } from "zustand/shallow";
 import {
     type VivContextType,
@@ -22,6 +22,8 @@ import {
 import { PopoverPicker } from "./ColorPicker";
 import { getSingleSelectionStats } from "./avivatorish/utils";
 import { X } from "lucide-react";
+import { useDebounce } from "use-debounce";
+import { Histogram, type Range } from "./HistogramComponent";
 
 export default function MainVivColorDialog({
     vivStores,
@@ -115,7 +117,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                             c: Number.parseInt(e.target.value),
                         };
                         setIsChannelLoading(index, true);
-                        const { domain: domains, contrastLimits } =
+                        const { domain: domains, contrastLimits, raster } =
                             await getSingleSelectionStats({
                                 loader,
                                 selection,
@@ -124,6 +126,7 @@ const ChannelChooser = ({ index }: { index: number }) => {
                         const newProps = {
                             domains,
                             contrastLimits, //, leaving out colors for now - keep existing color
+                            raster
                         };
                         setPropertiesForChannel(index, newProps);
                         setIsChannelLoading(index, false);
@@ -203,6 +206,81 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     );
 };
 
+const ChannelHistogram = ({ index }: { index: number }) => {
+    // return <div />
+    const limits = useChannelsStore(({ contrastLimits }) => contrastLimits); //using shallow as per Avivator *prevents* re-rendering which should be happening
+    // should be 'rasters' really
+    const { domains, raster } = useChannelsStore(({ domains, raster }) => ({ domains, raster }));
+    const { pixelValues } = useViewerStore(({ pixelValues }) => ({ pixelValues }));
+    const pixelValue = pixelValues[index];
+    const domain = domains[index];
+    const rasterData = raster[index]?.data || [0]; //! revisit this sometime
+    
+    const [histogramData, setHistogramData] = useState([] as number[]);
+
+    const [min, max] = domain;
+    const scaleValue = useCallback((v: number) => (v - min) / (max - min), [min, max]);
+    const normalisedPixelValue = scaleValue(pixelValue);
+    const limit = useMemo(() => limits[index], [limits, index]);
+    const normalisedLow = scaleValue(limit[0]);
+    const normalisedHigh = scaleValue(limit[1]);
+    const channelsStore = useChannelsStoreApi();
+
+
+    // this is never being called?
+    const queryHistogram = useCallback(async () => {
+        // todo nicer worker syntax?
+        const worker = new Worker(
+            new URL("../../datastore/rawHistogramWorker.ts", import.meta.url),
+        );
+        worker.onmessage = (event) => {
+            setHistogramData(event.data);
+            worker.terminate();
+        };
+        //! this is a lie - need to actually check!
+        const isInt32 = false;
+        const originalData = rasterData;
+        const data = new SharedArrayBuffer(originalData.length * 4);
+        new Float32Array(data).set(originalData);
+        worker.postMessage({
+            data,
+            min,
+            max,
+            bins: 100,
+            isFloat: isInt32,
+        });
+    }, [min, max, rasterData]);
+    const [liveValue, setLiveValue] = useState<Range>([0, 0]);
+    const [debouncedValue] = useDebounce(liveValue, 10);
+    useEffect(() => {
+        // this feels glitchy, need to iron out some issues
+        if (!debouncedValue) return;
+        if (debouncedValue[0] === 0 && debouncedValue[1] === 0) return;
+        // debouncing won't help if we still have a dependency on limits
+        const limits = channelsStore.getState().contrastLimits;
+        if (debouncedValue[0] === limits[index][0] && debouncedValue[1] === limits[index][1]) return;
+        limits[index] = debouncedValue;
+        const contrastLimits = [...limits];
+        channelsStore.setState({ contrastLimits });
+    }, [debouncedValue, index, channelsStore]);
+
+    return (
+        <Histogram 
+            value={limit}
+            step={0.001} //todo make this dynamic
+            histogram={histogramData}
+            // todo add indicator for highightValue={pixelValue}
+            lowFraction={normalisedLow} // component should calculate these
+            highFraction={normalisedHigh}
+            queryHistogram={queryHistogram}
+            setValue={setLiveValue}
+            minMax={domain}
+            histoWidth={100}
+            histoHeight={50}
+        />
+    )
+}
+
 const ChannelController = ({ index }: { index: number }) => {
     const limits = useChannelsStore(({ contrastLimits }) => contrastLimits); //using shallow as per Avivator *prevents* re-rendering which should be happening
     const { colors, domains, channelsVisible, removeChannel } =
@@ -217,27 +295,15 @@ const ChannelController = ({ index }: { index: number }) => {
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading);
     const metadata = useMetadata();
     const channelsStore = useChannelsStoreApi();
-
     if (!metadata) throw "no metadata"; //TODO type metadata
     const channelVisible = channelsVisible[index];
     const color = colors[index];
-    const colorString = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-    // not sure I want to be using material.ui... consider adding a widget abstration layer.
-    // not jumping right in with using it for all layout etc because I don't want to be tied to it.
-    // Starting to use tailwind here.
-    // memoizing styles to avoid re-rendering - not sure how to translate to tailwind, not thought about it much yet.
+    const colorString = useMemo(() => `rgb(${color[0]}, ${color[1]}, ${color[2]})`, [color[0], color[1], color[2]]);
     const gridStyle = useMemo(
         () => ({
             gridTemplateColumns: "0.4fr 0.1fr 0.1fr 1fr 0.1fr",
         }),
         [],
-    );
-    const sliderStyle = useMemo(
-        () => ({
-            color: colorString,
-            marginLeft: "10px",
-        }),
-        [colorString],
     );
     return (
         <>
@@ -263,21 +329,7 @@ const ChannelController = ({ index }: { index: number }) => {
                         channelsStore.setState({ colors: newColors });
                     }}
                 />
-                <Slider
-                    size="small"
-                    //slotProps={{ thumb: {  } }} //todo smaller thumb
-                    disabled={isChannelLoading[index]}
-                    style={sliderStyle}
-                    value={limits[index]}
-                    min={domains[index][0]}
-                    max={domains[index][1]}
-                    valueLabelDisplay="auto"
-                    onChange={(_, v) => {
-                        limits[index] = v as [number, number];
-                        const contrastLimits = [...limits];
-                        channelsStore.setState({ contrastLimits });
-                    }}
-                />
+                <ChannelHistogram index={index} />
                 <button
                     type="button"
                     className="pl-4"
@@ -329,6 +381,7 @@ const AddChannel = () => {
                 const newProps = {
                     domains,
                     contrastLimits,
+                    //raster
                 };
                 setPropertiesForChannel(index, newProps);
                 setIsChannelLoading(index, false);

@@ -1,11 +1,11 @@
-import { DataColumn, NumberDataType } from "@/charts/charts";
-import RangeDimension from "@/datastore/RangeDimension";
+import type { DataColumn, NumberDataType } from "@/charts/charts";
+import type RangeDimension from "@/datastore/RangeDimension";
 import * as d3 from "d3";
 import { observer } from "mobx-react-lite";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useDebounce } from "use-debounce";
 import { useDimensionFilter, useConfig } from "../hooks";
-import { SelectionDialogConfig, RangeFilter } from "./SelectionDialogReact";
+import type { SelectionDialogConfig, RangeFilter } from "./SelectionDialogReact";
 
 /**
  * This was exposed as a more general-purpose hook with useState,
@@ -48,10 +48,6 @@ export function useRangeFilter(column: DataColumn<NumberDataType>) {
     const [histogram, setHistogram] = useState<number[]>([]);
     // this could be a more general utility function - expect to extract soon
     const queryHistogram = useCallback(async () => {
-        // waste of life trying to use Dimension class.
-        // filter.getBinsAsync(column.name, { bins: 100 }).then((histogram) => {
-        //     setHistogram(histogram);
-        // });
         const worker = new Worker(
             new URL("../../datastore/rawHistogramWorker.ts", import.meta.url),
         );
@@ -223,6 +219,11 @@ export const Histogram = observer((props: RangeProps) => {
     const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
 
     const [hasQueried, setHasQueried] = useState(false);
+    // if data changes, reset the hasQueried state
+    useEffect(() => {
+        data;
+        setHasQueried(false);
+    }, [data]);
     useEffect(() => {
         if (!ref.current) return;
         const observer = new IntersectionObserver(
