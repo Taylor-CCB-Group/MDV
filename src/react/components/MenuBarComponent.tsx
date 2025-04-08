@@ -52,18 +52,6 @@ const MenuBarComponent = () => {
         new FileUploadDialogReact();
     };
 
-    const handleScreenshotClick = async () => {
-        const bounds = containerDiv.getBoundingClientRect();
-        const aspect = bounds.width / bounds.height;
-        const dataUrl = await toPng(containerDiv, {
-            canvasWidth: 400,
-            canvasHeight: 400 / aspect,
-        });
-        const img = document.createElement("img");
-        img.src = dataUrl;
-        document.body.appendChild(img);
-    };
-
     const handleDebugButtonClick = async () => {
         const datasources = await fetchJsonConfig(
             `${root}/datasources.json`,
@@ -111,11 +99,6 @@ const MenuBarComponent = () => {
                     {config.permission === "edit" && (
                         <IconWithTooltip tooltipText="Add Datasource" onClick={handleAddDataSourceClick}>
                             <CloudUploadIcon />
-                        </IconWithTooltip>
-                    )}
-                    {import.meta.env.DEV && (
-                        <IconWithTooltip tooltipText="Take Screenshot" onClick={handleScreenshotClick}>
-                            <CameraAltIcon />
                         </IconWithTooltip>
                     )}
                 </Box>
