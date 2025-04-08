@@ -27,8 +27,8 @@ if ENABLE_AUTH:
     from authlib.integrations.flask_client import OAuth
     from auth0.management import Auth0
     from auth0.authentication import GetToken
-    from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
     from mdvtools.auth.auth0_provider import Auth0Provider
+    from redis import Redis
 
     oauth = OAuth()  # Initialize OAuth only if auth is enabled
     #except ImportError:
@@ -49,12 +49,6 @@ def create_flask_app(config_name=None):
         SESSION_COOKIE_SECURE=True,     # Only send cookies over HTTPS
         SESSION_COOKIE_SAMESITE="Lax"   # Prevent cross-site cookie usage
     )
-    if ENABLE_AUTH:
-        app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
-        app.config["JWT_SECRET_KEY"] = app.secret_key
-        if not app.secret_key:
-            raise ValueError(" FLASK_SECRET_KEY environment variable is not set!")
-
     
     try:
         print("** Adding config.json details to app config")
@@ -93,6 +87,13 @@ def create_flask_app(config_name=None):
                 try:
                     print("Syncing users from Auth0 into the database...")
                     sync_auth0_users_to_db(app)
+                except Exception as e:
+                    raise e
+            
+            if ENABLE_AUTH:
+                try:
+                    print("Caching user-projects data...")
+                    cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
                 except Exception as e:
                     raise e
             
@@ -310,6 +311,53 @@ def sync_auth0_users_to_db(app):
         raise
 
 
+def cache_user_projects():
+    """
+    Caches user details and their associated project permissions in Redis.
+    - Caches users with keys: `user:{auth0_id}`
+    - Caches project permissions with keys: `user:{user_id}:projects`
+    """
+    try:
+        redis_client = Redis(host='localhost', port=6379, db=0)
+        
+        print("Caching user details and project permissions...")
+
+        # Fetch all users from the database
+        users = User.query.all()
+
+        for user in users:
+            # Cache user details
+            user_data = {
+                "id": user.id,
+                "auth0_id": user.auth0_id,
+                "email": user.email,
+                "is_admin": user.is_admin  # Add the is_admin field here
+            }
+            redis_client.setex(f"user:{user.auth0_id}", 86400, json.dumps(user_data))  # Cache for 24 hours
+
+
+            # Fetch project permissions for the user
+            user_projects = UserProject.query.filter_by(user_id=user.id).all()
+            
+            project_permissions = {
+                up.project_id: {
+                    "can_read": up.can_read,
+                    "can_write": up.can_write,
+                    "is_owner": up.is_owner
+                }
+                for up in user_projects
+            }
+
+            # Cache project permissions as a JSON string
+            redis_client.setex(f"user:{user.id}:projects", 86400, json.dumps(project_permissions))
+
+        print(f"Cached {len(users)} users and their project permissions.")
+        return True
+    
+    except Exception as e:
+        print(f"Error caching user projects: {e}")
+        return False
+
 
 def wait_for_database():
     """Wait for the database to be ready before proceeding."""
@@ -388,6 +436,7 @@ def load_config(app, config_name=None, enable_auth=False):
 
             # Only configure Auth0 if ENABLE_AUTH is True
             if enable_auth:
+                app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
                 auth0_domain = os.getenv('AUTH0_DOMAIN') or config.get('AUTH0_DOMAIN')
                 auth0_client_id = os.getenv('AUTH0_CLIENT_ID') or config.get('AUTH0_CLIENT_ID')
                 auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET') or read_secret("auth0_client_secret")
@@ -711,11 +760,75 @@ def register_auth0_routes(app):
         print(f"Error registering AUTH routes: {e}")
         raise
 
+def validate_and_get_user(app):
+    """
+    Validates the Auth0 token from the session and retrieves the user from Redis cache.
+    
+    :param app: Flask app instance
+    :return: Tuple (user object as dict, error response)
+    """
+    try:
+        redis_client = Redis(host='localhost', port=6379, db=0)
+
+        auth0_provider = Auth0Provider(
+            app,
+            oauth=oauth,
+            client_id=app.config['AUTH0_CLIENT_ID'],
+            client_secret=app.config['AUTH0_CLIENT_SECRET'],
+            domain=app.config['AUTH0_DOMAIN']
+        )
+
+        # Retrieve the token from session
+        token = auth0_provider.get_token()
+
+        if not token:
+            return None, jsonify({"error": "Authentication required"}), 401
+
+        # Validate token
+        if not auth0_provider.is_token_valid(token):
+            return None, jsonify({"error": "Invalid or expired token"}), 401
+
+        # Retrieve user info from Auth0
+        user_info = auth0_provider.get_user({"access_token": token})
+
+        if not user_info:
+            return None, jsonify({"error": "User not found"}), 404
+
+        # Get Auth0 user ID
+        auth0_id = user_info.get("sub")
+
+        # Fetch user directly from Redis (no DB query!)
+        cached_user = redis_client.get(f"user:{auth0_id}")
+        if cached_user:
+            return json.loads(cached_user), None  # Return cached user
+
+        # This should rarely happen since all users were cached at app startup.
+        # But if the user is missing from Redis, fallback to DB and log the issue.
+        print(f"User {auth0_id} not found in cache, falling back to DB!")
+
+        user = User.query.filter_by(auth0_id=auth0_id).first()
+        if not user:
+            return None, jsonify({"error": "User not found"}), 404
+
+        #DO NOT cache again here, since cache function already handled it at startup.
+
+        return {"id": user.id, "auth0_id": user.auth0_id, "email": user.email, "is_admin": user.is_admin}, None
+
+    except Exception as e:
+        print(f"Error during authentication: {e}")
+        return None, jsonify({"error": "Internal server error"}), 500
 
 
 def register_routes(app, ENABLE_AUTH):
     """Register routes with the Flask app."""
     print("Registering routes...")
+
+    # Initialize Redis client only if ENABLE_AUTH is True
+    if ENABLE_AUTH:
+        redis_client = Redis(host="localhost", port=6379, db=0, decode_responses=True)
+        print("Redis client initialized for caching.")
+    else:
+        redis_client = None  # No Redis client if authentication is not enabled
 
     try:
         @app.route('/')
@@ -735,76 +848,69 @@ def register_routes(app, ENABLE_AUTH):
 
         @app.route('/projects')
         def get_projects():
-            print('/projects queried...')
+            """
+            Fetches the list of active projects from Redis cache instead of querying the database.
+            
+            If authentication is enabled, only projects the user has access to are returned.
+            """
+            print("/projects queried...")
+
             try:
-                # Query the database to get all projects that aren't deleted
-                # Step 1: Retrieve the list of active projects
-                active_projects = ProjectService.get_active_projects()
-
-                # Step 2: If authentication is enabled, handle user-based filtering
-                if ENABLE_AUTH:
-
-                    auth0_provider = Auth0Provider(
-                        app,
-                        oauth=oauth,
-                        client_id=app.config['AUTH0_CLIENT_ID'],
-                        client_secret=app.config['AUTH0_CLIENT_SECRET'],
-                        domain=app.config['AUTH0_DOMAIN']
-                    )
-                
-                    # Retrieve the token from the session
-                    token = auth0_provider.get_token()
-
-                    # If no token is present, return error
-                    if not token:
-                        return jsonify({"error": "Authentication required"}), 401
-
-                    # Validate the token
-                    if not auth0_provider.is_token_valid(token):
-                        return jsonify({"error": "Invalid or expired token"}), 401
-
-                    # Retrieve user info using the token
-                    user_info = auth0_provider.get_user({"access_token": token})
-
-                    if not user_info:
-                        return jsonify({"error": "User not found"}), 404
-
-                    # Get the auth0_id (user identifier from Auth0)
-                    auth0_id = user_info.get("sub")
+                if redis_client:
+                    # Step 1: Fetch all cached active projects
+                    cached_projects = redis_client.get("projects:active")
                     
-                    # Fetch user from the database based on the decoded user info (e.g., user_id)
-                    user = User.query.filter_by(auth0_id=auth0_id).first()
-                    if not user:
-                        return jsonify({"error": "User not found"}), 404
-
-                    # Get user-specific projects where they have access (can_read, can_write, is_owner)
-                    user_projects = UserProject.query.filter_by(user_id=user.id).all()
-
-                    # Extract project IDs where the user has read, write, or ownership access
-                    allowed_project_ids = {up.project_id for up in user_projects if up.can_read or up.can_write or up.is_owner}
-
-                    # Filter active projects to only include those the user has access to
-                    filtered_projects = [p for p in active_projects if p.id in allowed_project_ids]
+                    if cached_projects:
+                        active_projects = json.loads(cached_projects)
+                        print("Projects fetched from cache.")
+                    else:
+                        print("Active projects not found in cache, fetching from the database.")
+                        active_projects = ProjectService.get_active_projects()
+                        redis_client.setex("projects:active", 86400, json.dumps(active_projects))  # Cache for 24 hours
+                        print("Projects cached in Redis.")
                 else:
-                    # If authentication is not required, return all active projects
-                    filtered_projects = active_projects
-                
-                # Step 4: Format response to return only the relevant fields
+                    active_projects = ProjectService.get_active_projects()  # If Redis is not used, fetch from DB
+
+                # Step 2: If authentication is enabled, filter user-specific projects
+                if ENABLE_AUTH:
+                    user, error_response = validate_and_get_user(app)
+                    if error_response:
+                        return error_response  # Return the error response if validation fails
+
+                    # Fetch cached user-project permissions
+                    cached_user_projects = redis_client.get(f"user_projects:{user['id']}")
+                    
+                    if cached_user_projects:
+                        user_projects = json.loads(cached_user_projects)  # Use cached data
+                    else:
+                        print(f"User projects for {user['id']} not found in cache.")
+                        return jsonify({"error": "User project permissions not available"}), 403  # Fail instead of re-caching
+
+                    # Extract projects user has access to
+                    allowed_project_ids = {
+                        pid for pid, perms in user_projects.items()
+                        if perms["can_read"] or perms["can_write"] or perms["is_owner"]
+                    }
+                    filtered_projects = [p for p in active_projects if p["id"] in allowed_project_ids]
+                else:
+                    filtered_projects = active_projects  # No authentication, return all projects
+
+                # Step 3: Format response
                 project_list = [
                     {
-                        "id": p.id,
-                        "name": p.name,
-                        "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                        "id": p["id"],
+                        "name": p["name"],
+                        "lastModified": p["update_timestamp"]
                     }
                     for p in filtered_projects
                 ]
 
-                # Return the list of projects as JSON
                 return jsonify(project_list)
-            
+
             except Exception as e:
-                print(f"In register_routes - /projects : Error retrieving projects: {e}")
+                print(f"Error retrieving projects: {e}")
                 return jsonify({"status": "error", "message": str(e)}), 500
+
         print("Route registered: /projects")
 
         @app.route("/create_project", methods=["POST"])
@@ -812,6 +918,18 @@ def register_routes(app, ENABLE_AUTH):
             project_path = None
             next_id = None
             try:
+                user_data = None
+                # Check if authentication is enabled
+                if ENABLE_AUTH:
+                    # Validate the user's authentication and retrieve user details
+                    user_data, error_response = validate_and_get_user(app)
+                    if error_response:
+                        return error_response  # Unauthorized or error response
+                    
+                    # Ensure the user is an admin before allowing project creation
+                    if not user_data.get("is_admin", False):
+                        return jsonify({"status": "error", "message": "Only admins can create projects."}), 403
+
                 print("Creating project")
                 
                 # Get the next available ID
@@ -838,9 +956,40 @@ def register_routes(app, ENABLE_AUTH):
                 new_project = ProjectService.add_new_project(path=project_path)
 
                 if new_project:
-                    return jsonify({"id": new_project.id, "name": new_project.name, "status": "success"})
-                
-                
+                    # Step 5: Associate the admin user with the new project and grant all permissions
+                    if ENABLE_AUTH:
+                        admin_user_id = user_data['id']
+                        user_project = UserProject(
+                            user_id=admin_user_id,
+                            project_id=new_project.id,
+                            can_read=True,
+                            can_write=True,
+                            is_owner=True
+                        )
+                        db.session.add(user_project)
+                        db.session.commit()
+                        
+                        # Cache the project permissions for the admin user
+                        user_project_permissions = {
+                            "can_read": user_project.can_read,
+                            "can_write": user_project.can_write,
+                            "is_owner": user_project.is_owner
+                        }
+                        redis_client.setex(f"user:{admin_user_id}:projects", 86400, json.dumps(user_project_permissions))
+
+                        # Step 6: Cache the newly added project in Redis
+                        redis_client.setex(f"project:{new_project.id}", 86400, json.dumps({
+                            "id": new_project.id,
+                            "name": new_project.name,
+                            "path": new_project.path
+                        }))
+                    
+                    # Return the new project info
+                    return jsonify({
+                        "id": new_project.id,
+                        "name": new_project.name,
+                        "status": "success"
+                    })     
 
             except Exception as e:
                 print(f"In register_routes - /create_project : Error creating project: {e}")
@@ -867,15 +1016,30 @@ def register_routes(app, ENABLE_AUTH):
             #project_removed_from_blueprints = False
             try:
                 print(f"Deleting project '{project_id}'")
+
+                user_data = None
+                # Step 1: Get the current user's information (if enabled)
+                if ENABLE_AUTH:
+                    user_data, error_response = validate_and_get_user(app)
+                    if error_response:
+                        return error_response  # Unauthorized or error response
+                    
+                    user_id = user_data['id']  # The ID of the authenticated user
+
                 
                 # Find the project by ID 
                 project = ProjectService.get_project_by_id(project_id)
-
                 if project is None:
                     print(f"In register_routes - /delete_project Error: Project with ID {project_id} not found in database")
                     return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
 
-                
+                # Step 3: Check if the user has ownership (is_owner)
+                if ENABLE_AUTH:
+                    user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+                    if not user_project or not user_project.is_owner:
+                        print(f"In delete_project: Error - User does not have ownership of project {project_id}")
+                        return jsonify({"status": "error", "message": "Only the project owner can delete the project."}), 403
+
                 # Check if the project is editable before attempting to delete
                 if project.access_level != 'editable':
                     print(f"In register_routes - /delete_project Error: Project with ID {project_id} is not editable.")
@@ -889,12 +1053,29 @@ def register_routes(app, ENABLE_AUTH):
                 
                 # Soft delete the project
                 delete_status = ProjectService.soft_delete_project(project_id)
-
-                if delete_status:
-                    return jsonify({"status": "success"})
-                else:
-                    print("In register_routes - /delete_project Error: Failed to soft delete project in db")
+                if not delete_status:
+                    print(f"In delete_project: Error - Failed to soft delete project {project_id} in the database")
                     return jsonify({"status": "error", "message": "Failed to soft delete project in db"}), 500
+
+                # Step 7: Update the cache for active projects (with is_deleted = True)
+                if ENABLE_AUTH:
+                    cached_projects = redis_client.get("projects:active")
+                    
+                    if cached_projects:
+                        active_projects = json.loads(cached_projects)
+                        # Mark the project as deleted in the active projects list
+                        for p in active_projects:
+                            if p["id"] == project_id:
+                                p["is_deleted"] = True  # Mark the project as deleted
+                        
+                        # Save the updated list of active projects back to the cache
+                        redis_client.setex("projects:active", 86400, json.dumps(active_projects))
+                        print(f"In delete_project: Updated cache for active projects, marked project '{project_id}' as deleted.")
+                    else:
+                        print("In delete_project: Active projects not found in cache, skipping cache update.")
+
+                # Step 8: Return success response
+                return jsonify({"status": "success", "message": f"Project '{project_id}' deleted successfully."})
 
             except Exception as e:
                 print(f"In register_routes - /delete_project: Error deleting project '{project_id}': {e}")
@@ -911,12 +1092,29 @@ def register_routes(app, ENABLE_AUTH):
                 return jsonify({"status": "error", "message": "New name not provided"}), 400
             
             try:
+                user_data = None
+                # Step 1: Get the current user's information (if enabled)
+                if ENABLE_AUTH:
+                    user_data, error_response = validate_and_get_user(app)
+                    if error_response:
+                        return error_response  # Unauthorized or error response
+                    
+                    user_id = user_data['id']  # The ID of the authenticated user
+
                 # Check if the project exists
                 project = ProjectService.get_project_by_id(project_id)
                 if project is None:
                     print(f"In register_routes - /rename_project Error: Project with ID {project_id} not found in database")
                     return jsonify({"status": "error", "message": f"Project with ID {project_id} not found in database"}), 404
                 
+                # Step 4: Check if the user is the owner of the project (only if ENABLE_AUTH is True)
+                if ENABLE_AUTH:
+                    # Fetch the user project relationship from the UserProject table to check if the user is the owner
+                    user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+                    if not user_project or not user_project.is_owner:
+                        print(f"In register_routes - /rename_project Error: User does not have ownership of project {project_id}")
+                        return jsonify({"status": "error", "message": "Only the project owner can rename the project."}), 403
+
                 # Check if the project is editable before attempting to rename
                 if project.access_level != 'editable':
                     print(f"In register_routes - /rename_project Error: Project with ID {project_id} is not editable.")
@@ -925,11 +1123,29 @@ def register_routes(app, ENABLE_AUTH):
                 # Attempt to rename the project
                 rename_status = ProjectService.update_project_name(project_id, new_name)
 
-                if rename_status:
-                    return jsonify({"status": "success", "id": project_id, "new_name": new_name}), 200
-                else:
+                if not rename_status:
                     print(f"In register_routes - /rename_project Error: The project with ID '{project_id}' not found in db")
                     return jsonify({"status": "error", "message": f"Failed to rename project '{project_id}' in db"}), 500
+                
+                # Step 6: If ENABLE_AUTH is True, and the user is the owner, update the cache
+                if ENABLE_AUTH:
+                    # Fetch cached active projects from Redis
+                    cached_projects = redis_client.get("projects:active")
+                    
+                    if cached_projects:
+                        active_projects = json.loads(cached_projects)
+                        # Find the project in the cache and update its name
+                        for p in active_projects:
+                            if p["id"] == project_id:
+                                p["name"] = new_name  # Update the project name
+                                break
+
+                        # Save the updated active projects list back to Redis cache
+                        redis_client.setex("projects:active", 86400, json.dumps(active_projects))
+                        print(f"In rename_project: Updated cache for active projects, renamed project '{project_id}'.")
+
+                # Step 7: Return success response
+                return jsonify({"status": "success", "id": project_id, "new_name": new_name}), 200
 
             except Exception as e:
                 print(f"In register_routes - /rename_project : Error renaming project '{project_id}': {e}")
@@ -941,6 +1157,20 @@ def register_routes(app, ENABLE_AUTH):
         def change_project_access(project_id):
             """API endpoint to change the access level of a project."""
             try:
+                # Step 1: Get the current user's information (if ENABLE_AUTH is True)
+                user_data = None
+                if ENABLE_AUTH:
+                    user_data, error_response = validate_and_get_user(app)
+                    if error_response:
+                        return error_response  # Unauthorized or error response
+
+                    user_id = user_data['id']  # The ID of the authenticated user
+
+                    user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+                    if not user_project or not user_project.is_owner:
+                        print(f"In register_routes - /access Error: User does not have ownership of project {project_id}")
+                        return jsonify({"status": "error", "message": "Only the project owner can change the access level."}), 403
+
                 # Get the new access level from the request
                 new_access_level = request.form.get("type")
 

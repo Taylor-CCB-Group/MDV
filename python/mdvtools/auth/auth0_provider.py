@@ -83,8 +83,14 @@ class Auth0Provider(AuthProvider):
             #redirect_uri = url_for('callback', _external=True)
             redirect_uri = self.app.config["AUTH0_CALLBACK_URL"]
             print(redirect_uri)
+            audience = self.app.config["AUTH0_AUDIENCE"]  # The API audience for which the token is requested
             print(self.oauth.auth0.authorize_redirect(redirect_uri))
-            return self.oauth.auth0.authorize_redirect(redirect_uri=redirect_uri)
+
+            # Initiate the redirect to Auth0's authorization endpoint with necessary parameters
+            return self.oauth.auth0.authorize_redirect(
+                redirect_uri=redirect_uri,
+                audience=audience  # The audience for the token (API identifier)                
+            )
         
         except Exception as e:
             logging.error(f"Error during login process: {e}")
@@ -187,15 +193,34 @@ class Auth0Provider(AuthProvider):
             token = self.oauth.auth0.authorize_access_token()
             if 'access_token' not in token:
                 raise ValueError("Access token not found in the response.")
+            # Check if the token is of the expected type (JWT)
+            access_token = token['access_token']
+            
+            # Decode the token's header to inspect its algorithm and other details
+            try:
+                header = jwt.get_unverified_header(access_token)
+                print("Token Header:", header)  # Check the header of the token
+
+                # Ensure the algorithm is RS256 (not JWE)
+                if header.get('alg') != 'RS256':
+                    logging.error(f"Expected RS256 algorithm, but found {header.get('alg')}")
+                    raise ValueError("The token is not of type RS256.")
+            except Exception as e:
+                logging.error(f"Error decoding the token header: {e}")
+                raise ValueError("Invalid token format.")
+
+            # Store the token in the session for later use
             session['token'] = token
             session["auth_method"] = "auth0"
             logging.info("Access token retrieved and stored in session.")
+            
             return token['access_token']
+
         except Exception as e:
             logging.error(f"Error during callback handling: {e}")
-            session.clear() # Clear session in case of failure
+            session.clear()  # Clear session in case of failure
             raise RuntimeError("Callback handling failed.") from e
-
+        
     def is_authenticated(self, token: str) -> bool:
         """
         Checks if the user is authenticated by verifying the token.

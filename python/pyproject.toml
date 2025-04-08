@@ -75,6 +75,7 @@ requests = "^2.32.3"
 python-jose = "^3.3.0"
 auth0-python = "^4.9.0"
 flask-jwt-extended = "^4.7.1"
+redis = "^5.2.1"
 
 [tool.pyright]
 venvPath = "../venv/"
