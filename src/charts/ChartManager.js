@@ -66,6 +66,7 @@ import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import ToggleThemeWrapper from "./dialogs/ToggleTheme";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
+import MenuBarWrapper from "@/react/components/MenuBarComponent";
 
 
 //order of column data in an array buffer
@@ -139,7 +140,7 @@ export class ChartManager {
      * @param {string[]} [config.all_views] A list of views that can be loaded (a suitable 
      * view loader is required to atually load the view)
      * @param {string} [config.current_view] the current view (only used with all views)
-     * @param {string} [config.permisson] the level of permission the user has. This just makes certain
+     * @param {string} [config.permission] the level of permission the user has. This just makes certain
      * options unavaliable. Any logic should be handled when a state_saved event is broadcast
      * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
      * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
@@ -228,174 +229,10 @@ export class ChartManager {
         this.containerDiv.style.flexDirection = "column";
 
         /** @type {HTMLDivElement} */
-        this.menuBar = createEl(
-            "div",
-            {
-                classes: ["ciview-main-menu-bar"],
-            },
-            this.containerDiv,
-        );
+        // classes: ["ciview-main-menu-bar"],
+        this.menuBar = createEl("div", {}, this.containerDiv);
 
-        /** @type {HTMLSpanElement} */
-        this.leftMenuBar = createEl("span", {}, this.menuBar);
-        createEl("span", { classes: ["mdv-divider"] }, this.menuBar);
-        /** @type {HTMLSpanElement} */
-        this.rightMenuBar = createEl("span", {}, this.menuBar);
-
-
-        /** @type {HTMLSpanElement} */
-        const homeButton = createMenuIcon(
-            "fas fa-home",
-            {
-                tooltip: {
-                    text: "Back to Catalog",
-                    position: "bottom-right",
-                },
-                func: () => {
-                    // const state = this.getState();
-                    // this._callListeners("state_saved", state);
-                    this.viewManager.checkUnsavedState(() => {
-                        window.location.href = import.meta.env.DEV
-                            ? `${window.location.origin}/catalog_dev`
-                            : `${window.location.origin}/../`;
-                    })
-                },
-            },
-            this.leftMenuBar,
-        );
-        homeButton.style.marginRight = "20px";
-
-        if (config.all_views) {
-            const filterWrapperNode = createEl(
-                "span",
-                {
-                    style: {
-                        marginRight: "4px",
-                    },
-                },
-                this.leftMenuBar,
-            );
-
-            // Filter view component
-            createMdvPortal(
-                ViewSelector(),
-                filterWrapperNode,
-            );
-        }
-
-        if (config.permission === "edit") {
-            createMenuIcon(
-                "fas fa-save",
-                {
-                    tooltip: {
-                        text: "Save View",
-                        position: "bottom-right",
-                    },
-                    func: () => {
-                        this.viewManager.saveView();
-                    },
-                },
-                this.leftMenuBar,
-            );
-        }
-
-        if (config.permission === "edit" && config.all_views) {
-            createMenuIcon(
-                "fas fa-plus",
-                {
-                    tooltip: {
-                        text: "Create New View",
-                        position: "bottom-right",
-                    },
-                    func: () => {
-                        this.viewManager.checkAndAddView();
-                    },
-                },
-                this.leftMenuBar,
-            );
-            createMenuIcon(
-                "fas fa-minus",
-                {
-                    tooltip: {
-                        text: "Delete Current View",
-                        position: "bottom-right",
-                    },
-                    func: () => {
-                        this.showDeleteViewDialog();
-                    },
-                },
-                this.leftMenuBar,
-            );
-        }
-
-        this.rightMenuBar.style.display = "flex";
-        this.rightMenuBar.style.alignItems = "center";
-
-        const themeNode = createEl(
-            "span",
-            {
-                style: {
-                    marginRight: "4px",
-                },
-            },
-            this.rightMenuBar,
-        );
-
-        createMdvPortal(ToggleThemeWrapper(), themeNode)
-        // themeButton.style.margin = "3px";
-        if (config.permission === "edit") {
-            const uploadButton = createMenuIcon(
-                "fas fa-upload",
-                {
-                    tooltip: {
-                        text: "Add datasource",
-                        position: "bottom-left",
-                    },
-                    func: (e) => {
-                        new FileUploadDialogReact(); //.open();
-                    },
-                },
-                this.leftMenuBar,
-            );
-            uploadButton.style.margin = "3px";
-        }
-
-        if (import.meta.env.DEV) {
-            // add a button to take a screenshot of the current view
-            // we don't actually want a button like this - I think we probably want to take a screenshot
-            // inside 'getState()' and add it to view... but that's a bit of a destructive change.
-            createMenuIcon(
-                "fas fa-camera",
-                {
-                    tooltip: {
-                        text: "Take Screenshot",
-                        position: "bottom-left",
-                    },
-                    func: async () => {
-                        const bounds =
-                            this.containerDiv.getBoundingClientRect();
-                        const aspect = bounds.width / bounds.height;
-                        const dataUrl = await toPng(this.containerDiv, {
-                            canvasWidth: 400,
-                            canvasHeight: 400 / aspect,
-                        });
-                        const img = document.createElement("img");
-                        img.src = dataUrl;
-                        document.body.appendChild(img);
-                    },
-                },
-                this.leftMenuBar,
-            );
-        }
-        // createMenuIcon("fas fa-question",{
-        //     tooltip:{
-        //         text:"Help",
-        //         position:"top-right"
-        //     },
-        //     func:()=>{
-        //         //todo
-        //     }
-        // },this.leftMenuBar).style.margin = "3px";
+        createMdvPortal(MenuBarWrapper(), this.menuBar);
 
         this._setupThemeContextMenu();
 
@@ -1229,6 +1066,7 @@ export class ChartManager {
         const initialCharts = {};
         const updatedColumns = {};
         const metadata = {};
+        const chartErrors = [];
         // const twidth = this.contentDiv.offsetWidth;
         for (const ds of this.dataSources) {
             if (ds.contentDiv) {
@@ -1252,15 +1090,24 @@ export class ChartManager {
         for (const chid in this.charts) {
             const chInfo = this.charts[chid];
             const chart = chInfo.chart;
-            const config = chart.getConfig();
-            const div = chart.getDiv();
-            const d = this.viewData.dataSources[chInfo.dataSource.name];
-            if (d.layout === "gridstack") {
-               //this is handled by gridstack now
-            } else {
-                config.position = [div.offsetLeft, div.offsetTop];
+            try {
+                // as of now, some charts throw errors when calling getConfig()
+                // in particular, if they haven't finished loading properly
+                const config = chart.getConfig();
+                const div = chart.getDiv();
+                const d = this.viewData.dataSources[chInfo.dataSource.name];
+                if (d.layout === "gridstack") {
+                   //this is handled by gridstack now
+                } else {
+                    config.position = [div.offsetLeft, div.offsetTop];
+                }
+                initialCharts[chInfo.dataSource.name].push(config);
+            } catch (error) {
+                console.error(
+                    `chart ${chid} failed to getConfig - ${error.message}`,
+                );
+                chartErrors.push(error);
             }
-            initialCharts[chInfo.dataSource.name].push(config);
         }
 
         const view = JSON.parse(JSON.stringify(this.viewData));
@@ -1272,6 +1119,9 @@ export class ChartManager {
             all_views: all_views,
             updatedColumns: updatedColumns,
             metadata: metadata,
+            //untested - what happens if we include this (including in what we save to server?)
+            //could be useful... but I'm leaving it out now in case of unexpected issues.
+            chartErrors, 
         };
     }
 

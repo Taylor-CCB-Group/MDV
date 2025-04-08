@@ -180,7 +180,12 @@ function useDropdownOptions(props: DropdownSpec) {
     const toOption = useCallback(getOptionAsObjectHelper(props.values), []);
     type OptionType = ReturnType<typeof toOption>;
     const NO_OPTIONS = [{ label: "No options (error - sorry...)", value: "", original: "" }];
-    const options = useMemo(() => props.values?.[0].map(toOption) || NO_OPTIONS, [props.values, toOption]);
+    // useMemo here was problematic because the values array is a stable reference...
+    // *mobx can be a pain* or at least it goes against the grain of react and functional programming
+    //! is always recomputing this when we hit this hook a problem? should test with large datasets
+    // actually seemed to be ok, but useMemo works if we're more careful about the dependencies
+    const options = useMemo(() => props.values?.[0].map(toOption) || NO_OPTIONS, [props.values[0], toOption]);
+    
     // bit of a faff with sometimes getting a one-item array, sometimes a single item...
     const getSingleOption = useCallback(
         (option: OptionType | OptionType[] | undefined) => {

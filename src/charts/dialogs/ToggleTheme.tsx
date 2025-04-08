@@ -1,7 +1,4 @@
-import {
-    Brightness4 as Brightness4Icon,
-    Brightness7 as Brightness7Icon,
-} from "@mui/icons-material";
+import { Brightness4 as Brightness4Icon, Brightness7 as Brightness7Icon } from "@mui/icons-material";
 import { IconButton, Tooltip } from "@mui/material";
 import { observer } from "mobx-react-lite";
 
@@ -9,6 +6,7 @@ const ToggleTheme = observer(() => {
     const cm = window.mdv.chartManager;
     const { theme } = cm;
 
+    // todo theme should be `"system" | "dark" | "light"`, and stored in local storage
     const toggleTheme = () => {
         if (theme === "dark") cm.setTheme("light");
         else cm.setTheme("dark");
@@ -39,7 +37,7 @@ const ToggleTheme = observer(() => {
     );
 });
 
-const ToggleThemeWrapper = (props: { theme: string; onClick: () => void }) => {
+const ToggleThemeWrapper = () => {
     return <ToggleTheme />;
 };
 

@@ -1,4 +1,5 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import { useEffect, useCallback } from "react";
 
 const SaveViewDialogComponent = (props: {
     open: boolean;
@@ -8,9 +9,35 @@ const SaveViewDialogComponent = (props: {
 }) => {
     const { viewManager } = window.mdv.chartManager;
 
-    const onSave = () => {
-        viewManager.saveView();
-    };
+    const onSave = useCallback(async () => {
+        await viewManager.saveView();
+        props?.action?.();
+        props.onClose();
+    }, [viewManager, props]);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!props.open) return; //probably doesn't happen, but no harm to check
+            if (event.key === "y") {
+                event.preventDefault();
+                onSave();
+                props?.action?.();
+                props.onClose();
+            }
+            if (event.key === "n") {
+                event.preventDefault();
+                props?.action?.();
+                props.onClose();
+            }            
+        };
+
+        // seems ok to use window here since this is a modal dialog
+        // saves faffing about with refs
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [props, onSave, props.open]);
 
     return (
         <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
@@ -23,13 +50,7 @@ const SaveViewDialogComponent = (props: {
                 </Typography>
             </DialogContent>
             <DialogActions>
-                <Button
-                    onClick={() => {
-                        onSave();
-                        props?.action?.();
-                        props.onClose();
-                    }}
-                >
+                <Button onClick={onSave}>
                     Yes
                 </Button>
                 <Button
