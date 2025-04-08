@@ -16,7 +16,7 @@ export type State =
           all_views: string[] | null;
           updatedColumns: UpdatedColumns;
           metadata: MetaData;
-          chartErrors?: ChartError[]; 
+          chartErrors?: ChartError[];
       }
     | undefined;
 
@@ -116,7 +116,7 @@ class ViewManager {
             const aspect = bounds.width / bounds.height;
             const dataUrl = await toPng(this.cm.contentDiv, {
                 canvasWidth: 250,
-                canvasHeight: 250/aspect,
+                canvasHeight: 250 / aspect,
             });
             return dataUrl;
         } catch (error) {
@@ -249,14 +249,14 @@ class ViewManager {
     // Helper to check if the current state differs from the last saved state
     hasUnsavedChanges(verbose = false) {
         if (this.lastSavedState === null) return true;
-        
+
         const removeImageProp = (state: State) => {
-            const cloneState = {...state};
+            const cloneState = { ...state };
             if (cloneState?.view?.viewImage) {
                 cloneState.view.viewImage = undefined;
             }
             return cloneState;
-        }
+        };
 
         const currState = this.cm.getState();
 
@@ -268,7 +268,6 @@ class ViewManager {
         const currentState = removeImageProp(toJS(currState));
 
         const prevState = removeImageProp(toJS(this.lastSavedState));
-
 
         console.log("currentState", currentState);
         console.log("prevState", prevState);

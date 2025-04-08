@@ -29,7 +29,7 @@ function useUpdateViewList() {
 
         return () => {
             clearInterval(interval);
-        }
+        };
     });
 }
 
@@ -58,14 +58,13 @@ function useKeyboardShortcuts() {
     }, [viewManager]);
 }
 
-
 const ViewSelectorDropdown = observer(() => {
     const cm = useChartManager();
     const viewManager = useViewManager();
 
     useKeyboardShortcuts();
     useUpdateViewList();
-    
+
     const options = viewManager.all_views;
     const [dirty, setDirty] = useState(false);
     const [error, setError] = useState<Error>();
@@ -73,7 +72,7 @@ const ViewSelectorDropdown = observer(() => {
 
     useEffect(() => {
         const interval = setInterval(() => {
-            setDirty(v => {
+            setDirty((v) => {
                 const dirty = viewManager.hasUnsavedChanges();
                 if (!v && dirty) {
                     viewManager.hasUnsavedChanges(true);
@@ -94,7 +93,7 @@ const ViewSelectorDropdown = observer(() => {
 
         return () => {
             cm.removeListener("view_selector");
-        }
+        };
     }, [cm]);
 
     return (
@@ -110,31 +109,27 @@ const ViewSelectorDropdown = observer(() => {
                         cm.changeView(newValue);
                     }
                 }}
-                renderInput={(params) => (
-                    <TextField {...params} label={`Select View${dirty ? '*' : ''}`} />
-                )}
+                renderInput={(params) => <TextField {...params} label={`Select View${dirty ? "*" : ""}`} />}
                 sx={{ display: "inline-flex", width: "20vw", margin: "0.2em" }}
             />
             {error && (
                 <IconButton color="error" onClick={() => setOpenError(true)}>
                     <PriorityHighIcon />
                 </IconButton>
-                )
-            }
+            )}
             {openError && (
                 <ReusableDialog
-                open={openError}
-                handleClose={() => setOpenError(false)}
-                component={
-                    <ErrorDisplay
-                    // todo: update the error to right format before passing
-                        error={{message: error?.message as string, stack: error?.stack}}
-                        // extraMetadata={extraMetaData}
-                    />
-                }
-            />
+                    open={openError}
+                    handleClose={() => setOpenError(false)}
+                    component={
+                        <ErrorDisplay
+                            // todo: update the error to right format before passing
+                            error={{ message: error?.message as string, stack: error?.stack }}
+                            // extraMetadata={extraMetaData}
+                        />
+                    }
+                />
             )}
-            
         </>
     );
 });
