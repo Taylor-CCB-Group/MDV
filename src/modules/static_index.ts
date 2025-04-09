@@ -15,7 +15,8 @@ import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
 import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
 import type { DataColumn, DataSource } from "@/charts/charts";
-import { getBuildInfo, getProjectName } from "./ProjectContext";
+import { getProjectName } from "./ProjectContext";
+import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
 declare global {
@@ -148,7 +149,7 @@ async function loadData() {
                 const { class: omit, ...props } = v;
                 return [k, props];
             });
-            const buildInfo = getBuildInfo();
+            const { buildInfo } = useBuildInfo();
             new DebugJsonReactWrapper({ chartTypes, datasources, views, state, buildInfo });
         },
         true //
