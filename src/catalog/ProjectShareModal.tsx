@@ -17,6 +17,7 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Typography,
 } from "@mui/material";
 import type React from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -34,22 +35,20 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
         email,
         setEmail,
         sharedUsers,
-        setSharedUsers,
         addUser,
-        // updateSharedUsers,
         isLoading,
         error,
         userList,
         newUser,
         setNewUser,
         deleteSharedUser,
-        changeUserPermission
+        changeUserPermission,
     } = useProjectShare(projectId);
 
     const handleAddNewUser = async () => {
         if (newUser) {
             // todo: update api logic
-            // await addUser(newUser.id, "View");
+            await addUser(newUser.id, "View");
             console.log("new user", newUser);
             setEmail("");
             setNewUser(undefined);
@@ -61,20 +60,19 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
     };
 
     const handleDeleteUser = async (userId: number) => {
-       await deleteSharedUser(userId);
+        await deleteSharedUser(userId);
     };
 
-    const onInputChange = (e: React.SyntheticEvent, value: string) => {
-        console.log("oninputchange", value);
+    const onInputChange = (value: string) => {
         setEmail(value);
     };
 
-    const onChange = async (e: React.SyntheticEvent, user: RegisteredUser | null) => {
+    const onChange = (user: RegisteredUser | null) => {
         console.log("onchange", user);
         if (user) {
             setNewUser(user);
         }
-    }
+    };
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -111,8 +109,8 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                         <TextField {...params} placeholder="Enter email to search for the user" />
                                     )}
                                     inputValue={email}
-                                    onChange={onChange}
-                                    onInputChange={onInputChange}
+                                    onChange={(_, value) => onChange(value)}
+                                    onInputChange={(_, value) => onInputChange(value)}
                                     getOptionLabel={(option) => option.email}
                                     getOptionKey={(option) => option.id}
                                 />
@@ -125,46 +123,63 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                     {isLoading ? <CircularProgress size="1.5rem" /> : "Add"}
                                 </Button>
                             </Box>
-                            <Table
-                                sx={{
-                                    mb: 3,
-                                    "& .MuiTableCell-head": {
-                                        fontWeight: 600,
-                                    },
-                                }}
-                            >
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Shared Users</TableCell>
-                                        <TableCell>Permission</TableCell>
-                                        <TableCell align="right">Remove</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {sharedUsers.map((user, index) => (
-                                        <TableRow key={user.id}>
-                                            <TableCell>{user.email}</TableCell>
-                                            <TableCell>
-                                                <Select
-                                                    value={user.permission}
-                                                    size="small"
-                                                    fullWidth
-                                                    onChange={(e) => handlePermissionChange(e.target.value as UserPermission, user.id)}
-                                                >
-                                                    <MenuItem value="View">View</MenuItem>
-                                                    <MenuItem value="Edit">Edit</MenuItem>
-                                                    <MenuItem value="Owner">Owner</MenuItem>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <IconButton onClick={() => handleDeleteUser(user.id)}>
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </TableCell>
+                            {sharedUsers?.length === 0 ? (
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        my: 2,
+                                    }}
+                                >
+                                    <Typography variant="h6">No shared users</Typography>
+                                </Box>
+                            ) : (
+                                <Table
+                                    sx={{
+                                        mb: 3,
+                                        "& .MuiTableCell-head": {
+                                            fontWeight: 600,
+                                        },
+                                    }}
+                                >
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Shared Users</TableCell>
+                                            <TableCell>Permission</TableCell>
+                                            <TableCell align="right">Remove</TableCell>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                    </TableHead>
+                                    <TableBody>
+                                        {sharedUsers.map((user) => (
+                                            <TableRow key={user.id}>
+                                                <TableCell>{user.email}</TableCell>
+                                                <TableCell>
+                                                    <Select
+                                                        value={user.permission}
+                                                        size="small"
+                                                        fullWidth
+                                                        onChange={(e) =>
+                                                            handlePermissionChange(
+                                                                e.target.value as UserPermission,
+                                                                user.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        <MenuItem value="View">View</MenuItem>
+                                                        <MenuItem value="Edit">Edit</MenuItem>
+                                                        <MenuItem value="Owner">Owner</MenuItem>
+                                                    </Select>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <IconButton onClick={() => handleDeleteUser(user.id)}>
+                                                        <DeleteIcon />
+                                                    </IconButton>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
                         </>
                     )}
                 </Box>

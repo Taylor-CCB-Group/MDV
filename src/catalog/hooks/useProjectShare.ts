@@ -35,10 +35,10 @@ const useProjectShare = (projectId: string) => {
 
     useEffect(() => {
         if (projectId) {
-            setUserList(mockUserList);
-            setSharedUsers(users);
+            // setUserList(mockUserList);
+            // setSharedUsers(users);
             // todo: uncomment later
-            // getAllUsers();
+            getAllUsers();
         }
     }, [projectId]);
 
@@ -54,8 +54,9 @@ const useProjectShare = (projectId: string) => {
             if (res.ok) {
                 const data = await res.json();
                 // todo: update user list with this data
-                // setUserList();
-                console.log("getAllUsers", res);
+                if (data?.all_users)    setUserList(data.all_users);
+                if (data?.shared_users) setSharedUsers(data.shared_users);
+                console.log("getAllUsers", data);
             } else {
                 throw new Error("An unknown error occurred.")
             }
@@ -93,6 +94,7 @@ const useProjectShare = (projectId: string) => {
 
             // todo: update shared users
             // setSharedUsers();
+            await getAllUsers();
 
         } catch (error) {
             const err = error instanceof Error ? error : new Error("Error adding new user.");
@@ -123,7 +125,7 @@ const useProjectShare = (projectId: string) => {
 
             // todo: update shared users
             // setSharedUsers();
-
+            await getAllUsers();
         } catch (error) {
             const err = error instanceof Error ? error : new Error("Error changing user permission.");
             setError(err);
@@ -153,7 +155,8 @@ const useProjectShare = (projectId: string) => {
 
             // todo: update shared users
             // setSharedUsers();
-            
+            await getAllUsers();
+
         } catch (error) {
             const err = error instanceof Error ? error : new Error("Error deleting user.");
             setError(err);
