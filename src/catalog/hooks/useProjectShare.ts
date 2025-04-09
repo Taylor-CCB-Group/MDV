@@ -61,7 +61,7 @@ const useProjectShare = (projectId: string) => {
         try {
             const res = await fetch(`projects/${projectId}/share`, {
                 method: "POST",
-                body: JSON.stringify({ userId, permission: permission.toLowerCase() }),
+                body: JSON.stringify({ user_id: userId, permission: permission.toLowerCase() }),
             });
 
             console.log("addUser", res);
