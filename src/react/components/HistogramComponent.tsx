@@ -210,14 +210,24 @@ export const Histogram = observer((props: RangeProps) => {
     const width = histoWidth;
     const height = histoHeight;
     const lineColor = prefersDarkMode ? "#fff" : "#000";
+    // Find max value for vertical scaling
+    const maxValue = Math.max(...data);
+
+    // Define the padding and scaling factor
+    const padding = 2;
+    const xStep = data.length / (width + 1); // Space between points
+    const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
+
 
     
     const [hasQueried, setHasQueried] = useState(false);
-    // if data changes, reset the hasQueried state
-    useEffect(() => {
-        data;
-        setHasQueried(false);
-    }, [data]);
+    // if data changes, reset the hasQueried state... disabled for now
+    // useEffect(() => {
+    //     // data;
+    //     // this may be going mad - should we use react query?
+    //     // console.log("data changed", data);
+    //     setHasQueried(false);
+    // }, []);
     useEffect(() => {
         if (!ref.current) return;
         const observer = new IntersectionObserver(
@@ -235,19 +245,18 @@ export const Histogram = observer((props: RangeProps) => {
     }, [queryHistogram, hasQueried]);
     
     // Generate the points for the polyline
-    const points = useMemo(() => {
-        const maxValue = Math.max(...data);
-        if (maxValue === 0) return ""; // Avoid division by zero
-        // Define the padding and scaling factor
-        const padding = 2;
-        const xStep = data.length / (width + 1); // Space between points
-        const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
-        return data.map((value, index) => {
-            const x = index * xStep;
-            const y = height - padding - value * yScale;
-            return `${x},${y}`;
-        }).join(" ");
-    }, [data, height, width]);
+    // ??? useMemo was wrong ????
+    const points = useMemo(
+        () =>
+            data
+                .map((value, index) => {
+                    const x = index * xStep;
+                    const y = height - padding - value * yScale;
+                    return `${x},${y}`;
+                })
+                .join(" "),
+        [data, xStep, yScale, height],
+    );
     const v = value || props.minMax;
     return (
         <>

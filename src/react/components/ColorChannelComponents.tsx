@@ -24,6 +24,9 @@ import { getSingleSelectionStats } from "./avivatorish/utils";
 import { X } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { Histogram, type Range } from "./HistogramComponent";
+import { ErrorBoundary } from "react-error-boundary";
+import { toJS } from "mobx";
+import JsonView from "react18-json-view";
 
 export default function MainVivColorDialog({
     vivStores,
@@ -208,11 +211,12 @@ const BrightnessContrast = ({ index }: { index: number }) => {
 
 const ChannelHistogram = ({ index }: { index: number }) => {
     // return <div />
-    const limits = useChannelsStore(({ contrastLimits }) => contrastLimits); //using shallow as per Avivator *prevents* re-rendering which should be happening
+    //using shallow as per Avivator *prevents* re-rendering which should be happening << review
+    const limits = useChannelsStore(({ contrastLimits }) => contrastLimits);
     // should be 'rasters' really
     const { domains, raster } = useChannelsStore(({ domains, raster }) => ({ domains, raster }));
-    const { pixelValues } = useViewerStore(({ pixelValues }) => ({ pixelValues }));
-    const pixelValue = pixelValues[index];
+    // const { pixelValues } = useViewerStore(({ pixelValues }) => ({ pixelValues }));
+    // const pixelValue = pixelValues[index];
     const domain = domains[index];
     const rasterData = raster[index]?.data || [0]; //! revisit this sometime
     
@@ -220,14 +224,18 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 
     const [min, max] = domain;
     const scaleValue = useCallback((v: number) => (v - min) / (max - min), [min, max]);
-    const normalisedPixelValue = scaleValue(pixelValue);
-    const limit = useMemo(() => limits[index], [limits, index]);
-    const normalisedLow = scaleValue(limit[0]);
-    const normalisedHigh = scaleValue(limit[1]);
+    const { limit, normalisedLow, normalisedHigh } = useMemo(() => {
+        const limit = limits[index];
+        // this can probably be integrated into the histogram component
+        const normalisedLow = scaleValue(limit[0]);
+        const normalisedHigh = scaleValue(limit[1]);
+        // const normalisedPixelValue = scaleValue(pixelValue);
+        return { limit, normalisedLow, normalisedHigh };
+    }, [limits, index, scaleValue]);
     const channelsStore = useChannelsStoreApi();
 
 
-    // this is never being called?
+    // some problems with initial querying, probably in the Histogram component
     const queryHistogram = useCallback(async () => {
         // todo nicer worker syntax?
         const worker = new Worker(
@@ -251,7 +259,8 @@ const ChannelHistogram = ({ index }: { index: number }) => {
         });
     }, [min, max, rasterData]);
     const [liveValue, setLiveValue] = useState<Range>([0, 0]);
-    const [debouncedValue] = useDebounce(liveValue, 5);
+    const debounceTime = 10; //how low can we go?
+    const [debouncedValue] = useDebounce(liveValue, debounceTime);
     useEffect(() => {
         // this feels glitchy, need to iron out some issues
         // maybe use useRef to store the value?
@@ -266,12 +275,14 @@ const ChannelHistogram = ({ index }: { index: number }) => {
         if (debouncedValue[0] === limits[index][0] && debouncedValue[1] === limits[index][1]) return;
         limits[index] = debouncedValue;
         const contrastLimits = [...limits];
+        // we have a weird mix of mobx and zustand here - don't think that's a particular source of bug,
+        // but it smells quite a bit
         channelsStore.setState({ contrastLimits });
     }, [debouncedValue, index, channelsStore]);
-
+    const isChannelLoading = useViewerStore((state) => state.isChannelLoading)[index];
     return (
         <div className="p-4">
-            <Histogram 
+            {!isChannelLoading ? <Histogram 
                 value={limit}
                 step={0.001} //todo make this dynamic
                 histogram={histogramData}
@@ -279,22 +290,37 @@ const ChannelHistogram = ({ index }: { index: number }) => {
                 lowFraction={normalisedLow} // component should calculate these
                 highFraction={normalisedHigh}
                 queryHistogram={queryHistogram}
-                setValue={setLiveValue}
+                setValue={v => {
+                    // we want a different behaviour for clearing the brush here vs selection dialog...
+                    if (v) setLiveValue(v);
+                }}
                 minMax={domain}
                 histoWidth={100}
                 histoHeight={50}
-            />
+            /> : "Loading..."}
+            {/* <Slider
+                size="small"
+                //slotProps={{ thumb: {  } }} //todo smaller thumb
+                disabled={isChannelLoading}
+                value={limits[index]}
+                min={domains[index][0]}
+                max={domains[index][1]}
+                valueLabelDisplay="auto"
+                onChange={(_, v) => {
+                    limits[index] = v as [number, number];
+                    const contrastLimits = [...limits];
+                    channelsStore.setState({ contrastLimits });
+                }}
+            /> */}
         </div>
     )
 }
 
 const ChannelController = ({ index }: { index: number }) => {
-    const limits = useChannelsStore(({ contrastLimits }) => contrastLimits); //using shallow as per Avivator *prevents* re-rendering which should be happening
-    const { colors, domains, channelsVisible, removeChannel } =
+    const { colors, channelsVisible, removeChannel } =
         useChannelsStore(
-            ({ colors, domains, channelsVisible, removeChannel }) => ({
+            ({ colors, channelsVisible, removeChannel }) => ({
                 colors,
-                domains,
                 channelsVisible,
                 removeChannel,
             }),
@@ -305,7 +331,6 @@ const ChannelController = ({ index }: { index: number }) => {
     if (!metadata) throw "no metadata"; //TODO type metadata
     const channelVisible = channelsVisible[index];
     const color = colors[index];
-    const colorString = useMemo(() => `rgb(${color[0]}, ${color[1]}, ${color[2]})`, [color[0], color[1], color[2]]);
     const gridStyle = useMemo(
         () => ({
             gridTemplateColumns: "0.4fr 0.1fr 0.1fr 1fr 0.1fr",
@@ -336,7 +361,9 @@ const ChannelController = ({ index }: { index: number }) => {
                         channelsStore.setState({ colors: newColors });
                     }}
                 />
-                <ChannelHistogram index={index} />
+                <ErrorBoundary fallback={<div>Histogram error</div>}>
+                    <ChannelHistogram index={index} />
+                </ErrorBoundary>
                 <button
                     type="button"
                     className="pl-4"
@@ -398,13 +425,36 @@ const AddChannel = () => {
         </button>
     );
 };
-
+function ChannelError() {
+    //this can be simpler with non-Api version
+    const store = useChannelsStoreApi();
+    const state = useMemo(() => {
+        return toJS(store.getState());
+    }, [store]);
+    return (
+        <JsonView src={state} />
+    );
+}
 export const Test = () => {
+    // ids are strings like "0.1234", and somehow there are too many of them
+    // when image was saved with removed channels - e.g. default 4 ids appear when
+    // image is saved with 2 channels
+    // seems like an inconsistency in the store
     const ids = useChannelsStore(({ ids }) => ids);
+    const selections = useChannelsStore(({ selections }) => selections);
+    if (selections.length !== ids.length) {
+        console.error(
+            "selections and ids do not match",
+            selections,
+            ids,
+        );
+    }
     return (
         <div className="bg-[hsl(var(--input))] w-full">
             {ids.map((id, i) => (
-                <ChannelController key={id} index={i} />
+                <ErrorBoundary fallback={<ChannelError />} key={id}>
+                    <ChannelController key={id} index={i} />
+                </ErrorBoundary>
             ))}
             <AddChannel />
         </div>

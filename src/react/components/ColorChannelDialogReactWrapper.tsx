@@ -56,10 +56,10 @@ class ColorDialogReactWrapper extends BaseDialog {
         // I don't think there's any 'this' weirdness going on here...
         // some kind of react voodoo?
         if (this.root) this.root.unmount();
-        else
-            console.warn(
-                "not unmounting react root for dialog because of weirdness",
-            );
+        else {
+            //! this seems to be more of a problem than I thought.
+            console.warn("not unmounting react root for dialog because of weirdness");
+        }
     }
 }
 
