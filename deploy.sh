@@ -41,6 +41,15 @@ create_or_validate_env_file() {
     echo "$var_name=$new_value"
   }
 
+  DB_USER=$(prompt_variable "DB_USER" false)
+  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true)
+  DB_NAME=$(prompt_variable "DB_NAME" false)
+
+  # Set PostgreSQL variables
+  POSTGRES_USER=${DB_USER}
+  POSTGRES_PASSWORD=${DB_PASSWORD}
+  POSTGRES_DB=${DB_NAME}
+
   # Write new .env file
   {
     echo "# Flask Configuration"
@@ -48,14 +57,14 @@ create_or_validate_env_file() {
     echo "PYTHONUNBUFFERED=1"
 
     echo "# Database Configuration"
-    echo "$(prompt_variable "DB_USER" false)"
-    echo "$(prompt_variable "DB_PASSWORD" true)"
-    echo "$(prompt_variable "DB_NAME" false)"
+    echo "DB_USER=$DB_USER"
+    echo "DB_PASSWORD=$DB_PASSWORD"
+    echo "DB_NAME=$DB_NAME"
     echo "DB_HOST=mdv_db"  # Default without prompting
 
-    echo "POSTGRES_USER=$DB_USER"
-    echo "POSTGRES_PASSWORD=$DB_PASSWORD"
-    echo "POSTGRES_DB=$DB_NAME"
+    echo "POSTGRES_USER=$POSTGRES_USER"
+    echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
+    echo "POSTGRES_DB=$POSTGRES_DB"
 
     # Authentication
     read -p "Enable Authentication? (y/n): " enable_auth
@@ -123,7 +132,7 @@ mkdir -p app_logs && echo "Ensured app_logs directory exists."
 
 create_or_validate_env_file
 
-DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/auth_rbac/docker-secrets-local.yml"
+DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/auth_rbac/docker-compose-local.yml"
 run_docker_compose "$DOCKER_COMPOSE_URL"
 
 open_browser
