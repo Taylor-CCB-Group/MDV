@@ -1,23 +1,35 @@
-import axios from "axios";
 import { useEffect, useState } from "react";
 
+export type UserPermission = "View" | "Edit" | "Owner";
+
 export type SharedUser = {
-    name: string;
-    permission: string;
+    id: number;
+    email: string;
+    permission: UserPermission;
 };
 
-const users = [
-    { name: "Joe", permission: "edit" },
-    { name: "Pete", permission: "view" },
-    { name: "Matt", permission: "view" },
+export type RegisteredUser = {
+    id: number;
+    email: string;
+};
+
+const users: SharedUser[] = [
+    { id: 1, email: "joe@test.com", permission: "Edit" },
+    { id: 2, email: "pete@test.com", permission: "View" },
+    { id: 3, email: "matt@test.com", permission: "View" },
 ];
 
-const mockUserList = ["Joe", "Pete", "Matt"];
+const mockUserList: RegisteredUser[] = [
+    { id: 1, email: "joe@test.com" },
+    { id: 2, email: "pete@test.com" },
+    { id: 3, email: "matt@test.com" },
+];
 
 const useProjectShare = (projectId: string) => {
-    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
-    const [userList, setUserList] = useState<string[]>([]);
+    const [newUser, setNewUser] = useState<RegisteredUser>();
+    const [userList, setUserList] = useState<RegisteredUser[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<Error>();
 
@@ -34,14 +46,15 @@ const useProjectShare = (projectId: string) => {
         setIsLoading(true);
         try {
             // todo: Change the api endpoint
-            const res = await fetch(`users/${projectId}`, {
+            const res = await fetch(`projects/${projectId}/share`, {
                 headers: {
                     Accept: "application/json",
                 },
             });
             if (res.ok) {
-                // todo: update user list with this data
                 const data = await res.json();
+                // todo: update user list with this data
+                // setUserList();
                 console.log("getAllUsers", res);
             } else {
                 throw new Error("An unknown error occurred.")
@@ -59,13 +72,13 @@ const useProjectShare = (projectId: string) => {
         }
     };
 
-    const addUser = async (username: string) => {
+    const addUser = async (userId: number, permission: UserPermission) => {
         setIsLoading(true);
         try {
             // todo: Change the api endpoint
-            const res = await fetch("add_user", {
+            const res = await fetch(`projects/${projectId}/share`, {
                 method: "POST",
-                body: JSON.stringify({ username }),
+                body: JSON.stringify({ userId, permission }),
             });
 
             console.log("addUser", res);
@@ -77,24 +90,28 @@ const useProjectShare = (projectId: string) => {
             if (res.status === 500) {
                 throw new Error("Internal Server Error.");
             }
+
+            // todo: update shared users
+            // setSharedUsers();
+
         } catch (error) {
-            const err = error instanceof Error ? error : new Error("Error fetching users data.");
+            const err = error instanceof Error ? error : new Error("Error adding new user.");
             setError(err);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const updateSharedUsers = async (updatedUsers: any) => {
+    const changeUserPermission = async (userId: number, permission: UserPermission) => {
         setIsLoading(true);
         try {
             // todo: Change the api endpoint
-            const res = await fetch("update_users", {
+            const res = await fetch(`/projects/${projectId}/share/${userId}/edit`, {
                 method: "POST",
-                body: JSON.stringify({ users: updatedUsers }),
+                body: JSON.stringify({ userId, permission }),
             });
 
-            console.log("updateSharedUsers", res);
+            console.log("changeUserPermission", res);
 
             if (!res.ok) {
                 throw new Error("An unknown error occurred.");
@@ -103,8 +120,42 @@ const useProjectShare = (projectId: string) => {
             if (res.status === 500) {
                 throw new Error("Internal Server Error.");
             }
+
+            // todo: update shared users
+            // setSharedUsers();
+
         } catch (error) {
-            const err = error instanceof Error ? error : new Error("Error fetching users data.");
+            const err = error instanceof Error ? error : new Error("Error changing user permission.");
+            setError(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const deleteSharedUser = async (userId: number) => {
+        setIsLoading(true);
+        try {
+            // todo: Change the api endpoint
+            const res = await fetch(`/projects/${projectId}/share/${userId}/edit`, {
+                method: "POST",
+                // body: JSON.stringify({ user }),
+            });
+
+            console.log("deleteSharedUser", res);
+
+            if (!res.ok) {
+                throw new Error("An unknown error occurred.");
+            }
+
+            if (res.status === 500) {
+                throw new Error("Internal Server Error.");
+            }
+
+            // todo: update shared users
+            // setSharedUsers();
+            
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error("Error deleting user.");
             setError(err);
         } finally {
             setIsLoading(false);
@@ -112,16 +163,19 @@ const useProjectShare = (projectId: string) => {
     };
 
     return {
-        username,
-        setUsername,
+        email,
+        setEmail,
         sharedUsers,
         setSharedUsers,
         addUser,
-        updateSharedUsers,
         getAllUsers,
         isLoading,
         error,
         userList,
+        newUser,
+        setNewUser,
+        changeUserPermission,
+        deleteSharedUser,
     };
 };
 
