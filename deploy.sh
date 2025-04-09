@@ -35,22 +35,27 @@ create_or_validate_env_file() {
     local default_value=$3
     local current_value=${!var_name:-$default_value}
 
+    # Ensure each prompt starts on a new line
+    echo
+
     if [ "$hide_value" == "true" ]; then
-        # Hide input (use -s for silent mode, i.e., don't show what the user types)
+        # Hide input (silent mode)
         read -s -p "Enter value for $var_name [$current_value]: " new_value
-        echo  # To move to the next line after input
+        echo  # Move to the next line after input
     else
         # Show input with default value suggestion
         read -p "Enter value for $var_name [$current_value]: " new_value
+        echo  # Move to the next line after input
     fi
 
     new_value=${new_value:-$current_value}  # Use the new value or fallback to the current value
-    echo "$var_name=$new_value"
+    echo "$var_name=$new_value"  # Return the value assignment (not the value alone)
   }
+
 
   # Capture the output of prompt_variable and extract the values
   DB_USER=$(prompt_variable "DB_USER" false | cut -d'=' -f2)
-  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true | cut -d'=' -f2)
+  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true "defaultpass" | cut -d'=' -f2 | tr -d '\n' | xargs)
   DB_NAME=$(prompt_variable "DB_NAME" false | cut -d'=' -f2)
 
 
