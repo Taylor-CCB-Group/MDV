@@ -878,7 +878,7 @@ def register_routes(app, ENABLE_AUTH):
                         return error_response  # Return the error response if validation fails
 
                     # Fetch cached user-project permissions
-                    cached_user_projects = redis_client.get(f"user_projects:{user['id']}")
+                    cached_user_projects = redis_client.get(f"user:{user['id']}:projects")
                     
                     if cached_user_projects:
                         user_projects = json.loads(cached_user_projects)  # Use cached data
@@ -891,7 +891,7 @@ def register_routes(app, ENABLE_AUTH):
                         pid for pid, perms in user_projects.items()
                         if perms["can_read"] or perms["can_write"] or perms["is_owner"]
                     }
-                    filtered_projects = [p for p in active_projects if p["id"] in allowed_project_ids]
+                    filtered_projects = [p for p in active_projects if str(p["id"]) in allowed_project_ids]
                 else:
                     filtered_projects = active_projects  # No authentication, return all projects
 
@@ -900,7 +900,7 @@ def register_routes(app, ENABLE_AUTH):
                     {
                         "id": p["id"],
                         "name": p["name"],
-                        "lastModified": p["update_timestamp"]
+                        "lastModified": p["lastModified"]
                     }
                     for p in filtered_projects
                 ]
@@ -969,20 +969,42 @@ def register_routes(app, ENABLE_AUTH):
                         db.session.add(user_project)
                         db.session.commit()
                         
+                        
                         # Cache the project permissions for the admin user
-                        user_project_permissions = {
+                        cached_user_projects = redis_client.get(f"user:{admin_user_id}:projects")
+                        if cached_user_projects:
+                            user_project_permissions = json.loads(cached_user_projects)
+                        else:
+                            user_project_permissions = {}
+
+                        # Add/update permissions for the new project
+                        user_project_permissions[str(new_project.id)] = {
                             "can_read": user_project.can_read,
                             "can_write": user_project.can_write,
                             "is_owner": user_project.is_owner
                         }
+
+                        # Store updated user project permissions in Redis
                         redis_client.setex(f"user:{admin_user_id}:projects", 86400, json.dumps(user_project_permissions))
 
                         # Step 6: Cache the newly added project in Redis
-                        redis_client.setex(f"project:{new_project.id}", 86400, json.dumps({
+                        # Fetch the existing cached projects
+                        cached_projects = redis_client.get("projects:active")
+                        if cached_projects:
+                            projects_list = json.loads(cached_projects)
+                        else:
+                            projects_list = []
+
+                        # Append the new project
+                        new_project_entry = {
                             "id": new_project.id,
                             "name": new_project.name,
-                            "path": new_project.path
-                        }))
+                            "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                        }
+                        projects_list.append(new_project_entry)
+
+                        # Store the updated projects list back in Redis
+                        redis_client.setex("projects:active", 86400, json.dumps(projects_list))
                     
                     # Return the new project info
                     return jsonify({
@@ -1060,17 +1082,16 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 7: Update the cache for active projects (with is_deleted = True)
                 if ENABLE_AUTH:
                     cached_projects = redis_client.get("projects:active")
-                    
+    
                     if cached_projects:
                         active_projects = json.loads(cached_projects)
-                        # Mark the project as deleted in the active projects list
-                        for p in active_projects:
-                            if p["id"] == project_id:
-                                p["is_deleted"] = True  # Mark the project as deleted
                         
-                        # Save the updated list of active projects back to the cache
+                        # Remove the project from the active projects list
+                        active_projects = [p for p in active_projects if p["id"] != project_id]
+                        
+                        # Save the updated list back to the cache
                         redis_client.setex("projects:active", 86400, json.dumps(active_projects))
-                        print(f"In delete_project: Updated cache for active projects, marked project '{project_id}' as deleted.")
+                        print(f"In delete_project: Removed project '{project_id}' from cache.")
                     else:
                         print("In delete_project: Active projects not found in cache, skipping cache update.")
 
@@ -1191,6 +1212,328 @@ def register_routes(app, ENABLE_AUTH):
                 return jsonify({"status": "error", "message": "An unexpected error occurred."}), 500
         
         print("Route registered: /projects/<int:project_id>/access")
+
+        @app.route("/projects/<int:project_id>/share", methods=["GET", "POST"])
+        def share_project(project_id):
+            """Fetch users with whom the project is shared along with their permissions."""
+            try:
+                print(f"Sharing project '{project_id}'")
+
+                # Step 1: Skip authentication if not enabled
+                if not ENABLE_AUTH:
+                    print("Authentication is disabled, skipping authentication check.")
+                    return jsonify({"message": "Authentication is disabled, no action taken."})
+
+                # Step 2: Get the current user's information
+                user_data, error_response = validate_and_get_user(app)
+                if error_response:
+                    return error_response  # Unauthorized or error response
+                
+                user_id = user_data['id']  # The ID of the authenticated user
+
+                # Step 3: Fetch the current user's permissions for the project
+                cached_permissions = redis_client.get(f"user:{user_id}:projects")
+                if cached_permissions:
+                    user_projects = json.loads(cached_permissions)
+                else:
+                    user_projects = {
+                        str(proj.project_id): {
+                            "can_read": proj.can_read,
+                            "can_write": proj.can_write,
+                            "is_owner": proj.is_owner
+                        }
+                        for proj in UserProject.query.filter_by(user_id=user_id).all()
+                    }
+
+                # Step 4: Validate if the user is the owner of the project
+                project_permissions = user_projects.get(str(project_id))  # Use string keys for consistency
+                if not project_permissions or not project_permissions["is_owner"]:
+                    return jsonify({"error": "Only the project owner can share the project"}), 403
+
+                # Step 5: Get list of users with project permissions
+                shared_users_list = []
+                all_users_keys = redis_client.keys("user:*:projects")  # Get all user project caches
+
+                for user_key in all_users_keys:
+                    user_id_key = user_key.split(":")[1]  # Extract user_id from key
+                    cached_user_projects = redis_client.get(user_key)
+                    
+                    if cached_user_projects:
+                        user_project_permissions = json.loads(cached_user_projects)
+                        project_permission = user_project_permissions.get(str(project_id))  # Get permission for this project
+                        
+                        if project_permission:
+                            # Fetch user details from cache
+                            cached_user_data = redis_client.get(f"user:{user_id_key}")
+                            if cached_user_data:
+                                user_data = json.loads(cached_user_data)
+                            else:
+                                user_obj = User.query.get(user_id_key)
+                                if user_obj:
+                                    user_data = {
+                                        "id": user_obj.id,
+                                        "email": user_obj.email
+                                    }
+                                    redis_client.setex(f"user:{user_id_key}", 86400, json.dumps(user_data))
+                                else:
+                                    continue
+
+                            shared_users_list.append({
+                                "id": user_data["id"],
+                                "email": user_data["email"],
+                                "permission": (
+                                    "Owner" if project_permission["is_owner"] else "Edit" if project_permission["can_write"] else "View"
+                                )
+                            })
+                
+                # Step 6: Fetch the list of all users for the dropdown
+                all_users = []
+                all_users_in_db = User.query.all()  # Fetch all users from DB
+                for user in all_users_in_db:
+                    # Add users who are not already shared in the project
+                    if not any(user["id"] == u["id"] for u in shared_users_list):
+                        all_users.append({
+                            "id": user.id,
+                            "email": user.email
+                        })
+
+                # Return the list of users with permissions, and all users for the dropdown
+                return jsonify({
+                    "shared_users": shared_users_list,
+                    "all_users": all_users  # List of all users to populate the dropdown
+                })
+            
+            except Exception as e:
+                print(f"Error in share_project: {e}")
+                return jsonify({"status": "error", "message": str(e)}), 500
+            
+        @app.route("/projects/<int:project_id>/share", methods=["POST"])
+        def add_user_to_project(project_id):
+            """Add a user to the project with specified permissions."""
+            try:
+                print(f"Adding user to project '{project_id}'")
+
+                # Step 1: Skip authentication if not enabled
+                if not ENABLE_AUTH:
+                    print("Authentication is disabled, skipping authentication check.")
+                    return jsonify({"message": "Authentication is disabled, no action taken."})
+
+                # Step 2: Get the current user's information
+                user_data, error_response = validate_and_get_user(app)
+                if error_response:
+                    return error_response  # Unauthorized or error response
+                
+                user_id = user_data['id']  # The ID of the authenticated user
+
+                # Step 3: Fetch the current user's permissions for the project
+                cached_permissions = redis_client.get(f"user:{user_id}:projects")
+                if cached_permissions:
+                    user_projects = json.loads(cached_permissions)
+                else:
+                    user_projects = {
+                        str(proj.project_id): {
+                            "can_read": proj.can_read,
+                            "can_write": proj.can_write,
+                            "is_owner": proj.is_owner
+                        }
+                        for proj in UserProject.query.filter_by(user_id=user_id).all()
+                    }
+
+                # Step 4: Validate if the user is the owner of the project
+                project_permissions = user_projects.get(str(project_id))  # Use string keys for consistency
+                if not project_permissions or not project_permissions["is_owner"]:
+                    return jsonify({"error": "Only the project owner can share the project"}), 403
+
+                # Step 5: Get data from the POST request
+                data = request.get_json()
+                target_user_id = data.get('user_id')  # User to be added
+                permission = data.get('permission')  # "view", "edit", or "owner"
+
+                if not target_user_id or permission not in ["view", "edit", "owner"]:
+                    return jsonify({"error": "Invalid user or permission"}), 400
+                
+                # Step 6: Add the user to the project with the specified permission
+                user_project = UserProject.query.filter_by(user_id=target_user_id, project_id=project_id).first()
+                
+                if not user_project:
+                    # Create new record if the user is not already in the project
+                    user_project = UserProject(
+                        user_id=target_user_id,
+                        project_id=project_id,
+                        can_read=(permission == "view"),
+                        can_write=(permission in ["edit", "owner"]),
+                        is_owner=(permission == "owner")
+                    )
+                    db.session.add(user_project)
+                    db.session.commit()
+
+                    # Cache the newly added permission for the user
+                    cached_user_projects = redis_client.get(f"user:{target_user_id}:projects")
+                    if cached_user_projects:
+                        user_projects_data = json.loads(cached_user_projects)
+                    else:
+                        user_projects_data = {}
+
+                    user_projects_data[str(project_id)] = {
+                        "can_read": (permission == "view"),
+                        "can_write": (permission in ["edit", "owner"]),
+                        "is_owner": (permission == "owner")
+                    }
+                    redis_client.setex(f"user:{target_user_id}:projects", 86400, json.dumps(user_projects_data))
+
+                return jsonify({"message": f"User {target_user_id} added to project {project_id} with {permission} permission."}), 200
+
+            except Exception as e:
+                print(f"Error in add_user_to_project: {e}")
+                return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+        @app.route("/projects/<int:project_id>/share/<int:user_id>/edit", methods=["POST"])
+        def edit_user_permission(project_id, user_id):
+            """Edit user permissions for a project."""
+            try:
+                print(f"Editing permissions for user '{user_id}' in project '{project_id}'")
+
+                # Step 1: Ensure authentication is enabled
+                if not ENABLE_AUTH:
+                    print("Authentication is disabled, skipping authentication check.")
+                    # If authentication is disabled, simply return and stop execution
+                    return jsonify({"message": "Authentication is disabled, no action taken."})
+
+                user_data, error_response = validate_and_get_user(app)
+                if error_response:
+                    return error_response  # Unauthorized or error response
+
+                current_user_id = user_data['id']  # The ID of the authenticated user
+
+                # Fetch user's permissions for the project
+                cached_permissions = redis_client.get(f"user:{current_user_id}:projects")
+                if cached_permissions:
+                    user_projects = json.loads(cached_permissions)
+                else:
+                    user_projects = {
+                        str(proj.project_id): {
+                            "can_read": proj.can_read,
+                            "can_write": proj.can_write,
+                            "is_owner": proj.is_owner
+                        }
+                        for proj in UserProject.query.filter_by(user_id=current_user_id).all()
+                    }
+
+                # Validate if the user is the **owner** of the project
+                project_permissions = user_projects.get(str(project_id))
+                if not project_permissions or not project_permissions["is_owner"]:
+                    return jsonify({"error": "Only the project owner can edit permissions"}), 403
+
+                # Step 2: Fetch new permissions from the request
+                new_permission = request.json.get("permission")
+                if new_permission not in ["Owner", "Edit", "View"]:
+                    return jsonify({"error": "Invalid permission value"}), 400
+                
+                # Step 3: Update the permission in the cache and database
+                # Fetch the user's project permissions
+                user_project_key = f"user:{user_id}:projects"
+                cached_user_permissions = redis_client.get(user_project_key)
+                if cached_user_permissions:
+                    user_project_permissions = json.loads(cached_user_permissions)
+                else:
+                    user_project_permissions = {}  # Fallback in case of cache miss
+                
+                # Update the user's permission
+                if str(project_id) in user_project_permissions:
+                    if new_permission == "Owner":
+                        user_project_permissions[str(project_id)]["is_owner"] = True
+                        user_project_permissions[str(project_id)]["can_write"] = True
+                    elif new_permission == "Edit":
+                        user_project_permissions[str(project_id)]["is_owner"] = False
+                        user_project_permissions[str(project_id)]["can_write"] = True
+                    elif new_permission == "View":
+                        user_project_permissions[str(project_id)]["is_owner"] = False
+                        user_project_permissions[str(project_id)]["can_write"] = False
+                    
+                    # Save the updated permission back to the cache
+                    redis_client.setex(user_project_key, 86400, json.dumps(user_project_permissions))
+
+                    # Update the DB as well
+                    user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+                    if user_project:
+                        user_project.can_read = user_project_permissions[str(project_id)]["can_read"]
+                        user_project.can_write = user_project_permissions[str(project_id)]["can_write"]
+                        user_project.is_owner = user_project_permissions[str(project_id)]["is_owner"]
+                        db.session.commit()
+
+                    return jsonify({"message": "Permissions updated successfully"})
+                
+                return jsonify({"error": "User does not have permissions for this project"}), 404
+            
+            except Exception as e:
+                print(f"Error in edit_user_permission: {e}")
+                return jsonify({"error": str(e)}), 500
+            
+        @app.route("/projects/<int:project_id>/share/<int:user_id>/delete", methods=["POST"])
+        def delete_user_from_project(project_id, user_id):
+            """Remove a user from the project."""
+            try:
+                print(f"Removing user '{user_id}' from project '{project_id}'")
+
+                # Step 1: Ensure authentication is enabled
+                if not ENABLE_AUTH:
+                    print("Authentication is disabled, skipping authentication check.")
+                    # If authentication is disabled, simply return and stop execution
+                    return jsonify({"message": "Authentication is disabled, no action taken."})
+
+                user_data, error_response = validate_and_get_user(app)
+                if error_response:
+                    return error_response  # Unauthorized or error response
+
+                current_user_id = user_data['id']  # The ID of the authenticated user
+
+                # Fetch user's permissions for the project
+                cached_permissions = redis_client.get(f"user:{current_user_id}:projects")
+                if cached_permissions:
+                    user_projects = json.loads(cached_permissions)
+                else:
+                    user_projects = {
+                        str(proj.project_id): {
+                            "can_read": proj.can_read,
+                            "can_write": proj.can_write,
+                            "is_owner": proj.is_owner
+                        }
+                        for proj in UserProject.query.filter_by(user_id=current_user_id).all()
+                    }
+
+                # Validate if the user is the **owner** of the project
+                project_permissions = user_projects.get(str(project_id))
+                if not project_permissions or not project_permissions["is_owner"]:
+                    return jsonify({"error": "Only the project owner can remove users"}), 403
+
+                # Step 2: Remove the user from the project
+                user_project_key = f"user:{user_id}:projects"
+                cached_user_permissions = redis_client.get(user_project_key)
+                if cached_user_permissions:
+                    user_project_permissions = json.loads(cached_user_permissions)
+                    if str(project_id) in user_project_permissions:
+                        del user_project_permissions[str(project_id)]  # Remove the project permissions
+
+                        # Save the updated permissions back to the cache
+                        redis_client.setex(user_project_key, 86400, json.dumps(user_project_permissions))
+
+                        # Remove from the DB as well
+                        user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+                        if user_project:
+                            db.session.delete(user_project)
+                            db.session.commit()
+
+                        return jsonify({"message": "User removed successfully"})
+                
+                return jsonify({"error": "User is not part of the project"}), 404
+            
+            except Exception as e:
+                print(f"Error in delete_user_from_project: {e}")
+                return jsonify({"error": str(e)}), 500
+
+
 
     except Exception as e:
         print(f"Error registering routes: {e}")
