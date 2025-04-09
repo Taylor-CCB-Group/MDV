@@ -58,10 +58,10 @@ def main():
     size = [792, 472]
     position = [10, 10]
 
-    color = "#377eb8"
+    color = "param3"
     brush = "poly"
     opacity = 0.8
-    radius = 0.2
+    radius = 4
 
     legend_display = True
     legend_position = [375,1]

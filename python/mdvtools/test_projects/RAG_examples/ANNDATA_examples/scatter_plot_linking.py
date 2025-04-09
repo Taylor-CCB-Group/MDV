@@ -64,7 +64,7 @@ def main():
     color = f"gs|{param_color}(gs)|{param_color_index}"
     brush = "poly"
     opacity = 0.8
-    radius = 0.2
+    radius = 4
 
     legend_display = True
     legend_position = [375,1]

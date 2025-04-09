@@ -84,7 +84,7 @@ def main():
     scatter_size = [792, 472]
     scatter_position = [820, 10]
 
-    scatter_color = "#377eb8"
+    scatter_color = "param6"
     scatter_brush = "poly"
     scatter_opacity = 0.8
     scatter_radius = 0.2

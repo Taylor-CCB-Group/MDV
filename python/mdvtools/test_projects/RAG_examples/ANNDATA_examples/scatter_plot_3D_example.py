@@ -56,16 +56,15 @@ def main():
     params = ["param1", "param2", "param3"] #param1, param2 and param3 should all be a numerical variables
     size = [300, 300]
     position = [10, 10]
-    center = [0,2000,2000]
+    center = [44.495425,-7.910625500000002,10.481393999999998]
 
-    color = "#377eb8"
+    color = "param4"
     brush = "default"
     radius = 9.0
     opacity = 0.8
     category_color = "categorial variable"
     
-    camera={"distance": 0.05, "theta": 0.1, "phi": 0.261}
-
+    camera={"distance":660.6206799999997,"theta":-1.038,"phi":0.261}
 
     # Create plot
     scatter_plot = create_scatter_plot(title, params, size, position, color, brush, opacity, radius, camera, center, category_color)
