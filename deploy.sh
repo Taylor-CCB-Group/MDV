@@ -35,15 +35,24 @@ create_or_validate_env_file() {
     local default_value=$3
     local current_value=${!var_name:-$default_value}
 
-    read -p "Enter value for $var_name [$current_value]: " new_value
-    new_value=${new_value:-$current_value}
+    if [ "$hide_value" == "true" ]; then
+        # Hide input (use -s for silent mode, i.e., don't show what the user types)
+        read -s -p "Enter value for $var_name [$current_value]: " new_value
+        echo  # To move to the next line after input
+    else
+        # Show input with default value suggestion
+        read -p "Enter value for $var_name [$current_value]: " new_value
+    fi
 
+    new_value=${new_value:-$current_value}  # Use the new value or fallback to the current value
     echo "$var_name=$new_value"
   }
 
-  DB_USER=$(prompt_variable "DB_USER" false)
-  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true)
-  DB_NAME=$(prompt_variable "DB_NAME" false)
+  # Capture the output of prompt_variable and extract the values
+  DB_USER=$(prompt_variable "DB_USER" false | cut -d'=' -f2)
+  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true | cut -d'=' -f2)
+  DB_NAME=$(prompt_variable "DB_NAME" false | cut -d'=' -f2)
+
 
   # Set PostgreSQL variables
   POSTGRES_USER=${DB_USER}
