@@ -324,6 +324,7 @@ def cache_user_projects():
 
         # Fetch all users from the database
         users = User.query.all()
+        all_users = [] 
 
         for user in users:
             # Cache user details
@@ -335,6 +336,13 @@ def cache_user_projects():
             }
             redis_client.setex(f"user:{user.auth0_id}", 86400, json.dumps(user_data))  # Cache for 24 hours
 
+            # Add user to the all_users list
+            all_users.append({
+                "id": user.id,
+                "auth0_id": user.auth0_id,
+                "email": user.email,
+                "is_admin": user.is_admin
+            })
 
             # Fetch project permissions for the user
             user_projects = UserProject.query.filter_by(user_id=user.id).all()
@@ -350,6 +358,9 @@ def cache_user_projects():
 
             # Cache project permissions as a JSON string
             redis_client.setex(f"user:{user.id}:projects", 86400, json.dumps(project_permissions))
+
+        # Cache the list of all users globally under the key 'users:all'
+        redis_client.setex("users:all", 86400, json.dumps(all_users))
 
         print(f"Cached {len(users)} users and their project permissions.")
         return True
@@ -1288,15 +1299,36 @@ def register_routes(app, ENABLE_AUTH):
                 
                 # Step 6: Fetch the list of all users for the dropdown
                 all_users = []
-                all_users_in_db = User.query.all()  # Fetch all users from DB
-                for user in all_users_in_db:
-                    # Add users who are not already shared in the project
-                    if not any(user["id"] == u["id"] for u in shared_users_list):
-                        all_users.append({
-                            "id": user.id,
-                            "email": user.email
-                        })
 
+                # Check if the list of all users is cached
+                all_users_in_cache = redis_client.get("users:all")  # Try to fetch the list of all users from cache
+
+                if all_users_in_cache:
+                    # If cached, parse the JSON data
+                    all_users_in_db = json.loads(all_users_in_cache)
+                    print(all_users_in_db)
+                    # Now filter out users who are already shared in the project
+                    for user in all_users_in_db:
+                        # If the user is not already in the shared_users_list, add to available users
+                        if not any(user["id"] == u["id"] for u in shared_users_list):
+                            all_users.append({
+                                "id": user["id"],  # Access the id if using cached data
+                                "email": user["email"]  # Access the email if using cached data
+                            })
+
+                else:
+                    # If not cached, fetch all users from the database and cache the result
+                    all_users_in_db = User.query.all()
+                    # Cache the result for future use (set expiry to 86400 seconds or 1 day)
+                    redis_client.setex("users:all", 86400, json.dumps([user.to_dict() for user in all_users_in_db]))
+
+                    # Now filter out users who are already shared in the project
+                    for user in all_users_in_db:
+                        if not any(user.id == u["id"] for u in shared_users_list):
+                            all_users.append({
+                                "id": user.id,
+                                "email": user.email
+                            })
                 # Return the list of users with permissions, and all users for the dropdown
                 return jsonify({
                     "shared_users": shared_users_list,
