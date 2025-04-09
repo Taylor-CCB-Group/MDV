@@ -17,9 +17,10 @@ import FileUploadDialogReact from "@/charts/dialogs/FileUploadDialogWrapper";
 import { toPng } from "html-to-image";
 import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
 import BaseChart from "@/charts/BaseChart";
-import { getBuildInfo, useProject } from "@/modules/ProjectContext";
+import { useProject } from "@/modules/ProjectContext";
 import DebugChartReactWrapper from "./DebugJsonDialogReactWrapper";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
+import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 
 const MenuBarComponent = () => {
     const cm = window.mdv.chartManager;
@@ -64,7 +65,7 @@ const MenuBarComponent = () => {
             const { class: omit, ...props } = v;
             return [k, props];
         });
-        const buildInfo = getBuildInfo();
+        const { buildInfo } = useBuildInfo();
         new DebugChartReactWrapper({ chartTypes, datasources, views, state, buildInfo });
     };
 
