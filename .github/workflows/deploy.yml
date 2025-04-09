@@ -48,7 +48,7 @@ jobs:
           
           docker buildx build --platform linux/amd64 \
             -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} \
-            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:latest \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:rbac \
             --push .
 
 
