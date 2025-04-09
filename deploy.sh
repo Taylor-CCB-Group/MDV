@@ -35,11 +35,29 @@ create_or_validate_env_file() {
     local default_value=$3
     local current_value=${!var_name:-$default_value}
 
-    read -p "Enter value for $var_name [$current_value]: " new_value
-    new_value=${new_value:-$current_value}
+    if [ "$hide_value" == "true" ]; then
+        # Hide input (use -s for silent mode, i.e., don't show what the user types)
+        read -s -p "Enter value for $var_name [$current_value]: " new_value
+        echo  # To move to the next line after input
+    else
+        # Show input with default value suggestion
+        read -p "Enter value for $var_name [$current_value]: " new_value
+    fi
 
+    new_value=${new_value:-$current_value}  # Use the new value or fallback to the current value
     echo "$var_name=$new_value"
   }
+
+  # Capture the output of prompt_variable and extract the values
+  DB_USER=$(prompt_variable "DB_USER" false | cut -d'=' -f2)
+  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true | cut -d'=' -f2)
+  DB_NAME=$(prompt_variable "DB_NAME" false | cut -d'=' -f2)
+
+
+  # Set PostgreSQL variables
+  POSTGRES_USER=${DB_USER}
+  POSTGRES_PASSWORD=${DB_PASSWORD}
+  POSTGRES_DB=${DB_NAME}
 
   # Write new .env file
   {
@@ -48,14 +66,14 @@ create_or_validate_env_file() {
     echo "PYTHONUNBUFFERED=1"
 
     echo "# Database Configuration"
-    echo "$(prompt_variable "DB_USER" false)"
-    echo "$(prompt_variable "DB_PASSWORD" true)"
-    echo "$(prompt_variable "DB_NAME" false)"
+    echo "DB_USER=$DB_USER"
+    echo "DB_PASSWORD=$DB_PASSWORD"
+    echo "DB_NAME=$DB_NAME"
     echo "DB_HOST=mdv_db"  # Default without prompting
 
-    echo "POSTGRES_USER=$DB_USER"
-    echo "POSTGRES_PASSWORD=$DB_PASSWORD"
-    echo "POSTGRES_DB=$DB_NAME"
+    echo "POSTGRES_USER=$POSTGRES_USER"
+    echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
+    echo "POSTGRES_DB=$POSTGRES_DB"
 
     # Authentication
     read -p "Enable Authentication? (y/n): " enable_auth
@@ -123,7 +141,7 @@ mkdir -p app_logs && echo "Ensured app_logs directory exists."
 
 create_or_validate_env_file
 
-DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/auth_rbac/docker-secrets-local.yml"
+DOCKER_COMPOSE_URL="https://raw.githubusercontent.com/Taylor-CCB-Group/MDV/auth_rbac/docker-compose-local.yml"
 run_docker_compose "$DOCKER_COMPOSE_URL"
 
 open_browser
