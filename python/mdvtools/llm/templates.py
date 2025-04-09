@@ -37,8 +37,8 @@ Your task is to:
     - Row summary box: Requires any column(s).  
     - Sankey diagram: Requires two categorical columns.  
       - If only one categorical variable is available, return it twice.  
-    - Scatter plot (2D): Requires two numerical columns.  
-    - Scatter plot (3D): Requires three numerical columns and one categorical column for color.  
+    - Scatter plot (2D): Requires two numerical columns and one any column for color.
+    - Scatter plot (3D): Requires three numerical columns and one any column for color.  
     - Selection dialog plot: Requires any column.  
     - Stacked row chart: Requires two categorical columns.  
       - If only one categorical variable is available, return it twice.  
@@ -47,7 +47,7 @@ Your task is to:
     - Violin plot: Requires one categorical column and one numerical column.  
     - Wordcloud: Requires one categorical column.  
 8. Important: Clearly separate the selected columns with quotes and commas.
-9. NEVER explain your reasoning. Only return the string: `"col1", "col2", "col3"`
+9. NEVER explain your reasoning. Only return the required columns as a string: `"col1", "col2", "col3"`
 """
 
 prompt_data_original = """
@@ -310,10 +310,10 @@ Each script follows this standard workflow:
     - Only wrap genes—do not apply `get_loc()` or `index` on `data_frame_obs` fields.
 
 7. Your Task:
-    - Interpret the user question: """+question+"""
-    - Use the fields in """+final_answer+""" as params appropriately:
+    - Interpret the user question and decide based on the question which graph needs to be plotted: """+question+"""
+    - Use the fields """+final_answer+""" as params appropriately:
         - Wrap only gene names as shown.
-        - Use others directly.
+        - Use others directly. Fields are case sensitive.
     - Use formatted f-strings for all dynamic strings.
     - Generate a valid Python script that creates and visualizes the appropriate chart using the MDVProject framework.
     - Update these variables with these values:

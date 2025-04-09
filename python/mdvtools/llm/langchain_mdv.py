@@ -309,7 +309,7 @@ class ProjectChat(ProjectChatProtocol):
                     "Pandas agent invoking...", id, progress, 31
                 )
                 progress += 31
-                response = self.agent(full_prompt)#(question)
+                response = self.agent(question)#(full_prompt)#(question)
                 chat_debug_logger.info(f"Agent Response - output: {response['output']}")
                 # assert "output" in response  # there are situations where this will cause unnecessary errors
             with time_block("b11: RAG prompt preparation"):  # ~0.003% of time
