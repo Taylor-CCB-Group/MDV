@@ -318,7 +318,7 @@ def cache_user_projects():
     - Caches project permissions with keys: `user:{user_id}:projects`
     """
     try:
-        redis_client = Redis(host='redis', port=6379, db=0)
+        redis_client = Redis(host='redis', port=6380, db=0)
         
         print("Caching user details and project permissions...")
 
@@ -768,7 +768,7 @@ def validate_and_get_user(app):
     :return: Tuple (user object as dict, error response)
     """
     try:
-        redis_client = Redis(host='redis', port=6379, db=0)
+        redis_client = Redis(host='redis', port=6380, db=0)
 
         auth0_provider = Auth0Provider(
             app,
@@ -825,7 +825,7 @@ def register_routes(app, ENABLE_AUTH):
 
     # Initialize Redis client only if ENABLE_AUTH is True
     if ENABLE_AUTH:
-        redis_client = Redis(host='redis', port=6379, db=0, decode_responses=True)
+        redis_client = Redis(host='redis', port=6380, db=0, decode_responses=True)
         print("Redis client initialized for caching.")
     else:
         redis_client = None  # No Redis client if authentication is not enabled
