@@ -13,18 +13,6 @@ export type RegisteredUser = {
     email: string;
 };
 
-const users: SharedUser[] = [
-    { id: 1, email: "joe@test.com", permission: "Edit" },
-    { id: 2, email: "pete@test.com", permission: "View" },
-    { id: 3, email: "matt@test.com", permission: "View" },
-];
-
-const mockUserList: RegisteredUser[] = [
-    { id: 1, email: "joe@test.com" },
-    { id: 2, email: "pete@test.com" },
-    { id: 3, email: "matt@test.com" },
-];
-
 const useProjectShare = (projectId: string) => {
     const [email, setEmail] = useState("");
     const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
@@ -35,9 +23,6 @@ const useProjectShare = (projectId: string) => {
 
     useEffect(() => {
         if (projectId) {
-            // setUserList(mockUserList);
-            // setSharedUsers(users);
-            // todo: uncomment later
             getAllUsers();
         }
     }, [projectId]);
@@ -45,7 +30,6 @@ const useProjectShare = (projectId: string) => {
     const getAllUsers = async () => {
         setIsLoading(true);
         try {
-            // todo: Change the api endpoint
             const res = await fetch(`projects/${projectId}/share`, {
                 headers: {
                     Accept: "application/json",
@@ -53,7 +37,6 @@ const useProjectShare = (projectId: string) => {
             });
             if (res.ok) {
                 const data = await res.json();
-                // todo: update user list with this data
                 if (data?.all_users)    setUserList(data.all_users);
                 if (data?.shared_users) setSharedUsers(data.shared_users);
                 console.log("getAllUsers", data);
@@ -76,10 +59,9 @@ const useProjectShare = (projectId: string) => {
     const addUser = async (userId: number, permission: UserPermission) => {
         setIsLoading(true);
         try {
-            // todo: Change the api endpoint
             const res = await fetch(`projects/${projectId}/share`, {
                 method: "POST",
-                body: JSON.stringify({ userId, permission }),
+                body: JSON.stringify({ userId, permission: permission.toLowerCase() }),
             });
 
             console.log("addUser", res);
@@ -92,8 +74,6 @@ const useProjectShare = (projectId: string) => {
                 throw new Error("Internal Server Error.");
             }
 
-            // todo: update shared users
-            // setSharedUsers();
             await getAllUsers();
 
         } catch (error) {
@@ -107,10 +87,9 @@ const useProjectShare = (projectId: string) => {
     const changeUserPermission = async (userId: number, permission: UserPermission) => {
         setIsLoading(true);
         try {
-            // todo: Change the api endpoint
             const res = await fetch(`/projects/${projectId}/share/${userId}/edit`, {
                 method: "POST",
-                body: JSON.stringify({ userId, permission }),
+                body: JSON.stringify({ permission }),
             });
 
             console.log("changeUserPermission", res);
@@ -123,8 +102,6 @@ const useProjectShare = (projectId: string) => {
                 throw new Error("Internal Server Error.");
             }
 
-            // todo: update shared users
-            // setSharedUsers();
             await getAllUsers();
         } catch (error) {
             const err = error instanceof Error ? error : new Error("Error changing user permission.");
@@ -137,10 +114,8 @@ const useProjectShare = (projectId: string) => {
     const deleteSharedUser = async (userId: number) => {
         setIsLoading(true);
         try {
-            // todo: Change the api endpoint
-            const res = await fetch(`/projects/${projectId}/share/${userId}/edit`, {
+            const res = await fetch(`/projects/${projectId}/share/${userId}/delete`, {
                 method: "POST",
-                // body: JSON.stringify({ user }),
             });
 
             console.log("deleteSharedUser", res);
@@ -153,8 +128,6 @@ const useProjectShare = (projectId: string) => {
                 throw new Error("Internal Server Error.");
             }
 
-            // todo: update shared users
-            // setSharedUsers();
             await getAllUsers();
 
         } catch (error) {

@@ -47,7 +47,6 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
 
     const handleAddNewUser = async () => {
         if (newUser) {
-            // todo: update api logic
             await addUser(newUser.id, "View");
             console.log("new user", newUser);
             setEmail("");
