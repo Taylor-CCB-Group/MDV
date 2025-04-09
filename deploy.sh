@@ -54,9 +54,9 @@ create_or_validate_env_file() {
 
 
   # Capture the output of prompt_variable and extract the values
-  DB_USER=$(prompt_variable "DB_USER" false | cut -d'=' -f2)
-  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true "defaultpass" | cut -d'=' -f2 | tr -d '\n' | xargs)
-  DB_NAME=$(prompt_variable "DB_NAME" false | cut -d'=' -f2)
+  DB_USER=$(prompt_variable "DB_USER" false | cut -d'=' -f2 | tr -d '\n' | xargs)
+  DB_PASSWORD=$(prompt_variable "DB_PASSWORD" true | cut -d'=' -f2 | tr -d '\n' | xargs)
+  DB_NAME=$(prompt_variable "DB_NAME" false | cut -d'=' -f2 | tr -d '\n' | xargs)
 
 
   # Set PostgreSQL variables
