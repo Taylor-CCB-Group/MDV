@@ -130,7 +130,7 @@ run_docker_compose() {
 
 # Function to open the application in the browser
 open_browser() {
-  URL="https://localhost:5055"
+  URL="http://localhost:5055"
   echo "Application deployed successfully!"
   echo "Open $URL in your browser."
 }
