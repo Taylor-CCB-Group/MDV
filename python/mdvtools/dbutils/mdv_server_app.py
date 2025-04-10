@@ -1379,7 +1379,7 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 5: Get data from the POST request
                 data = request.get_json()
                 target_user_id = data.get('user_id')  # User to be added
-                permission = data.get('permission')  # "view", "edit", or "owner"
+                permission = data.get('permission', 'view')  # "view", "edit", or "owner"
 
                 if not target_user_id or permission not in ["view", "edit", "owner"]:
                     return jsonify({"error": "Invalid user or permission"}), 400
