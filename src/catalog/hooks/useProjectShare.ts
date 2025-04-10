@@ -64,6 +64,7 @@ const useProjectShare = (projectId: string) => {
                 body: JSON.stringify({ user_id: userId, permission: permission.toLowerCase() }),
                 headers: {
                     "Content-Type": "application/json",
+                    Accept: "application/json",
                 }
             });
 
@@ -95,6 +96,7 @@ const useProjectShare = (projectId: string) => {
                 body: JSON.stringify({ permission }),
                 headers: {
                     "Content-Type": "application/json",
+                    Accept: "application/json",
                 }
             });
 
@@ -122,6 +124,9 @@ const useProjectShare = (projectId: string) => {
         try {
             const res = await fetch(`/projects/${projectId}/share/${userId}/delete`, {
                 method: "POST",
+                headers: {
+                    Accept: "application/json",
+                }
             });
 
             console.log("deleteSharedUser", res);
