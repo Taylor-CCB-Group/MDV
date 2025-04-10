@@ -62,6 +62,9 @@ const useProjectShare = (projectId: string) => {
             const res = await fetch(`projects/${projectId}/share`, {
                 method: "POST",
                 body: JSON.stringify({ user_id: userId, permission: permission.toLowerCase() }),
+                headers: {
+                    "Content-Type": "application/json",
+                }
             });
 
             console.log("addUser", res);
@@ -90,6 +93,9 @@ const useProjectShare = (projectId: string) => {
             const res = await fetch(`/projects/${projectId}/share/${userId}/edit`, {
                 method: "POST",
                 body: JSON.stringify({ permission }),
+                headers: {
+                    "Content-Type": "application/json",
+                }
             });
 
             console.log("changeUserPermission", res);
