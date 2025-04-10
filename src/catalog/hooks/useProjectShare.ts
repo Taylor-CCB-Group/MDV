@@ -91,7 +91,7 @@ const useProjectShare = (projectId: string) => {
     const changeUserPermission = async (userId: number, permission: UserPermission) => {
         setIsLoading(true);
         try {
-            const res = await fetch(`/projects/${projectId}/share/${userId}/edit`, {
+            const res = await fetch(`projects/${projectId}/share/${userId}/edit`, {
                 method: "POST",
                 body: JSON.stringify({ permission }),
                 headers: {
@@ -122,7 +122,7 @@ const useProjectShare = (projectId: string) => {
     const deleteSharedUser = async (userId: number) => {
         setIsLoading(true);
         try {
-            const res = await fetch(`/projects/${projectId}/share/${userId}/delete`, {
+            const res = await fetch(`projects/${projectId}/share/${userId}/delete`, {
                 method: "POST",
                 headers: {
                     Accept: "application/json",
