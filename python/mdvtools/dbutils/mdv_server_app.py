@@ -1224,7 +1224,7 @@ def register_routes(app, ENABLE_AUTH):
         
         print("Route registered: /projects/<int:project_id>/access")
 
-        @app.route("/projects/<int:project_id>/share", methods=["GET", "POST"])
+        @app.route("/projects/<int:project_id>/share", methods=["GET"])
         def share_project(project_id):
             """Fetch users with whom the project is shared along with their permissions."""
             try:
