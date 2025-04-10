@@ -41,7 +41,12 @@ const useProjectShare = (projectId: string) => {
                 if (data?.shared_users) setSharedUsers(data.shared_users);
                 console.log("getAllUsers", data);
             } else {
-                throw new Error("An unknown error occurred.")
+                const data = await res.json();
+                if (data?.error) {
+                    throw new Error(data?.error);
+                } else {
+                    throw new Error("An unknown error occurred.");
+                }
             }
 
 
@@ -71,7 +76,12 @@ const useProjectShare = (projectId: string) => {
             console.log("addUser", res);
 
             if (!res.ok) {
-                throw new Error("An unknown error occurred.");
+                const data = await res.json();
+                if (data?.error) {
+                    throw new Error(data?.error);
+                } else {
+                    throw new Error("An unknown error occurred.");
+                }
             }
 
             if (res.status === 500) {
@@ -103,7 +113,12 @@ const useProjectShare = (projectId: string) => {
             console.log("changeUserPermission", res);
 
             if (!res.ok) {
-                throw new Error("An unknown error occurred.");
+                const data = await res.json();
+                if (data?.error) {
+                    throw new Error(data?.error);
+                } else {
+                    throw new Error("An unknown error occurred.");
+                }
             }
 
             if (res.status === 500) {
@@ -132,7 +147,12 @@ const useProjectShare = (projectId: string) => {
             console.log("deleteSharedUser", res);
 
             if (!res.ok) {
-                throw new Error("An unknown error occurred.");
+                const data = await res.json();
+                if (data?.error) {
+                    throw new Error(data?.error);
+                } else {
+                    throw new Error("An unknown error occurred.");
+                }
             }
 
             if (res.status === 500) {

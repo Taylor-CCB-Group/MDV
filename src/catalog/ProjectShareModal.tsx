@@ -93,9 +93,14 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
             <DialogContent dividers>
                 <Box sx={{ mt: 2 }}>
                     {error ? (
-                        <div>
-                            <ErrorDisplay error={error} />
-                        </div>
+                        <Box sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            height: "20vh",
+                        }}>
+                            <Typography variant="h6" color="error">{error.message}</Typography>
+                        </Box>
                     ) : (
                         <>
                             <Box sx={{ display: "flex", gap: 1, mb: 5 }}>
