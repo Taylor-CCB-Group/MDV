@@ -24,6 +24,8 @@ import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
 import { g, isArray, toArray } from "@/lib/utils";
+import type { FeatureCollection } from "@turf/helpers";
+import { getEmptyFeatureCollection } from "../spatial_context";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -71,6 +73,7 @@ export type CategoryFilter = {
 };
 //viewState should be persisted... maybe a way of saving different snapshots?
 //could we infer or something to avoid having to repeat this?
+//! need to only use the other version of this...
 export type ScatterPlotConfig = {
     course_radius: number;
     radius: number;
@@ -85,6 +88,7 @@ export type ScatterPlotConfig = {
     //on_filter: "hide" | "grey", //todo
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
+    selectionFeatureCollection: FeatureCollection;
 } & TooltipConfig &
     DualContourLegacyConfig & BaseConfig;
 //@ts- expect-error things like 'id' are expected... subject to review.
@@ -106,6 +110,7 @@ const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title
     contour_bandwidth: 0.1,
     contour_intensity: 1,
     contour_opacity: 0.5,
+    selectionFeatureCollection: getEmptyFeatureCollection(),
 };
 export type VivRoiConfig = {
     // making this 'type' very specific will let us infer the rest of the type, i.e.
@@ -138,6 +143,7 @@ function adaptConfig(originalConfig: VivMdvReactConfig) {
     // in future we might have something like an array of layers with potentially ways of describing parameters...
     //@ts-expect-error contourParameter type
     if (!config.contourParameter) config.contourParameter = config.param[2];
+    // if (!config.)
     // === some dead code ===
     // if (config.type === 'VivMdvRegionReact') {
     //     // we don't use viv.image_properties, we use viv.channelsStore et al.
