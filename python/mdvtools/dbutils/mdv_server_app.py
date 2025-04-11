@@ -206,7 +206,7 @@ def create_flask_app(config_name=None):
     if ENABLE_AUTH:
         try:
             print("Registering authentication routes")
-            register_auth0_routes(app)  # Register Auth0-related routes like /login and /callback
+            register_auth_routes(app)  # Register Auth0-related routes like /login and /callback
         except Exception as e:
             print(f"Error registering authentication routes: {e}")
             raise e
@@ -630,7 +630,7 @@ def serve_projects_from_filesystem(app, base_dir):
 
 
 # The function that registers the Auth0 routes
-def register_auth0_routes(app):
+def register_auth_routes(app):
     """
     Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
     with centralized and route-specific error handling.
@@ -1235,12 +1235,20 @@ def register_routes(app, ENABLE_AUTH):
                     print("Authentication is disabled, skipping authentication check.")
                     return jsonify({"message": "Authentication is disabled, no action taken."})
 
-                # Step 2: Get the current user's information
-                user_data, error_response = validate_and_get_user(app)
-                if error_response:
-                    return error_response  # Unauthorized or error response
-                
-                user_id = user_data['id']  # The ID of the authenticated user
+                # Step 2: Check if user is already authenticated in the cache
+                user_id = redis_client.get('user_id')  # Retrieve cached user_id if available
+                print(user_id)
+                 
+                if not user_id:
+                    # If not cached, validate the user (make Auth0 call)
+                    user_data, error_response = validate_and_get_user(app)  # This is where you authenticate with Auth0
+                    if error_response:
+                        return error_response  # Unauthorized or error response
+                    user_id = user_data['id']
+                    
+                    # Cache the user's ID and other data in Redis for a session duration (e.g., 30 minutes)
+                    redis_client.setex('user_id', 1800, user_id)
+
 
                 # Step 3: Fetch the current user's permissions for the project
                 cached_permissions = redis_client.get(f"user:{user_id}:projects")
