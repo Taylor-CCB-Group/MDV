@@ -10,6 +10,7 @@ import type BaseChart from "@/charts/BaseChart";
 import { observer } from "mobx-react-lite";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { action } from "mobx";
+import { useDebounce } from "use-debounce";
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -58,7 +59,9 @@ function useSelectionCoords(selection: FeatureCollection) {
         const raw = geometry.coordinates as Position[][];
         return raw[0];
     }, [feature]);
-    return coords as [number, number][];
+    //fast debounce to avoid excessive re-render/re-compute
+    const [debouncedCoords] = useDebounce(coords, 1);
+    return debouncedCoords as [number, number][];
 }
 
 /** for this to be more useful as a hook will depend on state/context... */
