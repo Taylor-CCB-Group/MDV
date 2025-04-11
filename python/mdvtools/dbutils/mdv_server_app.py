@@ -79,7 +79,7 @@ def create_flask_app(config_name=None):
             if not tables_exist():
                 print("Creating database tables")
                 db.create_all()
-                print("************** Created database tables")
+                print("************* Created database tables")
             else:
                 print("Database tables already exist")
 
