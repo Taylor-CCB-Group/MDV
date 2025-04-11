@@ -838,6 +838,7 @@ def register_routes(app, ENABLE_AUTH):
     if ENABLE_AUTH:
         redis_client = Redis(host='redis', port=6379, db=0, decode_responses=True)
         print("Redis client initialized for caching.")
+        auth_method = None
     else:
         redis_client = None  # No Redis client if authentication is not enabled
 
@@ -883,7 +884,7 @@ def register_routes(app, ENABLE_AUTH):
                     active_projects = ProjectService.get_active_projects()  # If Redis is not used, fetch from DB
 
                 # Step 2: If authentication is enabled, filter user-specific projects
-                if ENABLE_AUTH:
+                if ENABLE_AUTH and auth_method == 'auth0':
                     user, error_response = validate_and_get_user(app)
                     if error_response:
                         return error_response  # Return the error response if validation fails
