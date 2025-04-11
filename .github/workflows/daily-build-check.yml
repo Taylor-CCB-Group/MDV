@@ -1,6 +1,9 @@
 name: Check for New Commits and Trigger Build
 
 on:
+  push:
+    branches:
+      - auth_rbac
   schedule:
     - cron: '0 0 * * *'  # Runs at midnight every day (UTC)
   workflow_dispatch:  # Allows manual trigger for testing
@@ -8,7 +11,7 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
+    if: contains(github.event.head_commit.message, '[testdeploy]')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
