@@ -865,7 +865,7 @@ def register_routes(app, ENABLE_AUTH):
             
             If authentication is enabled, only projects the user has access to are returned.
             """
-            print("/projects queried...")
+            print(" /projects queried...")
 
             try:
                 if redis_client:
