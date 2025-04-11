@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type RangeDimension from "../datastore/RangeDimension";
-import { useRegionScale, useScatterplotLayer } from "./scatter_state";
+import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
 import { Matrix4 } from "@math.gl/core";
 import { CompositeMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
@@ -8,6 +8,7 @@ import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useChartID, useRangeDimension2D } from "./hooks";
 import type BaseChart from "@/charts/BaseChart";
 import { observer } from "mobx-react-lite";
+import type { BaseConfig } from "@/charts/BaseChart";
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -39,12 +40,13 @@ export type SpatialAnnotationState = {
 // Could more usefully be thought of as SpatialContext?
 const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined as any);
 
-const getEmptyFeatureCollection = () => ({
+export const getEmptyFeatureCollection = () => ({
     type: "FeatureCollection",
     features: []
 } as FeatureCollection);
 
 function useSelectionCoords(selection: FeatureCollection) {
+    // where should we keep this in config for persisting?
     const feature = selection.features[0];
     const coords = useMemo(() => {
         if (!feature) return [];
@@ -71,13 +73,17 @@ function useScatterModelMatrix() {
 }
 
 
-function useCreateRange(chart: BaseChart<any>) {
+function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const id = useChartID();
     const { modelMatrix } = useScatterModelMatrix();
-    // consider making selectionFeatureCollection part of config, so it can be persisted
+    // making selectionFeatureCollection part of config, so it can be persisted
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
-    // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that.
-    const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
+    // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
+    //const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
+    const { selectionFeatureCollection } = chart.config;
+    const setSelectionFeatureCollection = useCallback((newSelection: FeatureCollection) => {
+        chart.config.selectionFeatureCollection = newSelection;
+    }, [chart]);
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
@@ -85,9 +91,9 @@ function useCreateRange(chart: BaseChart<any>) {
     useEffect(() => {
         console.log("pending different way of managing resetButton?");
         chart.removeFilter = () => {
-            setSelectionFeatureCollection(getEmptyFeatureCollection());
+            setSelectionFeatureCollection(getEmptyFeatureCollection());            
         }
-    }, [chart]);
+    }, [chart, setSelectionFeatureCollection]);
     useEffect(() => {
         if (coords.length === 0) {
             chart.resetButton.style.display = "none";
@@ -130,7 +136,9 @@ function useCreateRange(chart: BaseChart<any>) {
                 setSelectedFeatureIndexes(pickingInfo.index !== -1 ? [pickingInfo.index] : []);
             },
         })
-    }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes]);
+    }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
+        setSelectionFeatureCollection
+    ]);
     return {
         editableLayer,
         rangeDimension,
