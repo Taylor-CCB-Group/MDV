@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask, Response, request, jsonify, session, redirect, url_for
 from typing import Dict, Any, Callable, Tuple
 import re
@@ -88,7 +89,7 @@ class ProjectBlueprint_v2:
     TIMESTAMP_UPDATE_INTERVAL = timedelta(hours=1)
 
     # Normalize ENABLE_AUTH to a boolean
-    AUTH_ENABLED = os.getenv("ENABLE_AUTH", "true").strip().lower() in {"1", "yes", "true"}
+    AUTH_ENABLED = "true"
 
     @staticmethod
     def register_app(app: Flask) -> None:
@@ -104,8 +105,8 @@ class ProjectBlueprint_v2:
             It will look up the project_id in ProjectBlueprint_v2.blueprints and call the method with the given subpath.
             The ProjectBlueprint_v2 instance is responsible for routing the request to the correct method etc.
             """
-            if ProjectBlueprint_v2.AUTH_ENABLED and not ProjectBlueprint_v2.is_authenticated():
-                return redirect(url_for('login_dev'))
+            #if ProjectBlueprint_v2.AUTH_ENABLED and not ProjectBlueprint_v2.is_authenticated():
+            #    return redirect(url_for('login_dev'))
             
             if project_id in ProjectBlueprint_v2.blueprints:
                 try:
@@ -163,13 +164,13 @@ class ProjectBlueprint_v2:
 
         # find the item in self.routes that matches the subpath
         from mdvtools.dbutils.dbservice import ProjectService
-        print("***********************************")
+        print("**********************************")
         print(subpath, project_id)
         subpath = f"/{urlparse(subpath).path}"
         for rule, (method, options) in self.routes.items():
             match = rule.match(subpath)
             if match:
-                
+                print("options",options)
                 # Update the accessed timestamp only if the last update was more than TIMESTAMP_UPDATE_INTERVAL ago
                 project = ProjectService.get_project_by_id(project_id)
                 if project and (not project.accessed_timestamp or 
@@ -182,11 +183,36 @@ class ProjectBlueprint_v2:
                         print(f"dispatch_request: Error updating accessed timestamp: {e}")
                         return jsonify({"status": "error", "message": "Failed to update project accessed timestamp"}), 500
 
+                print("******************--1")
+                print(ProjectBlueprint_v2.AUTH_ENABLED)
+                project_permissions = None
+                # Check if authentication is enabled
+                if ProjectBlueprint_v2.AUTH_ENABLED:
+                    print("******************--2")
+                    from redis import Redis
+                    redis_client = Redis(host='redis', port=6379, db=0)
+                    # If not in cookies, check if the user is in the session
+                    user_id = redis_client.get('user_id')
+                    user_id = user_id.decode("utf-8") 
+                    
+                    cached_permissions = redis_client.get(f"user:{user_id}:projects")
+                    print("******************--3")
+                    
+                    
+                    print(user_id)
+                    print(cached_permissions)
+                    if cached_permissions:
+                        user_projects = json.loads(cached_permissions)
+                    
+                        print("^^^^^^^^^^^^^^^********-------")
+                        # Step 4: Validate if the user is the owner of the project
+                        project_permissions = user_projects.get(str(project_id))  # Use string keys for consistency
+                        print(project_permissions)
+                        
                 # first determine whether this is allowed
                 # - rather than iterating over (rule, method), we might have
                 # (rule, (method, permissionsFlags))
                 # we can check the request.token (or whatever it is) here...
-                print("options",options)
                 # Check for access level only if specified in options
                 if options and 'access_level' in options:
                     print("match", match)
@@ -201,6 +227,14 @@ class ProjectBlueprint_v2:
                     print("required_access_level", required_access_level)
                     if required_access_level == 'editable':
                         print("required_access_level is editable, fetched project is ", project)
+                        
+                        if ProjectBlueprint_v2.AUTH_ENABLED:
+                            if project_permissions:
+                                if not (project_permissions.get("is_owner", False) or project_permissions.get("can_write", False)):
+                                    print("MAIN--------------------------")
+                                    return jsonify({"status": "error", "message": "User does not have the required permissions"}), 403
+
+             
                         if project.access_level != 'editable':
                             return jsonify({"status": "error", "message": "This project is read-only and cannot be modified."}), 403
                         print(f"updating timestamp for project {project_id} '{subpath}'")
