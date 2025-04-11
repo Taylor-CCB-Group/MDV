@@ -9,6 +9,7 @@ import { useChartID, useRangeDimension2D } from "./hooks";
 import type BaseChart from "@/charts/BaseChart";
 import { observer } from "mobx-react-lite";
 import type { BaseConfig } from "@/charts/BaseChart";
+import { action } from "mobx";
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -80,10 +81,11 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
     // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
     //const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
+    //! it appears to drastically affect performance having this in mobx config - why?
     const { selectionFeatureCollection } = chart.config;
-    const setSelectionFeatureCollection = useCallback((newSelection: FeatureCollection) => {
+    const setSelectionFeatureCollection = useCallback(action((newSelection: FeatureCollection) => {
         chart.config.selectionFeatureCollection = newSelection;
-    }, [chart]);
+    }), []);
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
