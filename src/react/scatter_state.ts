@@ -20,6 +20,8 @@ import {
 import { useHighlightedIndex } from "./selectionHooks";
 import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
 import type { ColumnName } from "@/charts/charts";
+import type { FeatureCollection } from "@turf/helpers";
+import { getEmptyFeatureCollection } from "./spatial_context";
 
 export type TooltipConfig = {
     tooltip: {
@@ -48,6 +50,7 @@ export type ScatterPlotConfig = {
     zoom_on_filter: boolean;
     point_shape: "circle" | "square" | "gaussian";
     dimension: "2d" | "3d";
+    selectionFeatureCollection: FeatureCollection;
 } & TooltipConfig &
     DualContourLegacyConfig;
 export const scatterDefaults: ScatterPlotConfig = {
@@ -70,6 +73,7 @@ export const scatterDefaults: ScatterPlotConfig = {
     contour_opacity: 0.5,
     dimension: "2d",
     on_filter: "hide", //safer in case of large datasets
+    selectionFeatureCollection: getEmptyFeatureCollection(),
 };
 
 
