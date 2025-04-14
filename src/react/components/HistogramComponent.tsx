@@ -1,11 +1,14 @@
 import type { DataColumn, NumberDataType } from "@/charts/charts";
 import type RangeDimension from "@/datastore/RangeDimension";
-import * as d3 from "d3";
-import { observer } from "mobx-react-lite";
-import { useMemo, useEffect, useState, useCallback, useRef } from "react";
+import { useMemo, useEffect, useState, useCallback, useRef, type SVGProps } from "react";
 import { useDebounce } from "use-debounce";
 import { useDimensionFilter, useConfig } from "../hooks";
 import type { SelectionDialogConfig, RangeFilter } from "./SelectionDialogReact";
+import { Brush } from "@visx/brush";
+import { ParentSize } from '@visx/responsive';
+import { scaleLinear } from "@visx/scale";
+import { observer } from "mobx-react-lite";
+
 
 /**
  * This was exposed as a more general-purpose hook with useState,
@@ -94,140 +97,40 @@ export type RangeProps = FilterRangeType & {
     histoHeight: number; //height of the histogram
 };
 
-const useBrushX = (
-    ref: React.RefObject<SVGSVGElement>,
-    { value, setValue, minMax, histoWidth, histoHeight }: RangeProps, //consider different typing here
-) => {
-    const brushRef = useRef<ReturnType<typeof d3.brushX> | null>(null);
-    // we need to be able to respond to changes in value - but without causing an infinite loop
-    // or having the brush reset on every render
-    const [initialValue] = useState(value);
-
+const HistogramInner = observer((props: RangeProps) => {
     useEffect(() => {
-        if (!ref.current) return;
-
-        const svg = d3.select(ref.current);
-        // Set up brush
-        const brush = d3
-            .brushX()
-            .handleSize(1)
-            .extent([
-                [0, -2],
-                [histoWidth, histoHeight + 2],
-            ])
-            .on("brush end", (event) => {
-                if (event.selection) {
-                    const [start, end] = event.selection.map((x: number) => {
-                        if (!ref.current) {
-                            console.error(
-                                "No ref.current in brush event handler",
-                            );
-                            return 0;
-                        }
-                        const { width } = ref.current.getBoundingClientRect();
-                        // Normalize x-coordinate to [minMax[0], minMax[1]]
-                        const r = width / histoWidth;
-                        const normalizedX = (r * x) / width;
-                        return (
-                            minMax[0] + normalizedX * (minMax[1] - minMax[0])
-                        );
-                    });
-                    setValue([start, end]);
-                } else {
-                    // warning - the null value here does behave distinctly differently from undefined
-                    // e.g. as of this writing, the reset button will be glitchy if we don't use null here
-                    setValue(null); // null - reset to full range if brush is cleared
-                }
-            });
-
-        brushRef.current = brush;
-
-        // Apply the brush to the SVG
-        const brushGroup = svg.append("g").attr("class", "brush").call(brush);
-        // Initialize brush selection based on the initial value
-        if (initialValue) {
-            const [start, end] = initialValue.map(
-                (v) => ((v - minMax[0]) / (minMax[1] - minMax[0])) * histoWidth,
-            );
-            brushGroup.call(brush.move, [start, end]); // Move the brush to the initial selection
-        }
-
-        // Apply `vectorEffect` directly to handles
-        brushGroup
-            .selectAll(".selection")
-            .attr("vector-effect", "non-scaling-stroke");
-        brushGroup
-            .selectAll(".handle")
-            .attr("vector-effect", "non-scaling-stroke");
-
-        // Cleanup on unmount
-        return () => {
-            svg.select(".brush").remove();
-        };
-    }, [ref, setValue, minMax, histoWidth, histoHeight, initialValue]);
-
-    const [debouncedValue] = useDebounce(value, 100, {
-        equalityFn: (a, b) => {
-            //although the type of input argument is [number, number] | null - they are undefined when component is unmounted
-            //! which causes an exception here which breaks the whole chart
-            //so rather than checking === null, we check for falsy values
-            if (!a && !b) return true;
-            if (!a || !b) return false;
-            return a[0] === b[0] && a[1] === b[1];
-        },
-    });
-    const setBrushValue = useCallback<set2d>(
-        (v) => {
-            if (!brushRef.current || !ref.current) return;
-            const svg = d3.select(ref.current);
-
-            if (!v) {
-                // throw new Error("this is actually ok, but I want to test the error handling");
-                //@ts-ignore life is too short
-                svg.select(".brush").call(brushRef.current.move, null);
-                return;
-            }
-            const [start, end] = v;
-            const x0 =
-                ((start - minMax[0]) / (minMax[1] - minMax[0])) * histoWidth;
-            const x1 =
-                ((end - minMax[0]) / (minMax[1] - minMax[0])) * histoWidth;
-            //@ts-ignore life is too short
-            svg.select(".brush").call(brushRef.current.move, [x0, x1]);
-        },
-        [minMax, histoWidth, ref],
-    ); //why doesn't biome think we need brushRef?
-    useEffect(() => {
-        setBrushValue(debouncedValue);
-    }, [debouncedValue, setBrushValue]);
-};
-export const Histogram = observer((props: RangeProps) => {
+        console.log("Histogram component mounted");
+        return () => console.log("Histogram component unmounted");
+    }, []);
     const { histogram: data, queryHistogram, value } = props;
     const { histoWidth, histoHeight } = props;
     const ref = useRef<SVGSVGElement>(null);
-    useBrushX(ref, props);
+    // useBrushX(ref, props);
+    // nb, theme warrants use of observer
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
     const width = histoWidth;
     const height = histoHeight;
     const lineColor = prefersDarkMode ? "#fff" : "#000";
+    const selectedBrushStyle = useMemo<SVGProps<SVGRectElement>>(() => ({
+        // fill: prefersDarkMode ? "#fff" : "#000",
+        stroke: prefersDarkMode ? "#fff" : "#000",
+        strokeWidth: 1,
+        opacity: 0.5,
+        vectorEffect: "non-scaling-stroke",
+    }), [prefersDarkMode]);
     // Find max value for vertical scaling
     const maxValue = Math.max(...data);
-
-    // Define the padding and scaling factor
-    const padding = 2;
-    const xStep = data.length / (width + 1); // Space between points
-    const yScale = (height - 2 * padding) / maxValue; // Scale based on max value
-
-
     
     const [hasQueried, setHasQueried] = useState(false);
     // if data changes, reset the hasQueried state... disabled for now
-    // useEffect(() => {
-    //     // data;
-    //     // this may be going mad - should we use react query?
-    //     // console.log("data changed", data);
-    //     setHasQueried(false);
-    // }, []);
+    // also consider another row of data 
+    // (i.e. second histogram with filtered data, which is likely to need more frequent updates)
+    useEffect(() => {
+        data;
+        // this may be going mad - should we use react query?
+        // console.log("data changed", data);
+        setHasQueried(false);
+    }, [data]);
     useEffect(() => {
         if (!ref.current) return;
         const observer = new IntersectionObserver(
@@ -244,26 +147,45 @@ export const Histogram = observer((props: RangeProps) => {
         return () => observer.disconnect();
     }, [queryHistogram, hasQueried]);
     
+    // consider having options for scales other than linear
+    const brushXScale = useMemo(() => scaleLinear({
+        domain: [props.minMax[0], props.minMax[1]],
+        range: [0, width],
+        clamp: true,
+        nice: true, //nice extends the domain to nice round numbers
+    }), [props.minMax, width]);
+    const brushYScale = useMemo(() => scaleLinear({
+        domain: [0, maxValue],
+        range: [height, 0],
+        nice: true,
+    }), [height, maxValue]);
     // Generate the points for the polyline
-    // ??? useMemo was wrong ????
-    const points = useMemo(
-        () =>
-            data
-                .map((value, index) => {
-                    const x = index * xStep;
-                    const y = height - padding - value * yScale;
-                    return `${x},${y}`;
-                })
-                .join(" "),
-        [data, xStep, yScale, height],
-    );
-    const v = value || props.minMax;
+    const points = useMemo(() => {
+        return data.map((value, index) => {
+            const x = index * (width / data.length); //should we need this?
+            const y = brushYScale(value); //should we be using the scale here?
+            return `${x},${y}`;
+        }).join(" ")
+    }, [data, brushYScale, width]);
+    const [initialValue] = useState(value);
+    const initialBrushPosition = useMemo(() => {
+        if (!initialValue) {
+            return { start: { x: 0 }, end: { x: 0 } };
+        }
+        const start = { x: brushXScale(initialValue[0]) };
+        const end = { x: brushXScale(initialValue[1]) };
+        return { start, end };
+    }, [brushXScale, initialValue]);
     return (
         <>
             <svg
-                width={"100%"}
+                width={width}
                 height={height}
-                viewBox={`0 0 ${width} ${height}`}
+                // with brushXScale.range = [0, width],
+                // if I take viewBox out, it will be squished into left side,
+                // but mouse events will be correct.
+                // using ParentSize for responsiveness avoids this issue.
+                // viewBox={`0 0 ${width} ${height}`}
                 preserveAspectRatio="none"
                 ref={ref}
                 cursor="move"
@@ -278,9 +200,44 @@ export const Histogram = observer((props: RangeProps) => {
                     // but this would have been a real pain to figure out on my own)
                     vectorEffect="non-scaling-stroke" // Keeps the stroke width consistent
                 />
-                {/* d3.brushX will add more elements as a side-effect, handled in hook */}
+                <Brush 
+                    xScale={brushXScale}
+                    yScale={brushYScale}
+                    width={width}
+                    height={height}
+                    brushDirection="horizontal"
+                    initialBrushPosition={initialBrushPosition}
+                    onChange={(v) => {
+                        if (!v) return;
+                        props.setValue([v.x0, v.x1]);
+                    }}
+                    useWindowMoveEvents //needs fixing wrt scale
+                    selectedBoxStyle={selectedBrushStyle}
+                />
             </svg>
             {/* <p className="flex justify-between"><em>{`${v[0].toFixed(2)}<`}</em> <em>{`<${v[1].toFixed(2)}`}</em></p> */}
         </>
     );
 });
+
+export const Histogram = (props: RangeProps) => {
+    const style = useMemo(() => ({
+        width: "100%",
+        height: props.histoHeight,
+    }), [props.histoHeight]);
+    const { histoWidth, ...propsRest } = props;
+    return (
+        <div style={style}>
+            <ParentSize>
+                {({ width, height }) => (
+                    <HistogramInner
+                    {...propsRest}
+                    // just need to sort out this business of what I mean by width
+                    histoWidth={width}
+                    histoHeight={height}
+                    />
+                )}
+            </ParentSize>
+        </div>
+    )
+}
