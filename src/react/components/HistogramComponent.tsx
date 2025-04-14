@@ -94,8 +94,9 @@ export type RangeProps = FilterRangeType & {
     setValue: set2d;
     minMax: Range;
     // probably want to review how these are specified / controlled
-    histoWidth: number; //number of bins
+    histoWidth: number; //number of bins todo review
     histoHeight: number; //height of the histogram
+    highlightValue?: number;
 };
 
 const HistogramInner = observer((props: RangeProps) => {
@@ -185,6 +186,24 @@ const HistogramInner = observer((props: RangeProps) => {
             brushRef.current.reset();
         }
     }, [value]);
+    const highlightLine = useMemo(() => {
+        if (props.highlightValue === undefined) return null;
+        const x = brushXScale(props.highlightValue);
+        const y = maxValue;
+        return (
+            <line
+                x1={x}
+                y1={0}
+                x2={x}
+                y2={y}
+                stroke={lineColor}
+                strokeWidth="1"
+                opacity={0.5}
+                strokeDasharray="5,5"
+                vectorEffect="non-scaling-stroke"
+            />
+        );
+    }, [brushXScale, maxValue, lineColor, props.highlightValue]);
     return (
         <>
             <svg
@@ -224,6 +243,7 @@ const HistogramInner = observer((props: RangeProps) => {
                     useWindowMoveEvents //needs fixing wrt scale
                     selectedBoxStyle={selectedBrushStyle}
                 />
+                {highlightLine}
             </svg>
             {/* <p className="flex justify-between"><em>{`${v[0].toFixed(2)}<`}</em> <em>{`<${v[1].toFixed(2)}`}</em></p> */}
         </>

@@ -215,8 +215,8 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     const limits = useChannelsStore(({ contrastLimits }) => contrastLimits);
     // should be 'rasters' really
     const { domains, raster } = useChannelsStore(({ domains, raster }) => ({ domains, raster }));
-    // const { pixelValues } = useViewerStore(({ pixelValues }) => ({ pixelValues }));
-    // const pixelValue = pixelValues[index];
+    const { pixelValues } = useViewerStore(({ pixelValues }) => ({ pixelValues }));
+    const pixelValue = pixelValues[index];
     const domain = domains[index];
     const rasterData = raster[index]?.data || [0]; //! revisit this sometime
     
@@ -236,6 +236,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 
 
     // some problems with initial querying, probably in the Histogram component
+    // todo review this...
     const queryHistogram = useCallback(async () => {
         // todo nicer worker syntax?
         const worker = new Worker(
@@ -258,6 +259,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
             isFloat: isInt32,
         });
     }, [min, max, rasterData]);
+    // todo review whether this state can be cleaned up / simplified
     const [liveValue, setLiveValue] = useState<Range>([0, 0]);
     const debounceTime = 10; //how low can we go?
     const [debouncedValue] = useDebounce(liveValue, debounceTime);
@@ -287,6 +289,7 @@ const ChannelHistogram = ({ index }: { index: number }) => {
                 step={0.001} //todo make this dynamic
                 histogram={histogramData}
                 // todo add indicator for highightValue={pixelValue}
+                // todo add value label
                 lowFraction={normalisedLow} // component should calculate these
                 highFraction={normalisedHigh}
                 queryHistogram={queryHistogram}
@@ -297,21 +300,8 @@ const ChannelHistogram = ({ index }: { index: number }) => {
                 minMax={domain}
                 histoWidth={100}
                 histoHeight={50}
+                highlightValue={pixelValue}
             /> : "Loading..."}
-            {/* <Slider
-                size="small"
-                //slotProps={{ thumb: {  } }} //todo smaller thumb
-                disabled={isChannelLoading}
-                value={limits[index]}
-                min={domains[index][0]}
-                max={domains[index][1]}
-                valueLabelDisplay="auto"
-                onChange={(_, v) => {
-                    limits[index] = v as [number, number];
-                    const contrastLimits = [...limits];
-                    channelsStore.setState({ contrastLimits });
-                }}
-            /> */}
         </div>
     )
 }
