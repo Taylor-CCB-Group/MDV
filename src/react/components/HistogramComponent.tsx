@@ -8,6 +8,7 @@ import { Brush } from "@visx/brush";
 import { ParentSize } from '@visx/responsive';
 import { scaleLinear } from "@visx/scale";
 import { observer } from "mobx-react-lite";
+import type BaseBrush from "@visx/brush/lib/BaseBrush";
 
 
 /**
@@ -176,6 +177,14 @@ const HistogramInner = observer((props: RangeProps) => {
         const end = { x: brushXScale(initialValue[1]) };
         return { start, end };
     }, [brushXScale, initialValue]);
+    // respond to reset button, which sets value to null.
+    const brushRef = useRef<BaseBrush>(null);
+    useEffect(() => {
+        if (!brushRef.current) return;
+        if (value === null) {
+            brushRef.current.reset();
+        }
+    }, [value]);
     return (
         <>
             <svg
@@ -201,6 +210,7 @@ const HistogramInner = observer((props: RangeProps) => {
                     vectorEffect="non-scaling-stroke" // Keeps the stroke width consistent
                 />
                 <Brush 
+                    innerRef={brushRef}
                     xScale={brushXScale}
                     yScale={brushYScale}
                     width={width}
