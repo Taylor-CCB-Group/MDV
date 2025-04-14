@@ -301,6 +301,8 @@ const ChannelHistogram = ({ index }: { index: number }) => {
                 histoWidth={100}
                 histoHeight={50}
                 highlightValue={pixelValue}
+                xScaleType="log"
+                yScaleType="symlog"
             /> : "Loading..."}
         </div>
     )

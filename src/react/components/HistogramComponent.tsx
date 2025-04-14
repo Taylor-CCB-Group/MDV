@@ -6,7 +6,7 @@ import { useDimensionFilter, useConfig } from "../hooks";
 import type { SelectionDialogConfig, RangeFilter } from "./SelectionDialogReact";
 import { Brush } from "@visx/brush";
 import { ParentSize } from '@visx/responsive';
-import { scaleLinear } from "@visx/scale";
+import { scaleLinear, scaleLog, scaleSymlog } from "@visx/scale";
 import { observer } from "mobx-react-lite";
 import type BaseBrush from "@visx/brush/lib/BaseBrush";
 
@@ -97,9 +97,20 @@ export type RangeProps = FilterRangeType & {
     histoWidth: number; //number of bins todo review
     histoHeight: number; //height of the histogram
     highlightValue?: number;
+    xScaleType?: ScaleType;
+    yScaleType?: ScaleType;
 };
-
-const HistogramInner = observer((props: RangeProps) => {
+const ScaleTypes = {
+    linear: scaleLinear,
+    log: scaleLog,
+    symlog: scaleSymlog,
+} as const;
+export type ScaleType = keyof typeof ScaleTypes;
+const HistogramInner = observer(({
+    xScaleType = "linear",
+    yScaleType = "linear",
+    ...props
+}: RangeProps) => {
     useEffect(() => {
         console.log("Histogram component mounted");
         return () => console.log("Histogram component unmounted");
@@ -149,18 +160,19 @@ const HistogramInner = observer((props: RangeProps) => {
         return () => observer.disconnect();
     }, [queryHistogram, hasQueried]);
     
-    // consider having options for scales other than linear
-    const brushXScale = useMemo(() => scaleLinear({
+    // options for scales other than linear...
+    // x log & y symlog seem to work for colour histograms...
+    const brushXScale = useMemo(() => ScaleTypes[xScaleType]({
         domain: [props.minMax[0], props.minMax[1]],
         range: [0, width],
         clamp: true,
         nice: true, //nice extends the domain to nice round numbers
-    }), [props.minMax, width]);
-    const brushYScale = useMemo(() => scaleLinear({
+    }), [props.minMax, width, xScaleType]);
+    const brushYScale = useMemo(() => ScaleTypes[yScaleType]({
         domain: [0, maxValue],
         range: [height, 0],
         nice: true,
-    }), [height, maxValue]);
+    }), [height, maxValue, yScaleType]);
     // Generate the points for the polyline
     const points = useMemo(() => {
         return data.map((value, index) => {
