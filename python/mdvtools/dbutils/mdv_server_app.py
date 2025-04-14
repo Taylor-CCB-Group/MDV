@@ -1346,7 +1346,7 @@ def register_routes(app, ENABLE_AUTH):
             
             except Exception as e:
                 print(f"Error in share_project: {e}")
-                return jsonify({"status": "error", "message": str(e)}), 500
+                return jsonify({"error": str(e)}), 500
             
         @app.route("/projects/<int:project_id>/share", methods=["POST"])
         def add_user_to_project(project_id):
@@ -1426,7 +1426,7 @@ def register_routes(app, ENABLE_AUTH):
 
             except Exception as e:
                 print(f"Error in add_user_to_project: {e}")
-                return jsonify({"status": "error", "message": str(e)}), 500
+                return jsonify({"error": str(e)}), 500
 
 
 

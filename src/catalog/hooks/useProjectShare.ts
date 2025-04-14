@@ -19,7 +19,8 @@ const useProjectShare = (projectId: string) => {
     const [newUser, setNewUser] = useState<RegisteredUser>();
     const [userList, setUserList] = useState<RegisteredUser[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<Error>();
+    const [error, setError] = useState("");
+    const [errorMsg, setErrorMsg] = useState("");
 
     useEffect(() => {
         if (projectId) {
@@ -28,6 +29,8 @@ const useProjectShare = (projectId: string) => {
     }, [projectId]);
 
     const getAllUsers = async () => {
+        setError("");
+        setErrorMsg("");
         setIsLoading(true);
         try {
             const res = await fetch(`projects/${projectId}/share`, {
@@ -35,33 +38,43 @@ const useProjectShare = (projectId: string) => {
                     Accept: "application/json",
                 },
             });
+
+            const data = await res.json();
+
+            if (data?.error) {
+                setError(data?.error);
+                return;
+            }
+
+            if (data?.status === "error") {
+                setErrorMsg(data?.message);
+                return;
+            }
+
             if (res.ok) {
-                const data = await res.json();
-                if (data?.all_users)    setUserList(data.all_users);
+                if (data?.all_users) setUserList(data.all_users);
                 if (data?.shared_users) setSharedUsers(data.shared_users);
                 console.log("getAllUsers", data);
+                return;
             } else {
-                const data = await res.json();
-                if (data?.error) {
-                    throw new Error(data?.error);
+                if (res.status === 403) {
+                    setError(data?.error || "Forbidden: You are not allowed to perform this action.");
                 } else {
-                    throw new Error("An unknown error occurred.");
+                    setError(data?.error || "Internal Server Error");
                 }
             }
 
-
-            if (res.status === 500) {
-                throw new Error("Internal Server Error.");
-            }
+            setError(data?.message || "An error occurred. Please try again.");
         } catch (error) {
-            const err = error instanceof Error ? error : new Error("Error fetching users data.");
-            setError(err);
+            setError("Error fetching user data. Please try again.");
         } finally {
             setIsLoading(false);
         }
     };
 
     const addUser = async (userId: number, permission: UserPermission) => {
+        setError("");
+        setErrorMsg("");
         setIsLoading(true);
         try {
             const res = await fetch(`projects/${projectId}/share`, {
@@ -70,35 +83,33 @@ const useProjectShare = (projectId: string) => {
                 headers: {
                     "Content-Type": "application/json",
                     Accept: "application/json",
-                }
+                },
             });
 
-            console.log("addUser", res);
+            const data = await res.json();
 
-            if (!res.ok) {
-                const data = await res.json();
-                if (data?.error) {
-                    throw new Error(data?.error);
+            if (res.ok) {
+                console.log("addUser", res);
+                await getAllUsers();
+            } else {
+                if (res.status === 403) {
+                    setError(data?.error || "Forbidden: You are not allowed to perform this action.");
                 } else {
-                    throw new Error("An unknown error occurred.");
+                    setError(data?.error || "Internal Server Error");
                 }
             }
 
-            if (res.status === 500) {
-                throw new Error("Internal Server Error.");
-            }
-
-            await getAllUsers();
-
+            setErrorMsg(data?.message || "An error occurred. Please try again.");
         } catch (error) {
-            const err = error instanceof Error ? error : new Error("Error adding new user.");
-            setError(err);
+            setErrorMsg("Error adding new user. Please try again.");
         } finally {
             setIsLoading(false);
         }
     };
 
     const changeUserPermission = async (userId: number, permission: UserPermission) => {
+        setError("");
+        setErrorMsg("");
         setIsLoading(true);
         try {
             const res = await fetch(`projects/${projectId}/share/${userId}/edit`, {
@@ -107,63 +118,58 @@ const useProjectShare = (projectId: string) => {
                 headers: {
                     "Content-Type": "application/json",
                     Accept: "application/json",
-                }
+                },
             });
 
-            console.log("changeUserPermission", res);
+            const data = await res.json();
 
-            if (!res.ok) {
-                const data = await res.json();
-                if (data?.error) {
-                    throw new Error(data?.error);
+            if (res.ok) {
+                console.log("change user permission", res);
+                await getAllUsers();
+            } else {
+                if (res.status === 403) {
+                    setError(data?.error || "Forbidden: You are not allowed to perform this action.");
                 } else {
-                    throw new Error("An unknown error occurred.");
+                    setError(data?.error || "Internal Server Error");
                 }
             }
 
-            if (res.status === 500) {
-                throw new Error("Internal Server Error.");
-            }
-
-            await getAllUsers();
+            setErrorMsg(data?.message || "An error occurred. Please try again.");
         } catch (error) {
-            const err = error instanceof Error ? error : new Error("Error changing user permission.");
-            setError(err);
+            setErrorMsg("Error fetching user data. Please try again.");
         } finally {
             setIsLoading(false);
         }
     };
 
     const deleteSharedUser = async (userId: number) => {
+        setError("");
+        setErrorMsg("");
         setIsLoading(true);
         try {
             const res = await fetch(`projects/${projectId}/share/${userId}/delete`, {
                 method: "POST",
                 headers: {
                     Accept: "application/json",
-                }
+                },
             });
 
-            console.log("deleteSharedUser", res);
+            const data = await res.json();
 
-            if (!res.ok) {
-                const data = await res.json();
-                if (data?.error) {
-                    throw new Error(data?.error);
+            if (res.ok) {
+                console.log("delete user", res);
+                await getAllUsers();
+            } else {
+                if (res.status === 403) {
+                    setError(data?.error || "Forbidden: You are not allowed to perform this action.");
                 } else {
-                    throw new Error("An unknown error occurred.");
+                    setError(data?.error || "Internal Server Error");
                 }
             }
 
-            if (res.status === 500) {
-                throw new Error("Internal Server Error.");
-            }
-
-            await getAllUsers();
-
+            setErrorMsg(data?.message || "An error occurred. Please try again.");
         } catch (error) {
-            const err = error instanceof Error ? error : new Error("Error deleting user.");
-            setError(err);
+            setErrorMsg("Error deleting user. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -178,6 +184,7 @@ const useProjectShare = (projectId: string) => {
         getAllUsers,
         isLoading,
         error,
+        errorMsg,
         userList,
         newUser,
         setNewUser,

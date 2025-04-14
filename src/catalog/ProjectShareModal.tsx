@@ -22,7 +22,6 @@ import {
 import type React from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import useProjectShare, { type UserPermission, type RegisteredUser } from "./hooks/useProjectShare";
-import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 
 export interface ProjectShareModalProps {
     open: boolean;
@@ -38,6 +37,7 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
         addUser,
         isLoading,
         error,
+        errorMsg,
         userList,
         newUser,
         setNewUser,
@@ -93,16 +93,25 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
             <DialogContent dividers>
                 <Box sx={{ mt: 2 }}>
                     {error ? (
-                        <Box sx={{
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            height: "20vh",
-                        }}>
-                            <Typography variant="h6" color="error">{error.message}</Typography>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                height: "20vh",
+                            }}
+                        >
+                            <Typography variant="h6" color="error">
+                                {error}
+                            </Typography>
                         </Box>
                     ) : (
                         <>
+                            {errorMsg && (
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography color="error">{errorMsg}</Typography>
+                                </Box>
+                            )}
                             <Box sx={{ display: "flex", gap: 1, mb: 5 }}>
                                 <Autocomplete
                                     fullWidth
