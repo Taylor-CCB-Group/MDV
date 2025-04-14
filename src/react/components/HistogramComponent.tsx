@@ -5,6 +5,7 @@ import { useDebounce } from "use-debounce";
 import { useDimensionFilter, useConfig } from "../hooks";
 import type { SelectionDialogConfig, RangeFilter } from "./SelectionDialogReact";
 import { Brush } from "@visx/brush";
+import { LinePath } from '@visx/shape';
 import { ParentSize } from '@visx/responsive';
 import { scaleLinear, scaleLog, scaleSymlog } from "@visx/scale";
 import { observer } from "mobx-react-lite";
@@ -162,25 +163,22 @@ const HistogramInner = observer(({
     
     // options for scales other than linear...
     // x log & y symlog seem to work for colour histograms...
+    
+    // todo use xScaleType for computing bins, rather than distorting the data
+    // now they are linear 0 to data.length, mapping to [min, max]
+    const histXScale = useMemo(() => scaleLinear({
+        domain: [0, data.length-1],
+        range: [props.minMax[0], props.minMax[1]],
+    }), [props.minMax, data.length]);
     const brushXScale = useMemo(() => ScaleTypes[xScaleType]({
         domain: [props.minMax[0], props.minMax[1]],
         range: [0, width],
-        clamp: true,
-        nice: true, //nice extends the domain to nice round numbers
     }), [props.minMax, width, xScaleType]);
     const brushYScale = useMemo(() => ScaleTypes[yScaleType]({
         domain: [0, maxValue],
         range: [height, 0],
         nice: true,
     }), [height, maxValue, yScaleType]);
-    // Generate the points for the polyline
-    const points = useMemo(() => {
-        return data.map((value, index) => {
-            const x = index * (width / data.length); //should we need this?
-            const y = brushYScale(value); //should we be using the scale here?
-            return `${x},${y}`;
-        }).join(" ")
-    }, [data, brushYScale, width]);
     const [initialValue] = useState(value);
     const initialBrushPosition = useMemo(() => {
         if (!initialValue) {
@@ -214,7 +212,7 @@ const HistogramInner = observer(({
                 strokeDasharray="5,5"
                 vectorEffect="non-scaling-stroke"
             />
-        );
+        ); //!!! don't forget TagModel is broken again !!!
     }, [brushXScale, maxValue, lineColor, props.highlightValue]);
     return (
         <>
@@ -231,8 +229,12 @@ const HistogramInner = observer(({
                 cursor="move"
             >
                 {/* Background polyline (the simple line connecting data points) */}
-                <polyline
-                    points={points}
+                <LinePath
+                    data={data}
+                    x={(_, i) => brushXScale(histXScale(i))}
+                    y={d => brushYScale(d)}
+                    curve={undefined} // no curve, just a straight line
+                    // points={points}
                     fill="none"
                     stroke={lineColor}
                     strokeWidth="1.5"
