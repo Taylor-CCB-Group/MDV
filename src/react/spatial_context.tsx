@@ -9,6 +9,8 @@ import { useChartID, useRangeDimension2D } from "./hooks";
 import type BaseChart from "@/charts/BaseChart";
 import { observer } from "mobx-react-lite";
 import type { BaseConfig } from "@/charts/BaseChart";
+import { action, toJS } from "mobx";
+
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -55,7 +57,9 @@ function useSelectionCoords(selection: FeatureCollection) {
         //^^ need to be careful about managing that property.
         const geometry = feature.geometry as Geometry;
         const raw = geometry.coordinates as Position[][];
-        return raw[0];
+        //! without toJS, this can be orders of magnitude slower than before - careful with that mobx, eugene...
+        // still adds significant overhead - may need a different strategy for critical/hot paths.
+        return toJS(raw[0]);
     }, [feature]);
     return coords as [number, number][];
 }
@@ -80,10 +84,11 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
     // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
     //const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
+    //! it appears to drastically affect performance having this in mobx config - why?
     const { selectionFeatureCollection } = chart.config;
-    const setSelectionFeatureCollection = useCallback((newSelection: FeatureCollection) => {
+    const setSelectionFeatureCollection = useCallback(action((newSelection: FeatureCollection) => {
         chart.config.selectionFeatureCollection = newSelection;
-    }, [chart]);
+    }), []);
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
@@ -124,12 +129,13 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             },
             lineWidthMinPixels: 1,
             selectedFeatureIndexes,
-            onEdit: ({ updatedData }) => {
+            // adding `action` here gets rid of warnings but doesn't help with performance.
+            onEdit: action(({ updatedData }) => {
                 // console.log("onEdit", editType, updatedData);
                 const feature = updatedData.features.pop();
                 updatedData.features = [feature];
                 setSelectionFeatureCollection(updatedData);
-            },
+            }),
             onHover(pickingInfo, event) {
                 if ((pickingInfo as any).featureType === "points") return;
                 // -- try to avoid selecting invisible features etc - refer to notes in aosta prototype
