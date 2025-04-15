@@ -22,6 +22,7 @@ import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_st
 import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import { getEmptyFeatureCollection } from "./spatial_context";
+import type { BaseConfig } from "@/charts/BaseChart";
 
 export type TooltipConfig = {
     tooltip: {
@@ -52,8 +53,8 @@ export type ScatterPlotConfig = {
     dimension: "2d" | "3d";
     selectionFeatureCollection: FeatureCollection;
 } & TooltipConfig &
-    DualContourLegacyConfig;
-export const scatterDefaults: ScatterPlotConfig = {
+    DualContourLegacyConfig & BaseConfig;
+export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
     course_radius: 1,
     radius: 10,
     opacity: 1,
