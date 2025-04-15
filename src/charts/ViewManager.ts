@@ -132,7 +132,7 @@ class ViewManager {
             const viewList: { name: string; image: string }[] = [];
             for (const view of this.all_views) {
                 const data = await this.cm.viewLoader(view);
-                viewList.push({ name: view, image: data.viewImage });
+                viewList.push({ name: view, image: data?.viewImage });
                 console.log(data);
             }
             return viewList;
@@ -255,7 +255,8 @@ class ViewManager {
         const removeImageProp = (state: State) => {
             const cloneState = { ...state };
             if (cloneState?.view?.viewImage) {
-                cloneState.view.viewImage = undefined;
+                const {viewImage, ...view} = cloneState.view;
+                cloneState.view = view;
             }
             return cloneState;
         };

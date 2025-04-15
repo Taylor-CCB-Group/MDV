@@ -652,13 +652,26 @@ export class ChartManager {
         if (config.all_views) {
             const currentView = config.initial_view || config.all_views[0];
             this.viewManager.setView(currentView);
-            dataLoader.viewLoader(currentView).then((data) => {
-                this._init(data, firstTime);
+            dataLoader.viewLoader(currentView).then(async (data) => {
+                await this._init(data, firstTime);
+                if (currentView) {
+                    const state = this.getState();
+                    if (!state.view?.viewImage) {
+                        await this.viewManager.saveView();
+                    }
+                }
             });
         }
         //only one view hard coded in config
+        //! This else block is not called, but if it is called at some point, make sure the state save works properly
         else {
-            this._init(config.only_view, firstTime);
+            this._init(config.only_view, firstTime)
+            .then(async () => {
+                    const state = this.getState();
+                    if (!state.view?.viewImage) {
+                        await this.viewManager.saveView();
+                    }
+            });
         }
     }
 
