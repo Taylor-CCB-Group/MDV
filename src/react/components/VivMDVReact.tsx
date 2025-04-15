@@ -1,4 +1,4 @@
-import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import {
@@ -13,19 +13,17 @@ import {
 } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
-import type { ColumnName, GuiSpec } from "../../charts/charts";
+import type { ColumnName } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
 import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
-import type { DualContourLegacyConfig } from "../contour_state";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
 import { g, isArray, toArray } from "@/lib/utils";
-import type { FeatureCollection } from "@turf/helpers";
-import { getEmptyFeatureCollection } from "../spatial_context";
+import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -70,47 +68,6 @@ export type CategoryFilter = {
     column: ColumnName;
     category: string | string[];
     // consider properties like 'invert' or 'exclude', or 'color'...
-};
-//viewState should be persisted... maybe a way of saving different snapshots?
-//could we infer or something to avoid having to repeat this?
-//! need to only use the other version of this...
-export type ScatterPlotConfig = {
-    course_radius: number;
-    radius: number;
-    opacity: number;
-    // part of ColorConfig
-    // color_by?: ColumnName; 
-    // color_legend: {
-    //     display: boolean;
-    //     // todo: add more options here...
-    // };
-    category_filters: Array<CategoryFilter>;
-    //on_filter: "hide" | "grey", //todo
-    zoom_on_filter: boolean;
-    point_shape: "circle" | "square" | "gaussian";
-    selectionFeatureCollection: FeatureCollection;
-} & TooltipConfig &
-    DualContourLegacyConfig & BaseConfig;
-//@ts- expect-error things like 'id' are expected... subject to review.
-const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
-    course_radius: 1,
-    radius: 10,
-    opacity: 1,
-    color_by: undefined,
-    color_legend: {
-        display: false,
-    },
-    tooltip: {
-        show: false,
-    },
-    category_filters: [],
-    zoom_on_filter: false,
-    point_shape: "circle",
-    contour_fill: false,
-    contour_bandwidth: 0.1,
-    contour_intensity: 1,
-    contour_opacity: 0.5,
-    selectionFeatureCollection: getEmptyFeatureCollection(),
 };
 export type VivRoiConfig = {
     // making this 'type' very specific will let us infer the rest of the type, i.e.
