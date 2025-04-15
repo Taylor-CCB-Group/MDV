@@ -1,16 +1,17 @@
 
-type HistogramConfig = {
+export type HistogramMessage = {
     data: SharedArrayBuffer;
     min: number;
     max: number;
     bins: number;
+    // we should probably have more than two supported data types...
     isInt32: boolean;
     // todo pass in related to ~background_filter
     // as it may pertain to the view, or the chart, or in general some node in a graph...
-    // filteredIndices?: SharedArrayBuffer; 
+    // filteredIndices?: SharedArrayBuffer;
 }
 
-self.onmessage = async (event: MessageEvent<HistogramConfig>) => {
+self.onmessage = async (event: MessageEvent<HistogramMessage>) => {
     const { isInt32, data, min, max, bins } = event.data;
     // this logic is ok for MDV columns as of this writing
     // but what about viv raster data for example?

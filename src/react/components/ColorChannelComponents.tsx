@@ -5,7 +5,6 @@ import {
     VivProvider,
     useChannelsStore,
     useChannelsStoreApi,
-    useImageSettingsStoreApi,
     useLoader,
     useMetadata,
     useViewerStore,
@@ -27,6 +26,8 @@ import { Histogram, type Range } from "./HistogramComponent";
 import { ErrorBoundary } from "react-error-boundary";
 import { toJS } from "mobx";
 import JsonView from "react18-json-view";
+import HistogramWorker from '../../datastore/rawHistogramWorker.ts?worker';
+import type { HistogramMessage } from "@/datastore/rawHistogramWorker";
 
 export default function MainVivColorDialog({
     vivStores,
@@ -219,9 +220,10 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     const pixelValue = pixelValues[index];
     const domain = domains[index];
     const rasterData = raster[index]?.data || [0]; //! revisit this sometime
-    
+
     const [histogramData, setHistogramData] = useState([] as number[]);
 
+    // review this / use d3 scales, see if we can simplify state
     const [min, max] = domain;
     const scaleValue = useCallback((v: number) => (v - min) / (max - min), [min, max]);
     const { limit, normalisedLow, normalisedHigh } = useMemo(() => {
@@ -236,17 +238,17 @@ const ChannelHistogram = ({ index }: { index: number }) => {
 
 
     // some problems with initial querying, probably in the Histogram component
-    // todo review this...
+    //! todo review this... useQuery?
     const queryHistogram = useCallback(async () => {
-        // todo nicer worker syntax?
-        const worker = new Worker(
-            new URL("../../datastore/rawHistogramWorker.ts", import.meta.url),
-        );
+        // importing with this syntax doesn't make a massive difference (still not picking up types), 
+        // and is a bit vite-proprietary?
+        const worker = new HistogramWorker();
         worker.onmessage = (event) => {
             setHistogramData(event.data);
             worker.terminate();
         };
-        //! this is a lie - need to actually check!
+        //! this is a lie - need to actually check!<<
+        //while we're there, why not actually use the right type...
         const isInt32 = false;
         const originalData = rasterData;
         const data = new SharedArrayBuffer(originalData.length * 4);
@@ -256,8 +258,8 @@ const ChannelHistogram = ({ index }: { index: number }) => {
             min,
             max,
             bins: 100,
-            isFloat: isInt32,
-        });
+            isInt32,
+        } satisfies HistogramMessage);
     }, [min, max, rasterData]);
     // todo review whether this state can be cleaned up / simplified
     const [liveValue, setLiveValue] = useState<Range>([0, 0]);
@@ -284,11 +286,10 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading)[index];
     return (
         <div className="p-4">
-            {!isChannelLoading ? <Histogram 
+            {!isChannelLoading ? <Histogram
                 value={limit}
-                step={0.001} //todo make this dynamic
+                step={0.001} //!todo make this dynamic
                 histogram={histogramData}
-                // todo add indicator for highightValue={pixelValue}
                 // todo add value label
                 lowFraction={normalisedLow} // component should calculate these
                 highFraction={normalisedHigh}

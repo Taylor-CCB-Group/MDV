@@ -10,6 +10,7 @@ import { ParentSize } from '@visx/responsive';
 import { scaleLinear, scaleLog, scaleSymlog } from "@visx/scale";
 import { observer } from "mobx-react-lite";
 import type BaseBrush from "@visx/brush/lib/BaseBrush";
+import type { HistogramMessage } from "@/datastore/rawHistogramWorker";
 
 
 /**
@@ -69,8 +70,8 @@ export function useRangeFilter(column: DataColumn<NumberDataType>) {
             min: column.minMax[0],
             max: column.minMax[1],
             bins: 100,
-            isFloat: isInt32,
-        });
+            isInt32,
+        } satisfies HistogramMessage);
     }, [column]);
 
     const [low, high] = value || column.minMax;
@@ -134,10 +135,10 @@ const HistogramInner = observer(({
     }), [prefersDarkMode]);
     // Find max value for vertical scaling
     const maxValue = Math.max(...data);
-    
+
     const [hasQueried, setHasQueried] = useState(false);
     // if data changes, reset the hasQueried state... disabled for now
-    // also consider another row of data 
+    // also consider another row of data
     // (i.e. second histogram with filtered data, which is likely to need more frequent updates)
     useEffect(() => {
         data;
@@ -160,14 +161,14 @@ const HistogramInner = observer(({
         // queryHistogram();
         return () => observer.disconnect();
     }, [queryHistogram, hasQueried]);
-    
+
     // options for scales other than linear...
     // x log & y symlog seem to work for colour histograms...
-    
+
     // todo use xScaleType for computing bins, rather than distorting the data
     // now they are linear 0 to data.length, mapping to [min, max]
     const histXScale = useMemo(() => scaleLinear({
-        domain: [0, data.length-1],
+        domain: [0, data.length - 1],
         range: [props.minMax[0], props.minMax[1]],
     }), [props.minMax, data.length]);
     const brushXScale = useMemo(() => ScaleTypes[xScaleType]({
@@ -242,7 +243,7 @@ const HistogramInner = observer(({
                     // but this would have been a real pain to figure out on my own)
                     vectorEffect="non-scaling-stroke" // Keeps the stroke width consistent
                 />
-                <Brush 
+                <Brush
                     innerRef={brushRef}
                     xScale={brushXScale}
                     yScale={brushYScale}
@@ -275,10 +276,10 @@ export const Histogram = (props: RangeProps) => {
             <ParentSize>
                 {({ width, height }) => (
                     <HistogramInner
-                    {...propsRest}
-                    // just need to sort out this business of what I mean by width
-                    histoWidth={width}
-                    histoHeight={height}
+                        {...propsRest}
+                        // just need to sort out this business of what I mean by width
+                        histoWidth={width}
+                        histoHeight={height}
                     />
                 )}
             </ParentSize>
