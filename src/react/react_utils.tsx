@@ -9,7 +9,7 @@ import type { BaseDialog } from "@/utilities/Dialog";
 import { OuterContainerProvider, useOuterContainer } from "./screen_state";
 import { createFilterOptions } from "@mui/material";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-// import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+// import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 // todo - think about whether this might lead to unexpected future issues
 // consider virtualization etc
@@ -95,6 +95,7 @@ const createMdvPortal = (component: JSX.Element, container: HTMLElement, parent?
     root.render(
         <StrictMode>
             <QueryClientProvider client={queryClient}>
+                {/* todo - control for toggling query devtools */}
                 {/* <ReactQueryDevtools initialIsOpen={false} /> */}
                 <OuterContainerProvider parent={parent}>
                     <MaterialWrapper>
