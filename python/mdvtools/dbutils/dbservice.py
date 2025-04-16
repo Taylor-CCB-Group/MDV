@@ -14,8 +14,6 @@ class ProjectService:
             failed_project_ids = {f[0] for f in ProjectService.failed_projects}  
             projects = Project.query.filter(Project.is_deleted == False).all()
 
-            for p in projects:
-                print(next(iter(list(MDVProject(p.path).views.values())), None))
             
             # Convert to JSON-ready list of dictionaries
             project_list = [
