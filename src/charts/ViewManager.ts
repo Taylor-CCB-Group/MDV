@@ -20,6 +20,14 @@ export type State =
       }
     | undefined;
 
+const removeImageProp = (state: State) => {
+    const cloneState = { ...state };
+    if (cloneState?.view?.viewImage) {
+        cloneState.view.viewImage = undefined;
+    }
+    return cloneState;
+};
+
 class ViewManager {
     @observable accessor current_view = "";
     @observable accessor all_views: string[];
@@ -33,6 +41,15 @@ class ViewManager {
         setTimeout(() => {
             this.lastSavedState = this.cm.getState();
         }, 1000);
+    }
+
+    getCleanPrevState() {
+        return removeImageProp(toJS(this.lastSavedState));
+    }
+
+    getCleanCurrState() {
+        const currState = this.cm.getState();
+        return removeImageProp(toJS(currState));
     }
 
     // Setters
@@ -256,15 +273,6 @@ class ViewManager {
     // Helper to check if the current state differs from the last saved state
     hasUnsavedChanges(verbose = false) {
         if (this.lastSavedState === null) return true;
-
-        const removeImageProp = (state: State) => {
-            const cloneState = { ...state };
-            if (cloneState?.view?.viewImage) {
-                const {viewImage, ...view} = cloneState.view;
-                cloneState.view = view;
-            }
-            return cloneState;
-        };
 
         const currState = this.cm.getState();
 
