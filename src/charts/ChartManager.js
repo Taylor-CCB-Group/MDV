@@ -666,7 +666,6 @@ export class ChartManager {
                     // Consider adding user-facing error handling here
                 }
             });
-            });
         }
         //only one view hard coded in config
         //! This else block is not called, but if it is called at some point, make sure the state save works properly
