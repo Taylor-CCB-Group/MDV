@@ -14,31 +14,28 @@ class ProjectService:
             failed_project_ids = {f[0] for f in ProjectService.failed_projects}  
             projects = Project.query.filter(Project.is_deleted == False).all()
 
-            
+
             # Convert to JSON-ready list of dictionaries
-+            def get_project_thumbnail(project_path):
-+                """Extract the first available viewImage from a project's views."""
-+                try:
-+                    mdv_project = MDVProject(project_path)
-+                    return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
-+                except Exception as e:
-+                    print(f"Error extracting thumbnail for project at {project_path}: {e}")
-+                    return None
-+
+            def get_project_thumbnail(project_path):
+                """Extract the first available viewImage from a project's views."""
+                try:
+                    mdv_project = MDVProject(project_path)
+                    return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
+                except Exception as e:
+                    print(f"Error extracting thumbnail for project at {project_path}: {e}")
+                    return None
+
             project_list = [
                 {
                     "id": p.id,
                     "name": p.name,
                     "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
--                    "thumbnail": next(
--                        (v["viewImage"] for v in MDVProject(p.path).views.values() if "viewImage" in v), None
--                        ),
-+                    "thumbnail": get_project_thumbnail(p.path),
+                    "thumbnail": get_project_thumbnail(p.path),
                 }
                 for p in projects if p.id not in failed_project_ids
             ]
 
-            return project_list  #Already formatted for JSON storage
+            return project_list
         except Exception as e:
             print(f"Error in dbservice: Error querying active projects: {e}")
             raise
