@@ -13,6 +13,7 @@ export interface Project {
     collaborators: string[];
     numberOfStructures: string;
     numberOfImages: string;
+    thumbnail?: string;
 }
 
 export const sortProjects = (
