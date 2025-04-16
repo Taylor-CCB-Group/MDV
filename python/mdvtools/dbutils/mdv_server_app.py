@@ -640,9 +640,10 @@ def register_routes(app):
                 # Format each project with its id, name, and last modified timestamp as a string
                 project_list = [
                     {
-                        "id": p.id,
-                        "name": p.name,
-                        "lastModified": p.update_timestamp.strftime('%Y-%m-%d %H:%M:%S')  # Format datetime as string
+                        "id": p["id"],
+                        "name": p["name"],
+                        "lastModified": p["lastModified"],  # Format datetime as string
+                        "thumbnail": p["thumbnail"]
                     }
                     for p in projects
                 ]

@@ -37,18 +37,25 @@ export const ViewImageComponent = ({imgSrc, viewName}: ViewImageComponentProps) 
         <img
             src={imgSrc}
             alt={`${viewName} snapshot`}
-            style={{ objectFit: 'contain', aspectRatio: 4/3 }}
+            style={{ objectFit: 'contain', aspectRatio: 3/2 }}
             onError={() => setHasError(true)}
         />
     ) : (
-        <ImageIcon 
-            sx={{ 
-                width: "100%", 
-                height: "100%", 
-                objectFit: 'inherit', 
-                aspectRatio: 4/3 
-            }} 
-        />
+        <Box sx={{ 
+            width: "100%", 
+            height: "100%", 
+            aspectRatio: 3/2,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center", 
+        }}>
+            <ImageIcon 
+                sx={{ 
+                    fontSize: "5rem",
+                    color: "text.secondary"
+                }} 
+            />
+        </Box>
     );
 };
 
@@ -77,12 +84,8 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         setOpen(false);
     };
 
-    const handleCardClick = (name: string) => {
-        if (viewManager.hasUnsavedChanges()) {
-            // todo - show confirmation dialog, don't have time to test this now
-            console.warn("changing view with unsaved changes");
-        }
-        viewManager.changeView(name);
+    const handleCardClick = async (name: string) => {
+        viewManager.checkAndChangeView(name);
         onClose();
     };
 
@@ -174,22 +177,22 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
                                     <Grid2 container spacing={4}>
                                         {filteredViewList.map((view, index) => (
                                             <Grid2 key={`${view.name}-${index}`} size={{md: 4, sm: 6}}>
-                                                <Card sx={{ boxShadow: 20 }}>
+                                                <Card sx={{ boxShadow: 20, bgcolor: "inherit" }}>
                                                     <CardActionArea onClick={() => handleCardClick(view.name)}>
+                                                        <Box sx={{ padding: "1%", bgcolor: "background.default" }}>
+                                                            <ViewImageComponent imgSrc={view.image} viewName={view.name} />
+                                                        </Box>
+                                                        <Divider />
                                                         <Box
                                                             sx={{
                                                                 display: "flex",
                                                                 justifyContent: "center",
-                                                                padding: "2%",
+                                                                paddingY: "3%",
                                                             }}
                                                         >
                                                             <Typography sx={{ fontWeight: "bold" }}>
                                                                 {view.name}
                                                             </Typography>
-                                                        </Box>
-                                                        <Divider />
-                                                        <Box sx={{ padding: "1%" }}>
-                                                            <ViewImageComponent imgSrc={view.image} viewName={view.name} />
                                                         </Box>
                                                     </CardActionArea>
                                                 </Card>
