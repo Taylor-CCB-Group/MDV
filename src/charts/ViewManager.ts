@@ -240,6 +240,11 @@ class ViewManager {
         }
     }
 
+    @action
+    async saveAsView(viewName: string) {
+        await this.addView(viewName, {}, true);
+    }
+
     checkUnsavedState(action: () => void) {
         if (this.hasUnsavedChanges()) {
             this.cm.showSaveViewDialog(action);
@@ -269,11 +274,8 @@ class ViewManager {
         }
 
         const currentState = removeImageProp(toJS(currState));
-
         const prevState = removeImageProp(toJS(this.lastSavedState));
 
-        console.log("currentState", currentState);
-        console.log("prevState", prevState);
         if (verbose) {
             console.log("inside currentState", currentState);
             console.log("inside prevState", prevState);
