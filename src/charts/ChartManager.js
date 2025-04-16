@@ -653,13 +653,19 @@ export class ChartManager {
             const currentView = config.initial_view || config.all_views[0];
             this.viewManager.setView(currentView);
             dataLoader.viewLoader(currentView).then(async (data) => {
-                await this._init(data, firstTime);
-                if (currentView) {
-                    const state = this.getState();
-                    if (!state.view?.viewImage) {
-                        await this.viewManager.saveView();
+                try {
+                    await this._init(data, firstTime);
+                    if (currentView) {
+                        const state = this.getState();
+                        if (!state.view?.viewImage) {
+                            await this.viewManager.saveView();
+                        }
                     }
+                } catch (error) {
+                    console.error("Error during view initialization:", error);
+                    // Consider adding user-facing error handling here
                 }
+            });
             });
         }
         //only one view hard coded in config
