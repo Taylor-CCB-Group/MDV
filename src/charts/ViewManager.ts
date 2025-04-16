@@ -240,6 +240,11 @@ class ViewManager {
         }
     }
 
+    @action
+    async saveAsView(viewName: string) {
+        await this.addView(viewName, {}, true);
+    }
+
     checkUnsavedState(action: () => void) {
         if (this.hasUnsavedChanges()) {
             this.cm.showSaveViewDialog(action);

@@ -6,6 +6,7 @@ import ErrorDisplay from "./ErrorDisplay";
 import AddViewDialogComponent from "./AddViewDialog";
 import SaveViewDialogComponent from "./SaveViewDialog";
 import DeleteViewDialogComponent from "./DeleteViewDialog";
+import SaveAsViewDialogComponent from "./SaveAsViewDialog";
 
 const Wrapper = (props: {
     onDone: () => void;
@@ -15,44 +16,65 @@ const Wrapper = (props: {
 }) => {
     const [open, setOpen] = useState(true);
 
+    const getDialogComponent = () => {
+        switch (props.dialogType) {
+            case "save":
+                return (
+                    <SaveViewDialogComponent
+                        open={open}
+                        onClose={() => {
+                            setOpen(false);
+                            props.onDone();
+                        }}
+                        action={props?.saveDialogAction}
+                        content={props?.saveDialogContent}
+                    />
+                );
+            case "add":
+                return (
+                    <AddViewDialogComponent
+                        open={open}
+                        onClose={() => {
+                            setOpen(false);
+                            props.onDone();
+                        }}
+                    />
+                );
+            case "delete":
+                return (
+                    <DeleteViewDialogComponent
+                        open={open}
+                        onClose={() => {
+                            setOpen(false);
+                            props.onDone();
+                        }}
+                    />
+                );
+            case "save_as":
+                return (
+                    <SaveAsViewDialogComponent
+                        open={open}
+                        onClose={() => {
+                            setOpen(false);
+                            props.onDone();
+                        }}
+                    />
+                );
+        }
+    };
+
     return (
         <ErrorBoundary
             FallbackComponent={({ error }) => (
                 <ErrorDisplay error={error} title="Unexpected Error: please report to developers." />
             )}
         >
-            {props.dialogType === "add" ? (
-                <AddViewDialogComponent
-                    open={open}
-                    onClose={() => {
-                        setOpen(false);
-                        props.onDone();
-                    }}
-                />
-            ) : props.dialogType === "delete" ? (
-                <DeleteViewDialogComponent
-                    open={open}
-                    onClose={() => {
-                        setOpen(false);
-                        props.onDone();
-                    }}
-                />
-            ) : (
-                <SaveViewDialogComponent
-                    open={open}
-                    onClose={() => {
-                        setOpen(false);
-                        props.onDone();
-                    }}
-                    action={props?.saveDialogAction}
-                    content={props?.saveDialogContent}
-                />
-            )}
+            {getDialogComponent()}
         </ErrorBoundary>
     );
 };
 
-type DialogType = "save" | "add" | "delete";
+type DialogType = "save" | "add" | "delete" | "save_as";
 
 class ViewDialogWrapper extends BaseDialog {
     root: ReturnType<typeof createMdvPortal>;
