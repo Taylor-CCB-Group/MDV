@@ -273,11 +273,8 @@ class ViewManager {
         }
 
         const currentState = removeImageProp(toJS(currState));
-
         const prevState = removeImageProp(toJS(this.lastSavedState));
 
-        console.log("currentState", currentState);
-        console.log("prevState", prevState);
         if (verbose) {
             console.log("inside currentState", currentState);
             console.log("inside prevState", prevState);
