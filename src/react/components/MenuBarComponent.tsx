@@ -88,7 +88,7 @@ const MenuBarComponent = () => {
                             <IconWithTooltip tooltipText="Save View" onClick={handleSaveButtonClick}>
                                 <SaveIcon />
                             </IconWithTooltip>
-                            <IconWithTooltip tooltipText="Save As New View" onClick={handleSaveAsButtonClick}>
+                            <IconWithTooltip tooltipText="Save View As..." onClick={handleSaveAsButtonClick}>
                                 <SaveAsIcon />
                             </IconWithTooltip>
                         </>

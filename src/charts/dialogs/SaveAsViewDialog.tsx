@@ -4,7 +4,6 @@ import { useEffect, useCallback, useState } from "react";
 const SaveAsViewDialogComponent = (props: {
     open: boolean;
     onClose: () => void;
-    content?: string;
 }) => {
     const { viewManager } = window.mdv.chartManager;
     const [viewName, setViewName] = useState("");
@@ -42,13 +41,9 @@ const SaveAsViewDialogComponent = (props: {
 
     return (
         <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
-            <DialogTitle>Save As New View</DialogTitle>
+            <DialogTitle>Save View As...</DialogTitle>
             <DialogContent dividers>
-                <Typography>
-                    {props?.content
-                        ? props?.content
-                        : "Please provide the name of the new view"}
-                </Typography>
+                {/* todo consider adding thumbnail here */}
                 <TextField
                     label="Enter New View Name"
                     variant="outlined"
