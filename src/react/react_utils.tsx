@@ -8,6 +8,7 @@ import type BaseChart from "@/charts/BaseChart";
 import type { BaseDialog } from "@/utilities/Dialog";
 import { OuterContainerProvider, useOuterContainer } from "./screen_state";
 import { createFilterOptions } from "@mui/material";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // todo - think about whether this might lead to unexpected future issues
 // consider virtualization etc
@@ -66,6 +67,16 @@ const MaterialWrapper = observer(function MaterialWrapper({
     );
 });
 
+// should we be keeping this local to each react root? - not sure if it matters either way.
+// using coderabbitai suggestion for options - may review if we're using it for other things than histogram.
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            refetchOnWindowFocus: false,
+        }
+    }
+});
+
 /**
  * It also makes sure that any common global context, styles etc are applied.
  * todo - this is a placeholder for refactoring so that there is a single react root,
@@ -78,19 +89,17 @@ const MaterialWrapper = observer(function MaterialWrapper({
  * If not provided, the default is document.body.
  * @returns the root element that was created
  */
-const createMdvPortal = (
-    component: JSX.Element,
-    container: HTMLElement,
-    parent?: BaseChart<any> | BaseDialog,
-) => {
+const createMdvPortal = (component: JSX.Element, container: HTMLElement, parent?: BaseChart<any> | BaseDialog) => {
     const root = createRoot(container);
     root.render(
         <StrictMode>
-            <OuterContainerProvider parent={parent}>
-                <MaterialWrapper>
-                    <ProjectProvider>{component}</ProjectProvider>
-                </MaterialWrapper>
-            </OuterContainerProvider>
+            <QueryClientProvider client={queryClient}>
+                <OuterContainerProvider parent={parent}>
+                    <MaterialWrapper>
+                        <ProjectProvider>{component}</ProjectProvider>
+                    </MaterialWrapper>
+                </OuterContainerProvider>
+            </QueryClientProvider>
         </StrictMode>,
     );
     return root;

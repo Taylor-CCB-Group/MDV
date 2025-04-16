@@ -48,23 +48,23 @@ const useJsonLayer = () => {
     const layer = useMemo(() => {
         return json
             ? new GeoJsonLayer({
-                  id: layer_id,
-                  data: `${root}/${json}`,
-                  opacity: 0.25,
-                  filled: true,
-                  getFillColor: (f) => [255, 255, 255, 150],
-                  getLineColor: (f) => [f.properties.DN, 255, 255, 150],
-                  getLineWidth: 2,
-                  lineWidthMinPixels: 1,
-                  pickable: true,
-                  autoHighlight: true,
-                  //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
-                  getText: (f) => f.properties.DN,
-                  getTextColor: [255, 255, 255, 255],
-                  getTextSize: 12,
-                  textBackground: true,
-                  visible: showJson,
-              })
+                id: layer_id,
+                data: `${root}/${json}`,
+                opacity: 0.25,
+                filled: true,
+                getFillColor: (f) => [255, 255, 255, 150],
+                getLineColor: (f) => [f.properties.DN, 255, 255, 150],
+                getLineWidth: 2,
+                lineWidthMinPixels: 1,
+                pickable: true,
+                autoHighlight: true,
+                //@ts-expect-error GeoJson getText: might think about using zod to type/validate this
+                getText: (f) => f.properties.DN,
+                getTextColor: [255, 255, 255, 255],
+                getTextSize: 12,
+                textBackground: true,
+                visible: showJson,
+            })
             : null;
     }, [json, showJson, layer_id, root]);
     return layer;
@@ -209,7 +209,7 @@ const Main = observer(() => {
                 layerProps={[layerConfig]}
                 viewStates={[{ ...viewState, id: detailId }]}
                 // not really expecting OrbitViewState... yet... but we will for 3D.
-                onViewStateChange={(e: {viewState: OrthographicViewState | OrbitViewState}) => {
+                onViewStateChange={(e: { viewState: OrthographicViewState | OrbitViewState }) => {
                     viewerStore.setState({
                         viewState: { ...e.viewState, id: detailId },
                     });
@@ -219,6 +219,10 @@ const Main = observer(() => {
                             null,
                             2,
                         );
+                }}
+                hoverHooks={{
+                    // doesn't get values when occluded...
+                    handleValue: (v: any) => viewerStore.setState({ pixelValues: v })
                 }}
                 deckProps={deckProps}
             />

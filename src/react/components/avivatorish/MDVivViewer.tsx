@@ -105,7 +105,7 @@ class MDVivViewerWrapper extends React.PureComponent<
         views.forEach((view: any) => {
             viewStates[view.id] = view.filterViewState({
                 viewState: initialViewStates.find((v: any) => v.id === view.id),
-            });
+            }); //todo review ome_thumbnails branch changes
         });
         this._onViewStateChange = this._onViewStateChange.bind(this);
         this.layerFilter = this.layerFilter.bind(this);
@@ -150,7 +150,7 @@ class MDVivViewerWrapper extends React.PureComponent<
                     viewState: { ...viewState, id: viewId },
                     oldViewState,
                     currentViewState,
-                });
+                }); //todo review ome_thumbnails
             });
             return { viewStates };
         });
