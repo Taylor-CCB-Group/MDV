@@ -159,24 +159,24 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         # Step 1: Initialize Memory with Chat History
         memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
         
-        # Step 2: Create the Python REPL Tool (Dynamically Injecting DataFrames)
-        python_tool = PythonAstREPLTool(globals={})
+        # Step 2: Create the Python REPL Tool
+        python_tool = PythonAstREPLTool()
 
-        if python_tool.globals is None:
-            python_tool.globals = {}  # Ensure it's a dictionary
+        # if python_tool.globals is None:
+        #     python_tool.globals = {}  # Ensure it's a dictionary
+
+        if not hasattr(python_tool, "globals") or not isinstance(python_tool.globals, dict):
+            python_tool.globals = {}
+
+        python_tool.globals.update(dfs)
+        python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
+
 
         # Make DataFrames available inside the REPL tool
-        python_tool.globals.update(dfs)
-
-        print("python_tool.globals before assignment:", type(python_tool.globals))
+        python_tool.globals.update(dfs) 
 
         ## New fixes:
         python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
-
-        print(">>> keys in python_tool.globals:", python_tool.globals.keys())
-
-        for key, value in python_tool.globals.items():
-            print(f"{key}: {type(value)}")
 
         # Step 3: Define Contextualization Chain
 
@@ -223,20 +223,26 @@ def main(project_path, dataset_path, question_list_path, output_csv):
 
         return agent_with_contextualization
 
-    ## pandas agent code
-    #agent = lp.create_pandas_dataframe_agent(dataframe_llm, df_list, verbose=True, allow_dangerous_code=True)
-
     question_file = pd.read_csv(question_list_path, skipinitialspace=True, index_col=False)
     question_list = question_file['requests'].tolist()
     
     results = []
+
+    dataframes_for_agent = {"df1": df_list[0], "df2": df_list[1]}
+
+    agent = create_custom_pandas_agent(dataframe_llm, dataframes_for_agent, prompt_data, verbose=True)
+
+    #agent = create_custom_pandas_agent(dataframe_llm, {"df1": pd.DataFrame(df_list[0]), "df2": df_list[1]}, prompt_data, verbose=True)
+    #print(df_list[0])
+    #print(df_list[1])
+    #response = agent(full_prompt)
+
     for question in question_list:
         try:
             full_prompt = prompt_data + "\nQuestion: " + question
 
             ## custom agent code
-            agent_executor = create_custom_pandas_agent(dataframe_llm, {"df1": df_list[0], "df2": df_list[1]}, prompt_data, verbose=True)
-            response = agent_executor(full_prompt)#.invoke({"input": full_prompt})
+            response = agent(full_prompt)#agent(full_prompt) #agent.invoke({"input": full_prompt})
             
             prompt_RAG = get_createproject_prompt_RAG_copy(project, dataset_path, datasource_names[0], response['output'], response['input'])
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
