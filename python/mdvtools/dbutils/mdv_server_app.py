@@ -725,17 +725,41 @@ def register_auth_routes(app):
         @app.route('/profile')
         def profile():
             try:
-                token = session.get('token')
-                if token:
-                    user_info = auth0_provider.get_user(token)
-                    return jsonify(user_info)
+                auth_method = session.get('auth_method')
+
+                if auth_method == 'auth0':
+                    token = session.get('token')
+                    if token:
+                        user_info = auth0_provider.get_user(token)
+                        if user_info:
+                            return jsonify(user_info)
+                        else:
+                            return jsonify({"error": "Failed to retrieve user information from Auth0."}), 500
+                    else:
+                        return jsonify({"error": "Not authenticated with Auth0."}), 401
+
+                elif auth_method == 'shibboleth':
+                    # Extract user information from Shibboleth headers
+                    display_name = request.headers.get('shibboleth-displayName')
+                    email = request.headers.get('shibboleth-mail')
+                    uid = request.headers.get('shibboleth-uid')
+
+                    if uid:
+                        user_info = {
+                            "uid": uid,
+                            "display_name": display_name,
+                            "email": email
+                        }
+                        return jsonify(user_info)
+                    else:
+                        return jsonify({"error": "Shibboleth headers not found or user not authenticated."}), 401
+
                 else:
-                    print("Token not found in session.")
-                    return jsonify({"error": "Not authenticated."}), 401
+                    return jsonify({"error": "Unknown authentication method."}), 400
+
             except Exception as e:
-                print(f"In register_auth0_routes: Error during profile retrieval: {e}")
+                print(f"Error during profile retrieval: {e}")
                 return jsonify({"error": "Failed to retrieve user profile."}), 500
-        
 
         @app.route('/login_sso')
         def login_sso():
