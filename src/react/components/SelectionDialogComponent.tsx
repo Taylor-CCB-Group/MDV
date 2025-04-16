@@ -200,6 +200,8 @@ const UniqueComponent = observer(({ column }: Props<"unique">) => {
 
 const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const filters = useConfig<SelectionDialogConfig>().filters;
+    // revisiting this, still want a thing that is based on `column`, 
+    // but the flow of state - i.e. `histogramData` - is changing.
     const rangeProps = useRangeFilter(column);
     const { value, step } = rangeProps;
     const [min, max] = column.minMax;
@@ -217,7 +219,7 @@ const NumberComponent = observer(({ column }: Props<NumberDataType>) => {
     const high = value ? value[1] : max;
     return (
         <div>
-            <Histogram {...rangeProps} setValue={setValue} minMax={column.minMax} histoWidth={99} histoHeight={100} />
+            <Histogram {...rangeProps} name={column.name} setValue={setValue} domain={column.minMax} bins={200} histoHeight={100} />
             <div>
                 <TextField size="small" className="max-w-20" type="number"
                     variant="standard"

@@ -10,7 +10,8 @@ import { ParentSize } from '@visx/responsive';
 import { scaleLinear, scaleLog, scaleSymlog } from "@visx/scale";
 import { observer } from "mobx-react-lite";
 import type BaseBrush from "@visx/brush/lib/BaseBrush";
-import type { HistogramMessage } from "@/datastore/rawHistogramWorker";
+import { useHistogramQuery } from "../useHistogramQuery";
+import { LinearProgress } from "@mui/material";
 
 
 /**
@@ -51,29 +52,6 @@ export function useRangeFilter(column: DataColumn<NumberDataType>) {
         filter.filter("filterRange", [column.field], { min, max }, true);
     }, [column, filter, debouncedValue]);
 
-    const [histogram, setHistogram] = useState<number[]>([]);
-    // this could be a more general utility function - expect to extract soon
-    const queryHistogram = useCallback(async () => {
-        const worker = new Worker(
-            new URL("../../datastore/rawHistogramWorker.ts", import.meta.url),
-        );
-        worker.onmessage = (event) => {
-            setHistogram(event.data);
-            worker.terminate();
-        };
-        const isInt32 = column.datatype === "int32";
-        const originalData = column.data as Float32Array | Int32Array;
-        const data = new SharedArrayBuffer(originalData.length * 4);
-        new Float32Array(data).set(originalData);
-        worker.postMessage({
-            data,
-            min: column.minMax[0],
-            max: column.minMax[1],
-            bins: 100,
-            isInt32,
-        } satisfies HistogramMessage);
-    }, [column]);
-
     const [low, high] = value || column.minMax;
     const [min, max] = column.minMax;
     const lowFraction = (low - min) / (max - min);
@@ -82,10 +60,9 @@ export function useRangeFilter(column: DataColumn<NumberDataType>) {
     return {
         value,
         step,
-        histogram,
+        data: column.data || new Float32Array(),
         lowFraction,
         highFraction,
-        queryHistogram,
     };
 }
 // type set2d = ReturnType<typeof useState<[number, number]>>[1];
@@ -94,13 +71,15 @@ export type set2d = (v: Range | null) => void; //nb, setting undefined can actua
 export type FilterRangeType = ReturnType<typeof useRangeFilter>;
 export type RangeProps = FilterRangeType & {
     setValue: set2d;
-    minMax: Range;
+    domain: Range;
     // probably want to review how these are specified / controlled
-    histoWidth: number; //number of bins todo review
+    bins: number;
     histoHeight: number; //height of the histogram
     highlightValue?: number;
     xScaleType?: ScaleType;
     yScaleType?: ScaleType;
+    name?: string;
+    width?: number;
 };
 const ScaleTypes = {
     linear: scaleLinear,
@@ -111,57 +90,53 @@ export type ScaleType = keyof typeof ScaleTypes;
 const HistogramInner = observer(({
     xScaleType = "linear",
     yScaleType = "linear",
+    width = 100,
     ...props
 }: RangeProps) => {
     useEffect(() => {
         console.log("Histogram component mounted");
         return () => console.log("Histogram component unmounted");
     }, []);
-    const { histogram: data, queryHistogram, value } = props;
-    const { histoWidth, histoHeight } = props;
+    const { data: inputData, value } = props;
+    const { bins, histoHeight, domain } = props;
     const ref = useRef<SVGSVGElement>(null);
-    // useBrushX(ref, props);
     // nb, theme warrants use of observer
     const prefersDarkMode = window.mdv.chartManager.theme === "dark";
-    const width = histoWidth;
     const height = histoHeight;
     const lineColor = prefersDarkMode ? "#fff" : "#000";
     const selectedBrushStyle = useMemo<SVGProps<SVGRectElement>>(() => ({
-        // fill: prefersDarkMode ? "#fff" : "#000",
+        fill: prefersDarkMode ? "#fff" : "#000",
         stroke: prefersDarkMode ? "#fff" : "#000",
         strokeWidth: 1,
-        opacity: 0.5,
+        fillOpacity: 0.1,
         vectorEffect: "non-scaling-stroke",
     }), [prefersDarkMode]);
-    // Find max value for vertical scaling
-    const maxValue = Math.max(...data);
 
-    const [hasQueried, setHasQueried] = useState(false);
-    // if data changes, reset the hasQueried state... disabled for now
-    // also consider another row of data
-    // (i.e. second histogram with filtered data, which is likely to need more frequent updates)
-    useEffect(() => {
-        data;
-        // this may be going mad - should we use react query?
-        // console.log("data changed", data);
-        setHasQueried(false);
-    }, [data]);
-    useEffect(() => {
-        if (!ref.current) return;
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && !hasQueried) {
-                    setHasQueried(true);
-                    queryHistogram();
-                }
-            },
-            { rootMargin: "0px 0px 100px 0px" },
-        );
-        observer.observe(ref.current);
-        // queryHistogram();
-        return () => observer.disconnect();
-    }, [queryHistogram, hasQueried]);
-
+    // todo lazy load
+    // const [visible, setVisible] = useState(false);
+    // useEffect(() => {
+    //     if (!ref.current) return;
+    //     const observer = new IntersectionObserver(
+    //         (entries) => {
+    //             if (entries[0].isIntersecting) {
+    //                 setVisible(true);
+    //             } else {
+    //                 setVisible(false);
+    //             }
+    //         },
+    //         { rootMargin: "0px 0px 100px 0px" },
+    //     );
+    //     observer.observe(ref.current);
+    //     return () => observer.disconnect();
+    // }, []);
+    // Use TanStack Query for histogram data
+    const {
+        data = [],
+        isLoading,
+        isError,
+        error
+    } = useHistogramQuery(inputData, domain, bins, true, props.name);
+    const maxValue = useMemo(() => Math.max(...data), [data]);
     // options for scales other than linear...
     // x log & y symlog seem to work for colour histograms...
 
@@ -169,12 +144,12 @@ const HistogramInner = observer(({
     // now they are linear 0 to data.length, mapping to [min, max]
     const histXScale = useMemo(() => scaleLinear({
         domain: [0, data.length - 1],
-        range: [props.minMax[0], props.minMax[1]],
-    }), [props.minMax, data.length]);
+        range: domain,
+    }), [domain, data.length]);
     const brushXScale = useMemo(() => ScaleTypes[xScaleType]({
-        domain: [props.minMax[0], props.minMax[1]],
+        domain,
         range: [0, width],
-    }), [props.minMax, width, xScaleType]);
+    }), [domain, width, xScaleType]);
     const brushYScale = useMemo(() => ScaleTypes[yScaleType]({
         domain: [0, maxValue],
         range: [height, 0],
@@ -213,8 +188,12 @@ const HistogramInner = observer(({
                 strokeDasharray="5,5"
                 vectorEffect="non-scaling-stroke"
             />
-        ); //!!! don't forget TagModel is broken again !!!
+        );
     }, [brushXScale, maxValue, lineColor, props.highlightValue]);
+    
+    if (isLoading) return <div className="p-4"><LinearProgress /></div>;
+    if (isError) return <div className="p-4">Error: {error?.message}</div>;
+
     return (
         <>
             <svg
@@ -270,15 +249,15 @@ export const Histogram = (props: RangeProps) => {
         width: "100%",
         height: props.histoHeight,
     }), [props.histoHeight]);
-    const { histoWidth, ...propsRest } = props;
     return (
         <div style={style}>
             <ParentSize>
                 {({ width, height }) => (
                     <HistogramInner
-                        {...propsRest}
+                        {...props}
                         // just need to sort out this business of what I mean by width
-                        histoWidth={width}
+                        // bins={bins}
+                        width={width}
                         histoHeight={height}
                     />
                 )}

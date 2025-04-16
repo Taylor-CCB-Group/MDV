@@ -210,6 +210,16 @@ const BrightnessContrast = ({ index }: { index: number }) => {
     );
 };
 
+/** 
+ * @param index - index of the channel in the channels store - NOT the index of the channel in the metadata
+ * @returns the name of the channel
+ */
+const useChannelName = (index: number) => {
+    const selections = useChannelsStore(({ selections }) => selections, shallow);
+    const { c } = selections[index];
+    return useMetadata()?.Pixels.Channels[c].Name;
+}
+
 const ChannelHistogram = ({ index }: { index: number }) => {
     // return <div />
     //using shallow as per Avivator *prevents* re-rendering which should be happening << review
@@ -237,30 +247,6 @@ const ChannelHistogram = ({ index }: { index: number }) => {
     const channelsStore = useChannelsStoreApi();
 
 
-    // some problems with initial querying, probably in the Histogram component
-    //! todo review this... useQuery?
-    const queryHistogram = useCallback(async () => {
-        // importing with this syntax doesn't make a massive difference (still not picking up types), 
-        // and is a bit vite-proprietary?
-        const worker = new HistogramWorker();
-        worker.onmessage = (event) => {
-            setHistogramData(event.data);
-            worker.terminate();
-        };
-        //! this is a lie - need to actually check!<<
-        //while we're there, why not actually use the right type...
-        const isInt32 = false;
-        const originalData = rasterData;
-        const data = new SharedArrayBuffer(originalData.length * 4);
-        new Float32Array(data).set(originalData);
-        worker.postMessage({
-            data,
-            min,
-            max,
-            bins: 100,
-            isInt32,
-        } satisfies HistogramMessage);
-    }, [min, max, rasterData]);
     // todo review whether this state can be cleaned up / simplified
     const [liveValue, setLiveValue] = useState<Range>([0, 0]);
     const debounceTime = 10; //how low can we go?
@@ -283,28 +269,34 @@ const ChannelHistogram = ({ index }: { index: number }) => {
         // but it smells quite a bit
         channelsStore.setState({ contrastLimits });
     }, [debouncedValue, index, channelsStore]);
+    const channelName = useChannelName(index);
     const isChannelLoading = useViewerStore((state) => state.isChannelLoading)[index];
+    if (isChannelLoading) return <div>Loading...</div>;
     return (
         <div className="p-4">
-            {!isChannelLoading ? <Histogram
+            {/* {isChannelLoading ?  */}
+            <Histogram
                 value={limit}
                 step={0.001} //!todo make this dynamic
-                histogram={histogramData}
+                data={rasterData}
                 // todo add value label
                 lowFraction={normalisedLow} // component should calculate these
                 highFraction={normalisedHigh}
-                queryHistogram={queryHistogram}
                 setValue={v => {
                     // we want a different behaviour for clearing the brush here vs selection dialog...
                     if (v) setLiveValue(v);
                 }}
-                minMax={domain}
-                histoWidth={100}
+                domain={domain}
+                bins={150}
                 histoHeight={50}
                 highlightValue={pixelValue}
-                xScaleType="log"
+                //todo make scales adapt or be configurable
+                //log scale breaks with 0 values
+                xScaleType="linear"
                 yScaleType="symlog"
-            /> : "Loading..."}
+                name={channelName}
+            />
+            {/* : "Loading..."} */}
         </div>
     )
 }
