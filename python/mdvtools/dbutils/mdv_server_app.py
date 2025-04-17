@@ -206,7 +206,7 @@ def create_flask_app(config_name=None):
     if ENABLE_AUTH:
         try:
             print("Registering authentication routes")
-            register_auth_routes(app)  # Register Auth0-related routes like /login and /callback
+            register_sso_routes(app)  # Register Auth0-related routes like /login and /callback
         except Exception as e:
             print(f"Error registering authentication routes: {e}")
             raise e
@@ -628,6 +628,65 @@ def serve_projects_from_filesystem(app, base_dir):
         print(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
         raise
 
+def register_sso_routes(app):
+    try:
+        @app.route('/profile')
+        def profile():
+            try:
+                
+                # Extract user information from Shibboleth headers
+                display_name = request.headers.get('shibboleth-displayName')
+                email = request.headers.get('shibboleth-mail')
+                uid = request.headers.get('shibboleth-uid')
+
+                if uid:
+                    user_info = {
+                        "uid": uid,
+                        "display_name": display_name,
+                        "email": email
+                    }
+                    return jsonify(user_info)
+                else:
+                    return jsonify({"error": "Shibboleth headers not found or user not authenticated."}), 401
+
+                
+            except Exception as e:
+                print(f"Error during profile retrieval: {e}")
+                return jsonify({"error": "Failed to retrieve user profile."}), 500
+
+        @app.route('/login_sso')
+        def login_sso():
+            """Redirect user to Shibboleth-protected login page on Apache."""
+            try:
+                # Clear any existing session data to ensure we start with a fresh session
+                session.clear()
+                
+                # Store the authentication method as Shibboleth
+                session["auth_method"] = "shibboleth"  # Indicate Shibboleth login
+
+                # Check if the Shibboleth login URL is provided in the environment
+                shibboleth_login_url = app.config.get('SHIBBOLETH_LOGIN_URL', None)
+
+                if shibboleth_login_url:
+                    # Redirect the user to Shibboleth login page if the URL is configured
+                    print("Redirecting to Shibboleth login page...")
+                    return redirect(shibboleth_login_url)
+                else:
+                    # If Shibboleth URL is not provided, inform the user
+                    print("Shibboleth login URL not provided.")
+                    return jsonify({"error": "Shibboleth login URL not provided."}), 500
+
+            except Exception as e:
+                # In case of error, clear the session and handle the error
+                session.clear()  # Ensure session is cleared in case of failure
+                print(f"In login_sso: Error during login: {e}")
+                return jsonify({"error": "Failed to start login process using SSO."}), 500
+
+        print("sso routes registered successfully!")
+
+    except Exception as e:
+        print(f"Error registering AUTH routes: {e}")
+        raise
 
 # The function that registers the Auth0 routes
 def register_auth_routes(app):
