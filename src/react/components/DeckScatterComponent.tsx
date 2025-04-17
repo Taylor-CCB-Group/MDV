@@ -16,7 +16,7 @@ import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context"
 import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 
-const margin = { top: 10, right: 10, bottom: 40, left: 60 };
+// const margin = { top: 10, right: 10, bottom: 40, left: 60 };
 /** todo this should be common for viv / scatter_state, pending refactor
  * there should be hooks getting the range of a filtered column 
  * so that multiple charts can re-use the computation (but if not used, it's not computed)
@@ -105,14 +105,28 @@ const DeckScatter = observer(function DeckScatterComponent() {
     // const data = useSimplerFilteredIndices();
     const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
-    const { opacity, viewState, on_filter, color_by } = config;
-    // const is2d = dimension === "2d";
+    const { opacity, viewState, on_filter, dimension } = config;
+    const is2d = dimension === "2d";
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
     const chart = useChart();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
     const colorBy = (chart as any).colorBy;
     // const colorBy = color_by;
+    const margin = useMemo(() => (
+        //todo better Axis encapsulation in another component
+        is2d ? {
+            top: 10,
+            right: 10,
+            bottom: config.axis.x.size + 20,
+            left: config.axis.y.size + 20,
+        } : {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+        }
+    ), [is2d, is2d && config.axis.x.size, is2d && config.axis.y.size]);
     const chartWidth = width - margin.left - margin.right;
     //there could be a potential off-by-one/two error somewhere down the line
     //if we don't fully understand reasons for `- 2` here.
@@ -191,12 +205,8 @@ const DeckScatter = observer(function DeckScatterComponent() {
     }, [chartWidth, chartHeight, config.dimension, id]);
     //! deck doesn't like it if we change the layers array - better to toggle visibility
     const layers = [scatterplotLayer, greyScatterplotLayer, selectionLayer];
-    // todo - these need to be encapsulated better, the DeckGL component should be in a smaller
-    // area with the axes outside of it.
-    // axes need to respond to the viewState...
-    // This implementation will mean that the whole react component will re-render when the viewState changes.
-    // This is not very good for performance - we may consider using refs or something to avoid this, 
-    // and/or debouncing the viewState changes.
+    // todo - encapsulate better
+    // axes need to respond to the viewState... (make sure there isn't a regression here when refactoring etc).
     const ranges = useMemo(() => {
         viewState;
         // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
@@ -239,7 +249,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
                 />
             </div>
-            <svg width={width} height={height}>
+            {is2d && <svg width={width} height={height}>
                 <Axis.AxisBottom
                     top={chartHeight + margin.top}
                     scale={scaleX}
@@ -247,12 +257,12 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     tickStroke={"var(--text_color)"}
                     tickLabelProps={() => ({
                         fill: "var(--text_color)",
-                        fontSize: 9.5,
+                        fontSize: config.axis.x.tickfont,
                         textAnchor: "middle",
                     })}
                     labelProps={{
                         fill: "var(--text_color)",
-                        fontSize: 10,
+                        fontSize: config.axis.x.tickfont,
                         textAnchor: "middle",
                     }}
                     label={cx.name}
@@ -264,16 +274,17 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     tickStroke={"var(--text_color)"}
                     tickLabelProps={() => ({
                         fill: "var(--text_color)",
-                        fontSize: 9.5,
+                        fontSize: config.axis.y.tickfont,
                         textAnchor: "end",
                     })}
                     labelProps={{
                         fill: "var(--text_color)",
-                        fontSize: 10,
+                        fontSize: config.axis.y.tickfont,
+                        // dx: config.axis.x.rotate_labels ? 
                     }}
                     label={cy.name}
                 />
-            </svg>
+            </svg>}
         </>
     );
 });

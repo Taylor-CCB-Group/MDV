@@ -1,5 +1,5 @@
 import type { Matrix4 } from "@math.gl/core";
-import type { PickingInfo } from "@deck.gl/core";
+import type { OrbitViewState, OrthographicViewState, PickingInfo } from "@deck.gl/core";
 import { useChart } from "./context";
 import {
     useChartID,
@@ -30,6 +30,15 @@ export type TooltipConfig = {
         column?: ColumnName;
     };
 };
+export type AxisConfig = {
+    size: number;
+    tickfont: number;
+    rotate_labels: boolean;
+};
+export type AxisConfig2D = {
+    x: AxisConfig;
+    y: AxisConfig;
+};
 export type CategoryFilter = {
     column: ColumnName;
     category: string | string[];
@@ -52,8 +61,18 @@ export type ScatterPlotConfig = {
     point_shape: "circle" | "square" | "gaussian";
     dimension: "2d" | "3d";
     selectionFeatureCollection: FeatureCollection;
-} & TooltipConfig &
-    DualContourLegacyConfig & BaseConfig;
+} & TooltipConfig & DualContourLegacyConfig & BaseConfig;
+
+export type ScatterPlotConfig2D = ScatterPlotConfig & {
+    dimension: "2d";
+    axis: AxisConfig2D;
+    viewState: OrthographicViewState;
+};
+export type ScatterPlotConfig3D = ScatterPlotConfig & {
+    dimension: "3d";
+    viewState: OrbitViewState;
+};
+
 export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
     course_radius: 1,
     radius: 10,
@@ -77,7 +96,18 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
     selectionFeatureCollection: getEmptyFeatureCollection(),
 };
 
-
+export const scatterAxisDefaults: AxisConfig2D = {
+    x: {
+        rotate_labels: false,
+        size: 10,
+        tickfont: 10,
+    },
+    y: {
+        rotate_labels: false,
+        size: 10,
+        tickfont: 10,
+    },
+}
 
 export function useRegionScale() {
     const metadata = useMetadata();
