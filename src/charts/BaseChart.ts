@@ -229,14 +229,14 @@ class BaseChart<T extends BaseConfig> {
         );
 
         let oldSize = config.size;
-        this.contentDiv.addEventListener(
+        this.div.addEventListener(
             "fullscreenchange",
             action(() => {
                 //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
                 if (document.fullscreenElement) {
-                    if (this.contentDiv !== document.fullscreenElement)
+                    if (this.div !== document.fullscreenElement)
                         console.error("unexpected fullscreen element");
-                    this.observable.container = this.contentDiv;
+                    this.observable.container = this.div;
                     const rect = window.screen;
                     this.setSize(rect.width, rect.height);
                     for (const d of this.dialogs) {
@@ -248,13 +248,14 @@ class BaseChart<T extends BaseConfig> {
                     for (const d of this.dialogs) {
                         d.setParent(null);
                     }
+                    // this.contextMenu.__doc__ = document;
                 }
             }),
         );
         this.addMenuIcon("fas fa-expand", "fullscreen", {
             func: async () => {
                 oldSize = this.config.size;
-                await this.contentDiv.requestFullscreen();
+                await this.div.requestFullscreen();
             },
         });
 

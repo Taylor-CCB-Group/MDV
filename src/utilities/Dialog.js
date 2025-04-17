@@ -113,8 +113,8 @@ class BaseDialog {
 
         //may need to adjust its position depending on size
         //to avoid it being off screen
-        config.doc.body.append(this.outer);
-        const bbox = config.doc.body.getBoundingClientRect();
+        this.getDialogContainer().append(this.outer);
+        const bbox = this.getDialogContainer().getBoundingClientRect();
 
         const dbox = this.outer.getBoundingClientRect();
         if (config.maxHeight && dbox.height > config.maxHeight) {
@@ -145,9 +145,14 @@ class BaseDialog {
 
         // provide some observable mobx state for useOuterContainer()
         this.observable = makeAutoObservable({
-            container: config.doc.body,
+            container: this.getDialogContainer(),
         });
     }
+
+    getDialogContainer() {
+        return document.fullscreenElement || this.config.doc.body;
+    }
+
     setParent(parent) {
         // this.__doc__ = parent || document;
         action(() => (this.observable.container = parent || document.body))();
@@ -168,7 +173,7 @@ class BaseDialog {
                 snapback: true,
             });
         } else {
-            this.config.doc.body.append(this.outer);
+            this.this.getDialogContainer().append(this.outer);
             makeResizable(this.outer, {
                 doc: this.config.doc,
                 onresizeend: (x, y) => {
