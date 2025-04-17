@@ -18,15 +18,18 @@ const sizeLabel = (label: string) => {
 
 function axisGui(axis: AxisConfig, label: string, callback?: () => void) {
     return [
-        g({
-            type: "check",
-            label: `Rotate ${label} labels`,
-            current_value: axis.rotate_labels,
-            func: (x) => {
-                axis.rotate_labels = x;
-                callback?.();
-            }
-        }),
+        // rotate_labels is a bit of a pain to get working
+        // and not so useful for scatterplots - numbers tend to look ok
+        // will want to review axis settings for other charts
+        // g({
+        //     type: "check",
+        //     label: `Rotate ${label} labels`,
+        //     current_value: axis.rotate_labels,
+        //     func: (x) => {
+        //         axis.rotate_labels = x;
+        //         callback?.();
+        //     }
+        // }),
         g({
             type: "slider",
             max: 20,

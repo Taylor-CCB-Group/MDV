@@ -1,14 +1,29 @@
 import { observer } from "mobx-react-lite";
-import { ScatterPlotConfig2D, ScatterPlotConfig3D } from "../scatter_state";
+import { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../scatter_state";
 import type { DataColumn } from "@/charts/charts";
 import { useChartSize, useParamColumns } from "../hooks";
-import { useMemo, type PropsWithChildren } from "react";
+import { useEffect, useMemo, type PropsWithChildren } from "react";
 import { Axis, Scale } from "@visx/visx";
 
 type AxisComponentProps = {
     config: ScatterPlotConfig2D | ScatterPlotConfig3D
     unproject: (xy: [number, number]) => number[];
 } & PropsWithChildren;
+
+//! todo - get label options working... for now, we ignore rotate_labels
+// not generally relevant to scatterplot, but will be for other charts
+function getLabelProps(axisConfig?: AxisConfig) {
+    if (!axisConfig) return {};
+    const { tickfont, rotate_labels } = axisConfig;
+    return () => ({
+        fill: "var(--text_color)",
+        fontSize: tickfont,
+        textAnchor: rotate_labels ? "end" : "middle",
+        dx: rotate_labels ? "-.8em" : undefined,
+        dy: rotate_labels ? "-.10em" : ".71em",
+        transform: rotate_labels ? "rotate(-45)" : undefined,
+    });
+}
 
 export default observer(function AxisComponent({ config, unproject, children }: AxisComponentProps) {
     const [cx, cy] = useParamColumns() as DataColumn<"double">[];
@@ -67,6 +82,11 @@ export default observer(function AxisComponent({ config, unproject, children }: 
         width: chartWidth,
         height: chartHeight,
     } as const), [chartWidth, chartHeight]);
+    // useEffect(() => {
+    //     if (is2d && (config.axis.x.rotate_labels || config.axis.y.rotate_labels)) {
+    //         console.warn("Axis rotation not implemented for react charts");
+    //     }
+    // }, [is2d]);
     return (
         <>
             <div style={deckStyle}>{children}</div>
@@ -101,7 +121,6 @@ export default observer(function AxisComponent({ config, unproject, children }: 
                     labelProps={{
                         fill: "var(--text_color)",
                         fontSize: config.axis.y.tickfont,
-                        // dx: config.axis.x.rotate_labels ? 
                     }}
                     label={cy.name}
                 />
