@@ -98,6 +98,7 @@ packages_functions = """import os
 import pandas as pd
 import scanpy as sc
 from mdvtools.mdvproject import MDVProject
+from mdvtools.conversions import convert_scanpy_to_mdv
 from mdvtools.charts.density_scatter_plot import DensityScatterPlot
 from mdvtools.charts.heatmap_plot import HeatmapPlot
 from mdvtools.charts.histogram_plot import HistogramPlot

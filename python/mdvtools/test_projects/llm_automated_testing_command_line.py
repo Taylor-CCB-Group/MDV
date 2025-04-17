@@ -7,6 +7,7 @@ import sys
 from dotenv import load_dotenv
 
 from mdvtools.mdvproject import MDVProject
+from mdvtools.conversions import convert_scanpy_to_mdv
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain.schema.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -42,7 +43,7 @@ matplotlib.use('Agg')  # Prevent GUI issues
 mypath = os.path.dirname(__file__)
 
 # Define the relative path
-DIRECTORY_PATH = os.path.join(mypath, "../test_projects/RAG_examples/ANNDATA_examples_automation_testing/")
+DIRECTORY_PATH = os.path.join(mypath, "../test_projects/RAG_examples/ANNDATA_examples/")
 
 def crawl_local_repo(
     directory_path: str = DIRECTORY_PATH
@@ -78,7 +79,6 @@ def crawl_local_repo(
     return files
 # ******************************************************
 
-
 def setup_logging(log_file="mdv_llm.log"):
     logging.basicConfig(
         level=logging.INFO,
@@ -89,7 +89,6 @@ def setup_logging(log_file="mdv_llm.log"):
         ]
     )
     return logging.getLogger(__name__)
-
 
 
 def main(project_path, dataset_path, question_list_path, output_csv):
@@ -123,13 +122,9 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     project_path = os.path.expanduser(project_path)
     logger.info(f"Loading dataset from {dataset_path}")
     adata = sc.read_h5ad(dataset_path)
-    cells_df = pd.DataFrame(adata.obs)
-    genes_df = pd.DataFrame(adata.var).reset_index()
     
     logger.info("Creating MDV project...")
-    project = MDVProject(project_path, delete_existing=False)
-    project.add_datasource("datasource_name", cells_df)
-    project.add_datasource("datasource_name2", genes_df)
+    project = convert_scanpy_to_mdv(project_path, adata)
     
     logger.info("Setting up LLM interaction...")
     code_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
@@ -143,7 +138,6 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         logger.info("Using one data source for the pandas agent.")
 
     datasource_names = [ds['name'] for ds in project.datasources[:2]]  # Get names of up to 2 datasources
-
 
     #CUSTOM AGENT:
     def create_custom_pandas_agent(llm, dfs: dict, prompt_data, verbose=False):
@@ -160,22 +154,10 @@ def main(project_path, dataset_path, question_list_path, output_csv):
         memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
         
         # Step 2: Create the Python REPL Tool
-        python_tool = PythonAstREPLTool()
-
-        # if python_tool.globals is None:
-        #     python_tool.globals = {}  # Ensure it's a dictionary
-
-        if not hasattr(python_tool, "globals") or not isinstance(python_tool.globals, dict):
-            python_tool.globals = {}
+        python_tool = PythonAstREPLTool(locals={}, globals={})#, sanitize_input=True)
 
         python_tool.globals.update(dfs)
-        python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
 
-
-        # Make DataFrames available inside the REPL tool
-        python_tool.globals.update(dfs) 
-
-        ## New fixes:
         python_tool.globals["list_globals"] = lambda: list(python_tool.globals.keys())
 
         # Step 3: Define Contextualization Chain
@@ -220,29 +202,31 @@ def main(project_path, dataset_path, question_list_path, output_csv):
             # Point 3: Log agent output
             memory.save_context({"input": question}, {"output": response.get("output", str(response))})
             return response
+        
+        # Attach the memory object to the agent so it can be cleared externally
+        agent_with_contextualization.memory = memory
 
         return agent_with_contextualization
 
     question_file = pd.read_csv(question_list_path, skipinitialspace=True, index_col=False)
     question_list = question_file['requests'].tolist()
-    
     results = []
 
-    dataframes_for_agent = {"df1": df_list[0], "df2": df_list[1]}
+    dataframes_for_agent = {"df1": pd.DataFrame(df_list[0]), "df2": pd.DataFrame(df_list[1])}
 
     agent = create_custom_pandas_agent(dataframe_llm, dataframes_for_agent, prompt_data, verbose=True)
 
-    #agent = create_custom_pandas_agent(dataframe_llm, {"df1": pd.DataFrame(df_list[0]), "df2": df_list[1]}, prompt_data, verbose=True)
-    #print(df_list[0])
-    #print(df_list[1])
-    #response = agent(full_prompt)
+    RESET_THRESHOLD = 10  # Set the desired number of requests after which memory should be reset.
+    request_counter = 0
 
     for question in question_list:
         try:
+            request_counter += 1  # Increase request counter at each iteration.
             full_prompt = prompt_data + "\nQuestion: " + question
 
             ## custom agent code
-            response = agent(full_prompt)#agent(full_prompt) #agent.invoke({"input": full_prompt})
+
+            response = agent(full_prompt)
             
             prompt_RAG = get_createproject_prompt_RAG_copy(project, dataset_path, datasource_names[0], response['output'], response['input'])
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
@@ -270,6 +254,11 @@ def main(project_path, dataset_path, question_list_path, output_csv):
                 logger.error(f"Execution failed: {stderr}")
         except Exception as e:
             logger.error(f"Error processing question: {str(e)}")
+
+        # Reset the agent's conversation memory after RESET_THRESHOLD requests.
+        if request_counter % RESET_THRESHOLD == 0:
+            agent.memory.clear()  # Clear the conversation history.
+            logger.info(f"Agent memory has been reset after {request_counter} requests.")
     
     result_df = pd.DataFrame(results)
     result_df.to_csv(output_csv, index=False)
@@ -285,5 +274,10 @@ if __name__ == "__main__":
     parser.add_argument("question_list_path", help="Path to the Excel file containing questions")
     parser.add_argument("output_csv", help="Path to save the output CSV file")
     
-    args = parser.parse_args()
+    args =parser.parse_args()
     main(args.project_path, args.dataset_path, args.question_list_path, args.output_csv)
+    # main("mdv/automation_pbmc3k_test",
+    #      "mdv/automation_pbmc3k_test/scanpy-pbmc3k.h5ad", 
+    #      "../ChatMDV/testing_results/input/mdv_graph_requests_short.csv",
+    #      "../ChatMDV/testing_results/output/automation_pbmc3k_test.csv")
+
