@@ -22,7 +22,6 @@ export default function getTooltipSettings(config: ScatterPlotConfig, callback?:
                 //@ts-expect-error - need a way of dealing with optional column...
                 current_value: config.tooltip.column,
                 func: async (x) => {
-                    //@ts-expect-error pending tooltip column being FieldSpec(s)
                     config.tooltip.column = x;
                     callback?.();
                 }

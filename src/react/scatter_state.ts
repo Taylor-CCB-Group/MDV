@@ -24,14 +24,14 @@ import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
-import { flattenFields } from "@/lib/columnTypeHelpers";
+import { type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 
 export type TooltipConfig = {
     tooltip: {
         show: boolean;
         // would like to be able to have multiple columns
         // sticking to version that should be compatible with old config
-        column?: ColumnName;
+        column?: FieldSpec;
     };
 };
 export type AxisConfig = {
