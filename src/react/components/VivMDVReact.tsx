@@ -24,6 +24,7 @@ import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
 import { g, isArray, toArray } from "@/lib/utils";
 import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
+import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -237,33 +238,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.background_filter.category = v;
                 },
             }),
-            g({
-                type: "check",
-                label: "Show Tooltip",
-                current_value: tooltip.show,
-                func: async (x: boolean) => {
-                    tooltip.show = x;
-                    if (!tooltip.column) {
-                        const columnName = cols[0].field;
-                        console.log(
-                            "No tooltip column set, using first column:",
-                            columnName
-                        );
-                        await loadColumn(this.dataStore.name, cols[0].field);
-                        tooltip.column = cols[0].field;
-                    }
-                },
-            }),
-            g({
-                type: "dropdown",
-                label: "Tooltip value",
-                current_value: c.tooltip.column || cols[0].field,
-                values: [cols, "name", "field"],
-                func: async (c) => {
-                    await loadColumn(this.dataStore.name, c);
-                    tooltip.column = c;
-                },
-            }),
+            getTooltipSettings(c, this),
             g({
                 type: "dropdown",
                 label: "Shape",

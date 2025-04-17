@@ -23,10 +23,13 @@ import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
+import { FieldSpec } from "@/lib/columnTypeHelpers";
 
 export type TooltipConfig = {
     tooltip: {
         show: boolean;
+        // would like to be able to have multiple columns
+        // sticking to version that should be compatible with old config
         column?: ColumnName;
     };
 };
@@ -289,7 +292,11 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
 
     const tooltipCol = useMemo(() => {
         if (!config.tooltip.column) return undefined;
-        return chart.dataStore.columnIndex[config.tooltip.column];
+        if (typeof config.tooltip.column === "string") {
+            return chart.dataStore.columnIndex[config.tooltip.column];
+        }
+        console.warn("tooltip column not a string - need to support", config.tooltip.column);
+        // return chart.dataStore.columnIndex[config.tooltip.column];
     }, [config.tooltip, config.tooltip.column, chart.dataStore.columnIndex]);
     const getTooltipVal = useCallback(
         (i: number) => {
@@ -301,17 +308,15 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     );
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
+        //allow multicolumn with nice formatting
         () => {
-            if (!config.tooltip.show) return;
+            if (!config.tooltip.show) return null;
             // testing reading object properties --- pending further development
             // (not hardcoding DN property etc)
             // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
             const hoverInfo = hoverInfoRef.current;
-            return (
-                hoverInfo &&
-                hoverInfo.index !== -1 &&
-                `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`
-            );
+            if (!hoverInfo || hoverInfo.index === -1) return null;
+            return `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`;
         },
         [getTooltipVal, config.tooltip.show, config.tooltip.column],
     );

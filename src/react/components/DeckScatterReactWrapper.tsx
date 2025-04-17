@@ -10,6 +10,7 @@ import type { OrthographicViewState, OrbitViewState } from "deck.gl";
 import { g } from "@/lib/utils";
 import type DataStore from "@/datastore/DataStore";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
+import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
 
 const MainChart = observer(() => {
     return <DeckScatterComponent />;
@@ -90,11 +91,8 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
 
     getSettings() {
         const c = this.config;
-        const { tooltip } = c;
-        const cols = this.dataStore.getColumnList() as DataColumn<DataType>[];
-        //const catCols = cols.filter((c) => c.datatype.match(/text/i));
+        
         const settings = super.getSettings();
-
 
         if (c.dimension === "2d") {
             const axisSettings = getAxisGuiSpec(c);
@@ -102,34 +100,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         }
         return settings.concat([
             //todo standard tooltip setting (with multi-choice)
-            g({
-                type: "check",
-                label: "Show Tooltip",
-                current_value: tooltip.show,
-                func: async (x: boolean) => {
-                    tooltip.show = x;
-                    if (!tooltip.column) {
-                        const columnName = cols[0].field;
-                        console.log(
-                            "No tooltip column set, using first column:",
-                            columnName,
-                        );
-                        await loadColumn(this.dataStore.name, cols[0].field);
-                        tooltip.column = cols[0].field;
-                    }
-                },
-            }),
-            g({
-                type: "dropdown",
-                label: "Tooltip value",
-                current_value: c.tooltip.column || cols[0].field,
-                //@ts-expect-error - should be using "column" for the GiuSpecType rather than "dropdown"
-                values: [cols, "name", "field"],
-                func: async (c) => {
-                    await loadColumn(this.dataStore.name, c);
-                    tooltip.column = c;
-                },
-            }),
+            getTooltipSettings(c, this),
             g({
                 type: "radiobuttons",
                 label: "course radius",
