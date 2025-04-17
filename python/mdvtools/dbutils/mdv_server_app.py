@@ -634,20 +634,22 @@ def register_sso_routes(app):
         def profile():
             try:
                 
-                # Extract user information from Shibboleth headers
-                display_name = request.headers.get('shibboleth-displayName')
-                email = request.headers.get('shibboleth-mail')
-                uid = request.headers.get('shibboleth-uid')
+                # Retrieve user attributes from available Shibboleth headers
+                eppn = request.headers.get('Shibboleth-Eppn')  # e.g., whgu1064@ox.ac.uk
+                x_forwarded_user = request.headers.get('X-Forwarded-User')  # e.g., whgu1064@ox.ac.uk
 
-                if uid:
-                    user_info = {
-                        "uid": uid,
-                        "display_name": display_name,
-                        "email": email
+                if eppn:
+                    user_data = {
+                        "sub": eppn,
+                        "first_name": "Unknown",
+                        "last_name": "Unknown",
+                        "email": eppn,
+                        "association": "University of Oxford",
+                        "avatarUrl": ""
                     }
-                    return jsonify(user_info)
+                    return jsonify(user_data)
                 else:
-                    return jsonify({"error": "Shibboleth headers not found or user not authenticated."}), 401
+                    return jsonify({"error": "Shibboleth attributes not found."}), 401
 
                 
             except Exception as e:
