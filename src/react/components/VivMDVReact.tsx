@@ -238,7 +238,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.background_filter.category = v;
                 },
             }),
-            getTooltipSettings(c, this),
+            getTooltipSettings(c),
             g({
                 type: "dropdown",
                 label: "Shape",

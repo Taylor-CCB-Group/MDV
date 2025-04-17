@@ -91,7 +91,6 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
 
     getSettings() {
         const c = this.config;
-        
         const settings = super.getSettings();
 
         if (c.dimension === "2d") {
@@ -99,8 +98,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             settings.push(axisSettings);
         }
         return settings.concat([
-            //todo standard tooltip setting (with multi-choice)
-            getTooltipSettings(c, this),
+            getTooltipSettings(c),
             g({
                 type: "radiobuttons",
                 label: "course radius",
