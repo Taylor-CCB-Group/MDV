@@ -86,7 +86,7 @@ def create_flask_app(config_name=None):
             if ENABLE_AUTH:
                 try:
                     print("Syncing users from Auth0 into the database...")
-                    #sync_auth0_users_to_db(app)
+                    sync_auth0_users_to_db(app)
                 except Exception as e:
                     raise e
             
@@ -206,7 +206,8 @@ def create_flask_app(config_name=None):
     if ENABLE_AUTH:
         try:
             print("Registering authentication routes")
-            register_sso_routes(app)  # Register Auth0-related routes like /login and /callback
+            register_sso_routes(app) 
+            register_auth_routes(app) # Register Auth0-related routes like /login and /callback
         except Exception as e:
             print(f"Error registering authentication routes: {e}")
             raise e
@@ -783,7 +784,7 @@ def register_auth_routes(app):
 
 
         # You can also add a sample route to check the user's profile or token
-        @app.route('/profile')
+        @app.route('/profile_mo')
         def profile():
             try:
                 auth_method = session.get('auth_method')
