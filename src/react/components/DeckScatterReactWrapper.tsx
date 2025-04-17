@@ -4,20 +4,19 @@ import { action, makeObservable, observable } from "mobx";
 import type { ColumnName, DataColumn, DataType } from "../../charts/charts";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
-import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
+import { scatterAxisDefaults, scatterDefaults, ScatterPlotConfig2D, ScatterPlotConfig3D, type ScatterPlotConfig } from "../scatter_state";
 import DeckScatterComponent from "./DeckScatterComponent";
 import type { OrthographicViewState, OrbitViewState } from "deck.gl";
 import { g } from "@/lib/utils";
 import type DataStore from "@/datastore/DataStore";
+import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 
 const MainChart = observer(() => {
     return <DeckScatterComponent />;
 });
 
 
-export type DeckScatterConfig = ScatterPlotConfig & {
-    viewState: OrthographicViewState | OrbitViewState;
-} & BaseConfig;
+export type DeckScatterConfig = ScatterPlotConfig2D | ScatterPlotConfig3D;
 const defaultViewState = {
         viewState: {
         target: [0, 0, 0],
@@ -33,10 +32,12 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     constructor(
         dataStore: DataStore,
         div: HTMLDivElement,
-        originalConfig: DeckScatterConfig & BaseConfig,
+        originalConfig: DeckScatterConfig,
     ) {
         // config.tooltip = config.tooltip || { show: false, column: config.param[0] }; //todo fix this
-        const config = { ...scatterDefaults, ...defaultViewState, ...originalConfig };
+        // there is probably a less confusing way of writing this...
+        const defaults = originalConfig.dimension === "2d" ? {axis: scatterAxisDefaults} : {};
+        const config = { ...scatterDefaults, ...defaults, ...defaultViewState, ...originalConfig };
         super(dataStore, div, config, MainChart);
         if (!originalConfig.viewState) this.pendingRecenter = true;
         //@ts-expect-error - pending colorBy type fix
@@ -74,6 +75,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             target: c.viewState.target,
             zoom: c.viewState.zoom,
         }
+        // we should be able to make use of discriminated type here
         if (c.dimension === "3d") {
             const v = c.viewState as OrbitViewState;
             //@ts-expect-error - need to think about viewState types...
@@ -92,6 +94,10 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         const settings = super.getSettings();
 
 
+        if (c.dimension === "2d") {
+            const axisSettings = getAxisGuiSpec(c);
+            settings.push(axisSettings);
+        }
         return settings.concat([
             //todo standard tooltip setting (with multi-choice)
             g({
@@ -192,7 +198,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                     // that isn't in the config, but is in the chart.
                     this.pendingRecenter = true;
                 },
-            })
+            }),            
         ]);
     }
 }

@@ -4,7 +4,7 @@ import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns, useSimplerFilteredIndices } from "../hooks";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useChart, useDataStore } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
@@ -15,8 +15,9 @@ import "../../charts/css/charts.css";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
+import AxisComponent from "./AxisComponent";
 
-const margin = { top: 10, right: 10, bottom: 40, left: 60 };
+// const margin = { top: 10, right: 10, bottom: 40, left: 60 };
 /** todo this should be common for viv / scatter_state, pending refactor
  * there should be hooks getting the range of a filtered column 
  * so that multiple charts can re-use the computation (but if not used, it's not computed)
@@ -102,17 +103,28 @@ const DeckScatter = observer(function DeckScatterComponent() {
     const id = useId();
     const [width, height] = useChartSize();
     const [cx, cy, cz] = useParamColumns() as LoadedDataColumn<"double">[];
-    // const data = useSimplerFilteredIndices();
     const data = useFilteredIndices(); //changed to fallback to simplerFilteredIndices when filterColumn is not set
     const config = useConfig<DeckScatterConfig>();
-    const { opacity, viewState, on_filter, color_by } = config;
-    // const is2d = dimension === "2d";
+    const { opacity, viewState, on_filter, dimension } = config;
+    const is2d = dimension === "2d";
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
-    const chart = useChart();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
-    const colorBy = (chart as any).colorBy;
-    // const colorBy = color_by;
+    const margin = useMemo(() => (
+        //todo better Axis/margin encapsulation - new hook
+        //currently this is duplicated so that we have chartWidth/Height for the view
+        is2d ? {
+            top: 10,
+            right: 10,
+            bottom: config.axis.x.size + 20,
+            left: config.axis.y.size + 20,
+        } : {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+        }
+    ), [is2d, is2d && config.axis.x.size, is2d && config.axis.y.size]);
     const chartWidth = width - margin.left - margin.right;
     //there could be a potential off-by-one/two error somewhere down the line
     //if we don't fully understand reasons for `- 2` here.
@@ -124,7 +136,8 @@ const DeckScatter = observer(function DeckScatterComponent() {
 
     const { scatterProps, selectionLayer } = useSpatialLayers();
     // this is now somewhat able to render for "2d", pending further tweaks
-    const { scatterplotLayer, getTooltip, unproject } = scatterProps;
+    //! beware unproject from here is not what we want, should review
+    const { scatterplotLayer, getTooltip } = scatterProps;
 
     const filterValue = useFilterArray();
 
@@ -191,44 +204,15 @@ const DeckScatter = observer(function DeckScatterComponent() {
     }, [chartWidth, chartHeight, config.dimension, id]);
     //! deck doesn't like it if we change the layers array - better to toggle visibility
     const layers = [scatterplotLayer, greyScatterplotLayer, selectionLayer];
-    // todo - these need to be encapsulated better, the DeckGL component should be in a smaller
-    // area with the axes outside of it.
-    // axes need to respond to the viewState...
-    // This implementation will mean that the whole react component will re-render when the viewState changes.
-    // This is not very good for performance - we may consider using refs or something to avoid this, 
-    // and/or debouncing the viewState changes.
-    const ranges = useMemo(() => {
-        viewState;
-        // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
-        try {
-            const p = scatterplotLayer.unproject([0, 0]);
-            const p2 = scatterplotLayer.unproject([chartWidth, chartHeight]);
-            const domainX = [p[0], p2[0]];
-            const domainY = [p2[1], p[1]];
-            return { domainX, domainY };
-        } catch (e) {
-            return { domainX: cx.minMax, domainY: cy.minMax };
-        }
-    }, [cx.minMax, cy.minMax, viewState, chartWidth, chartHeight, scatterplotLayer]);
-    const scaleX = useMemo(() => Scale.scaleLinear({
-        domain: ranges.domainX, // e.g. [min, max]
-        range: [margin.left, chartWidth + margin.left],
-    }), [chartWidth, ranges]);
-    const scaleY = useMemo(() => Scale.scaleLinear({
-        domain: ranges.domainY, // e.g. [min, max]
-        range: [chartHeight + margin.top, margin.top],
-    }), [chartHeight, ranges]);
-
-    const deckStyle = useMemo(() => ({
-        position: "absolute",
-        top: margin.top,
-        left: margin.left,
-        width: chartWidth,
-        height: chartHeight,
-    } as const), [chartWidth, chartHeight]);
+    
+    // unproject used for updating ranges - may refactor hooks around this
+    const unproject = useCallback((coords: [number, number]) => {
+        // make sure it applies to the right `this`
+        return scatterplotLayer.unproject(coords);
+    }, [scatterplotLayer]);
     return (
         <>
-            <div style={deckStyle}>
+            <AxisComponent config={config} unproject={unproject}>
                 <DeckGL
                     layers={layers}
                     useDevicePixels={true}
@@ -238,42 +222,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     views={view}
                     onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
                 />
-            </div>
-            <svg width={width} height={height}>
-                <Axis.AxisBottom
-                    top={chartHeight + margin.top}
-                    scale={scaleX}
-                    stroke={"var(--text_color)"}
-                    tickStroke={"var(--text_color)"}
-                    tickLabelProps={() => ({
-                        fill: "var(--text_color)",
-                        fontSize: 9.5,
-                        textAnchor: "middle",
-                    })}
-                    labelProps={{
-                        fill: "var(--text_color)",
-                        fontSize: 10,
-                        textAnchor: "middle",
-                    }}
-                    label={cx.name}
-                />
-                <Axis.AxisLeft
-                    left={margin.left}
-                    scale={scaleY}
-                    stroke={"var(--text_color)"}
-                    tickStroke={"var(--text_color)"}
-                    tickLabelProps={() => ({
-                        fill: "var(--text_color)",
-                        fontSize: 9.5,
-                        textAnchor: "end",
-                    })}
-                    labelProps={{
-                        fill: "var(--text_color)",
-                        fontSize: 10,
-                    }}
-                    label={cy.name}
-                />
-            </svg>
+            </AxisComponent>
         </>
     );
 });
