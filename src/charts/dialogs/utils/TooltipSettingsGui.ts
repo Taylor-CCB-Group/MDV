@@ -6,6 +6,7 @@ import type { ScatterPlotConfig } from "@/react/scatter_state";
 
 // this will be for more general tooltip settings rather than just scatterplot
 export default function getTooltipSettings(config: ScatterPlotConfig, chart: BaseChart<any>) {
+    return getTooltipSettings2(config);
     // really don't want to be messing around with dataStore and such here...
     // first step is to separate out the tooltip settings from the chart config
     // and then we can sort out the implementation details

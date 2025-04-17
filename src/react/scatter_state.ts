@@ -5,6 +5,7 @@ import {
     useChartID,
     useChartSize,
     useConfig,
+    useFieldSpec,
     useFilteredIndices,
     useParamColumns,
 } from "./hooks";
@@ -23,7 +24,7 @@ import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
-import { FieldSpec } from "@/lib/columnTypeHelpers";
+import { flattenFields } from "@/lib/columnTypeHelpers";
 
 export type TooltipConfig = {
     tooltip: {
@@ -290,14 +291,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     );
     const contourLayers = useLegacyDualContour();
 
-    const tooltipCol = useMemo(() => {
-        if (!config.tooltip.column) return undefined;
-        if (typeof config.tooltip.column === "string") {
-            return chart.dataStore.columnIndex[config.tooltip.column];
-        }
-        console.warn("tooltip column not a string - need to support", config.tooltip.column);
-        // return chart.dataStore.columnIndex[config.tooltip.column];
-    }, [config.tooltip, config.tooltip.column, chart.dataStore.columnIndex]);
+    const tooltipCol = useFieldSpec(config.tooltip.column)?.column;
     const getTooltipVal = useCallback(
         (i: number) => {
             // if (!tooltipCol?.data) return '#'+i;
@@ -311,12 +305,15 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         //allow multicolumn with nice formatting
         () => {
             if (!config.tooltip.show) return null;
+            if (!config.tooltip.column) return null;
             // testing reading object properties --- pending further development
             // (not hardcoding DN property etc)
             // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
             const hoverInfo = hoverInfoRef.current;
             if (!hoverInfo || hoverInfo.index === -1) return null;
-            return `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`;
+            // need to deal with column being an object... there may be a better way to do this
+            const colName = flattenFields(config.tooltip.column)[0];
+            return `${colName}: ${getTooltipVal(hoverInfo.index)}`;
         },
         [getTooltipVal, config.tooltip.show, config.tooltip.column],
     );
