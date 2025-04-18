@@ -125,64 +125,48 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
 }
 
 /**
- * Given a field spec from a config object, return the (loaded) column associated with it.
+ * Given field specs from a config object, return the (loaded) columns associated with it.
  * If the spec is for some active column that changes at runtime, this will set up appropriate
  * (re)loading.
- * 
- * 
  */
-export function useFieldSpec(spec?: FieldSpec): {
-    column: DataColumn<any>;
-    isLoaded: boolean;
-} | undefined {
+export function useFieldSpecs(specs: FieldSpecs) {
     const chart = useChart();
-    const { columnIndex } = chart.dataStore;
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [column, setColumn] = useState<DataColumn<any> | undefined>(undefined);
+    // may consider different loading strategies later
+    // const [isLoaded, setIsLoaded] = useState(false);
+    const [columns, setColumns] = useState<DataColumn<any>[]>([]);
     useEffect(() => {
-        if (!spec) {
-            setColumn(undefined);
-            setIsLoaded(false);
+        if (!specs) {
+            setColumns([]);
             return;
         }
         return autorun(() => {
-            const fieldName = flattenFields(spec)[0];
+            const fieldName = flattenFields(specs);
             if (!fieldName) {
-                setColumn(undefined);
-                setIsLoaded(false);
+                setColumns([]);
                 return;
             }
             const cm = window.mdv.chartManager;
-            if (columnIndex[fieldName]) {
-                const column = columnIndex[fieldName];
-                const isLoaded = column.data !== undefined;
-                setColumn(columnIndex[fieldName]);
-                setIsLoaded(isLoaded);
-                if (!isLoaded) {
-                    cm.loadColumnSet([fieldName], chart.dataStore.name, () => {
-                        setIsLoaded(true);
-                    });
+            // if this is less efficient than it could be with already loaded columns,
+            // we could fix it upstream - although there'll always be some async...
+            // but then that's generally the case with setState etc
+            cm.loadColumnSet(fieldName, chart.dataStore.name, () => {
+                const { columnIndex } = chart.dataStore;
+                const columns = fieldName.map((f) => columnIndex[f]).filter(notEmpty);
+                if (columns.length !== fieldName.length) {
+                    throw `some columns are not loaded?`;
                 }
-                return;
-            } else {
-                // this is a bit of a mess, but we need to load the column
-                // and then set it in the chart...
-                cm.loadColumnSet([fieldName], chart.dataStore.name, () => {
-                    const column = columnIndex[fieldName];
-                    if (!column) throw `expected columnIndex[${fieldName}] to have a value`;
-                    setColumn(column);
-                    setIsLoaded(true);
-                });
-            }
+                setColumns(columns);
+            });
         });
-    });
-    // if (!column) throw `expected columnIndex[${spec}] to have a value`;
-    // not exactly how we want to do this, but somewhat keeps original type signature
-    if (!column) return undefined;
-    return { column, isLoaded };
+    }, [specs, chart.dataStore]);
+    return columns;
 }
-export function useFieldSpecs(specs: FieldSpecs) {
-    //todo - much the same as above, but for multiple fields
+export function useFieldSpec(spec?: FieldSpec) {
+    const fieldSpecs = spec ? [spec] : [];
+    const arr = useFieldSpecs(fieldSpecs);
+    if (!arr) return undefined;
+    if (arr.length === 0) return undefined;
+    return arr[0];
 }
 
 /** version of {@link useParamColumns} that only returns columns once they've been loaded */

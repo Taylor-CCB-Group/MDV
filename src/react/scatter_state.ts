@@ -291,7 +291,10 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     );
     const contourLayers = useLegacyDualContour();
 
-    const tooltipCol = useFieldSpec(config.tooltip.column)?.column;
+    // would rather not even need to call a hook here, but just have some
+    // `state.tooltip.column` which would have a column object...
+    // but this isn't really all that bad, so maybe we can stick with it.
+    const tooltipCol = useFieldSpec(config.tooltip.column);
     const getTooltipVal = useCallback(
         (i: number) => {
             // if (!tooltipCol?.data) return '#'+i;
