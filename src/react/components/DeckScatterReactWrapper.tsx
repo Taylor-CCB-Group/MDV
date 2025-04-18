@@ -4,7 +4,7 @@ import { action, makeObservable, observable } from "mobx";
 import type { ColumnName, DataColumn, DataType } from "../../charts/charts";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
-import { scatterAxisDefaults, scatterDefaults, ScatterPlotConfig2D, ScatterPlotConfig3D, type ScatterPlotConfig } from "../scatter_state";
+import { scatterAxisDefaults, scatterDefaults, type ScatterPlotConfig2D, type ScatterPlotConfig3D, type ScatterPlotConfig } from "../scatter_state";
 import DeckScatterComponent from "./DeckScatterComponent";
 import type { OrthographicViewState, OrbitViewState } from "deck.gl";
 import { g } from "@/lib/utils";
@@ -36,7 +36,9 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
     ) {
         // config.tooltip = config.tooltip || { show: false, column: config.param[0] }; //todo fix this
         // there is probably a less confusing way of writing this...
-        const defaults = originalConfig.dimension === "2d" ? {axis: scatterAxisDefaults} : {};
+        //! originalConfig.dimension may be undefined, which lead to a bug with axis settings & broken charts
+        // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
+        const defaults = originalConfig.dimension !== "3d" ? {axis: scatterAxisDefaults} : {};
         const config = { ...scatterDefaults, ...defaults, ...defaultViewState, ...originalConfig };
         super(dataStore, div, config, MainChart);
         if (!originalConfig.viewState) this.pendingRecenter = true;
