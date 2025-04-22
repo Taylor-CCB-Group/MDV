@@ -7,6 +7,7 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
+    DialogContentText,
     DialogTitle,
     IconButton,
     MenuItem,
@@ -22,6 +23,7 @@ import {
 import type React from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import useProjectShare, { type UserPermission, type RegisteredUser } from "./hooks/useProjectShare";
+import { useState } from "react";
 
 export interface ProjectShareModalProps {
     open: boolean;
@@ -30,6 +32,7 @@ export interface ProjectShareModalProps {
 }
 
 const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, projectId }) => {
+    const [openTextDialog, setOpenTextDialog] = useState(false);
     const {
         email,
         setEmail,
@@ -74,144 +77,170 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>
-                Manage Project Sharing
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{
-                        position: "absolute",
-                        right: 8,
-                        top: 8,
-                        color: (theme) => theme.palette.grey[500],
-                    }}
-                >
-                    <CloseIcon />
-                </IconButton>
-            </DialogTitle>
-            <DialogContent dividers>
-                <Box sx={{ mt: 2 }}>
-                    {error ? (
-                        <Box
-                            sx={{
-                                display: "flex",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                height: "20vh",
-                            }}
-                        >
-                            <Typography variant="h6" color="error">
-                                {error}
-                            </Typography>
-                        </Box>
-                    ) : (
-                        <>
-                            {errorMsg && (
-                                <Box sx={{ mb: 2 }}>
-                                    <Typography color="error">{errorMsg}</Typography>
-                                </Box>
-                            )}
-                            <Box sx={{ display: "flex", gap: 1, mb: 5 }}>
-                                <Autocomplete
-                                    fullWidth
-                                    size="small"
-                                    options={userList}
-                                    sx={{ color: "inherit" }}
-                                    renderInput={(params) => (
-                                        <TextField {...params} placeholder="Enter email to search for the user" />
-                                    )}
-                                    inputValue={email}
-                                    onChange={(_, value) => onChange(value)}
-                                    onInputChange={(_, value) => onInputChange(value)}
-                                    getOptionLabel={(option) => option.email}
-                                    getOptionKey={(option) => option.id}
-                                />
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    onClick={handleAddNewUser}
-                                    disabled={isLoading || !email}
-                                >
-                                    {isLoading ? <CircularProgress size="1.5rem" /> : "Add"}
-                                </Button>
+        <>
+            <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    Manage Project Sharing
+                    <IconButton
+                        aria-label="close"
+                        onClick={onClose}
+                        sx={{
+                            position: "absolute",
+                            right: 8,
+                            top: 8,
+                            color: (theme) => theme.palette.grey[500],
+                        }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Box sx={{ mt: 2 }}>
+                        {error ? (
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    height: "20vh",
+                                }}
+                            >
+                                <Typography variant="h6" color="error">
+                                    {error}
+                                </Typography>
                             </Box>
-                            {sharedUsers?.length === 0 ? (
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        justifyContent: "center",
-                                        my: 2,
-                                    }}
-                                >
-                                    <Typography variant="h6">No shared users</Typography>
+                        ) : (
+                            <>
+                                {errorMsg && (
+                                    <Box sx={{ mb: 2 }}>
+                                        <Typography color="error">{errorMsg}</Typography>
+                                    </Box>
+                                )}
+                                <Box sx={{ display: "flex", gap: 1, mb: 5 }}>
+                                    <Autocomplete
+                                        fullWidth
+                                        size="small"
+                                        options={userList}
+                                        sx={{ color: "inherit" }}
+                                        renderInput={(params) => (
+                                            <TextField {...params} placeholder="Enter email to search for the user" />
+                                        )}
+                                        inputValue={email}
+                                        onChange={(_, value) => onChange(value)}
+                                        onInputChange={(_, value) => onInputChange(value)}
+                                        getOptionLabel={(option) => option.email}
+                                        getOptionKey={(option) => option.id}
+                                        noOptionsText={
+                                            <Box sx={{ p: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                                                <Typography variant="body2" color="textPrimary">
+                                                    If it's a new user:
+                                                </Typography>
+                                                <Button variant="contained" size="small" sx={{ml: 1}} onClick={() => setOpenTextDialog(true)}>
+                                                    Add New User
+                                                </Button>
+                                            </Box>
+                                        }
+                                        disableClearable
+                                    />
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={handleAddNewUser}
+                                        disabled={isLoading || !newUser}
+                                    >
+                                        {isLoading ? <CircularProgress size="1.5rem" /> : "Add"}
+                                    </Button>
                                 </Box>
-                            ) : (
-                                <Table
-                                    sx={{
-                                        mb: 3,
-                                        "& .MuiTableCell-head": {
-                                            fontWeight: 600,
-                                        },
-                                    }}
-                                >
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>Shared Users</TableCell>
-                                            <TableCell>Permission</TableCell>
-                                            <TableCell align="right">Remove</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {sharedUsers.map((user) => (
-                                            <TableRow key={user.id}>
-                                                <TableCell>{user.email}</TableCell>
-                                                <TableCell>
-                                                    <Select
-                                                        value={user.permission}
-                                                        size="small"
-                                                        fullWidth
-                                                        onChange={(e) =>
-                                                            handlePermissionChange(
-                                                                e.target.value as UserPermission,
-                                                                user.id,
-                                                            )
-                                                        }
-                                                    >
-                                                        <MenuItem value="View">View</MenuItem>
-                                                        <MenuItem value="Edit">Edit</MenuItem>
-                                                        <MenuItem value="Owner">Owner</MenuItem>
-                                                    </Select>
-                                                </TableCell>
-                                                <TableCell align="right">
-                                                    <IconButton onClick={() => handleDeleteUser(user.id)}>
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </TableCell>
+                                {sharedUsers?.length === 0 ? (
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            justifyContent: "center",
+                                            my: 2,
+                                        }}
+                                    >
+                                        <Typography variant="h6">No shared users</Typography>
+                                    </Box>
+                                ) : (
+                                    <Table
+                                        sx={{
+                                            mb: 3,
+                                            "& .MuiTableCell-head": {
+                                                fontWeight: 600,
+                                            },
+                                        }}
+                                    >
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Shared Users</TableCell>
+                                                <TableCell>Permission</TableCell>
+                                                <TableCell align="right">Remove</TableCell>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            )}
-                        </>
-                    )}
-                </Box>
-            </DialogContent>
-            <DialogActions sx={{ py: 2 }}>
-                {/* <Button
-                    onClick={handleUpdate}
-                    variant="outlined"
-                    color="primary"
-                    sx={{ fontWeight: "bold" }}
-                    disabled={isLoading}
+                                        </TableHead>
+                                        <TableBody>
+                                            {sharedUsers.map((user) => (
+                                                <TableRow key={user.id}>
+                                                    <TableCell>{user.email}</TableCell>
+                                                    <TableCell>
+                                                        <Select
+                                                            value={user.permission}
+                                                            size="small"
+                                                            fullWidth
+                                                            onChange={(e) =>
+                                                                handlePermissionChange(
+                                                                    e.target.value as UserPermission,
+                                                                    user.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            <MenuItem value="View">View</MenuItem>
+                                                            <MenuItem value="Edit">Edit</MenuItem>
+                                                            <MenuItem value="Owner">Owner</MenuItem>
+                                                        </Select>
+                                                    </TableCell>
+                                                    <TableCell align="right">
+                                                        <IconButton onClick={() => handleDeleteUser(user.id)}>
+                                                            <DeleteIcon />
+                                                        </IconButton>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                            </>
+                        )}
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ py: 2 }}>
+                    <Button onClick={onClose} color="error" variant="outlined" sx={{ fontWeight: "bold" }}>
+                        Cancel
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {openTextDialog && (
+                <Dialog
+                    open={openTextDialog}
+                    onClose={() => setOpenTextDialog(false)}
+                    fullWidth
                 >
-                    {isLoading ? <CircularProgress size="1.5rem" /> : "Update"}
-                </Button> */}
-                <Button onClick={onClose} color="error" variant="outlined" sx={{ fontWeight: "bold" }}>
-                    Cancel
-                </Button>
-            </DialogActions>
-        </Dialog>
+                    <DialogContent dividers>
+                        <DialogContentText sx={{ display: "flex", height: "10vh", justifyContent: "center", alignItems: "center" }}>
+                            <Typography>Please contact the administrator:</Typography>
+                            <Typography sx={{ml: 1}} color="info">stephen.taylor@well.ox.ac.uk</Typography>
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button
+                            onClick={() => setOpenTextDialog(false)}
+                            color="primary"
+                        >
+                            OK
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            )}
+        </>
     );
 };
 
