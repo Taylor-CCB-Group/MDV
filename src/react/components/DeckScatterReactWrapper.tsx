@@ -193,7 +193,11 @@ BaseChart.types["DeckScatter"] = {
             type: "number",
             name: "y axis",
         },
-    ]
+        {
+            type: "_multi_column:number",
+            name: "density fields"
+        }
+    ],
 };
 BaseChart.types["DeckScatter3D"] = {
     name: "3D Scatter Plot (new)",
@@ -212,6 +216,7 @@ BaseChart.types["DeckScatter3D"] = {
             type: "number",
             name: "z axis",
         },
+        // todo 3d density with isosurface rendering...
     ],
     init: (config: ScatterPlotConfig) => {
         config.dimension = "3d";
