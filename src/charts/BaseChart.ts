@@ -278,11 +278,15 @@ class BaseChart<T extends BaseConfig> {
         );
         this.fullscreenIcon = this.addMenuIcon("fas fa-expand", "Full Screen", {
             func: async () => {
-                if (!this.isFullscreen) {
-                    oldSize = this.config.size;
-                    await this.div.requestFullscreen();
-                } else {
-                    await this.__doc__.exitFullscreen();
+                try {
+                    if (!this.isFullscreen) {
+                        oldSize = this.config.size;
+                        await this.div.requestFullscreen();
+                    } else {
+                        await this.__doc__.exitFullscreen();
+                    }
+                } catch (error) {
+                    console.error("fullscreen error caused: ", error);
                 }
             },
         });

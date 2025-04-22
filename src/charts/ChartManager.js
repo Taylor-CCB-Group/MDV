@@ -1566,10 +1566,14 @@ export class ChartManager {
                     //nb, not sure best way to access the actual div I want here
                     //this could easily break if the layout structure changes
                     // ds.contentDiv.parentElement.requestFullscreen();
-                    if (!this.isFullscreen) {
-                        await ds.menuBar.parentElement.requestFullscreen();
-                    } else {
-                        await document.exitFullscreen();
+                    try {
+                        if (!this.isFullscreen) {
+                            await ds.menuBar.parentElement.requestFullscreen();
+                        } else {
+                            await document.exitFullscreen();
+                        }
+                    } catch (error) {
+                        console.error("fullscreen error caused: ", error);
                     }
                 },
             },
