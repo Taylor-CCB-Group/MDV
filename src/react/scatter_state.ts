@@ -320,6 +320,9 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             const tooltipVal = getTooltipVal(hoverInfo.index);
             if (!tooltipVal) return null;
             const tooltip: TooltipContent = {
+                //todo - this should be in a popper / should follow useOuterConainer...
+                //also should understand if mouse has left deck.gl canvas & hide tooltip
+                //or maybe we actually use something else for rendering the tooltip?
                 html: `<div>${tooltipVal.join("<br/>")}</div>`,
             }
             return tooltip;
