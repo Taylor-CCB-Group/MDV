@@ -161,7 +161,7 @@ export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
     return columns;
 }
 export function useFieldSpec(spec?: FieldSpec) {
-    const fieldSpecs = spec ? [spec] : [];
+    const fieldSpecs = useMemo(() =>spec ? [spec] : [], [spec]);
     const arr = useFieldSpecs(fieldSpecs);
     if (!arr) return undefined;
     if (arr.length === 0) return undefined;
