@@ -22,7 +22,8 @@ import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
-import { g, isArray, toArray } from "@/lib/utils";
+import { g, toArray } from "@/lib/utils";
+import { getDensitySettings } from "../contour_state";
 import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
 import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
 
@@ -217,7 +218,6 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         );
         const images = imageRegionKeys.map((r) => ({ name: r, value: r }));
 
-
         return settings.concat([
             g({
                 type: "dropdown",
@@ -302,112 +302,9 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.showJson = x;
                 },
             }),
-            g({
-                type: "folder",
-                label: "Density Visualisation",
-                current_value: [
-                    g({
-                        type: "folder",
-                        label: "Category selection",
-                        current_value: [
-                            //maybe 2-spaces format is better...
-                            g({
-                                type: "dropdown", //todo, make this "column" and fix odd behaviour with showing the value...
-                                //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
-                                label: "Contour parameter",
-                                // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
-                                //@ts-expect-error contourParameter type
-                                current_value: c.contourParameter || c.param[2],
-                                values: [catCols, "name", "field"],
-                                func: (x) => {
-                                    if (x === c.contourParameter) return;
-                                    // could we change 'cats' and have the dropdowns update?
-                                    // was thinking this might mean a more general refactoring of the settings...
-                                    if (!isArray(c.param)) throw "expected param array";
-                                    c.contourParameter = c.param[2] = x; //this isn't causing useParamColumns to update...
-                                    // but maybe it's not necessary if 'cats' is observable... fiddly to get right...
-                                    const newCats = (
-                                        this.dataStore.getColumnValues(x) || []
-                                    ).map((t) => ({ t }));
-                                    // newCats.push({ t: "None" });
-                                    console.warn("changing contour parameter isn't properly updating dropdowns as of this writing...");
-                                    catsValues[0] = newCats;
-                                    //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
-                                    //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
-                                    // c.category1 = c.category2 = null;  //maybe we can allow state to be invalid?
-                                    //the dropdowns can set values to null if they're invalid rather than throw error?
-                                    //is that a good idea?
-                                },
-                            }),
-                            g({
-                                type: "multidropdown",
-                                label: "Contour Category 1",
-                                current_value: toArray(c.category1 || "None"),
-                                // values: [cats, "t", "t"],
-                                values: catsValues,
-                                func(x) {
-                                    // if (x === "None") x = null;
-                                    c.category1 = x;
-                                },
-                            }),
-                            g({
-                                type: "multidropdown",
-                                label: "Contour Category 2",
-                                current_value: toArray(c.category2 || "None"),
-                                // values: [cats, "t", "t"],
-                                values: catsValues,
-                                func(x) {
-                                    // if (x === "None") x = null;
-                                    c.category2 = x;
-                                },
-                            }),
-                        ],
-                    }),
-                    g({
-                        type: "slider",
-                        max: 25,
-                        min: 1,
-
-                        // doc: this.__doc__, //why?
-                        current_value: c.contour_bandwidth,
-                        label: "KDE Bandwidth",
-                        continuous: true,
-                        func(x) {
-                            c.contour_bandwidth = x;
-                        },
-                    }),
-                    g({
-                        label: "Fill Contours",
-                        type: "check",
-                        current_value: c.contour_fill,
-                        func(x) {
-                            c.contour_fill = x;
-                        },
-                    }),
-                    g({
-                        type: "slider",
-                        max: 1,
-                        min: 0,
-                        current_value: c.contour_intensity,
-                        continuous: true,
-                        label: "Fill Intensity",
-                        func(x) {
-                            c.contour_intensity = x;
-                        },
-                    }),
-                    g({
-                        type: "slider",
-                        max: 1,
-                        min: 0,
-                        current_value: c.contour_opacity,
-                        continuous: false, //why so slow?
-                        label: "Contour opacity",
-                        func(x) {
-                            c.contour_opacity = x ** 3;
-                        },
-                    }),
-                ],
-            }),
+            // side-note; what if "folders" could just be keyed objects?
+            // also, it might be nice to remember which folders were open...
+            getDensitySettings(c, this.dataStore),
             g({
                 type: "folder",
                 label: "Category Filters",
