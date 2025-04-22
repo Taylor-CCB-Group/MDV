@@ -51,16 +51,16 @@ const viridis = [
 ] as const;
 
 function useColorRange(
-    contourParameter: DataColumn<CategoricalDataType>,
+    contourParameter: DataColumn<CategoricalDataType> | undefined,
     category: string | string[] | undefined,
 ) {
     const ds = useDataStore();
     const columnColors = useMemo(
         () =>
-            ds.getColumnColors(contourParameter.name, {
+            contourParameter ? ds.getColumnColors(contourParameter.name, {
                 asArray: true,
                 useValue: true,
-            }),
+            }) : viridis,
         [ds, contourParameter],
     );
     /** 
@@ -71,8 +71,7 @@ function useColorRange(
      */
     const categoryValueIndex = useMemo(() => {
         // if (!category) return contourParameter.values.map((_, i) => i); //NO: -1 is a clue to use general 'viridis' color range atm.
-        // if (!contourParameter || !category) return -1;
-        if (!category) return -1;
+        if (!contourParameter || !category) return -1;
         //we could do something different here... would need more clever color handling on the receiving end
         if (Array.isArray(category)) return category.length > 1 ? -1 : contourParameter.values.indexOf(category[0]);
         return contourParameter.values.indexOf(category);
@@ -98,11 +97,8 @@ export function useContour(props: ContourProps) {
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
+    // this has a regression... while in the process of loading data, it will return undefined which we don't handle well.
     const contourParameter = useFieldSpec(parameter);
-    if (!contourParameter) {
-        console.error(`Contour parameter '${parameter}' not found`);
-        return undefined;
-    }
     const data = useCategoryFilterIndices(contourParameter, category);
     // const getWeight = useContourWeight(contourParameter, category);
     const colorRange = useColorRange(contourParameter, category);
