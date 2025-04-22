@@ -59,7 +59,7 @@ const MainChart = observer(() => {
     useImage(source);
     return !isViewerLoading && <VivScatter />;
 });
-
+//! todo move these types to different files
 export type TooltipConfig = {
     tooltip: {
         show: boolean;
@@ -100,7 +100,6 @@ export type VivMDVReact = VivMdvReact;
 function adaptConfig(originalConfig: VivMdvReactConfig) {
     const config = { ...scatterDefaults, ...originalConfig };
     // in future we might have something like an array of layers with potentially ways of describing parameters...
-    //@ts-expect-error contourParameter type
     if (!config.contourParameter) config.contourParameter = config.param[2];
     // if (!config.)
     // === some dead code ===
@@ -176,23 +175,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         const c = this.config;
         const { tooltip } = c;
         const cols = this.dataStore.getColumnList();// as DataColumn<DataType>[];
-        const catCols = cols.filter((c) => c.datatype.match(/text/i));
         const settings = super.getSettings();
 
-        //@ts-expect-error category column values...
-        const ocats = this.dataStore.getColumnValues(c.param[2]).slice() || [];
-        const cats = ocats.map((x) => {
-            return { t: x };
-        });
-        // could've sworn mobx observable had been working here at some point
-        // (changing contourParameter should immediately update "Contour Category" dropdowns)... it isn't now.
-        // and the type is dodgy - need to get on top of that with mobx in general.
-        const catsValues = observable.array([cats, "t", "t"]) as unknown as [{t: string}[], "t", "t"];
-        // const catsValues = [cats, "t", "t"];
-
-        // What I would like is ability to
-        // - change selected image at runtime.
-        // - choose multiple categories on which to filter.
         const filters = c.category_filters.map((f) => {
             // what we really want is to have a type that is fairly specific to category filters...
             // able to handle an array of them with controls for adding/removing...
