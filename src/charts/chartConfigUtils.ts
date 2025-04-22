@@ -169,7 +169,7 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             //@ts-expect-error type FieldSpec isn't serialised form, so deserialise complains
             const tooltipColumn = serialisedTooltipColumn.map((c) => deserialiseParam(chart.dataStore, c));
             (config as any).tooltip.column = getConcreteFieldNames(tooltipColumn);
-            // we're not using this method with multi-column, only react charts which aren't so method-based have this(?)
+            // we're not using this method with multi-column, only react charts which aren't so method-based have multicolumn tooltips
             // chart.deferredInit(() => {
             //     if (chart.setToolTipColumn) chart.setToolTipColumn(tooltipColumn);
             // })            

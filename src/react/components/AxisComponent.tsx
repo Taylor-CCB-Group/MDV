@@ -3,7 +3,8 @@ import type { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../sc
 import type { DataColumn } from "@/charts/charts";
 import { useChartSize, useParamColumns } from "../hooks";
 import { useMemo, type PropsWithChildren } from "react";
-import { Axis, Scale } from "@visx/visx";
+import * as Axis from "@visx/axis";
+import * as Scale from "@visx/scale";
 
 type AxisComponentProps = {
     config: ScatterPlotConfig2D | ScatterPlotConfig3D
@@ -29,6 +30,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     const [cx, cy] = useParamColumns() as DataColumn<"double">[];
     const { dimension, viewState } = config;
     const is2d = dimension === "2d";
+    // biome-ignore lint/correctness/useExhaustiveDependencies: axis is never if dimension is 3d, hope to get rid of this
     const margin = useMemo(() => (
         //todo better Axis encapsulation in another component
         is2d ? {

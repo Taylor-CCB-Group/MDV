@@ -132,9 +132,12 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
             // adding `action` here gets rid of warnings but doesn't help with performance.
             onEdit: action(({ updatedData }) => {
                 // console.log("onEdit", editType, updatedData);
-                const feature = updatedData.features.pop();
-                updatedData.features = [feature];
-                setSelectionFeatureCollection(updatedData);
+                const feature = updatedData.features.at(-1);
+                // updatedData.features = [feature];
+                setSelectionFeatureCollection({
+                    ...updatedData,
+                    features: feature ? [feature] : []
+                });
             }),
             onHover(pickingInfo, event) {
                 if ((pickingInfo as any).featureType === "points") return;
