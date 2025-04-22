@@ -12,7 +12,7 @@ To install from  TestPyPi:-
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ mdvtools
 ```
 
-To test, run this script (change /path/to/project to something appropriate):
+To test, run the script below, which creates and serves a project from the pbmc3k test data. `folder` is the location where the project will be stored and can be any location that you have write access. A new folder will be created if one does not exist already.
 
 ```python
 import scanpy
