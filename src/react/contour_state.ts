@@ -8,9 +8,12 @@ import {
     useParamColumns,
 } from "./hooks";
 import { useDataStore } from "./context";
-import { useViewerStore } from "./components/avivatorish/state";
 import { useDebounce } from "use-debounce";
 import { useViewState } from "./deck_state";
+import { g, isArray, toArray } from "@/lib/utils";
+import DataStore from "@/datastore/DataStore";
+import { observable } from "mobx";
+import type { BaseConfig } from "@/charts/BaseChart";
 
 /** need to be clearer on which prop types are for which parts of layer spec...
  *
@@ -180,7 +183,7 @@ export function useFieldContour(props: FieldContourProps) {
         // console.log('radiusPixels', radiusPixels);
         // there is an issue of the scaling of these layers e.g. with images that have been resized...
         // what is different about how we scale these layers vs other scatterplot layer?
-        return fields.map(({name, data: fieldData, minMax}) => ({
+        return fields.map(({ name, data: fieldData, minMax }) => ({
             id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
             data,
             opacity: fill ? intensity : 0,
@@ -197,7 +200,7 @@ export function useFieldContour(props: FieldContourProps) {
             getWeight: (i: number) => {
                 //potential for this to be animated in fun ways...
                 //phase shift for each field in shader...
-                
+
                 //normalization pending refactor/design
                 const [min, max] = minMax;
                 const range = max - min;
@@ -231,6 +234,13 @@ export function useFieldContour(props: FieldContourProps) {
     ]);
 }
 
+export type ContourVisualConfig = {
+    contour_fill: boolean;
+    /** KDE bandwidth/radius. todo: units */
+    contour_bandwidth: number;
+    contour_intensity: number;
+    contour_opacity: number;
+}
 /** In future I think we want something more flexible & expressive,
  * but this should be somewhat compatible with the previous implementation
  */
@@ -238,11 +248,141 @@ export type DualContourLegacyConfig = {
     contourParameter?: string; //this is param[2] in the original code
     category1?: string | string[];
     category2?: string | string[];
-    contour_fill: boolean;
-    contour_bandwidth: number;
-    contour_intensity: number;
-    contour_opacity: number;
-};
+} & ContourVisualConfig;
+
+export function getDensitySettings(c: DualContourLegacyConfig & BaseConfig, dataStore: DataStore) {
+    const cols = dataStore.getColumnList();
+    const catCols = cols.filter((c) => c.datatype.match(/text/i));
+
+    //todo: observe contourParameter & update catsValues appropriately
+    const ocats = c.contourParameter ? dataStore.getColumnValues(c.contourParameter).slice() : [];
+    const cats = ocats.map((x) => {
+        return { t: x };
+    });
+    // could've sworn mobx observable had been working here at some point
+    // (changing contourParameter should immediately update "Contour Category" dropdowns)... it isn't now.
+    // and the type is dodgy - need to get on top of that with mobx in general.
+    const catsValues = observable.array([cats, "t", "t"]) as unknown as [{ t: string }[], "t", "t"];
+    // const catsValues = [cats, "t", "t"];
+    return g({
+        type: "folder",
+        label: "Density Visualisation",
+        current_value: [
+            g({
+                type: "folder",
+                label: "Category selection",
+                current_value: [
+                    //maybe 2-spaces format is better...
+                    g({
+                        type: "dropdown", //todo, make this "column" and fix odd behaviour with showing the value...
+                        //todo: make the others be "category_selection" or something (which we don't have yet as a GuiSpec type)
+                        label: "Contour parameter",
+                        // current_value: c.contourParameter || this.dataStore.getColumnName(c.param[2]),
+                        //@ts-expect-error contourParameter type
+                        current_value: c.contourParameter || c.param[2],
+                        values: [catCols, "name", "field"],
+                        func: (x) => {
+                            if (x === c.contourParameter) return;
+                            // could we change 'cats' and have the dropdowns update?
+                            // was thinking this might mean a more general refactoring of the settings...
+                            if (!isArray(c.param)) throw "expected param array";
+                            c.contourParameter = c.param[2] = x; //this isn't causing useParamColumns to update...
+                            // but maybe it's not necessary if 'cats' is observable... fiddly to get right...
+                            const newCats = (
+                                dataStore.getColumnValues(x) || []
+                            ).map((t) => ({ t }));
+                            // newCats.push({ t: "None" });
+                            console.warn("changing contour parameter isn't properly updating dropdowns as of this writing...");
+                            catsValues[0] = newCats;
+                            //ru-roh, we're not calling the 'func's... mostly we just care about reacting to the change...
+                            //but setting things on config doesn't work anyway, because the dialog is based on this settings object...
+                            // c.category1 = c.category2 = null;  //maybe we can allow state to be invalid?
+                            //the dropdowns can set values to null if they're invalid rather than throw error?
+                            //is that a good idea?
+                        },
+                    }),
+                    g({
+                        type: "multidropdown",
+                        label: "Contour Category 1",
+                        current_value: toArray(c.category1 || "None"),
+                        // values: [cats, "t", "t"],
+                        values: catsValues,
+                        func(x) {
+                            // if (x === "None") x = null;
+                            c.category1 = x;
+                        },
+                    }),
+                    g({
+                        type: "multidropdown",
+                        label: "Contour Category 2",
+                        current_value: toArray(c.category2 || "None"),
+                        // values: [cats, "t", "t"],
+                        values: catsValues,
+                        func(x) {
+                            // if (x === "None") x = null;
+                            c.category2 = x;
+                        },
+                    }),
+                ],
+            }),
+            ...getContourVisualSettings(c)
+        ],
+    });
+}
+
+/**
+ * Gets settings for tweaking visual properties of contours.
+ * @param c - contour visual config, this might be a `chart.config` or in future a `layer.config`;
+ * shouldn't require any changes to this function if we have a more flexible nested config
+ * @returns - array of visual settings
+ */
+export function getContourVisualSettings(c: ContourVisualConfig) {
+    return [
+        g({
+            type: "slider",
+            max: 25,
+            min: 1,
+
+            // doc: this.__doc__, //why?
+            current_value: c.contour_bandwidth,
+            label: "KDE Bandwidth",
+            continuous: true,
+            func(x) {
+                c.contour_bandwidth = x;
+            },
+        }),
+        g({
+            label: "Fill Contours",
+            type: "check",
+            current_value: c.contour_fill,
+            func(x) {
+                c.contour_fill = x;
+            },
+        }),
+        g({
+            type: "slider",
+            max: 1,
+            min: 0,
+            current_value: c.contour_intensity,
+            continuous: true,
+            label: "Fill Intensity",
+            func(x) {
+                c.contour_intensity = x;
+            },
+        }),
+        g({
+            type: "slider",
+            max: 1,
+            min: 0,
+            current_value: c.contour_opacity,
+            continuous: false, //why so slow?
+            label: "Contour opacity",
+            func(x) {
+                c.contour_opacity = x ** 3;
+            },
+        }),
+    ]
+}
 
 /**
  * In future we will want more flexible array of contours.
