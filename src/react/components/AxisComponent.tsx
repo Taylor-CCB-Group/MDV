@@ -2,7 +2,7 @@ import { observer } from "mobx-react-lite";
 import type { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../scatter_state";
 import type { DataColumn } from "@/charts/charts";
 import { useChartSize, useParamColumns } from "../hooks";
-import { useEffect, useMemo, type PropsWithChildren } from "react";
+import { useMemo, type PropsWithChildren } from "react";
 import { Axis, Scale } from "@visx/visx";
 
 type AxisComponentProps = {
@@ -123,6 +123,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
                         fill: "var(--text_color)",
                         fontSize: config.axis.y.tickfont,
                     }}
+                    labelOffset={30}
                     label={cy.name}
                 />
             </svg>}        

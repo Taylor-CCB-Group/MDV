@@ -102,12 +102,12 @@ export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" |
 export const scatterAxisDefaults: AxisConfig2D = {
     x: {
         rotate_labels: false,
-        size: 10,
+        size: 20,
         tickfont: 10,
     },
     y: {
         rotate_labels: false,
-        size: 10,
+        size: 40,
         tickfont: 10,
     },
 }
