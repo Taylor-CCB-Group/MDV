@@ -221,6 +221,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
                     // initialViewState={viewState} //consider not using react state for this        
                     views={view}
                     onViewStateChange={v => { action(() => config.viewState = v.viewState)() }}
+                    getTooltip={getTooltip}
                 />
             </AxisComponent>
         </>

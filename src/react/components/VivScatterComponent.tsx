@@ -172,7 +172,6 @@ const Main = observer(() => {
             contrast,
         ],
     );
-    //@ts-expect-error tooltip content should be fixed
     const deckProps: Partial<DeckGLProps> = useMemo(
         () => ({
             getTooltip,

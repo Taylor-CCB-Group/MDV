@@ -11,7 +11,7 @@ import { useRegionScale } from "./scatter_state";
 import { isArray, notEmpty } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
-import { allColumnsLoaded, isColumnLoaded, type FieldSpec } from "@/lib/columnTypeHelpers";
+import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 
 
 /**
@@ -124,23 +124,48 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
     return columns;
 }
 
-export function useNamedColumn(name?: FieldName): {
-    column: DataColumn<any>;
-    isLoaded: boolean;
-} | undefined {
+/**
+ * Given field specs from a config object, return the (loaded) columns associated with it.
+ * If the spec is for some active column that changes at runtime, this will set up appropriate
+ * (re)loading.
+ */
+export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
     const chart = useChart();
-    const { columnIndex } = chart.dataStore;
-    const [isLoaded, setIsLoaded] = useState(false);
-    const column = name ? columnIndex[name] : undefined;
+    // consider different loading strategies, lazy vs eager column data
+    //todo generic type with corresponding check when loaded
+    const [columns, setColumns] = useState<DataColumn<any>[]>([]);
+    //I'm dubious about this...
     useEffect(() => {
-        if (!name) {
-            setIsLoaded(false);
+        if (!specs) {
+            setColumns([]);
             return;
         }
-        loadColumn(chart.dataStore.name, name).then(() => setIsLoaded(true));
-    }, [name, chart.dataStore]);
-    if (!column) throw `expected columnIndex[${name}] to have a value`;
-    return { column, isLoaded };
+        return autorun(() => {
+            const fieldNames = flattenFields(specs);
+            if (!fieldNames) {
+                setColumns([]);
+                return;
+            }
+            const cm = window.mdv.chartManager;
+            // if this is less efficient than it could be with already loaded columns,
+            // we could fix it upstream - although there'll always be some async...
+            // but then that's generally the case with setState etc
+            // console.log("loading columns", fieldNames);
+            cm.loadColumnSet(fieldNames, chart.dataStore.name, () => {
+                const { columnIndex } = chart.dataStore;
+                const columns = fieldNames.map((f) => columnIndex[f]).filter(notEmpty);
+                setColumns(columns);
+            });
+        });
+    }, [specs, chart.dataStore]);
+    return columns;
+}
+export function useFieldSpec(spec?: FieldSpec) {
+    const fieldSpecs = spec ? [spec] : [];
+    const arr = useFieldSpecs(fieldSpecs);
+    if (!arr) return undefined;
+    if (arr.length === 0) return undefined;
+    return arr[0];
 }
 
 /** version of {@link useParamColumns} that only returns columns once they've been loaded */

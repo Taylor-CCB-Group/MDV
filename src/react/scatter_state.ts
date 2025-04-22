@@ -5,6 +5,7 @@ import {
     useChartID,
     useChartSize,
     useConfig,
+    useFieldSpecs,
     useFilteredIndices,
     useParamColumns,
 } from "./hooks";
@@ -23,11 +24,13 @@ import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
 
 export type TooltipConfig = {
     tooltip: {
         show: boolean;
-        column?: ColumnName;
+        column?: FieldSpecs | FieldSpec;
     };
 };
 export type AxisConfig = {
@@ -287,31 +290,39 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     );
     const contourLayers = useLegacyDualContour();
 
-    const tooltipCol = useMemo(() => {
-        if (!config.tooltip.column) return undefined;
-        return chart.dataStore.columnIndex[config.tooltip.column];
-    }, [config.tooltip, config.tooltip.column, chart.dataStore.columnIndex]);
+    // todo - Tooltip should be a separate component
+    // would rather not even need to call a hook here, but just have some
+    // `state.tooltip.column` which would have a column object...
+    // but this isn't really all that bad, so maybe we can stick with it.
+    const tooltipCols = useFieldSpecs(config.tooltip.column);
     const getTooltipVal = useCallback(
         (i: number) => {
             // if (!tooltipCol?.data) return '#'+i;
-            if (!tooltipCol) return null;
-            return tooltipCol.getValue(data[i]);
+            if (!tooltipCols) return null;
+            // return tooltipCols.getValue(data[i]);
+            return tooltipCols.map((col) => {
+                    return `<strong>${col.name}:</strong> ${col.data ? col.getValue(data[i]) : "loading..."}`;
+            });
         },
-        [tooltipCol, data],
+        [tooltipCols, data],
     );
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
         () => {
-            if (!config.tooltip.show) return;
-            // testing reading object properties --- pending further development
+            if (!config.tooltip.show) return null;
+            if (!config.tooltip.column) return null;
+            // testing reading object properties --- pending further development (for GeoJSON layer in particular)
+            // also consider some other things like transcripts / stats heatmap etc...
             // (not hardcoding DN property etc)
             // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
             const hoverInfo = hoverInfoRef.current;
-            return (
-                hoverInfo &&
-                hoverInfo.index !== -1 &&
-                `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`
-            );
+            if (!hoverInfo || hoverInfo.index === -1) return null;
+            const tooltipVal = getTooltipVal(hoverInfo.index);
+            if (!tooltipVal) return null;
+            const tooltip: TooltipContent = {
+                html: `<div>${tooltipVal.join("<br/>")}</div>`,
+            }
+            return tooltip;
         },
         [getTooltipVal, config.tooltip.show, config.tooltip.column],
     );
