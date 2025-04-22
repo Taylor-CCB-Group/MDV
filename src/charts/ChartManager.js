@@ -948,7 +948,13 @@ export class ChartManager {
         }
         if (config.tooltip) {
             if (config.tooltip.column) {
-                set.add(config.tooltip.column);
+                if (Array.isArray(config.tooltip.column)) {
+                    for (const i of config.tooltip.column) {
+                        set.add(i);
+                    }
+                } else {
+                    set.add(config.tooltip.column);
+                }
             }
         }
         if (config.background_filter) {

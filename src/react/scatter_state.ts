@@ -5,7 +5,7 @@ import {
     useChartID,
     useChartSize,
     useConfig,
-    useFieldSpec,
+    useFieldSpecs,
     useFilteredIndices,
     useParamColumns,
 } from "./hooks";
@@ -24,14 +24,12 @@ import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
-import { type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
+import { type FieldSpec, type FieldSpecs, flattenFields } from "@/lib/columnTypeHelpers";
 
 export type TooltipConfig = {
     tooltip: {
         show: boolean;
-        // would like to be able to have multiple columns
-        // sticking to version that should be compatible with old config
-        column?: FieldSpec;
+        column?: FieldSpecs | FieldSpec;
     };
 };
 export type AxisConfig = {
@@ -291,17 +289,21 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     );
     const contourLayers = useLegacyDualContour();
 
+    // todo - Tooltip should be a separate component
     // would rather not even need to call a hook here, but just have some
     // `state.tooltip.column` which would have a column object...
     // but this isn't really all that bad, so maybe we can stick with it.
-    const tooltipCol = useFieldSpec(config.tooltip.column);
+    const tooltipCols = useFieldSpecs(config.tooltip.column);
     const getTooltipVal = useCallback(
         (i: number) => {
             // if (!tooltipCol?.data) return '#'+i;
-            if (!tooltipCol) return null;
-            return tooltipCol.getValue(data[i]);
+            if (!tooltipCols) return null;
+            // return tooltipCols.getValue(data[i]);
+            return tooltipCols.map((col) => {
+                    return `${col.name}: ${col.data ? col.getValue(data[i]) : "loading..."}`;
+            }).join("\n");
         },
-        [tooltipCol, data],
+        [tooltipCols, data],
     );
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
@@ -314,9 +316,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
             const hoverInfo = hoverInfoRef.current;
             if (!hoverInfo || hoverInfo.index === -1) return null;
-            // need to deal with column being an object... there may be a better way to do this
-            const colName = flattenFields(config.tooltip.column)[0];
-            return `${colName}: ${getTooltipVal(hoverInfo.index)}`;
+            return getTooltipVal(hoverInfo.index);
         },
         [getTooltipVal, config.tooltip.show, config.tooltip.column],
     );

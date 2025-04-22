@@ -129,13 +129,12 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
  * If the spec is for some active column that changes at runtime, this will set up appropriate
  * (re)loading.
  */
-export function useFieldSpecs(specs: FieldSpecs) {
+export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
     const chart = useChart();
     // consider different loading strategies, lazy vs eager column data
     //todo generic type with corresponding check when loaded
     const [columns, setColumns] = useState<DataColumn<any>[]>([]);
     //I'm dubious about this...
-    // biome-ignore lint/correctness/useExhaustiveDependencies: specs is the same mobx observable, and re-runs effect if included in deps
     useEffect(() => {
         if (!specs) {
             setColumns([]);
@@ -158,7 +157,7 @@ export function useFieldSpecs(specs: FieldSpecs) {
                 setColumns(columns);
             });
         });
-    }, []);
+    }, [specs, chart.dataStore]);
     return columns;
 }
 export function useFieldSpec(spec?: FieldSpec) {

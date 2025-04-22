@@ -17,7 +17,7 @@ export default function getTooltipSettings(config: ScatterPlotConfig, callback?:
                 },
             }),
             g({
-                type: "column",
+                type: "multicolumn",
                 label: "Tooltip value",
                 //@ts-expect-error - need a way of dealing with optional column...
                 current_value: config.tooltip.column,
