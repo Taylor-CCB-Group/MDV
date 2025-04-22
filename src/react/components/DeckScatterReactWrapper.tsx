@@ -9,6 +9,7 @@ import DeckScatterComponent from "./DeckScatterComponent";
 import type { OrthographicViewState, OrbitViewState } from "deck.gl";
 import { g } from "@/lib/utils";
 import type DataStore from "@/datastore/DataStore";
+import { getDensitySettings } from "../contour_state";
 import getAxisGuiSpec from "@/charts/dialogs/utils/AxisSettingsGui";
 import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
 
@@ -166,7 +167,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             g({
                 type: "button",
                 label: "Center Plot",
-                //@ts-expect-error - no nay never no more
+                //@ts-expect-error - no nay `never` no more
                 current_value: null,
                 func: () => {
                     // what should we do to trigger a re-center?
@@ -175,7 +176,9 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
                     // that isn't in the config, but is in the chart.
                     this.pendingRecenter = true;
                 },
-            }),            
+            }),
+            // consider making this only appear for "density" chart
+            getDensitySettings(c, this)
         ]);
     }
 }

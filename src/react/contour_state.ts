@@ -75,8 +75,8 @@ function useColorRange(
             }) : viridis,
         [ds, contourParameter],
     );
-    /** 
-     * if the category refers to a specific value, 
+    /**
+     * if the category refers to a specific value,
      * return its index in `category.values` (and associated `columnColors`).
      * otherwise return `-1` indicating that we should use the default color range
      * (currently hardcoded to `viridis`)
@@ -374,7 +374,7 @@ export function getContourVisualSettings(c: ContourVisualConfig) {
  * Dual-contour is a special case of this - may be useful in terms
  * of how it relates to cell-pair interation links
  */
-export function useLegacyDualContour() {
+export function useLegacyDualContour(): ContourLayerProps[] {
     const config = useConfig<DualContourLegacyConfig>();
     // todo: this is currently short-circuiting for non-viv deck scatter...
     // breaking rule of hooks etc, should be fixed
@@ -389,8 +389,10 @@ export function useLegacyDualContour() {
     const fieldContours = useFieldContour({
         ...commonProps,
         id: "fieldContours",
-        fields
+        // the spread above is wrong particularly when param[2] is categorical
+        fields: fields.filter(field => field.datatype === "double")
     });
+    //@ts-expect-error Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer'?
     if (!config.contourParameter) return fieldContours;
     const contour1 = useCategoryContour({
         ...commonProps,
@@ -403,9 +405,10 @@ export function useLegacyDualContour() {
         category: config.category2,
     });
     const stableArray = useMemo(
-        () => [contour1, contour2, ...fieldContours],
+        () => [contour1, contour2, ...fieldContours].filter(v => v !== undefined),
         [contour1, contour2, fieldContours],
     );
+    //@ts-expect-error Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer'?
     return stableArray;
 }
 
