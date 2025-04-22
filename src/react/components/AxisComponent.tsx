@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../scatter_state";
+import type { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../scatter_state";
 import type { DataColumn } from "@/charts/charts";
 import { useChartSize, useParamColumns } from "../hooks";
 import { useEffect, useMemo, type PropsWithChildren } from "react";
@@ -61,6 +61,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
             const domainY = [p2[1], p[1]];
             return { domainX, domainY };
         } catch (e) {
+            // console.warn("AxisComponent: unproject failed", e);
             return { domainX: cx.minMax, domainY: cy.minMax };
         }
     }, [cx.minMax, cy.minMax, viewState, chartWidth, chartHeight, unproject]);
@@ -69,11 +70,11 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     const scaleX = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainX, // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
-    }), [chartWidth, ranges]);
+    }), [chartWidth, ranges, margin.left]);
     const scaleY = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainY, // e.g. [min, max]
         range: [chartHeight + margin.top, margin.top],
-    }), [chartHeight, ranges]);
+    }), [chartHeight, ranges, margin.top]);
 
     const deckStyle = useMemo(() => ({
         position: "absolute",
@@ -81,7 +82,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
         left: margin.left,
         width: chartWidth,
         height: chartHeight,
-    } as const), [chartWidth, chartHeight]);
+    } as const), [chartWidth, chartHeight, margin.top, margin.left]);
     // useEffect(() => {
     //     if (is2d && (config.axis.x.rotate_labels || config.axis.y.rotate_labels)) {
     //         console.warn("Axis rotation not implemented for react charts");
