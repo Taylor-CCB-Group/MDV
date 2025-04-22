@@ -102,8 +102,6 @@ function useColorRange(
     return colorRange;
 }
 
-// this should be moved elsewhere - category_state.ts? or hooks.ts - as long as HMR works
-
 export function useCategoryContour(props: CategoryContourProps) {
     const { id, parameter, category, fill, bandwidth, intensity, opacity } =
         props;
@@ -418,10 +416,4 @@ export function useLegacyDualContour(): ContourLayerProps[] {
     );
     //@ts-expect-error Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer'?
     return stableArray;
-}
-
-export function useDensityFieldContours() {
-    const config = useConfig();
-    const [cx, cy, ...densityFields] = useParamColumns();
-    // return useFieldContour({})
 }
