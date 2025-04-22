@@ -24,7 +24,8 @@ import type { ColumnName } from "@/charts/charts";
 import type { FeatureCollection } from "@turf/helpers";
 import { getEmptyFeatureCollection } from "./spatial_context";
 import type { BaseConfig } from "@/charts/BaseChart";
-import { type FieldSpec, type FieldSpecs, flattenFields } from "@/lib/columnTypeHelpers";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
 
 export type TooltipConfig = {
     tooltip: {
@@ -300,23 +301,28 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             if (!tooltipCols) return null;
             // return tooltipCols.getValue(data[i]);
             return tooltipCols.map((col) => {
-                    return `${col.name}: ${col.data ? col.getValue(data[i]) : "loading..."}`;
-            }).join("\n");
+                    return `<strong>${col.name}:</strong> ${col.data ? col.getValue(data[i]) : "loading..."}`;
+            });
         },
         [tooltipCols, data],
     );
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
-        //allow multicolumn with nice formatting
         () => {
             if (!config.tooltip.show) return null;
             if (!config.tooltip.column) return null;
-            // testing reading object properties --- pending further development
+            // testing reading object properties --- pending further development (for GeoJSON layer in particular)
+            // also consider some other things like transcripts / stats heatmap etc...
             // (not hardcoding DN property etc)
             // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
             const hoverInfo = hoverInfoRef.current;
             if (!hoverInfo || hoverInfo.index === -1) return null;
-            return getTooltipVal(hoverInfo.index);
+            const tooltipVal = getTooltipVal(hoverInfo.index);
+            if (!tooltipVal) return null;
+            const tooltip: TooltipContent = {
+                html: `<div>${tooltipVal.join("<br/>")}</div>`,
+            }
+            return tooltip;
         },
         [getTooltipVal, config.tooltip.show, config.tooltip.column],
     );
