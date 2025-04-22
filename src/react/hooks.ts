@@ -131,17 +131,19 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
  */
 export function useFieldSpecs(specs: FieldSpecs) {
     const chart = useChart();
-    // may consider different loading strategies later
-    // const [isLoaded, setIsLoaded] = useState(false);
+    // consider different loading strategies, lazy vs eager column data
+    //todo generic type with corresponding check when loaded
     const [columns, setColumns] = useState<DataColumn<any>[]>([]);
+    //I'm dubious about this...
+    // biome-ignore lint/correctness/useExhaustiveDependencies: specs is the same mobx observable, and re-runs effect if included in deps
     useEffect(() => {
         if (!specs) {
             setColumns([]);
             return;
         }
         return autorun(() => {
-            const fieldName = flattenFields(specs);
-            if (!fieldName) {
+            const fieldNames = flattenFields(specs);
+            if (!fieldNames) {
                 setColumns([]);
                 return;
             }
@@ -149,16 +151,14 @@ export function useFieldSpecs(specs: FieldSpecs) {
             // if this is less efficient than it could be with already loaded columns,
             // we could fix it upstream - although there'll always be some async...
             // but then that's generally the case with setState etc
-            cm.loadColumnSet(fieldName, chart.dataStore.name, () => {
+            // console.log("loading columns", fieldNames);
+            cm.loadColumnSet(fieldNames, chart.dataStore.name, () => {
                 const { columnIndex } = chart.dataStore;
-                const columns = fieldName.map((f) => columnIndex[f]).filter(notEmpty);
-                if (columns.length !== fieldName.length) {
-                    throw `some columns are not loaded?`;
-                }
+                const columns = fieldNames.map((f) => columnIndex[f]).filter(notEmpty);
                 setColumns(columns);
             });
         });
-    }, [specs, chart.dataStore]);
+    }, []);
     return columns;
 }
 export function useFieldSpec(spec?: FieldSpec) {

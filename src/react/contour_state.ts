@@ -98,7 +98,7 @@ export function useContour(props: ContourProps) {
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
     // so encapsulating things like getPosition might be useful.
     const [cx, cy] = useParamColumns();
-    const { column: contourParameter } = useFieldSpec(parameter) || { column: undefined };
+    const contourParameter = useFieldSpec(parameter);
     if (!contourParameter) {
         console.error(`Contour parameter '${parameter}' not found`);
         return undefined;
