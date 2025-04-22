@@ -1,16 +1,15 @@
 import DeckGL from "@deck.gl/react";
 import { OrthographicView, OrbitView } from '@deck.gl/core';
 import { observer } from "mobx-react-lite";
-import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns, useSimplerFilteredIndices } from "../hooks";
-import { ScatterplotLayer } from "@deck.gl/layers";
+import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns } from "../hooks";
+import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { useChart, useDataStore } from "../context";
+import { useChart } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
 import type { OrbitViewState } from "@deck.gl/core";
 import type { LoadedDataColumn } from "@/charts/charts";
-import { Axis, Scale } from "@visx/visx";
 import "../../charts/css/charts.css";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
@@ -110,6 +109,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
+    // biome-ignore lint/correctness/useExhaustiveDependencies: is2d && config.axis.x.size
     const margin = useMemo(() => (
         //todo better Axis/margin encapsulation - new hook
         //currently this is duplicated so that we have chartWidth/Height for the view
@@ -180,6 +180,26 @@ const DeckScatter = observer(function DeckScatterComponent() {
         extensions: [new DataFilterExtension()],
         visible: greyOnFilter,
     }), [cx, cy, cz, opacity, radiusScale, id, filterValue, data, greyOnFilter]);
+
+    const axisLinesLayer = useMemo(() => {
+        if (is2d) return null;
+        return new LineLayer({
+            id: `axis-lines-${id}`,
+            data: [
+                { sourcePosition: [0, 0, 0], targetPosition: [cx.minMax[1], 0, 0], color: [255, 0, 0] },
+                { sourcePosition: [0, 0, 0], targetPosition: [0, cy.minMax[1], 0], color: [0, 255, 0] },
+                { sourcePosition: [0, 0, 0], targetPosition: [0, 0, cz.minMax[1]], color: [0, 0, 255] },
+            ],
+            getSourcePosition: (d: any) => d.sourcePosition,
+            getTargetPosition: (d: any) => d.targetPosition,
+            getColor: (d: any) => d.color,
+            getWidth: 1,
+            updateTriggers: {
+                getSourcePosition: [cx.minMax, cy.minMax, cz.minMax],
+                getTargetPosition: [cx.minMax, cy.minMax, cz.minMax],
+            },
+        });
+    }, [is2d, id, cx.minMax, cy.minMax, cz?.minMax]);
     
     // we need an OrthographicView to prevent wrapping etc...
     // if in future we have subgraphs sharing a canvas, we will need to
@@ -203,7 +223,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
         });
     }, [chartWidth, chartHeight, config.dimension, id]);
     //! deck doesn't like it if we change the layers array - better to toggle visibility
-    const layers = [scatterplotLayer, greyScatterplotLayer, selectionLayer];
+    const layers = [scatterplotLayer, greyScatterplotLayer, selectionLayer, axisLinesLayer].filter(x => x !== null);
     
     // unproject used for updating ranges - may refactor hooks around this
     const unproject = useCallback((coords: [number, number]) => {
