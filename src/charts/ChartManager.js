@@ -1562,16 +1562,15 @@ export class ChartManager {
                     text: "Full Screen",
                     position: "bottom-right",
                 },
-                func: () => {
+                func: async () => {
                     //nb, not sure best way to access the actual div I want here
                     //this could easily break if the layout structure changes
                     // ds.contentDiv.parentElement.requestFullscreen();
                     if (!this.isFullscreen) {
-                        ds.menuBar.parentElement.requestFullscreen();
+                        await ds.menuBar.parentElement.requestFullscreen();
                     } else {
-                        document.exitFullscreen();
+                        await document.exitFullscreen();
                     }
-                    this.isFullscreen = !this.isFullscreen;
                 },
             },
             ds.menuBar,
@@ -1579,20 +1578,22 @@ export class ChartManager {
 
         document.addEventListener("fullscreenchange", () => {
             const iconEl = iconElement.querySelector("i");
-            
-            // Updating the icon
-            if (this.isFullscreen) {
-                if (iconEl) {
-                    iconEl.classList.remove("fa-expand");
-                    iconEl.classList.add("fa-compress");
+            if (document.fullscreenElement) {
+                if (ds.menuBar.parentElement === document.fullscreenElement) {
+                    if (iconEl) {
+                        iconEl.classList.remove("fa-expand");
+                        iconEl.classList.add("fa-compress");
+                    }
+                    iconElement.setAttribute("aria-label", "Exit Full Screen");
+                    this.isFullscreen = true;
                 }
-                iconElement.setAttribute("aria-label", "Exit Full Screen");
-            } else {
+             } else {
                 if (iconEl) {
                     iconEl.classList.remove("fa-compress");
                     iconEl.classList.add("fa-expand");
                 }
                 iconElement.setAttribute("aria-label", "Full Screen");
+                this.isFullscreen = false;
             }
         });
 

@@ -235,26 +235,27 @@ class BaseChart<T extends BaseConfig> {
             "fullscreenchange",
             action(() => {
                 //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
-                if (this.isFullscreen) {
-                    if (this.div !== document.fullscreenElement)
-                        console.error("unexpected fullscreen element");
-                    this.observable.container = this.div;
-                    const rect = window.screen;
-                    this.setSize(rect.width, rect.height);
-                    for (const d of this.dialogs) {
-                        d.setParent(this.contentDiv);
-                    }
-
-
-                    // Updating the icon
-                    if (this.fullscreenIcon) {
-                        const iconEl = this.fullscreenIcon.querySelector("i");
-                        if (iconEl) {
-                            iconEl.classList.remove("fa-expand");
-                            iconEl.classList.add("fa-compress");
+                if (this.__doc__.fullscreenElement) {
+                    if (this.div === this.__doc__.fullscreenElement) {
+                        this.observable.container = this.div;
+                        const rect = window.screen;
+                        this.setSize(rect.width, rect.height);
+                        for (const d of this.dialogs) {
+                            d.setParent(this.contentDiv);
                         }
-                        this.fullscreenIcon.setAttribute("aria-label", "Exit Full Screen");
+    
+    
+                        // Updating the icon
+                        if (this.fullscreenIcon) {
+                            const iconEl = this.fullscreenIcon.querySelector("i");
+                            if (iconEl) {
+                                iconEl.classList.remove("fa-expand");
+                                iconEl.classList.add("fa-compress");
+                            }
+                            this.fullscreenIcon.setAttribute("aria-label", "Exit Full Screen");
+                        }
                     }
+                    this.isFullscreen = true;
                 } else {
                     this.observable.container = this.__doc__.body;
                     this.setSize(...oldSize);
@@ -270,7 +271,8 @@ class BaseChart<T extends BaseConfig> {
                             iconEl.classList.add("fa-expand");
                         }
                         this.fullscreenIcon.setAttribute("aria-label", "Full Screen");
-                      }
+                    }
+                    this.isFullscreen = false;
                 }
             }),
         );
@@ -280,9 +282,8 @@ class BaseChart<T extends BaseConfig> {
                     oldSize = this.config.size;
                     await this.div.requestFullscreen();
                 } else {
-                    this.__doc__.exitFullscreen();
+                    await this.__doc__.exitFullscreen();
                 }
-                this.isFullscreen = !this.isFullscreen;
             },
         });
 
