@@ -280,7 +280,7 @@ class BaseChart<T extends BaseConfig> {
                     oldSize = this.config.size;
                     await this.div.requestFullscreen();
                 } else {
-                    document.exitFullscreen();
+                    this.__doc__.exitFullscreen();
                 }
                 this.isFullscreen = !this.isFullscreen;
             },
