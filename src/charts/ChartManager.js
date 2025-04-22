@@ -269,6 +269,7 @@ export class ChartManager {
         this.viewLoader = dataLoader.viewLoader;
 
         this.layoutMenus = {};
+        this.isFullscreen = false;
 
         if (dataLoader.files) {
             this.filesToLoad = dataLoader.files.length;
@@ -1554,7 +1555,7 @@ export class ChartManager {
     }
 
     _addFullscreenIcon(ds) {
-        createMenuIcon(
+        const iconElement = createMenuIcon(
             "fas fa-expand",
             {
                 tooltip: {
@@ -1565,11 +1566,36 @@ export class ChartManager {
                     //nb, not sure best way to access the actual div I want here
                     //this could easily break if the layout structure changes
                     // ds.contentDiv.parentElement.requestFullscreen();
-                    ds.menuBar.parentElement.requestFullscreen();
+                    if (!this.isFullscreen) {
+                        ds.menuBar.parentElement.requestFullscreen();
+                    } else {
+                        document.exitFullscreen();
+                    }
+                    this.isFullscreen = !this.isFullscreen;
                 },
             },
             ds.menuBar,
         );
+
+        document.addEventListener("fullscreenchange", () => {
+            const iconEl = iconElement.querySelector("i");
+            
+            // Updating the icon
+            if (this.isFullscreen) {
+                if (iconEl) {
+                    iconEl.classList.remove("fa-expand");
+                    iconEl.classList.add("fa-compress");
+                }
+                iconElement.setAttribute("aria-label", "Exit Full Screen");
+            } else {
+                if (iconEl) {
+                    iconEl.classList.remove("fa-compress");
+                    iconEl.classList.add("fa-expand");
+                }
+                iconElement.setAttribute("aria-label", "Full Screen");
+            }
+        });
+
     }
 
     /**

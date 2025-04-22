@@ -68,6 +68,8 @@ class BaseChart<T extends BaseConfig> {
     width = 0;
     height = 0;
     legend: any;
+    isFullscreen = false;
+    fullscreenIcon: HTMLSpanElement;
     // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
     activeQueries: ColumnQueryMapper<T>;
     /**
@@ -233,7 +235,7 @@ class BaseChart<T extends BaseConfig> {
             "fullscreenchange",
             action(() => {
                 //nb, debounced version of setSize also being called by gridstack - doesn't seem to cause any problems
-                if (document.fullscreenElement) {
+                if (this.isFullscreen) {
                     if (this.div !== document.fullscreenElement)
                         console.error("unexpected fullscreen element");
                     this.observable.container = this.div;
@@ -242,20 +244,45 @@ class BaseChart<T extends BaseConfig> {
                     for (const d of this.dialogs) {
                         d.setParent(this.contentDiv);
                     }
+
+
+                    // Updating the icon
+                    if (this.fullscreenIcon) {
+                        const iconEl = this.fullscreenIcon.querySelector("i");
+                        if (iconEl) {
+                            iconEl.classList.remove("fa-expand");
+                            iconEl.classList.add("fa-compress");
+                        }
+                        this.fullscreenIcon.setAttribute("aria-label", "Exit Full Screen");
+                    }
                 } else {
                     this.observable.container = this.__doc__.body;
                     this.setSize(...oldSize);
                     for (const d of this.dialogs) {
                         d.setParent(null);
                     }
-                    // this.contextMenu.__doc__ = document;
+
+                    // Updating the icon
+                    if (this.fullscreenIcon) {
+                        const iconEl = this.fullscreenIcon.querySelector("i");
+                        if (iconEl) {
+                            iconEl.classList.remove("fa-compress");
+                            iconEl.classList.add("fa-expand");
+                        }
+                        this.fullscreenIcon.setAttribute("aria-label", "Full Screen");
+                      }
                 }
             }),
         );
-        this.addMenuIcon("fas fa-expand", "fullscreen", {
+        this.fullscreenIcon = this.addMenuIcon("fas fa-expand", "Full Screen", {
             func: async () => {
-                oldSize = this.config.size;
-                await this.div.requestFullscreen();
+                if (!this.isFullscreen) {
+                    oldSize = this.config.size;
+                    await this.div.requestFullscreen();
+                } else {
+                    document.exitFullscreen();
+                }
+                this.isFullscreen = !this.isFullscreen;
             },
         });
 
