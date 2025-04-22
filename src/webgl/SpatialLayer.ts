@@ -27,18 +27,9 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
     renderLayers(): Layer<SpatialLayerProps> | LayersList {
         // order matters here, we should make a ui where we can easily control it
         return [
-            new ScatterplotLayer(
-                this.getSubLayerProps({
-                    ...this.props,
-                    // ...this.props was not including `data`, so we need to add it manually
-                    // How many more props are going to need manual intervention like this?
-                    // (could use something like Object.assign())
-                    // As this develops further, we probably don't want to be using the same props as ScatterplotLayer anyway;
-                    // sub-layers will be more explicit about what they need.
-                    data: this.props.data,
-                    id: "spatial.scatterplot",
-                }),
-            ),
+            // add 'grey-out' layer here... that implies a different type of data being passed.
+            // it might want to know about background_filter...
+
             // now we need more layers, using gaussian density.
             // consider trying to render density map at lower resolution, then upscaling on debounce.
             ...this.props.contourLayers
@@ -64,6 +55,18 @@ export default class SpatialLayer extends CompositeLayer<SpatialLayerProps> {
                         }
                     });
                 }),
+            new ScatterplotLayer(
+                this.getSubLayerProps({
+                    ...this.props,
+                    // ...this.props was not including `data`, so we need to add it manually
+                    // How many more props are going to need manual intervention like this?
+                    // (could use something like Object.assign())
+                    // As this develops further, we probably don't want to be using the same props as ScatterplotLayer anyway;
+                    // sub-layers will be more explicit about what they need.
+                    data: this.props.data,
+                    id: "spatial.scatterplot",
+                }),
+            ),
         ];
     }
 }

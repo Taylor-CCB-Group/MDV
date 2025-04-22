@@ -1,8 +1,9 @@
-import type { CategoricalDataType, DataColumn } from "@/charts/charts";
+import type { CategoricalDataType, DataColumn, LoadedDataColumn } from "@/charts/charts";
 import { useMemo } from "react";
 import {
     useCategoryFilterIndices,
     useConfig,
+    useFilteredIndices,
     useFieldSpec,
     useParamColumns,
 } from "./hooks";
@@ -13,7 +14,7 @@ import { useDebounce } from "use-debounce";
 /** need to be clearer on which prop types are for which parts of layer spec...
  *
  */
-export type ContourProps = {
+export type CategoryContourProps = {
     /** to be used as deck.gl sublayer id */
     id: string;
     /** the column - if not present, should we not filter the data? at the moment, we reduce to nothing
@@ -26,7 +27,14 @@ export type ContourProps = {
     intensity: number;
     opacity: number;
 };
-
+export type FieldContourProps = {
+    id: string;
+    fill: boolean;
+    bandwidth: number;
+    intensity: number;
+    opacity: number;
+    fields: DataColumn<CategoricalDataType>[];
+}
 function rgb(
     r: number,
     g: number,
@@ -91,7 +99,7 @@ function useColorRange(
 
 // this should be moved elsewhere - category_state.ts? or hooks.ts - as long as HMR works
 
-export function useContour(props: ContourProps) {
+export function useCategoryContour(props: CategoryContourProps) {
     const { id, parameter, category, fill, bandwidth, intensity, opacity } =
         props;
     // there's a possiblity that in future different layers of the same chart might draw from different data sources...
@@ -149,6 +157,78 @@ export function useContour(props: ContourProps) {
         opacity,
     ]);
 }
+export function useFieldContour(props: FieldContourProps) {
+    const { id, fill, bandwidth, intensity, opacity, fields } =
+        props;
+    // there's a possiblity that in future different layers of the same chart might draw from different data sources...
+    // so encapsulating things like getPosition might be useful.
+    const [cx, cy] = useParamColumns();
+    const data = useFilteredIndices();
+    // const getWeight = useContourWeight(contourParameter, category);
+    const colorRange = viridis;
+    //! const { zoom } = useViewerStore((store) => store.viewState) ?? { zoom: 0 };//throws
+    const zoom = 4;
+    // we can compensate so that we don't have radiusPixels, but it makes it very slow...
+    //won't be necessary when we implement heatmap differently
+    const [debounceZoom] = useDebounce(zoom, 500);
+
+    return useMemo(() => {
+        //If I return a layer here rather than props, will it behave as expected?
+        //not really - we want to pass this into getSublayerProps() so the id is used correctly
+        const radiusPixels = 30 * bandwidth * 2 ** debounceZoom;
+        // console.log('radiusPixels', radiusPixels);
+        // there is an issue of the scaling of these layers e.g. with images that have been resized...
+        // what is different about how we scale these layers vs other scatterplot layer?
+        return fields.map(({name, data: fieldData, minMax}) => ({
+            id: `${id}_${name}`,//if we base this id on index rather than name we might do some transitions
+            data,
+            opacity: fill ? intensity : 0,
+            contourOpacity: opacity,
+            getPosition: (
+                i: number,
+                { target }: { target: number[] | Float32Array },
+            ) => {
+                target[0] = cx.data[i];
+                target[1] = cy.data[i];
+                target[2] = 0;
+                return target;
+            },
+            getWeight: (i: number) => {
+                //potential for this to be animated in fun ways...
+                //phase shift for each field in shader...
+                
+                //normalization pending refactor/design
+                const [min, max] = minMax;
+                const range = max - min;
+                const value = fieldData[i];
+                if (value < min) return 0;
+                if (value > max) return 1;
+                const normalizedValue = (value - min) / range;
+                return normalizedValue;
+            },
+            colorRange,
+            radiusPixels,
+            debounce: 1000,
+            weightsTextureSize: 512, //there could be a performance related parameter to tweak
+            pickable: false,
+            updateTriggers: {
+                getWeight: [fieldData],
+            }
+        }));
+    }, [
+        id,
+        data,
+        intensity,
+        cx,
+        cy,
+        colorRange,
+        debounceZoom,
+        bandwidth,
+        fill,
+        opacity,
+        fields,
+    ]);
+}
 
 /** In future I think we want something more flexible & expressive,
  * but this should be somewhat compatible with the previous implementation
@@ -172,27 +252,39 @@ export function useLegacyDualContour() {
     const config = useConfig<DualContourLegacyConfig>();
     // todo: this is currently short-circuiting for non-viv deck scatter...
     // breaking rule of hooks etc, should be fixed
-    if (!config.contourParameter) return [];
     const commonProps = {
         parameter: config.contourParameter,
-        fill: config.contour_fill,
-        bandwidth: config.contour_bandwidth,
-        intensity: config.contour_intensity,
-        opacity: config.contour_opacity,
+        fill: config.contour_fill || true,
+        bandwidth: config.contour_bandwidth || 100,
+        intensity: config.contour_intensity || 0.1,
+        opacity: config.contour_opacity || 1,
     };
-    const contour1 = useContour({
+    const [cx, cy, ...fields] = useParamColumns() as LoadedDataColumn<"double">[];
+    const fieldContours = useFieldContour({
+        ...commonProps,
+        id: "fieldContours",
+        fields
+    });
+    if (!config.contourParameter) return fieldContours;
+    const contour1 = useCategoryContour({
         ...commonProps,
         id: "contour1",
         category: config.category1,
     });
-    const contour2 = useContour({
+    const contour2 = useCategoryContour({
         ...commonProps,
         id: "contour2",
         category: config.category2,
     });
     const stableArray = useMemo(
-        () => [contour1, contour2],
-        [contour1, contour2],
+        () => [contour1, contour2, ...fieldContours],
+        [contour1, contour2, fieldContours],
     );
     return stableArray;
+}
+
+export function useDensityFieldContours() {
+    const config = useConfig();
+    const [cx, cy, ...densityFields] = useParamColumns();
+    // return useFieldContour({})
 }
