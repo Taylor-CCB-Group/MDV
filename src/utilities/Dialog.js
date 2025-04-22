@@ -150,6 +150,8 @@ class BaseDialog {
     }
 
     getDialogContainer() {
+        // return full screen element if exists, else return body of the doc
+        // returning full screen element because the dialog should open in it's parent if if parent is opened in full screen
         return document.fullscreenElement || this.config.doc.body;
     }
 
@@ -173,7 +175,7 @@ class BaseDialog {
                 snapback: true,
             });
         } else {
-            this.this.getDialogContainer().append(this.outer);
+            this.getDialogContainer().append(this.outer);
             makeResizable(this.outer, {
                 doc: this.config.doc,
                 onresizeend: (x, y) => {
