@@ -77,6 +77,7 @@ export type ScatterPlotConfig3D = ScatterPlotConfig & {
 };
 
 export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
+    //default 10 may be closer to original charts, not necessarily the best
     course_radius: 1,
     radius: 10,
     opacity: 1,

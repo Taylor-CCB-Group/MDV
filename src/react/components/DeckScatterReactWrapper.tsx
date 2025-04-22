@@ -177,6 +177,7 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
 BaseChart.types["DeckScatter"] = {
     name: "2D Scatter Plot (new)",
     class: DeckScatterReact,
+    allow_user_add: false,
     params: [
         {
             type: "number",
@@ -190,6 +191,42 @@ BaseChart.types["DeckScatter"] = {
 };
 BaseChart.types["DeckScatter3D"] = {
     name: "3D Scatter Plot (new)",
+    class: DeckScatterReact,
+    allow_user_add: false,
+    params: [
+        {
+            type: "number",
+            name: "x axis",
+        },
+        {
+            type: "number",
+            name: "y axis",
+        },
+        {
+            type: "number",
+            name: "z axis",
+        },
+    ],
+    init: (config: ScatterPlotConfig) => {
+        config.dimension = "3d";
+    }
+};
+BaseChart.types["wgl_scatter_plot"] = {
+    name: "2D Scatter Plot",
+    class: DeckScatterReact,
+    params: [
+        {
+            type: "number",
+            name: "x axis",
+        },
+        {
+            type: "number",
+            name: "y axis",
+        },
+    ]
+};
+BaseChart.types["wgl_3d_scatter_plot"] = {
+    name: "3D Scatter Plot",
     class: DeckScatterReact,
     params: [
         {

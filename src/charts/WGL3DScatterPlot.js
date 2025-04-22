@@ -182,23 +182,23 @@ class WGL3DScatterPlot extends WGLChart {
     }
 }
 
-BaseChart.types["wgl_3d_scatter_plot"] = {
-    name: "3D Scatter Plot",
-    class: WGL3DScatterPlot,
-    params: [
-        {
-            type: "number",
-            name: "X axis",
-        },
-        {
-            type: "number",
-            name: "Y axis",
-        },
-        {
-            type: "number",
-            name: "Z axis",
-        },
-    ],
-};
+// BaseChart.types["wgl_3d_scatter_plot"] = {
+//     name: "3D Scatter Plot",
+//     class: WGL3DScatterPlot,
+//     params: [
+//         {
+//             type: "number",
+//             name: "X axis",
+//         },
+//         {
+//             type: "number",
+//             name: "Y axis",
+//         },
+//         {
+//             type: "number",
+//             name: "Z axis",
+//         },
+//     ],
+// };
 
 export default WGL3DScatterPlot;
