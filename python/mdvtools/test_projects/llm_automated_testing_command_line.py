@@ -37,7 +37,6 @@ from pydantic.v1 import BaseModel, Field
 import matplotlib
 matplotlib.use('Agg')  # Prevent GUI issues
 
-
 # ******************************************************
 # Get the directory of the current script
 mypath = os.path.dirname(__file__)
@@ -93,7 +92,9 @@ def setup_logging(log_file="mdv_llm.log"):
 
 def main(project_path, dataset_path, question_list_path, output_csv):
     logger = setup_logging()
-    load_dotenv()
+    #load_dotenv()
+    load_dotenv("python/mdvtools/llm/.env")
+
     
     logger.info("Crawling the local repository...")
     code_files_urls = crawl_local_repo()
