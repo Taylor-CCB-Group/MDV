@@ -16,7 +16,7 @@ export type RegisteredUser = {
 const useProjectShare = (projectId: string) => {
     const [email, setEmail] = useState("");
     const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
-    const [newUser, setNewUser] = useState<RegisteredUser>();
+    const [newUser, setNewUser] = useState<RegisteredUser | null>();
     const [userList, setUserList] = useState<RegisteredUser[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
@@ -41,30 +41,20 @@ const useProjectShare = (projectId: string) => {
 
             const data = await res.json();
 
-            if (data?.error) {
-                setError(data?.error);
-                return;
-            }
-
-            if (data?.status === "error") {
-                setErrorMsg(data?.message);
-                return;
-            }
-
             if (res.ok) {
                 if (data?.all_users) setUserList(data.all_users);
                 if (data?.shared_users) setSharedUsers(data.shared_users);
-                console.log("getAllUsers", data);
                 return;
             } else {
                 if (res.status === 403) {
                     setError(data?.error || "Forbidden: You are not allowed to perform this action.");
-                } else {
+                } else if (res.status === 500) {
                     setError(data?.error || "Internal Server Error");
+                } else {
+                    setError(data?.message || "An error occurred. Please try again.");
                 }
             }
 
-            setError(data?.message || "An error occurred. Please try again.");
         } catch (error) {
             setError("Error fetching user data. Please try again.");
         } finally {
@@ -89,17 +79,18 @@ const useProjectShare = (projectId: string) => {
             const data = await res.json();
 
             if (res.ok) {
-                console.log("addUser", res);
                 await getAllUsers();
+                return;
             } else {
                 if (res.status === 403) {
                     setError(data?.error || "Forbidden: You are not allowed to perform this action.");
-                } else {
+                } else if (res.status === 500) {
                     setError(data?.error || "Internal Server Error");
+                } else {
+                    setErrorMsg(data?.message || "An error occurred. Please try again.");
                 }
             }
 
-            setErrorMsg(data?.message || "An error occurred. Please try again.");
         } catch (error) {
             setErrorMsg("Error adding new user. Please try again.");
         } finally {
@@ -124,17 +115,18 @@ const useProjectShare = (projectId: string) => {
             const data = await res.json();
 
             if (res.ok) {
-                console.log("change user permission", res);
                 await getAllUsers();
+                return;
             } else {
                 if (res.status === 403) {
                     setError(data?.error || "Forbidden: You are not allowed to perform this action.");
-                } else {
+                } else if (res.status === 500) {
                     setError(data?.error || "Internal Server Error");
+                } else {
+                    setErrorMsg(data?.message || "An error occurred. Please try again.");
                 }
             }
 
-            setErrorMsg(data?.message || "An error occurred. Please try again.");
         } catch (error) {
             setErrorMsg("Error fetching user data. Please try again.");
         } finally {
@@ -157,17 +149,17 @@ const useProjectShare = (projectId: string) => {
             const data = await res.json();
 
             if (res.ok) {
-                console.log("delete user", res);
                 await getAllUsers();
+                return;
             } else {
                 if (res.status === 403) {
                     setError(data?.error || "Forbidden: You are not allowed to perform this action.");
                 } else {
                     setError(data?.error || "Internal Server Error");
                 }
+                setErrorMsg(data?.message || "An error occurred. Please try again.");
             }
 
-            setErrorMsg(data?.message || "An error occurred. Please try again.");
         } catch (error) {
             setErrorMsg("Error deleting user. Please try again.");
         } finally {

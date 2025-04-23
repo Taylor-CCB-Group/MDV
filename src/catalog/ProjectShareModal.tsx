@@ -24,6 +24,7 @@ import type React from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import useProjectShare, { type UserPermission, type RegisteredUser } from "./hooks/useProjectShare";
 import { useState } from "react";
+import { matchEmail } from "@/lib/utils";
 
 export interface ProjectShareModalProps {
     open: boolean;
@@ -51,7 +52,6 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
     const handleAddNewUser = async () => {
         if (newUser) {
             await addUser(newUser.id, "View");
-            console.log("new user", newUser);
             setEmail("");
             setNewUser(undefined);
         }
@@ -70,9 +70,11 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
     };
 
     const onChange = (user: RegisteredUser | null) => {
-        console.log("onchange", user);
         if (user) {
             setNewUser(user);
+        } else {
+            setNewUser(null);
+            setEmail("");
         }
     };
 
@@ -131,16 +133,35 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                         getOptionLabel={(option) => option.email}
                                         getOptionKey={(option) => option.id}
                                         noOptionsText={
-                                            <Box sx={{ p: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                                            <Box
+                                                sx={{
+                                                    p: 1,
+                                                    display: "flex",
+                                                    justifyContent: "center",
+                                                    alignItems: "center",
+                                                }}
+                                            >
                                                 <Typography variant="body2" color="textPrimary">
                                                     If it's a new user:
                                                 </Typography>
-                                                <Button variant="contained" size="small" sx={{ml: 1}} onClick={() => setOpenTextDialog(true)}>
+                                                <Button
+                                                    variant="contained"
+                                                    size="small"
+                                                    sx={{ ml: 1 }}
+                                                    onClick={() => setOpenTextDialog(true)}
+                                                >
                                                     Add New User
                                                 </Button>
                                             </Box>
                                         }
-                                        disableClearable
+                                        filterOptions={(options, state) => {
+                                            if (state.inputValue.length < 5) return [];
+                                            const input = state.inputValue.toLowerCase();
+                                            return options.filter((option) => {
+                                                const email = option.email.toLowerCase();
+                                                if (matchEmail(input, email)) return option;
+                                            });
+                                        }}
                                     />
                                     <Button
                                         variant="contained"
@@ -219,22 +240,18 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                 </DialogActions>
             </Dialog>
             {openTextDialog && (
-                <Dialog
-                    open={openTextDialog}
-                    onClose={() => setOpenTextDialog(false)}
-                    fullWidth
-                >
-                    <DialogContent dividers>
-                        <DialogContentText sx={{ display: "flex", height: "10vh", justifyContent: "center", alignItems: "center" }}>
-                            <Typography>Please contact the administrator:</Typography>
-                            <Typography sx={{ml: 1}} color="info">stephen.taylor@well.ox.ac.uk</Typography>
-                        </DialogContentText>
+                <Dialog open={openTextDialog} onClose={() => setOpenTextDialog(false)} fullWidth maxWidth="sm">
+                    <DialogContent
+                        dividers
+                        sx={{ display: "flex", height: "20vh", justifyContent: "center", alignItems: "center" }}
+                    >
+                        <Typography>Please contact the administrator:</Typography>
+                        <Typography sx={{ ml: 1 }} color="info">
+                            stephen.taylor@well.ox.ac.uk
+                        </Typography>
                     </DialogContent>
                     <DialogActions>
-                        <Button
-                            onClick={() => setOpenTextDialog(false)}
-                            color="primary"
-                        >
+                        <Button onClick={() => setOpenTextDialog(false)} color="primary">
                             OK
                         </Button>
                     </DialogActions>

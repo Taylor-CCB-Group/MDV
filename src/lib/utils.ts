@@ -65,3 +65,18 @@ export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
 //         v.map(v => `${v}!`);
 //     }
 // });
+
+/**
+ * Helper function to match two strings
+ * (Will update to more sophisticated matching algorithm in future)
+ */
+export function matchString(str1: string[], str2: string) {
+    return !str1.some(i => !str2.includes(i));
+}
+
+/**
+ * Helper function to match two emails, and check if both are same from the start
+ */
+export function matchEmail(str1: string, str2: string) {
+    return str2.includes(str1) && str2.startsWith(str1);
+}
