@@ -30,20 +30,22 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     const [cx, cy] = useParamColumns() as DataColumn<"double">[];
     const { dimension, viewState } = config;
     const is2d = dimension === "2d";
-    // biome-ignore lint/correctness/useExhaustiveDependencies: axis is never if dimension is 3d, hope to get rid of this
+    const xSize = is2d ? config.axis.x.size : 0;
+    const ySize = is2d ? config.axis.y.size : 0;
+
     const margin = useMemo(() => (
         is2d ? {
             top: 10,
             right: 10,
-            bottom: config.axis.x.size,
-            left: config.axis.y.size,
+            bottom: xSize,
+            left: ySize,
         } : {
             top: 0,
             right: 0,
             bottom: 0,
             left: 0,
         }
-    ), [is2d, is2d && config.axis.x.size, is2d && config.axis.y.size]);
+    ), [is2d, xSize, ySize]);
     const [width, height] = useChartSize();
     const chartWidth = width - margin.left - margin.right;
     //there could be a potential off-by-one/two error somewhere down the line
