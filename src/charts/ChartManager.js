@@ -269,6 +269,7 @@ export class ChartManager {
         this.viewLoader = dataLoader.viewLoader;
 
         this.layoutMenus = {};
+        this.isFullscreen = false;
 
         if (dataLoader.files) {
             this.filesToLoad = dataLoader.files.length;
@@ -1554,22 +1555,52 @@ export class ChartManager {
     }
 
     _addFullscreenIcon(ds) {
-        createMenuIcon(
+        const iconElement = createMenuIcon(
             "fas fa-expand",
             {
                 tooltip: {
                     text: "Full Screen",
                     position: "bottom-right",
                 },
-                func: () => {
+                func: async () => {
                     //nb, not sure best way to access the actual div I want here
                     //this could easily break if the layout structure changes
                     // ds.contentDiv.parentElement.requestFullscreen();
-                    ds.menuBar.parentElement.requestFullscreen();
+                    try {
+                        if (!this.isFullscreen) {
+                            await ds.menuBar.parentElement.requestFullscreen();
+                        } else {
+                            await document.exitFullscreen();
+                        }
+                    } catch (error) {
+                        console.error("fullscreen error caused: ", error);
+                    }
                 },
             },
             ds.menuBar,
         );
+
+        document.addEventListener("fullscreenchange", () => {
+            const iconEl = iconElement.querySelector("i");
+            if (document.fullscreenElement) {
+                if (ds.menuBar.parentElement === document.fullscreenElement) {
+                    if (iconEl) {
+                        iconEl.classList.remove("fa-expand");
+                        iconEl.classList.add("fa-compress");
+                    }
+                    iconElement.setAttribute("aria-label", "Exit Full Screen");
+                    this.isFullscreen = true;
+                }
+             } else {
+                if (iconEl) {
+                    iconEl.classList.remove("fa-compress");
+                    iconEl.classList.add("fa-expand");
+                }
+                iconElement.setAttribute("aria-label", "Full Screen");
+                this.isFullscreen = false;
+            }
+        });
+
     }
 
     /**

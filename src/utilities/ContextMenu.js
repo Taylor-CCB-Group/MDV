@@ -36,7 +36,7 @@ class ContextMenu {
         this.removeFunc = () => {
             this.remove();
         };
-        this._getDocument().body.addEventListener("click", this.removeFunc);
+        this._getDocument().addEventListener("click", this.removeFunc);
     }
 
     /**
@@ -49,7 +49,7 @@ class ContextMenu {
         }
         this.menus = [];
         if (this.removeFunc) {
-            this._getDocument().body.removeEventListener(
+            this._getDocument().removeEventListener(
                 "click",
                 this.removeFunc,
             );
@@ -65,17 +65,25 @@ class ContextMenu {
         for (const item of items) {
             this._addItem(menu, item, index);
         }
-        doc.body.append(menu);
+        doc.append(menu);
         const rect = menu.getBoundingClientRect();
-        if (left + rect.width > doc.body.clientWidth) {
-            left = doc.body.clientWidth - rect.width - 3;
+        if (left + rect.width > doc.clientWidth) {
+            left = doc.clientWidth - rect.width - 3;
         }
         menu.style.left = `${left}px`;
         menu.style.top = `${top}px`;
         this.menus.push(menu);
     }
+
     _getDocument() {
-        return this.__doc__ ? this.__doc__ : document;
+        // return full screen element if exists else return body of doc
+        // returning full screen element because the context menu should open in it's parent if parent is opened in full screen
+        if (document.fullscreenElement) {
+            return document.fullscreenElement;
+        } else if (this.__doc__) {
+            return this.__doc__.body;
+        }
+        return document.body;
     }
 
     _showSubmenu(el, subitems, index) {
