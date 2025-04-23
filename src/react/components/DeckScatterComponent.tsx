@@ -116,8 +116,8 @@ const DeckScatter = observer(function DeckScatterComponent() {
         is2d ? {
             top: 10,
             right: 10,
-            bottom: config.axis.x.size,
-            left: config.axis.y.size,
+            bottom: config.axis.x.size + 20,
+            left: config.axis.y.size + 20,
         } : {
             top: 0,
             right: 0,
@@ -126,10 +126,10 @@ const DeckScatter = observer(function DeckScatterComponent() {
         }
     ), [is2d, is2d && config.axis.x.size, is2d && config.axis.y.size]);
     const chartWidth = width - margin.left - margin.right;
-    //there could be a potential off-by-one/two/'some fraction depending on phase of moon' error
-    //if we don't fully understand reasons for `- 3.5` here (which we don't).
+    //there could be a potential off-by-one/two error somewhere down the line
+    //if we don't fully understand reasons for `- 2` here.
     //prevents overlapping with x-axis.
-    const chartHeight = height - margin.top - margin.bottom - 3.5;
+    const chartHeight = height - margin.top - margin.bottom - 2;
     useZoomOnFilter(data);
 
     const greyOnFilter = on_filter === "grey";
