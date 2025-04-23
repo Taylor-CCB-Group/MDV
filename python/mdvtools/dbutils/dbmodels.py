@@ -69,7 +69,7 @@ class UserProject(db.Model):
     can_write = db.Column(db.Boolean, nullable=False, default=False)
     is_owner = db.Column(db.Boolean, nullable=False, default=False)
 
-    def __init__(self, user_id, project_id, is_owner=False, can_read=False, can_write=False):
+    def __init__(self, user_id, project_id, is_owner=False, can_read=None, can_write=False):
         self.user_id = user_id
         self.project_id = project_id
         self.is_owner = is_owner
@@ -78,8 +78,11 @@ class UserProject(db.Model):
             self.can_read = True
             self.can_write = True
         else:
-            self.can_read = can_read
             self.can_write = can_write
+            if can_read is not None:
+                self.can_read = can_read
+            else:
+                self.can_read = can_write
 
 class Genome(db.Model):
     __tablename__ = 'genomes'

@@ -1,6 +1,6 @@
 # project_service.py
 
-from mdvtools.dbutils.dbmodels import db, Project, File
+from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject
 from datetime import datetime
 
 class ProjectService:
@@ -252,3 +252,127 @@ class FileService:
             db.session.rollback()  # Rollback session on error
             return False
 
+
+class UserService:
+    @staticmethod
+    def add_or_update_user(email: str, auth0_id: str = None, first_name: str = None, last_name: str = None, institution: str = None):
+        """
+        Adds a new user or updates an existing user based on the provided email.
+
+        :param email: User's email address (mandatory).
+        :param auth0_id: User's Auth0 ID (optional).
+        :param first_name: User's first name (optional).
+        :param last_name: User's last name (optional).
+        :param institution: User's institution or association (optional).
+        :return: The created or updated User object.
+        """
+        try:
+            if not email:
+                raise ValueError("Email is required.")
+
+            user = User.query.filter_by(email=email).first()
+
+            if user:
+                # Update existing user with provided non-empty fields
+                if auth0_id:
+                    user.auth0_id = auth0_id
+                if first_name:
+                    user.first_name = first_name
+                if last_name:
+                    user.last_name = last_name
+                if institution:
+                    user.institution = institution
+                db.session.commit()
+                return user
+            else:
+                # Create new user with provided fields
+                new_user = User(
+                    email=email,
+                    auth0_id=auth0_id or '',
+                    first_name=first_name or '',
+                    last_name=last_name or '',
+                    institution=institution,
+                    confirmed_at=datetime.utcnow(),
+                    is_active=True,
+                    password='',  # Set to empty string or handle as per your authentication mechanism
+                    administrator=False,
+                    is_admin=False
+                )
+                db.session.add(new_user)
+                db.session.commit()
+                return new_user
+
+        except Exception as e:
+            print(f"Error in UserService: Failed to add or update user: {e}")
+            raise
+
+
+class UserProjectService:
+    @staticmethod
+    def add_or_update_user_project(user_id: int, project_id: int, is_owner: bool = False, can_write: bool = False):
+        """
+        Adds a new user-project relationship or updates an existing one.
+        Permission logic:
+        - If is_owner is True, can_read and can_write are set to True.
+        - If can_write is True (and is_owner is False), can_read is set to True.
+        - If neither is_owner nor can_write is True, can_read is set to True.
+        """
+        try:
+            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+
+            if user_project:
+                user_project.is_owner = is_owner
+
+                if is_owner:
+                    user_project.can_read = True
+                    user_project.can_write = True
+                else:
+                    user_project.can_write = can_write
+                    user_project.can_read = True  # Default to True
+
+                db.session.commit()
+                return user_project
+            else:
+                # Apply permission logic before creating
+                if is_owner:
+                    can_read = True
+                    can_write = True
+                elif can_write:
+                    can_read = True
+                else:
+                    can_read = True  # Default to True
+
+                new_user_project = UserProject(
+                    user_id=user_id,
+                    project_id=project_id,
+                    is_owner=is_owner,
+                    can_read=can_read,
+                    can_write=can_write
+                )
+                db.session.add(new_user_project)
+                db.session.commit()
+                return new_user_project
+
+        except Exception as e:
+            print(f"Error in UserProjectService: Failed to add/update user-project entry: {e}")
+            raise
+
+    @staticmethod
+    def get_user_project_permissions(user_id: int, project_id: int) -> dict:
+        """
+        Returns the permission info (can_read, can_write, is_owner) for the given user and project.
+        """
+        try:
+            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+            if not user_project:
+                return {"can_read": False, "can_write": False, "is_owner": False}
+
+            return {
+                "can_read": user_project.can_read,
+                "can_write": user_project.can_write,
+                "is_owner": user_project.is_owner
+            }
+
+        except Exception as e:
+            print(f"Error in UserProjectService: Failed to get permissions: {e}")
+            raise
