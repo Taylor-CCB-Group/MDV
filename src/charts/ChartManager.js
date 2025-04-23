@@ -1398,23 +1398,6 @@ export class ChartManager {
             });
     }
 
-    _addLinkIcon(ds, ds_to, link) {
-        createMenuIcon(
-            "fas fa-plus-square",
-            {
-                tooltip: {
-                    text: `Add ${link.name}`,
-                    position: "bottom-right",
-                },
-                func: () => {
-                    // new BaseDialog.experiment["AddColumnsFromRows"](ds, ds_to, link, this);
-                    new AddColumnsFromRowsDialog(ds, ds_to, link, this);
-                },
-            },
-            ds.menuBar,
-        );
-    }
-
     /**
      * @param {{dataStore: DataStore}} ds
      */
@@ -1492,18 +1475,6 @@ export class ChartManager {
             new BaseDialog.experiment["AnnotationDialogReact"](ds.dataStore);
         });
 
-        if (dataStore.links) {
-            for (const ods in dataStore.links) {
-                const link = dataStore.links[ods];
-                if (link.rows_as_columns) {
-                    this._addLinkIcon(
-                        ds,
-                        this.dsIndex[ods],
-                        link.rows_as_columns,
-                    );
-                }
-            }
-        }
         const idiv = createEl(
             "div",
             {
