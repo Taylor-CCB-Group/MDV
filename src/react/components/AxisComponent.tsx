@@ -2,7 +2,7 @@ import { observer } from "mobx-react-lite";
 import type { AxisConfig, ScatterPlotConfig2D, ScatterPlotConfig3D } from "../scatter_state";
 import type { DataColumn } from "@/charts/charts";
 import { useChartSize, useParamColumns } from "../hooks";
-import { useMemo, type PropsWithChildren } from "react";
+import { useLayoutEffect, useMemo, useState, type PropsWithChildren } from "react";
 import * as Axis from "@visx/axis";
 import * as Scale from "@visx/scale";
 
@@ -26,7 +26,8 @@ function getLabelProps(axisConfig?: AxisConfig) {
     });
 }
 
-export default observer(function AxisComponent({ config, unproject, children }: AxisComponentProps) {
+// todo export this & avoid duplication in DeckScatterComponent, need a little bit of a refactor for right props
+function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
     const [cx, cy] = useParamColumns() as DataColumn<"double">[];
     const { dimension, viewState } = config;
     const is2d = dimension === "2d";
@@ -53,24 +54,26 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     //prevents overlapping with x-axis.
     const chartHeight = height - margin.top - margin.bottom - 2;
 
-    // axes need to respond to the viewState... (make sure there isn't a regression here when refactoring etc).
-    const ranges = useMemo(() => {
+    const [ranges, setRanges] = useState({ domainX: cx.minMax, domainY: cy.minMax });
+
+    // Run synchronously after layout/before paint
+    useLayoutEffect(() => {
         viewState;
         // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
         try {
             const p = unproject([0, 0]);
             const p2 = unproject([chartWidth, chartHeight]);
-            const domainX = [p[0], p2[0]];
-            const domainY = [p2[1], p[1]];
-            return { domainX, domainY };
+            setRanges({
+                domainX: [p[0], p2[0]],
+                domainY: [p2[1], p[1]],
+            });
         } catch (e) {
+            // Fallback to data ranges
             // console.warn("AxisComponent: unproject failed", e);
-            return { domainX: cx.minMax, domainY: cy.minMax };
+            setRanges({ domainX: cx.minMax, domainY: cy.minMax });
         }
-    }, [cx.minMax, cy.minMax, viewState, chartWidth, chartHeight, unproject]);
-    // * as of now, we only use these scales for the axes,
-    // but we should consider how they might relate to data transformation
-    //! todo - check state, one frame behind?
+    }, [viewState, chartWidth, chartHeight, unproject, cx.minMax, cy.minMax]);
+
     const scaleX = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainX, // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
@@ -80,6 +83,16 @@ export default observer(function AxisComponent({ config, unproject, children }: 
         range: [chartHeight + margin.top, margin.top],
     }), [chartHeight, ranges, margin.top]);
 
+    return { ranges, margin, chartWidth, chartHeight, scaleX, scaleY };
+}
+
+export default observer(function AxisComponent({ config, unproject, children }: AxisComponentProps) {
+    const [cx, cy] = useParamColumns() as DataColumn<"double">[];
+    const { dimension } = config;
+    const is2d = dimension === "2d";
+    const [width, height] = useChartSize();
+    const { scaleX, scaleY, margin, chartWidth, chartHeight } = useSynchronizedScales({ config, unproject });
+    
     const deckStyle = useMemo(() => ({
         position: "absolute",
         top: margin.top,
