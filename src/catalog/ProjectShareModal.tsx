@@ -24,7 +24,7 @@ import type React from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import useProjectShare, { type UserPermission, type RegisteredUser } from "./hooks/useProjectShare";
 import { useState } from "react";
-import { matchString } from "@/lib/utils";
+import { matchEmail } from "@/lib/utils";
 
 export interface ProjectShareModalProps {
     open: boolean;
@@ -155,11 +155,11 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                             </Box>
                                         }
                                         filterOptions={(options, state) => {
-                                            if (!state.inputValue) return [];
-                                            const input = state.inputValue.toLowerCase().split(" ").filter(Boolean);
+                                            if (state.inputValue.length < 5) return [];
+                                            const input = state.inputValue.toLowerCase();
                                             return options.filter((option) => {
                                                 const email = option.email.toLowerCase();
-                                                if (matchString(input, email)) return option;
+                                                if (matchEmail(input, email)) return option;
                                             });
                                         }}
                                     />
