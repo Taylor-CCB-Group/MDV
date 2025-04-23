@@ -17,28 +17,6 @@ const SaveAsViewDialogComponent = (props: {
         props.onClose();
     }, [viewManager, viewName, props]);
 
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (!props.open) return; //probably doesn't happen, but no harm to check
-            if (event.key === "y") {
-                event.preventDefault();
-                onSaveAs();
-                props.onClose();
-            }
-            if (event.key === "n") {
-                event.preventDefault();
-                props.onClose();
-            }            
-        };
-
-        // seems ok to use window here since this is a modal dialog
-        // saves faffing about with refs
-        window.addEventListener("keydown", handleKeyDown);
-        return () => {
-            window.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [props, onSaveAs, props.open]);
-
     return (
         <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
             <DialogTitle>Save View As...</DialogTitle>
