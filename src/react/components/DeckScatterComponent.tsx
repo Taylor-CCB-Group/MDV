@@ -109,22 +109,24 @@ const DeckScatter = observer(function DeckScatterComponent() {
     //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
     const radiusScale = useScatterRadius();
     //todo colorBy should be done differently (also bearing in mind multiple layers)
-    // biome-ignore lint/correctness/useExhaustiveDependencies: is2d && config.axis.x.size
+    
+    //todo this shouldn't be repeated here and in AxisComponent
+    const xSize = is2d ? config.axis.x.size : 0;
+    const ySize = is2d ? config.axis.y.size : 0;
+
     const margin = useMemo(() => (
-        //todo better Axis/margin encapsulation - new hook
-        //currently this is duplicated so that we have chartWidth/Height for the view
         is2d ? {
             top: 10,
             right: 10,
-            bottom: config.axis.x.size,
-            left: config.axis.y.size,
+            bottom: xSize,
+            left: ySize,
         } : {
             top: 0,
             right: 0,
             bottom: 0,
             left: 0,
         }
-    ), [is2d, is2d && config.axis.x.size, is2d && config.axis.y.size]);
+    ), [is2d, xSize, ySize]);
     const chartWidth = width - margin.left - margin.right;
     //there could be a potential off-by-one/two error somewhere down the line
     //if we don't fully understand reasons for `- 3.5` here.

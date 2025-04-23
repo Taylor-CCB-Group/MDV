@@ -40,6 +40,13 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         // there is probably a less confusing way of writing this...
         //! originalConfig.dimension may be undefined, which lead to a bug with axis settings & broken charts
         // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
+        if (originalConfig.type === "wgl_3d_scatter_plot") {
+            //! charts loaded from other configs may not have a dimension set
+            originalConfig.dimension = "3d";
+            if (originalConfig.course_radius === undefined) {
+                originalConfig.course_radius = 10;
+            }
+        }
         const axisDefaults = originalConfig.dimension !== "3d" ? {axis: scatterAxisDefaults} : {};
         const config = { ...scatterDefaults, ...axisDefaults, ...defaultViewState, ...originalConfig };
         super(dataStore, div, config, MainChart);
@@ -242,6 +249,8 @@ BaseChart.types["wgl_3d_scatter_plot"] = {
         },
     ],
     init: (config: ScatterPlotConfig) => {
+        //! charts loaded from other configs may not have a dimension set
+        // and won't pass through the init function
         config.dimension = "3d";
     }
 };
