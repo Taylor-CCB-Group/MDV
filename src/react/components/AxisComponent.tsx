@@ -58,6 +58,7 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
 
     // Run synchronously after layout/before paint
     useLayoutEffect(() => {
+        //! not reacting to changes from useZoomOnFilter()...
         viewState;
         // first time around, we get an exception because scatterplotLayer hasn't been rendered yet
         try {
