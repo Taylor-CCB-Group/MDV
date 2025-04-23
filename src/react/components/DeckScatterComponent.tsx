@@ -57,9 +57,26 @@ function useZoomOnFilter(data: Uint32Array) {
             chart.ignoreStateUpdate = true;
             chart.pendingRecenter = false;
             const oldViewState = config.viewState;
+            
+            // Calculate range
+            const dx = maxX - minX;
+            const dy = maxY - minY;
+
+            // Use relative epsilon based on data scale or absolute minimum
+            const epsilon = Math.max(1e-9, Math.min(Math.abs(minX), Math.abs(maxX)) * 1e-6);
+            const safeDx = Math.max(epsilon, dx);
+            const safeDy = Math.max(epsilon, dy);
+
+            // Calculate zoom with fallback and NaN check
+            let zoom = Math.log2(Math.min(width / safeDx, height / safeDy)) - 0.2;
+            if (!Number.isFinite(zoom)) {
+                console.warn("Invalid zoom value detected, using fallback");
+                zoom = 0; // Default zoom fallback
+            }
+
             config.viewState = {
                 target: [(minX + maxX) / 2, (minY + maxY) / 2, 0],
-                zoom: Math.log2(Math.min(width / (maxX - minX), height / (maxY - minY))) - 0.2,
+                zoom,
                 // any kind of interpolator would probably mean changing how we handle viewState
                 // transitionInterpolator: new FlyToInterpolator({speed: 1.2}),
             };

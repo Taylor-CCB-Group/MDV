@@ -75,11 +75,11 @@ function useSynchronizedScales({ config, unproject }: AxisComponentProps) {
     }, [viewState, chartWidth, chartHeight, unproject, cx.minMax, cy.minMax]);
 
     const scaleX = useMemo(() => Scale.scaleLinear({
-        domain: ranges.domainX, // e.g. [min, max]
+        domain: ranges.domainX.sort(), // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
     }), [chartWidth, ranges, margin.left]);
     const scaleY = useMemo(() => Scale.scaleLinear({
-        domain: ranges.domainY, // e.g. [min, max]
+        domain: ranges.domainY.sort(), // e.g. [min, max]
         range: [chartHeight + margin.top, margin.top],
     }), [chartHeight, ranges, margin.top]);
 
