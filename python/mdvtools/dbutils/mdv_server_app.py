@@ -14,6 +14,8 @@ from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project, User, UserProject
+from mdvtools.dbutils.filesystem_watcher import start_watching
+import threading
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService, UserService, UserProjectService
 
@@ -1708,6 +1710,10 @@ with app.app_context():
     serve_projects_from_db(app)
     print("Starting - create_projects_from_filesystem")
     serve_projects_from_filesystem(app, app.config['projects_base_dir'])
+
+    watcher_thread = threading.Thread(target=start_watching, args=(app, app.config['projects_base_dir']))
+    watcher_thread.daemon = True
+    watcher_thread.start()
 
 if __name__ == '__main__':
     print("In main..")
