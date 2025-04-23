@@ -32,7 +32,6 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     const is2d = dimension === "2d";
     // biome-ignore lint/correctness/useExhaustiveDependencies: axis is never if dimension is 3d, hope to get rid of this
     const margin = useMemo(() => (
-        //todo better Axis encapsulation in another component
         is2d ? {
             top: 10,
             right: 10,
