@@ -19,9 +19,10 @@ const MainChart = observer(() => {
 
 export type DeckScatterConfig = ScatterPlotConfig2D | ScatterPlotConfig3D;
 const defaultViewState = {
-        viewState: {
+    viewState: {
         target: [0, 0, 0],
         zoom: 0,
+        /** not expected to be user-tweakable as of this writing */
         minZoom: -50,
     }
 }
@@ -39,8 +40,8 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
         // there is probably a less confusing way of writing this...
         //! originalConfig.dimension may be undefined, which lead to a bug with axis settings & broken charts
         // so if it is explicitly "3d", we have no axis settings, otherwise it will be "2d" | undefined
-        const defaults = originalConfig.dimension !== "3d" ? {axis: scatterAxisDefaults} : {};
-        const config = { ...scatterDefaults, ...defaults, ...defaultViewState, ...originalConfig };
+        const axisDefaults = originalConfig.dimension !== "3d" ? {axis: scatterAxisDefaults} : {};
+        const config = { ...scatterDefaults, ...axisDefaults, ...defaultViewState, ...originalConfig };
         super(dataStore, div, config, MainChart);
         if (!originalConfig.viewState) this.pendingRecenter = true;
         //@ts-expect-error - pending colorBy type fix
@@ -78,13 +79,11 @@ class DeckScatterReact extends BaseReactChart<DeckScatterConfig> {
             target: c.viewState.target,
             zoom: c.viewState.zoom,
         }
-        // we should be able to make use of discriminated type here
         if (c.dimension === "3d") {
-            const v = c.viewState as OrbitViewState;
-            //@ts-expect-error - need to think about viewState types...
-            viewState["rotationOrbit"] = v.rotationOrbit;
-            //@ts-expect-error - need to think about viewState types...
-            viewState["rotationX"] = v.rotationX;
+            const v = c.viewState;
+            const orbitSerialized = viewState as OrbitViewState;
+            orbitSerialized.rotationOrbit = v.rotationOrbit;
+            orbitSerialized.rotationX = v.rotationX;
         }
         return { ...c, viewState };
     }
