@@ -1,5 +1,5 @@
 import { g } from "@/lib/utils";
-import { AxisConfig, ScatterPlotConfig2D } from "@/react/scatter_state";
+import type { AxisConfig, ScatterPlotConfig2D } from "@/react/scatter_state";
 
 // premature abstraction?
 const axisNames = {

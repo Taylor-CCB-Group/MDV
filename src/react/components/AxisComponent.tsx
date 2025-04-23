@@ -36,8 +36,8 @@ export default observer(function AxisComponent({ config, unproject, children }: 
         is2d ? {
             top: 10,
             right: 10,
-            bottom: config.axis.x.size + 20,
-            left: config.axis.y.size + 20,
+            bottom: config.axis.x.size,
+            left: config.axis.y.size,
         } : {
             top: 0,
             right: 0,
@@ -69,6 +69,7 @@ export default observer(function AxisComponent({ config, unproject, children }: 
     }, [cx.minMax, cy.minMax, viewState, chartWidth, chartHeight, unproject]);
     // * as of now, we only use these scales for the axes,
     // but we should consider how they might relate to data transformation
+    //! todo - check state, one frame behind?
     const scaleX = useMemo(() => Scale.scaleLinear({
         domain: ranges.domainX, // e.g. [min, max]
         range: [margin.left, chartWidth + margin.left],
@@ -103,12 +104,15 @@ export default observer(function AxisComponent({ config, unproject, children }: 
                         fill: "var(--text_color)",
                         fontSize: config.axis.x.tickfont,
                         textAnchor: "middle",
+                        // for some reason, tickfont triggers a re-render but rotate_labels doesn't
+                        angle: config.axis.x.rotate_labels ? -45 : 0,
                     })}
                     labelProps={{
                         fill: "var(--text_color)",
                         fontSize: config.axis.x.tickfont,
                         textAnchor: "middle",
                     }}
+                    labelOffset={0}
                     label={cx.name}
                 />
                 <Axis.AxisLeft
@@ -120,12 +124,13 @@ export default observer(function AxisComponent({ config, unproject, children }: 
                         fill: "var(--text_color)",
                         fontSize: config.axis.y.tickfont,
                         textAnchor: "end",
+                        angle: config.axis.y.rotate_labels ? -45 : 0,
                     })}
                     labelProps={{
                         fill: "var(--text_color)",
                         fontSize: config.axis.y.tickfont,
                     }}
-                    labelOffset={30}
+                    labelOffset={20}
                     label={cy.name}
                 />
             </svg>}        
