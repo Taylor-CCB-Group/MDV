@@ -135,6 +135,7 @@ export const useImage = (
     }, [source, history]); // eslint-disable-line react-hooks/exhaustive-deps
     // biome-ignore lint/correctness/useExhaustiveDependencies: suppressed in viv as well, and would cause a bunch of re-running...
     useEffect(() => {
+        if (!metadata) return;
         const changeSettings = async () => {
             // Placeholder
             viewerStore.setState({ isChannelLoading: [true] });

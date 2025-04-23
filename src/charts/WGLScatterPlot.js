@@ -730,19 +730,19 @@ class WGLScatterPlot extends WGLChart {
     }
 }
 
-BaseChart.types["wgl_scatter_plot"] = {
-    name: "2D Scatter Plot",
-    class: WGLScatterPlot,
-    params: [
-        {
-            type: "number",
-            name: "X axis",
-        },
-        {
-            type: "number",
-            name: "Y axis",
-        },
-    ],
-};
+// BaseChart.types["wgl_scatter_plot"] = {
+//     name: "2D Scatter Plot",
+//     class: WGLScatterPlot,
+//     params: [
+//         {
+//             type: "number",
+//             name: "X axis",
+//         },
+//         {
+//             type: "number",
+//             name: "Y axis",
+//         },
+//     ],
+// };
 
 export default WGLScatterPlot;

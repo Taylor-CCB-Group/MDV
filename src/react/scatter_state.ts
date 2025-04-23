@@ -1,11 +1,11 @@
 import type { Matrix4 } from "@math.gl/core";
-import type { PickingInfo } from "@deck.gl/core";
-import type { ScatterPlotConfig } from "./components/VivMDVReact";
+import type { OrbitViewState, OrthographicViewState, PickingInfo } from "@deck.gl/core";
 import { useChart } from "./context";
 import {
     useChartID,
     useChartSize,
     useConfig,
+    useFieldSpecs,
     useFilteredIndices,
     useParamColumns,
 } from "./hooks";
@@ -19,7 +19,99 @@ import {
     ScatterDensityExension,
 } from "../webgl/ScatterDeckExtension";
 import { useHighlightedIndex } from "./selectionHooks";
-import { useLegacyDualContour } from "./contour_state";
+import { type DualContourLegacyConfig, useLegacyDualContour } from "./contour_state";
+import type { ColumnName } from "@/charts/charts";
+import type { FeatureCollection } from "@turf/helpers";
+import { getEmptyFeatureCollection } from "./spatial_context";
+import type { BaseConfig } from "@/charts/BaseChart";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
+import type { TooltipContent } from "@deck.gl/core/dist/lib/tooltip";
+
+export type TooltipConfig = {
+    tooltip: {
+        show: boolean;
+        column?: FieldSpecs | FieldSpec;
+    };
+};
+export type AxisConfig = {
+    size: number;
+    tickfont: number;
+    rotate_labels: boolean;
+};
+export type AxisConfig2D = {
+    x: AxisConfig;
+    y: AxisConfig;
+};
+export type CategoryFilter = {
+    column: ColumnName;
+    category: string | string[];
+    // consider properties like 'invert' or 'exclude', or 'color'...
+};
+//viewState should be persisted... maybe a way of saving different snapshots?
+//now using MobX for this, in a way that's common to viv & non-viv charts
+export type ScatterPlotConfig = {
+    course_radius: number;
+    radius: number;
+    opacity: number;
+    // color_by: ColumnName;
+    // color_legend: {
+    //     display: boolean;
+    //     // todo: add more options here...
+    // };
+    category_filters: Array<CategoryFilter>;
+    on_filter: "hide" | "grey", //todo...
+    zoom_on_filter: boolean;
+    point_shape: "circle" | "square" | "gaussian";
+    dimension: "2d" | "3d";
+    selectionFeatureCollection: FeatureCollection;
+} & TooltipConfig & DualContourLegacyConfig & BaseConfig;
+
+export type ScatterPlotConfig2D = ScatterPlotConfig & {
+    dimension: "2d";
+    axis: AxisConfig2D;
+    viewState: OrthographicViewState;
+};
+export type ScatterPlotConfig3D = ScatterPlotConfig & {
+    dimension: "3d";
+    viewState: OrbitViewState;
+};
+
+export const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
+    //default 10 may be closer to original charts, not necessarily the best
+    course_radius: 1,
+    radius: 10,
+    opacity: 1,
+    // color_by: null,
+    // color_legend: {
+    //     display: false,
+    // },
+    tooltip: {
+        show: false,
+    },
+    category_filters: [],
+    zoom_on_filter: false,
+    point_shape: "circle",
+    contour_fill: false,
+    contour_bandwidth: 0.1,
+    contour_intensity: 1,
+    contour_opacity: 0.5,
+    dimension: "2d",
+    on_filter: "hide", //safer in case of large datasets
+    selectionFeatureCollection: getEmptyFeatureCollection(),
+};
+
+export const scatterAxisDefaults: AxisConfig2D = {
+    x: {
+        rotate_labels: false,
+        size: 20,
+        tickfont: 10,
+    },
+    y: {
+        rotate_labels: false,
+        size: 40,
+        tickfont: 10,
+    },
+}
 
 export function useRegionScale() {
     const metadata = useMetadata();
@@ -36,9 +128,10 @@ export function useRegionScale() {
         console.warn(
             `physical size unit mismatch ${Pixels.PhysicalSizeXUnit} !== ${regionUnit}`,
         );
-    if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
+    // if (!Pixels.PhysicalSizeX) throw new Error("missing physical size");
+    if (!Pixels.PhysicalSizeX) return 1;
     const scale = Pixels.PhysicalSizeX / regionScale;
-    return scale;
+    return Number.isFinite(scale) ? scale : 1;
 }
 
 
@@ -128,19 +221,64 @@ function useZoomOnFilter(modelMatrix: Matrix4) {
     return viewState;
 }
 
+/**
+ * If we are in a 'region' then we might have some notion of physical size.
+ * If we are rendering abstract data, then we should probably have a normalised size
+ * with respect to the domain of the data.
+ * If we have very different scales in x and y, then we probably want to also scale each axis
+ * rather than assuming a 1:1 ratio - somewhat related concern... also need to consider that
+ * we still want circular points to be circular...
+ * 
+ * Also note that we would like in future to be able to set the size of individual points
+ * based on some property of the data - but for now we just return a number.
+ */
+export function useScatterRadius() {
+    const config = useConfig<ScatterPlotConfig>();
+    const params = useParamColumns();
+    const [cx, cy] = params;
+    const scale = useRegionScale();
+    const { radius, course_radius } = config;
+    //todo more clarity on radius units - but large radius was causing big problems after deck upgrade
+    // this is reasonably ok looking, but even for abstract data it should really relate to axis labels
+    // (which implies that if we have a warped aspect ratio but making circles circular, they will be based on one or other axis)
+    const radiusScale = (radius * course_radius)/scale;
+    return useMemo(() => {
+        if (cx.minMax && cy.minMax) {
+            const xRange = cx.minMax[1] - cx.minMax[0];
+            const yRange = cy.minMax[1] - cy.minMax[0];
+            const r = 10000 / Math.max(xRange, yRange);
+            return radiusScale / r;
+        }
+        return radiusScale;
+    }, [cx.minMax, cy.minMax, radiusScale, cx, cy]);
+}
+
 // type Tooltip = (PickingInfo) => string;
 export type P = [number, number];
+/**
+ * ! in its current form, this hook is only called by `useCreateSpatialAnnotationState`
+ * in future we may want to be able to have different arrangement of layers & rework this.
+ * 
+ * As of now, charts with appropriate spatial context can call `useSpatialLayers()` at any point
+ * to access the scatterplot layer, and the tooltip function.
+ */
 export function useScatterplotLayer(modelMatrix: Matrix4) {
     const id = useChartID();
     const chart = useChart();
     const colorBy = (chart as any).colorBy;
     const config = useConfig<ScatterPlotConfig>();
 
-    const { opacity, radius, course_radius } = config;
-    const radiusScale = radius * course_radius;
+    const { opacity } = config;
+    const radiusScale = useScatterRadius();
 
     const data = useFilteredIndices();
-    const [cx, cy, contourParameter] = useParamColumns();
+    //! not keen on third param potentially being either contourParameter or cz
+    // n.b. Viv version already has config.contourParameter (maybe should be densityParameter)
+    // param[2] is set to the same value for some kind of backward compatibility?
+    // or as the result of still using old BaseChart.init()
+    // const [cx, cy, contourParameter] = useParamColumns();
+    const params = useParamColumns();
+    const [cx, cy, cz] = params;
     const hoverInfoRef = useRef<PickingInfo | null>(null);
     const highlightedIndex = useHighlightedIndex();
     // const [highlightedObjectIndex, setHighlightedObjectIndex] = useState(-1);
@@ -153,34 +291,44 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     );
     const contourLayers = useLegacyDualContour();
 
-    const tooltipCol = useMemo(() => {
-        if (!config.tooltip.column) return undefined;
-        return chart.dataStore.columnIndex[config.tooltip.column];
-    }, [config.tooltip, config.tooltip.column, chart.dataStore.columnIndex]);
+    // todo - Tooltip should be a separate component
+    // would rather not even need to call a hook here, but just have some
+    // `state.tooltip.column` which would have a column object...
+    // but this isn't really all that bad, so maybe we can stick with it.
+    const tooltipCols = useFieldSpecs(config.tooltip.column);
     const getTooltipVal = useCallback(
         (i: number) => {
             // if (!tooltipCol?.data) return '#'+i;
-            if (!tooltipCol) return null;
-            return tooltipCol.getValue(data[i]);
+            if (!tooltipCols) return null;
+            // return tooltipCols.getValue(data[i]);
+            return tooltipCols.map((col) => {
+                    return `<strong>${col.name}:</strong> ${col.data ? col.getValue(data[i]) : "loading..."}`;
+            });
         },
-        [tooltipCol, data],
+        [tooltipCols, data],
     );
-    // biome-ignore lint/correctness/useExhaustiveDependencies: fix this
     const getTooltip = useCallback(
         //todo nicer tooltip interface (and review how this hook works)
         () => {
-            if (!config.tooltip.show) return;
-            // testing reading object properties --- pending further development
+            if (!config.tooltip.show) return null;
+            if (!config.tooltip.column) return null;
+            // testing reading object properties --- pending further development (for GeoJSON layer in particular)
+            // also consider some other things like transcripts / stats heatmap etc...
             // (not hardcoding DN property etc)
             // if (object && object?.properties?.DN) return `DN: ${object.properties.DN}`;
             const hoverInfo = hoverInfoRef.current;
-            return (
-                hoverInfo &&
-                hoverInfo.index !== -1 &&
-                `${config.tooltip.column}: ${getTooltipVal(hoverInfo.index)}`
-            );
+            if (!hoverInfo || hoverInfo.index === -1) return null;
+            const tooltipVal = getTooltipVal(hoverInfo.index);
+            if (!tooltipVal) return null;
+            const tooltip: TooltipContent = {
+                //todo - this should be in a popper / should follow useOuterConainer...
+                //also should understand if mouse has left deck.gl canvas & hide tooltip
+                //or maybe we actually use something else for rendering the tooltip?
+                html: `<div>${tooltipVal.join("<br/>")}</div>`,
+            }
+            return tooltip;
         },
-        [hoverInfoRef, getTooltipVal, config.tooltip.show],
+        [getTooltipVal, config.tooltip.show, config.tooltip.column],
     );
 
     const scale = useRegionScale();
@@ -188,15 +336,14 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
     const viewState = useZoomOnFilter(modelMatrix);
     const { point_shape } = config;
 
+    // could probably bring this more into SpatialLayer...
     const extensions = useMemo(() => {
         if (point_shape === "circle") return [];
         if (point_shape === "gaussian") return [new ScatterDensityExension()];
         return [new ScatterSquareExtension()];
     }, [point_shape]);
-    const [currentLayerHasRendered, setCurrentLayerHasRendered] =
-        useState(false);
     const scatterplotLayer = useMemo(() => {
-        setCurrentLayerHasRendered(false); //<<< this is fishy
+        const is3d = config.dimension === "3d";
         return new SpatialLayer({
             //new
             // loaders //<< this will be interesting to learn about
@@ -204,14 +351,21 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             data,
             opacity,
             radiusScale,
+            billboard: true,
+            // antialiasing has artefacts on edges in 3d.
+            // may also consider option to turn off antialiasing for performance?
+            // (if it even has a significant impact)
+            antialiasing: !is3d,
             getFillColor: colorBy ?? [255, 255, 255],
-            getRadius: 1 / scale,
+            // if we want different radii for different points, this is the place
+            // ^^ except that we probably want each density layer to have its own radius accessor
+            // getRadius: 1 / scale,
             // todo review buffer data / accessors / filters...
             getPosition: (i: unknown, { target }) => {
                 if (typeof i !== "number") throw new Error("expected index");
                 target[0] = cx.data[i];
                 target[1] = cy.data[i];
-                target[2] = 0;
+                target[2] = cz?.minMax ? cz.data[i] : 0;
                 return target as unknown as Float32Array; // deck.gl types are wrong AFAICT
             },
             modelMatrix,
@@ -220,6 +374,8 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
                 // modelMatrix: modelMatrix, // this is not necessary, manipulating the matrix works anyway
                 // getLineWith: clickIndex, // this does not work, seems to need something like a function
                 getLineWidth,
+                getPosition: [cx, cy, cz],
+                // getRadius: [radiusScale, scale],
                 //as of now, the SpatialLayer implemetation needs to figure this out for each sub-layer.
                 // getContourWeight1: config.category1,
             },
@@ -264,42 +420,52 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
         colorBy,
         cx,
         cy,
-        scale,
+        cz,
         modelMatrix,
         extensions,
         chart,
         getLineWidth,
         contourLayers,
+        config.dimension,
     ]);
+    // this should take into account axis margins... not chart.contentDiv,
+    // but the actual area where the scatterplot is rendered
+    // (which may in future be a smaller region within the deck.gl canvas itself)
+    const boundingClientRect = useMemo(() => {
+        return chart.contentDiv.getBoundingClientRect();
+    }, [chart.contentDiv.getBoundingClientRect]);
+    // maybe we should rename this `unprojectMouse` or something
     const unproject = useCallback(
         (e: MouseEvent | React.MouseEvent | P) => {
-            if (!currentLayerHasRendered || !scatterplotLayer.internalState)
-                throw new Error("scatterplotLayer not ready");
-            if (Array.isArray(e))
-                e = { clientX: e[0], clientY: e[1] } as MouseEvent;
-            const r = chart.contentDiv.getBoundingClientRect();
-            const x = e.clientX - r.left;
-            const y = e.clientY - r.top;
-            const p = scatterplotLayer.unproject([x, y]) as P;
-            //still need to reason better about transforms...
-            // const scale = 1; //this was only right when Pixels.PhysicalSizeX === regions.scale
-            // const p2 = p.map(v => v * scale) as P;
-            const m = modelMatrix.invert();
-            const p3 = m.transform(p) as P;
-            m.invert();
-            return p3;
+            // never liked this... and then it was actually causing an infinite loop
+            // if (!currentLayerHasRendered || !scatterplotLayer.internalState)
+            //     throw new Error("scatterplotLayer not ready");
+            // also not massively keen on try/catch, but much better the dodgy currentLayerHasRendered
+            try {
+                if (Array.isArray(e)) {
+                    e = { clientX: e[0], clientY: e[1] } as MouseEvent;
+                }
+                const r = boundingClientRect;
+                const x = e.clientX - r.left;
+                const y = e.clientY - r.top;
+                const p = scatterplotLayer.unproject([x, y]) as P;
+                //still need to reason better about transforms...
+                // const scale = 1; //this was only right when Pixels.PhysicalSizeX === regions.scale
+                // const p2 = p.map(v => v * scale) as P;
+                const m = modelMatrix.invert();
+                const p3 = m.transform(p) as P;
+                m.invert();
+                return p3;                
+            } catch (e) {
+                //console.error("unproject error", e);
+                return [0, 0];
+            }
         },
         [
             scatterplotLayer,
             modelMatrix,
-            currentLayerHasRendered,
-            chart.contentDiv.getBoundingClientRect,
+            boundingClientRect,
         ],
-    );
-    // const project =
-    const onAfterRender = useCallback(
-        () => setCurrentLayerHasRendered(true),
-        [],
     );
     return useMemo(
         () => ({
@@ -307,8 +473,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             getTooltip,
             modelMatrix,
             viewState,
-            currentLayerHasRendered,
-            onAfterRender,
             unproject,
         }),
         [
@@ -316,8 +480,6 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             getTooltip,
             modelMatrix,
             viewState,
-            currentLayerHasRendered,
-            onAfterRender,
             unproject,
         ],
     );

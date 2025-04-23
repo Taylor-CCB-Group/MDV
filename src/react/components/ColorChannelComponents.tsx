@@ -34,7 +34,7 @@ export default function MainVivColorDialog({
 }
 
 const ChannelChooserMUI = ({ index }: { index: number }) => {
-    const channels = useMetadata().Pixels.Channels.map(
+    const channels = useMetadata()?.Pixels.Channels.map(
         (c) => c.Name,
     ) as string[];
     const selections = useChannelsStore(({ selections }) => selections);
@@ -70,7 +70,7 @@ const ChannelChooserMUI = ({ index }: { index: number }) => {
 };
 
 const ChannelChooser = ({ index }: { index: number }) => {
-    const channels = useMetadata().Pixels.Channels.map(
+    const channels = useMetadata()?.Pixels.Channels.map(
         (c) => c.Name,
     ) as string[];
     const { selections, setPropertiesForChannel } = useChannelsStore(
