@@ -258,6 +258,7 @@ class BaseChart<T extends BaseConfig> {
                     this.isFullscreen = true;
                 } else {
                     this.observable.container = this.__doc__.body;
+                    // Reset the size of chart
                     this.setSize(...oldSize);
                     for (const d of this.dialogs) {
                         d.setParent(null);
