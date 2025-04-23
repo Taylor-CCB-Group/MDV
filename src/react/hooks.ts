@@ -224,13 +224,8 @@ export function useFilteredIndices() {
     const config = useConfig<VivRoiConfig>();
     const filterColumn = config.background_filter?.column;
     const simpleFilteredIndices = useSimplerFilteredIndices();
-    //!! extremely abusive of rules of hooks quick experiment
-    if (!filterColumn) return simpleFilteredIndices;
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
-    const [filteredOutIndices, setFilteredOutIndices] = useState(
-        new Uint32Array(),
-    );
     useEffect(() => {
         // return
         let cancelled = false;
@@ -311,6 +306,7 @@ export function useFilteredIndices() {
         dataStore.getFilteredIndices,
         dataStore.name,
     ]);
+    if (!filterColumn) return simpleFilteredIndices;
     return filteredIndices;
 }
 
