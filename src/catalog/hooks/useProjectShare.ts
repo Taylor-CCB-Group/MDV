@@ -41,16 +41,6 @@ const useProjectShare = (projectId: string) => {
 
             const data = await res.json();
 
-            if (data?.error) {
-                setError(data?.error);
-                return;
-            }
-
-            if (data?.status === "error") {
-                setErrorMsg(data?.message);
-                return;
-            }
-
             if (res.ok) {
                 if (data?.all_users) setUserList(data.all_users);
                 if (data?.shared_users) setSharedUsers(data.shared_users);
@@ -58,12 +48,13 @@ const useProjectShare = (projectId: string) => {
             } else {
                 if (res.status === 403) {
                     setError(data?.error || "Forbidden: You are not allowed to perform this action.");
-                } else {
+                } else if (res.status === 500) {
                     setError(data?.error || "Internal Server Error");
+                } else {
+                    setError(data?.message || "An error occurred. Please try again.");
                 }
             }
 
-            setError(data?.message || "An error occurred. Please try again.");
         } catch (error) {
             setError("Error fetching user data. Please try again.");
         } finally {
@@ -89,15 +80,17 @@ const useProjectShare = (projectId: string) => {
 
             if (res.ok) {
                 await getAllUsers();
+                return;
             } else {
                 if (res.status === 403) {
                     setError(data?.error || "Forbidden: You are not allowed to perform this action.");
-                } else {
+                } else if (res.status === 500) {
                     setError(data?.error || "Internal Server Error");
+                } else {
+                    setErrorMsg(data?.message || "An error occurred. Please try again.");
                 }
             }
 
-            setErrorMsg(data?.message || "An error occurred. Please try again.");
         } catch (error) {
             setErrorMsg("Error adding new user. Please try again.");
         } finally {
@@ -123,15 +116,17 @@ const useProjectShare = (projectId: string) => {
 
             if (res.ok) {
                 await getAllUsers();
+                return;
             } else {
                 if (res.status === 403) {
                     setError(data?.error || "Forbidden: You are not allowed to perform this action.");
-                } else {
+                } else if (res.status === 500) {
                     setError(data?.error || "Internal Server Error");
+                } else {
+                    setErrorMsg(data?.message || "An error occurred. Please try again.");
                 }
             }
 
-            setErrorMsg(data?.message || "An error occurred. Please try again.");
         } catch (error) {
             setErrorMsg("Error fetching user data. Please try again.");
         } finally {
@@ -155,15 +150,16 @@ const useProjectShare = (projectId: string) => {
 
             if (res.ok) {
                 await getAllUsers();
+                return;
             } else {
                 if (res.status === 403) {
                     setError(data?.error || "Forbidden: You are not allowed to perform this action.");
                 } else {
                     setError(data?.error || "Internal Server Error");
                 }
+                setErrorMsg(data?.message || "An error occurred. Please try again.");
             }
 
-            setErrorMsg(data?.message || "An error occurred. Please try again.");
         } catch (error) {
             setErrorMsg("Error deleting user. Please try again.");
         } finally {
