@@ -2139,11 +2139,15 @@ export class ChartManager {
             allCharts.push([ch.chart, ch.window]);
         }
         for (const ci of allCharts) {
-            if (ci[1]) {
-                ci[1].close();
+            try {
+                if (ci[1]) {
+                    ci[1].close();
+                }
+                ci[0].remove();
+                ci[0].div.remove();
+            } catch (error) {
+                console.error("Error occurred while removing the chart: ", error);
             }
-            ci[0].remove();
-            ci[0].div.remove();
         }
         this.charts = {};
     }
