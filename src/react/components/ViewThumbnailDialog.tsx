@@ -19,6 +19,7 @@ import { Clear as ClearIcon, Close as CloseIcon, Image as ImageIcon } from "@mui
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
+import { matchString } from "@/lib/utils";
 
 export type ViewThumbnailDialogProps = {
     open: boolean;
@@ -92,7 +93,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         const tempList = viewList.filter((view) => {
             const name = view.name.toLowerCase();
             // if any of the input words are not in the name, return false
-            if (!input.some(i => !name.includes(i))) return view;
+            if (matchString(input, name)) return view;
         });
         setFilteredViewList(tempList);
     };

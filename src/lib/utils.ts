@@ -65,3 +65,11 @@ export function g<T extends GuiSpecType>(spec: GuiSpec<T>): GuiSpec<T> {
 //         v.map(v => `${v}!`);
 //     }
 // });
+
+/**
+ * Helper function to match two strings
+ * (Will update to more sophisticated matching algorithm in future)
+ */
+export function matchString(str1: string[], str2: string) {
+    return !str1.some(i => !str2.includes(i));
+}

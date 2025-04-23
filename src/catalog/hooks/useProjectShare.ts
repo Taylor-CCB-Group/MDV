@@ -16,7 +16,7 @@ export type RegisteredUser = {
 const useProjectShare = (projectId: string) => {
     const [email, setEmail] = useState("");
     const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
-    const [newUser, setNewUser] = useState<RegisteredUser>();
+    const [newUser, setNewUser] = useState<RegisteredUser | null>();
     const [userList, setUserList] = useState<RegisteredUser[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
@@ -54,7 +54,6 @@ const useProjectShare = (projectId: string) => {
             if (res.ok) {
                 if (data?.all_users) setUserList(data.all_users);
                 if (data?.shared_users) setSharedUsers(data.shared_users);
-                console.log("getAllUsers", data);
                 return;
             } else {
                 if (res.status === 403) {
@@ -89,7 +88,6 @@ const useProjectShare = (projectId: string) => {
             const data = await res.json();
 
             if (res.ok) {
-                console.log("addUser", res);
                 await getAllUsers();
             } else {
                 if (res.status === 403) {
@@ -124,7 +122,6 @@ const useProjectShare = (projectId: string) => {
             const data = await res.json();
 
             if (res.ok) {
-                console.log("change user permission", res);
                 await getAllUsers();
             } else {
                 if (res.status === 403) {
@@ -157,7 +154,6 @@ const useProjectShare = (projectId: string) => {
             const data = await res.json();
 
             if (res.ok) {
-                console.log("delete user", res);
                 await getAllUsers();
             } else {
                 if (res.status === 403) {
