@@ -156,27 +156,4 @@ async function loadData() {
     );
     // debugButton.style.float = "right";
     debugButton.setAttribute("data-microtip-position", "bottom-left");
-
-    function extraFeatures(i: number) {
-        const dsName = datasources[i].name;
-        // cm.dsIndex[dsName].menuBar is undefined... so I'm deferring this call.
-        // should it be in the viewLoader callback? no ref to cm passed there.
-        setTimeout(() => {
-            cm.addMenuIcon(
-                dsName,
-                "fas fa-spinner",
-                "Pre-Load Data",
-                async () => {
-                    const columns = datasources[i].columns.map((c) => c.name);
-                    cm.loadColumnSet(columns, dsName, (failedColumns: DataColumn<any>[]) => {
-                        if (failedColumns.length) {
-                            console.error(`Failed to load columns: ${failedColumns}`);
-                        }
-                        console.log("done loadColumnSet");
-                    });
-                },
-            );
-        }, 100);
-    }
-    datasources.forEach((ds, i) => extraFeatures(i));
 }

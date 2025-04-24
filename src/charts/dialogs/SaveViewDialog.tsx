@@ -1,4 +1,6 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import { useEffect, useCallback, useState } from "react";
+import StateDiffComponent from "./StateDiffComponent";
 
 const SaveViewDialogComponent = (props: {
     open: boolean;
@@ -7,10 +9,38 @@ const SaveViewDialogComponent = (props: {
     content?: string;
 }) => {
     const { viewManager } = window.mdv.chartManager;
+    const dev = import.meta.env.DEV;
+    const [showDiff, setShowDiff] = useState(false);
 
-    const onSave = () => {
-        viewManager.saveView();
-    };
+    const onSave = useCallback(async () => {
+        await viewManager.saveView();
+        props?.action?.();
+        props.onClose();
+    }, [viewManager, props]);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!props.open) return; //probably doesn't happen, but no harm to check
+            if (event.key === "y") {
+                event.preventDefault();
+                onSave();
+                props?.action?.();
+                props.onClose();
+            }
+            if (event.key === "n") {
+                event.preventDefault();
+                props?.action?.();
+                props.onClose();
+            }            
+        };
+
+        // seems ok to use window here since this is a modal dialog
+        // saves faffing about with refs
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [props, onSave, props.open]);
 
     return (
         <Dialog open={props.open} onClose={props.onClose} fullWidth maxWidth="xs">
@@ -21,15 +51,26 @@ const SaveViewDialogComponent = (props: {
                         ? props?.content
                         : "You have unsaved changes, do you want to save the current view?"}
                 </Typography>
+                {
+                    showDiff && (
+                        <Box sx={{mt: 2, bgcolor: "background.default"}}>
+                            <StateDiffComponent 
+                                input1={viewManager.getCleanPrevState()} 
+                                input2={viewManager.getCleanCurrState()} 
+                            />
+                        </Box>
+                    )
+                }
             </DialogContent>
             <DialogActions>
-                <Button
-                    onClick={() => {
-                        onSave();
-                        props?.action?.();
-                        props.onClose();
-                    }}
-                >
+                {
+                    dev && (
+                        <Button onClick={() => setShowDiff(!showDiff)}>
+                            {showDiff ? "Hide Diff" : "Show Diff"}
+                        </Button>
+                    )
+                }
+                <Button onClick={onSave}>
                     Yes
                 </Button>
                 <Button

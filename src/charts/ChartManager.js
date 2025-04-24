@@ -68,6 +68,7 @@ import ViewDialogWrapper from "./dialogs/ViewDialogWrapper";
 import ToggleThemeWrapper from "./dialogs/ToggleTheme";
 import { deserialiseParam, getConcreteFieldNames } from "./chartConfigUtils";
 import AddChartDialogReact from "./dialogs/AddChartDialogReact";
+import MenuBarWrapper from "@/react/components/MenuBarComponent";
 
 
 //order of column data in an array buffer
@@ -122,30 +123,32 @@ function listenPreferredColorScheme(callback) {
 /**
 * The object to manage charts [Chart Manager](../../docs/extradocs/chartmanager.md)
 * 
-* @param {string|HTMLElement} div - The DOM element or id of the element to house the app
-* @param {import("@/charts/charts").DataSource[]} datasources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
-* Each config must contain the size parameter, giving the number of rows in the DataStore.
-* @param {object} dataloader - An object containing the following
-*   - function - The [function](../../docs/extradocs/dataloader.md) to load the data
-    (can be omitted if data loaded from a file)
-*   - viewLoader - The function that will load the each view  (not necessay if only one view)
-*   - rowDataLoader - (optional) an asunc function which is given the datasource name and row index
-*     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
-*   - files - specifies the files to load the data 
-* @param {Object} config extra settings
-* @param {Object[]} [config.initialCharts] A list of chart configs to initially load if
-* no views are specified
-* @param {string[]} [config.all_views] A list of views that can be loaded (a suitable 
-* view loader is required to atually load the view)
-* @param {string} [config.current_view] the current view (only used with all views)
-* @param {string} [config.permisson] the level of permission the user has. This just makes certain
-* options unavaliable. Any logic should be handled when a state_saved event is broadcast
-* @param {boolean} [config.gridstack] whether to arrange the charts in a grid
-* @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
-* beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
-* 
 */
 export class ChartManager {
+    /**
+     * @param {string|HTMLElement} div - The DOM element or id of the element to house the app
+     * @param {import("@/charts/charts").DataSource[]} dataSources - An array of datasource configs - see  [Data Source](../../docs/extradocs/datasource.md).
+     * Each config must contain the size parameter, giving the number of rows in the DataStore.
+     * @param {object} dataloader - An object containing the following
+     *   - function - The [function](../../docs/extradocs/dataloader.md) to load the data
+     *   (can be omitted if data loaded from a file)
+     *   - viewLoader - The function that will load the each view  (not necessay if only one view)
+     *   - rowDataLoader - (optional) an asunc function which is given the datasource name and row index
+     *     returns unstructured data . A datasource's config requires row_data_loader:true to activate the loader
+     *   - files - specifies the files to load the data 
+     * @param {Object} config extra settings
+     * @param {Object[]} [config.initialCharts] A list of chart configs to initially load if
+     * no views are specified
+     * @param {string[]} [config.all_views] A list of views that can be loaded (a suitable 
+     * view loader is required to atually load the view)
+     * @param {string} [config.current_view] the current view (only used with all views)
+     * @param {string} [config.permission] the level of permission the user has. This just makes certain
+     * options unavaliable. Any logic should be handled when a state_saved event is broadcast
+     * @param {boolean} [config.gridstack] whether to arrange the charts in a grid
+     * @param {function} [listener] - A function to listen to events. `(eventType: string, cm: ChartManager, data: any) => void | Promise<void>`
+     * beware: the way 'event listeners' are implemented is highly unorthodox and may be confusing.
+     * 
+     */
     constructor(div, dataSources, dataLoader, config = {}, listener = null) {
         if (!window.isSecureContext) {
             alert(
@@ -226,231 +229,10 @@ export class ChartManager {
         this.containerDiv.style.flexDirection = "column";
 
         /** @type {HTMLDivElement} */
-        this.menuBar = createEl(
-            "div",
-            {
-                classes: ["ciview-main-menu-bar"],
-            },
-            this.containerDiv,
-        );
+        // classes: ["ciview-main-menu-bar"],
+        this.menuBar = createEl("div", {}, this.containerDiv);
 
-        /** @type {HTMLSpanElement} */
-        this.leftMenuBar = createEl("span", {}, this.menuBar);
-        createEl("span", { classes: ["mdv-divider"] }, this.menuBar);
-        /** @type {HTMLSpanElement} */
-        this.rightMenuBar = createEl("span", {}, this.menuBar);
-
-
-        /** @type {HTMLSpanElement} */
-        const homeButton = createMenuIcon(
-            "fas fa-home",
-            {
-                tooltip: {
-                    text: "Back to Catalog",
-                    position: "bottom-right",
-                },
-                func: () => {
-                    // const state = this.getState();
-                    // this._callListeners("state_saved", state);
-                    this.viewManager.checkUnsavedState(() => {
-                        window.location.href = import.meta.env.DEV
-                            ? `${window.location.origin}/catalog_dev`
-                            : `${window.location.origin}/../`;
-                    })
-                },
-            },
-            this.leftMenuBar,
-        );
-        homeButton.style.marginRight = "20px";
-
-        if (config.all_views) {
-            const filterWrapperNode = createEl(
-                "span",
-                {
-                    style: {
-                        marginRight: "4px",
-                    },
-                },
-                this.leftMenuBar,
-            );
-
-            // Filter view component
-            createMdvPortal(
-                ViewSelector(),
-                filterWrapperNode,
-            );
-        }
-
-        if (config.permission === "edit") {
-            createMenuIcon(
-                "fas fa-save",
-                {
-                    tooltip: {
-                        text: "Save View",
-                        position: "bottom-right",
-                    },
-                    func: () => {
-                        this.viewManager.saveView();
-                    },
-                },
-                this.leftMenuBar,
-            );
-        }
-
-        if (config.permission === "edit" && config.all_views) {
-            createMenuIcon(
-                "fas fa-plus",
-                {
-                    tooltip: {
-                        text: "Create New View",
-                        position: "bottom-right",
-                    },
-                    func: () => {
-                        this.viewManager.checkAndAddView();
-                    },
-                },
-                this.leftMenuBar,
-            );
-            createMenuIcon(
-                "fas fa-minus",
-                {
-                    tooltip: {
-                        text: "Delete Current View",
-                        position: "bottom-right",
-                    },
-                    func: () => {
-                        this.showDeleteViewDialog();
-                    },
-                },
-                this.leftMenuBar,
-            );
-        }
-
-        this.rightMenuBar.style.display = "flex";
-        this.rightMenuBar.style.alignItems = "center";
-
-        const themeNode = createEl(
-            "span",
-            {
-                style: {
-                    marginRight: "4px",
-                },
-            },
-            this.rightMenuBar,
-        );
-
-        createMdvPortal(ToggleThemeWrapper(), themeNode)
-        // themeButton.style.margin = "3px";
-        if (config.permission === "edit") {
-            const uploadButton = createMenuIcon(
-                "fas fa-upload",
-                {
-                    tooltip: {
-                        text: "Add datasource",
-                        position: "bottom-left",
-                    },
-                    func: (e) => {
-                        new FileUploadDialogReact(); //.open();
-                    },
-                },
-                this.leftMenuBar,
-            );
-            uploadButton.style.margin = "3px";
-        }
-
-        if (config.websocket) {
-            console.log('websocket is enabled');
-            const fn = async () => {
-                // previously, we were always calling connectIPC - but it was only relevant to earlier experiment with Unity
-                // and we had disabled websocket on server.
-                // started experimenting with socketio for chatMDV - mechanism is working, to an extent... 
-                // but actually, REST is probably best for this (maybe a protocol agnostic abstraction).
-                // try/catch doesn't help when it gets stuck in await...
-                // console.warn('websocket is not currently supported but used as flag for chat experiment - will be fixed very soon')
-                try {
-                    const { socket, sendMessage } = await connectIPC(this);
-                    console.log('connected to socketio');
-                    this.ipc = { socket, sendMessage };
-                } catch (error) {
-                    console.error('Failed to connect to websocket', error);
-                }
-                createMenuIcon("fas fa-comments", {
-                    tooltip: {
-                        text: "Open ChatMDV",
-                        position: "bottom-left"
-                    },
-                    func: async () => {
-                        if (this.chatDialog) {
-                            this.chatDialog.close();                            
-                        } else {
-                            this.chatDialog = new ChatDialog();
-                            // session storage needs more thought, for now we
-                            // sessionStorage.setItem('chatMDV', true);
-                            this.chatDialog.config.onclose = () => {
-                                this.chatDialog = null;
-                                // sessionStorage.removeItem('chatMDV');
-                            }
-                        }
-                    }
-                }, this.rightMenuBar);
-                // biome-ignore lint/correctness/noConstantCondition: disabling sessionStorage with constant condition for now
-                if (sessionStorage.getItem('chatMDV') && false) {
-                    this.chatDialog = new ChatDialog();
-                    this.chatDialog.config.onclose = () => {
-                        this.chatDialog = null;
-                        sessionStorage.removeItem('chatMDV');
-                    }
-                }
-                // chatButton.setAttribute('data-lucide', 'bot-message-square'); //didn't work
-                createMenuIcon("fas fa-file-alt", {
-                    tooltip: {
-                        text: "View Chat Log",
-                        position: "bottom-left"
-                    },
-                    func: async () => {
-                        new ChatLogDialog();
-                    }
-                }, this.rightMenuBar);
-            };
-            fn();
-        }
-        
-        if (import.meta.env.DEV) {
-            // add a button to take a screenshot of the current view
-            // we don't actually want a button like this - I think we probably want to take a screenshot
-            // inside 'getState()' and add it to view... but that's a bit of a destructive change.
-            createMenuIcon(
-                "fas fa-camera",
-                {
-                    tooltip: {
-                        text: "Take Screenshot",
-                        position: "bottom-left",
-                    },
-                    func: async () => {
-                        const bounds =
-                            this.containerDiv.getBoundingClientRect();
-                        const aspect = bounds.width / bounds.height;
-                        const dataUrl = await toPng(this.containerDiv, {
-                            canvasWidth: 400,
-                            canvasHeight: 400 / aspect,
-                        });
-                        const img = document.createElement("img");
-                        img.src = dataUrl;
-                        document.body.appendChild(img);
-                    },
-                },
-                this.leftMenuBar,
-            );
-        }
-        // createMenuIcon("fas fa-question",{
-        //     tooltip:{
-        //         text:"Help",
-        //         position:"top-right"
-        //     },
-        //     func:()=>{
-        //         //todo
-        //     }
-        // },this.leftMenuBar).style.margin = "3px";
+        createMdvPortal(MenuBarWrapper(), this.menuBar);
 
         this._setupThemeContextMenu();
 
@@ -487,6 +269,7 @@ export class ChartManager {
         this.viewLoader = dataLoader.viewLoader;
 
         this.layoutMenus = {};
+        this.isFullscreen = false;
 
         if (dataLoader.files) {
             this.filesToLoad = dataLoader.files.length;
@@ -769,15 +552,16 @@ export class ChartManager {
                 removeDraggable(div);
             });
         }
-        //add new ones
+        
         view.layout = type;
-        if (type === "absolute") {
-            this.getAllCharts(ds.name).forEach((x) => this._makeChartRD(x, ds));
-        } else if (type === "gridstack") {
-            this.getAllCharts(ds.name).forEach((chart) => {
-                this.gridStack.manageChart(chart, ds, this._inInit);
-            });
-        }
+        //will add the appropriate layout depending on the current layout type
+        this.getAllCharts(ds.name).forEach((x) => {
+            //the chart is popped out so not subject to the layout manager
+            if (x.__doc__ !== document){
+                return;
+            }
+            this._makeChartRD(x, ds)
+        });
     }
 
     _setupThemeContextMenu() {
@@ -869,13 +653,31 @@ export class ChartManager {
         if (config.all_views) {
             const currentView = config.initial_view || config.all_views[0];
             this.viewManager.setView(currentView);
-            dataLoader.viewLoader(currentView).then((data) => {
-                this._init(data, firstTime);
+            dataLoader.viewLoader(currentView).then(async (data) => {
+                try {
+                    await this._init(data, firstTime);
+                    if (currentView) {
+                        const state = this.getState();
+                        if (!state.view?.viewImage) {
+                            await this.viewManager.saveView();
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error during view initialization:", error);
+                    // Consider adding user-facing error handling here
+                }
             });
         }
         //only one view hard coded in config
+        //! This else block is not called, but if it is called at some point, make sure the state save works properly
         else {
-            this._init(config.only_view, firstTime);
+            this._init(config.only_view, firstTime)
+            .then(async () => {
+                    const state = this.getState();
+                    if (!state.view?.viewImage) {
+                        await this.viewManager.saveView();
+                    }
+            });
         }
     }
 
@@ -1151,7 +953,13 @@ export class ChartManager {
         }
         if (config.tooltip) {
             if (config.tooltip.column) {
-                set.add(config.tooltip.column);
+                if (Array.isArray(config.tooltip.column)) {
+                    for (const i of config.tooltip.column) {
+                        set.add(i);
+                    }
+                } else {
+                    set.add(config.tooltip.column);
+                }
             }
         }
         if (config.background_filter) {
@@ -1287,6 +1095,7 @@ export class ChartManager {
         const initialCharts = {};
         const updatedColumns = {};
         const metadata = {};
+        const chartErrors = [];
         // const twidth = this.contentDiv.offsetWidth;
         for (const ds of this.dataSources) {
             if (ds.contentDiv) {
@@ -1309,25 +1118,25 @@ export class ChartManager {
         }
         for (const chid in this.charts) {
             const chInfo = this.charts[chid];
-
             const chart = chInfo.chart;
-            const config = chart.getConfig();
-            const div = chart.getDiv();
-            const d = this.viewData.dataSources[chInfo.dataSource.name];
-            if (d.layout === "gridstack") {
-                config.gsposition = [
-                    Number.parseInt(div.getAttribute("gs-x")),
-                    Number.parseInt(div.getAttribute("gs-y")),
-                ];
-                config.gssize = [
-                    Number.parseInt(div.getAttribute("gs-w")),
-                    Number.parseInt(div.getAttribute("gs-h")),
-                ];
-            } else {
-                config.position = [div.offsetLeft, div.offsetTop];
+            try {
+                // as of now, some charts throw errors when calling getConfig()
+                // in particular, if they haven't finished loading properly
+                const config = chart.getConfig();
+                const div = chart.getDiv();
+                const d = this.viewData.dataSources[chInfo.dataSource.name];
+                if (d.layout === "gridstack") {
+                   //this is handled by gridstack now
+                } else {
+                    config.position = [div.offsetLeft, div.offsetTop];
+                }
+                initialCharts[chInfo.dataSource.name].push(config);
+            } catch (error) {
+                console.error(
+                    `chart ${chid} failed to getConfig - ${error.message}`,
+                );
+                chartErrors.push(error);
             }
-
-            initialCharts[chInfo.dataSource.name].push(config);
         }
 
         const view = JSON.parse(JSON.stringify(this.viewData));
@@ -1339,6 +1148,9 @@ export class ChartManager {
             all_views: all_views,
             updatedColumns: updatedColumns,
             metadata: metadata,
+            //untested - what happens if we include this (including in what we save to server?)
+            //could be useful... but I'm leaving it out now in case of unexpected issues.
+            chartErrors, 
         };
     }
 
@@ -1596,23 +1408,6 @@ export class ChartManager {
             });
     }
 
-    _addLinkIcon(ds, ds_to, link) {
-        createMenuIcon(
-            "fas fa-plus-square",
-            {
-                tooltip: {
-                    text: `Add ${link.name}`,
-                    position: "bottom-right",
-                },
-                func: () => {
-                    // new BaseDialog.experiment["AddColumnsFromRows"](ds, ds_to, link, this);
-                    new AddColumnsFromRowsDialog(ds, ds_to, link, this);
-                },
-            },
-            ds.menuBar,
-        );
-    }
-
     /**
      * @param {{dataStore: DataStore}} ds
      */
@@ -1690,18 +1485,6 @@ export class ChartManager {
             new BaseDialog.experiment["AnnotationDialogReact"](ds.dataStore);
         });
 
-        if (dataStore.links) {
-            for (const ods in dataStore.links) {
-                const link = dataStore.links[ods];
-                if (link.rows_as_columns) {
-                    this._addLinkIcon(
-                        ds,
-                        this.dsIndex[ods],
-                        link.rows_as_columns,
-                    );
-                }
-            }
-        }
         const idiv = createEl(
             "div",
             {
@@ -1753,22 +1536,52 @@ export class ChartManager {
     }
 
     _addFullscreenIcon(ds) {
-        createMenuIcon(
+        const iconElement = createMenuIcon(
             "fas fa-expand",
             {
                 tooltip: {
                     text: "Full Screen",
                     position: "bottom-right",
                 },
-                func: () => {
+                func: async () => {
                     //nb, not sure best way to access the actual div I want here
                     //this could easily break if the layout structure changes
                     // ds.contentDiv.parentElement.requestFullscreen();
-                    ds.menuBar.parentElement.requestFullscreen();
+                    try {
+                        if (!this.isFullscreen) {
+                            await ds.menuBar.parentElement.requestFullscreen();
+                        } else {
+                            await document.exitFullscreen();
+                        }
+                    } catch (error) {
+                        console.error("fullscreen error caused: ", error);
+                    }
                 },
             },
             ds.menuBar,
         );
+
+        document.addEventListener("fullscreenchange", () => {
+            const iconEl = iconElement.querySelector("i");
+            if (document.fullscreenElement) {
+                if (ds.menuBar.parentElement === document.fullscreenElement) {
+                    if (iconEl) {
+                        iconEl.classList.remove("fa-expand");
+                        iconEl.classList.add("fa-compress");
+                    }
+                    iconElement.setAttribute("aria-label", "Exit Full Screen");
+                    this.isFullscreen = true;
+                }
+             } else {
+                if (iconEl) {
+                    iconEl.classList.remove("fa-compress");
+                    iconEl.classList.add("fa-expand");
+                }
+                iconElement.setAttribute("aria-label", "Full Screen");
+                this.isFullscreen = false;
+            }
+        });
+
     }
 
     /**
@@ -2311,11 +2124,15 @@ export class ChartManager {
             allCharts.push([ch.chart, ch.window]);
         }
         for (const ci of allCharts) {
-            if (ci[1]) {
-                ci[1].close();
+            try {
+                if (ci[1]) {
+                    ci[1].close();
+                }
+                ci[0].remove();
+                ci[0].div.remove();
+            } catch (error) {
+                console.error("Error occurred while removing the chart: ", error);
             }
-            ci[0].remove();
-            ci[0].div.remove();
         }
         this.charts = {};
     }

@@ -1,4 +1,4 @@
-import BaseChart, { type BaseConfig } from "../../charts/BaseChart";
+import BaseChart from "../../charts/BaseChart";
 import { BaseReactChart } from "./BaseReactChart";
 import { action, makeObservable, observable } from "mobx";
 import {
@@ -13,17 +13,18 @@ import {
 } from "./avivatorish/state";
 import "../../charts/VivScatterPlot"; //because we use the BaseChart.types object, make sure it's loaded.
 import { useEffect } from "react";
-import type { ColumnName, GuiSpec } from "../../charts/charts";
+import type { ColumnName } from "../../charts/charts";
 import { useImage } from "./avivatorish/hooks";
 import { VivScatter } from "./VivScatterComponent";
 import { useImgUrl } from "../hooks";
 import ColorChannelDialogReactWrapper from "./ColorChannelDialogReactWrapper";
-import type { DualContourLegacyConfig } from "../contour_state";
 import { loadColumn } from "@/dataloaders/DataLoaderUtil";
 import { observer } from "mobx-react-lite";
 import { useChart } from "../context";
 import type DataStore from "@/datastore/DataStore";
 import { g, isArray, toArray } from "@/lib/utils";
+import { scatterDefaults, type ScatterPlotConfig } from "../scatter_state";
+import getTooltipSettings from "@/charts/dialogs/utils/TooltipSettingsGui";
 
 function VivScatterChartRoot() {
     // to make this look like Avivator...
@@ -69,44 +70,6 @@ export type CategoryFilter = {
     category: string | string[];
     // consider properties like 'invert' or 'exclude', or 'color'...
 };
-//viewState should be persisted... maybe a way of saving different snapshots?
-//could we infer or something to avoid having to repeat this?
-export type ScatterPlotConfig = {
-    course_radius: number;
-    radius: number;
-    opacity: number;
-    // part of ColorConfig
-    // color_by?: ColumnName; 
-    // color_legend: {
-    //     display: boolean;
-    //     // todo: add more options here...
-    // };
-    category_filters: Array<CategoryFilter>;
-    //on_filter: "hide" | "grey", //todo
-    zoom_on_filter: boolean;
-    point_shape: "circle" | "square" | "gaussian";
-} & TooltipConfig &
-    DualContourLegacyConfig & BaseConfig;
-//@ts- expect-error things like 'id' are expected... subject to review.
-const scatterDefaults: Omit<ScatterPlotConfig, "id" | "legend" | "size" | "title" | "type" | "param"> = {
-    course_radius: 1,
-    radius: 10,
-    opacity: 1,
-    color_by: undefined,
-    color_legend: {
-        display: false,
-    },
-    tooltip: {
-        show: false,
-    },
-    category_filters: [],
-    zoom_on_filter: false,
-    point_shape: "circle",
-    contour_fill: false,
-    contour_bandwidth: 0.1,
-    contour_intensity: 1,
-    contour_opacity: 0.5,
-};
 export type VivRoiConfig = {
     // making this 'type' very specific will let us infer the rest of the type, i.e.
     // `if (config.type === 'VivMdvRegionReact')` will narrow the type to VivScatterConfig
@@ -138,6 +101,7 @@ function adaptConfig(originalConfig: VivMdvReactConfig) {
     // in future we might have something like an array of layers with potentially ways of describing parameters...
     //@ts-expect-error contourParameter type
     if (!config.contourParameter) config.contourParameter = config.param[2];
+    // if (!config.)
     // === some dead code ===
     // if (config.type === 'VivMdvRegionReact') {
     //     // we don't use viv.image_properties, we use viv.channelsStore et al.
@@ -248,8 +212,8 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         //   ^^ kinda want a more react-y SettingsDialog for that...
         // todo make sure associated json etc switches when region changes
         const ds = this.dataStore;
-        const imageRegionKeys = Object.keys(ds.regions.all_regions).filter(
-            (r) => ds.regions.all_regions[r].viv_image,
+        const imageRegionKeys = Object.keys(ds.regions?.all_regions).filter(
+            (r) => ds.regions?.all_regions[r].viv_image,
         );
         const images = imageRegionKeys.map((r) => ({ name: r, value: r }));
 
@@ -257,7 +221,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
         return settings.concat([
             g({
                 type: "dropdown",
-                label: `Image (${ds.getColumnName(ds.regions.region_field)})`,
+                label: `Image (${ds.getColumnName(ds.regions?.region_field)})`,
                 current_value: c.region,
                 values: [images, "name", "value"],
                 func(v) {
@@ -274,33 +238,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     c.background_filter.category = v;
                 },
             }),
-            g({
-                type: "check",
-                label: "Show Tooltip",
-                current_value: tooltip.show,
-                func: async (x: boolean) => {
-                    tooltip.show = x;
-                    if (!tooltip.column) {
-                        const columnName = cols[0].field;
-                        console.log(
-                            "No tooltip column set, using first column:",
-                            columnName
-                        );
-                        await loadColumn(this.dataStore.name, cols[0].field);
-                        tooltip.column = cols[0].field;
-                    }
-                },
-            }),
-            g({
-                type: "dropdown",
-                label: "Tooltip value",
-                current_value: c.tooltip.column || cols[0].field,
-                values: [cols, "name", "field"],
-                func: async (c) => {
-                    await loadColumn(this.dataStore.name, c);
-                    tooltip.column = c;
-                },
-            }),
+            getTooltipSettings(c),
             g({
                 type: "dropdown",
                 label: "Shape",
@@ -524,7 +462,7 @@ class VivMdvReact extends BaseReactChart<VivMdvReactConfig> {
                     // could be interested in lensEnabled, zoomLock, panLock, etc.
                 },
             };
-            console.table(viv);
+            // console.table(viv);
             config.viv = {
                 ...config.viv,
                 ...viv,

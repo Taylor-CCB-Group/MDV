@@ -1,12 +1,16 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type RangeDimension from "../datastore/RangeDimension";
-import { useRegionScale, useScatterplotLayer } from "./scatter_state";
+import { type ScatterPlotConfig, useRegionScale, useScatterplotLayer } from "./scatter_state";
 import { Matrix4 } from "@math.gl/core";
 import { CompositeMode, EditableGeoJsonLayer, type GeoJsonEditMode } from "@deck.gl-community/editable-layers";
 import type { FeatureCollection, Geometry, Position } from '@turf/helpers';
 import { getVivId } from "./components/avivatorish/MDVivViewer";
 import { useChartID, useRangeDimension2D } from "./hooks";
 import type BaseChart from "@/charts/BaseChart";
+import { observer } from "mobx-react-lite";
+import type { BaseConfig } from "@/charts/BaseChart";
+import { action, toJS } from "mobx";
+
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
  * Not every type of chart will have a range dimension, and not every chart will have a selection overlay etc.
@@ -32,17 +36,19 @@ export type MeasureState = {
 export type SpatialAnnotationState = {
     rectRange: RangeState;
     measure: MeasureState;
+    scatterProps: ReturnType<typeof useScatterplotLayer>;
 };
 
 // Could more usefully be thought of as SpatialContext?
 const SpatialAnnotationState = createContext<SpatialAnnotationState>(undefined as any);
 
-const getEmptyFeatureCollection = () => ({
+export const getEmptyFeatureCollection = () => ({
     type: "FeatureCollection",
     features: []
 } as FeatureCollection);
 
 function useSelectionCoords(selection: FeatureCollection) {
+    // where should we keep this in config for persisting?
     const feature = selection.features[0];
     const coords = useMemo(() => {
         if (!feature) return [];
@@ -51,7 +57,9 @@ function useSelectionCoords(selection: FeatureCollection) {
         //^^ need to be careful about managing that property.
         const geometry = feature.geometry as Geometry;
         const raw = geometry.coordinates as Position[][];
-        return raw[0];
+        //! without toJS, this can be orders of magnitude slower than before - careful with that mobx, eugene...
+        // still adds significant overhead - may need a different strategy for critical/hot paths.
+        return toJS(raw[0]);
     }, [feature]);
     return coords as [number, number][];
 }
@@ -69,13 +77,18 @@ function useScatterModelMatrix() {
 }
 
 
-function useCreateRange(chart: BaseChart<any>) {
+function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
     const id = useChartID();
     const { modelMatrix } = useScatterModelMatrix();
-    // consider making selectionFeatureCollection part of config, so it can be persisted
+    // making selectionFeatureCollection part of config, so it can be persisted
     // !nb as of this writing, the scale of these features will be wrong if there is useRegionScale() / modelMatrix that compensates for image being different to 'regions'
-    // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that.
-    const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
+    // so when we are persisting editable-geojson in a way that will be used elsewhere we need to address that later.
+    //const [selectionFeatureCollection, setSelectionFeatureCollection] = useState<FeatureCollection>(getEmptyFeatureCollection());
+    //! it appears to drastically affect performance having this in mobx config - why?
+    const { selectionFeatureCollection } = chart.config;
+    const setSelectionFeatureCollection = useCallback(action((newSelection: FeatureCollection) => {
+        chart.config.selectionFeatureCollection = newSelection;
+    }), []);
     const [selectionMode, setSelectionMode] = useState<GeoJsonEditMode>(new CompositeMode([]));
     const { filterPoly, removeFilter, rangeDimension } = useRangeDimension2D();
     const coords = useSelectionCoords(selectionFeatureCollection);
@@ -83,9 +96,9 @@ function useCreateRange(chart: BaseChart<any>) {
     useEffect(() => {
         console.log("pending different way of managing resetButton?");
         chart.removeFilter = () => {
-            setSelectionFeatureCollection(getEmptyFeatureCollection());
+            setSelectionFeatureCollection(getEmptyFeatureCollection());            
         }
-    });
+    }, [chart, setSelectionFeatureCollection]);
     useEffect(() => {
         if (coords.length === 0) {
             chart.resetButton.style.display = "none";
@@ -116,19 +129,25 @@ function useCreateRange(chart: BaseChart<any>) {
             },
             lineWidthMinPixels: 1,
             selectedFeatureIndexes,
-            onEdit: ({ updatedData }) => {
+            // adding `action` here gets rid of warnings but doesn't help with performance.
+            onEdit: action(({ updatedData }) => {
                 // console.log("onEdit", editType, updatedData);
-                const feature = updatedData.features.pop();
-                updatedData.features = [feature];
-                setSelectionFeatureCollection(updatedData);
-            },
+                const feature = updatedData.features.at(-1);
+                // updatedData.features = [feature];
+                setSelectionFeatureCollection({
+                    ...updatedData,
+                    features: feature ? [feature] : []
+                });
+            }),
             onHover(pickingInfo, event) {
                 if ((pickingInfo as any).featureType === "points") return;
                 // -- try to avoid selecting invisible features etc - refer to notes in aosta prototype
                 setSelectedFeatureIndexes(pickingInfo.index !== -1 ? [pickingInfo.index] : []);
             },
         })
-    }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes]);
+    }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
+        setSelectionFeatureCollection
+    ]);
     return {
         editableLayer,
         rangeDimension,
@@ -150,10 +169,11 @@ function useCreateSpatialAnnotationState(chart: BaseChart<any>) {
     // consider for project-wide annotation stuff as opposed to ephemeral selections
     const rectRange = useCreateRange(chart);
     const measure = useCreateMeasure();
-    return { rectRange, measure };
+    const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
+    return { rectRange, measure, scatterProps };
 }
 
-export function SpatialAnnotationProvider({
+export const SpatialAnnotationProvider = observer(function SpatialAnnotationProvider({
     chart,
     children,
     //add generic that extends SpatialConfig?
@@ -164,7 +184,7 @@ export function SpatialAnnotationProvider({
             {children}
         </SpatialAnnotationState.Provider>
     );
-}
+});
 
 export function useRange() {
     const range = useContext(SpatialAnnotationState).rectRange;
@@ -178,12 +198,19 @@ export function useMeasure() {
     return measure;
 }
 
-/** work in progress... very much unstable return type etc, but starting to make use
- * and hopefully refactor into something coherent soon.
+/** 
+ * useSpatialLayers is a hook that provides access to the spatial layers and their properties.
+ * 
+ * This includes the selection layer, scatterplot layer (which is actually an instance
+ * of a more complex `SpatialLayer` with custom density/contour rendering), etc.
+ * 
+ * work in progress... unstable return type etc, and subject to future changes.
  */
 export function useSpatialLayers() {
-    const { rectRange } = useContext(SpatialAnnotationState);
-    const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
+    const { rectRange, scatterProps } = useContext(SpatialAnnotationState);
+    // this should be in the context, useScatterplotLayer currently called *only* from there...
+    // if we want to use it in other places we need to refactor
+    // const scatterProps = useScatterplotLayer(rectRange.modelMatrix);
     const { getTooltip } = scatterProps;
     // const layers = [rectRange.polygonLayer, scatterplotLayer]; /// should probably be in a CompositeLayer?
     return {
