@@ -1,7 +1,7 @@
 import type { DataColumn, FieldName, LoadedDataColumn } from "@/charts/charts";
 import type DataStore from "@/datastore/DataStore";
 import type { MultiColumnQuery } from "@/links/link_utils.js";
-import type { DataType } from "../charts/charts";
+import type { DataType, NumberDataType } from "../charts/charts";
 import { isArray } from "./utils";
 
 //new Set(Object.values(BaseChart.types).flatMap(t => t.params).filter(Boolean).flatMap(p => p.type))
@@ -86,6 +86,9 @@ export function columnMatchesType(column: DataColumn<DataType>, type?: Param | P
     if (type === "_multi_column:number") return isNumeric;
     if (type === "number" && isNumeric) return true;
     return column.datatype === type;
+}
+export function allNumeric(columns: DataColumn<DataType>[]): columns is DataColumn<NumberDataType>[] {
+    return columns.every(c => c.datatype.match(/double|float|int/));
 }
 /**
  * Checks whether @param column has a `datatype` precisely matching the given @param datatype
