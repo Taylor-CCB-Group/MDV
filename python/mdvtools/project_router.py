@@ -6,6 +6,7 @@ import re
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import functools
+from mdvtools.dbutils.mdv_server_app import validate_and_get_user, validate_sso_user, user_project_cache, ENABLE_AUTH
 
 """
 This should work as a drop-in replacement for `Blueprint` in the context
@@ -89,7 +90,7 @@ class ProjectBlueprint_v2:
     TIMESTAMP_UPDATE_INTERVAL = timedelta(hours=1)
 
     # Normalize ENABLE_AUTH to a boolean
-    AUTH_ENABLED = "true"
+    AUTH_ENABLED = ENABLE_AUTH
 
     @staticmethod
     def register_app(app: Flask) -> None:
@@ -118,11 +119,6 @@ class ProjectBlueprint_v2:
                     return {"status": "error", "message": str(e)}
             return {"status": "error", "message": "invalid project_id or method"}, 500
     
-    @staticmethod
-    def is_authenticated() -> bool:
-        """Checks if the user is authenticated."""
-        return 'token' in session
-
     def __init__(self, name: str, _ignored: str, url_prefix: str) -> None:
         self.name = name
         self.url_prefix = url_prefix  # i.e. /project/<project_id>/
@@ -181,7 +177,7 @@ class ProjectBlueprint_v2:
                         print(f"In dispatch_request: Updated accessed timestamp for project ID {project_id}")
                     except Exception as e:
                         print(f"dispatch_request: Error updating accessed timestamp: {e}")
-                        return jsonify({"status": "error", "message": "Failed to update project accessed timestamp"}), 500
+                        return jsonify({"error": "Failed to update project accessed timestamp"}), 500
 
                 print("******************--1")
                 print(ProjectBlueprint_v2.AUTH_ENABLED)
@@ -189,25 +185,38 @@ class ProjectBlueprint_v2:
                 # Check if authentication is enabled
                 if ProjectBlueprint_v2.AUTH_ENABLED:
                     print("******************--2")
-                    from redis import Redis
-                    redis_client = Redis(host='redis', port=6379, db=0)
-                    # If not in cookies, check if the user is in the session
-                    user_id = redis_client.get('user_id')
-                    user_id = user_id.decode("utf-8") 
+                    # Dynamically check the authentication method from session
+                    auth_method = session.get("auth_method")
+                    if not auth_method:
+                        return jsonify({"error": "Authentication method not set in session"}), 401
+
+                    if auth_method == "auth0":
+                        user_data, error_response = validate_and_get_user()
+                    elif auth_method == "sso":
+                        user_data, error_response = validate_sso_user(request)
+                    else:
+                        return jsonify({"error": "Unknown authentication method"}), 400
+
+                    if error_response:
+                        return error_response  # Unauthorized or failed
+
+                    user_id = user_data['id']
+                    print(f"Authenticated user ({auth_method}): {user_id}") 
                     
-                    cached_permissions = redis_client.get(f"user:{user_id}:projects")
                     print("******************--3")
                     
+                    # Retrieve user permissions from the cache (without using update_cache)
+                    user_projects = None
+                    if user_id:
+                        # Directly fetch the user's project permissions from cache
+                        user_projects = user_project_cache.get(user_id)  # Fetch from cache
+                    print("User Projects from Cache:", user_projects)
                     
-                    print(user_id)
-                    print(cached_permissions)
-                    if cached_permissions:
-                        user_projects = json.loads(cached_permissions)
-                    
-                        print("^^^^^^^^^^^^^^^********-------")
-                        # Step 4: Validate if the user is the owner of the project
+                    if user_projects:
+                        # Step 4: Validate if the user has permissions for the requested project
                         project_permissions = user_projects.get(str(project_id))  # Use string keys for consistency
-                        print(project_permissions)
+                        print("Project Permissions:", project_permissions)
+                        
                         
                 # first determine whether this is allowed
                 # - rather than iterating over (rule, method), we might have
@@ -221,7 +230,7 @@ class ProjectBlueprint_v2:
                     
                     if project is None:
                         print("In dispatch_request: Error - project doesn't exist")
-                        return jsonify({"status": "error", "message": f"Project with ID {project_id} not found"}), 404
+                        return jsonify({"error": f"Project with ID {project_id} not found"}), 404
 
                     required_access_level = options['access_level']  # Get required access level
                     print("required_access_level", required_access_level)
@@ -232,11 +241,11 @@ class ProjectBlueprint_v2:
                             if project_permissions:
                                 if not (project_permissions.get("is_owner", False) or project_permissions.get("can_write", False)):
                                     print("MAIN--------------------------")
-                                    return jsonify({"status": "error", "message": "User does not have the required permissions"}), 403
+                                    return jsonify({"error": "User does not have the required permissions"}), 403
 
              
                         if project.access_level != 'editable':
-                            return jsonify({"status": "error", "message": "This project is read-only and cannot be modified."}), 403
+                            return jsonify({"error": "This project is read-only and cannot be modified."}), 403
                         print(f"updating timestamp for project {project_id} '{subpath}'")
                         # calling this here means that any edits done via any edit route will update the timestamp...
                         # this could almost be the *only* place where we call this method
