@@ -1043,7 +1043,8 @@ def register_routes(app, ENABLE_AUTH):
                         {
                             "id": p["id"],
                             "name": p["name"],
-                            "lastModified": p["lastModified"]
+                            "lastModified": p["lastModified"],
+                            "thumbnail": p["thumbnail"]
                         }
                         for p in active_projects
                         if str(p["id"]) in allowed_project_ids
@@ -1054,7 +1055,8 @@ def register_routes(app, ENABLE_AUTH):
                         {
                             "id": p["id"],
                             "name": p["name"],
-                            "lastModified": p["lastModified"]
+                            "lastModified": p["lastModified"],
+                            "thumbnail": p["thumbnail"]
                         }
                         for p in active_projects
                     ]
