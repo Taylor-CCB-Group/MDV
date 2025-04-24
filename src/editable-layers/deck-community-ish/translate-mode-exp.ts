@@ -60,11 +60,13 @@ export function mapCoords(
 //   return feature;
 // }
 
-function translate(feature: TurfFeature<TurfGeometry>, dp: [number, number]) {
+function translate(feature: TurfFeature<TurfGeometry>, dp: Position) {
   if (!feature.geometry) return feature;
+  // in the context of MDV, as of this writing
+  // - we have 2d and 3d coordinates (no geospatial, but hopefully that will change)
   const movedCoordinates = mapCoords(
     feature.geometry.coordinates as AnyCoordinates,
-    (coordinate) => [coordinate[0] - dp[0], coordinate[1] - dp[1]]
+    (coordinate) => coordinate.map((v, i) => v - dp[i])
   )
   feature.geometry.coordinates = movedCoordinates;
   return feature;
@@ -95,7 +97,12 @@ export default class TranslateModeEx extends TranslateMode {
     if (!p1.geometry || !p2.geometry) return null;
     const c1 = p1.geometry.coordinates;
     const c2 = p2.geometry.coordinates;
-    const dp: [number, number] = [c1[0] - c2[0], c1[1] - c2[1]];
+    // may be 3d coordinates, we need to allow for that.
+    // no reason to think the coordinates are not the same length, but let's be safe.
+    if (c1.length !== c2.length) {
+      throw new Error('Coordinates have different lengths');
+    }
+    const dp = c1.map((v, i) => v - c2[i]);
 
     const movedFeatures = this._geometryBeforeTranslate.features.map((feature) =>
       // xxx: original version of translateFromCenter was based on turfRhumb stuff that blows up with our coordinates
