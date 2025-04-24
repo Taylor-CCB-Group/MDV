@@ -195,6 +195,7 @@ export default class GridStackManager {
 
             // a bit long-winded but for gridstack to work correctly we 
             // the chart wrapped in an outer and inner container
+            //! check the handling these variables if any issues occur
             let outer: HTMLElement;
             let inner: HTMLElement;
             // Create new inner and outer divs only during the creation
@@ -232,6 +233,7 @@ export default class GridStackManager {
             }
 
             // Disconnect existing observers
+            //! If any problems occur try deleting the observers
             if (remanageChart) {
                 if (chart._gsResizeObserver) {
                 chart._gsResizeObserver.disconnect();
