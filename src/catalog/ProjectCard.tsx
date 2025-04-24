@@ -213,17 +213,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 </MenuItem>
                 <MenuItem
                     onClick={() => {
-                        setIsAccessModalOpen(true);
-                        handleMenuClose();
-                    }}
-                >
-                    <ListItemIcon>
-                        <LockPersonIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Project Access</ListItemText>
-                </MenuItem>
-                <MenuItem
-                    onClick={() => {
                         setIsShareModalOpen(true);
                         handleMenuClose();
                     }}
