@@ -215,7 +215,6 @@ def create_flask_app(config_name=None):
     if ENABLE_AUTH:
         try:
             print("Registering authentication routes")
-            register_sso_routes(app) 
             register_auth_routes(app) # Register Auth0-related routes like /login and /callback
         except Exception as e:
             print(f"Error registering authentication routes: {e}")
@@ -842,7 +841,7 @@ def register_auth_routes(app):
 
 def validate_and_get_user(app):
     """
-    Validates the Auth0 token from the session and retrieves the user from Redis cache.
+    Validates the Auth0 token from the session and retrieves the user from cache.
     
     :param app: Flask app instance
     :return: Tuple (user object as dict, error response)
