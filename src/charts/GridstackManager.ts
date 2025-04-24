@@ -202,7 +202,9 @@ export default class GridStackManager {
                 outer = chart?.outerDiv as HTMLElement;
                 inner = chart?.innerDiv as HTMLElement;
                 if (!inner || !outer) {
+                    // If the containers don't exist call manageChart again with the remanage as false
                     this.manageChart(chart, ds, autoPosition, false);
+                    return;
                 }
             } 
             else {
