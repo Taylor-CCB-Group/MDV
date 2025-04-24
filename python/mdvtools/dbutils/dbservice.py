@@ -316,6 +316,7 @@ class UserService:
 
         except Exception as e:
             print(f"Error in UserService: Failed to add or update user: {e}")
+            db.session.rollback()  # Rollback session on error
             raise
 
 
@@ -367,6 +368,7 @@ class UserProjectService:
 
         except Exception as e:
             print(f"Error in UserProjectService: Failed to add/update user-project entry: {e}")
+            db.session.rollback()  # Rollback session on error
             raise
 
     @staticmethod
@@ -387,4 +389,25 @@ class UserProjectService:
 
         except Exception as e:
             print(f"Error in UserProjectService: Failed to get permissions: {e}")
+            raise
+
+
+    @staticmethod
+    def remove_user_from_project(user_id: int, project_id: int):
+        """Remove a user from a project."""
+        try:
+            # Fetch the UserProject record
+            user_project = UserProject.query.filter_by(user_id=user_id, project_id=project_id).first()
+            if not user_project:
+                return None  # User is not part of the project
+            
+            # Delete the record from the database
+            db.session.delete(user_project)
+            db.session.commit()
+            
+            print(f"User {user_id} removed from project {project_id}")
+
+        except Exception as e:
+            print(f"Error in remove_user_from_project: {e}")
+            db.session.rollback()  # Rollback in case of error
             raise
