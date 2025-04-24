@@ -269,6 +269,7 @@ export class ChartManager {
         this.viewLoader = dataLoader.viewLoader;
 
         this.layoutMenus = {};
+        this.isFullscreen = false;
 
         if (dataLoader.files) {
             this.filesToLoad = dataLoader.files.length;
@@ -652,13 +653,31 @@ export class ChartManager {
         if (config.all_views) {
             const currentView = config.initial_view || config.all_views[0];
             this.viewManager.setView(currentView);
-            dataLoader.viewLoader(currentView).then((data) => {
-                this._init(data, firstTime);
+            dataLoader.viewLoader(currentView).then(async (data) => {
+                try {
+                    await this._init(data, firstTime);
+                    if (currentView) {
+                        const state = this.getState();
+                        if (!state.view?.viewImage) {
+                            await this.viewManager.saveView();
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error during view initialization:", error);
+                    // Consider adding user-facing error handling here
+                }
             });
         }
         //only one view hard coded in config
+        //! This else block is not called, but if it is called at some point, make sure the state save works properly
         else {
-            this._init(config.only_view, firstTime);
+            this._init(config.only_view, firstTime)
+            .then(async () => {
+                    const state = this.getState();
+                    if (!state.view?.viewImage) {
+                        await this.viewManager.saveView();
+                    }
+            });
         }
     }
 
@@ -930,7 +949,13 @@ export class ChartManager {
         }
         if (config.tooltip) {
             if (config.tooltip.column) {
-                set.add(config.tooltip.column);
+                if (Array.isArray(config.tooltip.column)) {
+                    for (const i of config.tooltip.column) {
+                        set.add(i);
+                    }
+                } else {
+                    set.add(config.tooltip.column);
+                }
             }
         }
         if (config.background_filter) {
@@ -1379,23 +1404,6 @@ export class ChartManager {
             });
     }
 
-    _addLinkIcon(ds, ds_to, link) {
-        createMenuIcon(
-            "fas fa-plus-square",
-            {
-                tooltip: {
-                    text: `Add ${link.name}`,
-                    position: "bottom-right",
-                },
-                func: () => {
-                    // new BaseDialog.experiment["AddColumnsFromRows"](ds, ds_to, link, this);
-                    new AddColumnsFromRowsDialog(ds, ds_to, link, this);
-                },
-            },
-            ds.menuBar,
-        );
-    }
-
     /**
      * @param {{dataStore: DataStore}} ds
      */
@@ -1473,18 +1481,6 @@ export class ChartManager {
             new BaseDialog.experiment["AnnotationDialogReact"](ds.dataStore);
         });
 
-        if (dataStore.links) {
-            for (const ods in dataStore.links) {
-                const link = dataStore.links[ods];
-                if (link.rows_as_columns) {
-                    this._addLinkIcon(
-                        ds,
-                        this.dsIndex[ods],
-                        link.rows_as_columns,
-                    );
-                }
-            }
-        }
         const idiv = createEl(
             "div",
             {
@@ -1536,22 +1532,52 @@ export class ChartManager {
     }
 
     _addFullscreenIcon(ds) {
-        createMenuIcon(
+        const iconElement = createMenuIcon(
             "fas fa-expand",
             {
                 tooltip: {
                     text: "Full Screen",
                     position: "bottom-right",
                 },
-                func: () => {
+                func: async () => {
                     //nb, not sure best way to access the actual div I want here
                     //this could easily break if the layout structure changes
                     // ds.contentDiv.parentElement.requestFullscreen();
-                    ds.menuBar.parentElement.requestFullscreen();
+                    try {
+                        if (!this.isFullscreen) {
+                            await ds.menuBar.parentElement.requestFullscreen();
+                        } else {
+                            await document.exitFullscreen();
+                        }
+                    } catch (error) {
+                        console.error("fullscreen error caused: ", error);
+                    }
                 },
             },
             ds.menuBar,
         );
+
+        document.addEventListener("fullscreenchange", () => {
+            const iconEl = iconElement.querySelector("i");
+            if (document.fullscreenElement) {
+                if (ds.menuBar.parentElement === document.fullscreenElement) {
+                    if (iconEl) {
+                        iconEl.classList.remove("fa-expand");
+                        iconEl.classList.add("fa-compress");
+                    }
+                    iconElement.setAttribute("aria-label", "Exit Full Screen");
+                    this.isFullscreen = true;
+                }
+             } else {
+                if (iconEl) {
+                    iconEl.classList.remove("fa-compress");
+                    iconEl.classList.add("fa-expand");
+                }
+                iconElement.setAttribute("aria-label", "Full Screen");
+                this.isFullscreen = false;
+            }
+        });
+
     }
 
     /**
@@ -2090,11 +2116,15 @@ export class ChartManager {
             allCharts.push([ch.chart, ch.window]);
         }
         for (const ci of allCharts) {
-            if (ci[1]) {
-                ci[1].close();
+            try {
+                if (ci[1]) {
+                    ci[1].close();
+                }
+                ci[0].remove();
+                ci[0].div.remove();
+            } catch (error) {
+                console.error("Error occurred while removing the chart: ", error);
             }
-            ci[0].remove();
-            ci[0].div.remove();
         }
         this.charts = {};
     }

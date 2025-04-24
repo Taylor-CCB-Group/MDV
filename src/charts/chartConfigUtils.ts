@@ -1,12 +1,13 @@
 import { getRandomString } from "@/utilities/Utilities";
 import type BaseChart from "./BaseChart";
-import { action, type IReactionDisposer, makeAutoObservable } from "mobx";
-import type { FieldSpec } from "@/lib/columnTypeHelpers";
+import { action, makeAutoObservable } from "mobx";
+import type { FieldSpec, FieldSpecs } from "@/lib/columnTypeHelpers";
 import { RowsAsColsQuery, type RowsAsColsQuerySerialized } from "@/links/link_utils";
-import type { DataSource, FieldName } from "./charts";
+import type { FieldName } from "./charts";
 import type DataStore from "@/datastore/DataStore";
 import { isArray } from "@/lib/utils";
 import type { BaseConfig } from "./BaseChart";
+import type { TooltipConfig } from "@/react/scatter_state";
 
 /**
  * This is a utility module for handling the serialisation and deserialisation of chart configurations.
@@ -51,9 +52,10 @@ export function deserialiseParam(ds: DataStore, param: SerialisedColumnParam) {
     return result;
 }
 
-export function getConcreteFieldNames(fieldSpec: FieldSpec) {
+export function getConcreteFieldNames(fieldSpec: FieldSpec | FieldSpecs) {
     if (isArray(fieldSpec)) {
-        throw new Error("Not implemented");
+        // throw new Error("Not implemented");
+        return fieldSpec.flatMap((f) => typeof f === "string" ? f : f.fields);
     }
     //! nb, previously unused, now changing the signature to return string array
     //(I've had it with checking for array or string)
@@ -160,12 +162,25 @@ export function initialiseChartConfig<C extends BaseConfig, T extends BaseChart<
             chart.colorByColumn?.(colorBy);
         })
     }
-    if ((originalConfig as any).tooltip?.column) {
-        const tooltipColumn = deserialiseParam(chart.dataStore, (originalConfig as any).tooltip.column);
-        (config as any).tooltip.column = getConcreteFieldNames(tooltipColumn)[0];
-        chart.deferredInit(() => {
-            if (chart.setToolTipColumn) chart.setToolTipColumn(tooltipColumn);
-        })
+    const configWithTooltip = config as unknown as TooltipConfig;
+    const serialisedTooltipColumn = configWithTooltip.tooltip?.column;
+    if (serialisedTooltipColumn) {
+        if (isArray(serialisedTooltipColumn)) {
+            //@ts-expect-error type FieldSpec isn't serialised form, so deserialise complains
+            const tooltipColumn = serialisedTooltipColumn.map((c) => deserialiseParam(chart.dataStore, c));
+            (config as any).tooltip.column = getConcreteFieldNames(tooltipColumn);
+            // we're not using this method with multi-column, only react charts which aren't so method-based have multicolumn tooltips
+            // chart.deferredInit(() => {
+            //     if (chart.setToolTipColumn) chart.setToolTipColumn(tooltipColumn);
+            // })            
+        } else {
+            //@ts-expect-error type FieldSpec isn't serialised form, so deserialise complains
+            const tooltipColumn = deserialiseParam(chart.dataStore, serialisedTooltipColumn);
+            (config as any).tooltip.column = getConcreteFieldNames(tooltipColumn)[0];
+            chart.deferredInit(() => {
+                if (chart.setToolTipColumn) chart.setToolTipColumn(tooltipColumn);
+            });
+        }
     }
     console.log(config.type, 'processed config:', config);
     //temporary way of prototyping query

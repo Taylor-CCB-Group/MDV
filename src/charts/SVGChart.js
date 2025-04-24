@@ -14,6 +14,10 @@ class SVGChart extends BaseChart {
             .attr("width", this.width)
             .attr("height", this.height);
 
+        // axis stuff for ref... could be handled differently, 
+        // - outside constructor to respond to config changes etc.
+        // - in a react component.
+        //  ^ could we change this base to use react here? risky, interesting to try.
         this.config.axis = this.config.axis || {};
         const cax = this.config.axis;
         function setDefault(ob, param, val) {
@@ -109,6 +113,13 @@ class SVGChart extends BaseChart {
         };
     }
 
+    /**
+     * Set the size of an axis
+     * @param {"tx" | "ry" | "x" | "y"} axis - the axis to set the size of. 
+     * `'tx'` is the top x-axis, `'ry'` is the right y-axis (in Sankey chart), `'x'` is the bottom x-axis, `'y'` is the left y-axis.
+     * Top and right axes apply to specific chart types.
+     * @param {number} size - the size in px to set the axis to
+     */
     setAxisSize(axis, size) {
         switch (axis) {
             case "tx":

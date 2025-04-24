@@ -1,4 +1,4 @@
-import { BrowseGallery as BrowseGalleryIcon } from "@mui/icons-material";
+import GridViewIcon from '@mui/icons-material/GridView';
 import { useState } from "react";
 import ViewThumbnailDialog from "./ViewThumbnailDialog";
 import IconWithTooltip from "./IconWithTooltip";
@@ -13,7 +13,7 @@ const ViewThumbnailComponent = () => {
     return (
         <>
             <IconWithTooltip tooltipText="Browse View Gallery" onClick={onOpen}>
-                <BrowseGalleryIcon />
+                <GridViewIcon />
             </IconWithTooltip>
 
             <ViewThumbnailDialog open={open} setOpen={setOpen} />

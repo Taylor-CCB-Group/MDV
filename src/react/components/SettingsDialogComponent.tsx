@@ -470,8 +470,8 @@ const FolderComponent = ({ props }: { props: GuiSpec<"folder"> }) => {
             type="single"
             collapsible
             className="w-full col-span-2"
-            //expand by default
-            defaultValue={props.label}
+            //uncomment to expand by default
+            // defaultValue={props.label}
         >
             <AccordionItem value={props.label}>
                 <AccordionTrigger>{props.label}</AccordionTrigger>

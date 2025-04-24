@@ -51,6 +51,7 @@ const useProjects = () => {
                         : [],
                     numberOfStructures: item.numberOfStructures || "0",
                     numberOfImages: item.numberOfImages || "0",
+                    thumbnail: item?.thumbnail,
                 }));
 
                 setProjects(formattedProjects);

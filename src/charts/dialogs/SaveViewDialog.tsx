@@ -1,5 +1,6 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
-import { useEffect, useCallback } from "react";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import { useEffect, useCallback, useState } from "react";
+import StateDiffComponent from "./StateDiffComponent";
 
 const SaveViewDialogComponent = (props: {
     open: boolean;
@@ -8,6 +9,8 @@ const SaveViewDialogComponent = (props: {
     content?: string;
 }) => {
     const { viewManager } = window.mdv.chartManager;
+    const dev = import.meta.env.DEV;
+    const [showDiff, setShowDiff] = useState(false);
 
     const onSave = useCallback(async () => {
         await viewManager.saveView();
@@ -48,8 +51,25 @@ const SaveViewDialogComponent = (props: {
                         ? props?.content
                         : "You have unsaved changes, do you want to save the current view?"}
                 </Typography>
+                {
+                    showDiff && (
+                        <Box sx={{mt: 2, bgcolor: "background.default"}}>
+                            <StateDiffComponent 
+                                input1={viewManager.getCleanPrevState()} 
+                                input2={viewManager.getCleanCurrState()} 
+                            />
+                        </Box>
+                    )
+                }
             </DialogContent>
             <DialogActions>
+                {
+                    dev && (
+                        <Button onClick={() => setShowDiff(!showDiff)}>
+                            {showDiff ? "Hide Diff" : "Show Diff"}
+                        </Button>
+                    )
+                }
                 <Button onClick={onSave}>
                     Yes
                 </Button>

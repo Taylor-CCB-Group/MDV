@@ -20,6 +20,14 @@ export type State =
       }
     | undefined;
 
+const removeImageProp = (state: State) => {
+    const cloneState = { ...state };
+    if (cloneState?.view?.viewImage) {
+        cloneState.view.viewImage = undefined;
+    }
+    return cloneState;
+};
+
 class ViewManager {
     @observable accessor current_view = "";
     @observable accessor all_views: string[];
@@ -33,6 +41,15 @@ class ViewManager {
         setTimeout(() => {
             this.lastSavedState = this.cm.getState();
         }, 1000);
+    }
+
+    getCleanPrevState() {
+        return removeImageProp(toJS(this.lastSavedState));
+    }
+
+    getCleanCurrState() {
+        const currState = this.cm.getState();
+        return removeImageProp(toJS(currState));
     }
 
     // Setters
@@ -132,7 +149,7 @@ class ViewManager {
             const viewList: { name: string; image: string }[] = [];
             for (const view of this.all_views) {
                 const data = await this.cm.viewLoader(view);
-                viewList.push({ name: view, image: data.viewImage });
+                viewList.push({ name: view, image: data?.viewImage });
                 console.log(data);
             }
             return viewList;
@@ -240,6 +257,11 @@ class ViewManager {
         }
     }
 
+    @action
+    async saveAsView(viewName: string) {
+        await this.addView(viewName, {}, true);
+    }
+
     checkUnsavedState(action: () => void) {
         if (this.hasUnsavedChanges()) {
             this.cm.showSaveViewDialog(action);
@@ -252,14 +274,6 @@ class ViewManager {
     hasUnsavedChanges(verbose = false) {
         if (this.lastSavedState === null) return true;
 
-        const removeImageProp = (state: State) => {
-            const cloneState = { ...state };
-            if (cloneState?.view?.viewImage) {
-                cloneState.view.viewImage = undefined;
-            }
-            return cloneState;
-        };
-
         const currState = this.cm.getState();
 
         if (currState.chartErrors && currState.chartErrors.length > 0) {
@@ -268,11 +282,8 @@ class ViewManager {
         }
 
         const currentState = removeImageProp(toJS(currState));
-
         const prevState = removeImageProp(toJS(this.lastSavedState));
 
-        console.log("currentState", currentState);
-        console.log("prevState", prevState);
         if (verbose) {
             console.log("inside currentState", currentState);
             console.log("inside prevState", prevState);

@@ -23,7 +23,6 @@ import {
     Typography,
 } from "@mui/material";
 import { useCallback, useState } from "react";
-import ProjectAccessModal from "./ProjectAccessModal";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";

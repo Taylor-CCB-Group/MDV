@@ -12,6 +12,7 @@ import {
     Card,
     CardContent,
     CardMedia,
+    Divider,
     IconButton,
     ListItemIcon,
     ListItemText,
@@ -21,7 +22,6 @@ import {
 } from "@mui/material";
 import type React from "react";
 import { useEffect, useState } from "react";
-import ProjectAccessModal from "./ProjectAccessModal";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
@@ -46,6 +46,7 @@ export interface ProjectCardProps {
         newType: ProjectAccessType,
     ) => Promise<void>;
     onAddCollaborator: (email: string) => void;
+    thumbnail?: string;
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({
@@ -62,6 +63,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     onRename,
     onChangeType,
     onAddCollaborator,
+    thumbnail,
 }) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
@@ -112,11 +114,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        bgcolor: "grey.200",
+                        bgcolor: thumbnail ? "inherit" : "grey.200",
                     }}
                 >
-                    <ImageIcon sx={{ fontSize: 80, color: "text.secondary" }} />
+                    {thumbnail ? (
+                        <img src={thumbnail} alt="project_thumbnail" style={{ objectFit: "contain", width: "90%", aspectRatio: 3/2 }} />
+                    ) : (
+                        <ImageIcon sx={{ fontSize: 80, color: "text.secondary" }} />
+                    )}
                 </CardMedia>
+
+                <Divider />
 
                 <CardContent
                     sx={{
@@ -269,14 +277,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 open={isDeleteModalOpen}
                 onDelete={onDelete}
                 onClose={() => setIsDeleteModalOpen(false)}
-            />
-
-            <ProjectAccessModal
-                id={id}
-                type={type}
-                open={isAccessModalOpen}
-                onChangeType={onChangeType}
-                onClose={() => setIsAccessModalOpen(false)}
             />
         </Card>
     );

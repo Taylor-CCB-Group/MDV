@@ -4,25 +4,18 @@ import PhotoSizeSelectSmallOutlinedIcon from "@mui/icons-material/PhotoSizeSelec
 import PolylineOutlinedIcon from "@mui/icons-material/PolylineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ControlCameraOutlinedIcon from "@mui/icons-material/ControlCameraOutlined";
-import StraightenIcon from "@mui/icons-material/Straighten";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useMetadata } from "./avivatorish/state";
+import { useCallback, useMemo, useState } from "react";
 import type { useScatterplotLayer } from "../scatter_state";
-import { useMeasure, useSpatialLayers } from "../spatial_context";
+import { useSpatialLayers } from "../spatial_context";
 import type RangeDimension from "../../datastore/RangeDimension";
 import { observer } from "mobx-react-lite";
-import { useChartDoc, useChartSize } from "../hooks";
-import { sizeToMeters } from "./avivatorish/utils";
-import clsx from "clsx";
 import {
     DrawPolygonMode,
     DrawPolygonByDraggingMode,
     ModifyMode,
-    DrawRectangleMode, //we need a different version of this that works by dragging
-    DrawLineStringMode,
     // TransformMode,
     // TranslateMode,
-    CompositeMode,
+    CompositeMode
 } from '@deck.gl-community/editable-layers';
 import TranslateModeEx from '../../editable-layers/deck-community-ish/translate-mode-exp';
 import { DrawRectangleByDraggingMode } from "@/editable-layers/deck-community-ish/draw-rectangle-by-dragging-mode";
@@ -319,7 +312,8 @@ export default observer(function SelectionOverlay() {
             <ButtonGroup
                 variant="contained"
                 aria-label="choose tool for manipulating view or selection"
-                className="z-[2] p-2"
+                //moving this to the top right corner and absolute to avoid interfering with axes
+                className="z-[2] p-2 absolute top-0 right-0"
                 // style={{zIndex: 2, padding: '0.3em'}}
             >
                 {toolButtons}

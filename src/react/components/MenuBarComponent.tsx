@@ -1,20 +1,18 @@
-import { AppBar, Box, IconButton, Toolbar, Tooltip } from "@mui/material";
+import { AppBar, Box, Toolbar } from "@mui/material";
 import {
     Home as HomeIcon,
     Save as SaveIcon,
+    SaveAs as SaveAsIcon,
     Add as AddIcon,
     Remove as RemoveIcon,
     CloudUpload as CloudUploadIcon,
-    CameraAlt as CameraAltIcon,
     PestControl as PestControlIcon,
-    BugReport as BugReportIcon,
 } from "@mui/icons-material";
 import ToggleThemeWrapper from "@/charts/dialogs/ToggleTheme";
 import IconWithTooltip from "./IconWithTooltip";
 import ViewSelectorWrapper from "./ViewSelectorComponent";
 import ViewThumbnailComponent from "./ViewThumbnailComponent";
 import FileUploadDialogReact from "@/charts/dialogs/FileUploadDialogWrapper";
-import { toPng } from "html-to-image";
 import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
 import BaseChart from "@/charts/BaseChart";
 import { useProject } from "@/modules/ProjectContext";
@@ -39,6 +37,10 @@ const MenuBarComponent = () => {
 
     const handleSaveButtonClick = async () => {
         await viewManager.saveView();
+    };
+
+    const handleSaveAsButtonClick = () => {
+        new ViewDialogWrapper("save_as");
     };
 
     const handleCreateViewClick = async () => {
@@ -83,9 +85,14 @@ const MenuBarComponent = () => {
                         </Box>
                     )}
                     {config.permission === "edit" && (
-                        <IconWithTooltip tooltipText="Save View" onClick={handleSaveButtonClick}>
-                            <SaveIcon />
-                        </IconWithTooltip>
+                        <>
+                            <IconWithTooltip tooltipText="Save View" onClick={handleSaveButtonClick}>
+                                <SaveIcon />
+                            </IconWithTooltip>
+                            <IconWithTooltip tooltipText="Save View As..." onClick={handleSaveAsButtonClick}>
+                                <SaveAsIcon />
+                            </IconWithTooltip>
+                        </>
                     )}
                     {config.permission === "edit" && config.all_views && (
                         <>
