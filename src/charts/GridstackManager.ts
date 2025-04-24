@@ -158,7 +158,7 @@ export default class GridStackManager {
         return [grid.cellWidth(), this.cellHeight];
     }
 
-    manageChart(chart: Chart, ds: DataSource, autoPosition?: boolean) {
+    manageChart(chart: Chart, ds: DataSource, autoPosition?: boolean, remanageChart?: boolean) {
         const gridInstance = this.getGrid(ds);
         if (!gridInstance) throw new Error(`no grid instance for ${ds.name}`);
         const grid = gridInstance.grid;
@@ -194,15 +194,27 @@ export default class GridStackManager {
 
         // a bit long-winded but for gridstack to work correctly we 
         // the chart wrapped in an outer and inner container
-        const outer = document.createElement("div");
-        const inner = document.createElement("div");
-        inner.classList.add("grid-stack-item-content");
-        inner.style.overflow = "visible"; // able to see shadow
-        const origHeight = div.style.height;;
+        let outer: HTMLElement;
+        let inner: HTMLElement;
+        // Create new inner and outer divs only during the creation
+        if (remanageChart) {
+            inner = chart.getDiv().parentElement as HTMLElement;
+            outer = inner.parentElement as HTMLElement;
+        } 
+        else {
+            outer = document.createElement("div");
+            inner = document.createElement("div");
+        }
+
+        if (!remanageChart) {
+            inner.classList.add("grid-stack-item-content");
+            inner.style.overflow = "visible"; // able to see shadow
+            outer.appendChild(inner);
+            inner.appendChild(div);
+            grid.el.appendChild(outer);
+        }
+        const origHeight = div.style.height;
         div.style.height="100%";
-        outer.appendChild(inner);
-        inner.appendChild(div);
-        grid.el.appendChild(outer);
 
         //saves thr chart's position and size to the chart's config
         const saveChartPosition = () => { 
@@ -256,7 +268,9 @@ export default class GridStackManager {
             chart.deferredInit(() => chart.setSize(), 100);
         }
 
-        grid.makeWidget(outer);
+        // Create widget only during creation
+        if (!remanageChart)
+            grid.makeWidget(outer);
 
         //nb, autoPosition property doesn't apply in update()?
         //passing options to makeWidget() or addWidget() does not evoke joy.
@@ -268,8 +282,13 @@ export default class GridStackManager {
         }
     
 
-        const lockButton = addPositionLock();
-        
+        let lockButton: HTMLElement;
+        // Create lock button only the first time during creation
+        if (remanageChart) {
+            lockButton = chart.menuSpace.querySelector("span[aria-label='lock position']") as HTMLElement;
+        } else {
+            lockButton = addPositionLock();
+        }
         function addPositionLock() {
             let locked = false;
             const lockButton = chart.addMenuIcon(

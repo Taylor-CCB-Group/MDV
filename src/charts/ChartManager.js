@@ -2216,6 +2216,10 @@ export class ChartManager {
         }
     }
 
+    /**
+     * @param {BaseChart} chart 
+     * @param {import("@/charts/charts").DataSource} ds
+     */
     _makeChartRD(chart, ds) {
         //if (!ds) console.error(`_makeChartRD called without ds - resize / drag etc may not work properly`);
         //^^ actually doesn't make much difference to non-gridStack in practice.
