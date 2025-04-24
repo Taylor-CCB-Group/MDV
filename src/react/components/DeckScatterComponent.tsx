@@ -4,17 +4,21 @@ import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns } from "../hooks";
 import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo } from "react";
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
 import type { OrbitViewState } from "@deck.gl/core";
-import type { LoadedDataColumn } from "@/charts/charts";
+import type { DataColumn, LoadedDataColumn, NumberDataType } from "@/charts/charts";
+import { allNumeric } from "@/lib/columnTypeHelpers";
 import "../../charts/css/charts.css";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
+
+//todo this should be in a common place etc.
+const colMid = ({minMax}: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
 
 // const margin = { top: 10, right: 10, bottom: 40, left: 60 };
 /** todo this should be common for viv / scatter_state, pending refactor
@@ -52,11 +56,9 @@ function useZoomOnFilter(data: Uint32Array) {
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
         }
-        // setViewState(
         action(() => {
             chart.ignoreStateUpdate = true;
             chart.pendingRecenter = false;
-            const oldViewState = config.viewState;
             
             // Calculate range
             const dx = maxX - minX;
@@ -68,7 +70,7 @@ function useZoomOnFilter(data: Uint32Array) {
             const safeDy = Math.max(epsilon, dy);
 
             // Calculate zoom with fallback and NaN check
-            let zoom = Math.log2(Math.min(width / safeDx, height / safeDy)) - 0.2;
+            let zoom = Math.log2(Math.min(width / safeDx, height / safeDy)) - 0.6;
             if (!Number.isFinite(zoom)) {
                 console.warn("Invalid zoom value detected, using fallback");
                 zoom = 0; // Default zoom fallback
@@ -81,20 +83,25 @@ function useZoomOnFilter(data: Uint32Array) {
                 // transitionInterpolator: new FlyToInterpolator({speed: 1.2}),
             };
             if (config.dimension === "3d") {
-                // a bit clunktastic, might make more fancy typescript-y way to do this
-                // (thanks copilot for the word clunktastic - maybe a little strong)
-                const vs = oldViewState as OrbitViewState;
-                const newVs = config.viewState as OrbitViewState;
-                if (vs) {
-                    newVs.rotationOrbit = vs.rotationOrbit || 0;
-                    newVs.rotationX = vs.rotationX || 0;
+                const vs = config.viewState;
+                vs.rotationOrbit = vs.rotationOrbit || 0;
+                vs.rotationX = vs.rotationX || 0;
+                if (!config.zoom_on_filter) {
+                    if (!cz) {
+                        console.warn("3D viewState requires z coordinate");
+                        return;
+                    }
+                    const params = [cx, cy, cz];
+                    if (!allNumeric(params)) {
+                        throw new Error("3D viewState requires numeric coordinates");
+                    }
+                    vs.target = params.map(colMid) as [number, number, number];
                 }
             }
 
             chart.ignoreStateUpdate = false;
         })();
-        //return [(minX + maxX) / 2, (minY + maxY) / 2, maxX - minX, maxY - minY];
-    }, [data, cx, cy, width, height, config, pendingRecenter, chart]);
+    }, [data, cx, cy, cz, width, height, config, pendingRecenter, chart]);
 }
 
 
