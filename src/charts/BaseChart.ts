@@ -72,6 +72,11 @@ class BaseChart<T extends BaseConfig> {
     fullscreenIcon: HTMLSpanElement;
     // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
     activeQueries: ColumnQueryMapper<T>;
+    outerDiv?: HTMLElement;
+    innerDiv?: HTMLElement;
+    lockButton?: HTMLElement;
+    _gsResizeObserver?: ResizeObserver;
+    _gsMutationObserver?: MutationObserver;
     /**
      * The base constructor
      * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
