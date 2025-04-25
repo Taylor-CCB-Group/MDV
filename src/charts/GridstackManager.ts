@@ -20,9 +20,16 @@ declare global {
         gridstackPopoutCallback?: () => void;
     }
 }
+type ManagedChart = {
+    outer: HTMLElement;
+    inner: HTMLElement;
+    lockButton: HTMLElement;
+    _gsResizeObserver?: ResizeObserver;
+    _gsMutationObserver?: MutationObserver;
+} & Chart;
 export type GridInstance = {
     grid: GridStack;
-    charts: Set<Chart>;
+    charts: Set<ManagedChart>;
     icon: HTMLElement;
 };
 
@@ -158,11 +165,16 @@ export default class GridStackManager {
         return [grid.cellWidth(), this.cellHeight];
     }
 
-    manageChart(chart: Chart, ds: DataSource, autoPosition?: boolean, remanageChart?: boolean) {
+    manageChart(originalChart: Chart, ds: DataSource, autoPosition?: boolean, remanageChart?: boolean) {
         try {
             const gridInstance = this.getGrid(ds);
             if (!gridInstance) throw new Error(`no grid instance for ${ds.name}`);
             const grid = gridInstance.grid;
+            //note that we're being a bit type-unsafe here
+            //everything we do with managedChart will be to the same chart instance
+            //we're adding properties to it and using it as a managed chart
+            //would just take a little bit more re-work to make it properly safe
+            const chart = originalChart as ManagedChart;
             gridInstance.charts.add(chart);
             const div = chart.getDiv();
             //work out the size location of the chart in gridstack
@@ -200,22 +212,19 @@ export default class GridStackManager {
             let inner: HTMLElement;
             // Create new inner and outer divs only during the creation
             if (remanageChart) {
-                outer = chart?.outerDiv as HTMLElement;
-                inner = chart?.innerDiv as HTMLElement;
+                outer = chart.outer;
+                inner = chart.inner;
                 if (!inner || !outer) {
                     // If the containers don't exist call manageChart again with the remanage as false
                     this.manageChart(chart, ds, autoPosition, false);
                     return;
                 }
-            } 
-            else {
+            } else {
                 outer = document.createElement("div");
                 inner = document.createElement("div");
-                chart.outerDiv = outer;
-                chart.innerDiv = inner;
-            }
+                chart.outer = outer;
+                chart.inner = inner;
 
-            if (!remanageChart) {
                 inner.classList.add("grid-stack-item-content");
                 inner.style.overflow = "visible"; // able to see shadow
                 outer.appendChild(inner);
@@ -403,11 +412,13 @@ export default class GridStackManager {
                 //remove the observers
                 if (chart._gsResizeObserver) {
                     chart._gsResizeObserver.disconnect();
-                    delete chart._gsResizeObserver;
+                    // not using delete because of biome performance warning
+                    chart._gsResizeObserver = undefined;
                 }
                 if (chart._gsMutationObserver) {
                     chart._gsMutationObserver.disconnect();
-                    delete chart._gsMutationObserver;
+                    // not using delete because of biome performance warning
+                    chart._gsMutationObserver = undefined;
                 }
                 ro.disconnect();
                 mo.disconnect();

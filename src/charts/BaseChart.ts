@@ -72,11 +72,6 @@ class BaseChart<T extends BaseConfig> {
     fullscreenIcon: HTMLSpanElement;
     // activeQueries: Record<string, (string | MultiColumnQuery)[]> = {};
     activeQueries: ColumnQueryMapper<T>;
-    outerDiv?: HTMLElement;
-    innerDiv?: HTMLElement;
-    lockButton?: HTMLElement;
-    _gsResizeObserver?: ResizeObserver;
-    _gsMutationObserver?: MutationObserver;
     /**
      * The base constructor
      * @param {import("./charts.js").DataStore} dataStore - The datastore object that contains the data for this chart
@@ -266,6 +261,9 @@ class BaseChart<T extends BaseConfig> {
                     // Reset the size of chart
                     this.setSize(...oldSize);
                     const cm = window.mdv.chartManager;
+                    // we could make GridstackManager also change the setSize method?
+                    // then we'd avoid any gridstack code in here
+                    // but this is probably easier to understand anyway.
                     if (cm.viewData.dataSources[this.dataStore.name]?.layout === "gridstack") {
                         cm.gridStack.manageChart(this, this.dataSource, false, true);
                     }
