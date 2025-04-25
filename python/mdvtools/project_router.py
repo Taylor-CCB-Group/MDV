@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, Response, request, jsonify, session, redirect, url_for
+from flask import Flask, current_app, Response, request, jsonify, session, redirect, url_for
 from typing import Dict, Any, Callable, Tuple
 import re
 from urllib.parse import urlparse
@@ -190,7 +190,8 @@ class ProjectBlueprint_v2:
                         return jsonify({"error": "Authentication method not set in session"}), 401
 
                     if auth_method == "auth0":
-                        user_data, error_response = validate_and_get_user()
+                        user_data, error_response = validate_and_get_user(current_app)
+                        print("******************--2.1", user_data)
                     elif auth_method == "sso":
                         user_data, error_response = validate_sso_user(request)
                     else:
@@ -213,7 +214,11 @@ class ProjectBlueprint_v2:
                     
                     if user_projects:
                         # Step 4: Validate if the user has permissions for the requested project
-                        project_permissions = user_projects.get(str(project_id))  # Use string keys for consistency
+                        project_permissions = user_projects.get(int(project_id))  # Use string keys for consistency
+                        print("******************--4")
+                        print(user_projects)
+                        print(project_id)
+                        print(project_permissions)
                         print("Project Permissions:", project_permissions)
                         
                         

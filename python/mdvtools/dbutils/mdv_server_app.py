@@ -6,7 +6,7 @@ from datetime import datetime
 from functools import wraps
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-from flask import Flask, render_template, jsonify, request, redirect, url_for, session
+from flask import Flask, current_app, render_template, jsonify, request, redirect, url_for, session
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
 # from flask import Flask, render_template, jsonify, request
@@ -367,13 +367,15 @@ def update_cache(user_id=None, project_id=None, user_data=None, project_data=Non
                 # Project exists in cache, update only the changed fields
                 existing_project["name"] = project_data.get("name", existing_project["name"])
                 existing_project["lastModified"] = project_data.get("lastModified", existing_project["lastModified"])
+                existing_project["thumbnail"] = project_data.get("thumbnail", existing_project["thumbnail"])
                 print(f"Updated project {project_id} in active projects cache.")
             else:
                 # Project does not exist in cache, append a new entry
                 project_entry = {
                     "id": project_data["id"],
                     "name": project_data["name"],
-                    "lastModified": project_data["lastModified"]
+                    "lastModified": project_data["lastModified"],
+                    "thumbnail": project_data["thumbnail"]
                 }
                 active_projects_cache.append(project_entry)
                 print(f"Added new project {project_id} to active projects cache.")
@@ -845,7 +847,11 @@ def validate_and_get_user(app):
     :return: Tuple (user object as dict, error response)
     """
     try:
+        # Check if user information is already cached in session
+        if 'user' in session:
+            return session['user'], None  # Return the user from the session cache
 
+        # Initialize Auth0 provider
         auth0_provider = Auth0Provider(
             app,
             oauth=oauth,
@@ -876,6 +882,7 @@ def validate_and_get_user(app):
         # Fetch user directly from in-memory cache
         cached_user = user_cache.get(auth0_id)
         if cached_user:
+            session['user'] = cached_user
             return cached_user, None  # Return cached user
 
         # This should rarely happen since all users were cached at app startup.
@@ -891,6 +898,9 @@ def validate_and_get_user(app):
         user_data = {"id": user.id, "auth0_id": user.auth0_id, "email": user.email, "is_admin": user.is_admin}
         user_cache[auth0_id] = user_data
 
+        # Cache the user data in session for future use
+        session['user'] = user_data
+
         return user_data, None
 
     except Exception as e:
@@ -905,6 +915,10 @@ def validate_sso_user():
     Does NOT add/update user in the DB.
     """
     try:
+        # Check if the user information is already cached in the session
+        if 'user' in session:
+            return session['user'], None  # Return the user from session cache
+
         email = request.headers.get("X-Forwarded-User")
         persistent_id = request.headers.get("Shibboleth-Persistent-Id")
 
@@ -918,12 +932,18 @@ def validate_sso_user():
         if not user:
             return None, jsonify({"error": "SSO user not found"}), 403
 
-        return {
-            "id": user["id"],
-            "email": user["email"],
+        # Prepare user data
+        user_data = {
+            "id": user.id,
+            "email": user.email,
             "auth0_id": persistent_id,
-            "is_admin": user["is_admin"]
-        }, None
+            "is_admin": user.is_admin
+        }
+
+        # Cache the user data in session for future use
+        session['user'] = user_data
+
+        return user_data, None
 
     except Exception as e:
         print(f"validate_sso_user error: {e}")
@@ -938,16 +958,19 @@ def maybe_require_user(ENABLE_AUTH):
                 return f(user=None, *args, **kwargs)  # Inject `user=None` for consistency
 
             auth_method = session.get("auth_method")
+            print("------maybe_require_user----", auth_method)
             if not auth_method:
                 return jsonify({"error": "Authentication method not set in session"}), 401
 
             if auth_method == "auth0":
-                user, error_response = validate_and_get_user()
+                user, error_response = validate_and_get_user(current_app)
                 if error_response:
+                    print("------maybe_require_user----ERROR in auth0 validation")
                     return error_response
             elif auth_method == "sso":
                 user, error_response = validate_sso_user(request)
                 if error_response:
+                    print("------maybe_require_user----ERROR in sso validation")
                     return error_response
             else:
                 return jsonify({"error": "Unknown authentication method"}), 400
@@ -1011,7 +1034,7 @@ def register_routes(app, ENABLE_AUTH):
                             "thumbnail": p["thumbnail"]
                         }
                         for p in active_projects
-                        if str(p["id"]) in allowed_project_ids
+                        if p["id"] in allowed_project_ids
                     ]
                 else:
                     # No auth, return all
@@ -1073,6 +1096,15 @@ def register_routes(app, ENABLE_AUTH):
                     print(f"In register_routes: Error serving MDVProject: {e}")
                     return jsonify({"error": "Failed to serve MDVProject"}), 500
 
+                def get_project_thumbnail(project_path):
+                    """Extract the first available viewImage from a project's views."""
+                    try:
+                        mdv_project = MDVProject(project_path)
+                        return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
+                    except Exception as e:
+                        print(f"Error extracting thumbnail for project at {project_path}: {e}")
+                        return None
+                    
                 # Create a new Project record in the database with the path
                 print("Adding new project to the database")
                 new_project = ProjectService.add_new_project(path=project_path)
@@ -1086,6 +1118,9 @@ def register_routes(app, ENABLE_AUTH):
                             project_id=new_project.id,
                             is_owner=True
                         )
+
+                        # Generate thumbnail
+                        thumbnail = get_project_thumbnail(project_path)
                         
                         # Step 6: Update caches for the admin user and new project
                         update_cache(
@@ -1099,7 +1134,8 @@ def register_routes(app, ENABLE_AUTH):
                             project_data={
                                 "id": new_project.id,
                                 "name": new_project.name,
-                                "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                                "lastModified": new_project.update_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                                "thumbnail": thumbnail
                             }
                         )
                         
@@ -1149,7 +1185,7 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 2: Check if the user is owner using in-memory cache
                 if ENABLE_AUTH:
                     user_projects = user_project_cache.get(user_id)
-                    if not user_projects or not user_projects.get(project_id, {}).get("is_owner", False):
+                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         print(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can delete the project."}), 403
 
@@ -1214,7 +1250,7 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 2: Check ownership using cache
                 if ENABLE_AUTH:
                     user_projects = user_project_cache.get(user_id)
-                    if not user_projects or not user_projects.get(project_id, {}).get("is_owner", False):
+                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         print(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can rename the project."}), 403
 
@@ -1271,7 +1307,7 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 3: Check ownership from the user_project_cache
                 if ENABLE_AUTH:
                     user_projects = user_project_cache.get(user_id)
-                    if not user_projects or not user_projects.get(project_id, {}).get("is_owner", False):
+                    if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         print(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can change the access level."}), 403
 
@@ -1304,7 +1340,7 @@ def register_routes(app, ENABLE_AUTH):
                 
                 user_id = user["id"] if ENABLE_AUTH else None
 
-                user_permissions = user_project_cache.get(user_id, {}).get(project_id)
+                user_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can share the project"}), 403
                 
@@ -1374,7 +1410,7 @@ def register_routes(app, ENABLE_AUTH):
                 user_id = user["id"] if ENABLE_AUTH else None
 
                 # Step 2: Check if current user is owner of the project
-                user_permissions = user_project_cache.get(user_id, {}).get(project_id)
+                user_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can share the project"}), 403
 
@@ -1422,7 +1458,7 @@ def register_routes(app, ENABLE_AUTH):
 
         @app.route("/projects/<int:project_id>/share/<int:user_id>/edit", methods=["POST"])
         @maybe_require_user(ENABLE_AUTH)
-        def edit_user_permission(current_user, project_id: int, user_id: int):
+        def edit_user_permission(user, project_id: int, user_id: int):
             """Edit user permissions for a project."""
             try:
                 print(f"Editing permissions for user '{user_id}' in project '{project_id}'")
@@ -1433,10 +1469,10 @@ def register_routes(app, ENABLE_AUTH):
                     # If authentication is disabled, simply return and stop execution
                     return jsonify({"Error": "Authentication is disabled, no action taken."})
 
-                current_user_id = current_user["id"] if ENABLE_AUTH else None # The ID of the authenticated user
+                current_user_id = user["id"] if ENABLE_AUTH else None # The ID of the authenticated user
 
                 # Step 2: Validate if current user is the owner
-                user_permissions = user_project_cache.get(current_user_id, {}).get(project_id)
+                user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id))
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can edit permissions"}), 403
 
@@ -1478,7 +1514,7 @@ def register_routes(app, ENABLE_AUTH):
             
         @app.route("/projects/<int:project_id>/share/<int:user_id>/delete", methods=["POST"])
         @maybe_require_user(ENABLE_AUTH)
-        def delete_user_from_project(current_user, project_id: int, user_id: int):
+        def delete_user_from_project(user, project_id: int, user_id: int):
             """Remove a user from the project."""
             try:
                 print(f"Removing user '{user_id}' from project '{project_id}'")
@@ -1489,10 +1525,10 @@ def register_routes(app, ENABLE_AUTH):
                     # If authentication is disabled, simply return and stop execution
                     return jsonify({"error": "Authentication is disabled, no action taken."})
 
-                current_user_id = current_user["id"] if ENABLE_AUTH else None # The ID of the authenticated user
+                current_user_id = user["id"] if ENABLE_AUTH else None # The ID of the authenticated user
 
                 # Step 2: Validate ownership
-                user_permissions = user_project_cache.get(current_user_id, {}).get(project_id)
+                user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id))
                 if not user_permissions or not user_permissions.get("is_owner"):
                     return jsonify({"error": "Only the project owner can remove users"}), 403
 
