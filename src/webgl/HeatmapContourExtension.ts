@@ -81,7 +81,10 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
                 { name: 'positions', format: 'float32x3' },
                 { name: 'texCoords', format: 'float32x2' }
             ],
-            topology: 'triangle-fan-webgl',
+            //needed to change this because old 'triangle-fan-webgl' has been removed
+            //I think this is ok in terms of topology, but just now the graphics output is not correct
+            //(maybe more props related rather than actual rendering, I see contours but no fill)
+            topology: 'triangle-list',
             vertexCount
         });
     }
