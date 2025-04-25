@@ -59,7 +59,7 @@
     "@radix-ui/react-label": "^2.0.2",
     "@radix-ui/react-radio-group": "^1.1.3",
     "@visx/visx": "^3.12.0",
-    "@hms-dbmi/viv": "^0.17.3",
+    "@vivjs-experimental/viv": "^1.0.0",
     "axios": "^1.6.8",
     "canvas-to-svg": "^1.0.3",
     "class-variance-authority": "^0.7.0",

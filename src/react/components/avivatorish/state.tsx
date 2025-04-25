@@ -1,5 +1,5 @@
 import { type PropsWithChildren, createContext, useContext } from "react";
-import type { loadBioformatsZarr, loadOmeTiff, loadOmeZarr } from "@hms-dbmi/viv";
+import type { loadBioformatsZarr, loadOmeTiff, loadOmeZarr } from "@vivjs-experimental/viv";
 import { createStore } from "zustand";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { observer } from "mobx-react-lite";
@@ -13,7 +13,7 @@ export type BIO_ZARR = Awaited<ReturnType<typeof loadBioformatsZarr>>;
 export type PixelSource = OME_TIFF | OME_ZARR | BIO_ZARR;
 
 // --- copied straight from Avivator's code::: with notes / changes for MDV ---
-import { RENDERING_MODES } from "@hms-dbmi/viv";
+import { RENDERING_MODES } from "@vivjs-experimental/viv";
 import { getEntries } from "@/lib/utils";
 
 const capitalize = (string: string) => string.charAt(0).toUpperCase() + string.slice(1);
