@@ -23,6 +23,7 @@ export type State =
 const removeImageProp = (state: State) => {
     const cloneState = { ...state };
     if (cloneState?.view?.viewImage) {
+        // biome-ignore lint/performance/noDelete: setting to undefined leads to an obscure issue with hasUnsavedChanges
         delete cloneState.view.viewImage;
     }
     return cloneState;
