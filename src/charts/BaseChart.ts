@@ -264,12 +264,10 @@ class BaseChart<T extends BaseConfig> {
                 } else {
                     this.observable.container = this.__doc__.body;
                     // Reset the size of chart
+                    this.setSize(...oldSize);
                     const cm = window.mdv.chartManager;
                     if (cm.viewData.dataSources[this.dataStore.name]?.layout === "gridstack") {
-                        this.setSize(...oldSize);
                         cm.gridStack.manageChart(this, this.dataSource, false, true);
-                    } else {
-                        this.setSize(...oldSize);
                     }
                     for (const d of this.dialogs) {
                         d.setParent(null);

@@ -22,7 +22,6 @@ import {
     Typography,
 } from "@mui/material";
 import { useCallback, useState } from "react";
-import ProjectAccessModal from "./ProjectAccessModal";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
@@ -137,12 +136,6 @@ const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: Project
                     </ListItemIcon>
                     <ListItemText>Delete Project</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={() => handleModalOpen(setIsAccessModalOpen)}>
-                    <ListItemIcon>
-                        <LockPerson fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Project Access</ListItemText>
-                </MenuItem>
             </Menu>
 
             {selectedProject && (
@@ -172,14 +165,6 @@ const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: Project
                         open={isDeleteModalOpen}
                         onDelete={onDelete}
                         onClose={() => setIsDeleteModalOpen(false)}
-                    />
-
-                    <ProjectAccessModal
-                        id={selectedProject.id}
-                        type={selectedProject.type}
-                        open={isAccessModalOpen}
-                        onChangeType={onChangeType}
-                        onClose={() => setIsAccessModalOpen(false)}
                     />
                 </>
             )}

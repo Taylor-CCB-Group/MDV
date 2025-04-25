@@ -11,7 +11,7 @@ import { useRegionScale } from "./scatter_state";
 import { isArray, notEmpty } from "@/lib/utils";
 import type { BaseConfig } from "@/charts/BaseChart";
 import type Dimension from "@/datastore/Dimension";
-import { allColumnsLoaded, isColumnLoaded, type FieldSpec } from "@/lib/columnTypeHelpers";
+import { allColumnsLoaded, type FieldSpecs, isColumnLoaded, type FieldSpec, flattenFields } from "@/lib/columnTypeHelpers";
 
 
 /**
@@ -124,23 +124,48 @@ export function useParamColumns(): LoadedDataColumn<DataType>[] {
     return columns;
 }
 
-export function useNamedColumn(name?: FieldName): {
-    column: DataColumn<any>;
-    isLoaded: boolean;
-} | undefined {
+/**
+ * Given field specs from a config object, return the (loaded) columns associated with it.
+ * If the spec is for some active column that changes at runtime, this will set up appropriate
+ * (re)loading.
+ */
+export function useFieldSpecs(specs?: FieldSpecs | FieldSpec) {
     const chart = useChart();
-    const { columnIndex } = chart.dataStore;
-    const [isLoaded, setIsLoaded] = useState(false);
-    const column = name ? columnIndex[name] : undefined;
+    // consider different loading strategies, lazy vs eager column data
+    //todo generic type with corresponding check when loaded
+    const [columns, setColumns] = useState<DataColumn<any>[]>([]);
+    //I'm dubious about this...
     useEffect(() => {
-        if (!name) {
-            setIsLoaded(false);
+        if (!specs) {
+            setColumns([]);
             return;
         }
-        loadColumn(chart.dataStore.name, name).then(() => setIsLoaded(true));
-    }, [name, chart.dataStore]);
-    if (!column) throw `expected columnIndex[${name}] to have a value`;
-    return { column, isLoaded };
+        return autorun(() => {
+            const fieldNames = flattenFields(specs);
+            if (!fieldNames) {
+                setColumns([]);
+                return;
+            }
+            const cm = window.mdv.chartManager;
+            // if this is less efficient than it could be with already loaded columns,
+            // we could fix it upstream - although there'll always be some async...
+            // but then that's generally the case with setState etc
+            // console.log("loading columns", fieldNames);
+            cm.loadColumnSet(fieldNames, chart.dataStore.name, () => {
+                const { columnIndex } = chart.dataStore;
+                const columns = fieldNames.map((f) => columnIndex[f]).filter(notEmpty);
+                setColumns(columns);
+            });
+        });
+    }, [specs, chart.dataStore]);
+    return columns;
+}
+export function useFieldSpec(spec?: FieldSpec) {
+    const fieldSpecs = useMemo(() =>spec ? [spec] : [], [spec]);
+    const arr = useFieldSpecs(fieldSpecs);
+    if (!arr) return undefined;
+    if (arr.length === 0) return undefined;
+    return arr[0];
 }
 
 /** version of {@link useParamColumns} that only returns columns once they've been loaded */
@@ -198,11 +223,9 @@ export function useFilteredIndices() {
     // I really want to sort out how I use types here...
     const config = useConfig<VivRoiConfig>();
     const filterColumn = config.background_filter?.column;
+    const simpleFilteredIndices = useSimplerFilteredIndices();
     const dataStore = useDataStore();
     const [filteredIndices, setFilteredIndices] = useState(new Uint32Array());
-    const [filteredOutIndices, setFilteredOutIndices] = useState(
-        new Uint32Array(),
-    );
     useEffect(() => {
         // return
         let cancelled = false;
@@ -283,8 +306,41 @@ export function useFilteredIndices() {
         dataStore.getFilteredIndices,
         dataStore.name,
     ]);
+    if (!filterColumn) return simpleFilteredIndices;
     return filteredIndices;
 }
+
+/** 
+ * The implementation of useFilteredIndices in `scatter_state` presuposes that the config
+ * will have a `background_filter`, which is used for filtering to image region... and then we also
+ * added `category_filters` as an extra feature... but it adds up to returning zero-length arrays here
+ * where we don't have those filters... and actually, now I'm thinking of a more general way of charts having
+ * local filters.
+ * 
+ * Additionally, I want to change the approach for how we use filtered indices in deck.gl so that rather than
+ * only rendering those points, we render all points, but with a filter that makes them invisible and allows for transitions.
+ * n.b. I don't really mean that we render all points either, we also need to consider cases where we have a large number of points
+ */
+export function useSimplerFilteredIndices() {
+    const ds = useDataStore();
+    const [filteredIndices, setFilteredIndices] = useState<Uint32Array>(new Uint32Array(0));
+    useEffect(() => {
+        ds._filteredIndicesPromise; //referencing this so it's a dependency
+        ds.getFilteredIndices().then(i => setFilteredIndices(i));
+    }, [ds._filteredIndicesPromise, ds.getFilteredIndices]);
+    return filteredIndices;
+}
+
+export function useFilterArray() {
+    const ds = useDataStore();
+    //not what we really want here - would be good to check if we end up with multiple copies of the data
+    const data = useSimplerFilteredIndices();
+    return useMemo(() => {
+        data; //referencing this so it's a dependency
+        return ds.filterArray;
+    }, [ds.filterArray, data]);
+}
+
 
 export function useCategoryFilterIndices(
     contourParameter?: DataColumn<CategoricalDataType>,

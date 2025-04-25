@@ -1,6 +1,8 @@
 import vSideEffect from "../react/components/VivMDVReact";
 const arr: any[] = [];
 arr.push(vSideEffect);
+import dSideEffect from "../react/components/DeckScatterReactWrapper";
+arr.push(dSideEffect);
 import SideEffect from "../charts/dialogs/AnnotationDialogReact";
 arr.push(SideEffect);
 // import addChart from "../charts/dialogs/AddChartDialogReact";

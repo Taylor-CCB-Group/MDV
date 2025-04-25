@@ -22,7 +22,6 @@ import {
 } from "@mui/material";
 import type React from "react";
 import { useEffect, useState } from "react";
-import ProjectAccessModal from "./ProjectAccessModal";
 import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
@@ -210,17 +209,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     </ListItemIcon>
                     <ListItemText>Delete Project</ListItemText>
                 </MenuItem>
-                <MenuItem
-                    onClick={() => {
-                        setIsAccessModalOpen(true);
-                        handleMenuClose();
-                    }}
-                >
-                    <ListItemIcon>
-                        <LockPersonIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Project Access</ListItemText>
-                </MenuItem>
             </Menu>
 
             <ProjectInfoModal
@@ -266,14 +254,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 open={isDeleteModalOpen}
                 onDelete={onDelete}
                 onClose={() => setIsDeleteModalOpen(false)}
-            />
-
-            <ProjectAccessModal
-                id={id}
-                type={type}
-                open={isAccessModalOpen}
-                onChangeType={onChangeType}
-                onClose={() => setIsAccessModalOpen(false)}
             />
         </Card>
     );
