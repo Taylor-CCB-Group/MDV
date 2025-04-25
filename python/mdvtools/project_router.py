@@ -6,7 +6,6 @@ import re
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import functools
-from mdvtools.dbutils.mdv_server_app import validate_and_get_user, validate_sso_user, user_project_cache, ENABLE_AUTH
 
 """
 This should work as a drop-in replacement for `Blueprint` in the context
@@ -90,7 +89,6 @@ class ProjectBlueprint_v2:
     TIMESTAMP_UPDATE_INTERVAL = timedelta(hours=1)
 
     # Normalize ENABLE_AUTH to a boolean
-    AUTH_ENABLED = ENABLE_AUTH
 
     @staticmethod
     def register_app(app: Flask) -> None:
@@ -160,6 +158,7 @@ class ProjectBlueprint_v2:
 
         # find the item in self.routes that matches the subpath
         from mdvtools.dbutils.dbservice import ProjectService
+        from mdvtools.dbutils.mdv_server_app import validate_and_get_user, validate_sso_user, user_project_cache, ENABLE_AUTH
         print("**********************************")
         print(subpath, project_id)
         subpath = f"/{urlparse(subpath).path}"
@@ -180,10 +179,10 @@ class ProjectBlueprint_v2:
                         return jsonify({"error": "Failed to update project accessed timestamp"}), 500
 
                 print("******************--1")
-                print(ProjectBlueprint_v2.AUTH_ENABLED)
+                print(ENABLE_AUTH)
                 project_permissions = None
                 # Check if authentication is enabled
-                if ProjectBlueprint_v2.AUTH_ENABLED:
+                if ENABLE_AUTH:
                     print("******************--2")
                     # Dynamically check the authentication method from session
                     auth_method = session.get("auth_method")
@@ -237,7 +236,7 @@ class ProjectBlueprint_v2:
                     if required_access_level == 'editable':
                         print("required_access_level is editable, fetched project is ", project)
                         
-                        if ProjectBlueprint_v2.AUTH_ENABLED:
+                        if ENABLE_AUTH:
                             if project_permissions:
                                 if not (project_permissions.get("is_owner", False) or project_permissions.get("can_write", False)):
                                     print("MAIN--------------------------")
