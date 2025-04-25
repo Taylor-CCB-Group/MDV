@@ -23,7 +23,7 @@ export type State =
 const removeImageProp = (state: State) => {
     const cloneState = { ...state };
     if (cloneState?.view?.viewImage) {
-        cloneState.view.viewImage = undefined;
+        delete cloneState.view.viewImage;
     }
     return cloneState;
 };
