@@ -1136,6 +1136,7 @@ def register_routes(app, ENABLE_AUTH):
         @maybe_require_user(ENABLE_AUTH)
         def delete_project(user, project_id: int):
             #project_removed_from_blueprints = False
+            global active_projects_cache
             try:
                 print(f"Deleting project '{project_id}'")
 
@@ -1181,7 +1182,7 @@ def register_routes(app, ENABLE_AUTH):
 
                 # Step 7: Remove from cache
                 if ENABLE_AUTH:
-                    global active_projects_cache
+                    
                     active_projects_cache = [p for p in active_projects_cache if p["id"] != project_id]
                     print(f"Removed project '{project_id}' from in-memory cache")
 
