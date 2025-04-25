@@ -1,6 +1,6 @@
-import { LayerExtension, Layer } from "@deck.gl/core";
+import { Layer } from "@deck.gl/core";
 import type { Buffer, Device, Texture } from '@luma.gl/core';
-import { Geometry, Model } from '@luma.gl/engine';
+import { Model } from '@luma.gl/engine';
 import { type LayerContext, project32 } from '@deck.gl/core';
 import type { _ConstructorOf } from "@deck.gl/core/";
 
@@ -89,9 +89,6 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
                 { name: 'positions', format: 'float32x3' },
                 { name: 'texCoords', format: 'float32x2' }
             ],
-            //needed to change this because old 'triangle-fan-webgl' has been removed
-            //I think this is ok in terms of topology, but just now the graphics output is not correct
-            //(maybe more props related rather than actual rendering, I see contours but no fill)
             topology: 'triangle-strip',
             vertexCount,
             
@@ -105,8 +102,7 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
         });
     }
 
-    //@ts-expect-error `draw({uniforms})`
-    draw({ uniforms }): void {
+    draw({ uniforms }: { uniforms: any }): void {
         const { model } = this.state;
         const { intensity, threshold, aggregationMode, colorDomain, contourOpacity } = this.props;
         // deprecated, "use uniform buffers for portability".
