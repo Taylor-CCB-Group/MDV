@@ -14,8 +14,6 @@ from mdvtools.server import add_safe_headers
 from mdvtools.mdvproject import MDVProject
 from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project, User, UserProject
-from mdvtools.dbutils.filesystem_watcher import start_watching
-import threading
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService, UserService, UserProjectService
 
