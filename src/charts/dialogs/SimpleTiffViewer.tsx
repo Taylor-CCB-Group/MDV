@@ -1,8 +1,8 @@
 import type React from 'react';
 import { useEffect, useMemo } from 'react';
 import { observer } from "mobx-react-lite";
-import { DetailView, getDefaultInitialViewState } from '@vivjs-experimental/viv';
-import { ColorPaletteExtension } from '@vivjs-experimental/viv';
+import { DetailView, getDefaultInitialViewState } from '@hms-dbmi/viv';
+import { ColorPaletteExtension } from '@hms-dbmi/viv';
 import { useLoader, useChannelsStore, useViewerStore, useViewerStoreApi } from '../../react/components/avivatorish/state';
 import { shallow } from 'zustand/shallow';
 import MDVivViewer from '../../react/components/avivatorish/MDVivViewer';

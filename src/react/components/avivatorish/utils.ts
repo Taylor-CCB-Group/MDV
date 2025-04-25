@@ -11,7 +11,7 @@ import {
     RENDERING_MODES,
     ColorPalette3DExtensions,
     AdditiveColormap3DExtensions,
-} from "@vivjs-experimental/viv";
+} from "@hms-dbmi/viv";
 
 import { GLOBAL_SLIDER_DIMENSION_FIELDS } from "./constants";
 import { isArray } from "@/lib/utils";

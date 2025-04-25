@@ -1,4 +1,4 @@
-import { getChannelStats } from "@vivjs-experimental/viv";
+import { getChannelStats } from "@hms-dbmi/viv";
 import { Matrix4 } from "@math.gl/core";
 
 /** copied (not quite verbatim) from avivator utils */

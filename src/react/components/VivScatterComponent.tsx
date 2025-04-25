@@ -2,7 +2,7 @@ import {
     getDefaultInitialViewState,
     ColorPaletteExtension,
     DetailView,
-} from "@vivjs-experimental/viv";
+} from "@hms-dbmi/viv";
 import { observer } from "mobx-react-lite";
 import { useMemo, useEffect, useRef } from "react";
 import { shallow } from "zustand/shallow";
