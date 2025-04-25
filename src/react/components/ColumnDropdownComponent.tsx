@@ -2,7 +2,7 @@ import { columnMatchesType, inferGenericColumnSelectionProps } from "@/lib/colum
 import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { useDataStore } from "../context";
 import type { DataColumn, DataType } from "@/charts/charts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type HTMLAttributes, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Autocomplete, Box, Checkbox, Chip, Divider, FormControlLabel, Paper } from "@mui/material";
 import { isArray } from "@/lib/utils";
@@ -121,6 +121,7 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
         <Grid className="w-full items-center" container>
             <Grid className={"grow"}>
                 <Autocomplete
+                    //! A future use-case can be that the columns will be added at runtime, but MUI's autocomplete has an existing issue. Refer: https://github.com/mui/material-ui/issues/29508 
                     className="w-full"
                     options={columns}
                     multiple={isMultiType}
@@ -135,10 +136,10 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                         // *sigh*. time to move on.
                         if (!value) return; //! check if this is correct
                         if (!(isMultiType === isArray(value))) throw new Error("type mismatch");
-                        if (isMultiType) {
-                            if (isArray(value) && value.length === columns.length) {
+                        if (isMultiType && isArray(value)) {
+                            if (value.length === columns.length) {
                                 setSelectAll(true);
-                            } else {
+                            } else if (selectAll && value.length !== columns.length) {
                                 setSelectAll(false);
                             }
                         }
@@ -219,7 +220,8 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                             </li>
                         );
                     }}
-                    PaperComponent={(paperProps) => {
+                    // biome-ignore lint/correctness/useExhaustiveDependencies: conflicting warning for handleSelectAll dependency
+                    PaperComponent={useMemo(() => (paperProps: HTMLAttributes<HTMLElement>) => {
                         const { children, ...restPaperProps } = paperProps;
                         return (
                           <Paper {...restPaperProps}>
@@ -246,7 +248,7 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                             {children}
                           </Paper>
                         );
-                      }}
+                      }, [isMultiType, selectAll])}
                 />
             </Grid>
         </Grid>
