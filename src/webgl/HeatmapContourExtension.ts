@@ -1,6 +1,6 @@
 import { LayerExtension, Layer } from "@deck.gl/core";
 import type { Buffer, Device, Texture } from '@luma.gl/core';
-import { Model } from '@luma.gl/engine';
+import { Geometry, Model } from '@luma.gl/engine';
 import { type LayerContext, project32 } from '@deck.gl/core';
 import type { _ConstructorOf } from "@deck.gl/core/";
 
@@ -75,6 +75,14 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
         return new Model(device, {
             ...this.getShaders(),
             id: this.props.id,
+            // geometry: new Geometry({
+            //     topology: 'triangle-list',
+            //     //@ts-expect-error shouldn't Record<string, Buffer> be ok here?
+            //     attributes: data.attributes,
+            //     bindings: { weightsTexture, maxTexture, colorTexture },
+            //     vertexCount: 6,
+            //     indices: new Uint16Array([0, 1, 3, 1, 2, 3]),
+            // }),
             bindings: { weightsTexture, maxTexture, colorTexture },
             attributes: data.attributes,
             bufferLayout: [
@@ -84,8 +92,16 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
             //needed to change this because old 'triangle-fan-webgl' has been removed
             //I think this is ok in terms of topology, but just now the graphics output is not correct
             //(maybe more props related rather than actual rendering, I see contours but no fill)
-            topology: 'triangle-list',
-            vertexCount
+            topology: 'triangle-strip',
+            vertexCount,
+            
+            // if we include this, we get 
+            // """
+            // drawing TriangleLayerContours({id: 'scatter_-#srslt0detail-react#-contour1-triangle-layer'}) to screen: 
+            // Cannot read properties of undefined (reading 'setUniforms') 
+            // TypeError: Cannot read properties of undefined (reading 'setUniforms')
+            // """
+            // indexBuffer: device.createBuffer(new Uint16Array([0, 1, 3, 1, 2, 3]))
         });
     }
 
@@ -93,6 +109,8 @@ export class TriangleLayerContours extends Layer<_TriangleLayerProps & ExtraCont
     draw({ uniforms }): void {
         const { model } = this.state;
         const { intensity, threshold, aggregationMode, colorDomain, contourOpacity } = this.props;
+        // deprecated, "use uniform buffers for portability".
+        // Sounds good. How do we do that?
         model.setUniforms({
             ...uniforms,
             intensity,
