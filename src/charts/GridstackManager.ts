@@ -20,9 +20,16 @@ declare global {
         gridstackPopoutCallback?: () => void;
     }
 }
+type ManagedChart = {
+    outer: HTMLElement;
+    inner: HTMLElement;
+    lockButton: HTMLElement;
+    _gsResizeObserver?: ResizeObserver;
+    _gsMutationObserver?: MutationObserver;
+} & Chart;
 export type GridInstance = {
     grid: GridStack;
-    charts: Set<Chart>;
+    charts: Set<ManagedChart>;
     icon: HTMLElement;
 };
 
@@ -158,209 +165,267 @@ export default class GridStackManager {
         return [grid.cellWidth(), this.cellHeight];
     }
 
-    manageChart(chart: Chart, ds: DataSource, autoPosition?: boolean) {
-        const gridInstance = this.getGrid(ds);
-        if (!gridInstance) throw new Error(`no grid instance for ${ds.name}`);
-        const grid = gridInstance.grid;
-        gridInstance.charts.add(chart);
-        const div = chart.getDiv();
-        //work out the size location of the chart in gridstack
-        //doesn't work that well with complex layouts
-        const rect = div.getBoundingClientRect();
-        let w = Math.round((rect.width+6) / grid.cellWidth());
-        let h = Math.round((rect.height+6) / this.cellHeight);
-        let x = Math.round(div.offsetLeft / grid.cellWidth()); //relative location
-        //cases where the old container was wider than the current one
-        x = x > 11 ? 11 : x;
-        let y = Math.floor(div.offsetTop / this.cellHeight); //relative location
-        //if the chart has gridstack data i.e. in saved view or being re-added from a popout
-        //then use these
-        if (chart.config.gsposition) {
-            [x, y] = chart.config.gsposition;
-            [w, h] = chart.config.gssize;
-            autoPosition = false;
-        }
-        //maybe better not to add to dom before getting here, and use grid.addWidget
-        //current version seems to be working moderately ok.
-        clearPosition(div);
-        div.style.transition = "filter 0.5s ease";
-
-
-         // Add the "move" cursor
-        const handle = div.querySelector(this.dragHandle) as HTMLElement;
-        if (handle) {
-            handle.style.cursor = "move"; // Add the "move" cursor
-        }
-
-        // a bit long-winded but for gridstack to work correctly we 
-        // the chart wrapped in an outer and inner container
-        const outer = document.createElement("div");
-        const inner = document.createElement("div");
-        inner.classList.add("grid-stack-item-content");
-        inner.style.overflow = "visible"; // able to see shadow
-        const origHeight = div.style.height;;
-        div.style.height="100%";
-        outer.appendChild(inner);
-        inner.appendChild(div);
-        grid.el.appendChild(outer);
-
-        //saves thr chart's position and size to the chart's config
-        const saveChartPosition = () => { 
-            const { x, y, w, h } = outer.gridstackNode;
-            chart.config.gssize = [w, h];
-            chart.config.gsposition = [x, y];
-        }
-
-        // using ResizeObserver rather than gridstack callbacks
-        // means we have closure on 'chart' without needing to maintain another data structure
-        // or attach more properties to the div.
-        const ro = new ResizeObserver(
-            debounce(() => {
-                try {
-                    //this is causing 'No data for row chart' error
-                    //when loading as saved view
-                    //it redraws chart before the data is processed
-                    //^ perhaps we could use something related to chart.deferredInit if this is a problem
-                    //would possibly need to improve the design of that mechanism, 
-                    //we could possibly move `ro` creation to after that promise resolves.
-
-                    // also leads to a condition in which initial chart.config.size is not stable
-                    // immediately after adding it... and also if the window is resized, 
-                    // or the view is opened on a different screen... we need to think about how
-                    // we serialize the layout information.
-                    chart.setSize();
-                    saveChartPosition();
-
-                } catch {}
-            }, 20),
-        );
-        ro.observe(outer);
-
-        //stores the position and size of the chart is repositioned
-        //could also check if width, height has changed as well and have one observer,
-        //but probably best to use the proper resize observer above
-        const mo = new MutationObserver(
-            debounce(() => {
-                try {
-                    saveChartPosition();
-                } catch {}
-            }, 20),
-        );
-        mo.observe(outer, { attributes: true, attributeFilter: ["style"] });
-        // workaround for absolute positioning still being saved in config
-        // this interferes with detecting unsaved changes
-        // but if we want to compare state with state from server, it won't work.
-        // it would still also have a false positive if window is resized.
-        // only applies during chart init, so not when _alreadyCheckedDeferReady is true.
-        if (!chart._alreadyCheckedDeferReady) {
-            chart.deferredInit(() => chart.setSize(), 100);
-        }
-
-        grid.makeWidget(outer);
-
-        //nb, autoPosition property doesn't apply in update()?
-        //passing options to makeWidget() or addWidget() does not evoke joy.
-        if (!autoPosition) {
-            console.log("gridstack:", chart.config.type, { w, h, x, y });
-            grid.update(outer, { w, h, x, y });
-        } else {
-            grid.update(outer, { w, h });
-        }
-    
-
-        const lockButton = addPositionLock();
-        
-        function addPositionLock() {
-            let locked = false;
-            const lockButton = chart.addMenuIcon(
-                "fas fa-unlock",
-                "lock position",
-            );
-            const lockIcon = lockButton.children[0];
-            lockButton.addEventListener("click", () => {
-                locked = !locked;
-                lockIcon.classList.toggle("fa-lock", locked);
-                lockIcon.classList.toggle("fa-unlock", !locked);
-                grid.update(outer, { locked });
-                outer.classList.toggle("gridLock", locked);
-            });
-            return lockButton;
-        }
-        //could this be handled by a decorator?
-        const oldRemove = addRemoveHandler();
-        function addRemoveHandler() {
-            const { remove } = chart;
-            chart.remove = () => {
-                //grid.removeWidget(div, true);
-                chart.removeLayout?.();
-                remove.apply(chart);
-            };
-            return remove;
-        }
-
-        div.gridstackPopoutCallback = () => {
-            chart.removeLayout?.();
-        };
-
-        //the below was leading subtle errors
-        //not sure why you need to alter changeBaseDocument?
-        /*
-        function addPopOutHandler() {
-            const { changeBaseDocument } = chart;
-            div.gridstackPopoutCallback = () => {
-                // console.log('removing from gridstack');
-                grid.removeWidget(div, true);
-                if (chart.removeLayout)
-                    chart.removeLayout();
-            };
-            chart.changeBaseDocument = (doc: Document) => {
-                //by now, it's too late... the parent element is no longer the grid.
-                //grid.removeWidget(div, true);
-                changeBaseDocument.apply(chart, [doc]);
-                if (doc === document)
-                    console.error(
-                        "changeBaseDocument should be restored to normal by the time we get here...",
-                    );
-                revertModifications();
-            };
-            return changeBaseDocument;
-        }
-        // this happens when we close PopOut... we expect to add them all again straight after
-        // >>> this implementation might change if we change more of the ChartManager logic for when manageChart is called <<<
-        function revertModifications() {
-            grid.removeWidget(div, true); //doesn't remove listeners from handle...
-            //// leaving listeners as a bug for now.
-            // lockButton.remove();
-            chart.remove = oldRemove;
-            chart.changeBaseDocument = oldChangeBase;
-        }*/
-
-        //cleanup - this is called when the chart is removed from the gridstack
-        //a) we transfer the chart to a popout
-        //b) we remove the chart completely
-        //c) we change the layout back to absolute positioning
-        chart.removeLayout = () => {
-            //remove the chart from the gridstack
-            grid.removeWidget(outer, false);
-            div.style.height = origHeight;
-            //take the chart out of the containers
-            grid.el.append(div);
-            //destroy the containers
-            outer.remove();
-            inner.remove();
-            lockButton.remove();
-            div.gridstackPopoutCallback = undefined;
-            chart.removeLayout = undefined;
-            chart.remove = oldRemove;
-            if (handle) {
-                handle.style.cursor = ""; // Reset to default cursor
+    manageChart(originalChart: Chart, ds: DataSource, autoPosition?: boolean, remanageChart?: boolean) {
+        try {
+            const gridInstance = this.getGrid(ds);
+            if (!gridInstance) throw new Error(`no grid instance for ${ds.name}`);
+            const grid = gridInstance.grid;
+            //note that we're being a bit type-unsafe here
+            //everything we do with managedChart will be to the same chart instance
+            //we're adding properties to it and using it as a managed chart
+            //would just take a little bit more re-work to make it properly safe
+            const chart = originalChart as ManagedChart;
+            gridInstance.charts.add(chart);
+            const div = chart.getDiv();
+            //work out the size location of the chart in gridstack
+            //doesn't work that well with complex layouts
+            const rect = div.getBoundingClientRect();
+            let w = Math.round((rect.width+6) / grid.cellWidth());
+            let h = Math.round((rect.height+6) / this.cellHeight);
+            let x = Math.round(div.offsetLeft / grid.cellWidth()); //relative location
+            //cases where the old container was wider than the current one
+            x = x > 11 ? 11 : x;
+            let y = Math.floor(div.offsetTop / this.cellHeight); //relative location
+            //if the chart has gridstack data i.e. in saved view or being re-added from a popout
+            //then use these
+            if (chart.config.gsposition) {
+                [x, y] = chart.config.gsposition;
+                [w, h] = chart.config.gssize;
+                autoPosition = false;
             }
-            //remove chart
-            gridInstance.charts.delete(chart);
-            //remove the observers
-            ro.disconnect();
-            mo.disconnect();
-        };
+            //maybe better not to add to dom before getting here, and use grid.addWidget
+            //current version seems to be working moderately ok.
+            clearPosition(div);
+            div.style.transition = "filter 0.5s ease";
+
+
+            // Add the "move" cursor
+            const handle = div.querySelector(this.dragHandle) as HTMLElement;
+            if (handle) {
+                handle.style.cursor = "move"; // Add the "move" cursor
+            }
+
+            // a bit long-winded but for gridstack to work correctly we 
+            // the chart wrapped in an outer and inner container
+            //! check the handling these variables if any issues occur
+            let outer: HTMLElement;
+            let inner: HTMLElement;
+            // Create new inner and outer divs only during the creation
+            if (remanageChart) {
+                outer = chart.outer;
+                inner = chart.inner;
+                if (!inner || !outer) {
+                    // If the containers don't exist call manageChart again with the remanage as false
+                    this.manageChart(chart, ds, autoPosition, false);
+                    return;
+                }
+            } else {
+                outer = document.createElement("div");
+                inner = document.createElement("div");
+                chart.outer = outer;
+                chart.inner = inner;
+
+                inner.classList.add("grid-stack-item-content");
+                inner.style.overflow = "visible"; // able to see shadow
+                outer.appendChild(inner);
+                inner.appendChild(div);
+                grid.el.appendChild(outer);
+            }
+            const origHeight = div.style.height;
+            div.style.height="100%";
+
+            //saves thr chart's position and size to the chart's config
+            const saveChartPosition = () => { 
+                const { x, y, w, h } = outer.gridstackNode;
+                chart.config.gssize = [w, h];
+                chart.config.gsposition = [x, y];
+            }
+
+            // Disconnect existing observers
+            //! If any problems occur try deleting the observers
+            if (remanageChart) {
+                if (chart._gsResizeObserver) {
+                chart._gsResizeObserver.disconnect();
+                }
+                if (chart._gsMutationObserver) {
+                chart._gsMutationObserver.disconnect();
+                }
+            }
+            // using ResizeObserver rather than gridstack callbacks
+            // means we have closure on 'chart' without needing to maintain another data structure
+            // or attach more properties to the div.
+            const ro = new ResizeObserver(
+                debounce(() => {
+                    try {
+                        //this is causing 'No data for row chart' error
+                        //when loading as saved view
+                        //it redraws chart before the data is processed
+                        //^ perhaps we could use something related to chart.deferredInit if this is a problem
+                        //would possibly need to improve the design of that mechanism, 
+                        //we could possibly move `ro` creation to after that promise resolves.
+
+                        // also leads to a condition in which initial chart.config.size is not stable
+                        // immediately after adding it... and also if the window is resized, 
+                        // or the view is opened on a different screen... we need to think about how
+                        // we serialize the layout information.
+                        chart.setSize();
+                        saveChartPosition();
+
+                    } catch {}
+                }, 20),
+            );
+            ro.observe(outer);
+            // Storing the observer
+            chart._gsResizeObserver = ro;
+
+            //stores the position and size of the chart is repositioned
+            //could also check if width, height has changed as well and have one observer,
+            //but probably best to use the proper resize observer above
+            const mo = new MutationObserver(
+                debounce(() => {
+                    try {
+                        saveChartPosition();
+                    } catch {}
+                }, 20),
+            );
+            mo.observe(outer, { attributes: true, attributeFilter: ["style"] });
+            // Storing the observer
+            chart._gsMutationObserver = mo;
+            // workaround for absolute positioning still being saved in config
+            // this interferes with detecting unsaved changes
+            // but if we want to compare state with state from server, it won't work.
+            // it would still also have a false positive if window is resized.
+            // only applies during chart init, so not when _alreadyCheckedDeferReady is true.
+            if (!chart._alreadyCheckedDeferReady) {
+                chart.deferredInit(() => chart.setSize(), 100);
+            }
+
+            // Create widget only during creation
+            if (!remanageChart)
+                grid.makeWidget(outer);
+
+            //nb, autoPosition property doesn't apply in update()?
+            //passing options to makeWidget() or addWidget() does not evoke joy.
+            if (!autoPosition) {
+                console.log("gridstack:", chart.config.type, { w, h, x, y });
+                grid.update(outer, { w, h, x, y });
+            } else {
+                grid.update(outer, { w, h });
+            }
+        
+
+            let lockButton: HTMLElement;
+            // Create lock button only the first time during creation
+            if (remanageChart) {
+                lockButton = chart.lockButton as HTMLElement;
+            } else {
+                lockButton = addPositionLock();
+                chart.lockButton = lockButton;
+            }
+            function addPositionLock() {
+                let locked = false;
+                const lockButton = chart.addMenuIcon(
+                    "fas fa-unlock",
+                    "lock position",
+                );
+                const lockIcon = lockButton.children[0];
+                lockButton.addEventListener("click", () => {
+                    locked = !locked;
+                    lockIcon.classList.toggle("fa-lock", locked);
+                    lockIcon.classList.toggle("fa-unlock", !locked);
+                    grid.update(outer, { locked });
+                    outer.classList.toggle("gridLock", locked);
+                });
+                return lockButton;
+            }
+            //could this be handled by a decorator?
+            const oldRemove = addRemoveHandler();
+            function addRemoveHandler() {
+                const { remove } = chart;
+                chart.remove = () => {
+                    //grid.removeWidget(div, true);
+                    chart.removeLayout?.();
+                    remove.apply(chart);
+                };
+                return remove;
+            }
+
+            div.gridstackPopoutCallback = () => {
+                chart.removeLayout?.();
+            };
+
+            //the below was leading subtle errors
+            //not sure why you need to alter changeBaseDocument?
+            /*
+            function addPopOutHandler() {
+                const { changeBaseDocument } = chart;
+                div.gridstackPopoutCallback = () => {
+                    // console.log('removing from gridstack');
+                    grid.removeWidget(div, true);
+                    if (chart.removeLayout)
+                        chart.removeLayout();
+                };
+                chart.changeBaseDocument = (doc: Document) => {
+                    //by now, it's too late... the parent element is no longer the grid.
+                    //grid.removeWidget(div, true);
+                    changeBaseDocument.apply(chart, [doc]);
+                    if (doc === document)
+                        console.error(
+                            "changeBaseDocument should be restored to normal by the time we get here...",
+                        );
+                    revertModifications();
+                };
+                return changeBaseDocument;
+            }
+            // this happens when we close PopOut... we expect to add them all again straight after
+            // >>> this implementation might change if we change more of the ChartManager logic for when manageChart is called <<<
+            function revertModifications() {
+                grid.removeWidget(div, true); //doesn't remove listeners from handle...
+                //// leaving listeners as a bug for now.
+                // lockButton.remove();
+                chart.remove = oldRemove;
+                chart.changeBaseDocument = oldChangeBase;
+            }*/
+
+            //cleanup - this is called when the chart is removed from the gridstack
+            //a) we transfer the chart to a popout
+            //b) we remove the chart completely
+            //c) we change the layout back to absolute positioning
+            chart.removeLayout = () => {
+                //remove the chart from the gridstack
+                grid.removeWidget(outer, false);
+                div.style.height = origHeight;
+                //take the chart out of the containers
+                grid.el.append(div);
+                //destroy the containers
+                outer?.remove();
+                inner?.remove();
+                lockButton?.remove();
+                div.gridstackPopoutCallback = undefined;
+                chart.removeLayout = undefined;
+                chart.remove = oldRemove;
+                if (handle) {
+                    handle.style.cursor = ""; // Reset to default cursor
+                }
+                //remove chart
+                gridInstance.charts.delete(chart);
+                //remove the observers
+                if (chart._gsResizeObserver) {
+                    chart._gsResizeObserver.disconnect();
+                    // not using delete because of biome performance warning
+                    chart._gsResizeObserver = undefined;
+                }
+                if (chart._gsMutationObserver) {
+                    chart._gsMutationObserver.disconnect();
+                    // not using delete because of biome performance warning
+                    chart._gsMutationObserver = undefined;
+                }
+                ro.disconnect();
+                mo.disconnect();
+            };
+        } catch (error) {
+            console.error("Error occurred during manage chart:", error);
+        }
     }
 }
 

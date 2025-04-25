@@ -258,7 +258,15 @@ class BaseChart<T extends BaseConfig> {
                     this.isFullscreen = true;
                 } else {
                     this.observable.container = this.__doc__.body;
+                    // Reset the size of chart
                     this.setSize(...oldSize);
+                    const cm = window.mdv.chartManager;
+                    // we could make GridstackManager also change the setSize method?
+                    // then we'd avoid any gridstack code in here
+                    // but this is probably easier to understand anyway.
+                    if (cm.viewData.dataSources[this.dataStore.name]?.layout === "gridstack") {
+                        cm.gridStack.manageChart(this, this.dataSource, false, true);
+                    }
                     for (const d of this.dialogs) {
                         d.setParent(null);
                     }
@@ -280,7 +288,7 @@ class BaseChart<T extends BaseConfig> {
             func: async () => {
                 try {
                     if (!this.isFullscreen) {
-                        oldSize = this.config.size;
+                        oldSize = [...this.config.size];
                         await this.div.requestFullscreen();
                     } else {
                         await this.__doc__.exitFullscreen();
