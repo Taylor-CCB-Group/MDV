@@ -660,7 +660,10 @@ export class ChartManager {
                         const state = this.getState();
                         if (!state.view?.viewImage) {
                             // todo: update the error handler function in future
-                            await this.viewManager.saveView((_state) => {});
+                            await this.viewManager.saveView((state) => {
+                                console.log("Error occurred: ", state.chartErrors);
+                                return false;
+                            });
                         }
                     }
                 } catch (error) {
@@ -677,7 +680,10 @@ export class ChartManager {
                     const state = this.getState();
                     if (!state.view?.viewImage) {
                         // todo: update the error handler function in future
-                        await this.viewManager.saveView((_state) => {});
+                        await this.viewManager.saveView((state) => {
+                            console.log("Error occurred: ", state.chartErrors);
+                            return false;
+                        });
                     }
             });
         }
