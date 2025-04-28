@@ -4,11 +4,10 @@ import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns } from "../hooks";
 import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
-import { useCallback, useEffect, useId, useMemo } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
-import type { OrbitViewState } from "@deck.gl/core";
 import type { DataColumn, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import "../../charts/css/charts.css";
@@ -16,6 +15,7 @@ import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context"
 import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
+import { useOuterContainer } from "../screen_state";
 
 //todo this should be in a common place etc.
 const colMid = ({minMax}: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -256,10 +256,42 @@ const DeckScatter = observer(function DeckScatterComponent() {
         // make sure it applies to the right `this`
         return scatterplotLayer.unproject(coords);
     }, [scatterplotLayer]);
+    const outerContainer = useOuterContainer();
+    const deckRef = useRef<any>();
+    useEffect(() => {
+        outerContainer; // make sure the hook runs when this changes
+        if (deckRef.current) {
+            try {
+                // const deck: Deck<any> = deckRef.current.deck;
+                const deck = deckRef.current.deck;// as Deck<any>;
+                //! suspected source of future problems... in order for mjolnir.js to re-bind events
+                deck.animationLoop.props.onInitialize(deck);
+                // deck.viewManager?.setNeedsUpdate("MDV useOuterContainer() changed (fullscreen/popout)");
+                // const eventManager = deck.eventManager as EventManager;
+                // https://visgl.github.io/mjolnir.js/docs/api-reference/event-manager
+                // > Element must be supplied when constructing EventManager and cannot be reassigned.
+                // > To change the event target, destroy the existing event manager instance and construct a new one.
+                // The element will be the same, but we need a new event manager so that events on window work in popout.
+                // const element = eventManager.getElement();
+                // eventManager.destroy();
+                
+            } catch (e) {
+                console.error(
+                    "attempt to reset deck eventManager element failed",
+                    e,
+                );
+            }
+        }
+    }, [outerContainer])
+    
+    // we want default controller options, but we want a new one when the outerContainer changes
+    // this doesn't seem to help re-register mouse events.
+    // const controller = useMemo(() => ({inertia: 10+Math.random()}), [outerContainer])
     return (
         <>
             <AxisComponent config={config} unproject={unproject}>
                 <DeckGL
+                    ref={deckRef}
                     layers={layers}
                     useDevicePixels={true}
                     controller={true}
