@@ -265,7 +265,14 @@ const DeckScatter = observer(function DeckScatterComponent() {
                 // const deck: Deck<any> = deckRef.current.deck;
                 const deck = deckRef.current.deck;// as Deck<any>;
                 //! suspected source of future problems... in order for mjolnir.js to re-bind events
-                deck.animationLoop.props.onInitialize(deck);
+                //we tracked down the place where the event manager is created...
+                //but this is frought with problems
+                //- EditableLayer modes not working
+                //- lots of failed assertions in deck.gl
+                //- glitchiness from a user perspective with pan/zoom etc after switching/back...
+                
+                // we pass deck not because it's the right type, but because we know it will just look at the device property.
+                if (deck.device) deck.animationLoop.props.onInitialize(deck);
                 // deck.viewManager?.setNeedsUpdate("MDV useOuterContainer() changed (fullscreen/popout)");
                 // const eventManager = deck.eventManager as EventManager;
                 // https://visgl.github.io/mjolnir.js/docs/api-reference/event-manager

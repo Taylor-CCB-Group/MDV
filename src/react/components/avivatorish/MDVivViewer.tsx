@@ -169,7 +169,7 @@ class MDVivViewerWrapper extends React.PureComponent<
                 //this should be common with DeckScatterComponent - make a helper/hook...
                 const deck = this.state.deckRef.current.deck;
                 //! suspected source of future problems... in order for mjolnir.js to re-bind events
-                deck.animationLoop.props.onInitialize(deck);
+                if (deck.context) deck.animationLoop.props.onInitialize(deck);
                 // const { eventManager } = this.state.deckRef.current.deck;
                 // const { element } = eventManager;
                 // // this will always be the same element, but calling setElement again will re-register
