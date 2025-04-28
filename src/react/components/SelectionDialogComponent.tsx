@@ -1,8 +1,8 @@
 import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Paper, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Checkbox, Chip, Divider, FormControlLabel, IconButton, Paper, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId, type HTMLAttributes } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
@@ -49,6 +49,7 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
 const filterOptions = createFilterOptions<any>({ limit: 100 });
 const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     const [open, setOpen] = useState(false);
+    const [selectAll, setSelectAll] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
@@ -62,7 +63,9 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             filters[column.field] = newFilter;
         })();
     }, [filters, column.field, filter]);
+
     useCloseOnIntersection(ref, () => setOpen(false));
+    
     // react to changes in value and update the filter
     useEffect(() => {
         // filter could be undefined - but we previously checked for null causing component to crash
@@ -72,7 +75,12 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         }
         dim.filter("filterCategories", [column.field], value, true);
     }, [dim, column.field, value, filter]);
-    const [hasFocus, setHasFocus] = useState(false);
+
+    useEffect(() => {
+        // Initialising select all
+        setSelectAll(isArray(value) && value?.length === values.length);
+    }, [value, values.length]);
+
     const toggleOption = useCallback((option: string) => {
         if (value.includes(option)) {
             setValue(value.filter((v) => v !== option));
@@ -80,13 +88,17 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         }
         setValue([...value, option]);
     }, [setValue, value]);
-    const selectAll = useCallback(() => {
-        setValue([...values]);
-    }, [values, setValue]);
-    const toggleSelection = useCallback(() => {
-        const newValues = values.filter((v) => !value.includes(v));
-        setValue(newValues);
-    }, [values, value, setValue]);
+
+    const handleSelectAll = () => {
+        if (selectAll) {
+            setValue([]);
+            setSelectAll(false);
+        } else {
+            setValue(values);
+            setSelectAll(true);
+        }
+    };
+
     return (
         <Autocomplete
             multiple
@@ -94,9 +106,15 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             options={values}
             value={value}
             filterOptions={filterOptions}
-            onChange={(_, newValue) => setValue(newValue)}
-            onFocus={() => setHasFocus(true)}
-            onBlur={() => setHasFocus(false)}
+            onChange={(_, value) => {
+                if (!value) return; //! check if this is correct
+                if (value.length === values.length) {
+                    setSelectAll(true);
+                } else if (selectAll && value.length !== values.length) {
+                    setSelectAll(false);
+                }
+                setValue(value);
+            }}
             open={open}
             onOpen={() => setOpen(true)}
             onClose={() => setOpen(false)}
@@ -106,14 +124,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                     key: string;
                 }; //questionable mui types?
                 return <>
-                    <TextFieldExtended key={key} {...p}
-                        customEndAdornment={(
-                            <>
-                                <IconButton size="small" aria-label="toggle selection" onClick={toggleSelection}><SwapHorizIcon fontSize="inherit" /></IconButton>
-                                <IconButton size="small" aria-label="select all" onClick={selectAll}><DoneAllIcon fontSize="inherit" /></IconButton>
-                            </>
-                        )}
-                    />
+                    <TextFieldExtended key={key} {...p} />
                 </>
             }}
             renderOption={(props, option) => {
@@ -154,7 +165,34 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                 //todo improve styling - bad from UX perspective at the moment when it overflows.
                 return <div className="max-h-32 overflow-auto">{chips}</div>;
             }}
-            // PaperComponent={(paperProps) => <Paper ref={ref} {...paperProps} />}
+            // biome-ignore lint/correctness/useExhaustiveDependencies: conflicting warning for handleSelectAll dependency
+            PaperComponent={useMemo(() => (paperProps: HTMLAttributes<HTMLElement>) => {
+                const { children, ...restPaperProps } = paperProps;
+                return (
+                  <Paper {...restPaperProps}>
+                    <>
+                        <Box
+                            onMouseDown={(e) => e.preventDefault()}
+                            py={1}
+                            px={2}
+                        >
+                            <FormControlLabel
+                                onClick={(e) => {
+                                e.preventDefault();
+                                handleSelectAll();
+                                }}
+                                label="Select All"
+                                control={
+                                <Checkbox id="select-all-checkbox" checked={selectAll} />
+                                }
+                            />
+                        </Box>
+                        <Divider />
+                    </>
+                    {children}
+                  </Paper>
+                );
+              }, [selectAll])}
         />
     );
 });
