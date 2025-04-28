@@ -659,7 +659,8 @@ export class ChartManager {
                     if (currentView) {
                         const state = this.getState();
                         if (!state.view?.viewImage) {
-                            await this.viewManager.saveView();
+                            // todo: update the error handler function in future
+                            await this.viewManager.saveView((_state) => {});
                         }
                     }
                 } catch (error) {
@@ -675,7 +676,8 @@ export class ChartManager {
             .then(async () => {
                     const state = this.getState();
                     if (!state.view?.viewImage) {
-                        await this.viewManager.saveView();
+                        // todo: update the error handler function in future
+                        await this.viewManager.saveView((_state) => {});
                     }
             });
         }

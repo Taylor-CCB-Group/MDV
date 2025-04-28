@@ -1,4 +1,4 @@
-import { action, observable, runInAction, toJS } from "mobx";
+import { action, observable, toJS } from "mobx";
 import type ChartManager from "./ChartManager";
 import type { DataSource } from "./charts";
 import _ from "lodash";
@@ -162,10 +162,18 @@ class ViewManager {
 
     // Save the current state
     @action
-    async saveView() {
+    async saveView(errorHandler?: (state: State) => void) {
         try {
             const imageUrl = await this.createImageofView();
             const state = this.cm.getState();
+            if (state.chartErrors.length > 0) {
+                // handling the errors differently if errorHandler is supplied
+                if (errorHandler) {
+                    errorHandler(state);
+                } else {
+                    throw state.chartErrors;
+                }
+            }
             state.view.viewImage = imageUrl;
             this.cm._callListeners("state_saved", state);
             this.setLastSavedState(state);
