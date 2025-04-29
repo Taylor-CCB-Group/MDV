@@ -6,6 +6,7 @@ import type { MjolnirEvent } from 'mjolnir.js';
 import equal from "fast-deep-equal";
 import { ScaleBarLayer } from "@vivjs-experimental/viv";
 import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
+import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 export function getVivId(id: string) {
     return `-#${id}#`;
 }
@@ -166,16 +167,9 @@ class MDVivViewerWrapper extends React.PureComponent<
             this.state.deckRef?.current
         ) {
             try {
-                //this should be common with DeckScatterComponent - make a helper/hook...
                 const deck = this.state.deckRef.current.deck;
-                //! suspected source of future problems... in order for mjolnir.js to re-bind events
-                if (deck.context) deck.animationLoop.props.onInitialize(deck);
-                // const { eventManager } = this.state.deckRef.current.deck;
-                // const { element } = eventManager;
-                // // this will always be the same element, but calling setElement again will re-register
-                // // drag events on window, which is necessary for popouts.
-                // eventManager.setElement(element);
-                // this.setState({ outerContainer });
+                //this should be common with DeckScatterComponent - make a helper/hook...
+                rebindMouseEvents(deck);
             } catch (e) {
                 console.error(
                     "attempt to reset deck eventManager element failed",

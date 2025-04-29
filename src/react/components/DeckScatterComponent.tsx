@@ -16,6 +16,8 @@ import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
+import type { EventManager } from 'mjolnir.js';
+import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 
 //todo this should be in a common place etc.
 const colMid = ({minMax}: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -264,24 +266,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
             try {
                 // const deck: Deck<any> = deckRef.current.deck;
                 const deck = deckRef.current.deck;// as Deck<any>;
-                //! suspected source of future problems... in order for mjolnir.js to re-bind events
-                //we tracked down the place where the event manager is created...
-                //but this is frought with problems
-                //- EditableLayer modes not working
-                //- lots of failed assertions in deck.gl
-                //- glitchiness from a user perspective with pan/zoom etc after switching/back...
-                
-                // we pass deck not because it's the right type, but because we know it will just look at the device property.
-                if (deck.device) deck.animationLoop.props.onInitialize(deck);
-                // deck.viewManager?.setNeedsUpdate("MDV useOuterContainer() changed (fullscreen/popout)");
-                // const eventManager = deck.eventManager as EventManager;
-                // https://visgl.github.io/mjolnir.js/docs/api-reference/event-manager
-                // > Element must be supplied when constructing EventManager and cannot be reassigned.
-                // > To change the event target, destroy the existing event manager instance and construct a new one.
-                // The element will be the same, but we need a new event manager so that events on window work in popout.
-                // const element = eventManager.getElement();
-                // eventManager.destroy();
-                
+                rebindMouseEvents(deck);
             } catch (e) {
                 console.error(
                     "attempt to reset deck eventManager element failed",
