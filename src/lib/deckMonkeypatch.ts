@@ -44,13 +44,8 @@ export function rebindMouseEvents(deckO: Deck<any>) {
     //- EditableLayer modes not working
     //- lots of failed assertions in deck.gl
     //- glitchiness from a user perspective with pan/zoom etc after switching/back...
+    //! still need to figure out why editable-layers modes aren't working...
 
-    // maybe we could just do this?
-    // deck.animationLoop = null;
-    // deck._setDevice(deck.props.device);
-
-    // we pass deck not because it's the right type, but because we know it will just look at the device property.
-    // deck.viewManager?.setNeedsUpdate("MDV useOuterContainer() changed (fullscreen/popout)");
     const oldEventManager = deck.eventManager as EventManager;
     if (!oldEventManager) {
         return;
