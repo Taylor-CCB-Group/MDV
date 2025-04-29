@@ -127,54 +127,22 @@ def create_flask_app(config_name=None):
     auth0_provider = None  # This should be set when Auth0 routes are registered
 
     def is_authenticated():
-        """Check if the user is authenticated, considering Auth0 and Shibboleth."""
+        """Validate the current user via Auth0 or Shibboleth."""
         if not ENABLE_AUTH:
-            return True  # Authentication is disabled, allow access
-        
-        if session.get("auth_method") == "shibboleth":
-            return True  # Shibboleth users are already authenticated
-        
-        return "token" in session and session["token"]
+            return True  # Auth disabled, treat as authenticated
 
-    # Authentication check function
-    def is_authenticated_token():
-        """Check if the user is authenticated (works for both Auth0 and Shibboleth)."""
-        # Check if auth0_provider is initialized
-        if not auth0_provider:
-            print("<<<<<<1")
-            # If auth0_provider is not available, return False as we can't check authentication for Auth0 yet
-            return False
-        
-        # Check if Auth0 is enabled and if the token is in session
-        if session.get('auth_method') == 'auth0' and 'token' in session:
-            print("<<<<<<2")
-            # For Auth0, we need to validate the token to ensure it's not expired or invalid
-            try:
-                # Validate the token with Auth0 (this will depend on your token structure and verification method)
-                if auth0_provider.is_token_valid(session['token']):
-                    print("--------88888")
-                    return True  # Token is valid, user is authenticated
-                else:
-                    # Token is invalid or expired
-                    print("Auth0 token is invalid or expired.")
-                    session.clear()  # Clear session if token is invalid
-                    return False
-            except Exception as e:
-                print(f"Error during Auth0 token validation: {e}")
-                session.clear()  # Clear session if there was an error during validation
-                return False
-        
-        # Check for Shibboleth authentication
-        elif session.get('auth_method') == 'shibboleth':
-            # For Shibboleth, if the token is not available in the session, we cannot validate like Auth0
-            # So, we assume that the presence of 'auth_method' is the sign of successful authentication
-            # You may adjust this depending on your specific Shibboleth setup.
-            if 'auth_method' in session and session['auth_method'] == 'shibboleth':
-                return True  # Assume user is authenticated after successful Shibboleth login
-            
-            return False  # If no 'auth_method' is found for Shibboleth, user is not authenticated
-        
-        return False  # Default to False if neither Auth0 nor Shibboleth is used
+        auth_method = session.get("auth_method")
+
+        if auth_method == "auth0":
+            user, error_response = validate_and_get_user()
+        elif auth_method == "shibboleth":
+            print(":::::3.2")
+            user, error_response = validate_sso_user(request)
+        else:
+            return False  # Unknown method
+
+        return user is not None and error_response is None
+
 
 
     # Whitelist of routes that do not require authentication
