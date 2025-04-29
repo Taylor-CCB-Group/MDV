@@ -1,11 +1,16 @@
 import { EventManager, InputDirection, Pan, Pinch, Tap } from 'mjolnir.js';
 // import { EVENT_HANDLERS, RECOGNIZERS } from '@deck.gl/core/dist/lib/constants';
-import type { Deck } from '@deck.gl/core';
+import { Deck } from '@deck.gl/core';
 
-type MonkeyPatchDeck = Deck<any> & {
-    eventManager: EventManager;
-    viewManager: any;
-    canvas: HTMLCanvasElement;
+// we don't need the keys; we'll break in.
+// we aren't really using this as an actual subclass, just declaring things as public so we can access them.
+//! we don't want to keep this around for future maintenance, hopefully deck can be patched so this is less necessary
+// or we find a better way to fix things.
+class MonkeyPatchDeck extends Deck<any> {
+    declare public eventManager;
+    declare public viewManager;
+    declare public animationLoop;
+    declare public canvas;
 }
 
 const EVENT_HANDLERS: { [eventName: string]: string } = {
@@ -39,6 +44,10 @@ export function rebindMouseEvents(deckO: Deck<any>) {
     //- EditableLayer modes not working
     //- lots of failed assertions in deck.gl
     //- glitchiness from a user perspective with pan/zoom etc after switching/back...
+
+    // maybe we could just do this?
+    // deck.animationLoop = null;
+    // deck._setDevice(deck.props.device);
 
     // we pass deck not because it's the right type, but because we know it will just look at the device property.
     // deck.viewManager?.setNeedsUpdate("MDV useOuterContainer() changed (fullscreen/popout)");
@@ -80,13 +89,16 @@ export function rebindMouseEvents(deckO: Deck<any>) {
             pointerleave: deck._onPointerMove
         }
     });
+    deck.eventManager = eventManager;
     for (const eventType in EVENT_HANDLERS) {
         deck.eventManager.on(eventType, deck._onEvent);
     }
 
-    // we might get away with this? it uses `_eventManager` to make a `new Controller()` in 
-    deck.viewManager._eventManager = eventManager;
-    deck.viewManager.controllers = {};
-    deck.viewManager._rebuildViewports();
-    deck.viewManager.setNeedsUpdate("MDV monkeypatch change event manager");
+    // we might get away with this? it uses `_eventManager` to make a `new Controller()`...
+    const viewManager = deck.viewManager as any;
+    viewManager._eventManager = eventManager;
+    // make sure it doesn't try to re-use controllers...
+    viewManager.controllers = {};
+    viewManager._rebuildViewports();
+    viewManager.setNeedsUpdate("MDV monkeypatch change event manager");
 }
