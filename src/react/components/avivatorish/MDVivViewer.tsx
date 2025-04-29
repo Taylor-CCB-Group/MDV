@@ -7,6 +7,7 @@ import equal from "fast-deep-equal";
 import { ScaleBarLayer } from "@vivjs-experimental/viv";
 import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
+import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
 export function getVivId(id: string) {
     return `-#${id}#`;
 }
@@ -73,6 +74,7 @@ export type VivViewerWrapperProps = {
     randomize?: boolean;
     useDevicePixels?: boolean;
     outerContainer?: HTMLElement;
+    selectionLayer?: EditableGeoJsonLayer;
 };
 export type VivViewerWrapperState = {
     viewStates: any;
@@ -160,7 +162,7 @@ class MDVivViewerWrapper extends React.PureComponent<
 
     componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
-        const { views, outerContainer } = props;
+        const { views, outerContainer, selectionLayer } = props;
 
         if (
             outerContainer !== this.state.outerContainer &&
@@ -169,7 +171,7 @@ class MDVivViewerWrapper extends React.PureComponent<
             try {
                 const deck = this.state.deckRef.current.deck;
                 //this should be common with DeckScatterComponent - make a helper/hook...
-                rebindMouseEvents(deck);
+                rebindMouseEvents(deck, selectionLayer);
             } catch (e) {
                 console.error(
                     "attempt to reset deck eventManager element failed",

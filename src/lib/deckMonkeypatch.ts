@@ -1,6 +1,7 @@
 import { EventManager, InputDirection, Pan, Pinch, Tap } from 'mjolnir.js';
 // import { EVENT_HANDLERS, RECOGNIZERS } from '@deck.gl/core/dist/lib/constants';
 import { Deck } from '@deck.gl/core';
+import type { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
 
 // we don't need the keys; we'll break in.
 // we aren't really using this as an actual subclass, just declaring things as public so we can access them.
@@ -36,7 +37,7 @@ const RECOGNIZERS = {
  * 
  * Apply this function to a deck instance whenever the outer container changes.
  */
-export function rebindMouseEvents(deckO: Deck<any>) {
+export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeoJsonLayer) {
     const deck = deckO as MonkeyPatchDeck;
     //! suspected source of future problems... in order for mjolnir.js to re-bind events
     //we tracked down the place where the event manager is created...
@@ -96,4 +97,14 @@ export function rebindMouseEvents(deckO: Deck<any>) {
     viewManager.controllers = {};
     viewManager._rebuildViewports();
     viewManager.setNeedsUpdate("MDV monkeypatch change event manager");
+    if (!selectionLayer) return;
+    setTimeout(() => {
+        // deferring this seems to allow it to have the right kind of internal state...
+        // needs more testing.
+        try {
+            selectionLayer.initializeState();
+        } catch (e) {
+            console.error("Error re-initializing (monkey-patching) editable layer state", e);
+        }
+    });
 }

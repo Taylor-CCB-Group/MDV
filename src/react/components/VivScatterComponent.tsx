@@ -204,6 +204,7 @@ const Main = observer(() => {
             <SelectionOverlay />
             <MDVivViewer
                 outerContainer={outerContainer}
+                selectionLayer={selectionLayer}
                 views={[detailView]}
                 layerProps={[layerConfig]}
                 viewStates={[{ ...viewState, id: detailId }]}

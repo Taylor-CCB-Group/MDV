@@ -260,13 +260,14 @@ const DeckScatter = observer(function DeckScatterComponent() {
     }, [scatterplotLayer]);
     const outerContainer = useOuterContainer();
     const deckRef = useRef<any>();
+    // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
     useEffect(() => {
         outerContainer; // make sure the hook runs when this changes
         if (deckRef.current) {
             try {
                 // const deck: Deck<any> = deckRef.current.deck;
                 const deck = deckRef.current.deck;// as Deck<any>;
-                rebindMouseEvents(deck);
+                rebindMouseEvents(deck, selectionLayer);
             } catch (e) {
                 console.error(
                     "attempt to reset deck eventManager element failed",
@@ -274,7 +275,7 @@ const DeckScatter = observer(function DeckScatterComponent() {
                 );
             }
         }
-    }, [outerContainer])
+    }, [outerContainer]);
     
     // we want default controller options, but we want a new one when the outerContainer changes
     // this doesn't seem to help re-register mouse events.
