@@ -29,7 +29,6 @@ import {
 } from "@mui/material";
 import React, { useCallback, useMemo, useState } from "react";
 import ProjectCard from "./ProjectCard";
-import ErrorModal from "./ProjectErrorModal";
 import ProjectListView from "./ProjectListView";
 import UserProfile from "./UserProfile";
 import mdvLogo from "./assets/mdv_logo.png";
@@ -39,6 +38,8 @@ import {
     type SortOrder,
     sortProjects,
 } from "./utils/projectUtils";
+import ReusableDialog from "@/charts/dialogs/ReusableDialog";
+import ErrorMessage from "@/charts/dialogs/ErrorMessage";
 
 const Dashboard: React.FC = () => {
     const {
@@ -343,10 +344,15 @@ const Dashboard: React.FC = () => {
                     />
                 )}
             </Container>
-            <ErrorModal
+            <ReusableDialog
                 open={isErrorModalOpen}
-                message={error || ""}
-                onClose={closeErrorModal}
+                handleClose={closeErrorModal}
+                isErrorMessage
+                component={
+                    <ErrorMessage
+                        message={error as string}
+                    />
+                }
             />
         </Box>
     );

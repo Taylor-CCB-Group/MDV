@@ -25,6 +25,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import useProjectShare, { type UserPermission, type RegisteredUser } from "./hooks/useProjectShare";
 import { useState } from "react";
 import { matchEmail } from "@/lib/utils";
+import ErrorMessage from "@/charts/dialogs/ErrorMessage";
 
 export interface ProjectShareModalProps {
     open: boolean;
@@ -99,18 +100,7 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                 <DialogContent dividers>
                     <Box sx={{ mt: 2 }}>
                         {error ? (
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                    height: "20vh",
-                                }}
-                            >
-                                <Typography variant="h6" color="error">
-                                    {error}
-                                </Typography>
-                            </Box>
+                            <ErrorMessage message={error} />
                         ) : (
                             <>
                                 {errorMsg && (

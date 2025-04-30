@@ -1,55 +1,37 @@
 import { Close } from "@mui/icons-material";
-import { Container, Dialog, IconButton, Paper } from "@mui/material";
-import { useEffect } from "react";
+import { Button, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper } from "@mui/material";
 
 export interface ReusableDialogProps {
     open: boolean;
     handleClose: () => void;
     component: JSX.Element;
+    isErrorMessage?: boolean;
 }
 
 const ReusableDialog = ({
     open,
     handleClose,
     component,
+    isErrorMessage,
 }: ReusableDialogProps) => {
     return (
         <Dialog
             open={open}
             onClose={handleClose}
-            fullScreen
             disableRestoreFocus
-            PaperProps={{
-                style: {
-                    backgroundColor: "var(--fade_background_color)",
-                    backdropFilter: "blur(1px)"
-                },
-            }}
+            fullWidth
+            maxWidth={isErrorMessage ? 'sm' : 'md'}
         >
-            <IconButton
-                onClick={handleClose}
-                className="absolute top-4 right-4"
-                sx={{
-                    position: "absolute",
-                    top: 16,
-                    right: 16,
-                    backgroundColor: "var(--background_color)",
-                    "&:hover": {
-                        backgroundColor: "var(--menu_bar_color)",
-                    },
-                }}
-            >
-                <Close />
-            </IconButton>
-
+            <DialogContent dividers>
             <div
                 className="flex items-center justify-center"
-                style={{marginTop: "20vh", marginBottom: "20vh"}}
             >
-                <Paper elevation={24} sx={{ p: 2 }}>
                     <Container>{component}</Container>
-                </Paper>
             </div>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={handleClose}>Close</Button>
+            </DialogActions>
         </Dialog>
     );
 };

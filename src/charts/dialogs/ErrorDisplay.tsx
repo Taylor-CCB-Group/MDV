@@ -25,6 +25,7 @@ import {
 import axios from "axios";
 import { useEffect, useState } from "react";
 import JsonView from "react18-json-view";
+import "../css/charts.css";
 
 /** Any extra information we may want to use
  *
@@ -113,11 +114,7 @@ const ErrorDisplay = ({
     return (
         <div
             style={{
-                // maxWidth: 800,
-                // minWidth: 500,
                 margin: "20px auto",
-                // width: "90%",
-                width: "45vw",
                 maxWidth: "1000px",
                 minHeight: "45vh",
                 display: "flex",
@@ -273,6 +270,10 @@ const ErrorDisplay = ({
                                         <Collapse in={expanded}>
                                             <JsonView
                                                 editable
+                                                style={{
+                                                    whiteSpace: "pre-wrap",
+                                                    wordBreak: "break-word",
+                                                }}
                                                 src={{
                                                     ...metaData, 
                                                     // buildInfo: buildInfo
