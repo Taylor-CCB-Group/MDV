@@ -30,7 +30,6 @@ const RECOGNIZERS = {
 } as const;
 
 
-
 /**
  * This is undesirable and liable to break in the future, but we need to monkeypatch
  * deck.gl to fix issues with event handling in popout windows.
@@ -40,12 +39,12 @@ const RECOGNIZERS = {
 export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeoJsonLayer) {
     const deck = deckO as MonkeyPatchDeck;
     //! suspected source of future problems... in order for mjolnir.js to re-bind events
+    // could consider more feature-detection to alert us when deck version changes etc...
+    // I think that just adds noise, we should be aware that we want to remove this & any changes
+    // to deck.gl version are not to be taken lightly.
+
     //we tracked down the place where the event manager is created...
-    //but this is frought with problems
-    //- EditableLayer modes not working
-    //- lots of failed assertions in deck.gl
-    //- glitchiness from a user perspective with pan/zoom etc after switching/back...
-    //! still need to figure out why editable-layers modes aren't working...
+    //& have something based on that to re-create it.
 
     const oldEventManager = deck.eventManager as EventManager;
     if (!oldEventManager) {
