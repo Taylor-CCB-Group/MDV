@@ -4,11 +4,10 @@ import { observer } from "mobx-react-lite";
 import { useChartSize, useConfig, useFilterArray, useFilteredIndices, useParamColumns } from "../hooks";
 import { LineLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { DataFilterExtension } from "@deck.gl/extensions";
-import { useCallback, useEffect, useId, useMemo } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { useChart } from "../context";
 import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
-import type { OrbitViewState } from "@deck.gl/core";
 import type { DataColumn, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { allNumeric } from "@/lib/columnTypeHelpers";
 import "../../charts/css/charts.css";
@@ -16,6 +15,8 @@ import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context"
 import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
+import { useOuterContainer } from "../screen_state";
+import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 
 //todo this should be in a common place etc.
 const colMid = ({minMax}: DataColumn<NumberDataType>) => minMax[0] + (minMax[1] - minMax[0]) / 2;
@@ -256,10 +257,33 @@ const DeckScatter = observer(function DeckScatterComponent() {
         // make sure it applies to the right `this`
         return scatterplotLayer.unproject(coords);
     }, [scatterplotLayer]);
+    const outerContainer = useOuterContainer();
+    const deckRef = useRef<any>();
+    // biome-ignore lint/correctness/useExhaustiveDependencies: selectionLayer might change without us caring
+    useEffect(() => {
+        outerContainer; // make sure the hook runs when this changes
+        if (deckRef.current) {
+            try {
+                // const deck: Deck<any> = deckRef.current.deck;
+                const deck = deckRef.current.deck;// as Deck<any>;
+                return rebindMouseEvents(deck, selectionLayer);
+            } catch (e) {
+                console.error(
+                    "attempt to reset deck eventManager element failed - could be related to brittle deck monkeypatch",
+                    e,
+                );
+            }
+        }
+    }, [outerContainer]);
+    
+    // we want default controller options, but we want a new one when the outerContainer changes
+    // this doesn't seem to help re-register mouse events.
+    // const controller = useMemo(() => ({inertia: 10+Math.random()}), [outerContainer])
     return (
         <>
             <AxisComponent config={config} unproject={unproject}>
                 <DeckGL
+                    ref={deckRef}
                     layers={layers}
                     useDevicePixels={true}
                     controller={true}
