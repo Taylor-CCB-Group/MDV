@@ -169,6 +169,7 @@ class MDVivViewerWrapper extends React.PureComponent<
             this.state.deckRef?.current
         ) {
             try {
+                this.setState({ outerContainer });
                 const deck = this.state.deckRef.current.deck;
                 //this should be common with DeckScatterComponent - make a helper/hook...
                 rebindMouseEvents(deck, selectionLayer);
