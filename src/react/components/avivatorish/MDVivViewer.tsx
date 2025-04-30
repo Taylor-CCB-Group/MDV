@@ -160,6 +160,12 @@ class MDVivViewerWrapper extends React.PureComponent<
         return viewState;
     }
 
+
+    /**
+     * prevent the deckMonkeypatch from double-binding etc.
+     * as of anything related to that, this is dubious and liable to need attention in the future.
+     */
+    _cleanupMouseEvents?: () => void;
     componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
         const { views, outerContainer, selectionLayer } = props;
@@ -171,8 +177,9 @@ class MDVivViewerWrapper extends React.PureComponent<
             try {
                 this.setState({ outerContainer });
                 const deck = this.state.deckRef.current.deck;
+                this._cleanupMouseEvents?.();
                 //this should be common with DeckScatterComponent - make a helper/hook...
-                rebindMouseEvents(deck, selectionLayer);
+                this._cleanupMouseEvents = rebindMouseEvents(deck, selectionLayer);
             } catch (e) {
                 console.error(
                     "attempt to reset deck eventManager element failed",
@@ -215,6 +222,10 @@ class MDVivViewerWrapper extends React.PureComponent<
             // eslint-disable-next-line react/no-did-update-set-state
             this.setState({ viewStates });
         }
+    }
+    componentWillUnmount(): void {
+        this._cleanupMouseEvents?.();
+        this._cleanupMouseEvents = undefined;
     }
 
     /**

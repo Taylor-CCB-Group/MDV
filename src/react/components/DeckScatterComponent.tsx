@@ -16,7 +16,6 @@ import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";
 import AxisComponent from "./AxisComponent";
 import { useOuterContainer } from "../screen_state";
-import type { EventManager } from 'mjolnir.js';
 import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
 
 //todo this should be in a common place etc.
@@ -267,10 +266,10 @@ const DeckScatter = observer(function DeckScatterComponent() {
             try {
                 // const deck: Deck<any> = deckRef.current.deck;
                 const deck = deckRef.current.deck;// as Deck<any>;
-                rebindMouseEvents(deck, selectionLayer);
+                return rebindMouseEvents(deck, selectionLayer);
             } catch (e) {
                 console.error(
-                    "attempt to reset deck eventManager element failed",
+                    "attempt to reset deck eventManager element failed - could be related to brittle deck monkeypatch",
                     e,
                 );
             }

@@ -98,7 +98,7 @@ export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeo
     viewManager._rebuildViewports();
     viewManager.setNeedsUpdate("MDV monkeypatch change event manager");
     if (!selectionLayer) return;
-    setTimeout(() => {
+    const timer = setTimeout(() => {
         // deferring this seems to allow it to have the right kind of internal state...
         // needs more testing.
         try {
@@ -107,4 +107,7 @@ export function rebindMouseEvents(deckO: Deck<any>, selectionLayer?: EditableGeo
             console.error("Error re-initializing (monkey-patching) editable layer state", e);
         }
     });
+    return () => {
+        clearTimeout(timer);
+    };
 }
