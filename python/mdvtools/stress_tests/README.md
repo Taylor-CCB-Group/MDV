@@ -49,7 +49,7 @@ A lot more reliable with the atomic writes, but less than 100% success rate, so 
 
 ### 2. Using `os.system("sync")` before and after replacing the file
 
-All of the "atomic" versions hit 100% success consistently (although the "interrupted_write" often reports "INVALID_JSON").
+All of the "atomic" versions hit close to 100% success consistently (re-running after some other changes to the test code had a 99% result for one run, so still perhaps not industrial-strength - but this mostly relates to dev server setup).
 
 Potentially adds a lot of extra overhead for something that might not be reflective of real-world usage... maybe these artificially induced errors are unlikely.
 
@@ -72,15 +72,15 @@ def save_json_atomic(path, data):
 {
   "interrupted_write": {
     "old": "VALID_JSON",
-    "atomic": "INVALID_JSON"
+    "atomic": "VALID_JSON"
   },
   "concurrent_write": {
-    "old": 0.2,
+    "old": 0.25,
     "atomic": 1.0
   },
   "rapid_succession": {
     "old": 0.86,
-    "atomic": 1.0
+    "atomic": 0.99
   },
   "resource_constrained": {
     "old": 0.95,
@@ -90,6 +90,8 @@ def save_json_atomic(path, data):
 ```
 
 ### 3. Using `os.system("sync")` only after replacing the file
+
+Some runs still show 100% success, but there can be a few failures, and it presumably adds half the overhead of the previous method.
 
 ```python
 def save_json_atomic(path, data):
@@ -109,18 +111,18 @@ def save_json_atomic(path, data):
 {
   "interrupted_write": {
     "old": "VALID_JSON",
-    "atomic": "INVALID_JSON"
+    "atomic": "VALID_JSON"
   },
   "concurrent_write": {
-    "old": 0.2,
-    "atomic": 1.0
+    "old": 0.25,
+    "atomic": 0.95
   },
   "rapid_succession": {
-    "old": 0.86,
-    "atomic": 0.99
+    "old": 0.88,
+    "atomic": 1.0
   },
   "resource_constrained": {
-    "old": 0.95,
+    "old": 1.0,
     "atomic": 1.0
   }
 }
@@ -128,7 +130,7 @@ def save_json_atomic(path, data):
 
 ### 4. Using sync on the directory which should be faster
 
-Some runs show this as having fairly significant numbers of failures, but we haven't really probably measured... maybe it is actually ok in practice, and I don't know how different the overhead is.
+This doesn't seem to do much better than the first version where we don't add any extra syncs, so there doesn't seem to be much point in adding the overhead, even if it is much less than others.
 
 ```python
 def save_json_atomic(path, data):
@@ -151,18 +153,18 @@ def save_json_atomic(path, data):
 {
   "interrupted_write": {
     "old": "VALID_JSON",
-    "atomic": "INVALID_JSON"
+    "atomic": "VALID_JSON"
   },
   "concurrent_write": {
-    "old": 0.1,
-    "atomic": 0.9
+    "old": 0.25,
+    "atomic": 0.85
   },
   "rapid_succession": {
-    "old": 0.88,
-    "atomic": 0.99
+    "old": 0.91,
+    "atomic": 0.93
   },
   "resource_constrained": {
-    "old": 0.9,
+    "old": 0.95,
     "atomic": 1.0
   }
 }

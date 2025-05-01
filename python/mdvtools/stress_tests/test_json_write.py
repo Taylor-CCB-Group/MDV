@@ -14,7 +14,7 @@ def save_json_old(file, data):
     with open(file, 'w') as o:
         o.write(json.dumps(data, indent=2, allow_nan=False))
         o.close()
-
+#! this code is from coderabbit - not written by a human, somewhat vibe-y
 class JSONTruncationTests:
     def __init__(self, test_dir="/app/mdv/json_test"):
         self.test_dir = Path(test_dir)
@@ -59,7 +59,7 @@ class JSONTruncationTests:
         """Check if a JSON file is valid and complete"""
         try:
             with open(path, 'r') as f:
-                data = json.load(f)
+                json.load(f)
                 # Additional validation can be added here
                 return True
         except (json.JSONDecodeError, FileNotFoundError):
@@ -102,6 +102,7 @@ class JSONTruncationTests:
         
         # Kill the process while it's writing
         proc.terminate()
+        proc.join()
         
         # Check if the file exists and is valid
         if not test_file.exists():
@@ -136,7 +137,7 @@ class JSONTruncationTests:
             # Run multiple workers concurrently
             threads = []
             for j in range(5):  # 5 concurrent writers
-                thread = threading.Thread(target=lambda: worker(f"{i}-{j}"))
+                thread = threading.Thread(target=worker, args=(f"{i}-{j}",))
                 threads.append(thread)
                 thread.start()
                 
