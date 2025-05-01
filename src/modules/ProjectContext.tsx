@@ -84,7 +84,7 @@ export function getProjectInfo(): ProjectInfo {
 
 export async function getProjectName(projectId: number) {
     try {
-        const res = await axios.get("/projects");
+        const res = await axios.get("../projects");
         const projectData: Project[] = res.data;
     
         const projectName = projectData?.find((project) => project.id === projectId)?.name || "unnamed_project";

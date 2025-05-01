@@ -659,7 +659,11 @@ export class ChartManager {
                     if (currentView) {
                         const state = this.getState();
                         if (!state.view?.viewImage) {
-                            await this.viewManager.saveView();
+                            // todo: update the error handler function in future
+                            await this.viewManager.saveView((state) => {
+                                console.log("Error occurred: ", state.chartErrors);
+                                return false;
+                            });
                         }
                     }
                 } catch (error) {
@@ -675,7 +679,11 @@ export class ChartManager {
             .then(async () => {
                     const state = this.getState();
                     if (!state.view?.viewImage) {
-                        await this.viewManager.saveView();
+                        // todo: update the error handler function in future
+                        await this.viewManager.saveView((state) => {
+                            console.log("Error occurred: ", state.chartErrors);
+                            return false;
+                        });
                     }
             });
         }
