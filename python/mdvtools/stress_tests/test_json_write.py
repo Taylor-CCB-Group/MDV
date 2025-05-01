@@ -190,13 +190,12 @@ class JSONTruncationTests:
             # Create CPU and I/O pressure
             temp_files = []
             for _ in range(10):
-                tf = tempfile.NamedTemporaryFile(dir=self.test_dir, delete=False)
-                temp_files.append(tf.name)
-                # Write random data
-                for _ in range(1000):
-                    tf.write(os.urandom(1024))
-                tf.flush()
-                tf.close()
+                with tempfile.NamedTemporaryFile(dir=self.test_dir, delete=False) as tf:
+                    temp_files.append(tf.name)
+                    # Write random data
+                    for _ in range(1000):
+                        tf.write(os.urandom(1024))
+                    tf.flush()
             
             # CPU pressure
             _ = [random.random() ** random.random() for _ in range(100000)]
