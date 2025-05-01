@@ -1,4 +1,4 @@
-import useBuildInfo from "@/catalog/hooks/useBuildInfo";
+import { useProject } from "@/modules/ProjectContext";
 import {
     Check,
     ContentCopy,
@@ -50,8 +50,6 @@ const ErrorDisplay = ({
     const [expanded, setExpanded] = useState(true);
     const [copied, setCopied] = useState(false);
     const [userComments, setUserComments] = useState<string>();
-    const info = useBuildInfo();
-    const buildInfo = info?.buildInfo || {};
     const [isLoading, setIsLoading] = useState(false);
     const [emailSent, setEmailSent] = useState(false);
     const [emailNotSent, setEmailNotSent] = useState(false);
@@ -68,6 +66,7 @@ const ErrorDisplay = ({
                 ...(error?.stack != null && { stack: error?.stack }),
             });
     }, [extraMetadata, error]);
+    // const { buildInfo } = useProject();
 
     // todo: Uncomment later
     //todo: Add the logic to send the error details to the email address and display the corresponding message to user

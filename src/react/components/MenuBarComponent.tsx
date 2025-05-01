@@ -15,10 +15,9 @@ import ViewThumbnailComponent from "./ViewThumbnailComponent";
 import FileUploadDialogReact from "@/charts/dialogs/FileUploadDialogWrapper";
 import { fetchJsonConfig } from "@/dataloaders/DataLoaderUtil";
 import BaseChart from "@/charts/BaseChart";
-import { useProject } from "@/modules/ProjectContext";
+import { getBuildInfo, useProject } from "@/modules/ProjectContext";
 import DebugChartReactWrapper from "./DebugJsonDialogReactWrapper";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
-import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 
 const MenuBarComponent = () => {
     const cm = window.mdv.chartManager;
@@ -67,7 +66,7 @@ const MenuBarComponent = () => {
             const { class: omit, ...props } = v;
             return [k, props];
         });
-        const { buildInfo } = useBuildInfo();
+        const buildInfo = getBuildInfo();
         new DebugChartReactWrapper({ chartTypes, datasources, views, state, buildInfo });
     };
 
