@@ -173,7 +173,7 @@ def create_flask_app(config_name=None):
     def enforce_authentication():
         """Redirect unauthenticated users to login if required."""
         if not ENABLE_AUTH:
-            print(":::::1")
+            # print(":::::1")
             return None  # Skip authentication check if auth is disabled
 
         requested_path = request.path
