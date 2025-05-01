@@ -1818,7 +1818,16 @@ def save_json_atomic(path, data):
         tmp.flush()
         os.fsync(tmp.fileno())
         temp_name = tmp.name
+    # potential issues particularly in Docker where the files are on a different volume
+    # safest option is to sync like this before and after, but may be overkill
+    os.system("sync")
     os.replace(temp_name, path)  # Atomic move on most OSes
+    os.system("sync")
+    # this method is lower overhead than os.system("sync") 
+    # but stress testing indicates it is less robust
+    # dir_fd = os.open(dir_name, os.O_DIRECTORY)
+    # os.fsync(dir_fd)
+    # os.close(dir_fd)
 
 def get_subgroup_bytes(grp, index, sparse=False):
     if sparse:
