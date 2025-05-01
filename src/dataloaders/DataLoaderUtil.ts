@@ -12,8 +12,9 @@ let projectRoot = "";
 /**
  * This could potentially also have some more awareness of what type of json it is fetching, and e.g. do some zod validation
  */
-export async function fetchJsonConfig(url: string, root: string)  {
+export async function fetchJsonConfig(url: string, root: string, createErrorComponent = false, flag = false)  {
     try {
+        if (flag) throw "error";
         const resp = await fetch(url);
         const config = await resp.json();
         if (!resp.ok) {
@@ -22,13 +23,15 @@ export async function fetchJsonConfig(url: string, root: string)  {
         //rewriteBaseUrlRecursive(config, root); //removed.
         return config;
     } catch (error: any) {
-        //todo less hacky CSS - also consider making the dialog open by default
-        document.body.style.display = "flex";
-        document.body.style.justifyContent = "center";
-        document.body.style.alignItems = "center";
-        createMdvPortal(ErrorComponentReactWrapper({ error: {message: `Error fetching JSON '${url}'`}, extraMetaData: {message: `${error}`} }), document.body);
+        if (createErrorComponent) {
+            //todo less hacky CSS - also consider making the dialog open by default
+            document.body.style.display = "flex";
+            document.body.style.justifyContent = "center";
+            document.body.style.alignItems = "center";
+            createMdvPortal(ErrorComponentReactWrapper({ error: {message: `Error fetching JSON '${url}'`}, extraMetaData: {message: `${error}`} }), document.body);
+        }
         console.error(`Error fetching ${url}: ${error}`);
-        return { error };
+        throw error;
     }
 }
 

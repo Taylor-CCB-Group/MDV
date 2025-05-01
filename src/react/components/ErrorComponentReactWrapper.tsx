@@ -1,4 +1,4 @@
-import ErrorDisplay, { type ErrorMetadata } from "@/charts/dialogs/ErrorDisplay";
+import DebugErrorComponent, { type ErrorMetadata } from "@/charts/dialogs/DebugErrorComponent";
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import { Error as ErrorIcon } from "@mui/icons-material";
 import { Alert, Button, Container, Paper } from "@mui/material";
@@ -71,7 +71,7 @@ const ErrorComponent = ({error, extraMetaData, title}: ErrorComponentType) => {
                     open={open}
                     handleClose={handleClose}
                     component={
-                        <ErrorDisplay
+                        <DebugErrorComponent
                             error={error}
                             extraMetadata={extraMetaData}
                         />

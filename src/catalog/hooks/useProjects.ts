@@ -56,19 +56,23 @@ const useProjects = () => {
 
                 setProjects(formattedProjects);
                 return;
-            }
-
-            if (response.status === 500) {
+            } else {
                 const errorData = await response.json().catch(() => ({
-                    message: "Database error occurred",
+                    error: "Failed to fetch the projects.",
                 }));
 
-                throw new Error(errorData.message || "Database error occurred");
+                if (response.status === 403) {
+                    throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
+                } else if (response.status === 500) {
+                    throw new Error(errorData.error || "Internal Server Error.");
+                } else {
+                    throw new Error(errorData.error || "Error fetching projects. Please try again later.");
+                }
             }
         } catch (error) {
             const errorMessage =
                 error instanceof Error
-                    ? `Error fetching projects: ${error.message}`
+                    ? error.message
                     : "Error fetching projects. Please try again later.";
 
             handleError(errorMessage);
@@ -91,9 +95,9 @@ const useProjects = () => {
                 },
             });
 
-            const data = await response.json();
-
+            
             if (response.ok) {
+                const data = await response.json();
                 // Add the new project to the local state with default values
                 // These will be populated by subsequent fetch
                 const newProject: Project = {
@@ -110,16 +114,20 @@ const useProjects = () => {
 
                 setProjects((prevProjects) => [...prevProjects, newProject]);
                 return newProject;
+            } else {
+                const errorData = await response.json().catch(() => ({
+                    error: "Failed to create project.",
+                }));
+
+                if (response.status === 403) {
+                    throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
+                } else if (response.status === 500) {
+                    throw new Error(errorData.error || "Internal Server Error.");
+                } else {
+                    throw new Error(errorData.error || "Error creating project. Please try again later.");
+                }
             }
 
-            if (response.status === 500) {
-                throw new Error(
-                    data.message ||
-                        "Error creating project. Please try again later.",
-                );
-            }
-
-            throw new Error("Failed to create project");
         } catch (error) {
             const errorMessage =
                 error instanceof Error
@@ -146,33 +154,26 @@ const useProjects = () => {
                     },
                 });
 
-                if (response.status === 200) {
+                if (response.ok) {
                     setProjects((prevProjects) =>
                         prevProjects.filter((p) => p.id !== id),
                     );
                     return;
+                } else {
+                    const errorData = await response.json().catch(() => ({
+                        error: "Failed to delete project.",
+                    }));
+    
+                    if (response.status === 403) {
+                        throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
+                    } else if (response.status === 404) {
+                        throw new Error(errorData.error || "Project not found or already deleted");
+                    } else if (response.status === 500) {
+                        throw new Error(errorData.error || "Internal Server Error.");
+                    } else {
+                        throw new Error(errorData.error || "Error deleting project. Please try again later.");
+                    }
                 }
-
-                const data = await response.json();
-
-                if (response.status === 404) {
-                    throw new Error("Project not found or already deleted");
-                }
-
-                if (response.status === 403) {
-                    throw new Error(
-                        "This project is read-only and cannot be modified",
-                    );
-                }
-
-                if (response.status === 500) {
-                    throw new Error(
-                        data.message ||
-                            "Internal server error occurred while deleting project",
-                    );
-                }
-
-                throw new Error("Failed to delete project");
             } catch (error) {
                 const errorMessage =
                     error instanceof Error
@@ -219,7 +220,7 @@ const useProjects = () => {
                 const errorMessage = "New name not provided";
                 handleError(errorMessage);
                 setIsLoading(false);
-                throw new Error(errorMessage);
+                return;
             }
 
             try {
@@ -234,9 +235,7 @@ const useProjects = () => {
                     },
                 });
 
-                const data = await response.json();
-
-                if (response.status === 200) {
+                if (response.ok) {
                     setProjects((prevProjects) =>
                         prevProjects.map((project) =>
                             project.id === id
@@ -245,30 +244,21 @@ const useProjects = () => {
                         ),
                     );
                     return;
+                } else {
+                    const errorData = await response.json().catch(() => ({
+                        error: "Failed to rename the project.",
+                    }));
+    
+                    if (response.status === 403) {
+                        throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
+                    } else if (response.status === 404) {
+                        throw new Error(errorData.error || "Project not found or has been deleted.");
+                    } else if (response.status === 500) {
+                        throw new Error(errorData.error || "Internal Server Error.");
+                    } else {
+                        throw new Error(errorData.error || "Error deleting project. Please try again later.");
+                    }
                 }
-
-                if (response.status === 404) {
-                    throw new Error("Project not found or has been deleted");
-                }
-
-                if (response.status === 403) {
-                    throw new Error(
-                        "This project is read-only and cannot be modified",
-                    );
-                }
-
-                if (response.status === 400) {
-                    throw new Error("Invalid project name provided");
-                }
-
-                if (response.status === 500) {
-                    throw new Error(
-                        data.message ||
-                            "Internal server error occurred while renaming project",
-                    );
-                }
-
-                throw new Error("Failed to rename project");
             } catch (error) {
                 const errorMessage =
                     error instanceof Error
@@ -302,9 +292,7 @@ const useProjects = () => {
                     },
                 });
 
-                const data = await response.json();
-
-                if (response.status === 200) {
+                if (response.ok) {
                     setProjects((prevProjects) =>
                         prevProjects.map((project) =>
                             project.id === id
@@ -317,26 +305,21 @@ const useProjects = () => {
                         ),
                     );
                     return;
+                } else {
+                    const errorData = await response.json().catch(() => ({
+                        error: "Failed to rename the project.",
+                    }));
+    
+                    if (response.status === 403) {
+                        throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
+                    } else if (response.status === 404) {
+                        throw new Error(errorData.error || "Project not found or has been deleted.");
+                    } else if (response.status === 500) {
+                        throw new Error(errorData.error || "Internal Server Error.");
+                    } else {
+                        throw new Error(errorData.error || "Error changing project type. Please try again later.");
+                    }
                 }
-
-                if (response.status === 400) {
-                    throw new Error(
-                        'Invalid project type. Must be either "Editable" or "Read-Only"',
-                    );
-                }
-
-                if (response.status === 404) {
-                    throw new Error("Project not found or has been deleted");
-                }
-
-                if (response.status === 500) {
-                    throw new Error(
-                        data.message ||
-                            "Internal server error occurred while updating project type",
-                    );
-                }
-
-                throw new Error("Failed to change project type");
             } catch (error) {
                 const errorMessage =
                     error instanceof Error

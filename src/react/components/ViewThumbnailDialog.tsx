@@ -18,7 +18,7 @@ import {
 import { Clear as ClearIcon, Close as CloseIcon, Image as ImageIcon } from "@mui/icons-material";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
+import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 
 export type ViewThumbnailDialogProps = {
     open: boolean;
@@ -125,7 +125,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
             <DialogContent dividers sx={{height: "95vh"}}>
                 <ErrorBoundary
                     FallbackComponent={({ error }) => (
-                        <ErrorDisplay error={error} title="Error displaying view gallery" />
+                        <DebugErrorComponent error={error} title="Error displaying view gallery" />
                     )}
                 >
                     {loading ? (

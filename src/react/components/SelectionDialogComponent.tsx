@@ -21,7 +21,7 @@ import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import * as d3 from 'd3';
 import { ErrorBoundary } from "react-error-boundary";
-import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
+import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
 import { isArray } from "@/lib/utils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
@@ -536,7 +536,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
             </AccordionSummary>
             <AccordionDetails>
                 <ErrorBoundary FallbackComponent={
-                    ({ error }) => <ErrorDisplay error={error} title="Unexpected Error: please report to developers." />
+                    ({ error }) => <DebugErrorComponent error={error} title="Unexpected Error: please report to developers." />
                     }>
                     <Component column={column} />
                 </ErrorBoundary>

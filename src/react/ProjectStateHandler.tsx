@@ -1,0 +1,103 @@
+import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
+import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
+import ReusableDialog from "@/charts/dialogs/ReusableDialog";
+import { getPostData } from "@/dataloaders/DataLoaderUtil";
+import { useCallback, useEffect, useState } from "react";
+
+export type ProjectStateHandlerType = {
+    root: string;
+    data: any;
+    staticFolder: boolean;
+    permission: boolean;
+};
+
+const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectStateHandlerType) => {
+    const [error, setError] = useState<Error | null>(null);
+    const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+
+    const [confirmSave, setConfirmSave] = useState(false);
+    const [permissionDenied, setPermissionDenied] = useState(false);
+    const cm = window.mdv.chartManager;
+    const saveState = useCallback(async () => {
+        if (staticFolder) return;
+        try {
+            // throw new Error("State save failed");
+            const resp = await getPostData(`${root}/save_state`, data);
+            if (resp.success) {
+                cm.createInfoAlert("State saved", { duration: 2000 });
+                cm.setAllColumnsClean();
+            } else {
+                throw new Error("An error occurred while saving state. Please try again later.");
+            }
+        } catch (err: any) {
+            setError(err);
+            setErrorDialogOpen(true);
+        }
+    }, [cm, staticFolder, data, root]);
+
+    // biome-ignore lint/correctness/useExhaustiveDependencies: conflicting suggestion for saveState
+    useEffect(() => {
+        console.log("render.....", data, permission);
+        setError(null);
+        setErrorDialogOpen(false);
+        setConfirmSave(false);
+        setPermissionDenied(false);
+
+        // check for permission
+        if (!permission) {
+            setPermissionDenied(true);
+            return;
+        }
+
+        if (data.chartErrors && !Array.isArray(data.chartErrors)) {
+            setConfirmSave(true);
+            return;
+        }
+
+        saveState();
+    }, [data, permission]);
+
+    const handleConfirmProceed = () => {
+        setConfirmSave(false);
+        saveState();
+    };
+
+    return (
+        <>
+            <ReusableDialog
+                open={permissionDenied}
+                handleClose={() => setPermissionDenied(false)}
+                component={
+                    <AlertErrorComponent title="Forbidden" message="You do not have permission to save this project." />
+                }
+            />
+
+            <ReusableDialog
+                open={confirmSave}
+                handleClose={() => setConfirmSave(false)}
+                component={
+                    <AlertErrorComponent
+                        title="Proceed with Errors"
+                        message={"There are currently errors in your current view. Would you like to proceed anyway?"}
+                    />
+                }
+                isAlertErrorComponent
+                isConfirmButton
+                confirmText="Proceed"
+                onConfirmClick={handleConfirmProceed}
+            />
+
+            <ReusableDialog
+                open={errorDialogOpen}
+                handleClose={() => setErrorDialogOpen(false)}
+                component={<DebugErrorComponent error={{ message: error?.message as string, stack: error?.stack }} />}
+            />
+        </>
+    );
+};
+
+const ProjectStateHandlerWrapper = ({ root, data, staticFolder, permission }: ProjectStateHandlerType) => {
+    return <ProjectStateHandler root={root} data={data} staticFolder={staticFolder} permission={permission} />;
+};
+
+export default ProjectStateHandlerWrapper;

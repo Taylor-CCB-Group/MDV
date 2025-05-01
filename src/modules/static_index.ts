@@ -15,7 +15,9 @@ import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
 import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
 import type { DataColumn, DataSource } from "@/charts/charts";
-import { getBuildInfo, getProjectName } from "./ProjectContext";
+import { getProjectName } from "./ProjectContext";
+import { createMdvPortal } from "@/react/react_utils";
+import ProjectStateHandlerWrapper from "@/react/ProjectStateHandler";
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
 declare global {
@@ -91,9 +93,11 @@ async function loadData() {
         `${root}/datasources.json`,
         root,
     )) as DataSource[];
-    const config = await fetchJsonConfig(`${root}/state.json`, root);
+    const config = await fetchJsonConfig(`${root}/state.json`, root, true);
     config.popouturl = undefined;
-    const views = await fetchJsonConfig(`${root}/views.json`, root);
+    // todo: check if this is correct
+    const permission = config?.permission === "edit" || config?.permission === "owner";
+    const views = await fetchJsonConfig(`${root}/views.json`, root, true);
     //is view in the URL
     const view = urlParams.get("view");
     if (config.all_views && view && config.all_views.indexOf(view) !== -1) {
@@ -103,17 +107,10 @@ async function loadData() {
     const dataLoader = getDataLoader(staticFolder, datasources, views, dir);
 
     const listener = async (type: string, cm: ChartManager, data: any) => {
-        if (type === "state_saved" && !staticFolder) {
-            const resp = await getPostData(`${root}/save_state`, data);
-            if (resp.success) {
-                cm.createInfoAlert("State saved", { duration: 2000 });
-                cm.setAllColumnsClean();
-            } else {
-                cm.createInfoAlert("State save failed", {
-                    duration: 3000,
-                    type: "danger",
-                });
-            }
+        if (type === "state_saved") {
+            const stateHandlerContainer = document.createElement('div');
+            document.body.appendChild(stateHandlerContainer);
+            createMdvPortal(ProjectStateHandlerWrapper({root, data, staticFolder, permission}), stateHandlerContainer);
         }
         if (type === "view_loaded") {
             changeURLParam("view", cm.viewManager.current_view);
@@ -127,32 +124,4 @@ async function loadData() {
         config,
         listener as any, //jsdoc 🙄
     );
-
-    // add a button for debugging datasources & views metadata
-    // this could be in ChartManager instead, this is convenient for now so we have `root` available.
-    // would be better if it appeared with other entry-points, and also having it here means HMR doesn't work.
-    const tiptext = "View datasource metadata";
-    const debugButton = cm.addMenuIcon(
-        "_main",
-        "fas fa-bug",
-        tiptext,
-        async () => {
-            const datasources = await fetchJsonConfig(
-                `${root}/datasources.json`,
-                root,
-            );
-            const views = await fetchJsonConfig(`${root}/views.json`, root);
-            const state = await fetchJsonConfig(`${root}/state.json`, root);
-
-            const chartTypes = Object.entries(BaseChart.types).map(([k, v]) => {
-                const { class: omit, ...props } = v;
-                return [k, props];
-            });
-            const buildInfo = getBuildInfo();
-            new DebugJsonReactWrapper({ chartTypes, datasources, views, state, buildInfo });
-        },
-        true //
-    );
-    // debugButton.style.float = "right";
-    debugButton.setAttribute("data-microtip-position", "bottom-left");
 }
