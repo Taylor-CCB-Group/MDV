@@ -388,7 +388,7 @@ def read_secret(secret_name):
             return secret_file.read().strip()
     except FileNotFoundError as fnf_error:
         print(f"Error: Secret '{secret_name}' not found. {fnf_error}")
-        raise  # Re-raise the exception to be handled by the parent
+        raise  # Re-raise the exception to be handled by the parent.
 
 def load_config(app, config_name=None, enable_auth=False):
     try:
