@@ -22,15 +22,8 @@ print(ENABLE_AUTH)
 if ENABLE_AUTH:
     
     from authlib.integrations.flask_client import OAuth
-    from auth0.management import Auth0
-    from auth0.authentication import GetToken
-    from mdvtools.auth.auth0_provider import Auth0Provider
-
     oauth = OAuth()  # Initialize OAuth only if auth is enabled
-    #except ImportError:
-    #    print("Auth library not found. Ensure poetry installs `auth` dependencies when ENABLE_AUTH=1.")
-    #    raise e  # Fail early if auth is enabled but libraries are missing
-
+    
 
 def create_flask_app(config_name=None):
     """ Create and configure the Flask app."""
@@ -83,14 +76,12 @@ def create_flask_app(config_name=None):
                 try:
                     print("Syncing users from Auth0 into the database...")
                     sync_auth0_users_to_db()
-                except Exception as e:
-                    raise e
-            
-            if ENABLE_AUTH:
-                try:
+
                     print("Caching user-projects data...")
                     cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
+
                 except Exception as e:
+                    print(f"Error during auth-related DB setup: {e}")
                     raise e
             
             # Routes registration and application setup
@@ -103,29 +94,19 @@ def create_flask_app(config_name=None):
         print(f"Error during app setup: {e}")
         raise e
 
-    # Register OAuth with the app
     if ENABLE_AUTH:
         try:
             print("Initializing OAuth for authentication")
             oauth.init_app(app)
-        except Exception as e:
-            print(f"Error initializing OAuth: {e}")
-            raise e
 
-    if ENABLE_AUTH:
-        try:
             print("Registering authentication before_request logic")
             register_before_request_auth(app)
-        except Exception as e:
-            print(f"Error setting up before_request auth: {e}")
-            raise e
 
-    if ENABLE_AUTH:
-        try:
             print("Registering authentication routes")
-            register_auth_routes(app) # Register Auth0-related routes like /login and /callback
+            register_auth_routes(app)  # Register Auth0-related routes like /login and /callback
+
         except Exception as e:
-            print(f"Error registering authentication routes: {e}")
+            print(f"Error setting up authentication: {e}")
             raise e
 
     # Register other routes (base routes like /, /projects, etc.)
