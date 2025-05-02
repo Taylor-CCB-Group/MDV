@@ -2,9 +2,9 @@ import { columnMatchesType, inferGenericColumnSelectionProps } from "@/lib/colum
 import type { ColumnSelectionProps, CTypes } from "@/lib/columnTypeHelpers";
 import { useDataStore } from "../context";
 import type { DataColumn, DataType } from "@/charts/charts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type HTMLAttributes, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { Autocomplete, Box, Checkbox, Chip, Divider, FormControlLabel, Paper } from "@mui/material";
+import { Autocomplete, Box, Button, Checkbox, Chip, Divider, FormControlLabel, Paper, PaperProps } from "@mui/material";
 import { isArray } from "@/lib/utils";
 import { TextFieldExtended } from "./TextFieldExtended";
 import Grid from '@mui/material/Grid2';
@@ -91,12 +91,6 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        if (isMultiType) {
-            setSelectAll(isArray(value) && value?.length === columns.length);
-        }
-    }, [value, columns.length, isMultiType]);
-
     useCloseOnIntersection(ref, () => setOpen(false));
     // should we be using a `GuiSpec<"dropdown"> | GuiSpec<"multidropdown">` here?
     // we decided against - we have some extra adornments we add and we don't want to have to deal with that in GuiSpec
@@ -104,8 +98,12 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
     type ColumnOption = DataColumn<DataType>;
     type ColumnValue = M extends true ? ColumnOption[] : ColumnOption | null;
 
-    const handleSelectAll = () => {
-        if (!isMultiType) console.error("expected multitype here");
+    const handleSelectAll = useCallback(() => {
+        if (!isMultiType) {
+            console.error("expected multitype here");
+            return;
+        }
+
         if (selectAll) {
             // @ts-expect-error: Incompatible types
             setValue([]);
@@ -115,12 +113,13 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
             setValue(columns);
             setSelectAll(true);
         }
-    };
+    }, [selectAll, setValue, columns, isMultiType]);
     
     return (
         <Grid className="w-full items-center" container>
             <Grid className={"grow"}>
                 <Autocomplete
+                    //! A future use-case can be that the columns will be added at runtime, but MUI's autocomplete has an existing issue. Refer: https://github.com/mui/material-ui/issues/29508 
                     className="w-full"
                     options={columns}
                     multiple={isMultiType}
@@ -135,12 +134,8 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                         // *sigh*. time to move on.
                         if (!value) return; //! check if this is correct
                         if (!(isMultiType === isArray(value))) throw new Error("type mismatch");
-                        if (isMultiType) {
-                            if (isArray(value) && value.length === columns.length) {
-                                setSelectAll(true);
-                            } else {
-                                setSelectAll(false);
-                            }
+                        if (isMultiType && isArray(value) && value.length === 0) {
+                            setSelectAll(false);
                         }
                         //@ts-ignore kicking the can down the road, maybe a new typescript version will fix this
                         setValue(value);
@@ -219,7 +214,8 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                             </li>
                         );
                     }}
-                    PaperComponent={(paperProps) => {
+                    // biome-ignore lint/correctness/useExhaustiveDependencies: not including handleSelectAll because it rerenders the paper component
+                    PaperComponent={useMemo(() => (paperProps: PaperProps) => {
                         const { children, ...restPaperProps } = paperProps;
                         return (
                           <Paper {...restPaperProps}>
@@ -230,23 +226,16 @@ const ColumnDropdownComponent = observer(<T extends CTypes, M extends boolean>(g
                                     py={1}
                                     px={2}
                                 >
-                                    <FormControlLabel
-                                        onClick={(e) => {
-                                        e.preventDefault();
-                                        handleSelectAll();
-                                        }}
-                                        label="Select All"
-                                        control={
-                                        <Checkbox id="select-all-checkbox" checked={selectAll} />
-                                        }
-                                    />
+                                    <Button onClick={handleSelectAll} color="inherit" fullWidth>
+                                        {selectAll ? "Unselect All" : "Select All"}
+                                    </Button>
                                 </Box>
                                 <Divider />
                             </>)}
                             {children}
                           </Paper>
                         );
-                      }}
+                      }, [isMultiType, selectAll])}
                 />
             </Grid>
         </Grid>
