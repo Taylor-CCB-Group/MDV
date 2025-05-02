@@ -8,16 +8,15 @@ import ChartManager from "../charts/ChartManager.js";
 import {
     fetchJsonConfig,
     getDataLoader,
-    getPostData,
     setProjectRoot,
 } from "../dataloaders/DataLoaderUtil";
 import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
-import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
-import type { DataColumn, DataSource } from "@/charts/charts";
+import type { DataSource } from "@/charts/charts";
 import { getProjectName } from "./ProjectContext";
 import { createMdvPortal } from "@/react/react_utils";
 import ProjectStateHandlerWrapper from "@/react/ProjectStateHandler";
+import type { Root } from "react-dom/client";
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
 declare global {
@@ -74,6 +73,9 @@ const root = getRoot(dir);
 // as of this writing, they work with a `?static` parameter, but that's not a good solution.
 const staticFolder = urlParams.get("static") !== null; //!dir.startsWith("/project") && !(window.location.port === "5050") && !dir.endsWith("5050");
 const project_id = dir.split("/").pop();
+// State handler container and root
+let stateHandlerContainer: HTMLElement | null = null;
+let stateHandlerRoot: Root | null = null;
 
 // getting the project name by passing project id
 getProjectName(Number(project_id)).then((project_name) => {
@@ -108,9 +110,18 @@ async function loadData() {
 
     const listener = async (type: string, cm: ChartManager, data: any) => {
         if (type === "state_saved") {
-            const stateHandlerContainer = document.createElement('div');
-            document.body.appendChild(stateHandlerContainer);
-            createMdvPortal(ProjectStateHandlerWrapper({root, data, staticFolder, permission}), stateHandlerContainer);
+            // Unmount the existing root
+            if (stateHandlerRoot) {
+                stateHandlerRoot.unmount();
+            }
+
+            // Create a new container if it's already not created
+            if (!stateHandlerContainer) {
+                stateHandlerContainer = document.createElement('div');
+                stateHandlerContainer.id = "mdv_state_handler";
+                document.body.appendChild(stateHandlerContainer);
+            }
+            stateHandlerRoot = createMdvPortal(ProjectStateHandlerWrapper({root, data, staticFolder, permission}), stateHandlerContainer);
         }
         if (type === "view_loaded") {
             changeURLParam("view", cm.viewManager.current_view);
