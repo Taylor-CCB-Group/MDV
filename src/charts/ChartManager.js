@@ -249,6 +249,27 @@ export class ChartManager {
         );
         this.contentDiv.classList.add("ciview-contentDiv");
 
+        //!!! ChatMDV specific, but we really should be using websocket for other things
+        if (config.websocket) {
+            console.log('websocket is enabled');
+            const fn = async () => {
+                // previously, we were always calling connectIPC - but it was only relevant to earlier experiment with Unity
+                // and we had disabled websocket on server.
+                // started experimenting with socketio for chatMDV - mechanism is working, to an extent... 
+                // but actually, REST is probably best for this (maybe a protocol agnostic abstraction).
+                // try/catch doesn't help when it gets stuck in await...
+                // console.warn('websocket is not currently supported but used as flag for chat experiment - will be fixed very soon')
+                try {
+                    const { socket, sendMessage } = await connectIPC(this);
+                    console.log('connected to socketio');
+                    this.ipc = { socket, sendMessage };
+                } catch (error) {
+                    console.error('Failed to connect to websocket', error);
+                }
+            };
+            fn();
+        }
+
         /** @type {GridStackManager} */
         this.gridStack = new GridStackManager(this);
 

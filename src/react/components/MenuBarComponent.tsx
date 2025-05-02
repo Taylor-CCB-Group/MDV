@@ -18,6 +18,31 @@ import BaseChart from "@/charts/BaseChart";
 import { getBuildInfo, useProject } from "@/modules/ProjectContext";
 import DebugChartReactWrapper from "./DebugJsonDialogReactWrapper";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
+import ChatDialog from "@/charts/dialogs/ChatDialog";
+import ChatLogDialog from "@/charts/dialogs/ChatLogDialog";
+import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
+import ChatLogIcon from '@mui/icons-material/WebStories';
+
+const ChatButtons = () => {
+    const handleChatButtonClick = () => {
+        new ChatDialog();
+    };
+
+    const handleChatLogButtonClick = () => {
+        new ChatLogDialog();
+    };
+
+    return (
+        <>
+            <IconWithTooltip tooltipText="Chat" onClick={handleChatButtonClick}>
+                <ChatBubbleIcon />
+            </IconWithTooltip>
+            <IconWithTooltip tooltipText="Chat Log" onClick={handleChatLogButtonClick}>
+                <ChatLogIcon />
+            </IconWithTooltip>
+        </>
+    );
+}
 
 const MenuBarComponent = () => {
     const cm = window.mdv.chartManager;
@@ -110,6 +135,7 @@ const MenuBarComponent = () => {
                     )}
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <ChatButtons />
                     <ToggleThemeWrapper />
                     <IconWithTooltip tooltipText="View Datasource Metadata" onClick={handleDebugButtonClick}>
                         <PestControlIcon sx={{height: "1.5rem", width: "1.5rem"}} />
