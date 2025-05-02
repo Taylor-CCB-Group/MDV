@@ -165,13 +165,12 @@ class ProjectBlueprint_v2:
         from mdvtools.dbutils.mdv_server_app import ENABLE_AUTH
         from mdvtools.auth.authutils import validate_and_get_user, validate_sso_user, user_project_cache
         
-        logger.info("Inside dispatch request")
-        logger.info(subpath, project_id)
+        logger.info(f"Inside dispatch request for project_id: {project_id} and subpath: {subpath}")
         subpath = f"/{urlparse(subpath).path}"
         for rule, (method, options) in self.routes.items():
             match = rule.match(subpath)
             if match:
-                logger.info("options",options)
+                logger.info(f"options: '{options}")
                 # Update the accessed timestamp only if the last update was more than TIMESTAMP_UPDATE_INTERVAL ago
                 project = ProjectService.get_project_by_id(project_id)
                 if project and (not project.accessed_timestamp or 
@@ -185,7 +184,7 @@ class ProjectBlueprint_v2:
                         return jsonify({"error": "Failed to update project accessed timestamp"}), 500
 
                 
-                logger.info("Enable_auth", ENABLE_AUTH)
+                logger.info(f"Enable_auth: '{ENABLE_AUTH}'")
                 project_permissions = None
                 # Check if authentication is enabled
                 if ENABLE_AUTH:
@@ -216,7 +215,7 @@ class ProjectBlueprint_v2:
                     if user_id:
                         # Directly fetch the user's project permissions from cache
                         user_projects = user_project_cache.get(user_id)  # Fetch from cache
-                    logger.info("User Projects from Cache:", user_projects)
+                    logger.info(f"User Projects from Cache: '{user_projects}'")
                     
                     if user_projects:
                         # Step 4: Validate if the user has permissions for the requested project
@@ -230,7 +229,7 @@ class ProjectBlueprint_v2:
                 # we can check the request.token (or whatever it is) here...
                 # Check for access level only if specified in options
                 if options and 'access_level' in options:
-                    logger.info("match", match)
+                    logger.info(f"match 'match'")
                     #project_id = match.group(0).split('/')[2]  # Extract project_id from matched route
                     project = ProjectService.get_project_by_id(project_id)  # Fetch the project
                     
@@ -239,9 +238,9 @@ class ProjectBlueprint_v2:
                         return jsonify({"error": f"Project with ID {project_id} not found"}), 404
 
                     required_access_level = options['access_level']  # Get required access level
-                    logger.info("required_access_level", required_access_level)
+                    logger.info(f"required_access_level: '{required_access_level}")
                     if required_access_level == 'editable':
-                        logger.info("required_access_level is editable, fetched project is ", project)
+                        logger.info(f"required_access_level is editable, fetched project is '{project}'")
                         
                         if ENABLE_AUTH:
                             if project_permissions:
