@@ -16,7 +16,7 @@ from mdvtools.dbutils.dbservice import ProjectService, FileService
 
 #Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
-print("((((((((((((((((()))))))))))))))))))))))")
+print("(((((((((((((((()))))))))))))))))))))))")
 print(ENABLE_AUTH)
 
 if ENABLE_AUTH:
