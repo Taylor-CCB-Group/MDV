@@ -195,14 +195,14 @@ const useProjects = () => {
             setIsLoading(true);
             setError(null);
 
-            if (!newName || newName.trim() === "") {
-                const errorMessage = "New name not provided";
-                handleError(errorMessage);
-                setIsLoading(false);
-                return;
-            }
-
+            
             try {
+                if (!newName || newName.trim() === "") {
+                    const errorMessage = "New name not provided";
+                    handleError(errorMessage);
+                    setIsLoading(false);
+                    throw new Error(errorMessage);
+                }
                 const formData = new FormData();
                 formData.append("name", newName.trim());
 
@@ -290,7 +290,6 @@ const useProjects = () => {
 
                 handleError(errorMessage);
                 console.error("Error changing project type:", error);
-                throw error;
             } finally {
                 setIsLoading(false);
             }

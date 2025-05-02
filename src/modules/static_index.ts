@@ -94,6 +94,7 @@ async function loadData() {
     const datasources = (await fetchJsonConfig(
         `${root}/datasources.json`,
         root,
+        true,
     )) as DataSource[];
     const config = await fetchJsonConfig(`${root}/state.json`, root, true);
     config.popouturl = undefined;
