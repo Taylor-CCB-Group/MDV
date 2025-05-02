@@ -10,12 +10,12 @@ import os"""
 
 def register_routes(app, ENABLE_AUTH):
     from flask import request, jsonify, render_template
-    from mdvtools.dbutils.mdv_server_app import maybe_require_user, update_cache, active_projects_cache, user_project_cache,user_cache,user_project_cache, all_users_cache, active_projects_cache
+    from mdvtools.auth.authutils import maybe_require_user, update_cache, active_projects_cache, user_project_cache,user_cache, all_users_cache
     import os
     import shutil
     from mdvtools.mdvproject import MDVProject
     from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
-    from mdvtools.dbutils.dbmodels import db, Project, User, UserProject
+    from mdvtools.dbutils.dbmodels import User
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
 
     """Register routes with the Flask app."""

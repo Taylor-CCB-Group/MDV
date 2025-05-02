@@ -158,7 +158,9 @@ class ProjectBlueprint_v2:
 
         # find the item in self.routes that matches the subpath
         from mdvtools.dbutils.dbservice import ProjectService
-        from mdvtools.dbutils.mdv_server_app import validate_and_get_user, validate_sso_user, user_project_cache, ENABLE_AUTH
+        from mdvtools.dbutils.mdv_server_app import ENABLE_AUTH
+        from mdvtools.auth.authutils import validate_and_get_user, validate_sso_user, user_project_cache
+        
         print("**********************************")
         print(subpath, project_id)
         subpath = f"/{urlparse(subpath).path}"
@@ -190,7 +192,7 @@ class ProjectBlueprint_v2:
                         return jsonify({"error": "Authentication method not set in session"}), 401
 
                     if auth_method == "auth0":
-                        user_data, error_response = validate_and_get_user(current_app)
+                        user_data, error_response = validate_and_get_user()
                         print("******************--2.1", user_data)
                     elif auth_method == "shibboleth":
                         user_data, error_response = validate_sso_user(request)

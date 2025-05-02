@@ -1,8 +1,9 @@
 def register_auth_routes(app):
     
     from flask import jsonify, request, redirect, url_for, session
-    from mdvtools.dbutils.dbservice import ProjectService, FileService, UserService, UserProjectService
-    from mdvtools.dbutils.mdv_server_app import update_cache, oauth
+    from mdvtools.dbutils.dbservice import UserService
+    from mdvtools.dbutils.mdv_server_app import oauth
+    from mdvtools.auth.authutils import update_cache
     from mdvtools.auth.auth0_provider import Auth0Provider
     
 
