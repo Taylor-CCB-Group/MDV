@@ -28,6 +28,7 @@ user_cache = {}  # key: auth0_id -> user details
 user_project_cache = {}  # key: user_id -> project permissions
 all_users_cache = []  # list of all user summaries
 active_projects_cache = []
+auth_method_cache = {} 
 
 
 if ENABLE_AUTH:
@@ -876,7 +877,7 @@ def validate_and_get_user(app):
         return None, jsonify({"error": "Internal server error - user not validated"}), 500
     
 
-def validate_sso_user():
+def validate_sso_user(request):
     """
     Validates the SSO-authenticated user by checking required headers.
     Returns the user info from the cache or DB, or an error response.
