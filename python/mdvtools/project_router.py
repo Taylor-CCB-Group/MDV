@@ -1,5 +1,6 @@
 import logging
-from flask import Flask, current_app, Response, request, jsonify, session
+from flask import Flask, request, jsonify, session
+from flask.typing import ResponseReturnValue as Response
 from typing import Dict, Any, Callable, Tuple
 import re
 from urllib.parse import urlparse
