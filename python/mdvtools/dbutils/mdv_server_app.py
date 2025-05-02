@@ -28,7 +28,6 @@ user_cache = {}  # key: auth0_id -> user details
 user_project_cache = {}  # key: user_id -> project permissions
 all_users_cache = []  # list of all user summaries
 active_projects_cache = []
-auth_method_cache = {} 
 
 
 if ENABLE_AUTH:
@@ -1034,10 +1033,10 @@ def register_routes(app, ENABLE_AUTH):
 
                 # Check if authentication is enabled and user is admin
                 # Check if authentication is enabled and user is admin
-                if ENABLE_AUTH:
-                    # Ensure the user is an admin before allowing project creation
-                    if not user_data.get("is_admin", False):
-                        return jsonify({"error": "Only admins can create projects."}), 403
+                #if ENABLE_AUTH:
+                #    # Ensure the user is an admin before allowing project creation
+                #    if not user_data.get("is_admin", False):
+                #        return jsonify({"error": "Only admins can create projects."}), 403
 
                 print("Creating project")
                 
@@ -1076,9 +1075,9 @@ def register_routes(app, ENABLE_AUTH):
                 if new_project:
                     # Step 5: Associate the admin user with the new project and grant all permissions
                     if ENABLE_AUTH:
-                        admin_user_id = user_data['id']
+                        current_user_id = user_data['id']
                         user_project = UserProjectService.add_or_update_user_project(
-                            user_id=admin_user_id,
+                            user_id=current_user_id,
                             project_id=new_project.id,
                             is_owner=True
                         )
@@ -1088,7 +1087,7 @@ def register_routes(app, ENABLE_AUTH):
                         
                         # Step 6: Update caches for the admin user and new project
                         update_cache(
-                            user_id=admin_user_id,
+                            user_id=current_user_id,
                             project_id=new_project.id,
                             permissions={
                                 "can_read": True,
