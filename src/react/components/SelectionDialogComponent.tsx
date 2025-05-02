@@ -1,6 +1,6 @@
 import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Checkbox, Chip, Divider, FormControlLabel, IconButton, Paper, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, FormControlLabel, IconButton, Paper, PaperProps, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId, type HTMLAttributes } from "react";
 
@@ -76,11 +76,6 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         dim.filter("filterCategories", [column.field], value, true);
     }, [dim, column.field, value, filter]);
 
-    useEffect(() => {
-        // Initialising select all
-        setSelectAll(isArray(value) && value?.length === values.length);
-    }, [value, values.length]);
-
     const toggleOption = useCallback((option: string) => {
         if (value.includes(option)) {
             setValue(value.filter((v) => v !== option));
@@ -89,7 +84,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         setValue([...value, option]);
     }, [setValue, value]);
 
-    const handleSelectAll = () => {
+    const handleSelectAll = useCallback(() => {
         if (selectAll) {
             setValue([]);
             setSelectAll(false);
@@ -97,7 +92,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             setValue(values);
             setSelectAll(true);
         }
-    };
+    }, [selectAll, setValue, values]);
 
     return (
         <Autocomplete
@@ -107,10 +102,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             value={value}
             filterOptions={filterOptions}
             onChange={(_, value) => {
-                if (!value) return; //! check if this is correct
-                if (value.length === values.length) {
-                    setSelectAll(true);
-                } else if (selectAll && value.length !== values.length) {
+                if(isArray(value) && value.length === 0) {
                     setSelectAll(false);
                 }
                 setValue(value);
@@ -165,34 +157,26 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                 //todo improve styling - bad from UX perspective at the moment when it overflows.
                 return <div className="max-h-32 overflow-auto">{chips}</div>;
             }}
-            // biome-ignore lint/correctness/useExhaustiveDependencies: conflicting warning for handleSelectAll dependency
-            PaperComponent={useMemo(() => (paperProps: HTMLAttributes<HTMLElement>) => {
+            // Getting warnings in console if slotProps is used for rendering Paper Component
+            PaperComponent={useMemo(() => (paperProps: PaperProps) => {
                 const { children, ...restPaperProps } = paperProps;
                 return (
                   <Paper {...restPaperProps}>
-                    <>
-                        <Box
-                            onMouseDown={(e) => e.preventDefault()}
-                            py={1}
-                            px={2}
-                        >
-                            <FormControlLabel
-                                onClick={(e) => {
-                                e.preventDefault();
-                                handleSelectAll();
-                                }}
-                                label="Select All"
-                                control={
-                                <Checkbox id="select-all-checkbox" checked={selectAll} />
-                                }
-                            />
-                        </Box>
-                        <Divider />
-                    </>
+                    <Box
+                        onMouseDown={(e) => e.preventDefault()}
+                        py={1}
+                        px={2}
+                        sx={{textAlign: "center"}}
+                    >
+                        <Button onClick={handleSelectAll} color="inherit" fullWidth>
+                            {selectAll ? "Unselect All" : "Select All"}
+                        </Button>
+                    </Box>
+                    <Divider />
                     {children}
                   </Paper>
                 );
-              }, [selectAll])}
+              }, [selectAll, handleSelectAll])}
         />
     );
 });

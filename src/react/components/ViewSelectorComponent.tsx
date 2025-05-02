@@ -103,9 +103,6 @@ const ViewSelectorDropdown = observer(() => {
                 value={viewManager.current_view || null}
                 onChange={(_event, newValue) => {
                     if (newValue) {
-                        // Updating state and changing view
-                        // const state = cm.getState();
-                        // cm._callListeners("state_saved", state);
                         cm.changeView(newValue);
                     }
                 }}
