@@ -21,7 +21,6 @@ const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectSt
     const saveState = useCallback(async () => {
         if (staticFolder) return;
         try {
-            // throw new Error("State save failed");
             const resp = await getPostData(`${root}/save_state`, data);
             if (resp.success) {
                 cm.createInfoAlert("State saved", { duration: 2000 });
