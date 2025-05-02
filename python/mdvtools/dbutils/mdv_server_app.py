@@ -135,7 +135,7 @@ def create_flask_app(config_name=None):
         auth_method = session.get("auth_method")
 
         if auth_method == "auth0":
-            user, error_response = validate_and_get_user()
+            user, error_response = validate_and_get_user(current_app)
         elif auth_method == "shibboleth":
             print(":::::3.2")
             user, error_response = validate_sso_user(request)
@@ -719,7 +719,7 @@ def register_auth_routes(app):
                     
                     # Store the authentication method as Shibboleth
                     session["auth_method"] = "shibboleth"  # Indicate Shibboleth login
-
+                    session.modified = True
                     # Check if the Shibboleth login URL is provided in the environment
                     shibboleth_login_url = app.config.get('SHIBBOLETH_LOGIN_URL', None)
 
@@ -748,6 +748,9 @@ def register_auth_routes(app):
 
                 # Store user in cache
                 update_cache(user_id=user.id, user_data=user_data)
+
+                session["auth_method"] = "shibboleth"  # Indicate Shibboleth login
+                session.modified = True
 
                 print(f"SSO login successful: {email}")
                 return redirect("/")
@@ -895,19 +898,11 @@ def validate_sso_user(request):
             return None, jsonify({"error": "Missing SSO authentication headers"}), 401
 
         # Look up the user in your in-memory cache or DB by persistent_id
-        user = user_cache.get(persistent_id)  # if using in-memory
+        user_data = user_cache.get(persistent_id)  # if using in-memory
         # or: user = User.query.filter_by(auth0_id=persistent_id).first()
 
-        if not user:
+        if not user_data:
             return None, jsonify({"error": "SSO user not found"}), 403
-
-        # Prepare user data
-        user_data = {
-            "id": user.id,
-            "email": user.email,
-            "auth0_id": persistent_id,
-            "is_admin": user.is_admin
-        }
 
         # Cache the user data in session for future use
         session['user'] = user_data
@@ -936,7 +931,7 @@ def maybe_require_user(ENABLE_AUTH):
                 if error_response:
                     print("------maybe_require_user----ERROR in auth0 validation")
                     return error_response
-            elif auth_method == "sso":
+            elif auth_method == "shibboleth":
                 user, error_response = validate_sso_user(request)
                 if error_response:
                     print("------maybe_require_user----ERROR in sso validation")
