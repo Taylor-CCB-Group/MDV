@@ -570,10 +570,13 @@ def register_routes(app, ENABLE_AUTH):
                 UserProjectService.remove_user_from_project(user_id, project_id)
 
                 # Step 5: Check if the user is part of the project
+                # Step 5: Check if the user is part of the project
                 user_permissions_cache = user_project_cache.get(user_id)
                 if user_permissions_cache:
-                    del user_project_cache[user_id][project_id]
-                
+                    if project_id in user_project_cache[user_id]:
+                        del user_project_cache[user_id][project_id]
+                    else:
+                        logger.warning(f"Project {project_id} not found in cache for user {user_id}")
                 return jsonify({"message": "User removed successfully"}), 200
             
             except Exception as e:
