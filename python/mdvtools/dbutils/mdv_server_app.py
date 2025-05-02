@@ -82,7 +82,7 @@ def create_flask_app(config_name=None):
             if ENABLE_AUTH:
                 try:
                     print("Syncing users from Auth0 into the database...")
-                    sync_auth0_users_to_db(app)
+                    sync_auth0_users_to_db()
                 except Exception as e:
                     raise e
             

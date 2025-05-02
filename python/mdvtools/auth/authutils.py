@@ -16,7 +16,7 @@ def is_authenticated():
 
     auth_method = session.get("auth_method")
     if auth_method == "auth0":
-        user, error_response = validate_and_get_user(current_app)
+        user, error_response = validate_and_get_user()
     elif auth_method == "shibboleth":
         user, error_response = validate_sso_user(request)
     else:
@@ -57,7 +57,7 @@ def register_before_request_auth(app):
 
         return None
 
-def sync_auth0_users_to_db(app):
+def sync_auth0_users_to_db():
     from mdvtools.dbutils.dbservice import UserService, UserProjectService
     from mdvtools.dbutils.dbmodels import db, Project
     from auth0.management import Auth0
@@ -68,10 +68,10 @@ def sync_auth0_users_to_db(app):
     """
     try:
         # Load Auth0 config from app
-        auth0_domain = app.config['AUTH0_DOMAIN']
-        client_id = app.config['AUTH0_CLIENT_ID']
-        client_secret = app.config['AUTH0_CLIENT_SECRET']
-        auth0_db_connection = app.config['AUTH0_DB_CONNECTION']
+        auth0_domain = current_app.config['AUTH0_DOMAIN']
+        client_id = current_app.config['AUTH0_CLIENT_ID']
+        client_secret = current_app.config['AUTH0_CLIENT_SECRET']
+        auth0_db_connection = current_app.config['AUTH0_DB_CONNECTION']
         audience = f"https://{auth0_domain}/api/v2/"
 
         # Get Auth0 Management API token
