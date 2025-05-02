@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 def register_routes(app, ENABLE_AUTH):
     from flask import request, jsonify, render_template
-    from mdvtools.auth.authutils import maybe_require_user, update_cache, active_projects_cache, user_project_cache,user_cache, all_users_cache
+    from mdvtools.auth.authutils import maybe_require_user, update_cache, active_projects_cache, user_project_cache,user_cache, all_users_cache, cache_user_projects
     import os
     import shutil
     from mdvtools.mdvproject import MDVProject
@@ -16,6 +16,11 @@ def register_routes(app, ENABLE_AUTH):
 
     """Register routes with the Flask app."""
     logger.info("Registering routes...")
+    # if len(active_projects_cache) == 0:
+    #     logger.info("active_projects_cache is empty, calling cache_user_projects()")
+    #     with app.app_context():
+    #         cache_user_projects() # this won't work in localhost
+    #         logger.info(f"active_projects_cache populated with {len(active_projects_cache)} projects")
 
     try:
         @app.route('/')
@@ -44,6 +49,7 @@ def register_routes(app, ENABLE_AUTH):
             try:
                 # Step 1: Get projects directly from cache
                 active_projects = active_projects_cache
+                # logger.info(f"Active projects from cache: {active_projects}")
 
                 if ENABLE_AUTH:
                     # Filter by user permissions if authentication is enabled
