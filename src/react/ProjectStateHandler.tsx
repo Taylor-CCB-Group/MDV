@@ -12,12 +12,12 @@ export type ProjectStateHandlerType = {
 };
 
 const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectStateHandlerType) => {
-    const [error, setError] = useState<Error | null>(null);
+    const [error, setError] = useState<DebugErrorComponentProps['error'] | null>(null);
     const [errorDialogOpen, setErrorDialogOpen] = useState(false);
-
     const [confirmSave, setConfirmSave] = useState(false);
     const [permissionDenied, setPermissionDenied] = useState(false);
     const cm = window.mdv.chartManager;
+
     const saveState = useCallback(async () => {
         if (staticFolder) return;
         try {
@@ -29,15 +29,19 @@ const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectSt
             } else {
                 throw new Error("An error occurred while saving state. Please try again later.");
             }
-        } catch (err: any) {
-            setError(err);
+        } catch (err) {
+            setError(err instanceof Error ? {
+                message: err.message,
+                stack: err?.stack,
+            } : {
+                message: "An error occurred while saving state. Please try again later.",
+                stack: `${err}`
+            });
             setErrorDialogOpen(true);
         }
     }, [cm, staticFolder, data, root]);
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies: conflicting suggestion for saveState
     useEffect(() => {
-        console.log("render.....", data, permission);
         setError(null);
         setErrorDialogOpen(false);
         setConfirmSave(false);
@@ -55,7 +59,7 @@ const ProjectStateHandler = ({ root, data, staticFolder, permission }: ProjectSt
         }
 
         saveState();
-    }, [data, permission]);
+    }, [data, permission, saveState]);
 
     const handleConfirmProceed = () => {
         setConfirmSave(false);

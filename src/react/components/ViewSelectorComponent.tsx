@@ -6,7 +6,7 @@ import { observer } from "mobx-react-lite";
 import { useEffect, useState } from "react";
 import { useChartManager, useViewManager } from "../hooks";
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
-import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
+import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 
 export type DropdownType = {
     options: string[];
@@ -72,7 +72,7 @@ const ViewSelectorDropdown = observer(() => {
 
     const options = viewManager.all_views;
     const [dirty, setDirty] = useState(false);
-    const [error, setError] = useState<Error>();
+    const [error, setError] = useState<DebugErrorComponentProps['error']>();
     const [openError, setOpenError] = useState(false);
 
     useEffect(() => {

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import type { Project, ProjectAccessType } from "../utils/projectUtils";
+import { parseErrorResponse } from "../utils/apiUtils";
 
 const useProjects = () => {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -57,17 +58,11 @@ const useProjects = () => {
                 setProjects(formattedProjects);
                 return;
             } else {
-                const errorData = await response.json().catch(() => ({
-                    error: "Failed to fetch the projects.",
-                }));
-
-                if (response.status === 403) {
-                    throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
-                } else if (response.status === 500) {
-                    throw new Error(errorData.error || "Internal Server Error.");
-                } else {
-                    throw new Error(errorData.error || "Error fetching projects. Please try again later.");
-                }
+                const errorResponse = await parseErrorResponse(
+                    response, 
+                    "Error fetching projects. Please try again later."
+                );
+                throw errorResponse;
             }
         } catch (error) {
             const errorMessage =
@@ -115,17 +110,11 @@ const useProjects = () => {
                 setProjects((prevProjects) => [...prevProjects, newProject]);
                 return newProject;
             } else {
-                const errorData = await response.json().catch(() => ({
-                    error: "Failed to create project.",
-                }));
-
-                if (response.status === 403) {
-                    throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
-                } else if (response.status === 500) {
-                    throw new Error(errorData.error || "Internal Server Error.");
-                } else {
-                    throw new Error(errorData.error || "Error creating project. Please try again later.");
-                }
+                const errorResponse = await parseErrorResponse(
+                    response, 
+                    "Error creating project. Please try again later."
+                );
+                throw errorResponse;
             }
 
         } catch (error) {
@@ -135,7 +124,6 @@ const useProjects = () => {
                     : "Error creating project. Please try again later.";
 
             handleError(errorMessage);
-            throw error;
         } finally {
             setIsLoading(false);
         }
@@ -160,19 +148,11 @@ const useProjects = () => {
                     );
                     return;
                 } else {
-                    const errorData = await response.json().catch(() => ({
-                        error: "Failed to delete project.",
-                    }));
-    
-                    if (response.status === 403) {
-                        throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
-                    } else if (response.status === 404) {
-                        throw new Error(errorData.error || "Project not found or already deleted");
-                    } else if (response.status === 500) {
-                        throw new Error(errorData.error || "Internal Server Error.");
-                    } else {
-                        throw new Error(errorData.error || "Error deleting project. Please try again later.");
-                    }
+                    const errorResponse = await parseErrorResponse(
+                        response, 
+                        "Error deleting project. Please try again later."
+                    );
+                    throw errorResponse;
                 }
             } catch (error) {
                 const errorMessage =
@@ -182,7 +162,6 @@ const useProjects = () => {
 
                 handleError(errorMessage);
                 console.error("Error deleting project:", error);
-                throw error;
             } finally {
                 setIsLoading(false);
             }
@@ -245,19 +224,11 @@ const useProjects = () => {
                     );
                     return;
                 } else {
-                    const errorData = await response.json().catch(() => ({
-                        error: "Failed to rename the project.",
-                    }));
-    
-                    if (response.status === 403) {
-                        throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
-                    } else if (response.status === 404) {
-                        throw new Error(errorData.error || "Project not found or has been deleted.");
-                    } else if (response.status === 500) {
-                        throw new Error(errorData.error || "Internal Server Error.");
-                    } else {
-                        throw new Error(errorData.error || "Error deleting project. Please try again later.");
-                    }
+                    const errorResponse = await parseErrorResponse(
+                        response, 
+                        "Error renaming project. Please try again later."
+                    );
+                    throw errorResponse;
                 }
             } catch (error) {
                 const errorMessage =
@@ -267,7 +238,6 @@ const useProjects = () => {
 
                 handleError(errorMessage);
                 console.error("Error renaming project:", error);
-                throw error;
             } finally {
                 setIsLoading(false);
             }
@@ -306,19 +276,11 @@ const useProjects = () => {
                     );
                     return;
                 } else {
-                    const errorData = await response.json().catch(() => ({
-                        error: "Failed to rename the project.",
-                    }));
-    
-                    if (response.status === 403) {
-                        throw new Error(errorData.error || "Forbidden: You are not allowed to perform this action.");
-                    } else if (response.status === 404) {
-                        throw new Error(errorData.error || "Project not found or has been deleted.");
-                    } else if (response.status === 500) {
-                        throw new Error(errorData.error || "Internal Server Error.");
-                    } else {
-                        throw new Error(errorData.error || "Error changing project type. Please try again later.");
-                    }
+                    const errorResponse = await parseErrorResponse(
+                        response, 
+                        "Error changing project type. Please try again later."
+                    );
+                    throw errorResponse;
                 }
             } catch (error) {
                 const errorMessage =

@@ -20,15 +20,16 @@ import DebugChartReactWrapper from "./DebugJsonDialogReactWrapper";
 import ViewDialogWrapper from "@/charts/dialogs/ViewDialogWrapper";
 import { useState } from "react";
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
-import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
+import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 
 const MenuBarComponent = () => {
-    const [error, setError] = useState<{message: string, stack?: string} | null>(null);
+    const [error, setError] = useState<DebugErrorComponentProps['error'] | null>(null);
     const [open, setOpen] = useState(false);
     const cm = window.mdv.chartManager;
     const { viewManager, config, containerDiv } = cm;
     const { root } = useProject();
+    const { buildInfo } = useBuildInfo();
 
     const handleHomeButtonClick = () => {
         // const state = this.getState();
@@ -74,7 +75,6 @@ const MenuBarComponent = () => {
                 const { class: omit, ...props } = v;
                 return [k, props];
             });
-            const { buildInfo } = useBuildInfo();
             new DebugChartReactWrapper({ chartTypes, datasources, views, state, buildInfo });
         } catch (error) {
             setError(error instanceof Error ? {

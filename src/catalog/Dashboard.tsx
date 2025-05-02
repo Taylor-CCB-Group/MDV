@@ -76,7 +76,7 @@ const Dashboard: React.FC = () => {
             const base = import.meta.env.DEV
                 ? "http://localhost:5170?dir=/"
                 : "";
-            window.location.href = `${base}project/${newProject.id}`;
+            window.location.href = `${base}project/${newProject?.id}`;
         } catch (error) {
             console.error("Failed to create project:", error);
         }
