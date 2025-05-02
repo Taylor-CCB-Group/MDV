@@ -39,19 +39,22 @@ const useProjectShare = (projectId: string) => {
                 },
             });
 
-            const data = await res.json();
 
             if (res.ok) {
+                const data = await res.json();
                 if (data?.all_users) setUserList(data.all_users);
                 if (data?.shared_users) setSharedUsers(data.shared_users);
                 return;
             } else {
+                const errorData = await res.json().catch(() => ({
+                    error: "An error occurred. Please try again."
+                }))
                 if (res.status === 403) {
-                    setError(data?.error || "Forbidden: You are not allowed to perform this action.");
+                    setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
                 } else if (res.status === 500) {
-                    setError(data?.error || "Internal Server Error");
+                    setError(errorData?.error || "Internal Server Error");
                 } else {
-                    setError(data?.message || "An error occurred. Please try again.");
+                    setError(errorData?.error || "An error occurred. Please try again.");
                 }
             }
 
@@ -76,18 +79,21 @@ const useProjectShare = (projectId: string) => {
                 },
             });
 
-            const data = await res.json();
 
             if (res.ok) {
+                const data = await res.json();
                 await getAllUsers();
                 return;
             } else {
+                const errorData = await res.json().catch(() => ({
+                    error: "An error occurred. Please try again."
+                }))
                 if (res.status === 403) {
-                    setError(data?.error || "Forbidden: You are not allowed to perform this action.");
+                    setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
                 } else if (res.status === 500) {
-                    setError(data?.error || "Internal Server Error");
+                    setError(errorData?.error || "Internal Server Error");
                 } else {
-                    setErrorMsg(data?.message || "An error occurred. Please try again.");
+                    setErrorMsg(errorData?.message || "An error occurred. Please try again.");
                 }
             }
 
@@ -112,18 +118,21 @@ const useProjectShare = (projectId: string) => {
                 },
             });
 
-            const data = await res.json();
 
             if (res.ok) {
+                const data = await res.json();
                 await getAllUsers();
                 return;
             } else {
+                const errorData = await res.json().catch(() => ({
+                    error: "An error occurred. Please try again."
+                }))
                 if (res.status === 403) {
-                    setError(data?.error || "Forbidden: You are not allowed to perform this action.");
+                    setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
                 } else if (res.status === 500) {
-                    setError(data?.error || "Internal Server Error");
+                    setError(errorData?.error || "Internal Server Error");
                 } else {
-                    setErrorMsg(data?.message || "An error occurred. Please try again.");
+                    setErrorMsg(errorData?.message || "An error occurred. Please try again.");
                 }
             }
 
@@ -146,18 +155,21 @@ const useProjectShare = (projectId: string) => {
                 },
             });
 
-            const data = await res.json();
 
             if (res.ok) {
+                const data = await res.json();
                 await getAllUsers();
                 return;
             } else {
+                const errorData = await res.json().catch(() => ({
+                    error: "An error occurred. Please try again."
+                }))
                 if (res.status === 403) {
-                    setError(data?.error || "Forbidden: You are not allowed to perform this action.");
+                    setError(errorData?.error || "Forbidden: You are not allowed to perform this action.");
                 } else {
-                    setError(data?.error || "Internal Server Error");
+                    setError(errorData?.error || "Internal Server Error");
                 }
-                setErrorMsg(data?.message || "An error occurred. Please try again.");
+                setErrorMsg(errorData?.message || "An error occurred. Please try again.");
             }
 
         } catch (error) {
