@@ -146,7 +146,7 @@ def register_routes(app, ENABLE_AUTH):
                     # Step 5: Associate the admin user with the new project and grant all permissions
                     if ENABLE_AUTH:
                         current_user_id = user_data['id']
-                        user_project = UserProjectService.add_or_update_user_project(
+                        UserProjectService.add_or_update_user_project(
                             user_id=current_user_id,
                             project_id=new_project.id,
                             is_owner=True
@@ -203,7 +203,7 @@ def register_routes(app, ENABLE_AUTH):
         @maybe_require_user(ENABLE_AUTH)
         def delete_project(user, project_id: int):
             #project_removed_from_blueprints = False
-            global active_projects_cache
+            nonlocal active_projects_cache
             try:
                 logger.info(f"Deleting project '{project_id}'")
 
@@ -511,6 +511,7 @@ def register_routes(app, ENABLE_AUTH):
 
 
                 # Step 3: Extract new permission from request
+                assert request.json, "Request JSON is empty"
                 new_permission = request.json.get("permission", "").lower()
                 if new_permission not in ["view", "edit", "owner"]:
                     return jsonify({"error": "Invalid permission value"}), 400

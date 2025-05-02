@@ -86,6 +86,7 @@ class Auth0Provider(AuthProvider):
             
 
             # Initiate the redirect to Auth0's authorization endpoint with necessary parameters
+            assert self.oauth.auth0 is not None, "Auth0 provider is not registered."
             return self.oauth.auth0.authorize_redirect(
                 redirect_uri=redirect_uri,
                 audience=audience  # The audience for the token (API identifier)                
@@ -113,6 +114,7 @@ class Auth0Provider(AuthProvider):
             logout_url = f"https://{self.app.config['AUTH0_DOMAIN']}/v2/logout?returnTo={redirect_url}&client_id={self.app.config['AUTH0_CLIENT_ID']}"
             
             logging.info(f"Redirecting to Auth0 logout URL: {logout_url}")
+            # "type 'response' is not assignable to None"
             return redirect(logout_url)
 
         except Exception as e:
@@ -188,6 +190,7 @@ class Auth0Provider(AuthProvider):
         """
         try:
             logging.info("Handling callback from Auth0.")
+            assert self.oauth.auth0 is not None, "Auth0 provider is not registered."
             token = self.oauth.auth0.authorize_access_token()
             if 'access_token' not in token:
                 raise ValueError("Access token not found in the response.")
@@ -228,6 +231,7 @@ class Auth0Provider(AuthProvider):
         """
         try:
             logging.info("Checking authentication status.")
+            # Argument of type "str" cannot be assigned to parameter "token" of type "dict[Unknown, Unknown]"
             user_info = self.get_user(token)
             return user_info is not None
         except Exception as e:

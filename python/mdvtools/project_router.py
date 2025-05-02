@@ -205,6 +205,8 @@ class ProjectBlueprint_v2:
                     if error_response:
                         return error_response  # Unauthorized or failed
 
+                    if not user_data:
+                        return jsonify({"error": "User data not found"}), 401
                     user_id = user_data['id']
                     logger.info(f"Authenticated user ({auth_method}): {user_id}") 
                     
