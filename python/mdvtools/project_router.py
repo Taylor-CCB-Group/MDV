@@ -229,7 +229,7 @@ class ProjectBlueprint_v2:
                 # we can check the request.token (or whatever it is) here...
                 # Check for access level only if specified in options
                 if options and 'access_level' in options:
-                    logger.info(f"match 'match'")
+                    logger.info(f"match '{match}'")
                     #project_id = match.group(0).split('/')[2]  # Extract project_id from matched route
                     project = ProjectService.get_project_by_id(project_id)  # Fetch the project
                     
