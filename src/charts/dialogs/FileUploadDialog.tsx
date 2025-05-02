@@ -32,7 +32,7 @@ import {
 import { isArray } from "@/lib/utils";
 // import processH5File from "./utils/h5Processing";
 import H5MetadataPreview from "./H5MetadataPreview";
-import ErrorDisplay from "./ErrorDisplay";
+import DebugErrorComponent from "./DebugErrorComponent";
 import AnndataConflictDialog from "./AnndataConflictDialog";
 import ReusableDialog from "./ReusableDialog";
 
@@ -1175,7 +1175,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                     </>
                 ) : state.error ? (
                     <>
-                        <ErrorDisplay error={state.error} />
+                        <DebugErrorComponent error={state.error} />
                         <div className="flex justify-center items-center gap-6">
                             <Button
                                 marginTop="mt-1"

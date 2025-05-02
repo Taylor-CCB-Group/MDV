@@ -10,7 +10,6 @@ import type { DeckScatterConfig } from "./DeckScatterReactWrapper";
 import { action } from "mobx";
 import type { DataColumn, LoadedDataColumn, NumberDataType } from "@/charts/charts";
 import { allNumeric } from "@/lib/columnTypeHelpers";
-import "../../charts/css/charts.css";
 import { SpatialAnnotationProvider, useSpatialLayers } from "../spatial_context";
 import SelectionOverlay from "./SelectionOverlay";
 import { useScatterRadius } from "../scatter_state";

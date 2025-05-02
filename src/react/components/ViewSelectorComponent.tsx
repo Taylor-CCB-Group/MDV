@@ -5,8 +5,8 @@ import { PriorityHigh as PriorityHighIcon } from "@mui/icons-material";
 import { observer } from "mobx-react-lite";
 import { useEffect, useState } from "react";
 import { useChartManager, useViewManager } from "../hooks";
-import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
+import DebugErrorComponent, { type DebugErrorComponentProps } from "@/charts/dialogs/DebugErrorComponent";
 
 export type DropdownType = {
     options: string[];
@@ -18,13 +18,18 @@ function useUpdateViewList() {
 
     useEffect(() => {
         const interval = setInterval(async () => {
-            const config = await fetchJsonConfig(`${root}/state.json`, root);
-            // we should consider zod validation here... but let's just try not to mess up
-            if (!config.all_views) {
-                console.warn(`expected state.json, got ${config}`);
-                return;
+            try {
+                const config = await fetchJsonConfig(`${root}/state.json`, root);
+                // we should consider zod validation here... but let's just try not to mess up
+                if (!config.all_views) {
+                    console.warn(`expected state.json, got ${config}`);
+                    return;
+                }
+                viewManager.setAllViews(config.all_views);
+            } catch (error) {
+                //! not setting error here because this will be called every 0.5 sec which is causing the error dialog to appear multiple times
+                console.error("Error fetching JSON: ", error);
             }
-            viewManager.setAllViews(config.all_views);
         }, 500);
 
         return () => {
@@ -67,7 +72,7 @@ const ViewSelectorDropdown = observer(() => {
 
     const options = viewManager.all_views;
     const [dirty, setDirty] = useState(false);
-    const [error, setError] = useState<Error>();
+    const [error, setError] = useState<DebugErrorComponentProps['error']>();
     const [openError, setOpenError] = useState(false);
 
     useEffect(() => {
@@ -119,7 +124,7 @@ const ViewSelectorDropdown = observer(() => {
                     open={openError}
                     handleClose={() => setOpenError(false)}
                     component={
-                        <ErrorDisplay
+                        <DebugErrorComponent
                             // todo: update the error to right format before passing
                             error={{ message: error?.message as string, stack: error?.stack }}
                             // extraMetadata={extraMetaData}

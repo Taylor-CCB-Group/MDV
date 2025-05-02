@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import type { Project, ProjectAccessType } from "../utils/projectUtils";
+import { parseErrorResponse } from "../utils/apiUtils";
 
 const useProjects = () => {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -56,19 +57,17 @@ const useProjects = () => {
 
                 setProjects(formattedProjects);
                 return;
-            }
-
-            if (response.status === 500) {
-                const errorData = await response.json().catch(() => ({
-                    message: "Database error occurred",
-                }));
-
-                throw new Error(errorData.message || "Database error occurred");
+            } else {
+                const errorResponse = await parseErrorResponse({
+                    response, 
+                    fallbackText: "Error fetching projects. Please try again later.",
+                });
+                throw errorResponse;
             }
         } catch (error) {
             const errorMessage =
                 error instanceof Error
-                    ? `Error fetching projects: ${error.message}`
+                    ? error.message
                     : "Error fetching projects. Please try again later.";
 
             handleError(errorMessage);
@@ -91,9 +90,9 @@ const useProjects = () => {
                 },
             });
 
-            const data = await response.json();
-
+            
             if (response.ok) {
+                const data = await response.json();
                 // Add the new project to the local state with default values
                 // These will be populated by subsequent fetch
                 const newProject: Project = {
@@ -110,16 +109,14 @@ const useProjects = () => {
 
                 setProjects((prevProjects) => [...prevProjects, newProject]);
                 return newProject;
+            } else {
+                const errorResponse = await parseErrorResponse({
+                    response, 
+                    fallbackText: "Error creating project. Please try again later."
+                });
+                throw errorResponse;
             }
 
-            if (response.status === 500) {
-                throw new Error(
-                    data.message ||
-                        "Error creating project. Please try again later.",
-                );
-            }
-
-            throw new Error("Failed to create project");
         } catch (error) {
             const errorMessage =
                 error instanceof Error
@@ -127,7 +124,6 @@ const useProjects = () => {
                     : "Error creating project. Please try again later.";
 
             handleError(errorMessage);
-            throw error;
         } finally {
             setIsLoading(false);
         }
@@ -146,33 +142,18 @@ const useProjects = () => {
                     },
                 });
 
-                if (response.status === 200) {
+                if (response.ok) {
                     setProjects((prevProjects) =>
                         prevProjects.filter((p) => p.id !== id),
                     );
                     return;
+                } else {
+                    const errorResponse = await parseErrorResponse({
+                        response, 
+                        fallbackText: "Error deleting project. Please try again later."
+                    });
+                    throw errorResponse;
                 }
-
-                const data = await response.json();
-
-                if (response.status === 404) {
-                    throw new Error("Project not found or already deleted");
-                }
-
-                if (response.status === 403) {
-                    throw new Error(
-                        "This project is read-only and cannot be modified",
-                    );
-                }
-
-                if (response.status === 500) {
-                    throw new Error(
-                        data.message ||
-                            "Internal server error occurred while deleting project",
-                    );
-                }
-
-                throw new Error("Failed to delete project");
             } catch (error) {
                 const errorMessage =
                     error instanceof Error
@@ -181,7 +162,6 @@ const useProjects = () => {
 
                 handleError(errorMessage);
                 console.error("Error deleting project:", error);
-                throw error;
             } finally {
                 setIsLoading(false);
             }
@@ -215,14 +195,14 @@ const useProjects = () => {
             setIsLoading(true);
             setError(null);
 
-            if (!newName || newName.trim() === "") {
-                const errorMessage = "New name not provided";
-                handleError(errorMessage);
-                setIsLoading(false);
-                throw new Error(errorMessage);
-            }
-
+            
             try {
+                if (!newName || newName.trim() === "") {
+                    const errorMessage = "New name not provided";
+                    handleError(errorMessage);
+                    setIsLoading(false);
+                    throw new Error(errorMessage);
+                }
                 const formData = new FormData();
                 formData.append("name", newName.trim());
 
@@ -234,9 +214,7 @@ const useProjects = () => {
                     },
                 });
 
-                const data = await response.json();
-
-                if (response.status === 200) {
+                if (response.ok) {
                     setProjects((prevProjects) =>
                         prevProjects.map((project) =>
                             project.id === id
@@ -245,30 +223,13 @@ const useProjects = () => {
                         ),
                     );
                     return;
+                } else {
+                    const errorResponse = await parseErrorResponse({
+                        response, 
+                        fallbackText: "Error renaming project. Please try again later."
+                    });
+                    throw errorResponse;
                 }
-
-                if (response.status === 404) {
-                    throw new Error("Project not found or has been deleted");
-                }
-
-                if (response.status === 403) {
-                    throw new Error(
-                        "This project is read-only and cannot be modified",
-                    );
-                }
-
-                if (response.status === 400) {
-                    throw new Error("Invalid project name provided");
-                }
-
-                if (response.status === 500) {
-                    throw new Error(
-                        data.message ||
-                            "Internal server error occurred while renaming project",
-                    );
-                }
-
-                throw new Error("Failed to rename project");
             } catch (error) {
                 const errorMessage =
                     error instanceof Error
@@ -277,7 +238,6 @@ const useProjects = () => {
 
                 handleError(errorMessage);
                 console.error("Error renaming project:", error);
-                throw error;
             } finally {
                 setIsLoading(false);
             }
@@ -302,9 +262,7 @@ const useProjects = () => {
                     },
                 });
 
-                const data = await response.json();
-
-                if (response.status === 200) {
+                if (response.ok) {
                     setProjects((prevProjects) =>
                         prevProjects.map((project) =>
                             project.id === id
@@ -317,26 +275,13 @@ const useProjects = () => {
                         ),
                     );
                     return;
+                } else {
+                    const errorResponse = await parseErrorResponse({
+                        response, 
+                        fallbackText: "Error changing project type. Please try again later."
+                    });
+                    throw errorResponse;
                 }
-
-                if (response.status === 400) {
-                    throw new Error(
-                        'Invalid project type. Must be either "Editable" or "Read-Only"',
-                    );
-                }
-
-                if (response.status === 404) {
-                    throw new Error("Project not found or has been deleted");
-                }
-
-                if (response.status === 500) {
-                    throw new Error(
-                        data.message ||
-                            "Internal server error occurred while updating project type",
-                    );
-                }
-
-                throw new Error("Failed to change project type");
             } catch (error) {
                 const errorMessage =
                     error instanceof Error
@@ -345,7 +290,6 @@ const useProjects = () => {
 
                 handleError(errorMessage);
                 console.error("Error changing project type:", error);
-                throw error;
             } finally {
                 setIsLoading(false);
             }
