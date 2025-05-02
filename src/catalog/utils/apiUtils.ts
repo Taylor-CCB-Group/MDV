@@ -1,4 +1,9 @@
-export const parseErrorResponse = async (response: Response, fallbackText: string) => {
+export type ParseErrorProps = {
+    response: Response;
+    fallbackText: string;
+}
+
+export const parseErrorResponse = async ({response, fallbackText}: ParseErrorProps) => {
     const errorData = await response.json().catch(() => ({
         error: fallbackText,
     }));

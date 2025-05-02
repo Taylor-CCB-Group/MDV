@@ -58,10 +58,10 @@ const useProjects = () => {
                 setProjects(formattedProjects);
                 return;
             } else {
-                const errorResponse = await parseErrorResponse(
+                const errorResponse = await parseErrorResponse({
                     response, 
-                    "Error fetching projects. Please try again later."
-                );
+                    fallbackText: "Error fetching projects. Please try again later.",
+                });
                 throw errorResponse;
             }
         } catch (error) {
@@ -110,10 +110,10 @@ const useProjects = () => {
                 setProjects((prevProjects) => [...prevProjects, newProject]);
                 return newProject;
             } else {
-                const errorResponse = await parseErrorResponse(
+                const errorResponse = await parseErrorResponse({
                     response, 
-                    "Error creating project. Please try again later."
-                );
+                    fallbackText: "Error creating project. Please try again later."
+                });
                 throw errorResponse;
             }
 
@@ -148,10 +148,10 @@ const useProjects = () => {
                     );
                     return;
                 } else {
-                    const errorResponse = await parseErrorResponse(
+                    const errorResponse = await parseErrorResponse({
                         response, 
-                        "Error deleting project. Please try again later."
-                    );
+                        fallbackText: "Error deleting project. Please try again later."
+                    });
                     throw errorResponse;
                 }
             } catch (error) {
@@ -224,10 +224,10 @@ const useProjects = () => {
                     );
                     return;
                 } else {
-                    const errorResponse = await parseErrorResponse(
+                    const errorResponse = await parseErrorResponse({
                         response, 
-                        "Error renaming project. Please try again later."
-                    );
+                        fallbackText: "Error renaming project. Please try again later."
+                    });
                     throw errorResponse;
                 }
             } catch (error) {
@@ -276,10 +276,10 @@ const useProjects = () => {
                     );
                     return;
                 } else {
-                    const errorResponse = await parseErrorResponse(
+                    const errorResponse = await parseErrorResponse({
                         response, 
-                        "Error changing project type. Please try again later."
-                    );
+                        fallbackText: "Error changing project type. Please try again later."
+                    });
                     throw errorResponse;
                 }
             } catch (error) {
