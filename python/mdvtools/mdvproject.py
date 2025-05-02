@@ -21,6 +21,7 @@ from typing import Optional, NewType, List, Union, Any
 from mdvtools.llm.chatlog import log_chat
 import time
 import copy
+import tempfile
 from mdvtools.image_view_prototype import create_image_view_prototype
 from mdvtools.charts.table_plot import TablePlot
 
@@ -1846,16 +1847,36 @@ def get_json(file):
 
 
 def save_json(file, data):
-    o = open(file, "w")
     try:
-        o.write(json.dumps(data, indent=2, allow_nan=False))
+        save_json_atomic(file, data)
     except Exception as e:
         print(
             f"Error saving json to '{file}': some data cleaning may be necessary... project likely to be in a bad state."
         )
         raise (e)
-    o.close()
 
+def save_json_atomic(path, data):
+    """
+    Save JSON data to a file atomically.
+    Hopefully this will be safer - in certain situations we were ending up with truncated output files.
+    This method was suggested by ChatGPT: https://chatgpt.com/share/6813337b-9acc-800b-a6cd-6d058f339cd5
+    """
+    dir_name = os.path.dirname(path)
+    with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False) as tmp:
+        json.dump(data, tmp, indent=2, allow_nan=False)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        temp_name = tmp.name
+    # potential issues particularly in Docker where the files are on a different volume
+    # safest option is to sync like this before and after, but may be overkill
+    os.system("sync")
+    os.replace(temp_name, path)  # Atomic move on most OSes
+    os.system("sync")
+    # this method is lower overhead than os.system("sync") 
+    # but stress testing indicates it is less robust
+    # dir_fd = os.open(dir_name, os.O_DIRECTORY)
+    # os.fsync(dir_fd)
+    # os.close(dir_fd)
 
 def get_subgroup_bytes(grp, index, sparse=False):
     if sparse:

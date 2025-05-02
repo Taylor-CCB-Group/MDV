@@ -1,4 +1,4 @@
-import { action, observable, runInAction, toJS } from "mobx";
+import { action, observable, toJS } from "mobx";
 import type ChartManager from "./ChartManager";
 import type { DataSource } from "./charts";
 import _ from "lodash";
@@ -23,7 +23,8 @@ export type State =
 const removeImageProp = (state: State) => {
     const cloneState = { ...state };
     if (cloneState?.view?.viewImage) {
-        cloneState.view.viewImage = undefined;
+        // biome-ignore lint/performance/noDelete: setting to undefined leads to an obscure issue with hasUnsavedChanges
+        delete cloneState.view.viewImage;
     }
     return cloneState;
 };
@@ -161,10 +162,22 @@ class ViewManager {
 
     // Save the current state
     @action
-    async saveView() {
+    async saveView(errorHandler?: (state: State) => boolean) {
         try {
             const imageUrl = await this.createImageofView();
             const state = this.cm.getState();
+            if (state.chartErrors.length > 0) {
+                // handling the errors differently if errorHandler is supplied
+                if (errorHandler) {
+                    const handled = errorHandler(state);
+                    // handle it differently if required
+                    if (!handled) {
+                        throw state.chartErrors;
+                    }
+                } else {
+                    throw state.chartErrors;
+                }
+            }
             state.view.viewImage = imageUrl;
             this.cm._callListeners("state_saved", state);
             this.setLastSavedState(state);

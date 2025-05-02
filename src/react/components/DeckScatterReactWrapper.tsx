@@ -217,9 +217,10 @@ BaseChart.types["DeckScatter3D"] = {
         config.dimension = "3d";
     }
 };
-BaseChart.types["wgl_scatter_plot"] = {
+BaseChart.types["wgl_scatter_plot_dev"] = {
     name: "2D Scatter Plot",
     class: DeckScatterReact,
+    allow_user_add: false,
     params: [
         {
             type: "number",
@@ -231,9 +232,10 @@ BaseChart.types["wgl_scatter_plot"] = {
         },
     ]
 };
-BaseChart.types["wgl_3d_scatter_plot"] = {
+BaseChart.types["wgl_3d_scatter_plot_dev"] = {
     name: "3D Scatter Plot",
     class: DeckScatterReact,
+    allow_user_add: false,
     params: [
         {
             type: "number",

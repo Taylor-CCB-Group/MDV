@@ -83,9 +83,6 @@ const SimpleTiffViewer: React.FC<SimpleTiffViewerProps> = observer(({ width, hei
         viewerStore.setState({ viewState: { ...e.viewState, id: 'detail-view' } });
       }}
       deckProps={{
-        glOptions: {
-          preserveDrawingBuffer: true,
-        },
         style: {
           height: `${viewerHeight}px`,
           width: `${viewerWidth}px`,

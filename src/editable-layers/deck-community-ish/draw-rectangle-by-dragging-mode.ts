@@ -8,8 +8,8 @@ import type { Feature } from "@turf/helpers";
 /**
  * Draw a rectangle by dragging
  * 
- * This is a feature that should be in deck.gl-community/editable-layers I think...
- * Will make a PR for it soon.
+ * !this is already a feature, we just needed to pass in `dragToDraw` in props...
+ * leaving this for now, for review later, as the other version isn't an immediate drop-in replacement.
  */
 export class DrawRectangleByDraggingMode extends DrawPolygonByDraggingMode {
   handleStopDragging(event: StopDraggingEvent, props: ModeProps<FeatureCollection>) {
