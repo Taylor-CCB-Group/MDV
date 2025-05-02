@@ -1,12 +1,8 @@
-""" from flask import request, jsonify, render_template
-from mdvtools.mdvproject import MDVProject
-#from mdvtools.dbutils.app import app
-#from mdvtools.dbutils.mdv_server_app import app, db
-from mdvtools.dbutils.dbmodels import Project, File
-from mdvtools.project_router import ProjectBlueprint
-from datetime import datetime 
-import os"""
+import logging
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def register_routes(app, ENABLE_AUTH):
     from flask import request, jsonify, render_template
@@ -19,7 +15,7 @@ def register_routes(app, ENABLE_AUTH):
     from mdvtools.dbutils.dbservice import ProjectService, UserProjectService
 
     """Register routes with the Flask app."""
-    print("Registering routes...")
+    logger.info("Registering routes...")
 
     try:
         @app.route('/')
@@ -27,15 +23,15 @@ def register_routes(app, ENABLE_AUTH):
             try:
                 return render_template('index.html')
             except Exception as e:
-                print(f"Error rendering index: {e}")
+                logger.exception(f"Error rendering index: {e}")
                 return jsonify({"error": str(e)}), 500
 
-        print("Route registered: /")
+        logger.info("Route registered: /")
 
         @app.route('/login_dev')
         def login_dev():
             return render_template('login.html')
-        print("Route registered: /login_dev")
+        logger.info("Route registered: /login_dev")
 
         @app.route('/projects')
         @maybe_require_user(ENABLE_AUTH)  # Pass ENABLE_AUTH here
@@ -43,7 +39,7 @@ def register_routes(app, ENABLE_AUTH):
             """
             Fetches the list of active projects from cache or database depending on the authentication.
             """
-            print(" /projects queried...")
+            logger.info(" /projects queried...")
 
             try:
                 # Step 1: Get projects directly from cache
@@ -88,10 +84,10 @@ def register_routes(app, ENABLE_AUTH):
                 return jsonify(filtered_projects)
 
             except Exception as e:
-                print(f"Error retrieving projects: {e}")
+                logger.exception(f"Error retrieving projects: {e}")
                 return jsonify({"error": str(e)}), 500
 
-        print("Route registered: /projects")
+        logger.info("Route registered: /projects")
 
 
         @app.route("/create_project", methods=["POST"])
@@ -112,12 +108,12 @@ def register_routes(app, ENABLE_AUTH):
                 #    if not user_data.get("is_admin", False):
                 #        return jsonify({"error": "Only admins can create projects."}), 403
 
-                print("Creating project")
+                logger.info("Creating project")
                 
                 # Get the next available ID
                 next_id = ProjectService.get_next_project_id()
                 if next_id is None:
-                    print("In register_routes: Error- Failed to determine next project ID from db")
+                    logger.error("In register_routes: Error- Failed to determine next project ID from db")
                     return jsonify({"error": "Failed to determine next project ID from db"}), 500
 
                 # Create the project directory path
@@ -125,12 +121,12 @@ def register_routes(app, ENABLE_AUTH):
 
                 # Create and serve the MDVProject
                 try:
-                    print("Creating and serving the new project")
+                    logger.info("Creating and serving the new project")
                     p = MDVProject(project_path, backend_db= True)
                     p.set_editable(True)
                     p.serve(app=app, open_browser=False, backend_db=True)
                 except Exception as e:
-                    print(f"In register_routes: Error serving MDVProject: {e}")
+                    logger.exception(f"In register_routes: Error serving MDVProject: {e}")
                     return jsonify({"error": "Failed to serve MDVProject"}), 500
 
                 def get_project_thumbnail(project_path):
@@ -139,11 +135,11 @@ def register_routes(app, ENABLE_AUTH):
                         mdv_project = MDVProject(project_path)
                         return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
                     except Exception as e:
-                        print(f"Error extracting thumbnail for project at {project_path}: {e}")
+                        logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
                         return None
                     
                 # Create a new Project record in the database with the path
-                print("Adding new project to the database")
+                logger.info("Adding new project to the database")
                 new_project = ProjectService.add_new_project(path=project_path)
 
                 if new_project:
@@ -184,24 +180,24 @@ def register_routes(app, ENABLE_AUTH):
                     })     
 
             except Exception as e:
-                print(f"In register_routes - /create_project : Error creating project: {e}")
-                print("started rollabck")
+                logger.error(f"In register_routes - /create_project : Error creating project: {e}")
+                logger.info("started rollabck")
                 # Rollback: Clean up the projects filesystem directory if it was created
                 if project_path and os.path.exists(project_path):
                     try:
                         shutil.rmtree(project_path)
-                        print("In register_routes -/create_project : Rolled back project directory creation as db entry is not added")
+                        logger.info("In register_routes -/create_project : Rolled back project directory creation as db entry is not added")
                     except Exception as cleanup_error:
-                        print(f"In register_routes -/create_project : Error during rollback cleanup: {cleanup_error}")
+                        logger.exception(f"In register_routes -/create_project : Error during rollback cleanup: {cleanup_error}")
 
                 # Optional: Remove project routes from Flask app if needed
                 if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(next_id)]
-                    print("In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
+                    logger.info("In register_routes -/create_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
                 
                 return jsonify({"error": str(e)}), 500
 
-        print("Route registered: /create_project")
+        logger.info("Route registered: /create_project")
 
         @app.route("/delete_project/<int:project_id>", methods=["DELETE"])
         @maybe_require_user(ENABLE_AUTH)
@@ -209,33 +205,33 @@ def register_routes(app, ENABLE_AUTH):
             #project_removed_from_blueprints = False
             global active_projects_cache
             try:
-                print(f"Deleting project '{project_id}'")
+                logger.info(f"Deleting project '{project_id}'")
 
                 user_id = user["id"] if ENABLE_AUTH else None
 
                 # Step 1: Get project from in-memory cache
                 project = next((p for p in active_projects_cache if p["id"] == project_id), None)
                 if not project:
-                    print(f"Project with ID {project_id} not found in cache")
+                    logger.error(f"Project with ID {project_id} not found in cache")
                     return jsonify({"error": f"Project with ID {project_id} not found"}), 404
 
                 # Step 2: Check if the user is owner using in-memory cache
                 if ENABLE_AUTH:
                     user_projects = user_project_cache.get(user_id)
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
-                        print(f"User does not have ownership of project {project_id}")
+                        logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can delete the project."}), 403
 
 
                 # Step 3: Get full project object for access_level check
                 project_obj = ProjectService.get_project_by_id(project_id)
                 if not project_obj:
-                    print(f"Project with ID {project_id} not found in database")
+                    logger.error(f"Project with ID {project_id} not found in database")
                     return jsonify({"error": f"Project with ID {project_id} not found in database"}), 404
 
                 # Step 4: Check if project is editable
                 if project_obj.access_level != 'editable':
-                    print(f"Project with ID {project_id} is not editable.")
+                    logger.error(f"Project with ID {project_id} is not editable.")
                     return jsonify({"error": "This project is not editable and cannot be deleted."}), 403
 
 
@@ -243,28 +239,28 @@ def register_routes(app, ENABLE_AUTH):
                 if str(project_id) in ProjectBlueprint.blueprints:
                     del ProjectBlueprint.blueprints[str(project_id)]
                     #project_removed_from_blueprints = True  # Mark as removed
-                    print(f"In register_routes - /delete_project : Removed project '{project_id}' from ProjectBlueprint.blueprints")
+                    logger.info(f"In register_routes - /delete_project : Removed project '{project_id}' from ProjectBlueprint.blueprints")
                 
                 # Soft delete the project
                 delete_status = ProjectService.soft_delete_project(project_id)
                 if not delete_status:
-                    print(f"In delete_project: Error - Failed to soft delete project {project_id} in the database")
+                    logger.error(f"In delete_project: Error - Failed to soft delete project {project_id} in the database")
                     return jsonify({"error": "Failed to soft delete project in db"}), 500
 
                 # Step 7: Remove from cache
                 if ENABLE_AUTH:
                     
                     active_projects_cache = [p for p in active_projects_cache if p["id"] != project_id]
-                    print(f"Removed project '{project_id}' from in-memory cache")
+                    logger.info(f"Removed project '{project_id}' from in-memory cache")
 
                 # Step 8: Return success response
                 return jsonify({"message": f"Project '{project_id}' deleted successfully."})
 
             except Exception as e:
-                print(f"In register_routes - /delete_project: Error deleting project '{project_id}': {e}")
+                logger.exception(f"In register_routes - /delete_project: Error deleting project '{project_id}': {e}")
                 return jsonify({"error": str(e)}), 500
 
-        print("Route registered: /delete_project/<project_id>")
+        logger.info("Route registered: /delete_project/<project_id>")
 
         @app.route("/projects/<int:project_id>/rename", methods=["PUT"])
         @maybe_require_user(ENABLE_AUTH)
@@ -281,32 +277,32 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 1: Check if project exists in active cache
                 cached_project = next((p for p in active_projects_cache if p["id"] == project_id), None)
                 if not cached_project:
-                    print(f"Project with ID {project_id} not found in cache")
+                    logger.error(f"Project with ID {project_id} not found in cache")
                     return jsonify({"error": f"Project with ID {project_id} not found"}), 404
 
                 # Step 2: Check ownership using cache
                 if ENABLE_AUTH:
                     user_projects = user_project_cache.get(user_id)
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
-                        print(f"User does not have ownership of project {project_id}")
+                        logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can rename the project."}), 403
 
                 # Step 3: Fetch project from DB to check access level
                 project = ProjectService.get_project_by_id(project_id)
                 if not project:
-                    print(f"Project with ID {project_id} not found in database")
+                    logger.error(f"Project with ID {project_id} not found in database")
                     return jsonify({"error": f"Project with ID {project_id} not found in database"}), 404
 
                 # Step 4: Check if project is editable
                 if project.access_level != 'editable':
-                    print(f"Project with ID {project_id} is not editable.")
+                    logger.error(f"Project with ID {project_id} is not editable.")
                     return jsonify({"error": "This project is not editable and cannot be renamed."}), 403
 
                 # Attempt to rename the project
                 rename_status = ProjectService.update_project_name(project_id, new_name)
 
                 if not rename_status:
-                    print(f"In register_routes - /rename_project Error: The project with ID '{project_id}' not found in db")
+                    logger.error(f"In register_routes - /rename_project Error: The project with ID '{project_id}' not found in db")
                     return jsonify({"error": f"Failed to rename project '{project_id}' in db"}), 500
                 
                 # Step 6: Update the name in active_projects_cache
@@ -316,16 +312,16 @@ def register_routes(app, ENABLE_AUTH):
                             proj["name"] = new_name
                             break
 
-                print(f"In rename_project: Updated cache for active projects, renamed project '{project_id}'.")
+                logger.info(f"In rename_project: Updated cache for active projects, renamed project '{project_id}'.")
 
                 # Step 7: Return success response
                 return jsonify({"status": "success", "id": project_id, "new_name": new_name}), 200
 
             except Exception as e:
-                print(f"In register_routes - /rename_project : Error renaming project '{project_id}': {e}")
+                logger.exception(f"In register_routes - /rename_project : Error renaming project '{project_id}': {e}")
                 return jsonify({"error": str(e)}), 500
 
-        print("Route registered: /projects/<int:project_id>/rename")
+        logger.info("Route registered: /projects/<int:project_id>/rename")
 
         @app.route("/projects/<int:project_id>/access", methods=["PUT"])
         @maybe_require_user(ENABLE_AUTH)
@@ -345,7 +341,7 @@ def register_routes(app, ENABLE_AUTH):
                 if ENABLE_AUTH:
                     user_projects = user_project_cache.get(user_id)
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
-                        print(f"User does not have ownership of project {project_id}")
+                        logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can change the access level."}), 403
 
 
@@ -358,21 +354,21 @@ def register_routes(app, ENABLE_AUTH):
                 return jsonify({"status": "success", "access_level": access_level}), 200
 
             except Exception as e:
-                print(f"In register_routes - /access : Unexpected error while changing access level for project '{project_id}': {e}")
+                logger.exception(f"In register_routes - /access : Unexpected error while changing access level for project '{project_id}': {e}")
                 return jsonify({"error": "An unexpected error occurred."}), 500
         
-        print("Route registered: /projects/<int:project_id>/access")
+        logger.info("Route registered: /projects/<int:project_id>/access")
 
         @app.route("/projects/<int:project_id>/share", methods=["GET"])
         @maybe_require_user(ENABLE_AUTH)
         def share_project(user, project_id: int):
             """Fetch users with whom the project is shared along with their permissions."""
             try:
-                print(f"Sharing project '{project_id}'")
+                logger.info(f"Sharing project '{project_id}'")
 
                 # Step 1: Skip authentication if not enabled
                 if not ENABLE_AUTH:
-                    print("Authentication is disabled, skipping authentication check.")
+                    logger.info("Authentication is disabled, skipping authentication check.")
                     return jsonify({"error": "Authentication is disabled, no action taken."})
                 
                 user_id = user["id"] if ENABLE_AUTH else None
@@ -428,20 +424,20 @@ def register_routes(app, ENABLE_AUTH):
                 })
             
             except Exception as e:
-                print(f"Error in share_project: {e}")
+                logger.exception(f"Error in share_project: {e}")
                 return jsonify({"error": str(e)}), 500
-        print("Route registered: /projects/<int:project_id>/share- GET")
+        logger.info("Route registered: /projects/<int:project_id>/share- GET")
             
         @app.route("/projects/<int:project_id>/share", methods=["POST"])
         @maybe_require_user(ENABLE_AUTH)
         def add_user_to_project(user, project_id: int):
             """Add a user to the project with specified permissions."""
             try:
-                print(f"Adding user to project '{project_id}'")
+                logger.info(f"Adding user to project '{project_id}'")
 
                 # Step 1: Skip authentication if not enabled
                 if not ENABLE_AUTH:
-                    print("Authentication is disabled, skipping authentication check.")
+                    logger.info("Authentication is disabled, skipping authentication check.")
                     return jsonify({"error": "Authentication is disabled, no action taken."})
 
                 user_id = user["id"] if ENABLE_AUTH else None
@@ -483,14 +479,14 @@ def register_routes(app, ENABLE_AUTH):
                     "is_owner": (permission == "owner")
                 }
 
-                print(f"User {target_user_id} added to project {project_id} with '{permission}' permission.")
+                logger.info(f"User {target_user_id} added to project {project_id} with '{permission}' permission.")
 
                 return jsonify({"message": f"User {target_user_id} added to project {project_id} with {permission} permission."}), 200
 
             except Exception as e:
-                print(f"Error in add_user_to_project: {e}")
+                logger.exception(f"Error in add_user_to_project: {e}")
                 return jsonify({"error": str(e)}), 500
-        print("Route registered: /projects/<int:project_id>/share- POST")
+        logger.info("Route registered: /projects/<int:project_id>/share- POST")
 
 
         @app.route("/projects/<int:project_id>/share/<int:user_id>/edit", methods=["POST"])
@@ -498,11 +494,11 @@ def register_routes(app, ENABLE_AUTH):
         def edit_user_permission(user, project_id: int, user_id: int):
             """Edit user permissions for a project."""
             try:
-                print(f"Editing permissions for user '{user_id}' in project '{project_id}'")
+                logger.info(f"Editing permissions for user '{user_id}' in project '{project_id}'")
 
                 # Step 1: Ensure authentication is enabled
                 if not ENABLE_AUTH:
-                    print("Authentication is disabled, skipping authentication check.")
+                    logger.info("Authentication is disabled, skipping authentication check.")
                     # If authentication is disabled, simply return and stop execution
                     return jsonify({"Error": "Authentication is disabled, no action taken."})
 
@@ -541,24 +537,24 @@ def register_routes(app, ENABLE_AUTH):
                     "is_owner": is_owner
                 }
 
-                print(f"Updated permissions for user {user_id} in project {project_id}: {new_permission}")
+                logger.info(f"Updated permissions for user {user_id} in project {project_id}: {new_permission}")
                 return jsonify({"message": "Permissions updated successfully"}), 200
             
             except Exception as e:
-                print(f"Error in edit_user_permission: {e}")
+                logger.exception(f"Error in edit_user_permission: {e}")
                 return jsonify({"error": str(e)}), 500
-        print("Route registered: /projects/<int:project_id>/share/<int:user_id>/edit")
+        logger.info("Route registered: /projects/<int:project_id>/share/<int:user_id>/edit")
             
         @app.route("/projects/<int:project_id>/share/<int:user_id>/delete", methods=["POST"])
         @maybe_require_user(ENABLE_AUTH)
         def delete_user_from_project(user, project_id: int, user_id: int):
             """Remove a user from the project."""
             try:
-                print(f"Removing user '{user_id}' from project '{project_id}'")
+                logger.info(f"Removing user '{user_id}' from project '{project_id}'")
 
                 # Step 1: Ensure authentication is enabled
                 if not ENABLE_AUTH:
-                    print("Authentication is disabled, skipping authentication check.")
+                    logger.info("Authentication is disabled, skipping authentication check.")
                     # If authentication is disabled, simply return and stop execution
                     return jsonify({"error": "Authentication is disabled, no action taken."})
 
@@ -580,12 +576,12 @@ def register_routes(app, ENABLE_AUTH):
                 return jsonify({"message": "User removed successfully"}), 200
             
             except Exception as e:
-                print(f"Error in delete_user_from_project: {e}")
+                logger.exception(f"Error in delete_user_from_project: {e}")
                 return jsonify({"error": str(e)}), 500
-        print("Route registered: /projects/<int:project_id>/share/<int:user_id>/delete")
+        logger.info("Route registered: /projects/<int:project_id>/share/<int:user_id>/delete")
 
 
     except Exception as e:
-        print(f"Error registering routes: {e}")
+        logger.exception(f"Error registering routes: {e}")
         raise  # Re-raise to be handled by the parent function
 

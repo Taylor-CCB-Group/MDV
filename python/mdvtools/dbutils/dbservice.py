@@ -3,6 +3,11 @@
 from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject
 from datetime import datetime
 from mdvtools.mdvproject import MDVProject
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ProjectService:
     # list of tuples containing failed project IDs and associated error messages/exceptions
@@ -22,7 +27,7 @@ class ProjectService:
                     mdv_project = MDVProject(project_path)
                     return next((v["viewImage"] for v in mdv_project.views.values() if "viewImage" in v), None)
                 except Exception as e:
-                    print(f"Error extracting thumbnail for project at {project_path}: {e}")
+                    logger.exception(f"Error extracting thumbnail for project at {project_path}: {e}")
                     return None
 
             project_list = [
@@ -37,7 +42,7 @@ class ProjectService:
 
             return project_list
         except Exception as e:
-            print(f"Error in dbservice: Error querying active projects: {e}")
+            logger.exception(f"Error in dbservice: Error querying active projects: {e}")
             raise
 
     @staticmethod
@@ -51,7 +56,7 @@ class ProjectService:
                 next_id += 1
             return next_id
         except Exception as e:
-            print(f"Error in dbservice: Error getting next project ID: {e}")
+            logger.exception(f"Error in dbservice: Error getting next project ID: {e}")
             raise
 
     @staticmethod
@@ -63,7 +68,7 @@ class ProjectService:
             db.session.commit()
             return new_project
         except Exception as e:
-            print(f"Error in dbservice: Error creating project: {e}")
+            logger.exception(f"Error in dbservice: Error creating project: {e}")
             db.session.rollback()
             raise
         
@@ -73,7 +78,7 @@ class ProjectService:
         try:
             return Project.query.get(id)
         except Exception as e:
-            print(f"Error in dbservice: Error querying project by id-No project found with id: {e}")
+            logger.exception(f"Error in dbservice: Error querying project by id-No project found with id: {e}")
             raise
 
     @staticmethod
@@ -87,10 +92,10 @@ class ProjectService:
                 db.session.commit()
                 return True
             else:
-                print(f"Attempted to soft delete non-existing project with id: {id}")
+                logger.info(f"Attempted to soft delete non-existing project with id: {id}")
                 return False
         except Exception as e:
-            print(f"Error in dbservice: Error soft deleting project: {e}")
+            logger.exception(f"Error in dbservice: Error soft deleting project: {e}")
             db.session.rollback()
             raise
 
@@ -108,7 +113,7 @@ class ProjectService:
                 return True
             return False
         except Exception as e:
-            print(f"Error in dbservice: Error renaming project: {e}")
+            logger.exception(f"Error in dbservice: Error renaming project: {e}")
             db.session.rollback()
             raise
     
@@ -130,7 +135,7 @@ class ProjectService:
             return project.access_level, "Success", 200
 
         except Exception as e:
-            print(f"Error in dbservice: Unexpected error in change access level: {e}")
+            logger.exception(f"Error in dbservice: Unexpected error in change access level: {e}")
             db.session.rollback()
             raise
 
@@ -142,16 +147,16 @@ class ProjectService:
             project = ProjectService.get_project_by_id(project_id)
             
             if project is None:
-                print(f"No project found with ID {project_id}")
+                logger.info(f"No project found with ID {project_id}")
                 return  # Exit if the project doesn't exist
 
             # Update the update_timestamp to current datetime
             project.update_timestamp = datetime.now()
             db.session.commit()  # Commit the changes to the database
-            print(f"Set project update timestamp for project ID {project_id}")
+            logger.info(f"Set project update timestamp for project ID {project_id}")
 
         except Exception as e:
-            print(f"Error in dbservice: Error setting project update timestamp for ID {project_id}: {e}")
+            logger.exception(f"Error in dbservice: Error setting project update timestamp for ID {project_id}: {e}")
             db.session.rollback()
             raise
     
@@ -163,16 +168,16 @@ class ProjectService:
             project = ProjectService.get_project_by_id(project_id)
             
             if project is None:
-                print(f"No project found with ID {project_id}")
+                logger.info(f"No project found with ID {project_id}")
                 return  # Exit if the project doesn't exist
 
             # Set the accessed_timestamp to the current datetime
             project.accessed_timestamp = datetime.now()
             db.session.commit()  # Commit the changes to the database
-            print(f"Set project accessed timestamp for project ID {project_id}")
+            logger.info(f"Set project accessed timestamp for project ID {project_id}")
 
         except Exception as e:
-            print(f"Error in dbservice: Error setting accessed timestamp for project ID {project_id}: {e}")
+            logger.exception(f"Error in dbservice: Error setting accessed timestamp for project ID {project_id}: {e}")
             db.session.rollback()
             raise
         
@@ -188,7 +193,7 @@ class FileService:
                 if existing_file.name != file_name:
                     existing_file.name = file_name
                     existing_file.update_timestamp = datetime.now()
-                    print(f"Updated file name in DB: {existing_file}")
+                    logger.info(f"Updated file name in DB: {existing_file}")
             else:
                 # Add new file to the database
                 new_file = File(
@@ -199,13 +204,13 @@ class FileService:
                     update_timestamp=datetime.now()
                 )
                 db.session.add(new_file)
-                print(f"Added new file to DB: {new_file}")
+                logger.info(f"Added new file to DB: {new_file}")
 
             # Commit the transaction after adding/updating
             db.session.commit()
 
         except Exception as e:
-            print(f"Error in FileService.add_or_update_file_in_project: Failed to add or update file '{file_name}' for project ID '{project_id}': {str(e)}")
+            logger.exception(f"Error in FileService.add_or_update_file_in_project: Failed to add or update file '{file_name}' for project ID '{project_id}': {str(e)}")
             db.session.rollback()  # Rollback session on error
             raise
         
@@ -215,7 +220,7 @@ class FileService:
         try:
             return File.query.filter_by(file_path=file_path, project_id=project_id).first()
         except Exception as e:
-            print(f"Error retrieving file by path '{file_path}' and project ID {project_id}: {e}")
+            logger.exception(f"Error retrieving file by path '{file_path}' and project ID {project_id}: {e}")
             return None
     
     @staticmethod
@@ -226,7 +231,7 @@ class FileService:
                 file_path=file_path, project_id=project_id
             ).first() is not None
         except Exception as e:
-            print(f"Error checking file existence: {e}")
+            logger.exception(f"Error checking file existence: {e}")
             return False
 
     @staticmethod
@@ -234,7 +239,7 @@ class FileService:
         try:
             return File.query.filter_by(project_id=project_id).all()
         except Exception as e:
-            print(f"Error querying files for project ID {project_id}: {e}")
+            logger.exception(f"Error querying files for project ID {project_id}: {e}")
             return []
 
     @staticmethod
@@ -246,7 +251,7 @@ class FileService:
             db.session.commit()
             return True
         except Exception as e:
-            print(f"Error deleting files for project ID {project_id}: {e}")
+            logger.exception(f"Error deleting files for project ID {project_id}: {e}")
             db.session.rollback()  # Rollback session on error
             return False
 
@@ -260,7 +265,7 @@ class FileService:
                 return True
             return False
         except Exception as e:
-            print(f"Error updating timestamp for file ID {file_id}: {e}")
+            logger.exception(f"Error updating timestamp for file ID {file_id}: {e}")
             db.session.rollback()  # Rollback session on error
             return False
 
@@ -315,7 +320,7 @@ class UserService:
                 return new_user
 
         except Exception as e:
-            print(f"Error in UserService: Failed to add or update user: {e}")
+            logger.exception(f"Error in UserService: Failed to add or update user: {e}")
             db.session.rollback()  # Rollback session on error
             raise
 
@@ -367,7 +372,7 @@ class UserProjectService:
                 return new_user_project
 
         except Exception as e:
-            print(f"Error in UserProjectService: Failed to add/update user-project entry: {e}")
+            logger.exception(f"Error in UserProjectService: Failed to add/update user-project entry: {e}")
             db.session.rollback()  # Rollback session on error
             raise
 
@@ -388,7 +393,7 @@ class UserProjectService:
             }
 
         except Exception as e:
-            print(f"Error in UserProjectService: Failed to get permissions: {e}")
+            logger.exception(f"Error in UserProjectService: Failed to get permissions: {e}")
             raise
 
 
@@ -405,9 +410,9 @@ class UserProjectService:
             db.session.delete(user_project)
             db.session.commit()
             
-            print(f"User {user_id} removed from project {project_id}")
+            logger.info(f"User {user_id} removed from project {project_id}")
 
         except Exception as e:
-            print(f"Error in remove_user_from_project: {e}")
+            logger.exception(f"Error in remove_user_from_project: {e}")
             db.session.rollback()  # Rollback in case of error
             raise
