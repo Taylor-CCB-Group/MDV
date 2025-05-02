@@ -192,7 +192,7 @@ class ProjectBlueprint_v2:
                     if auth_method == "auth0":
                         user_data, error_response = validate_and_get_user(current_app)
                         print("******************--2.1", user_data)
-                    elif auth_method == "sso":
+                    elif auth_method == "shibboleth":
                         user_data, error_response = validate_sso_user(request)
                     else:
                         return jsonify({"error": "Unknown authentication method"}), 400
