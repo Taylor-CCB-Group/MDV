@@ -6,6 +6,8 @@ import type { MjolnirEvent } from 'mjolnir.js';
 import equal from "fast-deep-equal";
 import { ScaleBarLayer } from "@vivjs-experimental/viv";
 import type { OrthographicViewState, OrbitViewState, DeckGLProps, PickingInfo } from "deck.gl";
+import { rebindMouseEvents } from "@/lib/deckMonkeypatch";
+import type { EditableGeoJsonLayer } from "@deck.gl-community/editable-layers";
 export function getVivId(id: string) {
     return `-#${id}#`;
 }
@@ -72,6 +74,7 @@ export type VivViewerWrapperProps = {
     randomize?: boolean;
     useDevicePixels?: boolean;
     outerContainer?: HTMLElement;
+    selectionLayer?: EditableGeoJsonLayer;
 };
 export type VivViewerWrapperState = {
     viewStates: any;
@@ -157,21 +160,26 @@ class MDVivViewerWrapper extends React.PureComponent<
         return viewState;
     }
 
+
+    /**
+     * prevent the deckMonkeypatch from double-binding etc.
+     * as of anything related to that, this is dubious and liable to need attention in the future.
+     */
+    _cleanupMouseEvents?: () => void;
     componentDidUpdate(prevProps: VivViewerWrapperProps) {
         const { props } = this;
-        const { views, outerContainer } = props;
+        const { views, outerContainer, selectionLayer } = props;
 
         if (
             outerContainer !== this.state.outerContainer &&
             this.state.deckRef?.current
         ) {
             try {
-                const { eventManager } = this.state.deckRef.current.deck;
-                const { element } = eventManager;
-                // this will always be the same element, but calling setElement again will re-register
-                // drag events on window, which is necessary for popouts.
-                eventManager.setElement(element);
                 this.setState({ outerContainer });
+                const deck = this.state.deckRef.current.deck;
+                this._cleanupMouseEvents?.();
+                //this should be common with DeckScatterComponent - make a helper/hook...
+                this._cleanupMouseEvents = rebindMouseEvents(deck, selectionLayer);
             } catch (e) {
                 console.error(
                     "attempt to reset deck eventManager element failed",
@@ -179,6 +187,7 @@ class MDVivViewerWrapper extends React.PureComponent<
                 );
             }
         }
+        
 
         // Only update state if the previous viewState prop does not match the current one
         // so that people can update viewState
@@ -213,6 +222,10 @@ class MDVivViewerWrapper extends React.PureComponent<
             // eslint-disable-next-line react/no-did-update-set-state
             this.setState({ viewStates });
         }
+    }
+    componentWillUnmount(): void {
+        this._cleanupMouseEvents?.();
+        this._cleanupMouseEvents = undefined;
     }
 
     /**

@@ -659,7 +659,11 @@ export class ChartManager {
                     if (currentView) {
                         const state = this.getState();
                         if (!state.view?.viewImage) {
-                            await this.viewManager.saveView();
+                            // todo: update the error handler function in future
+                            await this.viewManager.saveView((state) => {
+                                console.log("Error occurred: ", state.chartErrors);
+                                return false;
+                            });
                         }
                     }
                 } catch (error) {
@@ -675,7 +679,11 @@ export class ChartManager {
             .then(async () => {
                     const state = this.getState();
                     if (!state.view?.viewImage) {
-                        await this.viewManager.saveView();
+                        // todo: update the error handler function in future
+                        await this.viewManager.saveView((state) => {
+                            console.log("Error occurred: ", state.chartErrors);
+                            return false;
+                        });
                     }
             });
         }
@@ -2216,6 +2224,10 @@ export class ChartManager {
         }
     }
 
+    /**
+     * @param {BaseChart} chart 
+     * @param {import("@/charts/charts").DataSource} ds
+     */
     _makeChartRD(chart, ds) {
         //if (!ds) console.error(`_makeChartRD called without ds - resize / drag etc may not work properly`);
         //^^ actually doesn't make much difference to non-gridStack in practice.

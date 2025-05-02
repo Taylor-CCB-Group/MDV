@@ -356,7 +356,7 @@ export function useScatterplotLayer(modelMatrix: Matrix4) {
             // may also consider option to turn off antialiasing for performance?
             // (if it even has a significant impact)
             antialiasing: !is3d,
-            getFillColor: colorBy ?? [255, 255, 255],
+            getFillColor: colorBy ?? [55, 126, 184],
             // if we want different radii for different points, this is the place
             // ^^ except that we probably want each density layer to have its own radius accessor
             // getRadius: 1 / scale,

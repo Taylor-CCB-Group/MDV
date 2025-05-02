@@ -350,7 +350,7 @@ export const useLoader = () => {
 //! todo review the typing here...
 export type Metadata = OME_TIFF['metadata'];// | OME_ZARR['metadata'] | BIO_ZARR['metadata'];
 //export type Metadata = TiffPreviewProps["metadata"];
-export const useMetadata = (): Metadata | undefined => {
+export const useMetadata = (): Metadata | undefined | null => {
     try {
         const image = useChannelsStore((store) => store.image);
         const metadata = useViewerStore((store) => store.metadata);

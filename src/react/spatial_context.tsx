@@ -10,6 +10,7 @@ import type BaseChart from "@/charts/BaseChart";
 import { observer } from "mobx-react-lite";
 import type { BaseConfig } from "@/charts/BaseChart";
 import { action, toJS } from "mobx";
+import { useOuterContainer } from "./screen_state";
 
 /*****
  * Persisting some properties related to SelectionOverlay in "SpatialAnnotationProvider"... >>subject to change<<.
@@ -111,6 +112,8 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
         filterPoly(coords);
     }, [coords, filterPoly, removeFilter, chart]);
     const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<number[]>([]);
+    // we might be able to pass this to modeConfig, if it knows what to do with it?
+    // const outerContainer = useOuterContainer();
     const editableLayer = useMemo(() => {
         return new EditableGeoJsonLayer({
             id: `selection_${getVivId(`${id}detail-react`)}`,
@@ -144,6 +147,13 @@ function useCreateRange(chart: BaseChart<ScatterPlotConfig & BaseConfig>) {
                 // -- try to avoid selecting invisible features etc - refer to notes in aosta prototype
                 setSelectedFeatureIndexes(pickingInfo.index !== -1 ? [pickingInfo.index] : []);
             },
+            modeConfig: {
+                // dragToDraw: true,
+                // hopefully there is something here we can pass outerContainer to...
+                // or maybe it's enough to remake the layer when it changes?
+                // it looks as though editable-layer.js _addEventHandlers() isn't called again when eventManager has been changed.
+                // outerContainer
+            }
         })
     }, [selectionFeatureCollection, selectionMode, id, selectedFeatureIndexes,
         setSelectionFeatureCollection
