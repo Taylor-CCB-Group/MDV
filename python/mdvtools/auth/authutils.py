@@ -249,17 +249,17 @@ def validate_and_get_user():
         token = auth0_provider.get_token()
 
         if not token:
-            return None, jsonify({"error": "Authentication required"}), 401
+            return None, (jsonify({"error": "Authentication required"}), 401)
 
         # Validate token
         if not auth0_provider.is_token_valid(token):
-            return None, jsonify({"error": "Invalid or expired token"}), 401
+            return None, (jsonify({"error": "Invalid or expired token"}), 401)
 
         # Retrieve user info from Auth0
         user_info = auth0_provider.get_user({"access_token": token})
 
         if not user_info:
-            return None, jsonify({"error": "User not found"}), 404
+            return None, (jsonify({"error": "User not found"}), 404)
 
         # Get Auth0 user ID
         auth0_id = user_info.get("sub")
@@ -277,7 +277,7 @@ def validate_and_get_user():
         # Query the user from the database if not in cache
         user = User.query.filter_by(auth0_id=auth0_id).first()
         if not user:
-            return None, jsonify({"error": "User not found"}), 404
+            return None, (jsonify({"error": "User not found"}), 404)
 
         # Add the user to the in-memory cache
         user_data = {"id": user.id, "auth0_id": user.auth0_id, "email": user.email, "is_admin": user.is_admin}
@@ -290,7 +290,7 @@ def validate_and_get_user():
 
     except Exception as e:
         logger.exception(f"Error during authentication: {e}")
-        return None, jsonify({"error": "Internal server error - user not validated"}), 500
+        return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
     
 
 def validate_sso_user(request):
@@ -308,14 +308,14 @@ def validate_sso_user(request):
         persistent_id = request.headers.get("Shibboleth-Persistent-Id")
 
         if not email or not persistent_id:
-            return None, jsonify({"error": "Missing SSO authentication headers"}), 401
+            return None, (jsonify({"error": "Missing SSO authentication headers"}), 401)
 
         # Look up the user in your in-memory cache or DB by persistent_id
         user_data = user_cache.get(persistent_id)  # if using in-memory
         # or: user = User.query.filter_by(auth0_id=persistent_id).first()
 
         if not user_data:
-            return None, jsonify({"error": "SSO user not found"}), 403
+            return None, (jsonify({"error": "SSO user not found"}), 403)
 
         # Cache the user data in session for future use
         session['user'] = user_data
@@ -324,7 +324,7 @@ def validate_sso_user(request):
 
     except Exception as e:
         logger.exception(f"validate_sso_user error: {e}")
-        return None, jsonify({"error": "Internal server error - user not validated"}), 500
+        return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
 
 
 def maybe_require_user(ENABLE_AUTH):
