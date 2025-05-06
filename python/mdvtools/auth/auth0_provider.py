@@ -1,7 +1,7 @@
 import time
 import requests
 from authlib.integrations.flask_client import OAuth
-from flask import session, redirect, url_for
+from flask import session, redirect
 from typing import Optional
 from mdvtools.auth.auth_provider import AuthProvider
 import logging
@@ -53,8 +53,7 @@ class Auth0Provider(AuthProvider):
 
             # Parse and check the existence of jwks_uri in the metadata
             metadata = response.json()
-            print("@@@@@@")
-            #print(metadata)
+
             jwks_uri = metadata.get('jwks_uri')
             if not jwks_uri:
                 logging.error(f"The OpenID configuration is missing 'jwks_uri': {metadata}")
@@ -78,15 +77,16 @@ class Auth0Provider(AuthProvider):
         Initiates the login process by redirecting to Auth0's authorization page.
         """
         try:
-            print("$$$$$$$$$$$$$$$ -login-1")
+            
             logging.info("Initiating login process.")
             #redirect_uri = url_for('callback', _external=True)
             redirect_uri = self.app.config["AUTH0_CALLBACK_URL"]
             print(redirect_uri)
             audience = self.app.config["AUTH0_AUDIENCE"]  # The API audience for which the token is requested
-            print(self.oauth.auth0.authorize_redirect(redirect_uri))
+            
 
             # Initiate the redirect to Auth0's authorization endpoint with necessary parameters
+            assert self.oauth.auth0 is not None, "Auth0 provider is not registered."
             return self.oauth.auth0.authorize_redirect(
                 redirect_uri=redirect_uri,
                 audience=audience  # The audience for the token (API identifier)                
@@ -114,6 +114,7 @@ class Auth0Provider(AuthProvider):
             logout_url = f"https://{self.app.config['AUTH0_DOMAIN']}/v2/logout?returnTo={redirect_url}&client_id={self.app.config['AUTH0_CLIENT_ID']}"
             
             logging.info(f"Redirecting to Auth0 logout URL: {logout_url}")
+            # "type 'response' is not assignable to None"
             return redirect(logout_url)
 
         except Exception as e:
@@ -158,8 +159,7 @@ class Auth0Provider(AuthProvider):
                     "association": user_metadata.get("association", "Unknown Organization"),
                     "avatarUrl": raw_data.get("picture", ""),
                 }
-                print("!!!!!!")
-                print(user_data)
+                
                 return user_data
             else:
                 logging.warning(f"Failed to fetch user information: {response.status_code} {response.text}")
@@ -190,6 +190,7 @@ class Auth0Provider(AuthProvider):
         """
         try:
             logging.info("Handling callback from Auth0.")
+            assert self.oauth.auth0 is not None, "Auth0 provider is not registered."
             token = self.oauth.auth0.authorize_access_token()
             if 'access_token' not in token:
                 raise ValueError("Access token not found in the response.")
@@ -199,7 +200,7 @@ class Auth0Provider(AuthProvider):
             # Decode the token's header to inspect its algorithm and other details
             try:
                 header = jwt.get_unverified_header(access_token)
-                print("Token Header:", header)  # Check the header of the token
+                #print("Token Header:", header)  # Check the header of the token
 
                 # Ensure the algorithm is RS256 (not JWE)
                 if header.get('alg') != 'RS256':
@@ -230,6 +231,7 @@ class Auth0Provider(AuthProvider):
         """
         try:
             logging.info("Checking authentication status.")
+            # Argument of type "str" cannot be assigned to parameter "token" of type "dict[Unknown, Unknown]"
             user_info = self.get_user(token)
             return user_info is not None
         except Exception as e:
@@ -246,7 +248,7 @@ class Auth0Provider(AuthProvider):
             unverified_header = jwt.get_unverified_header(token)
             
             if unverified_header is None:
-                print("++++++++1")
+    
                 logging.error("Invalid token header.")
                 return False
 
@@ -258,12 +260,11 @@ class Auth0Provider(AuthProvider):
                     response = requests.get(self.app.config['AUTH0_PUBLIC_KEY_URI'])
                     if response.status_code != 200:
                         logging.error(f"Failed to fetch JWKS: {response.status_code}")
-                        print("++++++++2")
+                        
                         return False
                     jwks = response.json()
 
-                    print("++++++++2-No")
-                    print("JWKS Response:", jwks)
+                
                     # Find the key in the JWKS that matches the 'kid' in the token header
                     for key in jwks['keys']:
                         if key['kid'] == unverified_header['kid']:
@@ -281,7 +282,6 @@ class Auth0Provider(AuthProvider):
             
             if not rsa_key:
                 logging.error("No valid key found in JWKS for token verification.")
-                print("++++++++3")
                 return False
 
             # Step 3: Verify the JWT token using the public key
@@ -292,14 +292,12 @@ class Auth0Provider(AuthProvider):
                 audience=self.app.config["AUTH0_AUDIENCE"],  # Your API audience
                 issuer=f"https://{self.app.config['AUTH0_DOMAIN']}/"
             )
-            print("++++++++4")
+    
             # Step 4: Check the expiration of the token
             if payload['exp'] > time.time():
-                print("++++++++5")
                 return True
             else:
                 logging.error("Token is expired.")
-                print("++++++++6")
                 return False
 
         except ExpiredSignatureError:
