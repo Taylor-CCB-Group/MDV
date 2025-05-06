@@ -1,5 +1,10 @@
-from flask import jsonify, session, request,redirect, current_app
+import logging
 from functools import wraps
+from flask import jsonify, session, request,redirect, current_app
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # in_memory_cache.py
 user_cache = {}  # key: auth0_id -> user details
@@ -52,7 +57,7 @@ def register_before_request_auth(app):
 
         if not is_authenticated():
             redirect_uri = app.config.get("LOGIN_REDIRECT_URL", "/login_dev")
-            print(f"Unauthorized access to {requested_path}. Redirecting.")
+            logger.info(f"Unauthorized access to {requested_path}. Redirecting.")
             return redirect(redirect_uri)
 
         return None
@@ -86,8 +91,6 @@ def sync_auth0_users_to_db():
             email = user.get('email', '')
             auth0_id = user['user_id']
 
-            print(f"Syncing user: {email} - {auth0_id}")
-
             # Use UserService to add or update user
             db_user = UserService.add_or_update_user(
                 email=email,
@@ -111,10 +114,10 @@ def sync_auth0_users_to_db():
                         is_owner=True
                     )
 
-        print(f"Synced {len(users['users'])} users from Auth0.")
+        logger.info(f"Synced users from Auth0.")
 
     except Exception as e:
-        print(f"sync_auth0_users_to_db: An unexpected error occurred: {e}")
+        logger.exception(f"sync_auth0_users_to_db: An unexpected error occurred: {e}")
         raise
 
 def cache_user_projects():
@@ -124,7 +127,7 @@ def cache_user_projects():
     Caches user details and their associated project permissions in memory.
     """
     try:
-        print("Caching user details and project permissions...")
+        logger.info("Caching user details and project permissions...")
 
         users = User.query.all()
         all_users_cache.clear()
@@ -156,11 +159,11 @@ def cache_user_projects():
         active_projects = ProjectService.get_active_projects()
         active_projects_cache[:] = active_projects
 
-        print(f"Cached {len(users)} users and their project permissions in memory.")
+        logger.info(f"Cached users and their project permissions in memory.")
         return True
 
     except Exception as e:
-        print(f"Error caching user projects: {e}")
+        logger.exception(f"Error caching user projects: {e}")
         return False
     
 def update_cache(user_id=None, project_id=None, user_data=None, project_data=None, permissions=None):
@@ -201,7 +204,7 @@ def update_cache(user_id=None, project_id=None, user_data=None, project_data=Non
                 existing_project["name"] = project_data.get("name", existing_project["name"])
                 existing_project["lastModified"] = project_data.get("lastModified", existing_project["lastModified"])
                 existing_project["thumbnail"] = project_data.get("thumbnail", existing_project["thumbnail"])
-                print(f"Updated project {project_id} in active projects cache.")
+                logger.info(f"Updated project {project_id} in active projects cache.")
             else:
                 # Project does not exist in cache, append a new entry
                 project_entry = {
@@ -211,12 +214,12 @@ def update_cache(user_id=None, project_id=None, user_data=None, project_data=Non
                     "thumbnail": project_data["thumbnail"]
                 }
                 active_projects_cache.append(project_entry)
-                print(f"Added new project {project_id} to active projects cache.")
+                logger.info(f"Added new project {project_id} to active projects cache.")
 
-        print("Cache successfully updated.")
+        logger.info("Cache successfully updated.")
     
     except Exception as e:
-        print(f"Error updating cache: {e}")
+        logger.exception(f"Error updating cache: {e}")
 
 def validate_and_get_user():
     from mdvtools.auth.auth0_provider import Auth0Provider
@@ -269,7 +272,7 @@ def validate_and_get_user():
 
         # This should rarely happen since all users were cached at app startup.
         # But if the user is missing from Redis, fallback to DB and log the issue.
-        print(f"User {auth0_id} not found in cache, falling back to DB!")
+        logger.info(f"User {auth0_id} not found in cache, falling back to DB!")
 
         # Query the user from the database if not in cache
         user = User.query.filter_by(auth0_id=auth0_id).first()
@@ -286,7 +289,7 @@ def validate_and_get_user():
         return user_data, None
 
     except Exception as e:
-        print(f"Error during authentication: {e}")
+        logger.exception(f"Error during authentication: {e}")
         return None, jsonify({"error": "Internal server error - user not validated"}), 500
     
 
@@ -320,7 +323,7 @@ def validate_sso_user(request):
         return user_data, None
 
     except Exception as e:
-        print(f"validate_sso_user error: {e}")
+        logger.exception(f"validate_sso_user error: {e}")
         return None, jsonify({"error": "Internal server error - user not validated"}), 500
 
 
@@ -332,19 +335,19 @@ def maybe_require_user(ENABLE_AUTH):
                 return f(user=None, *args, **kwargs)  # Inject `user=None` for consistency
 
             auth_method = session.get("auth_method")
-            print("------maybe_require_user----", auth_method)
+            logger.info("------maybe_require_user----", auth_method)
             if not auth_method:
                 return jsonify({"error": "Authentication method not set in session"}), 401
 
             if auth_method == "auth0":
                 user, error_response = validate_and_get_user()
                 if error_response:
-                    print("------maybe_require_user----ERROR in auth0 validation")
+                    logger.error(error_response)
                     return error_response
             elif auth_method == "shibboleth":
                 user, error_response = validate_sso_user(request)
                 if error_response:
-                    print("------maybe_require_user----ERROR in sso validation")
+                    logger.error(error_response)
                     return error_response
             else:
                 return jsonify({"error": "Unknown authentication method"}), 400
