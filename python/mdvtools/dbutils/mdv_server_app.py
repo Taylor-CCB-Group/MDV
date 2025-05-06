@@ -343,8 +343,19 @@ def serve_projects_from_filesystem(app, base_dir):
                     new_project = ProjectService.add_new_project(name=project_name, path=project_path)
                     if new_project is None:
                         raise ValueError(f"Failed to add project '{project_name}' to the database.")
-                    else:
-                        logger.info(f"Added project to DB: {new_project}")
+                    
+                    logger.info(f"Added project to DB: {new_project}")
+
+                    # Auth-related setup
+                    if ENABLE_AUTH:
+                        try:
+                            sync_auth0_users_to_db()  # Sync users and assign permissions
+                            logger.info("Synced Auth0 users after adding project.")
+
+                            cache_user_projects() #update the cache
+                        except Exception as auth_e:
+                            logger.exception(f"Error syncing users or caching for {project_name}: {auth_e}")
+
                     
                     # Add files from the project directory to the database
                     for root, dirs, files in os.walk(project_path):

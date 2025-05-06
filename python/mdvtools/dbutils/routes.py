@@ -5,8 +5,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def register_routes(app, ENABLE_AUTH):
-    from flask import request, jsonify, render_template
+    from flask import abort, request, jsonify, redirect, url_for, render_template
     from mdvtools.auth.authutils import maybe_require_user, update_cache, active_projects_cache, user_project_cache,user_cache, all_users_cache
+    from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
     import os
     import shutil
     from mdvtools.mdvproject import MDVProject
@@ -37,6 +38,16 @@ def register_routes(app, ENABLE_AUTH):
         def login_dev():
             return render_template('login.html')
         logger.info("Route registered: /login_dev")
+
+        @app.route('/rescan_projects')
+        @maybe_require_user(ENABLE_AUTH)
+        def rescan_projects(user):
+            is_admin = user.get("is_admin", False)
+            if not is_admin:
+                abort(403)  # Forbidden
+            serve_projects_from_filesystem(app, app.config["projects_base_dir"])
+            return redirect(url_for('index'))
+
 
         @app.route('/projects')
         @maybe_require_user(ENABLE_AUTH)  # Pass ENABLE_AUTH here
