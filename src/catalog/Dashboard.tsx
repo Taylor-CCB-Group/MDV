@@ -29,7 +29,6 @@ import {
 } from "@mui/material";
 import React, { useCallback, useMemo, useState } from "react";
 import ProjectCard from "./ProjectCard";
-import ErrorModal from "./ProjectErrorModal";
 import ProjectListView from "./ProjectListView";
 import UserProfile from "./UserProfile";
 import mdvLogo from "./assets/mdv_logo.png";
@@ -39,6 +38,8 @@ import {
     type SortOrder,
     sortProjects,
 } from "./utils/projectUtils";
+import ReusableDialog from "@/charts/dialogs/ReusableDialog";
+import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
 
 const Dashboard: React.FC = () => {
     const {
@@ -75,7 +76,7 @@ const Dashboard: React.FC = () => {
             const base = import.meta.env.DEV
                 ? "http://localhost:5170?dir=/"
                 : "";
-            window.location.href = `${base}project/${newProject.id}`;
+            window.location.href = `${base}project/${newProject?.id}`;
         } catch (error) {
             console.error("Failed to create project:", error);
         }
@@ -343,10 +344,15 @@ const Dashboard: React.FC = () => {
                     />
                 )}
             </Container>
-            <ErrorModal
+            <ReusableDialog
                 open={isErrorModalOpen}
-                message={error || ""}
-                onClose={closeErrorModal}
+                handleClose={closeErrorModal}
+                isAlertErrorComponent
+                component={
+                    <AlertErrorComponent
+                        message={error as string}
+                    />
+                }
             />
         </Box>
     );

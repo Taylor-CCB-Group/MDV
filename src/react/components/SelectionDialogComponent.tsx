@@ -1,8 +1,8 @@
 import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Checkbox, Chip, IconButton, Paper, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, FormControlLabel, IconButton, Paper, PaperProps, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId, type HTMLAttributes } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
@@ -21,7 +21,7 @@ import { useDebounce } from "use-debounce";
 import { useHighlightedForeignRowsAsColumns, useRowsAsColumnsLinks } from "../chartLinkHooks";
 import * as d3 from 'd3';
 import { ErrorBoundary } from "react-error-boundary";
-import ErrorDisplay from "@/charts/dialogs/ErrorDisplay";
+import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 import { TextFieldExtended } from "./TextFieldExtended";
 import { isArray } from "@/lib/utils";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper";
@@ -49,6 +49,7 @@ function useFilterConfig<K extends DataType>(column: DataColumn<K>) {
 const filterOptions = createFilterOptions<any>({ limit: 100 });
 const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
     const [open, setOpen] = useState(false);
+    const [selectAll, setSelectAll] = useState(false);
     const ref = useRef<HTMLInputElement>(null);
     const dim = useDimensionFilter(column);
     const filters = useConfig<SelectionDialogConfig>().filters;
@@ -62,7 +63,9 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             filters[column.field] = newFilter;
         })();
     }, [filters, column.field, filter]);
+
     useCloseOnIntersection(ref, () => setOpen(false));
+    
     // react to changes in value and update the filter
     useEffect(() => {
         // filter could be undefined - but we previously checked for null causing component to crash
@@ -72,7 +75,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         }
         dim.filter("filterCategories", [column.field], value, true);
     }, [dim, column.field, value, filter]);
-    const [hasFocus, setHasFocus] = useState(false);
+
     const toggleOption = useCallback((option: string) => {
         if (value.includes(option)) {
             setValue(value.filter((v) => v !== option));
@@ -80,13 +83,17 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
         }
         setValue([...value, option]);
     }, [setValue, value]);
-    const selectAll = useCallback(() => {
-        setValue([...values]);
-    }, [values, setValue]);
-    const toggleSelection = useCallback(() => {
-        const newValues = values.filter((v) => !value.includes(v));
-        setValue(newValues);
-    }, [values, value, setValue]);
+
+    const handleSelectAll = useCallback(() => {
+        if (selectAll) {
+            setValue([]);
+            setSelectAll(false);
+        } else {
+            setValue(values);
+            setSelectAll(true);
+        }
+    }, [selectAll, setValue, values]);
+
     return (
         <Autocomplete
             multiple
@@ -94,9 +101,12 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
             options={values}
             value={value}
             filterOptions={filterOptions}
-            onChange={(_, newValue) => setValue(newValue)}
-            onFocus={() => setHasFocus(true)}
-            onBlur={() => setHasFocus(false)}
+            onChange={(_, value) => {
+                if(isArray(value) && value.length === 0) {
+                    setSelectAll(false);
+                }
+                setValue(value);
+            }}
             open={open}
             onOpen={() => setOpen(true)}
             onClose={() => setOpen(false)}
@@ -106,14 +116,7 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                     key: string;
                 }; //questionable mui types?
                 return <>
-                    <TextFieldExtended key={key} {...p}
-                        customEndAdornment={(
-                            <>
-                                <IconButton size="small" aria-label="toggle selection" onClick={toggleSelection}><SwapHorizIcon fontSize="inherit" /></IconButton>
-                                <IconButton size="small" aria-label="select all" onClick={selectAll}><DoneAllIcon fontSize="inherit" /></IconButton>
-                            </>
-                        )}
-                    />
+                    <TextFieldExtended key={key} {...p} />
                 </>
             }}
             renderOption={(props, option) => {
@@ -154,7 +157,26 @@ const TextComponent = observer(({ column }: Props<CategoricalDataType>) => {
                 //todo improve styling - bad from UX perspective at the moment when it overflows.
                 return <div className="max-h-32 overflow-auto">{chips}</div>;
             }}
-            // PaperComponent={(paperProps) => <Paper ref={ref} {...paperProps} />}
+            // Getting warnings in console if slotProps is used for rendering Paper Component
+            PaperComponent={useMemo(() => (paperProps: PaperProps) => {
+                const { children, ...restPaperProps } = paperProps;
+                return (
+                  <Paper {...restPaperProps}>
+                    <Box
+                        onMouseDown={(e) => e.preventDefault()}
+                        py={1}
+                        px={2}
+                        sx={{textAlign: "center"}}
+                    >
+                        <Button onClick={handleSelectAll} color="inherit" fullWidth>
+                            {selectAll ? "Unselect All" : "Select All"}
+                        </Button>
+                    </Box>
+                    <Divider />
+                    {children}
+                  </Paper>
+                );
+              }, [selectAll, handleSelectAll])}
         />
     );
 });
@@ -536,7 +558,7 @@ const AbstractComponent = observer(function AbstractComponent<K extends DataType
             </AccordionSummary>
             <AccordionDetails>
                 <ErrorBoundary FallbackComponent={
-                    ({ error }) => <ErrorDisplay error={error} title="Unexpected Error: please report to developers." />
+                    ({ error }) => <DebugErrorComponent error={error} title="Unexpected Error: please report to developers." />
                     }>
                     <Component column={column} />
                 </ErrorBoundary>

@@ -2,7 +2,7 @@ import { createMdvPortal } from "@/react/react_utils";
 import { BaseDialog } from "@/utilities/Dialog";
 import { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import ErrorDisplay from "./ErrorDisplay";
+import DebugErrorComponent from "./DebugErrorComponent";
 import AddViewDialogComponent from "./AddViewDialog";
 import SaveViewDialogComponent from "./SaveViewDialog";
 import DeleteViewDialogComponent from "./DeleteViewDialog";
@@ -66,7 +66,7 @@ const Wrapper = (props: {
     return (
         <ErrorBoundary
             FallbackComponent={({ error }) => (
-                <ErrorDisplay error={error} title="Unexpected Error: please report to developers." />
+                <DebugErrorComponent error={error} title="Unexpected Error: please report to developers." />
             )}
         >
             {getDialogComponent()}

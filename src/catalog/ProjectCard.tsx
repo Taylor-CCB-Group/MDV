@@ -140,6 +140,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         variant="h6"
                         component="div"
                         noWrap
+                        color="text.primary"
                         sx={{ marginBottom: "4px" }}
                     >
                         {name}
