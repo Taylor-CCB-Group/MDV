@@ -96,7 +96,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         const tempList = viewList.filter((view) => {
             const name = view.name.toLowerCase();
             // if any of the input words are not in the name, return false
-            if (matchString(input, name)) return view;
+            return matchString(input, name);
         });
         setFilteredViewList(tempList);
     };
