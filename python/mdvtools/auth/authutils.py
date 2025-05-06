@@ -63,14 +63,15 @@ def register_before_request_auth(app):
         return None
 
 def sync_auth0_users_to_db():
+    """
+    Syncs users from Auth0 to the application's database using UserService and UserProjectService.
+    """
+
     from mdvtools.dbutils.dbservice import UserService, UserProjectService
     from mdvtools.dbutils.dbmodels import db, Project
     from auth0.management import Auth0
     from auth0.authentication import GetToken
 
-    """
-    Syncs users from Auth0 to the application's database using UserService and UserProjectService.
-    """
     try:
         # Load Auth0 config from app
         auth0_domain = current_app.config['AUTH0_DOMAIN']
@@ -121,11 +122,13 @@ def sync_auth0_users_to_db():
         raise
 
 def cache_user_projects():
-    from mdvtools.dbutils.dbmodels import User, UserProject
-    from mdvtools.dbutils.dbservice import ProjectService
     """
     Caches user details and their associated project permissions in memory.
     """
+
+    from mdvtools.dbutils.dbmodels import User, UserProject
+    from mdvtools.dbutils.dbservice import ProjectService
+    
     try:
         logger.info("Caching user details and project permissions...")
 
@@ -222,15 +225,18 @@ def update_cache(user_id=None, project_id=None, user_data=None, project_data=Non
         logger.exception(f"Error updating cache: {e}")
 
 def validate_and_get_user():
-    from mdvtools.auth.auth0_provider import Auth0Provider
-    from mdvtools.dbutils.mdv_server_app import oauth
-    from mdvtools.dbutils.dbmodels import User
+
     """
     Validates the Auth0 token from the session and retrieves the user from cache.
     
     :param app: Flask app instance
     :return: Tuple (user object as dict, error response)
     """
+    
+    from mdvtools.auth.auth0_provider import Auth0Provider
+    from mdvtools.dbutils.mdv_server_app import oauth
+    from mdvtools.dbutils.dbmodels import User
+    
     try:
         # Check if user information is already cached in session
         if 'user' in session:
@@ -335,7 +341,8 @@ def maybe_require_user(ENABLE_AUTH):
                 return f(user=None, *args, **kwargs)  # Inject `user=None` for consistency
 
             auth_method = session.get("auth_method")
-            logger.info("------maybe_require_user----", auth_method)
+            logger.info("Authentication method")
+            logger.info(auth_method)
             if not auth_method:
                 return jsonify({"error": "Authentication method not set in session"}), 401
 

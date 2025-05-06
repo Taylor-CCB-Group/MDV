@@ -15,7 +15,6 @@ from mdvtools.auth.authutils import register_before_request_auth, sync_auth0_use
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 #Read environment flag for authentication
@@ -389,5 +388,6 @@ with app.app_context():
 if __name__ == '__main__':
     logger.info("Inside main..")
     #wait_for_database()
+    logging.basicConfig(level=logging.INFO)
     
-    app.run(host='0.0.0.0', debug=True, port=5055)
+    app.run(host='0.0.0.0', debug=False, port=5055)

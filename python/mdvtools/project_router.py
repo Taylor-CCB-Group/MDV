@@ -206,7 +206,10 @@ class ProjectBlueprint_v2:
 
                     if not user_data:
                         return jsonify({"error": "User data not found"}), 401
-                    user_id = user_data['id']
+    
+                    user_id = user_data.get('id') if user_data else None
+                    if not user_id:
+                        return jsonify({"error": "Unable to retrieve user ID"}), 401
                     logger.info(f"Authenticated user ({auth_method}): {user_id}") 
                     
                     

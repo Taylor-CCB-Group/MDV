@@ -2,7 +2,6 @@ from flask import Flask
 import logging
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 logger.info("safe_mdv_app.py starting")
@@ -17,5 +16,6 @@ except Exception as e:
 
 # Keep the existing __main__ block for direct execution
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     logger.info("running as __main__")
-    app.run(host='0.0.0.0', debug=True, port=5055)
+    app.run(host='0.0.0.0', debug=False, port=5055)

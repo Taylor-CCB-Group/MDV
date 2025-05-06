@@ -232,7 +232,9 @@ class Auth0Provider(AuthProvider):
         try:
             logging.info("Checking authentication status.")
             # Argument of type "str" cannot be assigned to parameter "token" of type "dict[Unknown, Unknown]"
-            user_info = self.get_user(token)
+            # Convert token string to dictionary format expected by get_user
+            token_dict = {"access_token": token}
+            user_info = self.get_user(token_dict)
             return user_info is not None
         except Exception as e:
             logging.error(f"Error while checking authentication: {e}")
