@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 def register_routes(app, ENABLE_AUTH):
     from flask import request, jsonify, render_template
-    from mdvtools.auth.authutils import maybe_require_user, update_cache, active_projects_cache, user_project_cache,user_cache, all_users_cache, cache_user_projects
+    from mdvtools.auth.authutils import maybe_require_user, update_cache, active_projects_cache, user_project_cache,user_cache, all_users_cache
     import os
     import shutil
     from mdvtools.mdvproject import MDVProject
@@ -465,7 +465,7 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 4: Determine permission flags
                 is_owner = permission == "owner"
                 can_write = permission in ["edit", "owner"]
-                can_read = True  # Always true if added to a project
+                #can_read = True  # Always true if added to a project
 
                 # Step 5: Update the DB via service
                 UserProjectService.add_or_update_user_project(

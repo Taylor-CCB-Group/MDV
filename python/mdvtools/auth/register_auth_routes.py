@@ -181,7 +181,7 @@ def register_auth_routes(app):
                 elif auth_method == 'shibboleth':
                     # Retrieve user attributes from available Shibboleth headers
                     eppn = request.headers.get('Shibboleth-Eppn')  # e.g., whgu1064@ox.ac.uk
-                    x_forwarded_user = request.headers.get('X-Forwarded-User')  # e.g., whgu1064@ox.ac.uk
+                    #x_forwarded_user = request.headers.get('X-Forwarded-User')  # e.g., whgu1064@ox.ac.uk
 
                     if eppn:
                         user_data = {

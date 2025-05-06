@@ -115,7 +115,7 @@ def sync_auth0_users_to_db():
                         is_owner=True
                     )
 
-        logger.info(f"Synced users from Auth0.")
+        logger.info("Synced users from Auth0.")
 
     except Exception as e:
         logger.exception(f"sync_auth0_users_to_db: An unexpected error occurred: {e}")
@@ -162,7 +162,7 @@ def cache_user_projects():
         active_projects = ProjectService.get_active_projects()
         active_projects_cache[:] = active_projects
 
-        logger.info(f"Cached users and their project permissions in memory.")
+        logger.info("Cached users and their project permissions in memory.")
         return True
 
     except Exception as e:
@@ -232,7 +232,7 @@ def validate_and_get_user():
     :param app: Flask app instance
     :return: Tuple (user object as dict, error response)
     """
-    
+
     from mdvtools.auth.auth0_provider import Auth0Provider
     from mdvtools.dbutils.mdv_server_app import oauth
     from mdvtools.dbutils.dbmodels import User
