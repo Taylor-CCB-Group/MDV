@@ -24,7 +24,7 @@ logger.info(f"Authentication enabled: {ENABLE_AUTH}")
 if ENABLE_AUTH:
     
     from authlib.integrations.flask_client import OAuth
-    oauth = OAuth()  # Initialize OAuth only if auth is enabled
+    oauth = OAuth()  #Initialize OAuth only if auth is enabled
     
 
 def create_flask_app(config_name=None):
@@ -389,5 +389,5 @@ if __name__ == '__main__':
     logger.info("Inside main..")
     #wait_for_database()
     logging.basicConfig(level=logging.INFO)
-    
+
     app.run(host='0.0.0.0', debug=False, port=5055)
