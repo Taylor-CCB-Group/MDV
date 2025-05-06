@@ -16,7 +16,7 @@ export type RegisteredUser = {
 const useProjectShare = (projectId: string) => {
     const [email, setEmail] = useState("");
     const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
-    const [newUser, setNewUser] = useState<RegisteredUser | null>();
+    const [newUser, setNewUser] = useState<RegisteredUser | null>(null);
     const [userList, setUserList] = useState<RegisteredUser[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");

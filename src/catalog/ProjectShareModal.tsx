@@ -53,7 +53,7 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
         if (newUser) {
             await addUser(newUser.id, "View");
             setEmail("");
-            setNewUser(undefined);
+            setNewUser(null);
         }
     };
 
@@ -131,7 +131,7 @@ const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, onClose, pr
                                         onChange={(_, value) => onChange(value)}
                                         onInputChange={(_, value) => onInputChange(value)}
                                         getOptionLabel={(option) => option.email}
-                                        getOptionKey={(option) => option.id}
+                                        // Add isOptionEqualToValue here if it doesn't work properly
                                         noOptionsText={
                                             <Box
                                                 sx={{
