@@ -45,6 +45,8 @@ def register_routes(app, ENABLE_AUTH):
             is_admin = user.get("is_admin", False)
             if not is_admin:
                 abort(403)  # Forbidden
+
+            #Serve the project
             serve_projects_from_filesystem(app, app.config["projects_base_dir"])
             return redirect(url_for('index'))
 

@@ -346,6 +346,27 @@ def serve_projects_from_filesystem(app, base_dir):
                     
                     logger.info(f"Added project to DB: {new_project}")
 
+                    # Rename directory to use project ID as folder name
+                    project_id_str = str(new_project.id)
+                    desired_path = os.path.join(app.config["projects_base_dir"], project_id_str)
+
+                    if project_path != desired_path:
+                        try:
+                            # Rename the directory
+                            os.rename(project_path, desired_path)
+                            logger.info(f"Renamed project folder from {project_path} to {desired_path}")
+
+                            # Update project path in DB
+                            new_project.path = desired_path
+                            db.session.commit()
+                            logger.info(f"Updated project path in DB for project ID {new_project.id}")
+
+                            # Also update local reference for downstream operations (like file sync)
+                            project_path = desired_path
+
+                        except Exception as rename_error:
+                            logger.exception(f"Failed to rename project directory or update DB for project ID {new_project.id}: {rename_error}")
+
                     # Auth-related setup
                     if ENABLE_AUTH:
                         try:
