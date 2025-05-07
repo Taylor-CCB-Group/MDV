@@ -35,7 +35,7 @@ RUN poetry install --with dev,backend
 EXPOSE 5055 
 
 # Command to run Gunicorn
-#CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "mdvtools.dbutils.mdv_server_app:app"]
-CMD ["poetry", "run", "python",  "-u", "-m", "mdvtools.dbutils.mdv_server_app"]
+CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "mdvtools.dbutils.mdv_server_app:app"]
+#CMD ["poetry", "run", "python",  "-u", "-m", "mdvtools.dbutils.mdv_server_app"]
 
 
