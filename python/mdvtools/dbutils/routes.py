@@ -62,8 +62,9 @@ def register_routes(app, ENABLE_AUTH):
 
             try:
                 # Step 1: Get projects directly from cache
-                active_projects = active_projects_cache
-                if not active_projects:
+                if ENABLE_AUTH:
+                    active_projects = active_projects_cache
+                else:
                     active_projects = ProjectService.get_active_projects()
                 # logger.info(f"Active projects from cache: {active_projects}")
 
