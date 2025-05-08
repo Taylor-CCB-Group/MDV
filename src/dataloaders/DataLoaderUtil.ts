@@ -7,6 +7,7 @@ import type { DataSource, DataColumn, DataType, LoadedDataColumn } from "@/chart
 import { isColumnLoaded } from "@/lib/columnTypeHelpers";
 import { createMdvPortal } from "@/react/react_utils";
 import ErrorComponentReactWrapper from "@/react/components/ErrorComponentReactWrapper";
+import { decompressData } from "./DataLoaders";
 
 let projectRoot = "";
 /**
@@ -129,11 +130,13 @@ async function getView(view?: string) {
 }
 
 async function loadBinaryData(datasource: string, name: string) {
-    return await getPostData(
+    const data =  await getPostData(
         `${projectRoot}/get_binary_data`,
         { datasource, name },
         "arraybuffer",
     );
+
+    return await decompressData(data);
 }
 //send json args and return json/array buffer response
 export async function getPostData(url: string, args: any, return_type = "json") {

@@ -34,7 +34,7 @@ onmessage = (e) => {
         }
         return 0;
     });
-    this.postMessage("done");
+    postMessage("done");
 };
 
 function getNumberSort({ data, desc }) {

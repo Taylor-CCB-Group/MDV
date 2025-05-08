@@ -76,16 +76,16 @@ class DeepToolsHeatMap extends SVGChart {
                 }
             }
 
-            this.data = new SharedArrayBuffer(this.dataLength * 5);
-            this.rowPositions = new Uint16Array(this.data, 0, this.dataLength);
+            this.data = new SharedArrayBuffer(this.dataLength * 7);
+            this.rowPositions = new Uint32Array(this.data, 0, this.dataLength);
             this.colPositions = new Uint16Array(
                 this.data,
-                this.dataLength * 2,
+                this.dataLength * 4,
                 this.dataLength,
             );
             this.values = new Uint8Array(
                 this.data,
-                this.dataLength * 4,
+                this.dataLength * 6,
                 this.dataLength,
             );
 
