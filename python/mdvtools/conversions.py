@@ -3,11 +3,13 @@ import scipy
 import pandas as pd
 from os.path import join, split
 import os
-from .mdvproject import MDVProject
+from .mdvproject import MDVProject,create_bed_gz_file
 import numpy as np
 import json
 import gzip
 import copy
+import yaml
+import shutil
 
 def convert_scanpy_to_mdv(
     folder: str, 
@@ -328,63 +330,133 @@ def convert_vcf_to_mdv(folder: str, vcf_filename: str) -> MDVProject:
     return p
 
 
+def create_regulamentary_project_from_pipeline(
+        output,
+        config,
+        results_folder,
+        atac_bw = None,
+        peaks = "merge",
+        genome="hg38",
+        openchrom="DNase"
+):
+    
+    fold = join(results_folder,peaks)
+    marks = ["H3K4me1", "H3K4me3", "H3K27ac", "CTCF","ATAC"]
+    with open(config, 'r') as file:
+        info = yaml.safe_load(file)
+    #get the bed files 
+    beds=  {x:info["union_peaks"].get(f"bed_{x}") for x in marks}
+    #get the bw files
+    bigwigs=  {x:info["compute_matrix_bigwigs"].get(f"bigwig_{x}") for x in marks}
+    bigwigs["ATAC"]=atac_bw
+
+    table= join(fold,"08_REgulamentary", "mlv_REgulamentary.csv")
+
+    #genome
+    bl =  info.get("remove_blacklist")
+    if bl:
+        gen = bl.get("genome")
+    gen = gen or genome
+
+    #get the matrix data and order
+    matrix = {
+        "data":join(fold,"09_metaplot","matrix.csv"),
+        "order":join(fold,"04_sort_regions","sort_union.bed"),
+        "marks":["H3K4me1", "H3K4me3", "H3K27ac", "CTCF"]
+    }
+    return create_regulamentary_project(
+        output,
+        table,
+        bigwigs,
+        beds,
+        matrix,
+        openchrom=openchrom,
+        genome=gen
+    )
+
 def create_regulamentary_project(
-    folder,
     output: str,
-    name: str,
-    bigwig_folder="",
-    bed_folder="",
-    openchrome="DNase",
-    openchrome_color="#eb9234",
-    marks=["H3K4me1", "H3K4me3", "H3K27ac", "CTCF"],
-    mark_colors=["#349beb", "#3aeb34", "#c4c41f", "#ab321a"],
-    genome="hg38",
+    table,
+    bigwigs,
+    beds,
+    matrix=None,
+    openchrom="DNase",
+    marks=["ATAC","H3K4me1", "H3K4me3", "H3K27ac", "CTCF"],
+    mark_colors=["#eb9234","#349beb", "#3aeb34", "#c4c41f", "#ab321a"],
+    genome="hg38"
 ):
     # get the template dir
     tdir = join(split(os.path.abspath(__file__))[0], "templates")
-    p = MDVProject(output)
-    mdvfile = join(folder, "08_REgulamentary", "mlv_REgulamentary.csv")
-    mdv = pd.read_csv(mdvfile, sep="\t")
-    p.add_datasource("elements", mdv)
-
-    # add the tracks
-    all_names = [openchrome] + marks
-    all_colors = [openchrome_color] + mark_colors
-    if bigwig_folder.startswith("http"):
-        bigwigs = [f"{bigwig_folder}/{name}_{x}_{genome}.bw" for x in all_names]
-        beds = [f"{bed_folder}/{name}_{x}_{genome}.bb" for x in all_names]
-    else:
-        # trying to avoid unbound variables - but not convinced this is correct
-        # what is supposed to happen if bigwig_folder is not a URL?
-        # >> need tests for this function... <<
-        beds = bigwigs = ["" for _ in all_names]
-        print(
-            "bigwig_folder is not a URL - using empty URLs for tracks, may well be wrong."
-        )
-        pass
-    # get the reference
+    p = MDVProject(output,delete_existing=True)
+    mdv = pd.read_csv(table, sep="\t")
+    columns=[{"name":"start","datatype":"int32"},{"name":"end","datatype":"int32"}]
+    p.add_datasource("elements", mdv, columns)
 
     default_tracks = []
-    for n in range(len(all_names)):
-        default_tracks.append(
-            {
-                "url": bigwigs[n],
-                "short_label": all_names[n] + " cov",
-                "color": all_colors[n],
-                "height": 60,
-                "track_id": "coverage_" + all_names[n],
-            }
-        )
-        default_tracks.append(
-            {
-                "url": beds[n],
-                "short_label": all_names[n] + " peaks",
-                "color": all_colors[n],
-                "height": 15,
-                "featureHeight": 5,
-                "track_id": "peaks_" + all_names[n],
-            }
-        )
+    for mark,color in zip(marks,mark_colors):
+        name =  mark if mark != 'ATAC' else openchrom
+        bw = bigwigs.get(mark)
+        if bw:
+            url = bw
+            if not bw.startswith("http"):
+                fname = split(bw)[1]
+                shutil.copy(bw,join(p.trackfolder,fname))
+                url = f"./tracks/{fname}"
+            default_tracks.append(
+                {
+                    "url": url,
+                    "short_label": f"{name} cov",
+                    "color":color,
+                    "height": 60,
+                    "track_id": f"coverage_{mark}" 
+                }
+            )
+        bed = beds.get(mark)
+        if bed:
+            url=bed
+            if not bed.startswith("http"):
+                fname = split(bed)[1]
+                #need to process to get into correct form for browser
+                if bed.endswith(".bed"):
+                    #bed file processing
+                    df = pd.read_csv(bed, sep="\t", header=None)
+                    first_row = df.iloc[0]
+                    #crude way to look for header
+                    has_header = not first_row[1].lstrip().isdigit()
+                    if has_header:
+                        df = df.iloc[1:]
+                    #only require chrom,start,enf
+                    df = df.iloc[:, :3]
+                    #create temp file in order to gzip and index
+                    t_file = join(p.trackfolder,f"{fname}.temp")
+                    o_file = join(p.trackfolder,fname)
+                    df.to_csv(t_file, sep="\t", header=False, index=False)
+                    #gzip and index
+                    create_bed_gz_file(t_file,o_file)
+                    os.remove(t_file)
+                    url = f"./tracks/{fname}.gz"
+                #just copy track as is - assume its in correct format 
+                else:
+                    to_file = join(p.trackfolder,fname)
+                    shutil.copyfile(bed,to_file)
+                    #need to copy the index of tabix files
+                    if bed.endswith(".gz"):
+                        shutil.copyfile(f"{bed}.tbi",f"{to_file}.tbi")
+                    url = f".tracks/{fname}"
+
+   
+
+
+            default_tracks.append(
+                {
+                    "url": url,
+                    "short_label": f"{name} peaks",
+                    "color": color,
+                    "height": 15,
+                    "featureHeight": 5,
+                    "track_id": f"peaks_{mark}"
+                }
+            )
 
     extra_params = {
         "default_tracks": default_tracks,
@@ -399,8 +471,8 @@ def create_regulamentary_project(
         "elements", ["chromosome", "start", "end"], extra_params=extra_params
     )
     p.add_refseq_track("elements", genome)
-
-    _create_dt_heatmap(folder, p, mdv, marks)
+    if matrix:
+        _create_dt_heatmap(p,matrix)
 
     view = json.load(open(join(tdir, "views", "regulamentary.json")))
     gb = p.get_genome_browser("elements")
@@ -413,7 +485,6 @@ def create_regulamentary_project(
         }
     )
     view.append(gb)
-
     p.set_view(
         "default",
         {
@@ -425,15 +496,20 @@ def create_regulamentary_project(
     return p
 
 
-def _create_dt_heatmap(folder, project, mdv, marks):
+def _create_dt_heatmap(
+        project,
+        matrix,
+        ds="elements",
+        ifields=["chromosome", "start", "end"]
+):
     # get the order of the regions in the matrix
-    mdv_i = mdv.set_index(["chromosome", "start", "end"])
-    order = pd.read_csv(
-        join(folder, "04_sort_regions", "sort_union.bed"), sep="\t", header=None
-    )
+    data = {x:project.get_column(ds,x) for x in ifields}
+    mdv_i = pd.DataFrame(data)
+    mdv_i = mdv_i.set_index(ifields)
+    order = pd.read_csv(matrix["order"], sep="\t", header=None)
     order = order.set_index([0, 1, 2])
     order = order[order.index.isin(mdv_i.index)]
-    mdv_i = mdv.reset_index()
+    mdv_i = mdv_i.reset_index()
     mdv_i["row_position"] = mdv_i.index
     arr = order.index.map(
         mdv_i.set_index(["chromosome", "start", "end"])["row_position"]
@@ -447,7 +523,7 @@ def _create_dt_heatmap(folder, project, mdv, marks):
     hm.write(arr.tobytes())
 
     # get the matrix and drop last two columns
-    mt = pd.read_csv(join(folder, "09_metaplot", "matrix.csv"), sep="\t")
+    mt = pd.read_csv(matrix["data"], sep="\t")
     mt = mt.iloc[:, :1600]
     # flatten and halve in size (mean of adjacent values)
     arr = mt.values.flatten()
@@ -461,14 +537,14 @@ def _create_dt_heatmap(folder, project, mdv, marks):
     hm.write(arr.tobytes())
     hm.close()
     # add the metadata
-    md = project.get_datasource_metadata("elements")
+    md = project.get_datasource_metadata(ds)
     md["deeptools"] = {
         "maps": {
             "default": {
                 "data": "heat_map",
                 "rows": md["size"],
                 "cols": 800,
-                "groups": marks,
+                "groups": matrix["marks"],
                 "max_scale": max,
             }
         }
@@ -503,7 +579,7 @@ def _add_dims(table, dims, max_dims,stub=""):
             print (f"unrecognized dimension reduction format - {type(data)} for dim reduction {dname} ")
             continue
         dim_table.columns=cols
-        #merge the tables to ensure the dims ar in sync with the main table
+        #merge the tables to ensure the dims are in sync with the main table
         #perhaps only necessary with mudata objects but will do no harm
         table = table.merge(dim_table, left_index=True, right_index=True, how= "left")
     return table

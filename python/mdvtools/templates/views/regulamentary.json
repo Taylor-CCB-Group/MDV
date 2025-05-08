@@ -3,7 +3,7 @@
     "title": "Activity_H3K27ac",
     "legend": "",
     "type": "ring_chart",
-    "param": "Activity_H3K27ac",
+    "param": ["Activity_H3K27ac"],
     "id": "activity_pie",
     "size": [
       219,
@@ -25,7 +25,7 @@
   {
     "title": "RE",
     "type": "row_chart",
-    "param": "RE",
+    "param":["RE"],
     "id": "RE_row_chart",
     "axis": {
     "x": {
@@ -96,7 +96,7 @@
     "title": "TSS_RE",
     "legend": "",
     "type": "row_chart",
-    "param": "TSS_RE",
+    "param": ["TSS_RE"],
     "id": "aQG7cc",
     "size": [
       203,
