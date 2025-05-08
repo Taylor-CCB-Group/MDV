@@ -232,12 +232,7 @@ def register_routes(app, ENABLE_AUTH):
 
                 user_id = user["id"] if ENABLE_AUTH else None
 
-                # Step 1: Get project from in-memory cache
-                project = next((p for p in active_projects_cache if p["id"] == project_id), None)
-                if not project:
-                    logger.error(f"Project with ID {project_id} not found in cache")
-                    return jsonify({"error": f"Project with ID {project_id} not found"}), 404
-
+    
                 # Step 2: Check if the user is owner using in-memory cache
                 if ENABLE_AUTH:
                     user_projects = user_project_cache.get(user_id)
@@ -298,9 +293,9 @@ def register_routes(app, ENABLE_AUTH):
                 user_id = user["id"] if ENABLE_AUTH else None
 
                 # Step 1: Check if project exists in active cache
-                cached_project = next((p for p in active_projects_cache if p["id"] == project_id), None)
-                if not cached_project:
-                    logger.error(f"Project with ID {project_id} not found in cache")
+                project = ProjectService.get_project_by_id(project_id)
+                if not project:
+                    logger.error(f"Project with ID {project_id} not found in db")
                     return jsonify({"error": f"Project with ID {project_id} not found"}), 404
 
                 # Step 2: Check ownership using cache
@@ -310,12 +305,7 @@ def register_routes(app, ENABLE_AUTH):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can rename the project."}), 403
 
-                # Step 3: Fetch project from DB to check access level
-                project = ProjectService.get_project_by_id(project_id)
-                if not project:
-                    logger.error(f"Project with ID {project_id} not found in database")
-                    return jsonify({"error": f"Project with ID {project_id} not found in database"}), 404
-
+        
                 # Step 4: Check if project is editable
                 if project.access_level != 'editable':
                     logger.error(f"Project with ID {project_id} is not editable.")
