@@ -39,9 +39,10 @@ class ViewManager {
         this.cm = window.mdv.chartManager;
         this.current_view = current_view;
         this.all_views = all_views;
-        setTimeout(() => {
-            this.lastSavedState = this.cm.getState();
-        }, 1000);
+        // todo: uncomment when we fix state issues
+        // setTimeout(() => {
+        //     this.lastSavedState = this.cm.getState();
+        // }, 1000);
     }
 
     getCleanPrevState() {
@@ -75,23 +76,25 @@ class ViewManager {
     // Check for any unsaved changes and show add view dialog
     @action
     checkAndAddView() {
-        if (this.hasUnsavedChanges()) {
-            this.cm.showSaveViewDialog(() => this.cm.showAddViewDialog());
-        } else {
+        // todo: uncomment if else when we fix state issues
+        // if (this.hasUnsavedChanges()) {
+        //     this.cm.showSaveViewDialog(() => this.cm.showAddViewDialog());
+        // } else {
             this.cm.showAddViewDialog();
-        }
+        // }
     }
 
     // Check for any unsaved changes and change view
     @action
     checkAndChangeView(view: string, isDelete = false) {
-        if (this.hasUnsavedChanges() && !isDelete) {
-            this.cm.showSaveViewDialog(() => {
-                this.changeView(view);
-            });
-        } else {
+        // todo: uncomment if else when we fix state issues
+        // if (this.hasUnsavedChanges() && !isDelete) {
+        //     this.cm.showSaveViewDialog(() => {
+        //         this.changeView(view);
+        //     });
+        // } else {
             this.changeView(view);
-        }
+        // }
     }
 
     // Change the current view
@@ -113,16 +116,17 @@ class ViewManager {
                 await this.cm._init(data);
                 const state = this.cm.getState();
                 this.setLastSavedState(state);
+                // todo: uncomment when we fix state issues
                 // check for anything that might escape our more formal logic
-                setTimeout(() => {
-                    if (this.hasUnsavedChanges()) {
-                        // this happens when changing to a view with gridstack layout
-                        console.warn("Unexpected unsaved changes shortly after changing view");
-                        this.hasUnsavedChanges(true);
-                    } else {
-                        console.log("✅ View changed without unexpected unsaved changes being detected");
-                    }
-                }, 500);
+                // setTimeout(() => {
+                //     if (this.hasUnsavedChanges()) {
+                //         // this happens when changing to a view with gridstack layout
+                //         console.warn("Unexpected unsaved changes shortly after changing view");
+                //         this.hasUnsavedChanges(true);
+                //     } else {
+                //         console.log("✅ View changed without unexpected unsaved changes being detected");
+                //     }
+                // }, 500);
             });
         } catch (error) {
             console.error("error while changing view", error);
@@ -151,7 +155,6 @@ class ViewManager {
             for (const view of this.all_views) {
                 const data = await this.cm.viewLoader(view);
                 viewList.push({ name: view, image: data?.viewImage });
-                console.log(data);
             }
             return viewList;
         } catch (error) {
