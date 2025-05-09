@@ -32,13 +32,12 @@ const MenuBarComponent = () => {
     const { buildInfo } = useBuildInfo();
 
     const handleHomeButtonClick = () => {
-        // const state = this.getState();
-        // this._callListeners("state_saved", state);
-        viewManager.checkUnsavedState(() => {
+        // todo: uncomment when we fix state issues
+        // viewManager.checkUnsavedState(() => {
             window.location.href = import.meta.env.DEV
                 ? `${window.location.origin}/catalog_dev`
                 : `${window.location.origin}/../`;
-        });
+        // });
     };
 
     const handleSaveButtonClick = async () => {
