@@ -63,17 +63,12 @@ const Dashboard: React.FC = () => {
 
     const { mode, toggleColorMode } = useColorMode();
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-    // ! This is not used
-    // const [projectType, setProjectType] = useState<ProjectAccessType>(
-    //     "Editable",
-    // );
     const [sortBy, setSortBy] = useState<SortBy>("lastModified");
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [open, setOpen] = useState(false);
 
     React.useEffect(() => {
-        console.log("use effect..........");
         fetchProjects();
     }, [fetchProjects]);
 
@@ -90,7 +85,6 @@ const Dashboard: React.FC = () => {
     };
 
     const sortedProjects = useMemo(() => {
-        console.log("sorted projects.....");
         return sortProjects(projects, sortBy, sortOrder);
     }, [projects, sortBy, sortOrder]);
 
@@ -114,7 +108,6 @@ const Dashboard: React.FC = () => {
     };
 
     return (
-        <>
         <Box
             sx={{
                 flexGrow: 1,
@@ -396,7 +389,6 @@ const Dashboard: React.FC = () => {
             />
             <ImportProjectDialog open={open} setOpen={setOpen} />
         </Box>
-        </>
     );
 };
 

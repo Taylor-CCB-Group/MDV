@@ -732,7 +732,7 @@ def register_routes(app):
                     return jsonify({"error": "No project archive provided"}), 400
                 
                 project_file = request.files['file']
-                # project_name = request.form.get("name")  # todo: Get project name from request
+                # todo: Get project name from request
 
                 # Get next available project ID
                 next_id = ProjectService.get_next_project_id()
@@ -808,10 +808,6 @@ def register_routes(app):
                         print("In register_routes -/import_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
                     except Exception as blueprint_error:
                         print(f"In register_routes -/import_project : Error removing blueprint: {blueprint_error}")
-                # if 'next_id' in locals() and os.path.exists(project_path):
-                #     shutil.rmtree(project_path)
-                # if 'next_id' in locals() and str(next_id) in ProjectBlueprint.blueprints:
-                #     del ProjectBlueprint.blueprints[str(next_id)]
                 return jsonify({"error": str(e)}), 500
             
         print("Route registered: /import_project")
