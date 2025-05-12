@@ -765,7 +765,7 @@ def register_routes(app):
                                         extracted_project_path = sub_path
 
                         # Copy the files to newly created project path, if project is valid
-                        if not extracted_project_path == None:
+                        if extracted_project_path is not None:
                             shutil.copytree(extracted_project_path, project_path, dirs_exist_ok=True)
                         else:
                             return jsonify({"error": "The uploaded file is not a valid MDV project"}), 400
@@ -787,11 +787,31 @@ def register_routes(app):
                 })
                 
             except Exception as e:
+                print(f"In register_routes - /import_project : Error creating project: {e}")
+                print("started rollabck")
                 # Clean up on error
-                if 'next_id' in locals() and os.path.exists(project_path):
-                    shutil.rmtree(project_path)
-                if 'next_id' in locals() and str(next_id) in ProjectBlueprint.blueprints:
-                    del ProjectBlueprint.blueprints[str(next_id)]
+                project_path = locals().get('project_path')
+                next_id = locals().get('next_id')
+                
+                # Clean up project directory if it was created
+                if project_path and os.path.exists(project_path):
+                    try:
+                        shutil.rmtree(project_path)
+                        print("In register_routes -/import_project : Rolled back project directory creation as db entry is not added")
+                    except Exception as cleanup_error:
+                        print(f"In register_routes -/import_project : Error during cleanup: {cleanup_error}")
+                
+                # Remove from blueprints if registered
+                if next_id is not None and str(next_id) in ProjectBlueprint.blueprints:
+                    try:
+                        del ProjectBlueprint.blueprints[str(next_id)]
+                        print("In register_routes -/import_project : Rolled back ProjectBlueprint.blueprints as db entry is not added")
+                    except Exception as blueprint_error:
+                        print(f"In register_routes -/import_project : Error removing blueprint: {blueprint_error}")
+                # if 'next_id' in locals() and os.path.exists(project_path):
+                #     shutil.rmtree(project_path)
+                # if 'next_id' in locals() and str(next_id) in ProjectBlueprint.blueprints:
+                #     del ProjectBlueprint.blueprints[str(next_id)]
                 return jsonify({"error": str(e)}), 500
             
         print("Route registered: /import_project")

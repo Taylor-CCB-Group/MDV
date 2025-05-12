@@ -22,6 +22,7 @@ import {
 } from "@mui/material";
 import { CloudUpload as CloudUploadIcon } from "@mui/icons-material";
 import axios from "axios";
+import type React from "react";
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { DialogCloseIconButton } from "@/catalog/ProjectRenameModal";
@@ -42,7 +43,12 @@ const Loader = () => {
     );
 };
 
-const ImportProjectDialog = ({ open, setOpen }: any) => {
+export type ImportProjectDialogProps = {
+    open: boolean;
+    setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [file, setFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<{ message: string; stack?: string }>();
