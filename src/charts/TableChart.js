@@ -83,7 +83,7 @@ class TableChart extends BaseChart {
         );
         this.grid.onHeaderCellRendered.subscribe((e, args) => {
             const c = args.column;
-            if (c.editor && this.mode === "edit") {
+            if (this.mode === "edit") {
                 const i = createEl("i", {
                     classes: ["far", "fa-edit"],
                     style: { cursor: "pointer" },
@@ -302,12 +302,6 @@ class TableChart extends BaseChart {
 
     _updateOverlay(args) {
         const column = this.grid.getColumns()[args.range.fromCell];
-
-        // Ensure the column is editable
-        if (!column.editor) {
-            return;
-        }
-
         this.dataModel.updateRange(
             column.field,
             args.range.fromRow,
