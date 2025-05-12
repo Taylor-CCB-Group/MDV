@@ -2,6 +2,8 @@ import os
 import time
 import json
 import shutil
+import tempfile
+import zipfile
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from flask import Flask, render_template, jsonify, request
@@ -332,6 +334,17 @@ def tables_exist():
         print("printing table names")
         print(inspector.get_table_names())
         return inspector.get_table_names()
+
+def is_valid_mdv_project(path: str):
+    if os.path.isdir(path):
+        dir_list = os.listdir(path)
+        if "views.json" in dir_list and "state.json" in dir_list and "datasources.json" in dir_list:
+            return True
+        else:
+            return False
+    else:
+        return False
+        
 
 def serve_projects_from_db(app):
     failed_projects: list[tuple[int, str | Exception]] = []
@@ -710,6 +723,78 @@ def register_routes(app):
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /create_project")
+            
+        @app.route("/import_project", methods=["POST"])
+        def import_project():
+            try:
+                # Check if the request contains a file
+                if 'file' not in request.files:
+                    return jsonify({"error": "No project archive provided"}), 400
+                
+                project_file = request.files['file']
+                # project_name = request.form.get("name")  # todo: Get project name from request
+
+                # Get next available project ID
+                next_id = ProjectService.get_next_project_id()
+                project_path = os.path.join(app.config['projects_base_dir'], str(next_id))
+                os.makedirs(project_path, exist_ok=True)
+                
+                # Using a temp directory for extracting files
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    temp_file_path = os.path.join(temp_dir, "project.zip")
+                    project_file.save(temp_file_path)
+
+                    with zipfile.ZipFile(temp_file_path, 'r') as zip_file:
+                        temp_extract_path = os.path.join(temp_dir, "extracted")
+                        os.makedirs(temp_extract_path, exist_ok=True)
+                        # Extract zip file in temp directory
+                        zip_file.extractall(temp_extract_path)
+
+                        extracted_list = os.listdir(temp_extract_path)
+
+                        extracted_project_path = None
+
+                        # Check if the directory or sub-directory is valid mdv project
+                        if is_valid_mdv_project(temp_extract_path):
+                            extracted_project_path = temp_extract_path
+                        else:
+                            for e in extracted_list:
+                                sub_path = os.path.join(temp_extract_path, e)
+                                if os.path.isdir(sub_path):
+                                    if is_valid_mdv_project(sub_path):
+                                        extracted_project_path = sub_path
+
+                        # Copy the files to newly created project path, if project is valid
+                        if not extracted_project_path == None:
+                            shutil.copytree(extracted_project_path, project_path, dirs_exist_ok=True)
+                        else:
+                            return jsonify({"error": "The uploaded file is not a valid MDV project"}), 400
+
+                # Create a new MDV project out of the new path and files copied
+                p = MDVProject(project_path, backend_db=True)
+                p.set_editable(True)
+                p.serve(app=app, open_browser=False, backend_db=True)
+                
+
+                
+                # Initialize the project and register it
+                new_project = ProjectService.add_new_project(path=project_path)
+                
+                return jsonify({
+                    "id": new_project.id,
+                    "name": new_project.name,
+                    "status": "success"
+                })
+                
+            except Exception as e:
+                # Clean up on error
+                if 'next_id' in locals() and os.path.exists(project_path):
+                    shutil.rmtree(project_path)
+                if 'next_id' in locals() and str(next_id) in ProjectBlueprint.blueprints:
+                    del ProjectBlueprint.blueprints[str(next_id)]
+                return jsonify({"error": str(e)}), 500
+            
+        print("Route registered: /import_project")
 
         @app.route("/delete_project/<project_id>", methods=["DELETE"])
         def delete_project(project_id: int):

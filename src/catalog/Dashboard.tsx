@@ -1,11 +1,15 @@
 import { useColorMode } from "@/ThemeProvider";
 import {
     Add,
+    Cloud,
+    CloudUpload,
     ExpandMore,
     Folder,
     GridView,
+    Publish,
     Reorder as ReorderIcon,
     Search,
+    Upload,
 } from "@mui/icons-material";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
@@ -17,7 +21,7 @@ import {
     CircularProgress,
     Container,
     Divider,
-    Grid,
+    Grid2 as Grid,
     IconButton,
     InputBase,
     Menu,
@@ -40,6 +44,7 @@ import {
 } from "./utils/projectUtils";
 import ReusableDialog from "@/charts/dialogs/ReusableDialog";
 import AlertErrorComponent from "@/charts/dialogs/AlertErrorComponent";
+import ImportProjectDialog from "@/react/components/ImportProjectDialog";
 
 const Dashboard: React.FC = () => {
     const {
@@ -65,8 +70,10 @@ const Dashboard: React.FC = () => {
     const [sortBy, setSortBy] = useState<SortBy>("lastModified");
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [open, setOpen] = useState(false);
 
     React.useEffect(() => {
+        console.log("use effect..........");
         fetchProjects();
     }, [fetchProjects]);
 
@@ -83,6 +90,7 @@ const Dashboard: React.FC = () => {
     };
 
     const sortedProjects = useMemo(() => {
+        console.log("sorted projects.....");
         return sortProjects(projects, sortBy, sortOrder);
     }, [projects, sortBy, sortOrder]);
 
@@ -106,6 +114,7 @@ const Dashboard: React.FC = () => {
     };
 
     return (
+        <>
         <Box
             sx={{
                 flexGrow: 1,
@@ -166,7 +175,7 @@ const Dashboard: React.FC = () => {
 
             <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
                 <Grid container spacing={3} sx={{ mb: 4 }}>
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid size={{xs: 12, sm: 6, md: 3}}>
                         <ButtonBase
                             sx={{
                                 width: "100%",
@@ -192,6 +201,36 @@ const Dashboard: React.FC = () => {
                                 />
                                 <Typography variant="subtitle1" align="center">
                                     Create new project
+                                </Typography>
+                            </Paper>
+                        </ButtonBase>
+                    </Grid>
+                    <Grid size={{xs: 12, sm: 6, md: 3}}>
+                        <ButtonBase
+                            sx={{
+                                width: "100%",
+                                display: "block",
+                                textAlign: "center",
+                            }}
+                        >
+                            <Paper
+                                sx={{
+                                    p: 2,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                }}
+                                onClick={() => setOpen(true)}
+                            >
+                                <CloudUpload
+                                    sx={{
+                                        fontSize: 40,
+                                        color: "primary.main",
+                                        mb: 1,
+                                    }}
+                                />
+                                <Typography variant="subtitle1" align="center">
+                                    Import a project
                                 </Typography>
                             </Paper>
                         </ButtonBase>
@@ -318,12 +357,13 @@ const Dashboard: React.FC = () => {
                     <Grid container spacing={4}>
                         {sortedProjects.map((project) => (
                             <Grid
-                                item
                                 key={project.id}
-                                xs={12}
-                                sm={6}
-                                md={4}
-                                lg={3}
+                                size={{
+                                    xs: 12,
+                                    sm: 6,
+                                    md: 4,
+                                    lg: 3
+                                }}
                             >
                                 <ProjectCard
                                     {...project}
@@ -354,7 +394,9 @@ const Dashboard: React.FC = () => {
                     />
                 }
             />
+            <ImportProjectDialog open={open} setOpen={setOpen} />
         </Box>
+        </>
     );
 };
 

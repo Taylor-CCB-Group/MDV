@@ -102,6 +102,7 @@ const proxy = [
     '^/.*\\.(json|b|gz)$',
     '/projects',
     '/create_project',
+    '/import_project',
     '/delete_project',
 // biome-ignore lint/performance/noAccumulatingSpread: don't care about performance in vite config
 ].reduce((acc, route) => ({...acc, [route]: proxyOptions}), {});
