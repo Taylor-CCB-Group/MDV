@@ -1,5 +1,5 @@
 import logging
-from flask import Flask, request, jsonify, session
+from flask import Flask, jsonify, session
 from flask.typing import ResponseReturnValue as Response
 from typing import Dict, Any, Callable, Tuple
 import re
@@ -194,7 +194,7 @@ class ProjectBlueprint_v2:
                     user_id = user["id"] if user else None
                     if not user_id:
                         return jsonify({"error": "Unable to retrieve user ID"}), 401
-                    logger.info(f"Authenticated user ({auth_method}): {user_id}") 
+                    logger.info(f"Authenticated user: {user_id}") 
                     
                     
                     # Retrieve user permissions from the cache (without using update_cache)

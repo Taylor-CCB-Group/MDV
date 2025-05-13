@@ -3,6 +3,7 @@
 from mdvtools.dbutils.dbmodels import db, Project, File, User, UserProject
 from datetime import datetime
 from mdvtools.mdvproject import MDVProject
+from typing import Optional
 import logging
 
 # Setup logging
@@ -272,7 +273,7 @@ class FileService:
 
 class UserService:
     @staticmethod
-    def add_or_update_user(email: str, auth_id: str = None, first_name: str = None, last_name: str = None, institution: str = None):
+    def add_or_update_user(email: str, auth_id: Optional[str] = None, first_name: Optional[str] = None, last_name: Optional[str] = None, institution: Optional[str] = None):
         """
         Adds a new user or updates an existing user based on the provided email.
 

@@ -2,6 +2,7 @@ from flask import session, redirect, request, jsonify
 from mdvtools.dbutils.dbservice import UserService
 from mdvtools.auth.authutils import update_cache
 from mdvtools.auth.auth_provider import AuthProvider
+from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ class ShibbolethProvider(AuthProvider):
         else:
             return jsonify({"error": "Shibboleth logout URL not configured."}), 500
 
-    def get_user(self):
+    def get_user(self, token: Optional[dict] = None) -> Optional[dict]:
         eppn = request.headers.get('Shibboleth-Eppn')
         if eppn:
             return {

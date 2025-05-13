@@ -43,14 +43,25 @@ def register_routes(app, ENABLE_AUTH):
         def rescan_projects():
             if ENABLE_AUTH:
                 user = session.get('user')
+                if not user:
+                    # If user is not found in session, raise an error or redirect.
+                    raise ValueError("User not found in session.")
+                
                 is_admin = user.get("is_admin", False)
                 if not is_admin:
+                    # If user isn't admin, abort with 403 (Forbidden).
                     abort(403)  # Forbidden
 
-            #Serve the project
-            serve_projects_from_filesystem(app, app.config["projects_base_dir"])
-            return redirect(url_for('index'))
+            try:
+                # Serve the projects after checking authentication and admin privileges
+                serve_projects_from_filesystem(app, app.config["projects_base_dir"])
+            except Exception as e:
+                # Handle potential errors while serving the projects
+                logger.exception("Error while serving the projects.")
+                abort(500, description="Error while serving the projects.")
 
+            # If everything goes well, redirect to the 'index' page
+            return redirect(url_for('index'))
 
         @app.route('/projects')
         def get_projects():
@@ -69,6 +80,8 @@ def register_routes(app, ENABLE_AUTH):
 
                 if ENABLE_AUTH:
                     user = session.get('user')
+                    if not user:
+                        raise ValueError("User not found in session.")
                     # Filter by user permissions if authentication is enabled
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id)
@@ -160,6 +173,8 @@ def register_routes(app, ENABLE_AUTH):
                     # Step 5: Associate the admin user with the new project and grant all permissions
                     if ENABLE_AUTH:
                         user_data = session.get('user')
+                        if not user_data:
+                            raise ValueError("User not found in session.")
                         current_user_id = user_data['id']
                         UserProjectService.add_or_update_user_project(
                             user_id=current_user_id,
@@ -224,6 +239,8 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 2: Check if the user is owner using in-memory cache
                 if ENABLE_AUTH:
                     user = session.get('user')
+                    if not user:
+                        raise ValueError("User not found in session.")
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id)
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
@@ -288,6 +305,8 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 2: Check ownership using cache
                 if ENABLE_AUTH:
                     user = session.get('user')
+                    if not user:
+                        raise ValueError("User not found in session.")
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id)
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
@@ -340,6 +359,8 @@ def register_routes(app, ENABLE_AUTH):
                 # Step 3: Check ownership from the user_project_cache
                 if ENABLE_AUTH:
                     user = session.get('user')
+                    if not user:
+                        raise ValueError("User not found in session.")
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id)
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
@@ -373,6 +394,8 @@ def register_routes(app, ENABLE_AUTH):
                     return jsonify({"error": "Authentication is disabled, no action taken."})
                 
                 user = session.get('user')
+                if not user:
+                    raise ValueError("User not found in session.")
                 user_id = user["id"]
 
                 user_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
@@ -442,6 +465,8 @@ def register_routes(app, ENABLE_AUTH):
                     return jsonify({"error": "Authentication is disabled, no action taken."})
 
                 user = session.get('user')
+                if not user:
+                    raise ValueError("User not found in session.")
                 user_id = user["id"]
 
                 # Step 2: Check if current user is owner of the project
@@ -504,6 +529,8 @@ def register_routes(app, ENABLE_AUTH):
                     return jsonify({"Error": "Authentication is disabled, no action taken."})
 
                 user = session.get('user')
+                if not user:
+                    raise ValueError("User not found in session.")
                 current_user_id = user["id"]
                 
                 # Step 2: Validate if current user is the owner
@@ -561,8 +588,10 @@ def register_routes(app, ENABLE_AUTH):
                     return jsonify({"error": "Authentication is disabled, no action taken."})
 
                 user = session.get('user')
+                if not user:
+                    raise ValueError("User not found in session.")
                 current_user_id = user["id"]
-                
+
                 # Step 2: Validate ownership
                 user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id))
                 if not user_permissions or not user_permissions.get("is_owner"):

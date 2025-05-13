@@ -123,7 +123,7 @@ class Auth0Provider(AuthProvider):
             raise RuntimeError("Auth0 logout failed.") from e
 
 
-    def get_user(self, token: dict) -> Optional[dict]:
+    def get_user(self, token: Optional[dict] = None) -> Optional[dict]:
         """
         Retrieves the user information using the provided token.
 
@@ -133,6 +133,10 @@ class Auth0Provider(AuthProvider):
         try:
             logging.info("Fetching user information.")
 
+            if token is None:
+                logging.error("Token is None.")
+                return None
+        
             # Extract access token
             access_token = token.get("access_token")
             if not access_token:
