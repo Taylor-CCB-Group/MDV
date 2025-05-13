@@ -302,6 +302,12 @@ class TableChart extends BaseChart {
 
     _updateOverlay(args) {
         const column = this.grid.getColumns()[args.range.fromCell];
+
+        // Only allow direct cell editing for editable columns
+        if (!column.editor) {
+            return;
+        }
+
         this.dataModel.updateRange(
             column.field,
             args.range.fromRow,
