@@ -7,7 +7,6 @@ import zipfile
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from flask import Flask, render_template, jsonify, request
-from flask import Flask, render_template, jsonify, request
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
 # from flask import Flask, render_template, jsonify, request
@@ -17,7 +16,7 @@ from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 #from mdvtools.dbutils.routes import register_global_routes
 from mdvtools.dbutils.dbservice import ProjectService, FileService
-from flask import redirect, url_for, session, jsonify
+from flask import redirect, url_for, session
 
 # Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
@@ -336,14 +335,10 @@ def tables_exist():
         return inspector.get_table_names()
 
 def is_valid_mdv_project(path: str):
-    if os.path.isdir(path):
-        dir_list = os.listdir(path)
-        if "views.json" in dir_list and "state.json" in dir_list and "datasources.json" in dir_list:
-            return True
-        else:
-            return False
-    else:
+    if not os.path.isdir(path):
         return False
+    dir_list = os.listdir(path)
+    return "views.json" in dir_list and "state.json" in dir_list and "datasources.json" in dir_list
         
 
 def serve_projects_from_db(app):
@@ -760,9 +755,8 @@ def register_routes(app):
                         else:
                             for e in extracted_list:
                                 sub_path = os.path.join(temp_extract_path, e)
-                                if os.path.isdir(sub_path):
-                                    if is_valid_mdv_project(sub_path):
-                                        extracted_project_path = sub_path
+                                if os.path.isdir(sub_path) and is_valid_mdv_project(sub_path):
+                                    extracted_project_path = sub_path
 
                         # Copy the files to newly created project path, if project is valid
                         if extracted_project_path is not None:

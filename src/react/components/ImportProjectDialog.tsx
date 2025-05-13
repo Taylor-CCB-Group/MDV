@@ -57,7 +57,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const { fetchProjects } = useProjects();
 
     // todo: add additional checks
-    const onDrop = useCallback((acceptedFiles: any[]) => {
+    const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles[0]) {
             setFile(acceptedFiles[0]);
             const name = acceptedFiles[0].name.split(".")[0];
@@ -71,12 +71,13 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         accept: {
             "application/zip": [".zip"],
         },
+        // todo: update later for larger files support
         maxSize: 2000 * 1024 * 1024, // 2 GB
     });
 
     const rejectionMessage =
         fileRejections.length > 0
-            ? "Only ZIP files are allowed under 200 MB. Please try again."
+            ? "Only ZIP files are allowed under 2 GB. Please try again."
             : "Drag and drop a file here or click the button below (only *.zip files are allowed)";
 
     const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
@@ -97,10 +98,14 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
 
             const form = new FormData();
             form.append("file", file);
-            form.append("name", projectName);
+
+            if (projectName.trim()) {
+                form.append("name", projectName);
+            }
+
             const res = await axios.post("import_project", form);
             if (res.status === 200) {
-                // Navigate to the newly created project
+                // Navigate to the newly created project and fetch the projects
                 if (res.data?.status === "success") {
                     await fetchProjects();
                     const base = import.meta.env.DEV ? "http://localhost:5170?dir=/" : "";
@@ -109,27 +114,19 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                     throw new Error("An error occurred. Please try again.");
                 }
             } else {
-                // Error Handling
-                if (res.status === 403) {
-                    setError({ message: res.data?.error || "Forbidden: You are not allowed to perform this action." });
-                } else if (res.status === 500) {
-                    setError({
-                        message: "Internal Server Error. Please try again.",
-                        stack: res.data?.error || "An unknown error occurred",
-                    });
-                } else {
-                    setError({ message: res.data?.error || "An error occurred. Please try again." });
-                }
-                setErrorOpen(true);
+                throw new Error(res.data?.error || "An error occurred. Please try again.");
             }
         } catch (error) {
             let err;
             if (error instanceof AxiosError) {
-                err = { message: error.response?.data?.error, stack: error?.stack };
+                err = {
+                    message: error.response?.data?.error,
+                    stack: error.response?.status === 500 ? error?.stack : undefined,
+                };
             } else if (error instanceof Error) {
                 err = { message: error.message, stack: error?.stack };
             } else {
-                err = { message: "An error occurred while trying to import the project. Please try again." };
+                err = { message: "An error occurred while trying to upload the file. Please try again." };
             }
             setError(err);
             setErrorOpen(true);
@@ -174,7 +171,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                             </DropzoneContainer>
                             {file ? (
                                 <Button onClick={onUpload} sx={{ mt: 2, minWidth: "50%" }} variant="contained">
-                                    Import
+                                    Upload file
                                 </Button>
                             ) : (
                                 <></>
