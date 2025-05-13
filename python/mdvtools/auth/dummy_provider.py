@@ -1,5 +1,6 @@
 from flask import session
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
+from flask import Response
 from mdvtools.auth.auth_provider import AuthProvider
 import logging
 
@@ -17,7 +18,7 @@ class DummyAuthProvider(AuthProvider):
         logger.info("Dummy login - no real login redirect.")
         return "/"
 
-    def logout(self) -> None:
+    def logout(self) -> Union[str, Response, Tuple[Response, int]]:
         """Clear dummy session."""
         logger.info("Dummy logout - clearing session.")
         session.clear()
