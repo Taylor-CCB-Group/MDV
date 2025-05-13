@@ -377,17 +377,21 @@ const Dashboard: React.FC = () => {
                     />
                 )}
             </Container>
-            <ReusableDialog
-                open={isErrorModalOpen}
-                handleClose={closeErrorModal}
-                isAlertErrorComponent
-                component={
-                    <AlertErrorComponent
-                        message={error as string}
-                    />
-                }
-            />
-            <ImportProjectDialog open={open} setOpen={setOpen} />
+            {error && (
+                <ReusableDialog
+                    open={isErrorModalOpen}
+                    handleClose={closeErrorModal}
+                    isAlertErrorComponent
+                    component={
+                        <AlertErrorComponent
+                            message={error as string}
+                        />
+                    }
+                />
+            )}
+            {open && (
+                <ImportProjectDialog open={open} setOpen={setOpen} />
+            )}
         </Box>
     );
 };

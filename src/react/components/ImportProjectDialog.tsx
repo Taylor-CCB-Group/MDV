@@ -46,7 +46,7 @@ const Loader = () => {
 export type ImportProjectDialogProps = {
     open: boolean;
     setOpen: React.Dispatch<React.SetStateAction<boolean>>;
-}
+};
 
 const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [file, setFile] = useState<File | null>(null);
@@ -71,22 +71,18 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         accept: {
             "application/zip": [".zip"],
         },
-        maxSize: 2000 * 1024 * 1024  // 2 GB
+        maxSize: 2000 * 1024 * 1024, // 2 GB
     });
 
     const rejectionMessage =
         fileRejections.length > 0
             ? "Only ZIP files are allowed under 200 MB. Please try again."
-            : "Drag and drop a .zip file here or click the button below";
+            : "Drag and drop a file here or click the button below (only *.zip files are allowed)";
 
     const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
 
     const onClose = useCallback(() => {
         setOpen(false);
-        setIsLoading(false);
-        setError(undefined);
-        setErrorOpen(false);
-        setFile(null);
     }, [setOpen]);
 
     const onUpload = useCallback(async () => {
@@ -129,11 +125,11 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         } catch (error) {
             let err;
             if (error instanceof AxiosError) {
-                err = {message: error.response?.data?.error, stack: error?.stack}
+                err = { message: error.response?.data?.error, stack: error?.stack };
             } else if (error instanceof Error) {
-                err = { message: error.message, stack: error?.stack }
+                err = { message: error.message, stack: error?.stack };
             } else {
-                err = { message: "An error occurred while trying to upload a file. Please try again." }
+                err = { message: "An error occurred while trying to import the project. Please try again." };
             }
             setError(err);
             setErrorOpen(true);
@@ -158,7 +154,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                                 aria-label={"dropzoneLabel"}
                                 style={{ border: "none" }}
                             >
-                                <input {...getInputProps()} />
+                                {!file && <input {...getInputProps()} />}
                                 <div className="flex flex-col items-center justify-center space-y-0">
                                     <CloudUploadIcon className="text-gray-400" style={{ fontSize: "5rem" }} />
                                     {isDragActive ? (
@@ -169,14 +165,16 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                                             className={`${rejectionMessageStyle} text-sm`}
                                         />
                                     )}
-                                    <FileInputLabel htmlFor="fileInput" className="text-sm">
-                                        {file ? "Choose Another File" : "Choose File"}
-                                    </FileInputLabel>
+                                    {!file && (
+                                        <FileInputLabel htmlFor="fileInput" className="text-sm">
+                                            Choose File
+                                        </FileInputLabel>
+                                    )}
                                 </div>
                             </DropzoneContainer>
                             {file ? (
                                 <Button onClick={onUpload} sx={{ mt: 2, minWidth: "50%" }} variant="contained">
-                                    Upload
+                                    Import
                                 </Button>
                             ) : (
                                 <></>
@@ -197,7 +195,10 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                     isAlertErrorComponent={!error?.stack}
                     component={
                         error?.stack ? (
-                            <DebugErrorComponent error={{ message: error.message, stack: error?.stack }} extraMetadata={{ error: error.message }} />
+                            <DebugErrorComponent
+                                error={{ message: error.message, stack: error?.stack }}
+                                extraMetadata={{ error: error.message }}
+                            />
                         ) : (
                             <AlertErrorComponent message={error.message} />
                         )
