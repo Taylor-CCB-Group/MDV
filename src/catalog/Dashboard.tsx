@@ -3,10 +3,10 @@ import {
     Add,
     Cloud,
     CloudUpload,
+    Download as DownloadIcon,
     ExpandMore,
     Folder,
     GridView,
-    Publish,
     Reorder as ReorderIcon,
     Search,
     Upload,
@@ -215,7 +215,7 @@ const Dashboard: React.FC = () => {
                                 }}
                                 onClick={() => setOpen(true)}
                             >
-                                <CloudUpload
+                                <DownloadIcon
                                     sx={{
                                         fontSize: 40,
                                         color: "primary.main",
@@ -223,7 +223,7 @@ const Dashboard: React.FC = () => {
                                     }}
                                 />
                                 <Typography variant="subtitle1" align="center">
-                                    Import a project
+                                    Import an existing project
                                 </Typography>
                             </Paper>
                         </ButtonBase>

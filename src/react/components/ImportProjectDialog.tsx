@@ -21,7 +21,7 @@ import {
     Typography,
 } from "@mui/material";
 import { CloudUpload as CloudUploadIcon } from "@mui/icons-material";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import type React from "react";
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
@@ -71,12 +71,13 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         accept: {
             "application/zip": [".zip"],
         },
+        maxSize: 2000 * 1024 * 1024  // 2 GB
     });
 
     const rejectionMessage =
         fileRejections.length > 0
-            ? "Only ZIP files can be selected"
-            : "Drag and drop a .zip file here or click the button below to upload";
+            ? "Only ZIP files are allowed under 200 MB. Please try again."
+            : "Drag and drop a .zip file here or click the button below";
 
     const rejectionMessageStyle = fileRejections.length > 0 ? "text-red-500" : "";
 
@@ -102,7 +103,6 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
             form.append("file", file);
             form.append("name", projectName);
             const res = await axios.post("import_project", form);
-
             if (res.status === 200) {
                 // Navigate to the newly created project
                 if (res.data?.status === "success") {
@@ -127,11 +127,15 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                 setErrorOpen(true);
             }
         } catch (error) {
-            setError(
-                error instanceof Error
-                    ? { message: error.message, stack: error?.stack }
-                    : { message: "An error occurred while trying to upload a file. Please try again." },
-            );
+            let err;
+            if (error instanceof AxiosError) {
+                err = {message: error.response?.data?.error, stack: error?.stack}
+            } else if (error instanceof Error) {
+                err = { message: error.message, stack: error?.stack }
+            } else {
+                err = { message: "An error occurred while trying to upload a file. Please try again." }
+            }
+            setError(err);
             setErrorOpen(true);
         } finally {
             setIsLoading(false);
@@ -193,7 +197,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                     isAlertErrorComponent={!error?.stack}
                     component={
                         error?.stack ? (
-                            <DebugErrorComponent error={{ message: error.message, stack: error?.stack }} />
+                            <DebugErrorComponent error={{ message: error.message, stack: error?.stack }} extraMetadata={{ error: error.message }} />
                         ) : (
                             <AlertErrorComponent message={error.message} />
                         )
