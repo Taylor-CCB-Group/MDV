@@ -68,38 +68,40 @@ const ViewSelectorDropdown = observer(() => {
     const viewManager = useViewManager();
 
     useKeyboardShortcuts();
-    useUpdateViewList();
+    // todo: uncomment when we fix state issues
+    // useUpdateViewList();
 
     const options = viewManager.all_views;
     const [dirty, setDirty] = useState(false);
     const [error, setError] = useState<DebugErrorComponentProps['error']>();
     const [openError, setOpenError] = useState(false);
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setDirty((v) => {
-                const dirty = viewManager.hasUnsavedChanges();
-                if (!v && dirty) {
-                    viewManager.hasUnsavedChanges(true);
-                }
-                return dirty;
-            });
-        }, 1000);
+    // todo: uncomment when we fix state issues
+    // useEffect(() => {
+    //     const interval = setInterval(() => {
+    //         setDirty((v) => {
+    //             const dirty = viewManager.hasUnsavedChanges();
+    //             if (!v && dirty) {
+    //                 viewManager.hasUnsavedChanges(true);
+    //             }
+    //             return dirty;
+    //         });
+    //     }, 1000);
 
-        return () => clearInterval(interval);
-    }, [viewManager]);
+    //     return () => clearInterval(interval);
+    // }, [viewManager]);
 
-    useEffect(() => {
-        cm.addListener("view_selector", (type: string, data: any) => {
-            if (type === "view_loaded") {
-                setDirty(false);
-            }
-        });
+    // useEffect(() => {
+    //     cm.addListener("view_selector", (type: string, data: any) => {
+    //         if (type === "view_loaded") {
+    //             setDirty(false);
+    //         }
+    //     });
 
-        return () => {
-            cm.removeListener("view_selector");
-        };
-    }, [cm]);
+    //     return () => {
+    //         cm.removeListener("view_selector");
+    //     };
+    // }, [cm]);
 
     return (
         <>
@@ -111,7 +113,9 @@ const ViewSelectorDropdown = observer(() => {
                         cm.changeView(newValue);
                     }
                 }}
-                renderInput={(params) => <TextField {...params} label={`Select View${dirty ? "*" : ""}`} />}
+                // todo: revert back when we fix state issues
+                // renderInput={(params) => <TextField {...params} label={`Select View${dirty ? "*" : ""}`} />}
+                renderInput={(params) => <TextField {...params} label={"Select View"} />}
                 sx={{ display: "inline-flex", width: "20vw", margin: "0.2em" }}
             />
             {error && (
