@@ -277,7 +277,7 @@ class UserService:
         Adds a new user or updates an existing user based on the provided email.
 
         :param email: User's email address (mandatory).
-        :param auth_id: User's Auth0 ID (optional).
+        :param auth_id: User's Auth ID (optional).
         :param first_name: User's first name (optional).
         :param last_name: User's last name (optional).
         :param institution: User's institution or association (optional).
