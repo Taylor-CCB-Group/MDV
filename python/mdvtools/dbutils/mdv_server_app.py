@@ -732,7 +732,7 @@ def register_routes(app):
                     return jsonify({"error": "No project archive provided"}), 400
                 
                 project_file = request.files['file']
-                # todo: Get project name from request
+                project_name = request.form.get('name')
 
                 # Get next available project ID
                 next_id = ProjectService.get_next_project_id()
@@ -777,8 +777,13 @@ def register_routes(app):
                 
 
                 
-                # Initialize the project and register it
-                new_project = ProjectService.add_new_project(path=project_path)
+                # Initialize the project and register it using project name if valid
+                if project_name is not None:
+                    new_project = ProjectService.add_new_project(path=project_path, name=project_name)
+                else:
+                    new_project = ProjectService.add_new_project(path=project_path)
+
+
                 
                 return jsonify({
                     "id": new_project.id,

@@ -50,6 +50,7 @@ export type ImportProjectDialogProps = {
 
 const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
     const [file, setFile] = useState<File | null>(null);
+    const [projectName, setProjectName] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<{ message: string; stack?: string }>();
     const [errorOpen, setErrorOpen] = useState(false);
@@ -57,7 +58,11 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
 
     // todo: add additional checks
     const onDrop = useCallback((acceptedFiles: any[]) => {
-        setFile(acceptedFiles[0] || null);
+        if (acceptedFiles[0]) {
+            setFile(acceptedFiles[0]);
+            const name = acceptedFiles[0].name.split(".")[0];
+            setProjectName(name ?? "");
+        }
     }, []);
 
     const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
@@ -95,6 +100,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
 
             const form = new FormData();
             form.append("file", file);
+            form.append("name", projectName);
             const res = await axios.post("import_project", form);
 
             if (res.status === 200) {
@@ -130,7 +136,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
         } finally {
             setIsLoading(false);
         }
-    }, [file, fetchProjects]);
+    }, [file, fetchProjects, projectName]);
 
     return (
         <>
