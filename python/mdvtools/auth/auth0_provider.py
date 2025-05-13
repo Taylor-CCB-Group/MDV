@@ -219,6 +219,7 @@ class Auth0Provider(AuthProvider):
             # Store the token in the session for later use
             session['token'] = token
             session["auth_method"] = "auth0"
+            session.modified = True
             logging.info("Access token retrieved and stored in session.")
             
             return token['access_token']

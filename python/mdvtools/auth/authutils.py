@@ -32,9 +32,10 @@ def get_auth_provider():
 
     if auth_method == "auth0":
         from mdvtools.auth.auth0_provider import Auth0Provider
+        from mdvtools.dbutils.mdv_server_app import oauth
         return Auth0Provider(
             current_app,
-            oauth=current_app.extensions.get('oauth'),
+            oauth=oauth,
             client_id=current_app.config['AUTH0_CLIENT_ID'],
             client_secret=current_app.config['AUTH0_CLIENT_SECRET'],
             domain=current_app.config['AUTH0_DOMAIN']
