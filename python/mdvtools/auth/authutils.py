@@ -35,14 +35,17 @@ def get_auth_provider():
             client_secret=current_app.config['AUTH0_CLIENT_SECRET'],
             domain=current_app.config['AUTH0_DOMAIN']
         )
-
-    elif auth_method == "shibboleth":
-        from mdvtools.auth.shibboleth_provider import ShibbolethProvider
-        return ShibbolethProvider(current_app)
-
+    
     elif auth_method == "dummy":
         from mdvtools.auth.dummy_provider import DummyAuthProvider
         return DummyAuthProvider(current_app)
+    elif auth_method == "shibboleth":
+        # If default method is 'dummy', force dummy provider even if 'shibboleth' was requested
+        if current_app.config.get("DEFAULT_AUTH_METHOD", "").lower() == "dummy":
+            from mdvtools.auth.dummy_provider import DummyAuthProvider
+            return DummyAuthProvider(current_app)
+        from mdvtools.auth.shibboleth_provider import ShibbolethProvider
+        return ShibbolethProvider(current_app)
     else:
         raise ValueError(f"Unsupported auth method: {auth_method}")
 
