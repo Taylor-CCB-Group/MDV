@@ -1,5 +1,5 @@
 import logging
-from flask import session, request,redirect, current_app
+from flask import session, request,redirect, current_app, has_request_context
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -14,11 +14,15 @@ active_projects_cache = []
 
 def get_auth_provider():
     # Try to fetch the authentication method from session first
-    auth_method = session.get("auth_method", None)
+
+    if has_request_context():
+        auth_method = session.get("auth_method", None)
+    else:
+        auth_method = None
     
     if not auth_method:
         # If no auth method is found in the session, use the default from app config
-        auth_method = current_app.config.get("DEFAULT_AUTH_METHOD", "auth0")
+        auth_method = current_app.config.get("DEFAULT_AUTH_METHOD", "dummy")
     
     if not auth_method:
         raise ValueError("Authentication method is not specified in session or config.")

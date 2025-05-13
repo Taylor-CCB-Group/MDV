@@ -417,7 +417,7 @@ def register_routes(app, ENABLE_AUTH):
                             user_data = {
                                 "id": user_obj.id,
                                 "email": user_obj.email,
-                                "auth0_id": user_obj.auth0_id,
+                                "auth_id": user_obj.auth_id,
                                 "is_admin": user_obj.is_admin
                             }
                             # Optionally update cache to avoid this hit next time
