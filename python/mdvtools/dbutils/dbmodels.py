@@ -14,7 +14,7 @@ class User(db.Model):
     last_name = db.Column(db.String(50), nullable=False, default='')
     administrator = db.Column(db.Boolean, nullable=False, default=False)
     institution = db.Column(db.Text, nullable=True)
-    auth0_id = db.Column(db.String(255), unique=True, nullable=False)  # Store Auth0 User ID only
+    auth_id = db.Column(db.String(255), unique=True, nullable=False)  # Store Auth0 User ID only
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
     projects = db.relationship('UserProject', backref='user', lazy=True)
     jobs = db.relationship('Job', backref='user', lazy=True)

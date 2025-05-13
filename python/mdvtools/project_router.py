@@ -163,7 +163,7 @@ class ProjectBlueprint_v2:
         # find the item in self.routes that matches the subpath
         from mdvtools.dbutils.dbservice import ProjectService
         from mdvtools.dbutils.mdv_server_app import ENABLE_AUTH
-        from mdvtools.auth.authutils import validate_and_get_user, validate_sso_user, user_project_cache
+        from mdvtools.auth.authutils import user_project_cache
         
         logger.info(f"Inside dispatch request for project_id: {project_id} and subpath: {subpath}")
         subpath = f"/{urlparse(subpath).path}"
@@ -189,25 +189,9 @@ class ProjectBlueprint_v2:
                 # Check if authentication is enabled
                 if ENABLE_AUTH:
                     logger.info("Auth Enabled")
-                    # Dynamically check the authentication method from session
-                    auth_method = session.get("auth_method")
-                    if not auth_method:
-                        return jsonify({"error": "Authentication method not set in session"}), 401
 
-                    if auth_method == "auth0":
-                        user_data, error_response = validate_and_get_user()
-                    elif auth_method == "shibboleth":
-                        user_data, error_response = validate_sso_user(request)
-                    else:
-                        return jsonify({"error": "Unknown authentication method"}), 400
-
-                    if error_response:
-                        return error_response  # Unauthorized or failed
-
-                    if not user_data:
-                        return jsonify({"error": "User data not found"}), 401
-    
-                    user_id = user_data.get('id') if user_data else None
+                    user = session.get('user')
+                    user_id = user["id"] if user else None
                     if not user_id:
                         return jsonify({"error": "Unable to retrieve user ID"}), 401
                     logger.info(f"Authenticated user ({auth_method}): {user_id}") 

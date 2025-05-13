@@ -8,12 +8,8 @@ logger = logging.getLogger(__name__)
 def register_auth_routes(app):
 
     from flask import jsonify, request, redirect, url_for, session
-    from mdvtools.dbutils.dbservice import UserService
-    from mdvtools.dbutils.mdv_server_app import oauth
-    from mdvtools.auth.authutils import update_cache
-    from mdvtools.auth.auth0_provider import Auth0Provider
+    from mdvtools.auth.authutils import get_auth_provider
     
-
     """
     Registers the Auth0 routes like login, callback, logout, etc. to the Flask app,
     with centralized and route-specific error handling.
@@ -21,48 +17,46 @@ def register_auth_routes(app):
     logger.info("Registering AUTH routes...")
 
     try:
-        # Initialize the Auth0Provider
-        auth0_provider = Auth0Provider(
-            app,
-            oauth=oauth,
-            client_id=app.config['AUTH0_CLIENT_ID'],
-            client_secret=app.config['AUTH0_CLIENT_SECRET'],
-            domain=app.config['AUTH0_DOMAIN']
-        )
-
         # Route for login (redirects to Auth0 for authentication)
         @app.route('/login')
         def login():
+            """Handles standard login (e.g., Auth0)."""
             try:
-                logger.info("auth0-login")
-                session.clear()  
-                return auth0_provider.login()
+                logger.info("Login initiated")
+                session.clear()
+                session["auth_method"] = app.config.get("DEFAULT_AUTH_METHOD", "dummy").lower()
+                session.modified = True
+                return get_auth_provider().login()
             except Exception as e:
-                logger.exception(f"In register_auth0_routes : Error during login: {e}")
+                session.clear()
+                logger.exception(f"In register_auth_routes : Error during login: {e}")
                 return jsonify({"error": "Failed to start login process."}), 500
 
         # Route for the callback after login (handles the callback from Auth0)
         @app.route('/callback')
         def callback():
             try:
-                logger.info("auth0-callback")
-                code = request.args.get('code')  # Get the code from the callback URL
-                if not code:
-                    logger.error("Missing 'code' parameter in the callback URL.")
-                    session.clear()  # Clear session if there's no code
-                    return jsonify({"error": "Authorization code not provided."}), 400
-                
+                logger.info("Callback route hit")
+                code = request.args.get('code')
 
-                access_token = auth0_provider.handle_callback()
-                if not access_token:  # If token retrieval fails, prevent redirecting
+                # If this is a code-based provider like Auth0, validate presence of 'code'
+                if not code and session.get("auth_method", "").lower() == "auth0":
+                    logger.error("Missing 'code' parameter in the callback URL for Auth0.")
+                    session.clear()
+                    return jsonify({"error": "Authorization code not provided."}), 400
+
+                auth_provider = get_auth_provider()
+
+                access_token = auth_provider.handle_callback()
+                if not access_token:
                     logger.error("Authentication failed: No valid token received.")
-                    session.clear()  # Clear session in case of failure
+                    session.clear()
                     return jsonify({"error": "Authentication failed."}), 401
-                
-            
-                return redirect(url_for('index'))  # Redirect to the home page or any protected page
+
+                logger.info("Authentication successful. Redirecting to index.")
+                return redirect(url_for("index")) # Redirect to the home page or any protected page
             except Exception as e:
-                logger.exception(f"In register_auth0_routes : Error during callback: {e}")
+                logger.exception(f"In register_auth_routes : Error during callback: {e}")
                 session.clear()  # Clear session on error
                 return jsonify({"error": "Failed to complete authentication process."}), 500
 
@@ -70,36 +64,24 @@ def register_auth_routes(app):
         @app.route('/logout')
         def logout():
             try:
-                # Check what authentication method was used (Auth0 or Shibboleth)
-                auth_method = session.get('auth_method', None)
+                auth_method = session.get("auth_method")
+                logger.info(f"Logout initiated for auth method: {auth_method}")
 
-                if auth_method == 'auth0':
-                    # If the user logged in via Auth0, log them out from Auth0
-                    return auth0_provider.logout()
-                    
-
-                # If the user logged in via Shibboleth, redirect to Shibboleth IdP's logout URL
-                elif auth_method == 'shibboleth':
-                    # Shibboleth does not handle the session clearing, so we first clear the session
-                    session.clear()
-                    # Then, redirect to the Shibboleth IdP logout URL
-                    shibboleth_logout_url = app.config.get('SHIBBOLETH_LOGOUT_URL', None)
-
-                    if shibboleth_logout_url:
-                        # Redirect to the provided Shibboleth IdP logout URL
-                        return redirect(shibboleth_logout_url)
-                    else:
-                        # If no Shibboleth logout URL is configured, return an error
-                        return jsonify({"error": "Shibboleth logout URL not provided."}), 500
-
-                # Clear the session data after logging out from either Auth0 or Shibboleth
+                # Always attempt to clear the session early
                 session.clear()
+                session.modified = True
 
-                # No need to redirect here if auth0_provider.logout() already handles redirection
-                return jsonify({"message": "Logged out successfully"}), 200
+                # Get the appropriate provider if method is set
+                if auth_method:
+                    auth_provider = get_auth_provider()
+                    return auth_provider.logout()
+
+                # Fallback for unknown or missing auth method
+                logger.warning("No auth method found in session during logout.")
+                return jsonify({"message": "Session cleared, but auth method unknown."}), 200
 
             except Exception as e:
-                logger.exception(f"In register_auth0_routes: Error during logout: {e}")
+                logger.exception(f"In register_auth_routes: Error during logout: {e}")
                 session.clear()
                 return jsonify({"error": "Failed to log out."}), 500
 
@@ -107,57 +89,15 @@ def register_auth_routes(app):
         def login_sso():
             """Redirect user to Shibboleth-protected login page on Apache."""
             try:
-                # Extract SSO headers (available only *after* successful Shibboleth login)
-                email = request.headers.get("X-Forwarded-User")
-                persistent_id = request.headers.get("Shibboleth-Persistent-Id")
-                
-                # If headers not present, this is the *first* visit — redirect to Shibboleth login
-                if not email or not persistent_id:
-                    # Clear any existing session data to ensure we start with a fresh session
-                    session.clear()
-                    
-                    # Store the authentication method as Shibboleth
-                    session["auth_method"] = "shibboleth"  # Indicate Shibboleth login
-                    session.modified = True
-                    # Check if the Shibboleth login URL is provided in the environment
-                    shibboleth_login_url = app.config.get('SHIBBOLETH_LOGIN_URL', None)
-
-                    if shibboleth_login_url:
-                        # Redirect the user to Shibboleth login page if the URL is configured
-                        logger.info("Redirecting to Shibboleth login page...")
-                        return redirect(shibboleth_login_url)
-                    else:
-                        # If Shibboleth URL is not provided, inform the user
-                        logger.error("Shibboleth login URL not provided.")
-                        return jsonify({"error": "Shibboleth login URL not provided."}), 500
-
-                # User is authenticated — proceed to provision user
-                user = UserService.add_or_update_user(
-                    email=email,
-                    auth0_id=persistent_id,
-                    institution="University of Oxford"
-                )
-
-                user_data = {
-                    "id": user.id,
-                    "auth0_id": user.auth0_id,
-                    "email": user.email,
-                    "is_admin": user.is_admin
-                }
-
-                # Store user in cache
-                update_cache(user_id=user.id, user_data=user_data)
-
-                session["auth_method"] = "shibboleth"  # Indicate Shibboleth login
+                logger.info("Shibboleth SSO login initiated")
+                session.clear()  # Clear previous session
+                session["auth_method"] = "shibboleth"
                 session.modified = True
-
-                logger.info(f"SSO login successful: {email}")
-                return redirect("/")
-            
+                return get_auth_provider().login()
             except Exception as e:
                 # In case of error, clear the session and handle the error
                 session.clear()  # Ensure session is cleared in case of failure
-                logger.exception(f"In login_sso: Error during login: {e}")
+                logger.exception(f"In register_auth_routes: Error during login SSO: {e}")
                 return jsonify({"error": "Failed to start login process using SSO."}), 500
 
 
@@ -165,40 +105,23 @@ def register_auth_routes(app):
         @app.route('/profile')
         def profile():
             try:
-                auth_method = session.get('auth_method')
+                # Get the appropriate authentication provider based on session
+                provider = get_auth_provider()
+                # If the provider is Auth0, we need to pass the token (which should be in the session)
+                token = session.get("token")
 
-                if auth_method == 'auth0':
-                    token = session.get('token')
-                    if token:
-                        user_info = auth0_provider.get_user(token)
-                        if user_info:
-                            return jsonify(user_info)
-                        else:
-                            return jsonify({"error": "Failed to retrieve user information from Auth0."}), 500
-                    else:
-                        return jsonify({"error": "Not authenticated with Auth0."}), 401
-
-                elif auth_method == 'shibboleth':
-                    # Retrieve user attributes from available Shibboleth headers
-                    eppn = request.headers.get('Shibboleth-Eppn')  # e.g., whgu1064@ox.ac.uk
-                    #x_forwarded_user = request.headers.get('X-Forwarded-User')  # e.g., whgu1064@ox.ac.uk
-
-                    if eppn:
-                        user_data = {
-                            "sub": eppn,
-                            "first_name": "Unknown",
-                            "last_name": "Unknown",
-                            "email": eppn,
-                            "association": "University of Oxford",
-                            "avatarUrl": ""
-                        }
-                        return jsonify(user_data)
-                    else:
-                        return jsonify({"error": "Shibboleth attributes not found."}), 401
-
+                # Get the user information
+                if token:
+                    # If token is available, use it for Auth0
+                    user_info = provider.get_user(token=token)
                 else:
-                    return jsonify({"error": "Unknown authentication method."}), 400
+                    # If no token (e.g., using Shibboleth), just call get_user without token
+                    user_info = provider.get_user()
 
+                if not user_info:
+                    return jsonify({"error": "User profile could not be retrieved."}), 404
+                # Return the user profile in a JSON response
+                return jsonify(user_info), 200
             except Exception as e:
                 logger.exception(f"Error during profile retrieval: {e}")
                 return jsonify({"error": "Failed to retrieve user profile."}), 500

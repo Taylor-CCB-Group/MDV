@@ -272,12 +272,12 @@ class FileService:
 
 class UserService:
     @staticmethod
-    def add_or_update_user(email: str, auth0_id: str = None, first_name: str = None, last_name: str = None, institution: str = None):
+    def add_or_update_user(email: str, auth_id: str = None, first_name: str = None, last_name: str = None, institution: str = None):
         """
         Adds a new user or updates an existing user based on the provided email.
 
         :param email: User's email address (mandatory).
-        :param auth0_id: User's Auth0 ID (optional).
+        :param auth_id: User's Auth0 ID (optional).
         :param first_name: User's first name (optional).
         :param last_name: User's last name (optional).
         :param institution: User's institution or association (optional).
@@ -291,8 +291,8 @@ class UserService:
 
             if user:
                 # Update existing user with provided non-empty fields
-                if auth0_id:
-                    user.auth0_id = auth0_id
+                if auth_id:
+                    user.auth_id = auth_id
                 if first_name:
                     user.first_name = first_name
                 if last_name:
@@ -305,7 +305,7 @@ class UserService:
                 # Create new user with provided fields
                 new_user = User(
                     email=email,
-                    auth0_id=auth0_id or '',
+                    auth_id=auth_id or '',
                     first_name=first_name or '',
                     last_name=last_name or '',
                     institution=institution,

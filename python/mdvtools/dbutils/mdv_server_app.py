@@ -11,7 +11,7 @@ from mdvtools.project_router import ProjectBlueprint_v2 as ProjectBlueprint
 from mdvtools.dbutils.dbmodels import db, Project
 from mdvtools.dbutils.routes import register_routes
 from mdvtools.auth.register_auth_routes import register_auth_routes
-from mdvtools.auth.authutils import register_before_request_auth, sync_auth0_users_to_db, cache_user_projects
+from mdvtools.auth.authutils import register_before_request_auth, get_auth_provider, cache_user_projects
 from mdvtools.dbutils.dbservice import ProjectService, FileService
 
 # Setup logging
@@ -76,8 +76,9 @@ def create_flask_app(config_name=None):
 
             if ENABLE_AUTH:
                 try:
-                    logger.info("Syncing users from Auth0 into the database...")
-                    sync_auth0_users_to_db()
+                    logger.info("Syncing users from Auth provider into the database...")
+                    auth_provider = get_auth_provider()
+                    auth_provider.sync_users_to_db()
 
                     logger.info("Caching user-projects data...")
                     cache_user_projects()  # Cache the user-project mappings into Redis only when Auth is enabled
@@ -197,25 +198,29 @@ def load_config(app, config_name=None, enable_auth=False):
 
             # Only configure Auth0 if ENABLE_AUTH is True
             if enable_auth:
-                app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
-                auth0_domain = os.getenv('AUTH0_DOMAIN') or config.get('AUTH0_DOMAIN')
-                auth0_client_id = os.getenv('AUTH0_CLIENT_ID') or config.get('AUTH0_CLIENT_ID')
-                auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET') or read_secret("auth0_client_secret")
-
-                if not all([auth0_domain, auth0_client_id, auth0_client_secret]):
-                    raise ValueError("Error: Missing Auth0 configuration.")
-
                 app.config['ENABLE_AUTH'] = True
-                app.config['AUTH0_DOMAIN'] = auth0_domain
-                app.config['AUTH0_CLIENT_ID'] = auth0_client_id
-                app.config['AUTH0_CLIENT_SECRET'] = auth0_client_secret
-                app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL') or config.get('AUTH0_CALLBACK_URL')
-                app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
-                app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
-                app.config["AUTH0_DB_CONNECTION"] = os.getenv('AUTH0_DB_CONNECTION') or config.get('AUTH0_DB_CONNECTION')
+                app.config["DEFAULT_AUTH_METHOD"] = os.getenv('DEFAULT_AUTH_METHOD') or config.get('DEFAULT_AUTH_METHOD')
+                app.secret_key = os.getenv('FLASK_SECRET_KEY') or read_secret('flask_secret_key')
+                
+                # Check if the authentication method is 'auth0'
+                if app.config["DEFAULT_AUTH_METHOD"] == "auth0":
+                    auth0_domain = os.getenv('AUTH0_DOMAIN') or config.get('AUTH0_DOMAIN')
+                    auth0_client_id = os.getenv('AUTH0_CLIENT_ID') or config.get('AUTH0_CLIENT_ID')
+                    auth0_client_secret = os.getenv('AUTH0_CLIENT_SECRET') or read_secret("auth0_client_secret")
 
-                app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
+                    if not all([auth0_domain, auth0_client_id, auth0_client_secret]):
+                        raise ValueError("Error: Missing Auth0 configuration.")
 
+                    app.config['AUTH0_DOMAIN'] = auth0_domain
+                    app.config['AUTH0_CLIENT_ID'] = auth0_client_id
+                    app.config['AUTH0_CLIENT_SECRET'] = auth0_client_secret
+                    app.config['AUTH0_CALLBACK_URL'] = os.getenv('AUTH0_CALLBACK_URL') or config.get('AUTH0_CALLBACK_URL')
+                    app.config["AUTH0_PUBLIC_KEY_URI"] = os.getenv('AUTH0_PUBLIC_KEY_URI') or config.get('AUTH0_PUBLIC_KEY_URI')
+                    app.config["AUTH0_AUDIENCE"] = os.getenv('AUTH0_AUDIENCE') or config.get('AUTH0_AUDIENCE')
+                    app.config["AUTH0_DB_CONNECTION"] = os.getenv('AUTH0_DB_CONNECTION') or config.get('AUTH0_DB_CONNECTION')
+                    app.config["LOGIN_REDIRECT_URL"] = os.getenv('LOGIN_REDIRECT_URL') or config.get('LOGIN_REDIRECT_URL')
+
+                
                 app.config["SHIBBOLETH_LOGIN_URL"] = os.getenv('SHIBBOLETH_LOGIN_URL') or config.get('SHIBBOLETH_LOGIN_URL')
                 app.config["SHIBBOLETH_LOGOUT_URL"] = os.getenv('SHIBBOLETH_LOGOUT_URL') or config.get('SHIBBOLETH_LOGOUT_URL')
             else:
@@ -370,8 +375,9 @@ def serve_projects_from_filesystem(app, base_dir):
                     # Auth-related setup
                     if ENABLE_AUTH:
                         try:
-                            sync_auth0_users_to_db()  # Sync users and assign permissions
-                            logger.info("Synced Auth0 users after adding project.")
+                            auth_provider = get_auth_provider()
+                            auth_provider.sync_users_to_db()  # Sync users and assign permissions
+                            logger.info("Synced Auth users after adding project.")
 
                             cache_user_projects() #update the cache
                         except Exception as auth_e:

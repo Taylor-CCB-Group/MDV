@@ -5,8 +5,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def register_routes(app, ENABLE_AUTH):
-    from flask import abort, request, jsonify, redirect, url_for, render_template
-    from mdvtools.auth.authutils import maybe_require_user, update_cache, active_projects_cache, user_project_cache,user_cache, all_users_cache
+    from flask import abort, request, jsonify, session, redirect, url_for, render_template
+    from mdvtools.auth.authutils import update_cache, active_projects_cache, user_project_cache,user_cache, all_users_cache
     from mdvtools.dbutils.mdv_server_app import serve_projects_from_filesystem
     import os
     import shutil
@@ -40,9 +40,9 @@ def register_routes(app, ENABLE_AUTH):
         logger.info("Route registered: /login_dev")
 
         @app.route('/rescan_projects')
-        @maybe_require_user(ENABLE_AUTH)
-        def rescan_projects(user):
+        def rescan_projects():
             if ENABLE_AUTH:
+                user = session.get('user')
                 is_admin = user.get("is_admin", False)
                 if not is_admin:
                     abort(403)  # Forbidden
@@ -53,8 +53,7 @@ def register_routes(app, ENABLE_AUTH):
 
 
         @app.route('/projects')
-        @maybe_require_user(ENABLE_AUTH)  # Pass ENABLE_AUTH here
-        def get_projects(user):
+        def get_projects():
             """
             Fetches the list of active projects from cache or database depending on the authentication.
             """
@@ -69,6 +68,7 @@ def register_routes(app, ENABLE_AUTH):
                 # logger.info(f"Active projects from cache: {active_projects}")
 
                 if ENABLE_AUTH:
+                    user = session.get('user')
                     # Filter by user permissions if authentication is enabled
                     user_id = user["id"]
                     user_projects = user_project_cache.get(user_id)
@@ -114,23 +114,14 @@ def register_routes(app, ENABLE_AUTH):
 
 
         @app.route("/create_project", methods=["POST"])
-        @maybe_require_user(ENABLE_AUTH)  # Pass ENABLE_AUTH here to handle authentication
-        def create_project(user):   
+        def create_project():   
             """
             Creates a new project and updates the caches and database accordingly.
             """
             project_path = None
             next_id = None
             try:
-                user_data = user  # Retrieve user data from the decorated function
-
-                # Check if authentication is enabled and user is admin
-                # Check if authentication is enabled and user is admin
-                #if ENABLE_AUTH:
-                #    # Ensure the user is an admin before allowing project creation
-                #    if not user_data.get("is_admin", False):
-                #        return jsonify({"error": "Only admins can create projects."}), 403
-
+                
                 logger.info("Creating project")
                 
                 # Get the next available ID
@@ -168,6 +159,7 @@ def register_routes(app, ENABLE_AUTH):
                 if new_project:
                     # Step 5: Associate the admin user with the new project and grant all permissions
                     if ENABLE_AUTH:
+                        user_data = session.get('user')
                         current_user_id = user_data['id']
                         UserProjectService.add_or_update_user_project(
                             user_id=current_user_id,
@@ -223,18 +215,16 @@ def register_routes(app, ENABLE_AUTH):
         logger.info("Route registered: /create_project")
 
         @app.route("/delete_project/<int:project_id>", methods=["DELETE"])
-        @maybe_require_user(ENABLE_AUTH)
-        def delete_project(user, project_id: int):
+        def delete_project(project_id: int):
             #project_removed_from_blueprints = False
             nonlocal active_projects_cache
             try:
                 logger.info(f"Deleting project '{project_id}'")
-
-                user_id = user["id"] if ENABLE_AUTH else None
-
-    
+                
                 # Step 2: Check if the user is owner using in-memory cache
                 if ENABLE_AUTH:
+                    user = session.get('user')
+                    user_id = user["id"]
                     user_projects = user_project_cache.get(user_id)
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         logger.error(f"User does not have ownership of project {project_id}")
@@ -281,8 +271,7 @@ def register_routes(app, ENABLE_AUTH):
         logger.info("Route registered: /delete_project/<project_id>")
 
         @app.route("/projects/<int:project_id>/rename", methods=["PUT"])
-        @maybe_require_user(ENABLE_AUTH)
-        def rename_project(user, project_id: int):
+        def rename_project(project_id: int):
             # Retrieve the new project name from the multipart/form-data payload
             new_name = request.form.get("name")
             
@@ -290,8 +279,6 @@ def register_routes(app, ENABLE_AUTH):
                 return jsonify({"error": "New name not provided"}), 400
             
             try:
-                user_id = user["id"] if ENABLE_AUTH else None
-
                 # Step 1: Check if project exists in active cache
                 project = ProjectService.get_project_by_id(project_id)
                 if not project:
@@ -300,6 +287,8 @@ def register_routes(app, ENABLE_AUTH):
 
                 # Step 2: Check ownership using cache
                 if ENABLE_AUTH:
+                    user = session.get('user')
+                    user_id = user["id"]
                     user_projects = user_project_cache.get(user_id)
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         logger.error(f"User does not have ownership of project {project_id}")
@@ -337,8 +326,7 @@ def register_routes(app, ENABLE_AUTH):
         logger.info("Route registered: /projects/<int:project_id>/rename")
 
         @app.route("/projects/<int:project_id>/access", methods=["PUT"])
-        @maybe_require_user(ENABLE_AUTH)
-        def change_project_access(user, project_id: int):
+        def change_project_access(project_id: int):
             """API endpoint to change the access level of a project (editable or read-only)."""
             try:
                 # Get the new access level from the request
@@ -348,10 +336,11 @@ def register_routes(app, ENABLE_AUTH):
                 if new_access_level not in ["read-only", "editable"]:
                     return jsonify({"error": "Invalid access level. Must be 'read-only' or 'editable'."}), 400
             
-                user_id = user["id"] if ENABLE_AUTH else None
 
                 # Step 3: Check ownership from the user_project_cache
                 if ENABLE_AUTH:
+                    user = session.get('user')
+                    user_id = user["id"]
                     user_projects = user_project_cache.get(user_id)
                     if not user_projects or not user_projects.get(int(project_id), {}).get("is_owner", False):
                         logger.error(f"User does not have ownership of project {project_id}")
@@ -373,8 +362,7 @@ def register_routes(app, ENABLE_AUTH):
         logger.info("Route registered: /projects/<int:project_id>/access")
 
         @app.route("/projects/<int:project_id>/share", methods=["GET"])
-        @maybe_require_user(ENABLE_AUTH)
-        def share_project(user, project_id: int):
+        def share_project(project_id: int):
             """Fetch users with whom the project is shared along with their permissions."""
             try:
                 logger.info(f"Sharing project '{project_id}'")
@@ -384,7 +372,8 @@ def register_routes(app, ENABLE_AUTH):
                     logger.info("Authentication is disabled, skipping authentication check.")
                     return jsonify({"error": "Authentication is disabled, no action taken."})
                 
-                user_id = user["id"] if ENABLE_AUTH else None
+                user = session.get('user')
+                user_id = user["id"]
 
                 user_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
                 if not user_permissions or not user_permissions.get("is_owner"):
@@ -442,8 +431,7 @@ def register_routes(app, ENABLE_AUTH):
         logger.info("Route registered: /projects/<int:project_id>/share- GET")
             
         @app.route("/projects/<int:project_id>/share", methods=["POST"])
-        @maybe_require_user(ENABLE_AUTH)
-        def add_user_to_project(user, project_id: int):
+        def add_user_to_project(project_id: int):
             """Add a user to the project with specified permissions."""
             try:
                 logger.info(f"Adding user to project '{project_id}'")
@@ -453,7 +441,8 @@ def register_routes(app, ENABLE_AUTH):
                     logger.info("Authentication is disabled, skipping authentication check.")
                     return jsonify({"error": "Authentication is disabled, no action taken."})
 
-                user_id = user["id"] if ENABLE_AUTH else None
+                user = session.get('user')
+                user_id = user["id"]
 
                 # Step 2: Check if current user is owner of the project
                 user_permissions = user_project_cache.get(user_id, {}).get(int(project_id))
@@ -503,8 +492,7 @@ def register_routes(app, ENABLE_AUTH):
 
 
         @app.route("/projects/<int:project_id>/share/<int:user_id>/edit", methods=["POST"])
-        @maybe_require_user(ENABLE_AUTH)
-        def edit_user_permission(user, project_id: int, user_id: int):
+        def edit_user_permission(project_id: int, user_id: int):
             """Edit user permissions for a project."""
             try:
                 logger.info(f"Editing permissions for user '{user_id}' in project '{project_id}'")
@@ -515,8 +503,9 @@ def register_routes(app, ENABLE_AUTH):
                     # If authentication is disabled, simply return and stop execution
                     return jsonify({"Error": "Authentication is disabled, no action taken."})
 
-                current_user_id = user["id"] if ENABLE_AUTH else None # The ID of the authenticated user
-
+                user = session.get('user')
+                current_user_id = user["id"]
+                
                 # Step 2: Validate if current user is the owner
                 user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id))
                 if not user_permissions or not user_permissions.get("is_owner"):
@@ -560,8 +549,7 @@ def register_routes(app, ENABLE_AUTH):
         logger.info("Route registered: /projects/<int:project_id>/share/<int:user_id>/edit")
             
         @app.route("/projects/<int:project_id>/share/<int:user_id>/delete", methods=["POST"])
-        @maybe_require_user(ENABLE_AUTH)
-        def delete_user_from_project(user, project_id: int, user_id: int):
+        def delete_user_from_project(project_id: int, user_id: int):
             """Remove a user from the project."""
             try:
                 logger.info(f"Removing user '{user_id}' from project '{project_id}'")
@@ -572,8 +560,9 @@ def register_routes(app, ENABLE_AUTH):
                     # If authentication is disabled, simply return and stop execution
                     return jsonify({"error": "Authentication is disabled, no action taken."})
 
-                current_user_id = user["id"] if ENABLE_AUTH else None # The ID of the authenticated user
-
+                user = session.get('user')
+                current_user_id = user["id"]
+                
                 # Step 2: Validate ownership
                 user_permissions = user_project_cache.get(current_user_id, {}).get(int(project_id))
                 if not user_permissions or not user_permissions.get("is_owner"):

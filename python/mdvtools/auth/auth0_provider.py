@@ -1,13 +1,14 @@
 import time
 import requests
 from authlib.integrations.flask_client import OAuth
-from flask import session, redirect
+from flask import jsonify, session, redirect
 from typing import Optional
 from mdvtools.auth.auth_provider import AuthProvider
 import logging
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
-
+from auth0.management import Auth0
+from auth0.authentication import GetToken
 
 
 class Auth0Provider(AuthProvider):
@@ -222,24 +223,6 @@ class Auth0Provider(AuthProvider):
             session.clear()  # Clear session in case of failure
             raise RuntimeError("Callback handling failed.") from e
         
-    def is_authenticated(self, token: str) -> bool:
-        """
-        Checks if the user is authenticated by verifying the token.
-
-        :param token: Access token
-        :return: True if authenticated, False otherwise
-        """
-        try:
-            logging.info("Checking authentication status.")
-            # Argument of type "str" cannot be assigned to parameter "token" of type "dict[Unknown, Unknown]"
-            # Convert token string to dictionary format expected by get_user
-            token_dict = {"access_token": token}
-            user_info = self.get_user(token_dict)
-            return user_info is not None
-        except Exception as e:
-            logging.error(f"Error while checking authentication: {e}")
-            return False
-        
     def is_token_valid(self, token):
         """
         Validates the provided token by verifying its signature using Auth0's public keys
@@ -314,3 +297,104 @@ class Auth0Provider(AuthProvider):
         except Exception as e:
             logging.error(f"Error during token validation: {e}")
             return False
+
+    def validate_user(self):
+        """Validate the user using Auth0."""
+
+        from mdvtools.dbutils.dbmodels import User
+        
+        try:
+            # Check if user information is already cached in session
+            if 'user' in session:
+                return session['user'], None  # Return the user from session cache
+
+            # Retrieve the token from session
+            token = self.get_token()
+            if not token:
+                return None, (jsonify({"error": "Authentication required"}), 401)
+
+            # Validate token using the provider-specific logic
+            if not self.is_token_valid(token):
+                return None, (jsonify({"error": "Invalid or expired token"}), 401)
+            
+            # Retrieve user info from Auth0
+            user_info = self.get_user({"access_token": token})
+            if not user_info:
+                return None, (jsonify({"error": "User not found"}), 404)
+
+            # Get Auth0 user ID
+            auth0_id = user_info.get("sub")
+
+            # Query the user from the database if not in cache
+            user = User.query.filter_by(auth_id=auth0_id).first()
+            if not user:
+                return None, (jsonify({"error": "User not found"}), 404)
+
+            # Add the user to the in-memory cache
+            user_data = {"id": user.id, "auth_id": user.auth_id, "email": user.email, "is_admin": user.is_admin}
+
+            # Cache the user data in session for future use
+            session['user'] = user_data
+            session.modified = True
+
+            return user_data, None
+
+        except Exception as e:
+            logging.exception(f"Error in validate_user: {e}")
+            return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
+        
+    def sync_users_to_db(self):
+        """
+        Syncs users from Auth0 to the application's database using UserService and UserProjectService.
+        """
+        from mdvtools.dbutils.dbservice import UserService, UserProjectService
+        from mdvtools.dbutils.dbmodels import db, Project
+        
+        try:
+            # Load Auth0 config from app
+            auth0_domain = self.app.config['AUTH0_DOMAIN']
+            client_id = self.app.config['AUTH0_CLIENT_ID']
+            client_secret = self.app.config['AUTH0_CLIENT_SECRET']
+            auth0_db_connection = self.app.config['AUTH0_DB_CONNECTION']
+            audience = f"https://{auth0_domain}/api/v2/"
+
+            # Get Auth0 Management API token
+            get_token = GetToken(domain=auth0_domain, client_id=client_id, client_secret=client_secret)
+            mgmt_api_token = get_token.client_credentials(audience=audience)["access_token"]
+            auth0 = Auth0(auth0_domain, mgmt_api_token)
+
+            # Fetch users from Auth0 connection
+            users = auth0.users.list(q=f'identities.connection:"{auth0_db_connection}"', per_page=100)
+
+            for user in users['users']:
+                email = user.get('email', '')
+                auth0_id = user['user_id']
+
+                # Use UserService to add or update user
+                db_user = UserService.add_or_update_user(
+                    email=email,
+                    auth_id=auth0_id
+                )
+
+                # Fetch user's roles to determine admin status
+                roles = auth0.users.list_roles(auth0_id)
+                is_admin = any(role['name'] == 'admin' for role in roles['roles'])
+
+                # Update admin status
+                db_user.is_admin = is_admin
+                db.session.commit()
+
+                if is_admin:
+                    # Assign all projects to this user as owner via UserProjectService
+                    for project in Project.query.all():
+                        UserProjectService.add_or_update_user_project(
+                            user_id=db_user.id,
+                            project_id=project.id,
+                            is_owner=True
+                        )
+
+            logging.info("Successfully synced users from Auth0 to the database.")
+
+        except Exception as e:
+            logging.exception(f"In sync_users_to_db: An unexpected error occurred: {e}")
+            raise

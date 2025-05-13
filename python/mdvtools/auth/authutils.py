@@ -1,16 +1,50 @@
 import logging
-from functools import wraps
-from flask import jsonify, session, request,redirect, current_app
+from flask import session, request,redirect, current_app
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # in_memory_cache.py
-user_cache = {}  # key: auth0_id -> user details
+user_cache = {}  # key: auth_id -> user details
 user_project_cache = {}  # key: user_id -> project permissions
 all_users_cache = []  # list of all user summaries
 active_projects_cache = []
+
+
+def get_auth_provider():
+    # Try to fetch the authentication method from session first
+    auth_method = session.get("auth_method", None)
+    
+    if not auth_method:
+        # If no auth method is found in the session, use the default from app config
+        auth_method = current_app.config.get("DEFAULT_AUTH_METHOD", "auth0")
+    
+    if not auth_method:
+        raise ValueError("Authentication method is not specified in session or config.")
+    
+    
+    auth_method = auth_method.lower()
+
+    if auth_method == "auth0":
+        from mdvtools.auth.auth0_provider import Auth0Provider
+        return Auth0Provider(
+            current_app,
+            oauth=current_app.extensions.get('oauth'),
+            client_id=current_app.config['AUTH0_CLIENT_ID'],
+            client_secret=current_app.config['AUTH0_CLIENT_SECRET'],
+            domain=current_app.config['AUTH0_DOMAIN']
+        )
+
+    elif auth_method == "shibboleth":
+        from mdvtools.auth.shibboleth_provider import ShibbolethProvider
+        return ShibbolethProvider(current_app)
+
+    elif auth_method == "dummy":
+        from mdvtools.auth.dummy_provider import DummyAuthProvider
+        return DummyAuthProvider(current_app)
+    else:
+        raise ValueError(f"Unsupported auth method: {auth_method}")
 
 def is_authenticated():
     """Validate the current user via Auth0 or Shibboleth."""
@@ -18,15 +52,14 @@ def is_authenticated():
     
     if not ENABLE_AUTH:
         return True
-
-    auth_method = session.get("auth_method")
-    if auth_method == "auth0":
-        user, error_response = validate_and_get_user()
-    elif auth_method == "shibboleth":
-        user, error_response = validate_sso_user(request)
-    else:
+    
+    try:
+        provider = get_auth_provider()
+    except Exception as e:
+        current_app.logger.error(f"Failed to get auth provider: {e}")
         return False
 
+    user, error_response = provider.validate_user()
     return user is not None and error_response is None
 
 def register_before_request_auth(app):
@@ -62,64 +95,6 @@ def register_before_request_auth(app):
 
         return None
 
-def sync_auth0_users_to_db():
-    """
-    Syncs users from Auth0 to the application's database using UserService and UserProjectService.
-    """
-
-    from mdvtools.dbutils.dbservice import UserService, UserProjectService
-    from mdvtools.dbutils.dbmodels import db, Project
-    from auth0.management import Auth0
-    from auth0.authentication import GetToken
-
-    try:
-        # Load Auth0 config from app
-        auth0_domain = current_app.config['AUTH0_DOMAIN']
-        client_id = current_app.config['AUTH0_CLIENT_ID']
-        client_secret = current_app.config['AUTH0_CLIENT_SECRET']
-        auth0_db_connection = current_app.config['AUTH0_DB_CONNECTION']
-        audience = f"https://{auth0_domain}/api/v2/"
-
-        # Get Auth0 Management API token
-        get_token = GetToken(domain=auth0_domain, client_id=client_id, client_secret=client_secret)
-        mgmt_api_token = get_token.client_credentials(audience=audience)["access_token"]
-        auth0 = Auth0(auth0_domain, mgmt_api_token)
-
-        # Fetch users from Auth0 connection
-        users = auth0.users.list(q=f'identities.connection:"{auth0_db_connection}"', per_page=100)
-
-        for user in users['users']:
-            email = user.get('email', '')
-            auth0_id = user['user_id']
-
-            # Use UserService to add or update user
-            db_user = UserService.add_or_update_user(
-                email=email,
-                auth0_id=auth0_id
-            )
-
-            # Fetch user's roles to determine admin status
-            roles = auth0.users.list_roles(auth0_id)
-            is_admin = any(role['name'] == 'admin' for role in roles['roles'])
-
-            # Update admin status
-            db_user.is_admin = is_admin
-            db.session.commit()
-
-            if is_admin:
-                # Assign all projects to this user as owner via UserProjectService
-                for project in Project.query.all():
-                    UserProjectService.add_or_update_user_project(
-                        user_id=db_user.id,
-                        project_id=project.id,
-                        is_owner=True
-                    )
-
-        logger.info("Synced users from Auth0.")
-
-    except Exception as e:
-        logger.exception(f"sync_auth0_users_to_db: An unexpected error occurred: {e}")
-        raise
 
 def cache_user_projects():
     """
@@ -141,11 +116,11 @@ def cache_user_projects():
         for user in users:
             user_data = {
                 "id": user.id,
-                "auth0_id": user.auth0_id,
+                "auth_id": user.auth_id,
                 "email": user.email,
                 "is_admin": user.is_admin
             }
-            user_cache[user.auth0_id] = user_data
+            user_cache[user.auth_id] = user_data
             all_users_cache.append(user_data)
 
             user_projects = UserProject.query.filter_by(user_id=user.id).all()
@@ -224,143 +199,5 @@ def update_cache(user_id=None, project_id=None, user_data=None, project_data=Non
     except Exception as e:
         logger.exception(f"Error updating cache: {e}")
 
-def validate_and_get_user():
 
-    """
-    Validates the Auth0 token from the session and retrieves the user from cache.
-    
-    :param app: Flask app instance
-    :return: Tuple (user object as dict, error response)
-    """
-
-    from mdvtools.auth.auth0_provider import Auth0Provider
-    from mdvtools.dbutils.mdv_server_app import oauth
-    from mdvtools.dbutils.dbmodels import User
-    
-    try:
-        # Check if user information is already cached in session
-        if 'user' in session:
-            return session['user'], None  # Return the user from the session cache
-
-        # Initialize Auth0 provider
-        auth0_provider = Auth0Provider(
-            current_app,
-            oauth=oauth,
-            client_id=current_app.config['AUTH0_CLIENT_ID'],
-            client_secret=current_app.config['AUTH0_CLIENT_SECRET'],
-            domain=current_app.config['AUTH0_DOMAIN']
-        )
-
-        # Retrieve the token from session
-        token = auth0_provider.get_token()
-
-        if not token:
-            return None, (jsonify({"error": "Authentication required"}), 401)
-
-        # Validate token
-        if not auth0_provider.is_token_valid(token):
-            return None, (jsonify({"error": "Invalid or expired token"}), 401)
-
-        # Retrieve user info from Auth0
-        user_info = auth0_provider.get_user({"access_token": token})
-
-        if not user_info:
-            return None, (jsonify({"error": "User not found"}), 404)
-
-        # Get Auth0 user ID
-        auth0_id = user_info.get("sub")
-
-        # Fetch user directly from in-memory cache
-        cached_user = user_cache.get(auth0_id)
-        if cached_user:
-            session['user'] = cached_user
-            return cached_user, None  # Return cached user
-
-        # This should rarely happen since all users were cached at app startup.
-        # But if the user is missing from Redis, fallback to DB and log the issue.
-        logger.info(f"User {auth0_id} not found in cache, falling back to DB!")
-
-        # Query the user from the database if not in cache
-        user = User.query.filter_by(auth0_id=auth0_id).first()
-        if not user:
-            return None, (jsonify({"error": "User not found"}), 404)
-
-        # Add the user to the in-memory cache
-        user_data = {"id": user.id, "auth0_id": user.auth0_id, "email": user.email, "is_admin": user.is_admin}
-        user_cache[auth0_id] = user_data
-
-        # Cache the user data in session for future use
-        session['user'] = user_data
-
-        return user_data, None
-
-    except Exception as e:
-        logger.exception(f"Error during authentication: {e}")
-        return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
-    
-
-def validate_sso_user(request):
-    """
-    Validates the SSO-authenticated user by checking required headers.
-    Returns the user info from the cache or DB, or an error response.
-    Does NOT add/update user in the DB.
-    """
-    try:
-        # Check if the user information is already cached in the session
-        if 'user' in session:
-            return session['user'], None  # Return the user from session cache
-
-        email = request.headers.get("X-Forwarded-User")
-        persistent_id = request.headers.get("Shibboleth-Persistent-Id")
-
-        if not email or not persistent_id:
-            return None, (jsonify({"error": "Missing SSO authentication headers"}), 401)
-
-        # Look up the user in your in-memory cache or DB by persistent_id
-        user_data = user_cache.get(persistent_id)  # if using in-memory
-        # or: user = User.query.filter_by(auth0_id=persistent_id).first()
-
-        if not user_data:
-            return None, (jsonify({"error": "SSO user not found"}), 403)
-
-        # Cache the user data in session for future use
-        session['user'] = user_data
-
-        return user_data, None
-
-    except Exception as e:
-        logger.exception(f"validate_sso_user error: {e}")
-        return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
-
-
-def maybe_require_user(ENABLE_AUTH):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not ENABLE_AUTH:
-                return f(user=None, *args, **kwargs)  # Inject `user=None` for consistency
-
-            auth_method = session.get("auth_method")
-            logger.info("Authentication method")
-            logger.info(auth_method)
-            if not auth_method:
-                return jsonify({"error": "Authentication method not set in session"}), 401
-
-            if auth_method == "auth0":
-                user, error_response = validate_and_get_user()
-                if error_response:
-                    logger.error(error_response)
-                    return error_response
-            elif auth_method == "shibboleth":
-                user, error_response = validate_sso_user(request)
-                if error_response:
-                    logger.error(error_response)
-                    return error_response
-            else:
-                return jsonify({"error": "Unknown authentication method"}), 400
-
-            return f(user=user, *args, **kwargs)
-        
-        return decorated_function
-    return decorator
 
