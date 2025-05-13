@@ -18,7 +18,7 @@ class ProjectService:
     def get_active_projects():
         try:
             failed_project_ids = {f[0] for f in ProjectService.failed_projects}  
-            projects = Project.query.filter(Project.is_deleted == False).all()
+            projects = Project.query.filter(~Project.is_deleted).all()
 
 
             # Convert to JSON-ready list of dictionaries

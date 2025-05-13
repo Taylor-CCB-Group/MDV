@@ -57,7 +57,7 @@ def register_routes(app, ENABLE_AUTH):
                 serve_projects_from_filesystem(app, app.config["projects_base_dir"])
             except Exception as e:
                 # Handle potential errors while serving the projects
-                logger.exception("Error while serving the projects.")
+                logger.exception(f"Error while serving the projects: {e}")
                 abort(500, description="Error while serving the projects.")
 
             # If everything goes well, redirect to the 'index' page
