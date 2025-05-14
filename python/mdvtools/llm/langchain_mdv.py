@@ -179,9 +179,9 @@ class ProjectChat(ProjectChatProtocol):
             # raise ValueError("test error")
             self.df = project.get_datasource_as_dataframe(self.ds_name)
             with time_block("b6: Initialising LLM for RAG"):
-                self.code_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
+                self.code_llm = ChatOpenAI(temperature=0.1, model="gpt-4o") #"gpt-4o"
             with time_block("b7: Initialising LLM for agent"):
-                self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
+                self.dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o") #"gpt-4o"
             with time_block("b8: Pandas agent creating"):
                 #Custom langchain agent:
                 def create_custom_pandas_agent(llm, dfs: dict, prompt_data, verbose=False):

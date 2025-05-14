@@ -15,6 +15,7 @@ def create_scatter_plot(title, param, size, position, color, brush, opacity, rad
     )
 
     plot.set_default_color(color)
+    plot.set_color_by(color)
     plot.set_brush(brush)
     plot.set_opacity(opacity)
     plot.set_radius(radius)

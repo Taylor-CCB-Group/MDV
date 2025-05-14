@@ -47,7 +47,11 @@ Your task is to:
     - Violin plot: Requires one categorical column and one numerical column.  
     - Wordcloud: Requires one categorical column.  
 8. Important: Clearly separate the selected columns with quotes and commas.
-9. NEVER explain your reasoning. Only return the required columns as a string: `"col1", "col2", "col3"`
+9. The column names are case sensitive therefore return them as they are defined in the dataframe.
+10. Output format:
+   - First line: Quoted, comma-separated list of column names.
+   - Second line: Quoted, comma-separated list of suitable chart types for the selected columns.
+11. NEVER explain your reasoning.
 """
 
 prompt_data_original = """
@@ -169,7 +173,8 @@ If no script is relevant, guided by the context generate a new script.
 
 This string """
         + final_answer
-        + """ specifies the names of the data fields that need to be plotted, for example in the params field. Get the structure of params definition from the context.
+        + """ specifies the names of the data fields that need to be plotted, for example in the params field. The string also gives the types of plots that are suitable to be used for the data. Get the structure of params definition from the context.
+
 
 IMPORTANT: All string interpolations MUST use Python formatted string literals (f-strings).
 

@@ -128,8 +128,8 @@ def main(project_path, dataset_path, question_list_path, output_csv):
     project = convert_scanpy_to_mdv(project_path, adata)
     
     logger.info("Setting up LLM interaction...")
-    code_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
-    dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4o")
+    code_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
+    dataframe_llm = ChatOpenAI(temperature=0.1, model="gpt-4.1")
     
     if len(project.datasources) >= 2:
         df_list = [project.get_datasource_as_dataframe(ds['name']) for ds in project.datasources[:2]]
@@ -217,7 +217,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
 
     agent = create_custom_pandas_agent(dataframe_llm, dataframes_for_agent, prompt_data, verbose=True)
 
-    RESET_THRESHOLD = 10  # Set the desired number of requests after which memory should be reset.
+    RESET_THRESHOLD = 1  # Set the desired number of requests after which memory should be reset.
     request_counter = 0
 
     for question in question_list:
@@ -233,7 +233,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
             prompt_template = PromptTemplate(template=prompt_RAG, input_variables=["context", "question"])
             
             qa_chain = RetrievalQA.from_llm(llm=code_llm, prompt=prompt_template, retriever=retriever, return_source_documents=True)
-            output = qa_chain.invoke({"context": retriever, "query": response['input']})
+            output = qa_chain.invoke({"query": response['input'] + response['output']}) #"context": retriever, 
             result_code = prepare_code(output["result"], df_list[0], project, logger.info, modify_existing_project=True, view_name=question)
 
             context_information = output['source_documents']
@@ -245,6 +245,7 @@ def main(project_path, dataset_path, question_list_path, output_csv):
                 "question": question,
                 "pandas_input": response.get('prompt_data', ''), #'input', ''),
                 "pandas_output": response.get('output', ''),
+                "RAG_output": output,
                 "context": context_information_metadata_url,
                 "final_code": result_code,
                 "stdout": stdout,
