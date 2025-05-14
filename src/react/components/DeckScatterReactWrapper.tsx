@@ -233,7 +233,8 @@ BaseChart.types["wgl_scatter_plot_dev"] = {
     ]
 };
 BaseChart.types["wgl_3d_scatter_plot_dev"] = {
-    name: "3D Scatter Plot",
+    // todo: remove (Deck) later, added to differentiate it with the existing 3d scatter plot
+    name: "3D Scatter Plot (Deck)",
     class: DeckScatterReact,
     allow_user_add: false,
     params: [
