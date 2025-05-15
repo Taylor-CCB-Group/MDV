@@ -1,0 +1,97 @@
+name: Check for New Commits and Trigger Build
+
+on:
+  push:
+    branches:
+      - auth_rbac
+  schedule:
+    - cron: '0 0 * * *'  # Runs at midnight every day (UTC)
+  workflow_dispatch:  # Allows manual trigger for testing
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[testdeploy]')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Git for commit history
+        run: |
+          git fetch --prune --unshallow
+
+      - name: Get the last successful commit hash
+        id: last_successful_commit
+        run: |
+          LAST_SUCCESSFUL_COMMIT=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs?status=success&branch=auth_rbac&per_page=1" \
+            | jq -r '.workflow_runs[0].head_sha')
+          echo "LAST_SUCCESSFUL_COMMIT=$LAST_SUCCESSFUL_COMMIT" >> $GITHUB_ENV
+
+      - name: Get the latest commit hash from auth_rbac branch
+        id: latest_commit
+        run: |
+          LATEST_COMMIT=$(git rev-parse origin/auth_rbac)
+          echo "LATEST_COMMIT=$LATEST_COMMIT" >> $GITHUB_ENV
+
+      - name: Compare commits and trigger build if different
+        if: env.LATEST_COMMIT != env.LAST_SUCCESSFUL_COMMIT
+        run: echo "New commits found. Proceeding with build and deployment."
+
+      - name: Set up Docker Buildx
+        if: env.LATEST_COMMIT != env.LAST_SUCCESSFUL_COMMIT
+        uses: docker/setup-buildx-action@v2
+        with:
+          install: true
+
+      - name: Log in to Docker Hub
+        if: env.LATEST_COMMIT != env.LAST_SUCCESSFUL_COMMIT
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Read current version
+        if: env.LATEST_COMMIT != env.LAST_SUCCESSFUL_COMMIT
+        run: |
+          VERSION=$(cat version.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Increment version
+        if: env.LATEST_COMMIT != env.LAST_SUCCESSFUL_COMMIT
+        run: |
+          NEW_VERSION=$(awk -F. '{print $1"."($2+1)}' version.txt)
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo $NEW_VERSION > version.txt
+
+      - name: Generate release notes
+        if: env.LATEST_COMMIT != env.LAST_SUCCESSFUL_COMMIT
+        id: release_notes
+        run: |
+          RELEASE_NOTES=$(git log --pretty=format:"%h - %s" ${{ env.LAST_SUCCESSFUL_COMMIT }}..${{ env.LATEST_COMMIT }} | tr '\n' ' ' | sed 's/"/\\"/g')
+          echo "RELEASE_NOTES=$RELEASE_NOTES" >> $GITHUB_ENV
+          echo "Release notes: $RELEASE_NOTES"
+
+      - name: Build and push multi-architecture image
+        if: env.LATEST_COMMIT != env.LAST_SUCCESSFUL_COMMIT
+        run: |
+          echo "Building and pushing image..."
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --label "org.opencontainers.image.version=${{ env.NEW_VERSION }}" \
+            --label "org.opencontainers.image.revision=${{ env.LATEST_COMMIT }}" \
+            --label "org.opencontainers.image.description=${{ env.RELEASE_NOTES }}" \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:${{ env.NEW_VERSION }} \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/mdv-frontend:rbac \
+            --push .
+
+      - name: Commit and push new version
+        if: env.LATEST_COMMIT != env.LAST_SUCCESSFUL_COMMIT
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.txt
+          git commit -m "Increment version to ${{ env.NEW_VERSION }} [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

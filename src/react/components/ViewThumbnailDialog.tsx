@@ -18,6 +18,7 @@ import {
 import { Clear as ClearIcon, Close as CloseIcon, Image as ImageIcon } from "@mui/icons-material";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import { matchString } from "@/lib/utils";
 import DebugErrorComponent from "@/charts/dialogs/DebugErrorComponent";
 
 export type ViewThumbnailDialogProps = {
@@ -95,7 +96,7 @@ const ViewThumbnailDialog = ({ open, setOpen }: ViewThumbnailDialogProps) => {
         const tempList = viewList.filter((view) => {
             const name = view.name.toLowerCase();
             // if any of the input words are not in the name, return false
-            if (!input.some(i => !name.includes(i))) return view;
+            return matchString(input, name);
         });
         setFilteredViewList(tempList);
     };

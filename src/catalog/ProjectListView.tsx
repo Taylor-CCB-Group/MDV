@@ -6,6 +6,7 @@ import {
     LockPerson,
     MoreVert,
     Upload as UploadIcon,
+    Share as ShareIcon
 } from "@mui/icons-material";
 import {
     IconButton,
@@ -29,6 +30,7 @@ import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import type { Project } from "./utils/projectUtils";
 import type { ProjectAccessType } from "./utils/projectUtils";
+import ProjectShareModal from "./ProjectShareModal";
 
 export type Pvoid = Promise<void>;
 export type ProjectListViewProps = {
@@ -47,6 +49,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const theme = useTheme();
 
     const handleMenuClick = useCallback((event: MouseEv, project: Project) => {
@@ -151,6 +154,12 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                     </ListItemIcon>
                     <ListItemText>Delete Project</ListItemText>
                 </MenuItem>
+                <MenuItem onClick={() => handleModalOpen(setIsShareModalOpen)}>
+                    <ListItemIcon>
+                        <ShareIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Share Project</ListItemText>
+                </MenuItem>
             </Menu>
 
             {selectedProject && (
@@ -180,6 +189,12 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                         open={isDeleteModalOpen}
                         onDelete={onDelete}
                         onClose={() => setIsDeleteModalOpen(false)}
+                    />
+
+                    <ProjectShareModal
+                        open={isShareModalOpen}
+                        onClose={() => setIsShareModalOpen(false)}
+                        projectId={selectedProject.id}
                     />
                 </>
             )}

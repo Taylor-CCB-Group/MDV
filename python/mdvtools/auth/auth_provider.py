@@ -1,19 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from flask import Response
+from typing import Optional, Tuple, Union
 
 class AuthProvider(ABC):
     @abstractmethod
-    def login(self) -> str:
+    def login(self) -> Union[str, Response, Tuple[Response, int]]:
         """Redirects to the login page of the provider."""
         pass
 
     @abstractmethod
-    def logout(self) -> None:
+    def logout(self) -> Union[str, Response, Tuple[Response, int]]:
         """Logs out the user."""
         pass
 
     @abstractmethod
-    def get_user(self, token: dict) -> Optional[dict]:
+    def get_user(self, token: Optional[dict] = None) -> Optional[dict]:
         """Fetches the user profile using the provided token."""
         pass
 
@@ -30,8 +31,13 @@ class AuthProvider(ABC):
         :return: Access token if successfully retrieved, else None
         """
         pass
-    
+
     @abstractmethod
-    def is_authenticated(self, token: str) -> bool:
-        """Verifies if the user is authenticated using the token."""
+    def validate_user(self) -> Tuple[Optional[dict], Optional[Tuple]]:
+        """Validates and returns user data."""
+        pass
+
+    @abstractmethod
+    def sync_users_to_db(self):
+        """ Syncs users from the authentication provider (e.g., Auth0) to the application's database."""
         pass

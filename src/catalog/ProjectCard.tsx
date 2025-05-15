@@ -7,7 +7,7 @@ import {
     MoreVert,
     Upload as UploadIcon,
     Settings,
-    Share,
+    Share as ShareIcon,
 } from "@mui/icons-material";
 import {
     Card,
@@ -28,9 +28,8 @@ import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
-import ProjectShareModal from "./ProjectShareModal";
 import type { ProjectAccessType } from "./utils/projectUtils";
-import axios from "axios";
+import ProjectShareModal from "./ProjectShareModal";
 
 export interface ProjectCardProps {
     id: string;
@@ -169,8 +168,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     position: "absolute",
                     top: 8,
                     right: 8,
-                    bgcolor: "inherit",
-                    "&:hover": { bgcolor: "inherit" },
+                    bgcolor: "background.paper",
+                    "&:hover": { 
+                        bgcolor: "grey.500"
+                    },
                     zIndex: 1,
                 }}
             >
@@ -228,6 +229,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     </ListItemIcon>
                     <ListItemText>Delete Project</ListItemText>
                 </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setIsShareModalOpen(true);
+                        handleMenuClose();
+                    }}
+                >
+                    <ListItemIcon>
+                        <ShareIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Share Project</ListItemText>
+                </MenuItem>
             </Menu>
 
             <ProjectInfoModal
@@ -256,7 +268,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             <ProjectShareModal
                 open={isShareModalOpen}
                 onClose={() => setIsShareModalOpen(false)}
-                onAddCollaborator={onAddCollaborator}
                 projectId={id}
             />
 
