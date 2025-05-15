@@ -96,9 +96,11 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                 return;
             }
 
+            // Append file to form data
             const form = new FormData();
             form.append("file", file);
 
+            // Append name to form data if the name exists
             if (projectName.trim()) {
                 form.append("name", projectName);
             }
@@ -118,6 +120,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
             }
         } catch (error) {
             let err;
+            // Handling errors based on the error type and status code
             if (error instanceof AxiosError) {
                 err = {
                     message: error.response?.data?.error,
@@ -137,10 +140,10 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
 
     return (
         <>
-            <Dialog open={open} onClose={onClose} fullWidth>
+            <Dialog open={open} onClose={!isLoading ? onClose : undefined} fullWidth>
                 <DialogTitle>
                     Import Project
-                    <DialogCloseIconButton onClose={onClose} />
+                    <DialogCloseIconButton onClose={onClose} disabled={isLoading} />
                 </DialogTitle>
                 <DialogContent dividers>
                     {!isLoading ? (
@@ -182,7 +185,7 @@ const ImportProjectDialog = ({ open, setOpen }: ImportProjectDialogProps) => {
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={onClose}>Close</Button>
+                    <Button onClick={onClose} disabled={isLoading}>Close</Button>
                 </DialogActions>
             </Dialog>
             {error && (

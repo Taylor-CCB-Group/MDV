@@ -22,9 +22,10 @@ export interface ProjectRenameModalProps {
 
 export type DialogCloseIconButtonProps = {
     onClose: () => void;
+    disabled?: boolean;
 };
 
-export const DialogCloseIconButton = ({onClose}: DialogCloseIconButtonProps) => {
+export const DialogCloseIconButton = ({onClose, disabled}: DialogCloseIconButtonProps) => {
     return (
         <IconButton
             aria-label="close"
@@ -35,6 +36,7 @@ export const DialogCloseIconButton = ({onClose}: DialogCloseIconButtonProps) => 
                 top: 8,
                 color: (theme) => theme.palette.grey[500],
             }}
+            disabled={disabled}
         >
             <CloseIcon />
         </IconButton>

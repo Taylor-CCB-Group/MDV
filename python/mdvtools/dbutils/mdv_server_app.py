@@ -6,7 +6,7 @@ import tempfile
 import zipfile
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 #from flask_sqlalchemy import SQLAlchemy
 # import threading
 # from flask import Flask, render_template, jsonify, request
@@ -850,6 +850,44 @@ def register_routes(app):
                 return jsonify({"status": "error", "message": str(e)}), 500
 
         print("Route registered: /delete_project/<project_id>")
+
+        @app.route("/export_project/<int:project_id>", methods=["GET"])
+        def export_project(project_id: int):
+            try:
+                # Fetch the project using the provided project id
+                project = ProjectService.get_project_by_id(project_id)
+
+                # No project with the given project id found
+                if project is None:
+                    print(f"In register_routes - /export_project Error: Project with ID {project_id} not found in database")
+                    return jsonify({"error": f"Project with ID {project_id} not found in database"})
+                                
+                # Create a temporary directory
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    file_name = f"{project.name}"
+                    file_path = os.path.join(temp_dir, file_name)
+
+                    # Create an archive from the project path
+                    zip_path = shutil.make_archive(
+                        file_path,
+                        "zip",
+                        project.path
+                    )
+
+                    # Return the zip file
+                    return send_file(
+                        path_or_file=zip_path,
+                        mimetype="application/zip",
+                        as_attachment=True,
+                    )
+
+                return jsonify({"error": "Internal Server Error"}), 500
+
+            except Exception as e:
+                print(f"In register_routes - /export_project : Unexpected error while exporting project with project id - '{project_id}': {e}")
+                return jsonify({"error": str(e)}), 500
+        
+        print("Route registered: /export_project/<project_id>")
 
         @app.route("/projects/<int:project_id>/rename", methods=["PUT"])
         def rename_project(project_id: int):

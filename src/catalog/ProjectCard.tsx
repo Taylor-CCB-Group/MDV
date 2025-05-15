@@ -5,6 +5,7 @@ import {
     Info,
     LockPerson as LockPersonIcon,
     MoreVert,
+    Upload as UploadIcon,
     Settings,
     Share,
 } from "@mui/icons-material";
@@ -19,6 +20,7 @@ import {
     Menu,
     MenuItem,
     Typography,
+    useTheme,
 } from "@mui/material";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -28,6 +30,7 @@ import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
 import ProjectShareModal from "./ProjectShareModal";
 import type { ProjectAccessType } from "./utils/projectUtils";
+import axios from "axios";
 
 export interface ProjectCardProps {
     id: string;
@@ -46,6 +49,7 @@ export interface ProjectCardProps {
         newType: ProjectAccessType,
     ) => Promise<void>;
     onAddCollaborator: (email: string) => void;
+    onExport: (id: string, name: string) => Promise<void>;
     thumbnail?: string;
 }
 
@@ -63,6 +67,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     onRename,
     onChangeType,
     onAddCollaborator,
+    onExport,
     thumbnail,
 }) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -72,6 +77,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+    const theme = useTheme();
     
     // todo - review how we do stuff like this
     const base = import.meta.env.DEV
@@ -201,12 +207,24 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 </MenuItem>
                 <MenuItem
                     onClick={() => {
-                        setIsDeleteModalOpen(true);
                         handleMenuClose();
+                        onExport(id, name)
                     }}
                 >
                     <ListItemIcon>
-                        <DeleteIcon fontSize="small" />
+                        <UploadIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Export Project (as *.zip)</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setIsDeleteModalOpen(true);
+                        handleMenuClose();
+                    }}
+                    sx={{color: theme.palette.error.main}}
+                >
+                    <ListItemIcon>
+                        <DeleteIcon color="error" fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Delete Project</ListItemText>
                 </MenuItem>
