@@ -861,12 +861,21 @@ def register_routes(app):
                 if project is None:
                     print(f"In register_routes - /export_project Error: Project with ID {project_id} not found in database")
                     return jsonify({"error": f"Project with ID {project_id} not found in database"})
+                
+                if project.path is None:
+                    print(f"In register_routes - /export_project Error: Project with ID {project_id} has no path in database")
+                    return jsonify({"error": f"Project with ID {project_id} has no path in the database"})
+                
+                if project.name is None:
+                    project_name = "unnamed_project"
+                else:
+                    project_name = project.name
                                 
                 # Create a temporary directory
                 with tempfile.TemporaryDirectory() as temp_dir:
-                    file_name = f"{project.name}"
+                    file_name = f"{project_name}"
                     file_path = os.path.join(temp_dir, file_name)
-
+                    
                     # Create an archive from the project path
                     zip_path = shutil.make_archive(
                         file_path,
@@ -879,6 +888,7 @@ def register_routes(app):
                         path_or_file=zip_path,
                         mimetype="application/zip",
                         as_attachment=True,
+                        download_name=project_name
                     )
 
                 return jsonify({"error": "Internal Server Error"}), 500
