@@ -888,7 +888,7 @@ def register_routes(app):
                         path_or_file=zip_path,
                         mimetype="application/zip",
                         as_attachment=True,
-                        download_name=project_name
+                        download_name=f"{project_name}.zip"
                     )
 
                 return jsonify({"error": "Internal Server Error"}), 500
