@@ -29,7 +29,7 @@ import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv
 routes = set()
-
+from mdvtools.websocket_upload import initialize_websocket_upload, register_project_for_upload
 
 # consider using flask_cors...
 def add_safe_headers(resp):
@@ -126,6 +126,11 @@ def create_app(
     #     raise Exception(
     #         "Route already exists - can't have two projects with the same name"
     #     )
+
+        # Websocket initialization
+        websocket_manager = initialize_websocket_upload(app)
+        register_project_for_upload(project.id, project)
+
     routes.add(route)
 
     @project_bp.route("/")
