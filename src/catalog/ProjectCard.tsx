@@ -219,6 +219,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 </MenuItem>
                 <MenuItem
                     onClick={() => {
+                        setIsShareModalOpen(true);
+                        handleMenuClose();
+                    }}
+                >
+                    <ListItemIcon>
+                        <ShareIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Share Project</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    onClick={() => {
                         setIsDeleteModalOpen(true);
                         handleMenuClose();
                     }}
@@ -228,17 +239,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         <DeleteIcon color="error" fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Delete Project</ListItemText>
-                </MenuItem>
-                <MenuItem
-                    onClick={() => {
-                        setIsShareModalOpen(true);
-                        handleMenuClose();
-                    }}
-                >
-                    <ListItemIcon>
-                        <ShareIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Share Project</ListItemText>
                 </MenuItem>
             </Menu>
 

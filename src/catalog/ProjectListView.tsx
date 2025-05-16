@@ -148,17 +148,17 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                     </ListItemIcon>
                     <ListItemText>Export Project (as *.zip)</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={() => handleModalOpen(setIsDeleteModalOpen)} sx={{color: theme.palette.error.main}}>
-                    <ListItemIcon>
-                        <Delete color="error" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Delete Project</ListItemText>
-                </MenuItem>
                 <MenuItem onClick={() => handleModalOpen(setIsShareModalOpen)}>
                     <ListItemIcon>
                         <ShareIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Share Project</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => handleModalOpen(setIsDeleteModalOpen)} sx={{color: theme.palette.error.main}}>
+                    <ListItemIcon>
+                        <Delete color="error" fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Delete Project</ListItemText>
                 </MenuItem>
             </Menu>
 
