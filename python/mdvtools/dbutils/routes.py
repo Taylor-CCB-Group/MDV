@@ -389,10 +389,9 @@ def register_routes(app, ENABLE_AUTH):
                         logger.error(f"User does not have ownership of project {project_id}")
                         return jsonify({"error": "Only the project owner can export the project."}), 403
                     
-                # todo: uncomment later after confirming
-                # if project.access_level != 'editable':
-                #     logger.error(f"Project with ID {project_id} is not editable.")
-                #     return jsonify({"error": "This project is not editable and cannot be exported."}), 403
+                if project.access_level != 'editable':
+                    logger.error(f"Project with ID {project_id} is not editable.")
+                    return jsonify({"error": "This project is not editable and cannot be exported."}), 403
                     
                 if project.path is None:
                     logger.error(f"In register_routes - /export_project Error: Project with ID {project_id} has no path in database")
