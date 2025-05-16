@@ -253,6 +253,11 @@ def register_routes(app, ENABLE_AUTH):
                     project_file.save(temp_file_path)
 
                     with zipfile.ZipFile(temp_file_path, 'r') as zip_file:
+                        # Reject entries with absolute paths or “..”
+                        for file in zip_file.infolist():
+                            if file.filename.startswith('/') or '..' in file.filename:
+                                logger.error(f"In register_routes /import_project: Unsafe zip entry {file.filename}")
+                                return jsonify({"error": "Invalid ZIP file: unsafe paths detected"}), 400
                         temp_extract_path = os.path.join(temp_dir, "extracted")
                         os.makedirs(temp_extract_path, exist_ok=True)
                         # Extract zip file in temp directory
