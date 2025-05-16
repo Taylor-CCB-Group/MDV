@@ -52,6 +52,11 @@ const useProjects = () => {
                         : [],
                     numberOfStructures: item.numberOfStructures || "0",
                     numberOfImages: item.numberOfImages || "0",
+                    permissions: {
+                        read: item["can_read"],
+                        write: item["can_write"],
+                        owner: item["is_owner"],
+                    },
                     thumbnail: item?.thumbnail,
                 }));
 
@@ -105,6 +110,11 @@ const useProjects = () => {
                     collaborators: [],
                     numberOfStructures: "0",
                     numberOfImages: "0",
+                    permissions: {
+                        read: true,
+                        write: true,
+                        owner: true,
+                    },
                 };
 
                 setProjects((prevProjects) => [...prevProjects, newProject]);

@@ -111,7 +111,8 @@ def register_routes(app, ENABLE_AUTH):
                             "id": p["id"],
                             "name": p["name"],
                             "lastModified": p["lastModified"],
-                            "thumbnail": p["thumbnail"]
+                            "thumbnail": p["thumbnail"],
+                            "permissions": user_projects[p["id"]],
                         }
                         for p in active_projects
                         if p["id"] in allowed_project_ids
@@ -123,7 +124,12 @@ def register_routes(app, ENABLE_AUTH):
                             "id": p["id"],
                             "name": p["name"],
                             "lastModified": p["lastModified"],
-                            "thumbnail": p["thumbnail"]
+                            "thumbnail": p["thumbnail"],
+                            "permissions": {
+                                "can_read": True,
+                                "can_write": True,
+                                "is_owner": False,
+                            }
                         }
                         for p in active_projects
                     ]
