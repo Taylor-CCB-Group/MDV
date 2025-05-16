@@ -411,8 +411,6 @@ def register_routes(app, ENABLE_AUTH):
                         as_attachment=True,
                         download_name=f"{project_name}.zip"
                     )
-                logger.error("In register_routes - /export_project : Internal Server Error")
-                return jsonify({"error": "Internal Server Error"}), 500
 
             except Exception as e:
                 logger.exception(f"In register_routes - /export_project : Unexpected error while exporting project with project id - '{project_id}': {e}")
