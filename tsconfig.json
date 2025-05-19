@@ -21,7 +21,10 @@
         "baseUrl": ".",
         "paths": {
             "@/*": ["./src/*"]
-        }
+        },
+        "types": [
+            "@webgpu/types"
+        ]
     },
     "exclude": [
         "venv",
