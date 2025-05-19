@@ -36,6 +36,8 @@ class Dimension {
             // } catch (e) {
             //     // console.error('Error in evaluating filterPredicate', e);
             // }
+            // this logic needs to be duplicated in GPU version
+            // does that imply an atomic `filterSize` manipulation?
             const value = !predicate(i); //not much faster than try...catch
             if (value) {
                 if (localFilter[i] === 0) {
