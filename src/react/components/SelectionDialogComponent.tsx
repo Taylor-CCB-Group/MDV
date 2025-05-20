@@ -668,7 +668,7 @@ const SelectionDialogComponent = () => {
     //we could consider returning some kind of `Result` object from this hook...
     const cols = useParamColumnsExperimental();
     useResetButton();
-    const showAddRow = true;
+    const showAddRow = false;
     return (
         <div className="p-3 absolute w-[100%] h-[100%] overflow-x-hidden overflow-y-auto">
             {cols.map((col) => <AbstractComponent key={col.field} column={col} />)}
