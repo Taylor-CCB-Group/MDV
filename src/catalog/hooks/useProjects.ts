@@ -52,6 +52,7 @@ const useProjects = () => {
                         : [],
                     numberOfStructures: item.numberOfStructures || "0",
                     numberOfImages: item.numberOfImages || "0",
+                    // todo: update this when the backend is updated for the disable auth
                     permissions: {
                         read: item["can_read"],
                         edit: item["can_write"],

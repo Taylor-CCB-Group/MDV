@@ -119,6 +119,7 @@ def register_routes(app, ENABLE_AUTH):
                     ]
                 else:
                     # No auth, return all
+                    # todo: update permissions to not pass all values as True and think of an alternative
                     filtered_projects = [
                         {
                             "id": p["id"],
@@ -254,6 +255,7 @@ def register_routes(app, ENABLE_AUTH):
                 os.makedirs(project_path, exist_ok=True)
                 
                 # Using a temp directory for extracting files
+                # todo: extract the file contents to the project folder directly rather than using a temp directory (need to check how to check valid project without extracting)
                 with tempfile.TemporaryDirectory() as temp_dir:
                     temp_file_path = os.path.join(temp_dir, "project.zip")
                     project_file.save(temp_file_path)
