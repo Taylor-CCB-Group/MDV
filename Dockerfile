@@ -64,6 +64,11 @@ EXPOSE 5055
 # something changed causing npm to need this in order for `source` to work in npm scripts
 RUN npm config set script-shell "/bin/bash"
 
+# Create logs directory and set permissions before switching user
+RUN mkdir -p /app/logs && \
+    touch /app/logs/error.log /app/logs/access.log && \
+    chmod -R 755 /app/logs
+
 # Create non-root user and assign permissions
 RUN useradd -u 1010 -m mdvuser \
     && chown -R mdvuser:mdvuser /app
