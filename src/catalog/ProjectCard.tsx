@@ -197,7 +197,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     </ListItemIcon>
                     <ListItemText>Project Info</ListItemText>
                 </MenuItem>
-                {permissions.owner && (
+                {permissions.edit && (
                     <>
                         <MenuItem
                             onClick={() => {
@@ -260,7 +260,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 numberOfImages={numberOfImages}
             />
             
-            {permissions.owner && (
+            {permissions.edit && (
                 <>
                     <ProjectSettingsModal
                         id={id}

@@ -128,7 +128,7 @@ def register_routes(app, ENABLE_AUTH):
                             "permissions": {
                                 "can_read": True,
                                 "can_write": True,
-                                "is_owner": False,
+                                "is_owner": True,
                             }
                         }
                         for p in active_projects

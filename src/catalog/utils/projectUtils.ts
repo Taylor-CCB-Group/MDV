@@ -4,7 +4,7 @@ export type SortOrder = "asc" | "desc";
 export type ProjectAccessType = "Editable" | "Read-Only";
 export type Permissions = {
     read: boolean;
-    write: boolean;
+    edit: boolean;
     owner: boolean;
 };
 export interface Project {

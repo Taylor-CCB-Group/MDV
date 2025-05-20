@@ -131,7 +131,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                     </ListItemIcon>
                     <ListItemText>Project Info</ListItemText>
                 </MenuItem>
-                {selectedProject?.permissions.owner && (
+                {selectedProject?.permissions.edit && (
                         <>
                             <MenuItem onClick={() => handleModalOpen(setIsRenameModalOpen)}>
                                 <ListItemIcon>
@@ -183,7 +183,7 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                         numberOfImages={selectedProject.numberOfImages}
                     />
 
-                    {selectedProject.permissions.owner && (
+                    {selectedProject.permissions.edit && (
                         <>
                             <ProjectRenameModal
                                 id={selectedProject.id}

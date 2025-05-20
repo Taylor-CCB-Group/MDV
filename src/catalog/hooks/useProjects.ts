@@ -54,7 +54,7 @@ const useProjects = () => {
                     numberOfImages: item.numberOfImages || "0",
                     permissions: {
                         read: item["can_read"],
-                        write: item["can_write"],
+                        edit: item["can_write"],
                         owner: item["is_owner"],
                     },
                     thumbnail: item?.thumbnail,
@@ -112,7 +112,7 @@ const useProjects = () => {
                     numberOfImages: "0",
                     permissions: {
                         read: true,
-                        write: true,
+                        edit: true,
                         owner: true,
                     },
                 };
