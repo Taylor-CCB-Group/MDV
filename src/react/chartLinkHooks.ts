@@ -110,14 +110,14 @@ export function useRowsAsColumnsLinks() {
     return getRowsAsColumnsLinks(dataStore);
 }
 
-/** design of this will need to change to account for n-links
+/** What if the linkIndex might be able to change at runtime?
  * 
  * We could also consider having distinct hooks for highlighted and filtered rows.
  * @returns the text values and indices of the highlighted/filtered rows in a linked dataSource
  */
-export function useHighlightedForeignRows() {
+export function useHighlightedForeignRows(linkIndex = 0) {
     const id = useId();
-    const racLink = useRowsAsColumnsLinks()[0];
+    const racLink = useRowsAsColumnsLinks()[linkIndex];
     const values = racLink?.link.observableFields || [];
     return values; //maybe don't useState version of this but return the mobx observable directly
 }
@@ -136,11 +136,11 @@ export function useHighlightedForeignRows() {
  * @returns an array of DataColumn objects, with loaded data, for virtual columns 
  * corresponding to the highlighted/filtered rows in the linked dataSource.
  */
-export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
-    const cols = useHighlightedForeignRows(); //not actual cols
+export function useHighlightedForeignRowsAsColumns(max = 10, filter = "", linkIndex = 0) {
+    const cols = useHighlightedForeignRows(linkIndex); //not actual cols
     //would like not to have this here - might have some more logic in above hook
     //in particular want to redesign the fieldName being what determines the column
-    const racLink = useRowsAsColumnsLinks()[0];
+    const racLink = useRowsAsColumnsLinks()[linkIndex];
     //! this next line may be problematic - useMemo is important
     const { link } = useMemo(() => racLink || { link: null }, [racLink]);
     const [columns, setColumns] = useState<DataColumn<DataType>[]>([]);
@@ -157,6 +157,7 @@ export function useHighlightedForeignRowsAsColumns(max = 10, filter = "") {
         }
         const cm = window.mdv.chartManager;
         // c.value & c.index are from the DataStore listener event, now in cols
+        // this needs to change for multiple subgroups
         const sg = Object.keys(link.subgroups)[0];
         const f = filter.toLowerCase();
         // todo: consider pagination... pass in a page number, return information about total number of columns etc.
