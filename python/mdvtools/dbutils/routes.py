@@ -119,18 +119,13 @@ def register_routes(app, ENABLE_AUTH):
                     ]
                 else:
                     # No auth, return all
-                    # todo: update permissions to not pass all values as True and think of an alternative
                     filtered_projects = [
                         {
                             "id": p["id"],
                             "name": p["name"],
                             "lastModified": p["lastModified"],
                             "thumbnail": p["thumbnail"],
-                            "permissions": {
-                                "can_read": True,
-                                "can_write": True,
-                                "is_owner": True,
-                            }
+                            "permissions": None,
                         }
                         for p in active_projects
                     ]
