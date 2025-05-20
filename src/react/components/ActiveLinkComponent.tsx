@@ -82,7 +82,7 @@ const ActiveLinkComponent = observer(
         // const rowsText = highlightedForeignRows.slice(0, maxItems).map((r) => r.name).join(", ");
 
         return (
-            <div className="w-full flex justify-around text-xs font-light">
+            <div className="w-full flex justify-end text-xs font-light p-1">
                 <Button onClick={activateLink}>
                     {isActive ? "Using" : "Activate"} '{sg.label}' Link
                 </Button>

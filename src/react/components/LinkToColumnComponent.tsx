@@ -134,7 +134,8 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: LocalProps<T, M
         }
     }, [link.valueToRowIndex, props.multiple, sg]);
     //! there is a bug - when values from a different link are selected, the spec doesn't update
-    // it should be cleared...
+    // we want to be able to set more different combinations of values - which will mean more changes to state management
+    // for now, the UI should better reflect what the user is allowed to select.
     const [initialValue] = useState(() => getSafeInternalValue(props.current_value));
 
     /// we don't want a new spec every time the value changes... we want to give it an observable value
@@ -183,7 +184,7 @@ const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(pro
     // at least it feels simple if you ignore everything in the hook...
     const spec = useLinkSpec(props);
     return (
-        <div className="flex flex-col" style={{ textAlign: 'left' }}>
+        <div className="flex flex-col p-1">
             {/* don't want to have this typecast here, slight nuisance. */}
             <DropdownAutocompleteComponent props={spec as GuiSpec<"dropdown"> | GuiSpec<"multidropdown">} />
         </div>
