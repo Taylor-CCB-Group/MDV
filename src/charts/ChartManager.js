@@ -1741,6 +1741,38 @@ export class ChartManager {
                 div,
             );
             createMdvPortal(ErrorComponentReactWrapper({ error, height, width, extraMetaData: { config } }), debugNode);
+            const closeButtonContainer = createEl(
+                "div",
+                {
+                    styles: {
+                        position: "absolute",
+                        top: "10px",
+                        right: "10px",
+                    }
+                },
+                div
+            );
+
+            createMenuIcon(
+                "fas fa-times",
+                {
+                    tooltip: {
+                        text: "Remove Chart",
+                        position: "bottom-right",
+                    },
+                    func: () => {
+                        if (this.charts[config.id] && this.charts[config.id].chart) {
+                            const chart = this.charts[config.id].chart;
+                            chart.remove();
+                            delete this.charts[chart.config.id];
+                            this._removeLinks(chart);
+                            this._callListeners("chart_removed", chart);
+                        }
+                        div.remove();
+                    },
+                },
+                closeButtonContainer,
+            )
             //not rethrowing doesn't help recovering from missing data in other charts.
             //throw new Error(error); //probably not a great way to handle this
         }
