@@ -143,7 +143,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: LocalProps<T, M
     // the real props.current_value???
     const [spec] = useState(() => makeAutoObservable(g<"multidropdown" | "dropdown">({
         type: isMultiType ? 'multidropdown' : 'dropdown',
-        label: `specific '${name}'`,
+        label: `specific '${name}'`, //don't really want to have this label here, would take a bigger change to remove
         // no ts error! praise be!
         values,
         current_value: initialValue,
@@ -215,16 +215,59 @@ const LinkMulti = observer(
         props: ColumnSelectionProps<T, M>,
     ) => {
         const links = useRowsAsColumnsLinks();
+        const [activeLinkIndex, setActiveLinkIndex] = useState(() => {
+            // Determine the initial active link based on `current_state` and `FieldName`
+            // this logic might be adjusted if we allow combined selections with multiple links
+            // also we might want to persist as user changes tab outside of this component
+            const v = props.current_value;
+            const currentFieldName = isArray(v) ? v[0] : v;
+            if (typeof currentFieldName === "string") {
+                const matchingIndex = links.findIndex((link) => {
+                    const sgName = Object.keys(link.link.subgroups)[0];
+                    return currentFieldName.startsWith(`${sgName}|`);
+                });
+                return matchingIndex !== -1 ? matchingIndex : 0;
+            }
+            return 0;
+        });
+
+        const handleLinkChange = (index: number) => {
+            setActiveLinkIndex(index);
+        };
+        // don't show tab ui if we only have one link
+        if (links.length === 1) {
+            return <LinkToColumnComponentInit {...props} link={links[0]} />;
+        }
         return (
-            <>
-                {links.map((link) => (
-                    <LinkToColumnComponentInit
-                        key={link.link.name}
-                        {...props}
-                        link={link}
-                    />
-                ))}
-            </>
+            <div>
+                {/* Render tabs or radio buttons for selecting the active link */}
+                <div className="flex space-x-2 mb-4">
+                    {links.map((link, index) => (
+                        <button
+                            key={link.link.name}
+                            className={`px-4 py-1 border-b-2 ${
+                                index === activeLinkIndex
+                                    ? "font-bold"
+                                    : "font-light"
+                            }`}
+                            onClick={() => handleLinkChange(index)}
+                        >
+                            {link.link.name}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Render the active link's UI */}
+                {links.map((link, index) =>
+                    index === activeLinkIndex ? (
+                        <LinkToColumnComponentInit
+                            key={link.link.name}
+                            {...props}
+                            link={link}
+                        />
+                    ) : null
+                )}
+            </div>
         );
     },
 );
