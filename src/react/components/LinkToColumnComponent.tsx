@@ -7,6 +7,15 @@ import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import { g, isArray } from "@/lib/utils";
 import { getFieldName } from "@/links/link_utils";
 import { useRowsAsColumnsLinks } from "../chartLinkHooks";
+
+type LocalProps<T extends CTypes, M extends boolean> = ColumnSelectionProps<
+    T,
+    M
+> & {
+    link: ReturnType<typeof useRowsAsColumnsLinks>[0];
+};
+
+
 /**
  * A hook for managing the state of manually chosen columns from a rows-as-columns link.
  * 
@@ -16,8 +25,8 @@ import { useRowsAsColumnsLinks } from "../chartLinkHooks";
  * 
  * In the end... just bundling everything about state management for this component into a hook, returning a spec.
  */
-function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) {
-    const { linkedDs, link } = useRowsAsColumnsLinks()[0];
+function useLinkSpec<T extends CTypes, M extends boolean>(props: LocalProps<T, M>) {
+    const { linkedDs, link } = props.link;
     const { name_column, name, subgroups } = link;
     const targetColumn = linkedDs.dataStore.columnIndex[name_column];
     if (!targetColumn) {
@@ -37,7 +46,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
     //   (and probably also log a warning)
 
     // Loop through the values and create the format in pipes '|', by making use of the index.
-    //todo - we need to let the user select link/subgroup...
+    //todo - we need to let the user select subgroup...
     //^^ do we allow a mix-match of links/subgroups? We could... but that doesn't mean we should.
     //(we should only do so if we have a clean way of presenting it to the user)
     const sg = Object.keys(subgroups)[0];
@@ -124,6 +133,8 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
             return v;
         }
     }, [link.valueToRowIndex, props.multiple, sg]);
+    //! there is a bug - when values from a different link are selected, the spec doesn't update
+    // it should be cleared...
     const [initialValue] = useState(() => getSafeInternalValue(props.current_value));
 
     /// we don't want a new spec every time the value changes... we want to give it an observable value
@@ -167,7 +178,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
  * `subgroup|value (subgroup)|index`, where `subgroup` is the name of the user-selected subgroup, `value (subgroup)` is a human-readable
  * representation of the value, and `index` is the index of the value in the column.
  */
-const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
+const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(props: LocalProps<T, M>) => {
     // is all of the complexity being in the hook really making this component simpler?
     // at least it feels simple if you ignore everything in the hook...
     const spec = useLinkSpec(props);
@@ -182,7 +193,7 @@ const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(pro
 /**
  * Avoid dealing with internal state of the link until it's ready.
  */
-const LinkToColumnComponentInit = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
+const LinkToColumnComponentInit = observer(<T extends CTypes, M extends boolean>(props: LocalProps<T, M>) => {
     const { link } = useRowsAsColumnsLinks()[0];
     //wanted to initialise this with ~init.linkPromise.resolved but apparently that's not a thing
     //so we have an initial re-render even if the link is already resolved.
@@ -198,4 +209,24 @@ const LinkToColumnComponentInit = observer(<T extends CTypes, M extends boolean>
     return <LinkToColumnComponent {...props} />;
 });
 
-export default LinkToColumnComponentInit;
+const LinkMulti = observer(
+    <T extends CTypes, M extends boolean>(
+        props: ColumnSelectionProps<T, M>,
+    ) => {
+        const links = useRowsAsColumnsLinks();
+        return (
+            <>
+                {links.map((link) => (
+                    <LinkToColumnComponentInit
+                        key={link.link.name}
+                        {...props}
+                        link={link}
+                    />
+                ))}
+            </>
+        );
+    },
+);
+
+
+export default LinkMulti;
