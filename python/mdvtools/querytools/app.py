@@ -42,8 +42,8 @@ def execute_query():
     if not sql_query:
         return jsonify({"error": "Invalid query type provided"}), 400
 
-    conn: psycopg2._psycopg.connection | None = None
-    cur: psycopg2._psycopg.cursor | None = None
+    conn: psycopg2._psycopg.connection | None = None # type: ignore
+    cur: psycopg2._psycopg.cursor | None = None # type: ignore
     try:
         conn = get_db_connection()
         cur = conn.cursor()

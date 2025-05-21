@@ -64,7 +64,10 @@ class ProjectService:
     #  Routes -> /create_project
     def add_new_project(path, name='unnamed_project'):
         try:
-            new_project = Project(name=name, path=path)
+            # new_project = Project(name=name, path=path)
+            new_project = Project()
+            new_project.name = name
+            new_project.path = path
             db.session.add(new_project)
             db.session.commit()
             return new_project
@@ -197,13 +200,19 @@ class FileService:
                     logger.info(f"Updated file name in DB: {existing_file}")
             else:
                 # Add new file to the database
-                new_file = File(
-                    name=file_name,
-                    file_path=file_path,
-                    project_id=project_id,
-                    upload_timestamp=datetime.now(),
-                    update_timestamp=datetime.now()
-                )
+                # new_file = File(
+                #     name=file_name,
+                #     file_path=file_path,
+                #     project_id=project_id,
+                #     upload_timestamp=datetime.now(),
+                #     update_timestamp=datetime.now()
+                # )
+                new_file = File()
+                new_file.name = file_name
+                new_file.file_path = file_path
+                new_file.project_id = project_id
+                new_file.upload_timestamp = datetime.now()
+                new_file.update_timestamp = datetime.now()
                 db.session.add(new_file)
                 logger.info(f"Added new file to DB: {new_file}")
 
@@ -304,18 +313,29 @@ class UserService:
                 return user
             else:
                 # Create new user with provided fields
-                new_user = User(
-                    email=email,
-                    auth_id=auth_id or '',
-                    first_name=first_name or '',
-                    last_name=last_name or '',
-                    institution=institution,
-                    confirmed_at=datetime.utcnow(),
-                    is_active=True,
-                    password='',  # Set to empty string or handle as per your authentication mechanism
-                    administrator=False,
-                    is_admin=False
-                )
+                # new_user = User(
+                #     email=email,
+                #     auth_id=auth_id or '',
+                #     first_name=first_name or '',
+                #     last_name=last_name or '',
+                #     institution=institution,
+                #     confirmed_at=datetime.utcnow(),
+                #     is_active=True,
+                #     password='',  # Set to empty string or handle as per your authentication mechanism
+                #     administrator=False,
+                #     is_admin=False
+                # )
+                new_user = User()
+                new_user.email = email
+                new_user.auth_id = auth_id or ''
+                new_user.first_name = first_name or ''
+                new_user.last_name = last_name or ''
+                new_user.institution = institution
+                new_user.confirmed_at = datetime.now()
+                new_user.is_active = True
+                new_user.password = ''  # Set to empty string or handle as per your authentication mechanism
+                new_user.administrator = False
+                new_user.is_admin = False
                 db.session.add(new_user)
                 db.session.commit()
                 return new_user

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 #Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 logger.info(f"Authentication enabled: {ENABLE_AUTH}")
-
+oauth = None
 if ENABLE_AUTH:
     
     from authlib.integrations.flask_client import OAuth
@@ -28,7 +28,7 @@ if ENABLE_AUTH:
     
 
 def create_flask_app(config_name=None):
-    """ Create and configure the Flask app."""
+    """Create and configure the Flask app."""
     app = Flask(__name__, template_folder='../templates', static_folder='/app/dist/flask')
     # this was causing a number of issues with various routes, changing this here seems to be the best way to fix it
     # as there isn't a clear single point of front-end that would consistently guarantee fixing it
@@ -100,6 +100,7 @@ def create_flask_app(config_name=None):
     if ENABLE_AUTH:
         try:
             logger.info("Initializing OAuth for authentication")
+            assert(oauth is not None), "OAuth is not initialized"
             oauth.init_app(app)
 
             logger.info("Registering authentication before_request logic")

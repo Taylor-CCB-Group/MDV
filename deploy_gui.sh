@@ -25,7 +25,6 @@ check_docker_daemon() {
 }
 
 # Function to create or validate the .env file using Zenity
-#!/bin/bash
 
 # Function to check and update environment variables
 create_or_validate_env_file() {
@@ -155,7 +154,7 @@ run_docker_compose() {
 
 # Function to open the browser
 open_browser() {
-  URL="https://localhost:5055"
+  URL="http://localhost:5055"
 
   zenity --question --title="Open Application" --text="Do you want to open MDV in your browser now?"
   if [ $? -eq 0 ]; then

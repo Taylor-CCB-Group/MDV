@@ -1,15 +1,16 @@
 from abc import ABC, abstractmethod
-from flask import Response
-from typing import Optional, Tuple, Union
+# from flask import Response
+from flask.typing import ResponseReturnValue
+from typing import Optional, Tuple
 
 class AuthProvider(ABC):
     @abstractmethod
-    def login(self) -> Union[str, Response, Tuple[Response, int]]:
+    def login(self) -> ResponseReturnValue:
         """Redirects to the login page of the provider."""
         pass
 
     @abstractmethod
-    def logout(self) -> Union[str, Response, Tuple[Response, int]]:
+    def logout(self) -> ResponseReturnValue:
         """Logs out the user."""
         pass
 

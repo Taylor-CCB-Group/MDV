@@ -2,8 +2,8 @@ from flask import session, redirect, request, jsonify
 from mdvtools.dbutils.dbservice import UserService
 from mdvtools.auth.authutils import update_cache
 from mdvtools.auth.auth_provider import AuthProvider
-from typing import Optional, Tuple, Union
-from flask import Response
+from typing import Optional
+from flask.typing import ResponseReturnValue
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ class ShibbolethProvider(AuthProvider):
         self.logout_url = app.config.get("SHIBBOLETH_LOGOUT_URL")
         self.login_url = app.config.get("SHIBBOLETH_LOGIN_URL")
 
-    def login(self) -> Union[str, Response, Tuple[Response, int]]:
+    def login(self) -> ResponseReturnValue:
         try:
             # Extract headers that Shibboleth sets after login
             email = request.headers.get("X-Forwarded-User")
@@ -116,4 +116,11 @@ class ShibbolethProvider(AuthProvider):
             return None, (jsonify({"error": "Internal server error - user not validated"}), 500)
 
     def sync_users_to_db(self) -> None:
-        logger.info("Dummy sync - skipping user sync.")
+        """
+        Shibboleth doesn't have a centralized user store to sync from like Auth0.
+        Users are provisioned individually upon login.
+        """
+        logger.info(
+            "Shibboleth users are provisioned individually upon login, "
+            "no batch sync performed."
+        )
