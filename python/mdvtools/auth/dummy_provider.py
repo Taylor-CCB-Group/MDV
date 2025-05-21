@@ -1,6 +1,6 @@
 from flask import session, redirect
-from typing import Optional, Tuple, Union
-from flask import Response
+from typing import Optional, Tuple
+from flask.typing import ResponseReturnValue
 from mdvtools.auth.auth_provider import AuthProvider
 import logging
 
@@ -10,7 +10,7 @@ class DummyAuthProvider(AuthProvider):
     def __init__(self, app):
         self.app = app
 
-    def login(self) -> str:
+    def login(self) -> ResponseReturnValue:
         """No-op login for dummy provider."""
 
         session["auth_method"] = "dummy"
@@ -18,7 +18,7 @@ class DummyAuthProvider(AuthProvider):
         logger.info("Dummy login - no real login redirect.")
         return redirect("/")
 
-    def logout(self) -> Union[str, Response, Tuple[Response, int]]:
+    def logout(self) -> ResponseReturnValue:
         """Clear dummy session."""
         logger.info("Dummy logout - clearing session.")
         session.clear()

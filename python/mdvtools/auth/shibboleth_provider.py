@@ -2,8 +2,8 @@ from flask import session, redirect, request, jsonify
 from mdvtools.dbutils.dbservice import UserService
 from mdvtools.auth.authutils import update_cache
 from mdvtools.auth.auth_provider import AuthProvider
-from typing import Optional, Tuple, Union
-from flask import Response
+from typing import Optional
+from flask.typing import ResponseReturnValue
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ class ShibbolethProvider(AuthProvider):
         self.logout_url = app.config.get("SHIBBOLETH_LOGOUT_URL")
         self.login_url = app.config.get("SHIBBOLETH_LOGIN_URL")
 
-    def login(self) -> Union[str, Response, Tuple[Response, int]]:
+    def login(self) -> ResponseReturnValue:
         try:
             # Extract headers that Shibboleth sets after login
             email = request.headers.get("X-Forwarded-User")
