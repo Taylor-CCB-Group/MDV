@@ -64,8 +64,22 @@ EXPOSE 5055
 # something changed causing npm to need this in order for `source` to work in npm scripts
 RUN npm config set script-shell "/bin/bash"
 
+# Create logs directory and set permissions before switching user
+RUN mkdir -p /app/logs && \
+    touch /app/logs/error.log /app/logs/access.log && \
+    chmod -R 755 /app/logs
+
+# Create non-root user and assign permissions
+RUN useradd -u 1010 -m mdvuser \
+    && chown -R mdvuser:mdvuser /app
+
+# Switch to non-root user
+USER mdvuser
+# apply the same config to the user so that `poetry run` works for tests etc.
+RUN poetry config virtualenvs.create false
+
 # Command to run Gunicorn
-CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.mdv_server_app:app"]
+CMD ["poetry", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5055", "--reload", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--capture-output", "mdvtools.dbutils.safe_mdv_app:app"]
 #CMD ["poetry", "run", "python", "-m", "mdvtools.dbutils.mdv_server_app"]
 
 

@@ -1,5 +1,4 @@
 from scanpy import AnnData
-from mudata import MuData
 import scipy
 import pandas as pd
 from os.path import join, split
@@ -494,12 +493,12 @@ def _add_dims(table, dims, max_dims,stub=""):
         cols  = [f"{stub}{dname}_{i+1}" for i in range(num_dims)]
         dim_table= pd.DataFrame()
         #can either be an ndarray or a dataframe
-        if type(data)== np.ndarray:
-            dim_table =pd.DataFrame(data[:,0:num_dims])
+        if isinstance(data, np.ndarray):
+            dim_table = pd.DataFrame(data[:, 0:num_dims])
             dim_table.index = dims.dim_names
-        elif type(data)==pd.DataFrame:
-            ##should already have correct index
-            dim_table= data.iloc[:,0:num_dims]
+        elif isinstance(data, pd.DataFrame):
+            # Should already have correct index
+            dim_table = data.iloc[:, 0:num_dims]
         else:
             print (f"unrecognized dimension reduction format - {type(data)} for dim reduction {dname} ")
             continue

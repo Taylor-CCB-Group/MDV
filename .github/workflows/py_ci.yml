@@ -38,7 +38,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'poetry'
 
-      - run: poetry install --with dev
+      - run: poetry install --with dev,backend,auth
       - run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
 
       - run: make test
@@ -61,7 +61,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'poetry'
 
-      - run: poetry install --with dev
+      - run: poetry install --with dev,backend,auth
       - run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
 
       - uses: jakebailey/pyright-action@v2

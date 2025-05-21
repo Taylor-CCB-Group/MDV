@@ -14,9 +14,10 @@ class User(db.Model):
     last_name = db.Column(db.String(50), nullable=False, default='')
     administrator = db.Column(db.Boolean, nullable=False, default=False)
     institution = db.Column(db.Text, nullable=True)
+    auth_id = db.Column(db.String(255), unique=True, nullable=False)  # Store Auth0 User ID only
+    is_admin = db.Column(db.Boolean, nullable=False, default=False)
     projects = db.relationship('UserProject', backref='user', lazy=True)
     jobs = db.relationship('Job', backref='user', lazy=True)
-    permissions = db.relationship('Permission', backref='user', lazy=True)
     preferences = db.relationship('UserPreference', backref='user', lazy=True)
     #shared_objects = db.relationship('SharedObject', foreign_keys='SharedObject.shared_with', backref='shared_with_user', lazy=True)
 
@@ -66,6 +67,19 @@ class UserProject(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     can_read = db.Column(db.Boolean, nullable=False, default=False)
     can_write = db.Column(db.Boolean, nullable=False, default=False)
+    is_owner = db.Column(db.Boolean, nullable=False, default=False)
+
+    def __init__(self, user_id, project_id, is_owner=False, can_read=None, can_write=False):
+        self.user_id = user_id
+        self.project_id = project_id
+        self.is_owner = is_owner
+        # Automatically set can_read and can_write if the user is the owner
+        if self.is_owner:
+            self.can_read = True
+            self.can_write = True
+        else:
+            self.can_write = can_write
+            self.can_read = True if can_write else (can_read if can_read is not None else False)
 
 class Genome(db.Model):
     __tablename__ = 'genomes'
@@ -95,13 +109,6 @@ class Job(db.Model):
     finished_on = db.Column(db.DateTime)
     is_deleted = db.Column(db.Boolean, nullable=False, default=False)
     type = db.Column(db.String(200))
-
-class Permission(db.Model):
-    __tablename__ = 'permissions'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    permission = db.Column(db.String(200), nullable=False)
-    value = db.Column(db.String(200), nullable=False)
 
 class SharedObject(db.Model):
     __tablename__ = 'shared_objects'
