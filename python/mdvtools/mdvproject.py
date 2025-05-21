@@ -705,6 +705,7 @@ class MDVProject:
         """
         if isinstance(data, str):
             data = pandas.read_csv(data, sep=separator)
+        assert(isinstance(data, pandas.DataFrame))
         ds = self.get_datasource_metadata(datasource)
         index_col = data.columns[0]
         data = data.set_index(index_col)

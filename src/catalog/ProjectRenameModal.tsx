@@ -20,6 +20,29 @@ export interface ProjectRenameModalProps {
     onClose: () => void;
 }
 
+export type DialogCloseIconButtonProps = {
+    onClose: () => void;
+    disabled?: boolean;
+};
+
+export const DialogCloseIconButton = ({onClose, disabled}: DialogCloseIconButtonProps) => {
+    return (
+        <IconButton
+            aria-label="close"
+            onClick={onClose}
+            sx={{
+                position: "absolute",
+                right: 8,
+                top: 8,
+                color: (theme) => theme.palette.grey[500],
+            }}
+            disabled={disabled}
+        >
+            <CloseIcon />
+        </IconButton>
+    )
+}
+
 const ProjectRenameModal: React.FC<ProjectRenameModalProps> = ({
     id,
     name,
@@ -39,18 +62,7 @@ const ProjectRenameModal: React.FC<ProjectRenameModalProps> = ({
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>
                 Rename Project
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{
-                        position: "absolute",
-                        right: 8,
-                        top: 8,
-                        color: (theme) => theme.palette.grey[500],
-                    }}
-                >
-                    <CloseIcon />
-                </IconButton>
+                <DialogCloseIconButton onClose={onClose} />
             </DialogTitle>
             <DialogContent dividers>
                 <Box sx={{ mb: 2 }}>

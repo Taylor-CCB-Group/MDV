@@ -1,4 +1,4 @@
-import { useProject } from "@/modules/ProjectContext";
+import useBuildInfo from "@/catalog/hooks/useBuildInfo";
 import {
     Check,
     ContentCopy,
@@ -28,11 +28,11 @@ import JsonView from "react18-json-view";
 
 /** Any extra information we may want to use
  *
- * @remarks Only an object is expected, large objects like data store will break the ErrorDisplay component
+ * @remarks Only an object is expected, large objects like data store will break the DebugErrorComponent component
  */
-//! Don't send large objects like DataStore which will break the ErrorDisplay component, also look for an alternative way to handle this issue
+//! Don't send large objects like DataStore which will break the DebugErrorComponent component, also look for an alternative way to handle this issue
 export type ErrorMetadata = object;
-export interface ErrorDisplayProps {
+export interface DebugErrorComponentProps {
     error: {
         message: string;
         traceback?: string;
@@ -42,14 +42,15 @@ export interface ErrorDisplayProps {
     extraMetadata?: ErrorMetadata;
 }
 
-const ErrorDisplay = ({
+const DebugErrorComponent = ({
     error,
     title = "Error Occurred",
     extraMetadata,
-}: ErrorDisplayProps) => {
-    const [expanded, setExpanded] = useState(true);
+}: DebugErrorComponentProps) => {
+    const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const [userComments, setUserComments] = useState<string>();
+    const { buildInfo } = useBuildInfo();
     const [isLoading, setIsLoading] = useState(false);
     const [emailSent, setEmailSent] = useState(false);
     const [emailNotSent, setEmailNotSent] = useState(false);
@@ -66,7 +67,6 @@ const ErrorDisplay = ({
                 ...(error?.stack != null && { stack: error?.stack }),
             });
     }, [extraMetadata, error]);
-    // const { buildInfo } = useProject();
 
     // todo: Uncomment later
     //todo: Add the logic to send the error details to the email address and display the corresponding message to user
@@ -112,11 +112,7 @@ const ErrorDisplay = ({
     return (
         <div
             style={{
-                // maxWidth: 800,
-                // minWidth: 500,
                 margin: "20px auto",
-                // width: "90%",
-                width: "45vw",
                 maxWidth: "1000px",
                 minHeight: "45vh",
                 display: "flex",
@@ -157,7 +153,7 @@ const ErrorDisplay = ({
                             justifyContent: "center",
                         }}
                     >
-                        <Typography>
+                        <Typography sx={{color: "text.primary"}}>
                             Thank you for your feedback, we will do our best to
                             fix this issue as soon as possible.
                         </Typography>
@@ -222,8 +218,8 @@ const ErrorDisplay = ({
                             </AlertTitle>
 
                             <div style={{ marginTop: "12px" }}>
-                                <p
-                                    style={{
+                                <Typography
+                                    sx={{
                                         margin: "0 0 12px 0",
                                         lineHeight: "1.6",
                                         padding: "4px 8px",
@@ -231,9 +227,10 @@ const ErrorDisplay = ({
                                         whiteSpace: "pre-wrap",
                                         wordBreak: "break-word",
                                     }}
+                                    variant="subtitle1"
                                 >
                                     {error.message}
-                                </p>
+                                </Typography>
 
                                 {metaData && (
                                     <div>
@@ -272,6 +269,10 @@ const ErrorDisplay = ({
                                         <Collapse in={expanded}>
                                             <JsonView
                                                 editable
+                                                style={{
+                                                    whiteSpace: "pre-wrap",
+                                                    wordBreak: "break-word",
+                                                }}
                                                 src={{
                                                     ...metaData, 
                                                     // buildInfo: buildInfo
@@ -299,9 +300,10 @@ const ErrorDisplay = ({
                         <Container
                             sx={{
                                 pt: 2,
+                                color: "text.primary",
                             }}
                         >
-                            <Typography variant="h6" sx={{ mb: 2 }}>
+                            <Typography variant="h6" sx={{ mb: 2, color: "text.primary" }}>
                                 We are sorry for the inconvenience.
                             </Typography>
                             <Typography sx={{ mb: 2 }}>
@@ -365,4 +367,4 @@ const ErrorDisplay = ({
     );
 };
 
-export default ErrorDisplay;
+export default DebugErrorComponent;

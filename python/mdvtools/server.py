@@ -25,8 +25,8 @@ from mdvtools.project_router import (
 )
 import os
 import pandas as pd
-from typing import Optional, Callable, Any
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Optional
 import threading
 import scanpy as sc
 from mdvtools.conversions import convert_scanpy_to_mdv

@@ -14,7 +14,7 @@ import { fetchJsonConfig } from '@/dataloaders/DataLoaderUtil';
 import { useProject } from '@/modules/ProjectContext';
 import type { DataSource } from '../charts';
 import _ from 'lodash';
-import ErrorDisplay from './ErrorDisplay';
+import ErrorDisplay from './DebugErrorComponent';
 
 
 /**

@@ -1,10 +1,15 @@
-import os
-from flask import Flask, Response, request, jsonify, session, redirect, url_for
+import logging
+from flask import Flask, jsonify, session
+from flask.typing import ResponseReturnValue as Response
 from typing import Dict, Any, Callable, Tuple
 import re
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 import functools
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 """
 This should work as a drop-in replacement for `Blueprint` in the context
@@ -88,7 +93,6 @@ class ProjectBlueprint_v2:
     TIMESTAMP_UPDATE_INTERVAL = timedelta(hours=1)
 
     # Normalize ENABLE_AUTH to a boolean
-    AUTH_ENABLED = os.getenv("ENABLE_AUTH", "true").strip().lower() in {"1", "yes", "true"}
 
     @staticmethod
     def register_app(app: Flask) -> None:
@@ -104,8 +108,8 @@ class ProjectBlueprint_v2:
             It will look up the project_id in ProjectBlueprint_v2.blueprints and call the method with the given subpath.
             The ProjectBlueprint_v2 instance is responsible for routing the request to the correct method etc.
             """
-            if ProjectBlueprint_v2.AUTH_ENABLED and not ProjectBlueprint_v2.is_authenticated():
-                return redirect(url_for('login_dev'))
+            #if ProjectBlueprint_v2.AUTH_ENABLED and not ProjectBlueprint_v2.is_authenticated():
+            #    return redirect(url_for('login_dev'))
             
             if project_id in ProjectBlueprint_v2.blueprints:
                 try:
@@ -117,11 +121,6 @@ class ProjectBlueprint_v2:
                     return {"status": "error", "message": str(e)}
             return {"status": "error", "message": "invalid project_id or method"}, 500
     
-    @staticmethod
-    def is_authenticated() -> bool:
-        """Checks if the user is authenticated."""
-        return 'token' in session
-
     def __init__(self, name: str, _ignored: str, url_prefix: str) -> None:
         self.name = name
         self.url_prefix = url_prefix  # i.e. /project/<project_id>/
@@ -163,47 +162,82 @@ class ProjectBlueprint_v2:
 
         # find the item in self.routes that matches the subpath
         from mdvtools.dbutils.dbservice import ProjectService
-        # print("***********************************")
-        # print(subpath, project_id)
+        from mdvtools.dbutils.mdv_server_app import ENABLE_AUTH
+        from mdvtools.auth.authutils import user_project_cache
+        
+        logger.info(f"Inside dispatch request for project_id: {project_id} and subpath: {subpath}")
         subpath = f"/{urlparse(subpath).path}"
         for rule, (method, options) in self.routes.items():
             match = rule.match(subpath)
             if match:
-                
+                logger.info(f"options: '{options}")
                 # Update the accessed timestamp only if the last update was more than TIMESTAMP_UPDATE_INTERVAL ago
                 project = ProjectService.get_project_by_id(project_id)
                 if project and (not project.accessed_timestamp or 
                     datetime.now() - project.accessed_timestamp > self.TIMESTAMP_UPDATE_INTERVAL):
-                    print("****time interval greater than an hour ")
+                    logger.info("****time interval greater than an hour ")
                     try:
                         ProjectService.set_project_accessed_timestamp(project_id)
-                        print(f"In dispatch_request: Updated accessed timestamp for project ID {project_id}")
+                        logger.info(f"In dispatch_request: Updated accessed timestamp for project ID {project_id}")
                     except Exception as e:
-                        print(f"dispatch_request: Error updating accessed timestamp: {e}")
-                        return jsonify({"status": "error", "message": "Failed to update project accessed timestamp"}), 500
+                        logger.exception(f"dispatch_request: Error updating accessed timestamp: {e}")
+                        return jsonify({"error": "Failed to update project accessed timestamp"}), 500
 
+                
+                logger.info(f"Enable_auth: '{ENABLE_AUTH}'")
+                project_permissions = None
+                # Check if authentication is enabled
+                if ENABLE_AUTH:
+                    logger.info("Auth Enabled")
+
+                    user = session.get('user')
+                    user_id = user["id"] if user else None
+                    if not user_id:
+                        return jsonify({"error": "Unable to retrieve user ID"}), 401
+                    logger.info(f"Authenticated user: {user_id}") 
+                    
+                    
+                    # Retrieve user permissions from the cache (without using update_cache)
+                    user_projects = None
+                    if user_id:
+                        # Directly fetch the user's project permissions from cache
+                        user_projects = user_project_cache.get(user_id)  # Fetch from cache
+                    logger.info(f"User Projects from Cache: '{user_projects}'")
+                    
+                    if user_projects:
+                        # Step 4: Validate if the user has permissions for the requested project
+                        project_permissions = user_projects.get(int(project_id))  # Use string keys for consistency
+                        
+                        
+                        
                 # first determine whether this is allowed
                 # - rather than iterating over (rule, method), we might have
                 # (rule, (method, permissionsFlags))
                 # we can check the request.token (or whatever it is) here...
-                # print("options",options)
                 # Check for access level only if specified in options
                 if options and 'access_level' in options:
-                    # print("match", match)
+                    logger.info(f"match '{match}'")
                     #project_id = match.group(0).split('/')[2]  # Extract project_id from matched route
                     project = ProjectService.get_project_by_id(project_id)  # Fetch the project
                     
                     if project is None:
-                        print("In dispatch_request: Error - project doesn't exist")
-                        return jsonify({"status": "error", "message": f"Project with ID {project_id} not found"}), 404
+                        logger.error("In dispatch_request: Error - project doesn't exist")
+                        return jsonify({"error": f"Project with ID {project_id} not found"}), 404
 
                     required_access_level = options['access_level']  # Get required access level
-                    print("required_access_level", required_access_level)
+                    logger.info(f"required_access_level: '{required_access_level}")
                     if required_access_level == 'editable':
-                        print("required_access_level is editable, fetched project is ", project)
+                        logger.info(f"required_access_level is editable, fetched project is '{project}'")
+                        
+                        if ENABLE_AUTH:
+                            if project_permissions:
+                                if not (project_permissions.get("is_owner", False) or project_permissions.get("can_write", False)):
+                                    return jsonify({"error": "User does not have the required permissions"}), 403
+
+             
                         if project.access_level != 'editable':
-                            return jsonify({"status": "error", "message": "This project is read-only and cannot be modified."}), 403
-                        print(f"updating timestamp for project {project_id} '{subpath}'")
+                            return jsonify({"error": "This project is read-only and cannot be modified."}), 403
+                        logger.info(f"updating timestamp for project {project_id} '{subpath}'")
                         # calling this here means that any edits done via any edit route will update the timestamp...
                         # this could almost be the *only* place where we call this method
                         # - although other methods executed by scripts etc rather than web interface will not go through here
@@ -228,7 +262,7 @@ class SingleProjectShim:
             def wrapped_func(*args, **kwargs):
                 # Process access_level or other logic here if needed
                 if access_level:
-                    print(f"Access level required: {access_level}")
+                    logger.info(f"Access level required: {access_level}")
                 # Call the original function
                 return func(*args, **kwargs)
 

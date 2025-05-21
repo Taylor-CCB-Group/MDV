@@ -1,5 +1,5 @@
 test:
-	poetry run pytest
+	poetry run pytest mdvtools/
 
 type:
 	poetry run pyright

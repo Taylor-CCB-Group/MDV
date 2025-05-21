@@ -1,3 +1,4 @@
+/*! If making any change to the css variables, sync the changes with catalog/catalog_index.css (temporary fix) */
 @media (prefers-color-scheme: dark) {
     :root {
         --title_bar_color: #222;

@@ -8,14 +8,15 @@ import ChartManager from "../charts/ChartManager.js";
 import {
     fetchJsonConfig,
     getDataLoader,
-    getPostData,
     setProjectRoot,
 } from "../dataloaders/DataLoaderUtil";
 import { changeURLParam } from "./desktop_index";
 import BaseChart from "../charts/BaseChart";
-import DebugJsonReactWrapper from "@/react/components/DebugJsonDialogReactWrapper";
-import type { DataColumn, DataSource } from "@/charts/charts";
-import { getBuildInfo, getProjectName } from "./ProjectContext";
+import type { DataSource } from "@/charts/charts";
+import { getProjectName } from "./ProjectContext";
+import { createMdvPortal } from "@/react/react_utils";
+import ProjectStateHandlerWrapper from "@/react/ProjectStateHandler";
+import type { Root } from "react-dom/client";
 
 // see also basic_index.js for some global mdv stuff... only interested in chartManager for now.
 declare global {
@@ -72,6 +73,9 @@ const root = getRoot(dir);
 // as of this writing, they work with a `?static` parameter, but that's not a good solution.
 const staticFolder = urlParams.get("static") !== null; //!dir.startsWith("/project") && !(window.location.port === "5050") && !dir.endsWith("5050");
 const project_id = dir.split("/").pop();
+// State handler container and root
+let stateHandlerContainer: HTMLElement | null = null;
+let stateHandlerRoot: Root | null = null;
 
 // getting the project name by passing project id
 getProjectName(Number(project_id)).then((project_name) => {
@@ -90,10 +94,13 @@ async function loadData() {
     const datasources = (await fetchJsonConfig(
         `${root}/datasources.json`,
         root,
+        true,
     )) as DataSource[];
-    const config = await fetchJsonConfig(`${root}/state.json`, root);
+    const config = await fetchJsonConfig(`${root}/state.json`, root, true);
     config.popouturl = undefined;
-    const views = await fetchJsonConfig(`${root}/views.json`, root);
+    // todo: check if this is correct
+    const permission = config?.permission === "edit" || config?.permission === "owner";
+    const views = await fetchJsonConfig(`${root}/views.json`, root, true);
     //is view in the URL
     const view = urlParams.get("view");
     if (config.all_views && view && config.all_views.indexOf(view) !== -1) {
@@ -103,17 +110,19 @@ async function loadData() {
     const dataLoader = getDataLoader(staticFolder, datasources, views, dir);
 
     const listener = async (type: string, cm: ChartManager, data: any) => {
-        if (type === "state_saved" && !staticFolder) {
-            const resp = await getPostData(`${root}/save_state`, data);
-            if (resp.success) {
-                cm.createInfoAlert("State saved", { duration: 2000 });
-                cm.setAllColumnsClean();
-            } else {
-                cm.createInfoAlert("State save failed", {
-                    duration: 3000,
-                    type: "danger",
-                });
+        if (type === "state_saved") {
+            // Unmount the existing root
+            if (stateHandlerRoot) {
+                stateHandlerRoot.unmount();
             }
+
+            // Create a new container if it's already not created
+            if (!stateHandlerContainer) {
+                stateHandlerContainer = document.createElement('div');
+                stateHandlerContainer.id = "mdv_state_handler";
+                document.body.appendChild(stateHandlerContainer);
+            }
+            stateHandlerRoot = createMdvPortal(ProjectStateHandlerWrapper({root, data, staticFolder, permission}), stateHandlerContainer);
         }
         if (type === "view_loaded") {
             changeURLParam("view", cm.viewManager.current_view);
@@ -127,33 +136,4 @@ async function loadData() {
         config,
         listener as any, //jsdoc 🙄
     );
-
-    // add a button for debugging datasources & views metadata
-    // this could be in ChartManager instead, this is convenient for now so we have `root` available.
-    // would be better if it appeared with other entry-points, and also having it here means HMR doesn't work.
-    const tiptext = "View datasource metadata";
-    const debugButton = cm.addMenuIcon(
-        "_main",
-        "fas fa-bug",
-        tiptext,
-        async () => {
-            const datasources = await fetchJsonConfig(
-                `${root}/datasources.json`,
-                root,
-            );
-            const views = await fetchJsonConfig(`${root}/views.json`, root);
-            const state = await fetchJsonConfig(`${root}/state.json`, root);
-        const chat = await fetchJsonConfig(`${root}/chat_log.json`, root);
-
-            const chartTypes = Object.entries(BaseChart.types).map(([k, v]) => {
-                const { class: omit, ...props } = v;
-                return [k, props];
-            });
-            const buildInfo = getBuildInfo();
-            new DebugJsonReactWrapper({ chartTypes, datasources, views, state, buildInfo });
-        },
-        true //
-    );
-    // debugButton.style.float = "right";
-    debugButton.setAttribute("data-microtip-position", "bottom-left");
 }

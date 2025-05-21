@@ -5,8 +5,9 @@ import {
     Info,
     LockPerson as LockPersonIcon,
     MoreVert,
+    Upload as UploadIcon,
     Settings,
-    Share,
+    Share as ShareIcon,
 } from "@mui/icons-material";
 import {
     Card,
@@ -19,6 +20,7 @@ import {
     Menu,
     MenuItem,
     Typography,
+    useTheme,
 } from "@mui/material";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -26,8 +28,8 @@ import ProjectDeleteModal from "./ProjectDeleteModal";
 import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import ProjectSettingsModal from "./ProjectSettingsModal";
+import type { Permissions, ProjectAccessType } from "./utils/projectUtils";
 import ProjectShareModal from "./ProjectShareModal";
-import type { ProjectAccessType } from "./utils/projectUtils";
 
 export interface ProjectCardProps {
     id: string;
@@ -39,6 +41,7 @@ export interface ProjectCardProps {
     collaborators: string[];
     numberOfStructures: string;
     numberOfImages: string;
+    permissions: Permissions;
     onDelete: (id: string) => Promise<void>;
     onRename: (id: string, newName: string) => Promise<void>;
     onChangeType: (
@@ -46,6 +49,7 @@ export interface ProjectCardProps {
         newType: ProjectAccessType,
     ) => Promise<void>;
     onAddCollaborator: (email: string) => void;
+    onExport: (id: string, name: string) => Promise<void>;
     thumbnail?: string;
 }
 
@@ -59,10 +63,12 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     collaborators,
     numberOfStructures,
     numberOfImages,
+    permissions,
     onDelete,
     onRename,
     onChangeType,
     onAddCollaborator,
+    onExport,
     thumbnail,
 }) => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -72,6 +78,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+    const theme = useTheme();
     
     // todo - review how we do stuff like this
     const base = import.meta.env.DEV
@@ -140,6 +147,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         variant="h6"
                         component="div"
                         noWrap
+                        color="text.primary"
                         sx={{ marginBottom: "4px" }}
                     >
                         {name}
@@ -162,8 +170,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     position: "absolute",
                     top: 8,
                     right: 8,
-                    bgcolor: "inherit",
-                    "&:hover": { bgcolor: "inherit" },
+                    bgcolor: "background.paper",
+                    "&:hover": { 
+                        bgcolor: "grey.500"
+                    },
                     zIndex: 1,
                 }}
             >
@@ -192,6 +202,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         setIsRenameModalOpen(true);
                         handleMenuClose();
                     }}
+                    disabled={!permissions.edit}
                 >
                     <ListItemIcon>
                         <DriveFileRenameOutline fontSize="small" />
@@ -200,12 +211,38 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 </MenuItem>
                 <MenuItem
                     onClick={() => {
+                        handleMenuClose();
+                        onExport(id, name)
+                    }}
+                    disabled={!permissions.edit}
+                >
+                    <ListItemIcon>
+                        <UploadIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Export Project (as *.zip)</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setIsShareModalOpen(true);
+                        handleMenuClose();
+                    }}
+                    disabled={!permissions.edit}
+                >
+                    <ListItemIcon>
+                        <ShareIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Share Project</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    onClick={() => {
                         setIsDeleteModalOpen(true);
                         handleMenuClose();
                     }}
+                    sx={{color: theme.palette.error.main}}
+                    disabled={!permissions.edit}
                 >
                     <ListItemIcon>
-                        <DeleteIcon fontSize="small" />
+                        <DeleteIcon color="error" fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Delete Project</ListItemText>
                 </MenuItem>
@@ -222,39 +259,42 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 numberOfStructures={numberOfStructures}
                 numberOfImages={numberOfImages}
             />
+            
+            {permissions.edit && (
+                <>
+                    <ProjectSettingsModal
+                        id={id}
+                        name={name}
+                        type={type}
+                        open={isSettingsModalOpen}
+                        onRename={onRename}
+                        onChangeType={onChangeType}
+                        onDelete={onDelete}
+                        onClose={() => setIsSettingsModalOpen(false)}
+                    />
 
-            <ProjectSettingsModal
-                id={id}
-                name={name}
-                type={type}
-                open={isSettingsModalOpen}
-                onRename={onRename}
-                onChangeType={onChangeType}
-                onDelete={onDelete}
-                onClose={() => setIsSettingsModalOpen(false)}
-            />
+                    <ProjectRenameModal
+                        id={id}
+                        name={name}
+                        open={isRenameModalOpen}
+                        onRename={onRename}
+                        onClose={() => setIsRenameModalOpen(false)}
+                    />
 
-            <ProjectShareModal
-                open={isShareModalOpen}
-                onClose={() => setIsShareModalOpen(false)}
-                onAddCollaborator={onAddCollaborator}
-                projectId={id}
-            />
+                    <ProjectShareModal
+                        open={isShareModalOpen}
+                        onClose={() => setIsShareModalOpen(false)}
+                        projectId={id}
+                    />
 
-            <ProjectRenameModal
-                id={id}
-                name={name}
-                open={isRenameModalOpen}
-                onRename={onRename}
-                onClose={() => setIsRenameModalOpen(false)}
-            />
-
-            <ProjectDeleteModal
-                id={id}
-                open={isDeleteModalOpen}
-                onDelete={onDelete}
-                onClose={() => setIsDeleteModalOpen(false)}
-            />
+                    <ProjectDeleteModal
+                        id={id}
+                        open={isDeleteModalOpen}
+                        onDelete={onDelete}
+                        onClose={() => setIsDeleteModalOpen(false)}
+                    />
+                </>
+            )}
         </Card>
     );
 };

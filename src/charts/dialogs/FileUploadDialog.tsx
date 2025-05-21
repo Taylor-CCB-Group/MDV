@@ -32,7 +32,7 @@ import {
 import { isArray } from "@/lib/utils";
 // import processH5File from "./utils/h5Processing";
 import H5MetadataPreview from "./H5MetadataPreview";
-import ErrorDisplay from "./ErrorDisplay";
+import DebugErrorComponent from "./DebugErrorComponent";
 import AnndataConflictDialog from "./AnndataConflictDialog";
 import ReusableDialog from "./ReusableDialog";
 
@@ -44,7 +44,7 @@ const DatasourceWorker = new Worker(
     },
 );
 
-const Container = ({ children }: PropsWithChildren) => {
+export const Container = ({ children }: PropsWithChildren) => {
     return (
         <div className="flex flex-col content-center items-center h-max dark:bg-black-800 dark:text-white">
             {children}
@@ -76,7 +76,7 @@ const SuccessText = ({ children }: PropsWithChildren) => (
     </p>
 );
 
-const DropzoneContainer = forwardRef(
+export const DropzoneContainer = forwardRef(
     ({ isDragOver, children, ...props }: any, ref) => (
         <div
             {...props}
@@ -90,7 +90,7 @@ const DropzoneContainer = forwardRef(
 
 //! warning: className isn't being merged etc, I think it just gets overriden.
 // not sure if there's a better type for `htmlFor`.
-const FileInputLabel = ({
+export const FileInputLabel = ({
     children,
     htmlFor,
     ...props
@@ -148,7 +148,7 @@ type ButtonProps = {
     size?: string;
     marginTop?: string;
 } & PropsWithChildren;
-const Button = ({
+export const Button = ({
     onClick,
     color = "blue",
     disabled = false,
@@ -214,7 +214,7 @@ const ErrorContainer = ({ children }: PropsWithChildren) => (
     </div>
 );
 
-const DynamicText = ({
+export const DynamicText = ({
     text,
     className = "",
 }: { text: string; className: string }) => (
@@ -1175,7 +1175,7 @@ const FileUploadDialogComponent: React.FC<FileUploadDialogComponentProps> =
                     </>
                 ) : state.error ? (
                     <>
-                        <ErrorDisplay error={state.error} />
+                        <DebugErrorComponent error={state.error} />
                         <div className="flex justify-center items-center gap-6">
                             <Button
                                 marginTop="mt-1"

@@ -1,3 +1,4 @@
+import useBuildInfo, {type BuildInfo} from "@/catalog/hooks/useBuildInfo";
 import type ChartManager from "@/charts/ChartManager";
 import axios from "axios";
 import {
@@ -7,21 +8,12 @@ import {
     useState,
 } from "react";
 
-export type BuildInfo = {
-    commitDate: string;
-    branchName: string;
-    commitHash: string;
-    lastCommitMessage: string;
-    buildDate: string;
-    dirty: boolean;
-}
-
 export type ProjectInfo = {
     root: string;
     staticFolder: boolean;
     chartManager: ChartManager;
     projectName: string;
-    // buildInfo: BuildInfo;
+    buildInfo: BuildInfo;
 };
 
 export type Project = {
@@ -29,28 +21,6 @@ export type Project = {
     lastModified: string;
     name: string;
 };
-
-/**
- * Returns information about the current build, particularly git revision.
- * 
- * Note, hardcoded for vite, this will need to be updated if we switch to a different bundler.
- */
-export function getBuildInfo(): BuildInfo {
-    const commitDate = import.meta.env.VITE_GIT_COMMIT_DATE || "";
-    const branchName = import.meta.env.VITE_GIT_BRANCH_NAME || "";
-    const commitHash = import.meta.env.VITE_GIT_COMMIT_HASH || "";
-    const lastCommitMessage = import.meta.env.VITE_GIT_LAST_COMMIT_MESSAGE || "";
-    const buildDate = import.meta.env.VITE_BUILD_DATE || "";
-    const dirty = import.meta.env.VITE_GIT_DIRTY === "dirty";
-    return {
-        commitDate,
-        branchName,
-        commitHash,
-        lastCommitMessage,
-        buildDate,
-        dirty,
-    };
-}
 
 /** 
  * Get project information from the URL and URL parameters.
@@ -73,12 +43,13 @@ export function getProjectInfo(): ProjectInfo {
     // this is really projectID in the current implementation - would be good to have name as well (and be able to change it)
     const projectName = dir.split("/").pop() || ""; //todo - check logic for default project name
     const { chartManager } = window.mdv;
+    const { buildInfo } = useBuildInfo();
     return {
         root,
         staticFolder,
         projectName,
         chartManager,
-        // buildInfo: getBuildInfo(),
+        buildInfo,
     };   
 }
 

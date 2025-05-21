@@ -102,6 +102,8 @@ const proxy = [
     '^/.*\\.(json|b|gz)$',
     '/projects',
     '/create_project',
+    '/import_project',
+    '/export_project',
     '/delete_project',
     '/socket.io', //pending...
 // biome-ignore lint/performance/noAccumulatingSpread: don't care about performance in vite config

@@ -2,7 +2,11 @@ export type SortBy = "lastModified" | "name";
 export type SortOrder = "asc" | "desc";
 // todo - consider relating this to what is in state.json (used in ChartManager)
 export type ProjectAccessType = "Editable" | "Read-Only";
-
+export type Permissions = {
+    read: boolean;
+    edit: boolean;
+    owner: boolean;
+};
 export interface Project {
     id: string;
     name: string;
@@ -13,6 +17,7 @@ export interface Project {
     collaborators: string[];
     numberOfStructures: string;
     numberOfImages: string;
+    permissions: Permissions;
     thumbnail?: string;
 }
 

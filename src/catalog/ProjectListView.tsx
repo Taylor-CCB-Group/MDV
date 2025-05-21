@@ -5,6 +5,8 @@ import {
     Info,
     LockPerson,
     MoreVert,
+    Upload as UploadIcon,
+    Share as ShareIcon
 } from "@mui/icons-material";
 import {
     IconButton,
@@ -20,6 +22,7 @@ import {
     TableHead,
     TableRow,
     Typography,
+    useTheme,
 } from "@mui/material";
 import { useCallback, useState } from "react";
 import ProjectDeleteModal from "./ProjectDeleteModal";
@@ -27,6 +30,7 @@ import ProjectInfoModal from "./ProjectInfoModal";
 import ProjectRenameModal from "./ProjectRenameModal";
 import type { Project } from "./utils/projectUtils";
 import type { ProjectAccessType } from "./utils/projectUtils";
+import ProjectShareModal from "./ProjectShareModal";
 
 export type Pvoid = Promise<void>;
 export type ProjectListViewProps = {
@@ -34,9 +38,10 @@ export type ProjectListViewProps = {
     onDelete: (id: string) => Pvoid;
     onRename: (id: string, name: string) => Pvoid;
     onChangeType: (id: string, type: ProjectAccessType) => Pvoid;
+    onExport: (id: string, name: string) => Pvoid;
 };
 export type MouseEv = React.MouseEvent<HTMLElement>;
-const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: ProjectListViewProps) => {
+const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType }: ProjectListViewProps) => {
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>();
     const [selectedProject, setSelectedProject] = useState<Project>();
 
@@ -44,6 +49,8 @@ const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: Project
     const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const theme = useTheme();
 
     const handleMenuClick = useCallback((event: MouseEv, project: Project) => {
         event.stopPropagation();
@@ -124,15 +131,45 @@ const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: Project
                     </ListItemIcon>
                     <ListItemText>Project Info</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={() => handleModalOpen(setIsRenameModalOpen)}>
+                <MenuItem 
+                    onClick={() => handleModalOpen(setIsRenameModalOpen)}
+                    disabled={!selectedProject?.permissions.edit}
+                >
                     <ListItemIcon>
                         <DriveFileRenameOutline fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Rename Project</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={() => handleModalOpen(setIsDeleteModalOpen)}>
+                <MenuItem 
+                    onClick={() => {
+                        if (selectedProject) {
+                            handleMenuClose();
+                            onExport(selectedProject.id, selectedProject.name);
+                        }
+                    }}
+                    disabled={!selectedProject?.permissions.edit}
+                >
                     <ListItemIcon>
-                        <Delete fontSize="small" />
+                        <UploadIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Export Project (as *.zip)</ListItemText>
+                </MenuItem>
+                <MenuItem 
+                    onClick={() => handleModalOpen(setIsShareModalOpen)} 
+                    disabled={!selectedProject?.permissions.edit}
+                >
+                    <ListItemIcon>
+                        <ShareIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Share Project</ListItemText>
+                </MenuItem>
+                <MenuItem 
+                    onClick={() => handleModalOpen(setIsDeleteModalOpen)} 
+                    sx={{color: theme.palette.error.main}}
+                    disabled={!selectedProject?.permissions.edit}
+                >
+                    <ListItemIcon>
+                        <Delete color="error" fontSize="small" />
                     </ListItemIcon>
                     <ListItemText>Delete Project</ListItemText>
                 </MenuItem>
@@ -152,20 +189,30 @@ const ProjectListView = ({ projects, onDelete, onRename, onChangeType }: Project
                         numberOfImages={selectedProject.numberOfImages}
                     />
 
-                    <ProjectRenameModal
-                        id={selectedProject.id}
-                        name={selectedProject.name}
-                        open={isRenameModalOpen}
-                        onRename={onRename}
-                        onClose={() => setIsRenameModalOpen(false)}
-                    />
+                    {selectedProject.permissions.edit && (
+                        <>
+                            <ProjectRenameModal
+                                id={selectedProject.id}
+                                name={selectedProject.name}
+                                open={isRenameModalOpen}
+                                onRename={onRename}
+                                onClose={() => setIsRenameModalOpen(false)}
+                            />
 
-                    <ProjectDeleteModal
-                        id={selectedProject.id}
-                        open={isDeleteModalOpen}
-                        onDelete={onDelete}
-                        onClose={() => setIsDeleteModalOpen(false)}
-                    />
+                            <ProjectShareModal
+                                open={isShareModalOpen}
+                                onClose={() => setIsShareModalOpen(false)}
+                                projectId={selectedProject.id}
+                            />
+
+                            <ProjectDeleteModal
+                                id={selectedProject.id}
+                                open={isDeleteModalOpen}
+                                onDelete={onDelete}
+                                onClose={() => setIsDeleteModalOpen(false)}
+                            />
+                        </>
+                    )}
                 </>
             )}
         </>

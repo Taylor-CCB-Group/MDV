@@ -64,6 +64,20 @@ EXPOSE 5055
 # something changed causing npm to need this in order for `source` to work in npm scripts
 RUN npm config set script-shell "/bin/bash"
 
+# Create logs directory and set permissions before switching user
+RUN mkdir -p /app/logs && \
+    touch /app/logs/error.log /app/logs/access.log && \
+    chmod -R 755 /app/logs
+
+# Create non-root user and assign permissions
+RUN useradd -u 1010 -m mdvuser \
+    && chown -R mdvuser:mdvuser /app
+
+# Switch to non-root user
+USER mdvuser
+# apply the same config to the user so that `poetry run` works for tests etc.
+RUN poetry config virtualenvs.create false
+
 # Command to run Gunicorn
 # nb -t 0 means no timeout, this is a dev setting, chat requests are long running & should be made async
 # for SocketIO, we also need to run with --worker-class eventlet or gevent https://flask-socketio.readthedocs.io/en/latest/deployment.html
