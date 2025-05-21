@@ -7,6 +7,16 @@ import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import { g, isArray } from "@/lib/utils";
 import { getFieldName } from "@/links/link_utils";
 import { useRowsAsColumnsLinks } from "../chartLinkHooks";
+import TabHeader from "./TabHeader";
+
+type LocalProps<T extends CTypes, M extends boolean> = ColumnSelectionProps<
+    T,
+    M
+> & {
+    link: ReturnType<typeof useRowsAsColumnsLinks>[0];
+};
+
+
 /**
  * A hook for managing the state of manually chosen columns from a rows-as-columns link.
  * 
@@ -16,8 +26,8 @@ import { useRowsAsColumnsLinks } from "../chartLinkHooks";
  * 
  * In the end... just bundling everything about state management for this component into a hook, returning a spec.
  */
-function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) {
-    const { linkedDs, link } = useRowsAsColumnsLinks()[0];
+function useLinkSpec<T extends CTypes, M extends boolean>(props: LocalProps<T, M>) {
+    const { linkedDs, link } = props.link;
     const { name_column, name, subgroups } = link;
     const targetColumn = linkedDs.dataStore.columnIndex[name_column];
     if (!targetColumn) {
@@ -37,7 +47,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
     //   (and probably also log a warning)
 
     // Loop through the values and create the format in pipes '|', by making use of the index.
-    //todo - we need to let the user select link/subgroup...
+    //todo - we need to let the user select subgroup...
     //^^ do we allow a mix-match of links/subgroups? We could... but that doesn't mean we should.
     //(we should only do so if we have a clean way of presenting it to the user)
     const sg = Object.keys(subgroups)[0];
@@ -124,6 +134,9 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
             return v;
         }
     }, [link.valueToRowIndex, props.multiple, sg]);
+    //! there is a bug - when values from a different link are selected, the spec doesn't update
+    // we want to be able to set more different combinations of values - which will mean more changes to state management
+    // for now, the UI should better reflect what the user is allowed to select.
     const [initialValue] = useState(() => getSafeInternalValue(props.current_value));
 
     /// we don't want a new spec every time the value changes... we want to give it an observable value
@@ -131,7 +144,7 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
     // the real props.current_value???
     const [spec] = useState(() => makeAutoObservable(g<"multidropdown" | "dropdown">({
         type: isMultiType ? 'multidropdown' : 'dropdown',
-        label: `specific '${name}'`,
+        label: `specific '${name}'`, //don't really want to have this label here, would take a bigger change to remove
         // no ts error! praise be!
         values,
         current_value: initialValue,
@@ -167,12 +180,12 @@ function useLinkSpec<T extends CTypes, M extends boolean>(props: ColumnSelection
  * `subgroup|value (subgroup)|index`, where `subgroup` is the name of the user-selected subgroup, `value (subgroup)` is a human-readable
  * representation of the value, and `index` is the index of the value in the column.
  */
-const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
+const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(props: LocalProps<T, M>) => {
     // is all of the complexity being in the hook really making this component simpler?
     // at least it feels simple if you ignore everything in the hook...
     const spec = useLinkSpec(props);
     return (
-        <div className="flex flex-col" style={{ textAlign: 'left' }}>
+        <div className="flex flex-col p-1">
             {/* don't want to have this typecast here, slight nuisance. */}
             <DropdownAutocompleteComponent props={spec as GuiSpec<"dropdown"> | GuiSpec<"multidropdown">} />
         </div>
@@ -182,7 +195,7 @@ const LinkToColumnComponent = observer(<T extends CTypes, M extends boolean>(pro
 /**
  * Avoid dealing with internal state of the link until it's ready.
  */
-const LinkToColumnComponentInit = observer(<T extends CTypes, M extends boolean>(props: ColumnSelectionProps<T, M>) => {
+const LinkToColumnComponentInit = observer(<T extends CTypes, M extends boolean>(props: LocalProps<T, M>) => {
     const { link } = useRowsAsColumnsLinks()[0];
     //wanted to initialise this with ~init.linkPromise.resolved but apparently that's not a thing
     //so we have an initial re-render even if the link is already resolved.
@@ -198,4 +211,57 @@ const LinkToColumnComponentInit = observer(<T extends CTypes, M extends boolean>
     return <LinkToColumnComponent {...props} />;
 });
 
-export default LinkToColumnComponentInit;
+const LinkMulti = observer(
+    <T extends CTypes, M extends boolean>(
+        props: ColumnSelectionProps<T, M>,
+    ) => {
+        const links = useRowsAsColumnsLinks();
+        const [activeLinkName, setActiveLinkName] = useState(() => {
+            // Determine the initial active link based on `current_state` and `FieldName`
+            // this logic might be adjusted if we allow combined selections with multiple links
+            // also we might want to persist as user changes tab outside of this component
+            const v = props.current_value;
+            const currentFieldName = isArray(v) ? v[0] : v;
+            if (typeof currentFieldName === "string") {
+                const matchingLink = links.find((link) => {
+                    const sgName = Object.keys(link.link.subgroups)[0];
+                    return currentFieldName.startsWith(`${sgName}|`);
+                });
+                return matchingLink?.link.name || links[0].link.name;
+            }
+            return links[0].link.name;
+        });
+
+        const handleLinkChange = useCallback((name: string) => {
+            setActiveLinkName(name);
+        }, []);
+
+        // don't show tab ui if we only have one link
+        if (links.length === 1) {
+            return <LinkToColumnComponentInit {...props} link={links[0]} />;
+        }
+        return (
+            <div>
+                <TabHeader
+                    activeTab={activeLinkName}
+                    setActiveTab={handleLinkChange}
+                    tabs={links.map((link) => link.link.name)}
+                />
+
+                {/* Render the active link's UI */}
+                {links.map((link) =>
+                    link.link.name === activeLinkName ? (
+                        <LinkToColumnComponentInit
+                            key={link.link.name}
+                            {...props}
+                            link={link}
+                        />
+                    ) : null
+                )}
+            </div>
+        );
+    },
+);
+
+
+export default LinkMulti;

@@ -1,15 +1,13 @@
 import { useCloseOnIntersection, useConfig, useDimensionFilter, useParamColumnsExperimental } from "../hooks";
 import type { CategoricalDataType, NumberDataType, DataColumn, DataType } from "../../charts/charts";
-import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, FormControlLabel, IconButton, Paper, PaperProps, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Autocomplete, Box, Button, Checkbox, Chip, Divider, IconButton, Paper, type PaperProps, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from '@mui/material/Autocomplete';
-import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId, type HTMLAttributes } from "react";
+import { type MouseEvent, useCallback, useEffect, useState, useMemo, useRef, useId } from "react";
 
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
 import CachedIcon from '@mui/icons-material/Cached';
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import type { SelectionDialogConfig, CategoryFilter, MultiTextFilter, UniqueFilter, RangeFilter } from "./SelectionDialogReact";
 import { observer } from "mobx-react-lite";
@@ -595,20 +593,17 @@ const AddRowComponent = observer(() => {
             />
         </div>
     )
-})
+});
 
-const ForeignRows = observer(() => {
-    // const rlink = useRowsAsColumnsLinks();
-    // //!breaking rule of hooks here, but in a way that should be ok at runtime as of now
-    // //! (just testing "infinte loop with no link" fix)
-    // if (rlink.length === 0) return null; //todo: 30sec video clip
+type RLink = ReturnType<typeof useRowsAsColumnsLinks>[0];
+
+const LinkComponent = observer(({ rlink, linkIndex }: { rlink: RLink, linkIndex: number }) => {
     const [filter, setFilter] = useState("");
     const [max, setMax] = useState(10);
     const [debouncedFilter] = useDebounce(filter, 300);
-    const rlink = useRowsAsColumnsLinks();
-    const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter);
-    if (!rlink[0]) return null;
-    const { linkedDs, link } = rlink[0];
+    // if we re-instate this, perhaps temporarily, it could be a useful way to test showing multiple links and subgroups.
+    const fcols = useHighlightedForeignRowsAsColumns(max, debouncedFilter, linkIndex);
+    const { linkedDs, link } = rlink;
     return (
         <div className="p-3">
             <Typography variant="h6" sx={{ marginBottom: '0.5em' }}>Columns associated with selected '{linkedDs.name}':</Typography>
@@ -618,10 +613,19 @@ const ForeignRows = observer(() => {
                 value={max}
                 onChange={(e) => setMax(Number(e.target.value))}
             />
-
+    
             {fcols.map(col => <AbstractComponent key={col.field} column={col} />)}
         </div>
     );
+});
+
+const ForeignRows = observer(() => {
+    const rlink = useRowsAsColumnsLinks();
+    return (
+        <>
+        {rlink.map((link, i) => <LinkComponent key={link.link.name} rlink={link} linkIndex={i} />)}
+        </>
+    )
 });
 
 /**
@@ -680,6 +684,7 @@ const SelectionDialogComponent = () => {
                         )
             }>
                 <AddRowComponent />
+                <ForeignRows />
             </ErrorBoundary>}
         </div>
     );
