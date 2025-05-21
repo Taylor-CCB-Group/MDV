@@ -38,6 +38,7 @@ datatype_mappings = {
     "category": "text",
     "bool": "text",
     "int32": "double",
+    "boolean":"text"
 }
 
 numpy_dtypes = {
@@ -58,11 +59,13 @@ class MDVProject:
         id: Optional[str] = None,
         delete_existing=False,
         skip_column_clean=True,
-        backend_db = False
+        backend_db = False,
+        safe_file_save = True
     ):
         self.skip_column_clean = (
             skip_column_clean  # signficant speedup for large datasets
         )
+        self.safe_file_save = safe_file_save
         self.dir = dir
         self.id = id if id else os.path.basename(dir)
         if delete_existing and exists(dir):
@@ -101,7 +104,7 @@ class MDVProject:
 
     @datasources.setter
     def datasources(self, value):
-        save_json(self.datasourcesfile, value)
+        save_json(self.datasourcesfile, value, self.safe_file_save)
 
     @property
     def views(self):
@@ -109,7 +112,7 @@ class MDVProject:
 
     @views.setter
     def views(self, value):
-        save_json(self.viewsfile, value)
+        save_json(self.viewsfile, value, self.safe_file_save)
 
     @property
     def state(self):
@@ -117,7 +120,7 @@ class MDVProject:
 
     @state.setter
     def state(self, value):
-        save_json(self.statefile, value)
+        save_json(self.statefile, value ,self.safe_file_save)
 
     def set_editable(self, edit):
         c = self.state
@@ -1023,11 +1026,11 @@ class MDVProject:
             
             h5.close()  # Close HDF5 file
             columns = [x for x in columns if x["field"] not in dodgy_columns]
-            print(f" - non-dodgy columns: {columns}")
+            #print(f" - non-dodgy columns: {columns}")
             
             # Update datasource metadata
             ds = {"name": name, "columns": columns, "size": len(dataframe)}
-            print(f'--- setting datasource metadata: {ds}')
+            #print(f'--- setting datasource metadata: {ds}')
             self.set_datasource_metadata(ds)
             
             print("Updated datasource metadata")
@@ -1282,7 +1285,7 @@ class MDVProject:
         conf["static"] = True
         # throttle the dataloading so don't get network errors
         conf["dataloading"] = {"split": 5, "threads": 2}
-        save_json(join(outdir, "state.json"), conf)
+        save_json(join(outdir, "state.json"), conf,self.safe_file_save)
         # add service worker for cross origin headers
         if include_sab_headers:
             page = page.replace("<!--sw-->", '<script src="serviceworker.js"></script>')
@@ -1334,7 +1337,7 @@ class MDVProject:
                     datasource[param] = md[ds][param]
                 self.set_datasource_metadata(datasource)
 
-    def add_image_set(self, datasource, setname, column, folder, type="png"):
+    def add_image_set(self, datasource, setname, column, folder, type="png",large=False):
         """Adds a set of images to a datasource. The images should be in a folder, with the same name as the column
         Args:
             datasource (str): The name of the datasource.
@@ -1354,9 +1357,10 @@ class MDVProject:
         for im in images:
             copyfile(join(folder, im), join(imdir, im))
         # update the metadata
-        if not ds.get("images"):
-            ds["images"] = {}
-        ds["images"][setname] = {
+        imt = "large_images" if large else "images"
+        if not ds.get(imt):
+            ds[imt] = {}
+        ds[imt][setname] = {
             "key_column": column,
             "type": type,
             "base_url": f"./images/{fname}/",
@@ -1853,9 +1857,13 @@ def get_json(file):
     return json.loads(open(file).read())
 
 
-def save_json(file, data):
+def save_json(file, data, safe= True):
     try:
-        save_json_atomic(file, data)
+        if safe:
+            save_json_atomic(file, data)
+        else:
+            with open(file,"w") as f:
+                json.dump(data,f,indent=2,allow_nan=False)
     except Exception as e:
         print(
             f"Error saving json to '{file}': some data cleaning may be necessary... project likely to be in a bad state."
@@ -1876,9 +1884,12 @@ def save_json_atomic(path, data):
         temp_name = tmp.name
     # potential issues particularly in Docker where the files are on a different volume
     # safest option is to sync like this before and after, but may be overkill
+    # 'sync' will fail silently on windows
     os.system("sync")
     os.replace(temp_name, path)  # Atomic move on most OSes
     os.system("sync")
+    #file is saved with restictive permissions (this may be intentional)
+    #
     # this method is lower overhead than os.system("sync") 
     # but stress testing indicates it is less robust
     # dir_fd = os.open(dir_name, os.O_DIRECTORY)
@@ -1921,13 +1932,17 @@ def add_column_to_group(
         or col["datatype"] == "unique"
         or col["datatype"] == "text16"
     ):
-        
+        #in pandas missing values are represented by NaN
+        #which cause problems when co-ercing into text, therefore replace with ND
         if data.dtype == "category": # type: ignore not sure what's best here
             data = data.cat.add_categories("ND")
             data = data.fillna("ND")
+        #no boolean datatype at the moment have to co-erce to text
+        elif data.dtype== "boolean":
+            data= data.apply(lambda x: "True" if x is True else "False" if x is False else "ND")
         else:
             # may need to double-check this...
-            data = data.fillna("NaN")
+            data = data.fillna("ND")
         values = data.value_counts()
 
         if len(values) < 65537 and col["datatype"] != "unique":
@@ -1995,7 +2010,8 @@ def add_column_to_group(
         clean = (
             data
             if skip_column_clean
-            else data.apply(pandas.to_numeric, errors="coerce")
+            #this is pretty fast now
+            else pandas.to_numeric(data,errors="coerce")
         )  # this is slooooow?
         # faster but non=numeric values have to be certain values
         # clean=data.replace("?",numpy.NaN).replace("ND",numpy.NaN).replace("None",numpy.NaN)

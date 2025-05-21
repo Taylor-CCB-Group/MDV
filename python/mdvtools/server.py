@@ -42,6 +42,8 @@ def add_safe_headers(resp):
     # headers required if serving endpoints for another server e,g dev server
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    #required for vite dev
+    resp.headers["Cross-Origin-Resource-Policy"] ="cross-origin"
     return resp
 
 
@@ -218,9 +220,12 @@ def create_app(
     @project_bp.route("/images/<path:path>")
     def images(path):
         try:
-            return _send_file(project.get_image(path))
+            response= make_response(_send_file(project.get_image(path)))
         except Exception:
-            return _send_file(safe_join(project.imagefolder, path))
+            response =  make_response(_send_file(safe_join(project.imagefolder, path)))
+        #make sure images are cached
+        response.headers['Cache-Control'] = 'public, max-age=31536000'  # Cache for 1 year
+        return response
 
     # All the project's metadata
     @project_bp.route("/get_configs", methods=["GET", "POST"])
