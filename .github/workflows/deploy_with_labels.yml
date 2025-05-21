@@ -41,7 +41,7 @@ jobs:
 
       - name: Set up Docker Buildx
         if: env.LATEST_COMMIT != env.LAST_SUCCESSFUL_COMMIT
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
         with:
           install: true
 
