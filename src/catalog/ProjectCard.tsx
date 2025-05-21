@@ -197,55 +197,55 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                     </ListItemIcon>
                     <ListItemText>Project Info</ListItemText>
                 </MenuItem>
-                {permissions.edit && (
-                    <>
-                        <MenuItem
-                            onClick={() => {
-                                setIsRenameModalOpen(true);
-                                handleMenuClose();
-                            }}
-                        >
-                            <ListItemIcon>
-                                <DriveFileRenameOutline fontSize="small" />
-                            </ListItemIcon>
-                            <ListItemText>Rename Project</ListItemText>
-                        </MenuItem>
-                        <MenuItem
-                            onClick={() => {
-                                handleMenuClose();
-                                onExport(id, name)
-                            }}
-                        >
-                            <ListItemIcon>
-                                <UploadIcon fontSize="small" />
-                            </ListItemIcon>
-                            <ListItemText>Export Project (as *.zip)</ListItemText>
-                        </MenuItem>
-                        <MenuItem
-                            onClick={() => {
-                                setIsShareModalOpen(true);
-                                handleMenuClose();
-                            }}
-                        >
-                            <ListItemIcon>
-                                <ShareIcon fontSize="small" />
-                            </ListItemIcon>
-                            <ListItemText>Share Project</ListItemText>
-                        </MenuItem>
-                        <MenuItem
-                            onClick={() => {
-                                setIsDeleteModalOpen(true);
-                                handleMenuClose();
-                            }}
-                            sx={{color: theme.palette.error.main}}
-                        >
-                            <ListItemIcon>
-                                <DeleteIcon color="error" fontSize="small" />
-                            </ListItemIcon>
-                            <ListItemText>Delete Project</ListItemText>
-                        </MenuItem>
-                    </>
-                )}
+                <MenuItem
+                    onClick={() => {
+                        setIsRenameModalOpen(true);
+                        handleMenuClose();
+                    }}
+                    disabled={!permissions.edit}
+                >
+                    <ListItemIcon>
+                        <DriveFileRenameOutline fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Rename Project</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        handleMenuClose();
+                        onExport(id, name)
+                    }}
+                    disabled={!permissions.edit}
+                >
+                    <ListItemIcon>
+                        <UploadIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Export Project (as *.zip)</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setIsShareModalOpen(true);
+                        handleMenuClose();
+                    }}
+                    disabled={!permissions.edit}
+                >
+                    <ListItemIcon>
+                        <ShareIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Share Project</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    onClick={() => {
+                        setIsDeleteModalOpen(true);
+                        handleMenuClose();
+                    }}
+                    sx={{color: theme.palette.error.main}}
+                    disabled={!permissions.edit}
+                >
+                    <ListItemIcon>
+                        <DeleteIcon color="error" fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Delete Project</ListItemText>
+                </MenuItem>
             </Menu>
 
             <ProjectInfoModal

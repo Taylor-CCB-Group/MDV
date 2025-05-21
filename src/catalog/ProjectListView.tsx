@@ -131,42 +131,48 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                     </ListItemIcon>
                     <ListItemText>Project Info</ListItemText>
                 </MenuItem>
-                {selectedProject?.permissions.edit && (
-                        <>
-                            <MenuItem onClick={() => handleModalOpen(setIsRenameModalOpen)}>
-                                <ListItemIcon>
-                                    <DriveFileRenameOutline fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText>Rename Project</ListItemText>
-                            </MenuItem>
-                            <MenuItem onClick={() => {
-                                if (selectedProject) {
-                                    handleMenuClose();
-                                    onExport(selectedProject.id, selectedProject.name);
-                                }
-                            }}>
-                                <ListItemIcon>
-                                    <UploadIcon fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText>Export Project (as *.zip)</ListItemText>
-                            </MenuItem>
-                            <MenuItem onClick={() => handleModalOpen(setIsShareModalOpen)}>
-                                <ListItemIcon>
-                                    <ShareIcon fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText>Share Project</ListItemText>
-                            </MenuItem>
-                            <MenuItem 
-                                onClick={() => handleModalOpen(setIsDeleteModalOpen)} 
-                                sx={{color: theme.palette.error.main}}
-                            >
-                                <ListItemIcon>
-                                    <Delete color="error" fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText>Delete Project</ListItemText>
-                            </MenuItem>
-                        </>
-                )}
+                <MenuItem 
+                    onClick={() => handleModalOpen(setIsRenameModalOpen)}
+                    disabled={!selectedProject?.permissions.edit}
+                >
+                    <ListItemIcon>
+                        <DriveFileRenameOutline fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Rename Project</ListItemText>
+                </MenuItem>
+                <MenuItem 
+                    onClick={() => {
+                        if (selectedProject) {
+                            handleMenuClose();
+                            onExport(selectedProject.id, selectedProject.name);
+                        }
+                    }}
+                    disabled={!selectedProject?.permissions.edit}
+                >
+                    <ListItemIcon>
+                        <UploadIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Export Project (as *.zip)</ListItemText>
+                </MenuItem>
+                <MenuItem 
+                    onClick={() => handleModalOpen(setIsShareModalOpen)} 
+                    disabled={!selectedProject?.permissions.edit}
+                >
+                    <ListItemIcon>
+                        <ShareIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Share Project</ListItemText>
+                </MenuItem>
+                <MenuItem 
+                    onClick={() => handleModalOpen(setIsDeleteModalOpen)} 
+                    sx={{color: theme.palette.error.main}}
+                    disabled={!selectedProject?.permissions.edit}
+                >
+                    <ListItemIcon>
+                        <Delete color="error" fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Delete Project</ListItemText>
+                </MenuItem>
             </Menu>
 
             {selectedProject && (
