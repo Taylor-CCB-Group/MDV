@@ -2,7 +2,7 @@ import time
 import requests
 from authlib.integrations.flask_client import OAuth
 from flask import jsonify, session, redirect
-from typing import Optional, Tuple, Union
+from typing import Optional
 # from flask import Response
 from flask.typing import ResponseReturnValue
 from mdvtools.auth.auth_provider import AuthProvider
