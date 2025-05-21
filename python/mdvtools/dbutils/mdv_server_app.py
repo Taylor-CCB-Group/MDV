@@ -420,6 +420,8 @@ def serve_projects_from_filesystem(app, base_dir):
         logger.exception(f"In create_projects_from_filesystem: Error retrieving projects from database: {e}")
         raise
 
+
+# Create the app object at the module level
 app = create_flask_app()
 
 with app.app_context():

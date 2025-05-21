@@ -199,17 +199,17 @@ const ProjectListView = ({ projects, onDelete, onRename, onExport, onChangeType 
                                 onClose={() => setIsRenameModalOpen(false)}
                             />
 
+                            <ProjectShareModal
+                                open={isShareModalOpen}
+                                onClose={() => setIsShareModalOpen(false)}
+                                projectId={selectedProject.id}
+                            />
+
                             <ProjectDeleteModal
                                 id={selectedProject.id}
                                 open={isDeleteModalOpen}
                                 onDelete={onDelete}
                                 onClose={() => setIsDeleteModalOpen(false)}
-                            />
-
-                            <ProjectShareModal
-                                open={isShareModalOpen}
-                                onClose={() => setIsShareModalOpen(false)}
-                                projectId={selectedProject.id}
                             />
                         </>
                     )}

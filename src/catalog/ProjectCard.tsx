@@ -273,18 +273,18 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                         onClose={() => setIsSettingsModalOpen(false)}
                     />
 
-                    <ProjectShareModal
-                        open={isShareModalOpen}
-                        onClose={() => setIsShareModalOpen(false)}
-                        projectId={id}
-                    />
-
                     <ProjectRenameModal
                         id={id}
                         name={name}
                         open={isRenameModalOpen}
                         onRename={onRename}
                         onClose={() => setIsRenameModalOpen(false)}
+                    />
+
+                    <ProjectShareModal
+                        open={isShareModalOpen}
+                        onClose={() => setIsShareModalOpen(false)}
+                        projectId={id}
                     />
 
                     <ProjectDeleteModal
