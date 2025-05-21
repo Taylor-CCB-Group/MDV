@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 #Read environment flag for authentication
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "0").lower() in ["1", "true", "yes"]
 logger.info(f"Authentication enabled: {ENABLE_AUTH}")
-
+oauth = None
 if ENABLE_AUTH:
     
     from authlib.integrations.flask_client import OAuth
@@ -100,6 +100,7 @@ def create_flask_app(config_name=None):
     if ENABLE_AUTH:
         try:
             logger.info("Initializing OAuth for authentication")
+            assert(oauth is not None), "OAuth is not initialized"
             oauth.init_app(app)
 
             logger.info("Registering authentication before_request logic")
