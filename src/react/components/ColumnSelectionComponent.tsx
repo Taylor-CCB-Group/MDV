@@ -10,41 +10,13 @@ import { paramAcceptsNumeric } from "@/lib/columnTypeHelpers";
 import ColumnDropdownComponent from "./ColumnDropdownComponent.js";
 import LinkToColumnComponent from "./LinkToColumnComponent.js";
 import ActiveLinkComponent from "./ActiveLinkComponent.js";
-import clsx from "clsx";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorComponentReactWrapper from "./ErrorComponentReactWrapper.js";
 import { isArray } from "@/lib/utils.js";
-
+import TabHeader from "./TabHeader";
 
 type ColumnMode = "column" | "link" | "active link";
 
-type TabHeaderProps = {
-    activeTab: ColumnMode;
-    setActiveTab: (tab: ColumnMode) => void;
-    tabName: ColumnMode;
-    activeMode?: ColumnMode;
-}
-
-const TabHeader = ({ activeTab, setActiveTab, tabName, activeMode }: TabHeaderProps) => {
-    const theme = useTheme();
-    const isActiveMode = activeMode === tabName;
-    return (
-        <button
-            onClick={() => setActiveTab(tabName)}
-            type="button"
-            className={clsx("p-2 text-center border-b-2 transition-colors w-full", isActiveMode ? "font-bold" : "font-light")}
-            style={{
-                borderColor: activeTab === tabName ? theme.palette.primary.main : theme.palette.divider,
-                color:
-                    activeTab === tabName
-                        ? theme.palette.primary.main
-                        : theme.palette.text.primary,
-            }}
-        >
-            {tabName}
-        </button>
-    );
-}
 
 /**
  * Currently, the only type of 'link' that we are referring to is a `RowsAsCols` link.
@@ -108,11 +80,11 @@ const ColumnSelectionComponent = observer(<T extends CTypes, M extends boolean>(
         <>
             {iIsLinkCompatible ? (
                 <Paper className="mx-auto w-full" variant="outlined" sx={{ backgroundColor: "transparent" }}>
-                    <div className="w-full flex justify-around text-xs font-light">
-                        <TabHeader activeMode={activeMode} activeTab={activeTab} setActiveTab={setActiveTab} tabName="column" />
-                        <TabHeader activeMode={activeMode} activeTab={activeTab} setActiveTab={setActiveTab} tabName="link" />
-                        <TabHeader activeMode={activeMode} activeTab={activeTab} setActiveTab={setActiveTab} tabName="active link" />
-                    </div>
+                    <TabHeader
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        tabs={["column", "link", "active link"]}
+                    />
                     <ErrorBoundary FallbackComponent={({error}) => <ErrorComponentReactWrapper error={error} title={error.toString()} />}>
                         <div className="p-4">
                             {activeTab === "column" && (

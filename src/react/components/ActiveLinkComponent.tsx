@@ -6,6 +6,7 @@ import { isArray } from "@/lib/utils";
 import { RowsAsColsQuery } from "@/links/link_utils";
 import { Button, TextField } from "@mui/material";
 import { action } from "mobx";
+import TabHeader from "./TabHeader";
 
 type LocalProps<T extends CTypes, M extends boolean> = ColumnSelectionProps<
     T,
@@ -108,16 +109,50 @@ const ActiveLinkMultiComponent = observer(
         props: ColumnSelectionProps<T, M>,
     ) => {
         const links = useRowsAsColumnsLinks();
+        // Infer the initial active tab based on `current_state`
+        const [activeLinkName, setActiveLinkName] = useState(() => {
+            const v = props.current_value;
+            const currentFieldSpec = isArray(v) ? v[0] : v;
+            if (currentFieldSpec instanceof RowsAsColsQuery) {
+                return currentFieldSpec.link.name;
+            }
+            return links[0].link.name;
+        });
+
+        const handleLinkChange = useCallback((name: string) => {
+            setActiveLinkName(name);
+        }, []);
+
+        // Don't show tab UI if we only have one link
+        if (links.length === 1) {
+            return (
+                <ActiveLinkComponent
+                    {...props}
+                    link={links[0]}
+                />
+            );
+        }
+
         return (
-            <>
-                {links.map((link) => (
-                    <ActiveLinkComponent
-                        key={link.link.name}
-                        {...props}
-                        link={link}
-                    />
-                ))}
-            </>
+            <div>
+                {/* Tab-based interface for selecting the active link */}
+                <TabHeader
+                    activeTab={activeLinkName}
+                    setActiveTab={handleLinkChange}
+                    tabs={links.map((link) => link.link.name)}
+                />
+
+                {/* Render the active link's UI */}
+                {links.map((link) =>
+                    link.link.name === activeLinkName ? (
+                        <ActiveLinkComponent
+                            key={link.link.name}
+                            {...props}
+                            link={link}
+                        />
+                    ) : null
+                )}
+            </div>
         );
     },
 );

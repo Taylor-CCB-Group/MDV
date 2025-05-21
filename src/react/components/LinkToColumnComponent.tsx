@@ -7,6 +7,7 @@ import { DropdownAutocompleteComponent } from "./SettingsDialogComponent";
 import { g, isArray } from "@/lib/utils";
 import { getFieldName } from "@/links/link_utils";
 import { useRowsAsColumnsLinks } from "../chartLinkHooks";
+import TabHeader from "./TabHeader";
 
 type LocalProps<T extends CTypes, M extends boolean> = ColumnSelectionProps<
     T,
@@ -215,52 +216,41 @@ const LinkMulti = observer(
         props: ColumnSelectionProps<T, M>,
     ) => {
         const links = useRowsAsColumnsLinks();
-        const [activeLinkIndex, setActiveLinkIndex] = useState(() => {
+        const [activeLinkName, setActiveLinkName] = useState(() => {
             // Determine the initial active link based on `current_state` and `FieldName`
             // this logic might be adjusted if we allow combined selections with multiple links
             // also we might want to persist as user changes tab outside of this component
             const v = props.current_value;
             const currentFieldName = isArray(v) ? v[0] : v;
             if (typeof currentFieldName === "string") {
-                const matchingIndex = links.findIndex((link) => {
+                const matchingLink = links.find((link) => {
                     const sgName = Object.keys(link.link.subgroups)[0];
                     return currentFieldName.startsWith(`${sgName}|`);
                 });
-                return matchingIndex !== -1 ? matchingIndex : 0;
+                return matchingLink?.link.name || links[0].link.name;
             }
-            return 0;
+            return links[0].link.name;
         });
 
-        const handleLinkChange = useCallback((index: number) => {
-            setActiveLinkIndex(index);
+        const handleLinkChange = useCallback((name: string) => {
+            setActiveLinkName(name);
         }, []);
+
         // don't show tab ui if we only have one link
         if (links.length === 1) {
             return <LinkToColumnComponentInit {...props} link={links[0]} />;
         }
         return (
             <div>
-                {/* Render tabs or radio buttons for selecting the active link */}
-                <div className="flex space-x-2 mb-4">
-                    {links.map((link, index) => (
-                        <button
-                            key={link.link.name}
-                            type="button"
-                            className={`px-4 py-1 border-b-2 ${
-                                index === activeLinkIndex
-                                    ? "font-bold"
-                                    : "font-light"
-                            }`}
-                            onClick={() => handleLinkChange(index)}
-                        >
-                            {link.link.name}
-                        </button>
-                    ))}
-                </div>
+                <TabHeader
+                    activeTab={activeLinkName}
+                    setActiveTab={handleLinkChange}
+                    tabs={links.map((link) => link.link.name)}
+                />
 
                 {/* Render the active link's UI */}
-                {links.map((link, index) =>
-                    index === activeLinkIndex ? (
+                {links.map((link) =>
+                    link.link.name === activeLinkName ? (
                         <LinkToColumnComponentInit
                             key={link.link.name}
                             {...props}
